@@ -33,235 +33,6 @@ afterAll(() => {
 // ==========================================================================
 // AggregationsTest — targets aggregations_test.rb
 // ==========================================================================
-describe("AggregationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      customers: { name: "string", address_street: "string", address_city: "string" },
-      locations: { name: "string", lat: "float", lng: "float" },
-      articles: { title: "string", tag_name: "string" },
-    });
-  });
-  // Rails: test_find_multiple_value_object
-  it("find multiple value object", async () => {
-    class Address {
-      constructor(
-        public street: string,
-        public city: string,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("address_street", "string");
-        this.attribute("address_city", "string");
-      }
-    }
-    composedOf(Customer, "address", {
-      className: Address,
-      mapping: [
-        ["address_street", "street"],
-        ["address_city", "city"],
-      ],
-    });
-
-    const c = await Customer.create({
-      name: "Alice",
-      address_street: "123 Main",
-      address_city: "NYC",
-    });
-    const addr = (c as any).address;
-    expect(addr).toBeInstanceOf(Address);
-    expect(addr.street).toBe("123 Main");
-    expect(addr.city).toBe("NYC");
-  });
-
-  // Rails: test_change_single_value_object
-  it("change single value object", async () => {
-    class Address {
-      constructor(
-        public street: string,
-        public city: string,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("address_street", "string");
-        this.attribute("address_city", "string");
-      }
-    }
-    composedOf(Customer, "address", {
-      className: Address,
-      mapping: [
-        ["address_street", "street"],
-        ["address_city", "city"],
-      ],
-    });
-
-    const c = await Customer.create({ name: "Bob", address_street: "Old St", address_city: "LA" });
-    (c as any).address = new Address("New Ave", "SF");
-    expect(c.address_street).toBe("New Ave");
-    expect(c.address_city).toBe("SF");
-  });
-
-  // Rails: test_nil_assignment_results_in_nil
-  it("nil assignment results in nil", async () => {
-    class Address {
-      constructor(
-        public street: string,
-        public city: string,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("address_street", "string");
-        this.attribute("address_city", "string");
-      }
-    }
-    composedOf(Customer, "address", {
-      className: Address,
-      mapping: [
-        ["address_street", "street"],
-        ["address_city", "city"],
-      ],
-      allowNil: true,
-    });
-
-    const c = await Customer.create({
-      name: "Carol",
-      address_street: "123 Elm",
-      address_city: "PDX",
-    });
-    (c as any).address = null;
-    expect(c.address_street).toBeNull();
-    expect(c.address_city).toBeNull();
-    expect((c as any).address).toBeNull();
-  });
-
-  // Rails: test_allow_nil_address_set_to_nil
-  it("allow nil address set to nil", async () => {
-    class GeoPoint {
-      constructor(
-        public lat: number,
-        public lng: number,
-      ) {}
-    }
-    class Location extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("lat", "float");
-        this.attribute("lng", "float");
-      }
-    }
-    composedOf(Location, "gps", {
-      className: GeoPoint,
-      mapping: [
-        ["lat", "lat"],
-        ["lng", "lng"],
-      ],
-      allowNil: true,
-    });
-
-    const loc = await Location.create({ name: "HQ", lat: 37.7, lng: -122.4 });
-    (loc as any).gps = null;
-    expect(loc.lat).toBeNull();
-    expect(loc.lng).toBeNull();
-  });
-
-  // Rails: test_allow_nil_address_loaded_when_only_some_attributes_are_nil
-  it("allow nil address loaded when only some attributes are nil", async () => {
-    class Address {
-      constructor(
-        public street: string,
-        public city: string,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("address_street", "string");
-        this.attribute("address_city", "string");
-      }
-    }
-    composedOf(Customer, "address", {
-      className: Address,
-      mapping: [
-        ["address_street", "street"],
-        ["address_city", "city"],
-      ],
-    });
-
-    const c = new Customer({ name: "Dan", address_street: "123 Oak", address_city: null } as any);
-    const addr = (c as any).address;
-    expect(addr).toBeInstanceOf(Address);
-  });
-
-  // Rails: test_immutable_value_objects
-  it("immutable value objects", async () => {
-    class Tag {
-      constructor(public readonly name: string) {}
-    }
-    class Article extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("tag_name", "string");
-      }
-    }
-    composedOf(Article, "tag", {
-      className: Tag,
-      mapping: [["tag_name", "name"]],
-    });
-
-    const a = await Article.create({ title: "Test", tag_name: "ruby" });
-    const tag = (a as any).tag;
-    expect(tag).toBeInstanceOf(Tag);
-    expect(tag.name).toBe("ruby");
-  });
-
-  // Rails: test_reloaded_instance_refreshes_aggregations
-  it("reloaded instance refreshes aggregations", async () => {
-    class Address {
-      constructor(
-        public street: string,
-        public city: string,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("address_street", "string");
-        this.attribute("address_city", "string");
-      }
-    }
-    composedOf(Customer, "address", {
-      className: Address,
-      mapping: [
-        ["address_street", "street"],
-        ["address_city", "city"],
-      ],
-    });
-
-    const c = await Customer.create({
-      name: "Eve",
-      address_street: "1 First St",
-      address_city: "BOS",
-    });
-    const addr1 = (c as any).address;
-    expect(addr1.city).toBe("BOS");
-
-    // Bypass the composed-of setter / aggregation cache invalidation path,
-    // then reload to flush it — mirrors the Rails test's update_all + reload
-    // sequence used to clear @aggregation_cache.
-    await c.updateColumn("address_city", "CHI");
-    await c.reload();
-    const addr2 = (c as any).address;
-    expect(addr2.city).toBe("CHI");
-  });
-});
-
 // Fixture-backed AggregationsTest cases: mirror Rails' `fixtures :customers`
 // against the canonical Customer model + composed_of mappings, rather than the
 // ad-hoc inline Customer classes used elsewhere in this file.
@@ -276,6 +47,83 @@ describe("AggregationsTest", () => {
     expect(david.balance.amount).toBe(50);
     expect(david.balance).toBeInstanceOf(MoneyClass);
     expect(david.balance.exchangeTo("DKK").amount).toBe(300);
+  });
+
+  // Rails: test_find_multiple_value_object
+  it("find multiple value object", () => {
+    const david = customers("david") as CustomerModel & { address: Address };
+    expect(david.address.street).toBe(david.readAttribute("address_street"));
+    expect(
+      david.address.closeToQ(
+        new Address(
+          "Different Street",
+          david.readAttribute("address_city") as string,
+          david.readAttribute("address_country") as string,
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  // Rails: test_change_single_value_object
+  it("change single value object", async () => {
+    const david = customers("david") as CustomerModel & { balance: MoneyClass };
+    david.balance = new MoneyClass(100);
+    await david.save();
+    await david.reload();
+    expect(david.balance.amount).toBe(100);
+  });
+
+  // Rails: test_immutable_value_objects
+  it("immutable value objects", () => {
+    const david = customers("david") as CustomerModel & { balance: MoneyClass };
+    expect(() => {
+      (david.balance as { amount: number }).amount = 20;
+    }).toThrow();
+
+    david.balance = new MoneyClass(100);
+    expect(() => {
+      (david.balance as { amount: number }).amount = 20;
+    }).toThrow();
+  });
+
+  // Rails: test_reloaded_instance_refreshes_aggregations
+  it("reloaded instance refreshes aggregations", async () => {
+    const david = customers("david") as CustomerModel & { gpsLocation: GpsLocation };
+    expect(david.gpsLocation.latitude).toBe("35.544623640962634");
+    expect(david.gpsLocation.longitude).toBe("-105.9309951055148");
+
+    await CustomerModel.updateAll({ gps_location: "24x113" });
+    await david.reload();
+    expect(david.readAttribute("gps_location")).toBe("24x113");
+    expect(david.gpsLocation.isEqual(new GpsLocation("24x113"))).toBe(true);
+  });
+
+  // Rails: test_allow_nil_address_set_to_nil
+  it("allow nil address set to nil", async () => {
+    const zaphod = customers("zaphod") as CustomerModel & { address: Address | null };
+    zaphod.address = null;
+    await zaphod.save();
+    await zaphod.reload();
+    expect(zaphod.address).toBeNull();
+  });
+
+  // Rails: test_allow_nil_address_loaded_when_only_some_attributes_are_nil
+  it("allow nil address loaded when only some attributes are nil", async () => {
+    const zaphod = customers("zaphod") as CustomerModel & { address: Address };
+    zaphod.writeAttribute("address_street", null);
+    await zaphod.save();
+    await zaphod.reload();
+    expect(zaphod.address).toBeInstanceOf(Address);
+    expect(zaphod.address.street).toBeNull();
+  });
+
+  // Rails: test_nil_assignment_results_in_nil
+  it("nil assignment results in nil", () => {
+    const david = customers("david") as CustomerModel & { gpsLocation: GpsLocation | null };
+    david.gpsLocation = new GpsLocation("39x111");
+    expect(david.gpsLocation).not.toBeNull();
+    david.gpsLocation = null;
+    expect(david.gpsLocation).toBeNull();
   });
 
   // Rails: test_allow_nil_gps_is_nil
