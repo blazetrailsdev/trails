@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Base, registerModel } from "../index.js";
+import { association } from "../associations.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -21,9 +22,17 @@ class Boy extends Human {
   static name = "Boy";
 }
 
-// Set an association target in memory, mirroring Rails' `record.face = f` /
-// `record.interests << ...` so the presence validator (which reads from
-// `_cachedAssociations` via read_attribute_for_validation) sees it.
+// In-memory has_one / belongs_to assignment, mirroring Rails' `record.face = f`
+// / `s.dashboard = dash`. These canonical models are schema-introspected and
+// expose no generated `face=` / `dashboard=` *property* accessor (unlike
+// has_many, which yields a real CollectionProxy — see test 4), so a plain
+// `record.face = f` would set an own data property the validator never reads.
+// The only real setters are the low-level `setHasOne` / `setBelongsTo`, but
+// those issue a findBy + save against the target table, side effects Rails'
+// in-memory setter skips for a brand-new (unsaved, null-PK) owner. Writing the
+// association cache directly — the same idiom autosave-association.test.ts uses
+// via its `cacheAssoc` helper — is the faithful in-memory mirror: presence
+// reads it through read_attribute_for_validation's `_cachedAssociations` lookup.
 function setAssoc(record: Base, name: string, value: unknown) {
   const r = record as unknown as { _cachedAssociations?: Map<string, unknown> };
   if (!r._cachedAssociations) r._cachedAssociations = new Map();
@@ -90,7 +99,9 @@ describe("PresenceValidationTest", () => {
     const b = new Boy();
     const i1 = new Interest();
     const i2 = new Interest();
-    setAssoc(b, "interests", [i1, i2]);
+    // Rails `b.interests << [i1, i2]`. has_many yields a real CollectionProxy,
+    // so we use its setter (concat) rather than poking the association cache.
+    await association(b, "interests").concat(i1, i2);
     expect(await b.isValid()).toBe(true);
 
     i1.markForDestruction();
@@ -130,6 +141,11 @@ describe("PresenceValidationTest", () => {
       });
       expect(await interest.isValid()).toBe(true);
 
+      // Rails `interest.abbreviation = ""`. Calling `attribute()` at runtime here
+      // (inside repairValidations) defines a real get/set accessor on the
+      // prototype, so this assignment routes through writeAttribute — readAttribute
+      // and read_attribute_for_validation then see "", exactly like Rails'
+      // attr_accessor-backed reader.
       (interest as unknown as { abbreviation: string }).abbreviation = "";
 
       expect(await interest.isInvalid()).toBe(true);
