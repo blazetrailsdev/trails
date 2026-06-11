@@ -121,7 +121,7 @@ function _isSqliteMissingDbError(error: unknown): boolean {
   );
 }
 
-export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
+export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override get adapterName(): AdapterName {
     return "sqlite";
   }
@@ -242,9 +242,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     super();
     this._config = { ...options };
     this._filename = filename;
-    this._memoryDatabase = SQLite3Adapter._isMemoryFilename(filename);
+    this._memoryDatabase = AbstractSQLite3Adapter._isMemoryFilename(filename);
     this._readonly = options.readonly ?? false;
-    this._strict = options.strict ?? SQLite3Adapter.strictStringsByDefault;
+    this._strict = options.strict ?? AbstractSQLite3Adapter.strictStringsByDefault;
     (this._config as SQLite3AdapterOptions).strict = this._strict;
     // Rails: `SQLite3Adapter#default_prepared_statements` inherits the
     // abstract adapter's `true`. Mirror that default and let options
@@ -255,7 +255,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (options.statementLimit !== undefined) this.statementLimit = options.statementLimit;
     this.connect();
     this.configureConnection();
-    this._nativeTypeMap = SQLite3Adapter._buildTypeMap();
+    this._nativeTypeMap = AbstractSQLite3Adapter._buildTypeMap();
   }
 
   /**
@@ -755,7 +755,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // INTEGER in SQLite can store up to 8 bytes; default _limit to 8 when none given.
   private static _buildTypeMap(): TypeMap {
     const map = new TypeMap();
-    SQLite3Adapter.initializeTypeMap(map);
+    AbstractSQLite3Adapter.initializeTypeMap(map);
     return map;
   }
 
@@ -937,8 +937,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  static newClient(config: { database?: string; readonly?: boolean }): SQLite3Adapter {
-    return new SQLite3Adapter(config.database ?? ":memory:", { readonly: config.readonly });
+  static newClient(
+    this: new (filename?: string, options?: SQLite3AdapterOptions) => AbstractSQLite3Adapter,
+    config: { database?: string; readonly?: boolean },
+  ): AbstractSQLite3Adapter {
+    return new this(config.database ?? ":memory:", { readonly: config.readonly });
   }
 
   static override dbconsole(config?: { database?: string }): void {
@@ -2188,6 +2191,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new GenericStatementPool<SqliteStatement>(this._statementLimit);
   }
 
+  /**
+   * The SQLite client library this adapter is bound to. Concrete subclasses
+   * (BetterSQLite3Adapter, etc.) override this to return their bundled driver,
+   * mirroring how Rails ties Mysql2Adapter/TrilogyAdapter to a client lib. The
+   * abstract base is driver-agnostic and returns undefined.
+   * @internal
+   */
+  protected defaultSqliteDriver(): SqliteDriver | undefined {
+    return undefined;
+  }
+
   /** @internal */
   private connect(): void {
     try {
@@ -2204,8 +2218,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           );
         }
         factory = driverOpt as SqliteDriver;
-      } else {
+      } else if (typeof driverOpt === "string") {
+        // Explicit driver name still resolves through the legacy registry.
         factory = getSqlite(driverOpt);
+      } else {
+        // No driver configured (driverOpt is undefined or null): concrete
+        // subclasses (e.g. BetterSQLite3Adapter) return their bundled driver so
+        // no registry lookup is needed. The abstract base falls back to the
+        // registry for backward compatibility. getSqlite resolves its argument
+        // by truthiness (resolveName: `if (name) return name`), so an undefined
+        // or null driverOpt selects the registry default identically.
+        factory = this.defaultSqliteDriver() ?? getSqlite(driverOpt ?? undefined);
       }
       if (!factory.openSync) {
         throw new Error(
@@ -2458,9 +2481,19 @@ function translateException(
 // `execute`/`execQuery`), so dirtying it clears the query cache on writes and
 // schema changes — the trails analogue of Rails' `dirties_query_cache base,
 // :execute` for the write side.
-dirtiesQueryCache(SQLite3Adapter, "executeMutation");
+dirtiesQueryCache(AbstractSQLite3Adapter, "executeMutation");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers
 // gate behavior on the sqlite3 adapter being loaded.
-runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
+runLoadHooks("active_record_sqlite3adapter", AbstractSQLite3Adapter);
+
+/**
+ * Backward-compatible alias. Historically the single concrete SQLite adapter
+ * was `SQLite3Adapter`; it is now the abstract base. Existing call sites and
+ * tests that import `SQLite3Adapter` keep working — `new SQLite3Adapter()`
+ * resolves a driver through the legacy registry, and instances of the concrete
+ * `BetterSQLite3Adapter` subclass are `instanceof SQLite3Adapter`. New code
+ * should prefer `AbstractSQLite3Adapter` / `BetterSQLite3Adapter`.
+ */
+export { AbstractSQLite3Adapter as SQLite3Adapter };

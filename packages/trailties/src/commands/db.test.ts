@@ -167,12 +167,14 @@ describe("connectAdapter", () => {
 
   it("creates SqliteAdapter for sqlite3", async () => {
     adapter = await connectAdapter({ adapter: "sqlite3", database: ":memory:" });
-    expect(adapter.constructor.name).toBe("SQLite3Adapter");
+    // The `sqlite3` name resolves to the concrete better-sqlite3 subclass,
+    // matching ConnectionAdapters.resolve("sqlite3").
+    expect(adapter.constructor.name).toBe("BetterSQLite3Adapter");
   });
 
   it("creates SqliteAdapter for sqlite", async () => {
     adapter = await connectAdapter({ adapter: "sqlite", database: ":memory:" });
-    expect(adapter.constructor.name).toBe("SQLite3Adapter");
+    expect(adapter.constructor.name).toBe("BetterSQLite3Adapter");
   });
 
   it("throws for unknown adapter", async () => {
