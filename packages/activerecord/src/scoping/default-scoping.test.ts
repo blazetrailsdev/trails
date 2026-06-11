@@ -70,7 +70,11 @@ const capSql = (fn: () => unknown) =>
   captureSql(fn as () => Promise<void>, { includeSchema: false });
 
 describe("DefaultScopingTest", () => {
-  const { developers } = useHandlerFixtures(["developers", "posts", "comments"], {
+  // Only `developers` is seeded: every active test reads developers fixtures (or
+  // builds SQL without hitting the DB). The `posts`/`comments`-backed cases are
+  // all `it.skip`, so seeding those shared tables here would only risk the known
+  // parallel-fork `posts` collision without exercising anything.
+  const { developers } = useHandlerFixtures(["developers"], {
     schema: canonicalSchema,
   });
 
