@@ -3050,7 +3050,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         include,
         where,
         nullsNotDistinct,
-        comment: (row.comment as string | null) ?? undefined,
+        // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.
+        comment: (row.comment as string | null)?.trim() ? (row.comment as string) : undefined,
       };
     });
   }

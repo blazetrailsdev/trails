@@ -1430,9 +1430,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         } else {
           using = idxType.toLowerCase();
         }
+        // Mirrors Rails' `row["Index_comment"].presence` — blank (incl. whitespace-only) → nil.
         const rawComment = r.idx_comment ?? r.IDX_COMMENT ?? r.INDEX_COMMENT;
         const comment =
-          rawComment != null && String(rawComment) !== "" ? String(rawComment) : undefined;
+          rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
         byIndex.set(name, { columns: [], unique: nonUnique === 0, using, type, comment });
       }
       byIndex.get(name)!.columns.push(column);
