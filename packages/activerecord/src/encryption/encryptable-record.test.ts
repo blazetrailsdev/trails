@@ -351,30 +351,36 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("encrypts serialized attributes where encrypts is declared first", async () => {
     // _pendingEncryptions defers the wrapping until attribute() is called.
-    // applyPendingEncryptions() then wraps the resolved JSON type, so declaration
-    // order (encrypts before attribute) is transparent.
+    // applyPendingEncryptions() then wraps the resolved serialized type, so
+    // declaration order (encrypts before attribute) is transparent. Mirrors
+    // Rails' EncryptedFirstTrafficLight (`encrypts :state` declared before
+    // `serialize :state, type: Array`) on the canonical `traffic_lights` table.
     const adp = await freshAdapter();
-    await defineSchema(adp, { articles_first: { settings: "json" } });
-    const Article = class extends Base {
+    await defineSchema(adp, { traffic_lights: canonicalSchema.traffic_lights });
+    const EncryptedFirstTrafficLight = class extends Base {
       static {
-        this._tableName = "articles_first";
+        this._tableName = "traffic_lights";
         this.adapter = adp;
-        this.encrypts("settings"); // declared BEFORE the JSON type
+        this.encrypts("state"); // declared BEFORE the serialized type
         this.attribute("id", "integer");
-        this.attribute("settings", "json");
+        this.attribute("state", "json");
+        this.attribute("long_state", "json");
       }
     } as any;
-    new Article();
+    new EncryptedFirstTrafficLight();
 
-    const settings = { theme: "light", font_size: 14 };
-    const article = await Article.create({ settings });
+    const states = ["green", "red"];
+    const trafficLight = await EncryptedFirstTrafficLight.create({
+      state: states,
+      long_state: states,
+    });
 
-    const dbValue = article._attributes.valuesForDatabase()["settings"] as string;
+    const dbValue = trafficLight._attributes.valuesForDatabase()["state"] as string;
     expect(typeof dbValue).toBe("string");
-    expect(dbValue).not.toBe(JSON.stringify(settings));
+    expect(dbValue).not.toBe(JSON.stringify(states));
 
-    const reloaded = await Article.find(article.id);
-    expect(reloaded.settings).toEqual(settings);
+    const reloaded = await EncryptedFirstTrafficLight.find(trafficLight.id);
+    expect(reloaded.state).toEqual(states);
   });
 
   it("encrypts store attributes with accessors", async () => {

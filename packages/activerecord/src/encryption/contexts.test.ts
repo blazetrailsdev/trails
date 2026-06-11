@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
 import "../relation.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
@@ -30,14 +31,12 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
   let titleCiphertext: unknown;
 
   beforeAll(async () => {
-    // Dedicated tables (limit 1024) so the JSON-wrapped, base64'd ciphertext is
-    // not truncated by a default VARCHAR(255) column.
+    // Rails' EncryptedPost (`< Post`, `self.table_name = "posts"`) and EncryptedBook
+    // (`encrypted_books`) both ride canonical tables; contexts_test.rb declares
+    // `fixtures :posts`. Mirror that here.
     await defineSchema({
-      encrypted_posts: {
-        title: { type: "string", limit: 1024 },
-        body: { type: "string", limit: 1024 },
-      },
-      encrypted_books: { name: { type: "string", limit: 1024, default: "<untitled>" } },
+      posts: TEST_SCHEMA.posts,
+      encrypted_books: TEST_SCHEMA.encrypted_books,
     });
   });
 
@@ -59,10 +58,10 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     // encryptor).
     EncryptedPost = class EncryptedPost extends Base {
       static {
-        this._tableName = "encrypted_posts";
+        this._tableName = "posts";
         this.attribute("id", "integer");
-        this.attribute("title", "string", { limit: 1024 });
-        this.attribute("body", "string", { limit: 1024 });
+        this.attribute("title", "string");
+        this.attribute("body", "string");
         this.encrypts("title");
         this.encrypts("body");
       }
