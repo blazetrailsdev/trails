@@ -4,10 +4,10 @@
  */
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { Base, Migration, Schema, TableDefinition } from "./index.js";
+import { MigrationContext } from "./migration.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -30,7 +30,16 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   afterEach(async () => {
-    await dropAllTables(adapter);
+    const ctx = new MigrationContext(adapter);
+    await ctx.dropTable("pk_test", { ifExists: true });
+    await ctx.dropTable("schema_test", { ifExists: true });
+    await ctx.dropTable("fruits", { ifExists: true });
+    await ctx.dropTable("nep_fruits", { ifExists: true });
+    await ctx.dropTable("multi_idx", { ifExists: true });
+    await ctx.dropTable("ts_change", { ifExists: true });
+    await ctx.dropTable("has_timestamps", { ifExists: true });
+    await ctx.dropTable("ts_opts", { ifExists: true });
+    await ctx.dropTable("ts_add", { ifExists: true });
   });
 
   it("has primary key", async () => {
