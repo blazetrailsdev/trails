@@ -11,6 +11,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getDefaultTimezone } from "../../type/internal/timezone.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import type { SchemaQuoter } from "./assert-schema-adapter.js";
 
 /**
  * Quote a SQL identifier (table name, column name, index name).
@@ -176,6 +177,21 @@ export function quoteDefaultExpression(value: unknown, _column?: unknown): strin
   if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
   return ` DEFAULT ${quote(value)}`;
 }
+
+/**
+ * ANSI fallback quoter used only when a schema visitor or definition is built
+ * without a live adapter (the standalone `schemaCreation()` convention helpers
+ * and isolated unit tests). Every adapter-backed caller passes its own
+ * `SchemaQuoter`, so this never quotes DDL for a real connection; it exists so
+ * the abstract schema layer stays usable adapter-free rather than silently
+ * routing through whatever dialect happens to import these freestanding
+ * functions. Mirrors the `ABSTRACT_QUOTER` crutch in `sanitization.ts`.
+ */
+export const ABSTRACT_SCHEMA_QUOTER: SchemaQuoter = {
+  quoteIdentifier,
+  quoteTableName,
+  quoteDefaultExpression,
+};
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_true

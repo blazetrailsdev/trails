@@ -1,8 +1,4 @@
-import {
-  quoteIdentifier as abstractQuoteIdentifier,
-  quoteTableName as abstractQuoteTableName,
-  quoteDefaultExpression as abstractQuoteDefaultExpression,
-} from "./quoting.js";
+import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { singularize, pluralize } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -649,11 +645,7 @@ export class TableDefinition {
   ) {
     this.tableName = tableName;
     this._adapterName = tdOptions.adapterName ?? "sqlite";
-    this._adapter = tdOptions.adapter ?? {
-      quoteIdentifier: abstractQuoteIdentifier,
-      quoteTableName: abstractQuoteTableName,
-      quoteDefaultExpression: abstractQuoteDefaultExpression,
-    };
+    this._adapter = tdOptions.adapter ?? ABSTRACT_SCHEMA_QUOTER;
     // Composite primaryKey implies id: false — Rails requires this and emitting both
     // an auto-id column AND a composite PK constraint is invalid DDL.
     const hasCompositePk = Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length > 0;

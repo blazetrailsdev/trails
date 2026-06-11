@@ -19,11 +19,7 @@ import {
   CheckConstraintDefinition,
   TableDefinition,
 } from "./schema-definitions.js";
-import {
-  quoteIdentifier as abstractQuoteIdentifier,
-  quoteTableName as abstractQuoteTableName,
-  quoteDefaultExpression as abstractQuoteDefaultExpression,
-} from "./quoting.js";
+import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -44,11 +40,7 @@ export class SchemaCreation {
     protected adapterName: "sqlite" | "postgres" | "mysql",
     adapter?: SchemaQuoter,
   ) {
-    this.adapter = adapter ?? {
-      quoteIdentifier: abstractQuoteIdentifier,
-      quoteTableName: abstractQuoteTableName,
-      quoteDefaultExpression: abstractQuoteDefaultExpression,
-    };
+    this.adapter = adapter ?? ABSTRACT_SCHEMA_QUOTER;
   }
 
   protected supportsPartialIndex(): boolean {
