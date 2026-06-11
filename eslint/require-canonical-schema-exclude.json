@@ -79,7 +79,6 @@
   "packages/activerecord/src/relation/merging.test.ts",
   "packages/activerecord/src/relation/or.test.ts",
   "packages/activerecord/src/relation/predicate-builder.test.ts",
-  "packages/activerecord/src/relation/select.test.ts",
   "packages/activerecord/src/relation/thenable.test.ts",
   "packages/activerecord/src/relation/update-all.test.ts",
   "packages/activerecord/src/relation/where-chain.test.ts",
