@@ -2,21 +2,27 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
+import { MigrationContext } from "../migration.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("RequiredAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
+  let ctx: MigrationContext;
   beforeAll(async () => {
-    await defineSchema({
-      parents: {},
-      children: { parent_id: "integer" },
+    ctx = new MigrationContext(Base.connection);
+    await ctx.createTable("parents", { force: true }, () => {});
+    await ctx.createTable("children", { force: true }, (t) => {
+      t.integer("parent_id");
     });
+  });
+  afterAll(async () => {
+    await ctx.dropTable("children", { ifExists: true });
+    await ctx.dropTable("parents", { ifExists: true });
   });
 
   it("belongs_to associations can be optional by default", async () => {
@@ -182,15 +188,42 @@ describe("RequiredAssociationsTest", () => {
 describe("belongs_to required option", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
+  let ctx: MigrationContext;
   beforeAll(async () => {
-    await defineSchema({
-      r_authors: { name: "string" },
-      r_books: { title: "string", author_id: "integer" },
-      r_writers: { name: "string" },
-      r_novels: { title: "string", writer_id: "integer" },
-      rg_parents: { name: "string" },
-      rg_children: { title: "string", rg_parent_id: "integer" },
+    ctx = new MigrationContext(Base.connection);
+    await ctx.createTable("r_authors", { force: true }, (t) => {
+      t.string("name");
     });
+    await ctx.createTable("r_books", { force: true }, (t) => {
+      t.string("title");
+      t.integer("author_id");
+    });
+    await ctx.createTable("r_writers", { force: true }, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("r_novels", { force: true }, (t) => {
+      t.string("title");
+      t.integer("writer_id");
+    });
+    await ctx.createTable("rg_parents", { force: true }, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("rg_children", { force: true }, (t) => {
+      t.string("title");
+      t.integer("rg_parent_id");
+    });
+  });
+  afterAll(async () => {
+    for (const table of [
+      "r_authors",
+      "r_books",
+      "r_writers",
+      "r_novels",
+      "rg_parents",
+      "rg_children",
+    ]) {
+      await ctx.dropTable(table, { ifExists: true });
+    }
   });
 
   it("validates presence of foreign key when required: true", async () => {
