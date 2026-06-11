@@ -11,6 +11,7 @@ import {
   quoteTableNameForAssignment as abstractQuoteTableNameForAssignment,
   quoteString as abstractQuoteString,
   castBoundValue as abstractCastBoundValue,
+  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting-interface.js";
 import {
@@ -25,7 +26,13 @@ export type Quoter = Pick<
   "quote" | "quoteIdentifier" | "quoteTableNameForAssignment" | "quoteString" | "castBoundValue"
 >;
 
-/** Fallback for callers that haven't been migrated to thread an adapter. @internal */
+/**
+ * Guarded no-connection fallback, used only by {@link quoterFor} when a model
+ * class has no resolvable adapter (e.g. `connection` raises
+ * `ConnectionNotDefined`). Every connected caller quotes through the live
+ * adapter's quoter; this pins SQL-92 rules purely so sanitization can still
+ * run before a connection is established. @internal
+ */
 const ABSTRACT_QUOTER: Quoter = {
   quote: (v) => abstractQuote(v),
   quoteIdentifier: (n) => abstractQuoteIdentifier(n),
@@ -33,16 +40,6 @@ const ABSTRACT_QUOTER: Quoter = {
   quoteString: (s) => abstractQuoteString(s),
   castBoundValue: (v) => abstractCastBoundValue(v),
 };
-
-/**
- * Sanitize a SQL template with bind parameters.
- * Replaces `?` placeholders with properly quoted values.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_array
- */
-export function sanitizeSqlArray(template: string, ...binds: unknown[]): string {
-  return _sanitizeSqlArray(ABSTRACT_QUOTER, template, binds);
-}
 
 /** @internal */
 function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): string {
@@ -73,76 +70,6 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
 
   raiseIfBindArityMismatch(statement, 0, binds.length);
   return statement;
-}
-
-/**
- * Sanitize SQL — accepts either a string or an array of [template, ...binds].
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql
- */
-export function sanitizeSql(input: string | [string, ...unknown[]]): string {
-  return _sanitizeSql(ABSTRACT_QUOTER, input);
-}
-
-/** @internal */
-function _sanitizeSql(quoter: Quoter, input: string | [string, ...unknown[]]): string {
-  if (typeof input === "string") return input;
-  const [template, ...binds] = input;
-  return _sanitizeSqlArray(quoter, template, binds);
-}
-
-/**
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_conditions
- */
-export function sanitizeSqlForConditions(
-  condition: string | [string, ...unknown[]] | null | undefined,
-  quoter: Quoter = ABSTRACT_QUOTER,
-): string | null {
-  if (!condition || (typeof condition === "string" && condition.trim() === "")) return null;
-  return _sanitizeSql(quoter, condition);
-}
-
-/**
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_assignment
- */
-export function sanitizeSqlForAssignment(
-  assignments: string | [string, ...unknown[]] | Record<string, unknown>,
-  defaultTableName?: string,
-  quoter: Quoter = ABSTRACT_QUOTER,
-): string {
-  if (typeof assignments === "string") return assignments;
-  if (Array.isArray(assignments)) return _sanitizeSql(quoter, assignments);
-  return _sanitizeSqlHashForAssignment(quoter, assignments, defaultTableName ?? "");
-}
-
-/**
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_order
- */
-export function sanitizeSqlForOrder(
-  condition: string | [string, ...unknown[]] | Nodes.Node,
-  quoter: Quoter = ABSTRACT_QUOTER,
-): string | Nodes.Node {
-  if (condition instanceof Nodes.Node) return condition;
-  if (Array.isArray(condition) && condition[0]?.toString().includes("?")) {
-    const sanitized = _sanitizeSqlArray(quoter, condition[0], condition.slice(1));
-    disallowRawSqlBang([sanitized]);
-    return arelSql(sanitized);
-  }
-  return typeof condition === "string" ? condition : condition[0];
-}
-
-/**
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_hash_for_assignment
- */
-export function sanitizeSqlHashForAssignment(
-  attrs: Record<string, unknown>,
-  table: string,
-  typeForAttribute?: (
-    name: string,
-  ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
-  quoter: Quoter = ABSTRACT_QUOTER,
-): string {
-  return _sanitizeSqlHashForAssignment(quoter, attrs, table, typeForAttribute);
 }
 
 /** @internal */
@@ -217,18 +144,29 @@ export function sanitizeSqlLike(value: string, escapeChar: string = "\\"): strin
 }
 
 /**
- * Class-method variant of `sanitizeSql` that dispatches through
- * `this.sanitizeSqlArray`, so subclass overrides of `sanitizeSqlArray`
- * take effect — matching Rails' `Sanitization::ClassMethods#sanitize_sql`
- * which calls `sanitize_sql_array` via `self`.
+ * In Rails, `sanitize_sql` is an alias of `sanitize_sql_for_conditions`
+ * (sanitization.rb:41), so blank input returns `nil` and an Array dispatches
+ * to `sanitize_sql_array`. We dispatch through `this.sanitizeSqlArray` so
+ * subclass overrides take effect.
+ *
+ * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql
  */
-function sanitizeSqlClassMethod(
+export function sanitizeSql(
   this: { sanitizeSqlArray(template: string, ...binds: unknown[]): string },
-  input: string | [string, ...unknown[]],
-): string {
+  input: string | [string, ...unknown[]] | null | undefined,
+): string | null {
+  if (isBlankCondition(input)) return null;
   if (typeof input === "string") return input;
-  const [template, ...binds] = input;
+  const [template, ...binds] = input as [string, ...unknown[]];
   return this.sanitizeSqlArray(template, ...binds);
+}
+
+/** Rails `Object#blank?` for the condition inputs we accept. @internal */
+function isBlankCondition(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
 }
 
 /** @internal */
@@ -252,38 +190,58 @@ function quoterFor(host: QuoterHost): Quoter {
 }
 
 /**
- * Class-method variant of `sanitizeSqlArray` that threads the active
- * adapter as the quoter, matching Rails' `connection.quote` dispatch.
+ * Resolves the adapter's `column_name_with_order_matcher`
+ * (Rails `adapter_class.column_name_with_order_matcher`), falling back to the
+ * abstract matcher when no connection is resolvable. @internal
  */
-function sanitizeSqlArrayClassMethod(
-  this: QuoterHost,
-  template: string,
-  ...binds: unknown[]
-): string {
+function orderMatcherFor(host: QuoterHost): RegExp {
+  let conn: unknown;
+  try {
+    conn = host.connection;
+  } catch (err) {
+    if (!(err instanceof ConnectionNotDefined)) throw err;
+  }
+  const matcher = (conn as { constructor?: { columnNameWithOrderMatcher?: () => RegExp } } | null)
+    ?.constructor?.columnNameWithOrderMatcher;
+  return typeof matcher === "function" ? matcher() : abstractColumnNameWithOrderMatcher();
+}
+
+/**
+ * Threads the active adapter as the quoter, matching Rails'
+ * `connection.quote` dispatch.
+ *
+ * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_array
+ */
+export function sanitizeSqlArray(this: QuoterHost, template: string, ...binds: unknown[]): string {
   return _sanitizeSqlArray(quoterFor(this), template, binds);
 }
 
 /**
- * Class-method variant of `sanitizeSqlForConditions` that dispatches
- * through `this.sanitizeSql` (and therefore `this.sanitizeSqlArray`),
+ * Dispatches through `this.sanitizeSql` (and therefore `this.sanitizeSqlArray`),
  * matching Rails' Ruby `self` dispatch through `ClassMethods`.
+ *
+ * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_conditions
  */
-function sanitizeSqlForConditionsClassMethod(
-  this: QuoterHost & { sanitizeSql(input: string | [string, ...unknown[]]): string },
+export function sanitizeSqlForConditions(
+  this: QuoterHost & {
+    sanitizeSql(input: string | [string, ...unknown[]] | null | undefined): string | null;
+  },
   condition: string | [string, ...unknown[]] | null | undefined,
 ): string | null {
-  if (!condition || (typeof condition === "string" && condition.trim() === "")) return null;
+  if (isBlankCondition(condition)) return null;
   return this.sanitizeSql(condition);
 }
 
 /**
- * Class-method variant of `sanitizeSqlForAssignment` that dispatches
- * `Array` case through `this.sanitizeSql` — matching Rails' self dispatch
- * from `sanitize_sql_for_assignment` → `sanitize_sql_array`.
+ * Dispatches the `Array` case through `this.sanitizeSql` — matching Rails'
+ * self dispatch from `sanitize_sql_for_assignment` → `sanitize_sql_array`.
+ *
+ * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_assignment
  */
-function sanitizeSqlForAssignmentClassMethod(
+export function sanitizeSqlForAssignment(
   this: QuoterHost & {
-    sanitizeSql(input: string | [string, ...unknown[]]): string;
+    tableName?: string;
+    sanitizeSql(input: string | [string, ...unknown[]] | null | undefined): string | null;
     sanitizeSqlHashForAssignment(
       attrs: Record<string, unknown>,
       table: string,
@@ -292,41 +250,61 @@ function sanitizeSqlForAssignmentClassMethod(
       ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
     ): string;
   },
+  // Rails defaults `default_table_name` to the model's `table_name`
+  // (sanitization.rb:68); an explicitly-passed value still wins.
   assignments: string | [string, ...unknown[]] | Record<string, unknown>,
-  defaultTableName?: string,
+  defaultTableName: string = this.tableName ?? "",
 ): string {
   if (typeof assignments === "string") return assignments;
-  if (Array.isArray(assignments)) return this.sanitizeSql(assignments);
-  return this.sanitizeSqlHashForAssignment(assignments, defaultTableName ?? "");
+  // A non-empty Array is never blank, so `sanitizeSql` returns a string here;
+  // `?? ""` only guards the degenerate empty-array case (Rails returns "").
+  if (Array.isArray(assignments)) return this.sanitizeSql(assignments) ?? "";
+  return this.sanitizeSqlHashForAssignment(assignments, defaultTableName);
 }
 
 /**
- * Class-method variant of `sanitizeSqlForOrder` that dispatches
- * `disallowRawSqlBang` and `sanitizeSqlArray` through `this` — matching
- * Rails' self dispatch.
+ * Dispatches `disallowRawSqlBang` and `sanitizeSqlArray` through `this` —
+ * matching Rails' self dispatch.
+ *
+ * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_order
  */
-function sanitizeSqlForOrderClassMethod(
-  this: {
+export function sanitizeSqlForOrder(
+  this: QuoterHost & {
     disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permit?: RegExp): void;
     sanitizeSqlArray(template: string, ...binds: unknown[]): string;
   },
-  condition: string | [string, ...unknown[]] | Nodes.Node,
-): string | Nodes.Node {
+  condition: string | [string | Nodes.Node, ...unknown[]] | Nodes.Node,
+): string | Nodes.Node | [string | Nodes.Node, ...unknown[]] {
   if (condition instanceof Nodes.Node) return condition;
-  if (Array.isArray(condition) && condition[0]?.toString().includes("?")) {
-    const sanitized = this.sanitizeSqlArray(condition[0], ...condition.slice(1));
-    this.disallowRawSqlBang([sanitized]);
-    return arelSql(sanitized);
+  if (Array.isArray(condition)) {
+    const first: unknown = condition[0];
+    // Rails reads `condition.first.to_s`; a SqlLiteral carries its text on
+    // `.value` (it has no `toString()` override), so read that for the `?`
+    // check and the template passed to sanitizeSqlArray.
+    const firstText = first instanceof Nodes.SqlLiteral ? first.value : String(first);
+    if (firstText.includes("?")) {
+      // Rails checks the *raw* first element with the adapter order matcher
+      // (sanitization.rb:85-88); `disallowRawSqlBang` skips Node instances, so
+      // `Arel.sql("field(id, ?)")` is permitted and only the substituted
+      // result is returned.
+      this.disallowRawSqlBang([first as string | symbol | Nodes.Node], orderMatcherFor(this));
+      const sanitized = this.sanitizeSqlArray(firstText, ...condition.slice(1));
+      return arelSql(sanitized);
+    }
   }
-  return typeof condition === "string" ? condition : condition[0];
+  // Rails' `else` branch returns the original `condition` unchanged
+  // (sanitization.rb:99) — for a non-bind array, the full array, not just its
+  // first element.
+  return condition;
 }
 
 /**
- * Class-method variant of `sanitizeSqlHashForAssignment` that uses the
- * active adapter as the quoter — so `Model.sanitizeSqlHashForAssignment`
+ * Uses the active adapter as the quoter — so `Model.sanitizeSqlHashForAssignment`
  * emits dialect-correct identifiers (backticks on MySQL).
+ *
+ * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_hash_for_assignment
  */
-function sanitizeSqlHashForAssignmentClassMethod(
+export function sanitizeSqlHashForAssignment(
   this: QuoterHost,
   attrs: Record<string, unknown>,
   table: string,
@@ -342,13 +320,13 @@ function sanitizeSqlHashForAssignmentClassMethod(
  * Mirrors Rails' `ActiveRecord::Sanitization::ClassMethods`.
  */
 export const ClassMethods = {
-  sanitizeSql: sanitizeSqlClassMethod,
-  sanitizeSqlArray: sanitizeSqlArrayClassMethod,
+  sanitizeSql,
+  sanitizeSqlArray,
   sanitizeSqlLike,
-  sanitizeSqlForConditions: sanitizeSqlForConditionsClassMethod,
-  sanitizeSqlForAssignment: sanitizeSqlForAssignmentClassMethod,
-  sanitizeSqlForOrder: sanitizeSqlForOrderClassMethod,
-  sanitizeSqlHashForAssignment: sanitizeSqlHashForAssignmentClassMethod,
+  sanitizeSqlForConditions,
+  sanitizeSqlForAssignment,
+  sanitizeSqlForOrder,
+  sanitizeSqlHashForAssignment,
   disallowRawSqlBang,
 };
 

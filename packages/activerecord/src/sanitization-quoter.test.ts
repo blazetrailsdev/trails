@@ -2,13 +2,7 @@
 // quote_table_name_for_assignment (Rails sanitization.rb:112,
 // postgresql/quoting.rb:133, sqlite3/quoting.rb:70).
 import { describe, it, expect } from "vitest";
-import { ClassMethods } from "./sanitization.js";
-import {
-  sanitizeSqlForAssignment,
-  sanitizeSqlHashForAssignment,
-  sanitizeSqlForConditions,
-  type Quoter,
-} from "./sanitization.js";
+import { ClassMethods, type Quoter } from "./sanitization.js";
 import { ConnectionNotDefined, ConnectionTimeoutError } from "./errors.js";
 
 const dq = (n: string) => `"${n.replace(/"/g, '""')}"`;
@@ -32,32 +26,34 @@ const mysqlQuoter: Quoter = {
 };
 
 describe("sanitization quoter threading (module-level)", () => {
+  const hostFor = (q: Quoter) => ({ connection: q, ...ClassMethods });
+
   it("MySQL emits backtick-qualified `table`.`column` for hash assignment", () => {
-    expect(sanitizeSqlHashForAssignment({ name: "x" }, "users", undefined, mysqlQuoter)).toBe(
+    expect(hostFor(mysqlQuoter).sanitizeSqlHashForAssignment({ name: "x" }, "users")).toBe(
       "`users`.`name` = 'x'",
     );
   });
 
   it("PostgreSQL drops the table prefix for hash assignment (Rails parity)", () => {
-    expect(sanitizeSqlHashForAssignment({ name: "x" }, "users", undefined, pgQuoter)).toBe(
+    expect(hostFor(pgQuoter).sanitizeSqlHashForAssignment({ name: "x" }, "users")).toBe(
       `"name" = 'x'`,
     );
   });
 
   it("SQLite drops the table prefix for hash assignment (Rails parity)", () => {
-    expect(sanitizeSqlHashForAssignment({ name: "x" }, "users", undefined, sqliteQuoter)).toBe(
+    expect(hostFor(sqliteQuoter).sanitizeSqlHashForAssignment({ name: "x" }, "users")).toBe(
       `"name" = 'x'`,
     );
   });
 
   it("sanitizeSqlForAssignment hash form threads quoter for MySQL", () => {
-    expect(sanitizeSqlForAssignment({ name: "x" }, "users", mysqlQuoter)).toBe(
+    expect(hostFor(mysqlQuoter).sanitizeSqlForAssignment({ name: "x" }, "users")).toBe(
       "`users`.`name` = 'x'",
     );
   });
 
   it("sanitizeSqlForConditions array form threads quoter through `?` binds", () => {
-    expect(sanitizeSqlForConditions(["name = ?", "x"], mysqlQuoter)).toBe("name = 'x'");
+    expect(hostFor(mysqlQuoter).sanitizeSqlForConditions(["name = ?", "x"])).toBe("name = 'x'");
   });
 });
 
