@@ -14,6 +14,10 @@
       "types": "./dist/connection-adapters/sqlite3-adapter.d.ts",
       "default": "./dist/connection-adapters/sqlite3-adapter.js"
     },
+    "./connection-adapters/better-sqlite3-adapter.js": {
+      "types": "./dist/connection-adapters/better-sqlite3-adapter.d.ts",
+      "default": "./dist/connection-adapters/better-sqlite3-adapter.js"
+    },
     "./connection-adapters/postgresql-adapter.js": {
       "types": "./dist/connection-adapters/postgresql-adapter.d.ts",
       "default": "./dist/connection-adapters/postgresql-adapter.js"
