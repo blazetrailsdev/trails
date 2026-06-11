@@ -290,8 +290,12 @@ export class BelongsToAssociation extends SingularAssociation {
     if (typeof fk === "string") return [fk];
     if (Array.isArray(fk)) return fk;
 
-    // Derive composite FKs when target has composite PK (mirrors loadBelongsTo)
-    const pks = this.associationPrimaryKeys(null);
+    // Derive composite FKs when target has composite PK (mirrors loadBelongsTo).
+    // Prefer the already-loaded target's class for the PK lookup so seeding an
+    // inverse target (which marks the holder loaded → staleState → here) reads
+    // the PK off the instance in hand instead of forcing a registry resolve of
+    // a target class that need not be registered.
+    const pks = this.associationPrimaryKeys((this.target as Base | null) ?? null);
     if (pks.length > 1) {
       const assocName = underscore(this.reflection.name);
       return pks.map((pk) => `${assocName}_${pk}`);
