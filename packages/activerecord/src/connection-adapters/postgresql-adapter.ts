@@ -4204,7 +4204,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     try {
       await this.transaction(
         async () => {
-          await this.execute(disableReferentialIntegritySql(await this.tables()).join(";"));
+          await this.execute(
+            disableReferentialIntegritySql.call(this, await this.tables()).join(";"),
+          );
         },
         { requiresNew: true },
       );
@@ -4230,7 +4232,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     try {
       await this.transaction(
         async () => {
-          await this.execute(enableReferentialIntegritySql(await this.tables()).join(";"));
+          await this.execute(
+            enableReferentialIntegritySql.call(this, await this.tables()).join(";"),
+          );
         },
         { requiresNew: true },
       );
