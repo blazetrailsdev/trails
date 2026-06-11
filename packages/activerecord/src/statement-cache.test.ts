@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Attribute, ValueType } from "@blazetrails/activemodel";
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import {
@@ -12,7 +12,6 @@ import {
 } from "./statement-cache.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
@@ -27,10 +26,6 @@ describe("StatementCacheTest", () => {
     });
   });
   withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
 
   it("statement cache", () => {
     const sub = new Substitute();

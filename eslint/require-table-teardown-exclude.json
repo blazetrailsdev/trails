@@ -1,5 +1,4 @@
 [
-  "packages/activerecord/src/active-record-schema.test.ts",
   "packages/activerecord/src/adapters/abstract-mysql-adapter/active-schema.test.ts",
   "packages/activerecord/src/adapters/postgresql/collation.test.ts",
   "packages/activerecord/src/adapters/postgresql/invertible-migration.test.ts",
@@ -10,11 +9,9 @@
   "packages/activerecord/src/connection-adapters/abstract/schema-statements-on-adapter.test.ts",
   "packages/activerecord/src/invertible-migration.test.ts",
   "packages/activerecord/src/migration.test.ts",
-  "packages/activerecord/src/normalized-attribute.test.ts",
   "packages/activerecord/src/query-cache.test.ts",
   "packages/activerecord/src/reserved-word.test.ts",
   "packages/activerecord/src/schema-dumper.test.ts",
   "packages/activerecord/src/schema-introspection.test.ts",
-  "packages/activerecord/src/statement-cache.test.ts",
   "packages/activerecord/src/timestamp.test.ts"
 ]

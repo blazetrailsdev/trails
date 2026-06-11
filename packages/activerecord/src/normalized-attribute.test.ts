@@ -5,10 +5,10 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { Base } from "./index.js";
 
+import { MigrationContext } from "./migration.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -55,7 +55,7 @@ describe("NormalizedAttributeTest", () => {
   });
 
   afterAll(async () => {
-    await dropAllTables(adapter);
+    await new MigrationContext(adapter).dropTable("aircrafts", { ifExists: true });
   });
 
   it("normalizes value from create", async () => {
@@ -198,7 +198,7 @@ describe("normalizes on Base", () => {
   let _adapter: DatabaseAdapter;
 
   afterAll(async () => {
-    if (_adapter) await dropAllTables(_adapter);
+    if (_adapter) await new MigrationContext(_adapter).dropTable("users", { ifExists: true });
   });
 
   it("normalizes attributes before persistence", async () => {
