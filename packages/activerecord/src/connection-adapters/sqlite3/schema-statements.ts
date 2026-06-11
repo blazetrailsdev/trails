@@ -245,15 +245,23 @@ export function extractGeneratedType(
 export function extractValueFromDefault(dfltValue: string | null): unknown {
   if (dfltValue === null) return null;
   if (/^null$/i.test(dfltValue)) return null;
-  // Quoted types — `[^|]` mirrors Rails exactly (sqlite3_adapter.rb:527,530).
-  const single = /^'([^|]*)'$/.exec(dfltValue);
+  // Quoted types — `[^|]` and the `m` flag mirror Rails' `/^'([^|]*)'$/m`
+  // exactly (sqlite3_adapter.rb:527,530). Ruby's `^`/`$` are always line
+  // anchors, so the faithful JS translation needs the `m` flag.
+  const single = /^'([^|]*)'$/m.exec(dfltValue);
   if (single) return single[1].replace(/''/g, "'");
-  const double = /^"([^|]*)"$/.exec(dfltValue);
+  const double = /^"([^|]*)"$/m.exec(dfltValue);
   if (double) return double[1].replace(/""/g, '"');
   // Numeric types
   if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
-  // Binary columns — unanchored `x'(.*)'` + hex unpack, mirroring Rails'
-  // `[ $1 ].pack("H*")` (sqlite3_adapter.rb:536).
+  // Binary columns — unanchored `x'(.*)'` mirrors Rails (sqlite3_adapter.rb:535).
+  // Rails unpacks via `[ $1 ].pack("H*")`. SQLite's `PRAGMA table_info`
+  // serializes a blob default as `x'<HEX>'` where HEX is always an even-length
+  // run of valid hex digits and never contains an embedded quote, so the greedy
+  // `.*` capture equals that hex run and `Buffer.from(hex)` is byte-identical to
+  // `pack("H*")` for every value SQLite can emit. The two only differ on
+  // malformed/non-hex captures, which SQLite never produces; replicating
+  // `pack`'s nibble-masking there would be emulating undefined-domain behavior.
   const hex = /x'(.*)'/.exec(dfltValue);
   if (hex) return Buffer.from(hex[1], "hex");
   return null;
