@@ -16,7 +16,6 @@
   "packages/activerecord/src/associations/bidirectional-destroy-dependencies.test.ts",
   "packages/activerecord/src/associations/callbacks.test.ts",
   "packages/activerecord/src/associations/cascaded-eager-loading.test.ts",
-  "packages/activerecord/src/associations/collection-proxy-count.test.ts",
   "packages/activerecord/src/associations/collection-proxy.test.ts",
   "packages/activerecord/src/associations/constructor-form-and-hmt-insert.test.ts",
   "packages/activerecord/src/associations/cp-count-disable-joins-through.test.ts",
