@@ -9,7 +9,7 @@
 // For collections (`hasMany` / `hasAndBelongsToMany`), the
 // AssociationProxy's thenable handles the load — `await record.<name>`.
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { MigrationContext } from "../migration.js";
@@ -17,6 +17,7 @@ import { withTransactionalFixtures } from "../test-helpers/with-transactional-fi
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   let adapter: TestDatabaseAdapter;
+  let ctx: MigrationContext;
 
   class LoAuthor extends Base {
     declare name: string;
@@ -49,7 +50,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
-    const ctx = new MigrationContext(adapter);
+    ctx = new MigrationContext(adapter);
     await ctx.createTable("lo_authors", { force: true }, (t) => {
       t.string("name");
     });
@@ -67,6 +68,11 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
     registerModel(LoAuthor);
     registerModel(LoPost);
     registerModel(LoProfile);
+  });
+  afterAll(async () => {
+    await ctx.dropTable("lo_profiles", { ifExists: true });
+    await ctx.dropTable("lo_posts", { ifExists: true });
+    await ctx.dropTable("lo_authors", { ifExists: true });
   });
   withTransactionalFixtures(() => adapter);
 
