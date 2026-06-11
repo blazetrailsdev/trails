@@ -549,15 +549,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
+      # tmpfs: the data dir is mounted in RAM so Postgres' per-DDL fsync
+      # traffic (WAL flushes + checkpoints) never hits disk. This suite is
+      # DDL-heavy (lots of createTable/dropTable per file across 8 parallel
+      # forks), so durability fsync is a real CI cost. Mirrors the MariaDB
+      # stand-in runner below, where a side-by-side experiment measured tmpfs
+      # at ~7m45s vs ~9m23s (~17% faster) on this same suite. The DB is
+      # throwaway per-run, so losing it on container stop is fine.
+      #
+      # --mount is a `docker create` flag, so it goes in options. We can't pass
+      # server tuning args (-c fsync=off, -c synchronous_commit=off, etc.) here:
+      # GitHub Actions service containers support neither a `command:` key nor
+      # appending command args via options (options only accepts `docker create`
+      # flags, not args forwarded to the image entrypoint), and only a custom
+      # image could set them. With the data dir already on tmpfs those flags add
+      # little — fsync lands in RAM regardless. POSTGRES_INITDB_ARGS=--no-sync
+      # is the one initdb-time knob env vars can reach, skipping the fsync at
+      # cluster init (safe because the cluster is disposable).
       postgres:
         image: postgres:17
         env:
           POSTGRES_DB: rails_js_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          POSTGRES_INITDB_ARGS: "--no-sync"
         ports:
           - 5432:5432
         options: >-
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
           --health-cmd "pg_isready -U postgres"
           --health-interval 2s
           --health-timeout 5s
