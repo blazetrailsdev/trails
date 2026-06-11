@@ -245,12 +245,20 @@ function resolveCteEntry(name: string, query: unknown): string {
         throw argumentError(`Unsupported argument type in array for CTE "${name}": ${typeName}`);
       }
     }
+    // Rails reduces array sub-queries into an `Arel::Nodes::UnionAll` AST
+    // (build_with_expression_from_value). trails' CTE bodies are SQL strings
+    // throughout (this whole feature stores `_ctes` as `{name, sql}` strings, not
+    // arel nodes), so we emit the same `UNION ALL` the UnionAll node compiles to
+    // by joining the parts' SQL — semantically identical (duplicate rows across
+    // parts are preserved), differing only in mechanism from the string-based CTE
+    // design, not in result.
     // Do NOT wrap individual subqueries in extra parens: the CTE body is already
-    // wrapped as `AS (...)` in toSql(), so `SELECT ... UNION SELECT ...` is valid.
-    // Parenthesized `(SELECT ...) UNION (SELECT ...)` is rejected by SQLite inside CTEs.
+    // wrapped as `AS (...)` in toSql(), so `SELECT ... UNION ALL SELECT ...` is
+    // valid; parenthesized `(SELECT ...) UNION ALL (SELECT ...)` is rejected by
+    // SQLite inside CTEs.
     return (query as any[])
       .map((q: any) => (typeof q === "string" ? q : q.toSql()))
-      .join(" UNION ");
+      .join(" UNION ALL ");
   }
   const q = query as any;
   if (typeof q !== "string" && typeof q?.toSql !== "function") {

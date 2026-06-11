@@ -83,7 +83,6 @@
   "packages/activerecord/src/relation/update-all.test.ts",
   "packages/activerecord/src/relation/where-chain.test.ts",
   "packages/activerecord/src/relation/where.test.ts",
-  "packages/activerecord/src/relation/with.test.ts",
   "packages/activerecord/src/relations.test.ts",
   "packages/activerecord/src/scoping/default-scoping.test.ts",
   "packages/activerecord/src/scoping/named-scoping.test.ts",
