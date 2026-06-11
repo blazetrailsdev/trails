@@ -437,9 +437,9 @@ describe("ConnectionHandlingTest", () => {
 
   it("#adapterClass resolves to the SQLite3Adapter constructor", async () => {
     const Klass = await Base.adapterClass();
-    const { BetterSqlite3Adapter } =
+    const { BetterSQLite3Adapter } =
       await import("./connection-adapters/better-sqlite3-adapter.js");
-    expect(Klass).toBe(BetterSqlite3Adapter);
+    expect(Klass).toBe(BetterSQLite3Adapter);
   });
 
   // Mirrors Rails: `ActiveRecord::Base.establish_connection` with no args
@@ -467,9 +467,9 @@ describe("ConnectionHandlingTest", () => {
 
       await InMemoryModel.establishConnection();
       const Klass = await InMemoryModel.adapterClass();
-      const { BetterSqlite3Adapter } =
+      const { BetterSQLite3Adapter } =
         await import("./connection-adapters/better-sqlite3-adapter.js");
-      expect(Klass).toBe(BetterSqlite3Adapter);
+      expect(Klass).toBe(BetterSQLite3Adapter);
     } finally {
       (DatabaseConfigurations as any).current = priorCurrent;
     }
@@ -502,9 +502,9 @@ describe("ConnectionHandlingTest", () => {
       const pool = WorkerModel.connectionPool();
       expect(pool.dbConfig.database).toBe("db/foo-2.sqlite3");
       const Klass = await WorkerModel.adapterClass();
-      const { BetterSqlite3Adapter } =
+      const { BetterSQLite3Adapter } =
         await import("./connection-adapters/better-sqlite3-adapter.js");
-      expect(Klass).toBe(BetterSqlite3Adapter);
+      expect(Klass).toBe(BetterSQLite3Adapter);
     } finally {
       (DatabaseConfigurations as any).current = priorCurrent;
     }
