@@ -11,7 +11,13 @@ import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { TableDefinition } from "./schema-definitions.js";
 import { Column } from "./column.js";
-import { quoteString } from "./quoting.js";
+
+/** @internal Host surface for the introspection-scope helpers: quoting dispatches
+ * through the adapter instance (`this.quote`) so a sub-adapter can override it,
+ * mirroring Rails' `quoted_scope`, which quotes via `quote(...)`. */
+interface QuotedScopeHost {
+  quote(value: unknown): string;
+}
 
 export interface SchemaStatements {
   createDatabase(name: string, options?: Record<string, unknown>): Promise<void>;
@@ -281,8 +287,12 @@ export function addOptionsForIndexColumns(
 }
 
 /** @internal */
-export function dataSourceSql(name?: string | null, options: { type?: string } = {}): string {
-  const scope = quotedScope(name, options);
+export function dataSourceSql(
+  this: QuotedScopeHost,
+  name?: string | null,
+  options: { type?: string } = {},
+): string {
+  const scope = quotedScope.call(this, name, options);
   let sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = ${scope.schema}`;
   if (scope.name) {
     sql += ` AND table_name = ${scope.name}`;
@@ -294,15 +304,16 @@ export function dataSourceSql(name?: string | null, options: { type?: string } =
 
 /** @internal */
 export function quotedScope(
+  this: QuotedScopeHost,
   name?: string | null,
   options: { type?: string } = {},
 ): { schema: string; name?: string; type?: string } {
   const [schema, tableName] = extractSchemaQualifiedName(name);
   const scope: { schema: string; name?: string; type?: string } = {
-    schema: schema ? quoteString(schema) : "database()",
+    schema: schema ? this.quote(schema) : "database()",
   };
-  if (tableName) scope.name = quoteString(tableName);
-  if (options.type) scope.type = quoteString(options.type);
+  if (tableName) scope.name = this.quote(tableName);
+  if (options.type) scope.type = this.quote(options.type);
   return scope;
 }
 
