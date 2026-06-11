@@ -2,12 +2,15 @@
  * Mirrors: activerecord/test/cases/unsafe_raw_sql_test.rb
  */
 import { describe, it, expect } from "vitest";
-import { UnknownAttributeReference } from "./index.js";
+import { UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post } from "./test-helpers/models/post.js";
-import "./test-helpers/models/comment.js";
+import { Comment } from "./test-helpers/models/comment.js";
+
+registerModel(Post);
+registerModel(Comment);
 
 describe("UnsafeRawSqlTest", () => {
   // Rails `fixtures :posts, :comments` — seed the canonical rows so the
@@ -186,8 +189,8 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: allows column names with includes", async () => {
-    const valuesExpected = await Post.pluck(arelSql("title"), arelSql("id"));
-    const values = await Post.all().pluck("title", "id");
+    const valuesExpected = await Post.includes("comments").pluck(arelSql("title"), arelSql("id"));
+    const values = await Post.includes("comments").pluck("title", "id");
     expect(values).toEqual(valuesExpected);
   });
 
@@ -227,7 +230,7 @@ describe("UnsafeRawSqlTest", () => {
 
   it("pluck: disallows invalid column names with includes", async () => {
     await expect(
-      Post.all().pluck("title", "REPLACE(title, 'misc', 'zzzz')"),
+      Post.includes("comments").pluck("title", "REPLACE(title, 'misc', 'zzzz')"),
     ).rejects.toBeInstanceOf(UnknownAttributeReference);
   });
 
@@ -241,11 +244,10 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: always allows Arel", async () => {
-    const expectedValues = (await Post.pluck("title")).map((title: unknown) => [
-      title,
-      (title as string).length,
-    ]);
-    const values = await Post.pluck("title", arelSql("length(title)"));
+    const expectedValues = (await Post.includes("comments").pluck("title")).map(
+      (title: unknown) => [title, (title as string).length],
+    );
+    const values = await Post.includes("comments").pluck("title", arelSql("length(title)"));
     expect(values).toEqual(expectedValues);
   });
 
