@@ -1,10 +1,11 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_explain_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { dropAllTables } from "../../test-helpers/drop-all-tables.js";
 import { Base } from "../../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
@@ -22,6 +23,12 @@ describeIfMysql("Mysql2Adapter", () => {
   beforeAll(async () => {
     adapter = Base.connection as Mysql2Adapter;
     await adapter.getDatabaseVersion();
+  });
+
+  // Drop the bespoke ex_* tables so they don't leak into the next file's
+  // worker (bespoke handler-suite contract).
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   describe("MysqlExplainTest", () => {
