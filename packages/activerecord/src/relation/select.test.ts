@@ -3,11 +3,12 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/relation/select_test.rb
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import "../index.js";
 import { StatementInvalid } from "../index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -43,6 +44,17 @@ describe("SelectTest", () => {
       "select with hash array value with not exists field",
       "select with invalid nested field",
     ],
+  });
+  // Shield against the shared-worker `posts` collision: sibling files that
+  // physically replace `posts` with a title-only shape survive into this suite
+  // because the canonical preload keeps signatures cache-warm (a plain
+  // defineSchema is a no-op). `dropExisting` rebuilds `posts`/`comments` from
+  // the canonical schema verbatim so fixture seeding finds the `body` column.
+  beforeAll(async () => {
+    await defineSchema(
+      { posts: canonicalSchema.posts, comments: canonicalSchema.comments },
+      { dropExisting: true },
+    );
   });
   const q = (name: string) => escapeRegExp(quoteTableName(name));
 
