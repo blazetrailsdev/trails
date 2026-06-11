@@ -17,7 +17,10 @@ describe("SqliteAdapter", () => {
     adapter = new SQLite3Adapter(":memory:");
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await adapter.dropTable("users", "products", "accounts", "authors", "books", {
+      ifExists: true,
+    });
     adapter.close();
   });
 

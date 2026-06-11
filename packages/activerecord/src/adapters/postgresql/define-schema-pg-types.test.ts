@@ -12,8 +12,7 @@ describeIfPg("PostgreSQL adapter PG-only column types", () => {
   });
 
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS ds_pg_types`);
-    await adapter.exec(`DROP TABLE IF EXISTS ds_pg_array`);
+    await adapter.dropTable("ds_pg_types", "ds_pg_array", { ifExists: true });
     await adapter.close();
   });
 

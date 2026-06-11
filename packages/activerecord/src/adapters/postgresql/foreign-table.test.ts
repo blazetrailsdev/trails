@@ -67,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     await adapter.exec("DROP FOREIGN TABLE IF EXISTS foreign_professors").catch(() => {});
     await adapter.exec("DROP SERVER IF EXISTS foreign_server CASCADE").catch(() => {});
-    await adapter.exec("DROP TABLE IF EXISTS professors").catch(() => {});
+    await adapter.dropTable("professors", { ifExists: true }).catch(() => {});
     await adapter.disableExtension("postgres_fdw", { force: "cascade" }).catch(() => {});
   });
 

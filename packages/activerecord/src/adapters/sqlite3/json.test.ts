@@ -12,7 +12,8 @@ beforeEach(() => {
   adapter = new SQLite3Adapter(":memory:");
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await adapter.dropTable("json_string_cast", "json_data_type", { ifExists: true });
   adapter.close();
 });
 
