@@ -406,6 +406,36 @@ export function commitAndPush(opts: {
       );
       process.exit(1);
     }
+  } else {
+    // Colon refspec (`HEAD:main`, the per-worktree default): the push carries
+    // *every* commit on HEAD that origin/main lacks — not just the mutation
+    // we're about to make. The intended workflow keeps the worktree branch at
+    // exactly origin/main (syncFromOrigin hard-resets it), so HEAD should be
+    // even with origin/main before we commit. If it is already AHEAD, those
+    // pre-existing commits are foreign work (e.g. a hand-authored RFC branch
+    // checked out in this same dir) that `git push HEAD:main` would silently
+    // shove onto main. Refuse loudly instead — this is the leak that put a
+    // `0000-` RFC placeholder onto main. Best-effort: a fetch failure (offline)
+    // leaves us no baseline, so we skip the check rather than block all writes.
+    let ahead = "";
+    try {
+      git(["fetch", "--quiet", "origin", "main"], { silent: true, cwd });
+      ahead = git(["rev-list", "--count", "origin/main..HEAD"], { silent: true, cwd }).trim();
+    } catch {
+      /* offline / no origin — leave ahead = "" so the guard skips rather than
+         blocking the mutation; do NOT swallow the process.exit below. */
+    }
+    if (ahead !== "" && ahead !== "0") {
+      const where = cwd ?? TASKS_DIR;
+      console.error(
+        `error: ${where} HEAD is ${ahead} commit(s) ahead of origin/main; ` +
+          `pushing "${pushRefspec}" would carry them onto main.\n` +
+          `  This dir is the tasks CLI's working checkout — it must not hold un-pushed\n` +
+          `  branch work. Author RFCs/branches in a separate worktree (scripts/start-worktree.sh),\n` +
+          `  then reset this checkout: git -C "${where}" fetch origin && git -C "${where}" reset --hard origin/main`,
+      );
+      process.exit(1);
+    }
   }
   // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
   // tree. Only needed before the first attempt — the retry path resets hard to
