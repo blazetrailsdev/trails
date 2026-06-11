@@ -308,8 +308,62 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
     proxy._wireInverseTarget(owner);
     return;
   }
-  child._cachedAssociations = child._cachedAssociations ?? new Map();
-  child._cachedAssociations.set(inverseName, owner);
+  _cacheSingularTarget(child, inverseName, owner);
+}
+
+/**
+ * Write a singular (belongs_to / has_one) target onto the record's
+ * `SingularAssociation` holder, reached via `record.association(name)` and
+ * stored there as `target` — the trails analog of Rails' `@target` living on
+ * the association object (`@association_cache[name]`). Only singular inverses
+ * get the holder write; a collection inverse name is left to its proxy.
+ *
+ * RFC 0022 b1: writers and inverse-of seeders route through the holder. A
+ * transitional `_cachedAssociations` mirror is kept until b3 migrates the
+ * remaining singular readers (counter-cache / validations / autosave /
+ * persistence / serialization) and b4 deletes the map.
+ *
+ * @internal
+ */
+export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
+  const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
+  if (macro === "belongsTo" || macro === "hasOne") {
+    record.association(assocName).setTarget(target);
+  }
+  record._cachedAssociations = record._cachedAssociations ?? new Map();
+  record._cachedAssociations.set(assocName, target);
+}
+
+/**
+ * Read the explicitly-set singular target for `assocName` — the short-circuit
+ * the inner `loadBelongsTo` / `loadHasOne` loaders consult before querying.
+ *
+ * RFC 0022 b1: singular writers and inverse-of seeders now store their target
+ * on the `SingularAssociation` holder (`record.association(name).target`,
+ * Rails' `@target`) as the source of truth, mirroring it into the transitional
+ * `_cachedAssociations` map. These inner loaders run *inside* the holder's own
+ * `loadTarget` (`doAsyncFindTarget`) and from sibling through-writers, where
+ * the holder's `loaded` flag tracks load results — not just explicit sets — so
+ * reading it here would memoize a load and defeat the re-query those paths
+ * depend on. The loaders therefore read the `_cachedAssociations` mirror (the
+ * holder's write-shadow, carrying only explicit sets/seeds) plus the
+ * `_preloadedAssociations` fallback. b3 migrates the remaining singular readers
+ * onto the holder and b4 deletes the mirror. Returns a one-key box (`{ value }`)
+ * on a hit so a loaded-nil target (null) is distinguished from a miss.
+ *
+ * @internal
+ */
+export function _loadedSingularTarget(
+  record: Base,
+  assocName: string,
+): { value: Base | null } | null {
+  if (record._cachedAssociations?.has(assocName)) {
+    return { value: record._cachedAssociations.get(assocName) as Base | null };
+  }
+  if (record._preloadedAssociations?.has(assocName)) {
+    return { value: record._preloadedAssociations.get(assocName) as Base | null };
+  }
+  return null;
 }
 
 /**
@@ -814,8 +868,12 @@ export async function loadBelongsTo(
   // the value is null: an invalid name must throw even when the cached value is
   // null (e.g. preloader stored null for a missing row), consistent with the
   // cache-miss path that validates before the FK/null short-circuit.
-  if (record._cachedAssociations?.has(assocName)) {
-    const cached = record._cachedAssociations.get(assocName) as Base | null;
+  // Read the loaded target off the singular holder (Rails' @target), with the
+  // legacy mirror + preload fallback for direct-loader calls on undeclared
+  // names. A loaded-nil target (null) is distinguished from "not loaded".
+  const loaded = _loadedSingularTarget(record, assocName);
+  if (loaded) {
+    const cached = loaded.value;
     if (options.inverseOf && !options.polymorphic) {
       // Resolve target class from instance if available, otherwise from options.
       const targetModel =
@@ -832,24 +890,6 @@ export async function loadBelongsTo(
       if (inverseName) _wireInverseAssociation(record, cached, inverseName);
     }
     return cached;
-  }
-  if (record._preloadedAssociations?.has(assocName)) {
-    const preloaded = record._preloadedAssociations.get(assocName) as Base | null;
-    if (options.inverseOf && !options.polymorphic) {
-      const targetModel =
-        (preloaded?.constructor as typeof Base | undefined) ??
-        resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
-      validateInverseOf(targetModel, assocName, options.inverseOf);
-    }
-    if (preloaded) {
-      const inverseName = _resolveInverseName(
-        record.constructor as typeof Base,
-        assocName,
-        options,
-      );
-      if (inverseName) _wireInverseAssociation(record, preloaded, inverseName);
-    }
-    return preloaded;
   }
 
   // Strict loading check: this is a lazy load
@@ -964,12 +1004,11 @@ export async function loadHasOne(
   if (options.through) {
     validateThroughReflection(record.constructor as typeof Base, assocName);
   }
-  // Check cached (inverse_of) first, then preloaded
-  if (record._cachedAssociations?.has(assocName)) {
-    return record._cachedAssociations.get(assocName) as Base | null;
-  }
-  if (record._preloadedAssociations?.has(assocName)) {
-    return record._preloadedAssociations.get(assocName) as Base | null;
+  // Read the loaded target off the singular holder (Rails' @target), with the
+  // legacy mirror + preload fallback for direct-loader calls on undeclared names.
+  const loaded = _loadedSingularTarget(record, assocName);
+  if (loaded) {
+    return loaded.value;
   }
 
   // Strict loading check
@@ -2366,9 +2405,8 @@ export function setBelongsTo(
     }
   }
 
-  // Cache the association
-  if (!record._cachedAssociations) record._cachedAssociations = new Map();
-  record._cachedAssociations.set(assocName, target);
+  // Cache the association on the singular holder (Rails' @target).
+  _cacheSingularTarget(record, assocName, target);
 
   // Set inverse on target (polymorphic existence validated above).
   if (target && typeof options.inverseOf === "string") {
@@ -2417,9 +2455,8 @@ export async function setHasOne(
     if (target.isPersisted()) await target.save();
   }
 
-  // Cache
-  if (!record._cachedAssociations) record._cachedAssociations = new Map();
-  record._cachedAssociations.set(assocName, target);
+  // Cache on the singular holder (Rails' @target).
+  _cacheSingularTarget(record, assocName, target);
 
   // Set inverse
   if (target && typeof options.inverseOf === "string") {
