@@ -48,6 +48,22 @@ export function resolveValueForDatabase(value: unknown): unknown {
 const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
 
 /**
+ * True when a CTE body node renders its own surrounding parentheses (a
+ * `Grouping` or a set-operation node), so `visit_Arel_Nodes_Cte` must not add
+ * another pair. A bare `SelectStatement` / `SqlLiteral` returns false — those
+ * need the explicit `AS (...)` wrap.
+ */
+export function cteRelationSelfWraps(relation: Node): boolean {
+  return (
+    relation instanceof Nodes.Grouping ||
+    relation instanceof Nodes.Union ||
+    relation instanceof Nodes.UnionAll ||
+    relation instanceof Nodes.Intersect ||
+    relation instanceof Nodes.Except
+  );
+}
+
+/**
  * ToSql visitor — walks the AST and produces SQL strings.
  *
  * Mirrors: Arel::Visitors::ToSql
@@ -1182,9 +1198,19 @@ export class ToSql extends Visitor {
     } else if (node.materialized === false) {
       collector.append("NOT MATERIALIZED ");
     }
-    collector.append("(");
-    this.visit(node.relation, collector);
-    collector.append(")");
+    // Rails' visit_Arel_Nodes_Cte emits only `AS ` and visits the relation,
+    // relying on the Grouping / SelectManager / set-operation visitors to supply
+    // their own parentheses (arel/visitors/to_sql.rb:732). Trails also stores
+    // bare SelectStatement / SqlLiteral relations, which don't self-wrap, so add
+    // the parens explicitly only for those — otherwise an array CTE
+    // (UnionAll) or a SqlLiteral CTE (Grouping) double-wraps to `AS ((…))`.
+    if (cteRelationSelfWraps(node.relation)) {
+      this.visit(node.relation, collector);
+    } else {
+      collector.append("(");
+      this.visit(node.relation, collector);
+      collector.append(")");
+    }
     return collector;
   }
 

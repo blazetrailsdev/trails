@@ -155,7 +155,7 @@ interface QueryMethodsHost {
   _fromClause: FromClause;
   _createWithAttrs: Record<string, unknown>;
   _extending: Array<Record<string, (...args: any[]) => any>>;
-  _ctes: Array<{ name: string; sql: string; recursive: boolean }>;
+  _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _skipPreloading: boolean;
   _skipQueryCache: boolean;
   _modelClass: typeof import("../base.js").Base;
@@ -222,8 +222,21 @@ export function referencesFromConditions(conditions: unknown): string[] {
   return PredicateBuilder.references(conditions).map((ref) => ref.value);
 }
 
-/** Validate and resolve a CTE name+query into a SQL string. */
-function resolveCteEntry(name: string, query: unknown): string {
+// Resolve a single CTE sub-query value into an arel body node, mirroring Rails'
+// `build_with_expression_from_value`. A raw SQL string / `SqlLiteral` becomes
+// `Nodes.Grouping(SqlLiteral)` (`when SqlLiteral then Grouping.new(value)`), so
+// it carries its own operand parens. A Relation / SelectManager contributes a
+// bare node — Rails uses `value.arel(.ast)`; we use its inlined SQL as a bare
+// `SqlLiteral` (the `value.arel` branches are deferred per the RFC 0022 cte
+// story), so UNION ALL leaves it unparenthesized exactly as Rails does.
+function buildCteLeaf(q: unknown): Nodes.Node {
+  if (typeof q === "string") return new Nodes.Grouping(arelSql(q) as any);
+  if (q instanceof Nodes.SqlLiteral) return new Nodes.Grouping(q as any);
+  return arelSql((q as any).toSql()) as unknown as Nodes.Node;
+}
+
+/** Validate and resolve a CTE name+query into an arel expression node. */
+function resolveCteEntry(name: string, query: unknown): Nodes.Node {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
     throw argumentError(
       `Invalid CTE name "${name}": must be a valid SQL identifier (letters, digits, underscores, not starting with a digit).`,
@@ -245,20 +258,13 @@ function resolveCteEntry(name: string, query: unknown): string {
         throw argumentError(`Unsupported argument type in array for CTE "${name}": ${typeName}`);
       }
     }
-    // Rails reduces array sub-queries into an `Arel::Nodes::UnionAll` AST
-    // (build_with_expression_from_value). trails' CTE bodies are SQL strings
-    // throughout (this whole feature stores `_ctes` as `{name, sql}` strings, not
-    // arel nodes), so we emit the same `UNION ALL` the UnionAll node compiles to
-    // by joining the parts' SQL — semantically identical (duplicate rows across
-    // parts are preserved), differing only in mechanism from the string-based CTE
-    // design, not in result.
-    // Do NOT wrap individual subqueries in extra parens: the CTE body is already
-    // wrapped as `AS (...)` in toSql(), so `SELECT ... UNION ALL SELECT ...` is
-    // valid; parenthesized `(SELECT ...) UNION ALL (SELECT ...)` is rejected by
-    // SQLite inside CTEs.
-    return (query as any[])
-      .map((q: any) => (typeof q === "string" ? q : q.toSql()))
-      .join(" UNION ALL ");
+    // Rails reduces array sub-queries into a left-nested `Arel::Nodes::UnionAll`
+    // AST (build_with_expression_from_value). A single-element array unwraps to
+    // its sole leaf. The SQLite visitor strips the leaves' `Grouping` parens
+    // inside UNION ALL (infix_value_with_paren); PG/MySQL keep them.
+    return (query as unknown[])
+      .map(buildCteLeaf)
+      .reduce((left, right) => new Nodes.UnionAll(left as any, right as any));
   }
   const q = query as any;
   if (typeof q !== "string" && typeof q?.toSql !== "function") {
@@ -270,22 +276,51 @@ function resolveCteEntry(name: string, query: unknown): string {
       `Unsupported argument type for CTE "${name}": expected a SQL string or Relation, got ${typeName}`,
     );
   }
-  return typeof q === "string" ? q : q.toSql();
+  return buildCteLeaf(query);
 }
 
 /** Upsert a CTE into _ctes by name (last-write-wins), matching Rails behavior. */
 function upsertCte(
-  ctes: Array<{ name: string; sql: string; recursive: boolean }>,
+  ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>,
   name: string,
-  sql: string,
+  expression: Nodes.Node,
   recursive: boolean,
 ): void {
   const existing = ctes.findIndex((c) => c.name === name);
   if (existing >= 0) {
-    ctes[existing] = { name, sql, recursive };
+    ctes[existing] = { name, expression, recursive };
   } else {
-    ctes.push({ name, sql, recursive });
+    ctes.push({ name, expression, recursive });
   }
+}
+
+/**
+ * Render the `WITH [RECURSIVE] <name> AS (body), ...` clause for a set of CTEs.
+ * `compile` lowers a CTE body node to SQL through the dialect's arel visitor;
+ * `quoteName` quotes the CTE name through the adapter (double quotes on
+ * SQLite/PG, backticks on MySQL) — mirroring Rails' `visit_Arel_Nodes_Cte`,
+ * which renders the name via `quote_table_name`. `UnionAll` / `Grouping` bodies
+ * already emit their own surrounding parens, so the `AS (...)` parens are only
+ * added for any other (bare) node.
+ * @internal
+ */
+export function buildCteSql(
+  ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>,
+  compile: (node: Nodes.Node) => string,
+  quoteName: (name: string) => string,
+): string {
+  const recursive = ctes.some((c) => c.recursive);
+  const defs = ctes
+    .map((c) => {
+      const body = compile(c.expression);
+      const wrapped =
+        c.expression instanceof Nodes.UnionAll || c.expression instanceof Nodes.Grouping
+          ? body
+          : `(${body})`;
+      return `${quoteName(c.name)} AS ${wrapped}`;
+    })
+    .join(", ");
+  return `WITH ${recursive ? "RECURSIVE " : ""}${defs}`;
 }
 
 function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>>): any {
@@ -298,8 +333,8 @@ function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>
       throw argumentError(`Unsupported argument type: ${typeName}`);
     }
     for (const [name, query] of Object.entries(cte)) {
-      const sql = resolveCteEntry(name, query);
-      upsertCte(this._ctes, name, sql, false);
+      const expression = resolveCteEntry(name, query);
+      upsertCte(this._ctes, name, expression, false);
     }
   }
   return this;
@@ -315,8 +350,8 @@ function withRecursiveBang(this: QueryMethodsHost, ...ctes: Array<Record<string,
       throw argumentError(`Unsupported argument type: ${typeName}`);
     }
     for (const [name, query] of Object.entries(cte)) {
-      const sql = resolveCteEntry(name, query);
-      upsertCte(this._ctes, name, sql, true);
+      const expression = resolveCteEntry(name, query);
+      upsertCte(this._ctes, name, expression, true);
     }
   }
   return this;
@@ -2511,7 +2546,7 @@ export function buildWith(this: QueryMethodsHost, arel: any): void {
   if (!this._ctes || this._ctes.length === 0) return;
 
   const hasRecursive = this._ctes.some((c) => c.recursive);
-  const withNodes = this._ctes.map((c) => new Nodes.Cte(c.name, arelSql(c.sql) as any));
+  const withNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression as any));
 
   if (hasRecursive) {
     arel.withRecursive?.(...withNodes);

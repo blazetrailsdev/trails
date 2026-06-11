@@ -338,7 +338,7 @@ export class Relation<T extends Base> {
   private _fromClause: FromClause = FromClause.empty();
   private _createWithAttrs: Record<string, unknown> = {};
   private _extending: Array<Record<string, (...args: any[]) => any>> = [];
-  private _ctes: Array<{ name: string; sql: string; recursive: boolean }> = [];
+  private _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }> = [];
   private _skipPreloading = false;
   private _skipQueryCache = false;
   private _loaded = false;
@@ -4103,12 +4103,15 @@ export class Relation<T extends Base> {
       sql = `${sql} ${comments}`;
     }
 
-    // Prepend CTE clauses
+    // Prepend CTE clauses. The bodies are arel expression nodes
+    // (build_with_expression_from_value) compiled through the dialect visitor —
+    // UNION ALL operand parens are stripped on SQLite, kept on PG/MySQL.
     if (this._ctes.length > 0) {
-      const hasRecursive = this._ctes.some((c) => c.recursive);
-      const keyword = hasRecursive ? "WITH RECURSIVE" : "WITH";
-      const cteDefs = this._ctes.map((c) => `"${c.name}" AS (${c.sql})`).join(", ");
-      sql = `${keyword} ${cteDefs} ${sql}`;
+      sql = `${_qm.buildCteSql(
+        this._ctes,
+        (n) => this._compileArelNode(n),
+        (name) => this._modelClass.connection.quoteTableName(name),
+      )} ${sql}`;
     }
 
     return sql;
