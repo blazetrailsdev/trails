@@ -110,7 +110,11 @@ describe("PresenceValidationTest", () => {
     const s = new speedometer();
     setAssoc(s, "dashboard", dash);
 
-    // Rails `assert_nothing_raised { s.valid? }`.
+    // Rails defines `def dash.to_a; …; end` to prove presence validation never
+    // coerces a single associated record through `to_a`. Our AR PresenceValidator
+    // wraps with `Array.isArray(value) ? value : [value]` and never calls any
+    // `to_a`/`toA`, so the regression cannot recur in JS — Rails
+    // `assert_nothing_raised { s.valid? }`.
     expect(await s.isValid()).toBe(true);
   });
 
@@ -120,7 +124,7 @@ describe("PresenceValidationTest", () => {
       Interest.validatesPresenceOf("topic");
       Interest.validatesPresenceOf("abbreviation");
 
-      const interest = await Interest.create({
+      const interest = await Interest.createBang({
         topic: "Thought Leadering",
         abbreviation: "tl",
       });
@@ -135,7 +139,7 @@ describe("PresenceValidationTest", () => {
   it("validations run on persisted record", async () => {
     await repairValidations(Interest, async () => {
       const interest = new Interest();
-      await interest.save();
+      await interest.saveBang();
       expect(await interest.isValid()).toBe(true);
 
       Interest.validatesPresenceOf("topic");
@@ -148,7 +152,7 @@ describe("PresenceValidationTest", () => {
     await repairValidations(Interest, async () => {
       Interest.validatesPresenceOf("topic", { on: "required_name" });
       const interest = new Interest();
-      await interest.save();
+      await interest.saveBang();
       expect(await interest.isValid("required_name")).toBe(false);
     });
   });
