@@ -52,6 +52,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("schema", async () => {
       await defineSchema(adapter, {
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL introspection test owns its schema; dropped in finally, mirrors Rails schema_test.rb
         posts: { title: "string", body: "text", type: "string" },
       });
       try {
@@ -83,6 +84,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("primary key", async () => {
+      // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL introspection test owns its schema; dropped in finally, mirrors Rails schema_test.rb
       await defineSchema(adapter, { topics: { title: "string" } });
       try {
         expect(await adapter.primaryKey("topics")).toBe("id");
@@ -92,6 +94,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("data source exists?", async () => {
+      // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL introspection test owns its schema; dropped in finally, mirrors Rails schema_test.rb
       await defineSchema(adapter, { topics: { title: "string" } });
       try {
         const db = await adapter.currentDatabase();
@@ -172,6 +175,7 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
 
   it("primary key method with ansi quotes", async () => {
     const a = ansi!;
+    // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL introspection test owns its schema; dropped in finally, mirrors Rails schema_test.rb
     await defineSchema(a, { topics: { title: "string" } });
     try {
       expect(await a.primaryKey("topics")).toBe("id");
@@ -186,7 +190,9 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
     // bigint student_id referencing students(id). Bigint width matches the
     // default Rails PK so addForeignKey doesn't trip MySQL's type-match rule.
     await defineSchema(a, {
+      // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL foreign-key test owns its schema; dropped in finally, mirrors Rails schema_test.rb
       students: { name: "string" },
+      // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL foreign-key test owns its schema; dropped in finally, mirrors Rails schema_test.rb
       lessons_students: {
         columns: { student_id: "big_integer" },
         primaryKey: false,

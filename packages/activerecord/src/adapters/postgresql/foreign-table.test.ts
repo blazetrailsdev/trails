@@ -44,6 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
     await defineSchema(
       {
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- FDW backing table owns its schema; dropped in beforeEach/afterEach, mirrors Rails foreign_table_test.rb
         professors: { name: { type: "string", null: false } },
       },
       { dropExisting: true },

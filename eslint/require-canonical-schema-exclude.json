@@ -1,11 +1,4 @@
 [
-  "packages/activerecord/src/adapters/abstract-mysql-adapter/mysql-explain.test.ts",
-  "packages/activerecord/src/adapters/abstract-mysql-adapter/schema.test.ts",
-  "packages/activerecord/src/adapters/postgresql/bind-parameter.test.ts",
-  "packages/activerecord/src/adapters/postgresql/define-schema-pg-types.test.ts",
-  "packages/activerecord/src/adapters/postgresql/foreign-table.test.ts",
-  "packages/activerecord/src/adapters/sqlite3-adapter.test.ts",
-  "packages/activerecord/src/adapters/sqlite3/json.test.ts",
   "packages/activerecord/src/aggregations.test.ts",
   "packages/activerecord/src/associations.test.ts",
   "packages/activerecord/src/associations/association-relation.test.ts",

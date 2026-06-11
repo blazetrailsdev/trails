@@ -21,6 +21,7 @@ describeIfPg("defineSchema PG-only column types", () => {
     await defineSchema(
       adapter,
       {
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- PG-only type DDL; table owns its schema, dropped in afterEach
         ds_pg_types: {
           col_citext: "citext",
           col_hstore: "hstore",
@@ -51,6 +52,7 @@ describeIfPg("defineSchema PG-only column types", () => {
     await defineSchema(
       adapter,
       {
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- PG-only array-type DDL; table owns its schema, dropped in afterEach
         ds_pg_array: {
           tags: { type: "integer", array: true },
           labels: { type: "string", array: true },

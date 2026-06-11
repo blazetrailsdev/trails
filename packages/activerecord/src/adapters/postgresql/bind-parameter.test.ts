@@ -24,6 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // behind, and the per-adapter signature cache starts empty in a
     // fresh process, so defineSchema would otherwise try CREATE TABLE
     // over an existing table.
+    // eslint-disable-next-line blazetrails/require-canonical-schema -- uniquely-named bind-probe table owns its schema; dropped in afterAll
     await defineSchema(adapter, { bind_test: { name: "string" } }, { dropExisting: true });
     await adapter.executeMutation(`INSERT INTO "bind_test" ("name") VALUES ('hello')`);
   });

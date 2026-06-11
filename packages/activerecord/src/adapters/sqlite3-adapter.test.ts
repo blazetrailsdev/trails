@@ -130,6 +130,7 @@ describe("SqliteAdapter", () => {
 
     beforeEach(async () => {
       await defineSchema(adapter, {
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
         users: { name: "string", email: "string", age: "integer" },
       });
       User.adapter = adapter;
@@ -237,6 +238,7 @@ describe("SqliteAdapter", () => {
 
     beforeEach(async () => {
       await defineSchema(adapter, {
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
         products: { name: "string", price: "integer", category: "string" },
       });
       Product.adapter = adapter;
@@ -409,6 +411,7 @@ describe("SqliteAdapter", () => {
 
     beforeEach(async () => {
       await defineSchema(adapter, {
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
         accounts: {
           name: "string",
           balance: { type: "integer", default: 0 },
@@ -485,7 +488,9 @@ describe("SqliteAdapter", () => {
 
     beforeEach(async () => {
       await defineSchema(adapter, {
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
         authors: { name: "string" },
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
         books: { title: "string", author_id: "integer" },
       });
       Author.adapter = adapter;

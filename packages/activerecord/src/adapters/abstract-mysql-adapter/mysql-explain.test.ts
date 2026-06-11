@@ -126,6 +126,7 @@ describeIfMysql("Mysql2Adapter", () => {
       // paths — plain "contains the table name" would pass either
       // way.
       await defineSchema({
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- uniquely-named explain-probe table owns its schema; no shared-DB collision
         ex_rel_mysqls: { name: "string" },
       });
       class ExRelMysql extends Base {
@@ -149,7 +150,9 @@ describeIfMysql("Mysql2Adapter", () => {
     it("Relation#explain on MySQL captures preload queries", async () => {
       const { registerModel } = await import("../../index.js");
       await defineSchema({
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- uniquely-named explain-probe table owns its schema; no shared-DB collision
         ex_mysql_authors: { name: "string" },
+        // eslint-disable-next-line blazetrails/require-canonical-schema -- uniquely-named explain-probe table owns its schema; no shared-DB collision
         ex_mysql_books: { title: "string", ex_mysql_author_id: "integer" },
       });
       class ExMysqlAuthor extends Base {

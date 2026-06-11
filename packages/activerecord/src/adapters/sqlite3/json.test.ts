@@ -20,6 +20,7 @@ afterEach(() => {
 describeIfSqlite("SQLite3JSONTest", () => {
   it("json string cast round-trip", async () => {
     await defineSchema(adapter, {
+      // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated in-memory adapter; JSON type-test table owns its schema
       json_string_cast: { data: "json" },
     });
     class JsonStringCast extends Base {
@@ -38,6 +39,7 @@ describeIfSqlite("SQLite3JSONTest", () => {
 
   it("test_default", async () => {
     await defineSchema(adapter, {
+      // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated in-memory adapter; JSON type-test table owns its schema
       json_data_type: {
         payload: { type: "json", default: "{}" },
         settings: "json",
