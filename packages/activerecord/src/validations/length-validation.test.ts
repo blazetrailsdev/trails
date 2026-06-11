@@ -8,8 +8,8 @@ import "../index.js";
 import { registerModel, association } from "../associations.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
 
@@ -22,8 +22,7 @@ describe("LengthValidationTest", () => {
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    const schema = canonicalSchema as Schema;
-    await defineSchema({ owners: schema.owners, pets: schema.pets });
+    await defineSchema({ owners: TEST_SCHEMA.owners, pets: TEST_SCHEMA.pets });
     registerModel("Owner", Owner);
     registerModel("Pet", Pet);
   });
