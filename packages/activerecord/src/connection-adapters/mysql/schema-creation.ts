@@ -21,8 +21,7 @@ import {
   TableDefinition,
 } from "../abstract/schema-definitions.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
-import { quoteIdentifier, quoteTableName, quoteString as mysqlQuoteString } from "./quoting.js";
-import { quoteDefaultExpression } from "../abstract/quoting.js";
+import { mysqlSchemaQuoter, type MysqlSchemaQuoter } from "./schema-quoter.js";
 import {
   addOptionsForIndexColumns,
   integerToSql,
@@ -58,6 +57,12 @@ export interface VisitorHostAdapter {
   isMariadb?(): boolean;
   /** Mirrors `SchemaStatements#isForeignKeysEnabled` (`adapter.config?.foreignKeys !== false`). */
   config?: { foreignKeys?: boolean };
+  /** Quoting surface consulted polymorphically by the visitor when the real adapter is
+   * threaded; absent on the host-less (unit-test) path, which falls back to the standalone
+   * MySQL helpers in {@link mysqlSchemaQuoter}. */
+  quoteIdentifier?(name: string): string;
+  quoteTableName?(name: string): string;
+  quote?(value: unknown): string;
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
@@ -65,13 +70,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected _mariadb = false;
   /** @internal Optional adapter ref so `supports*` helpers mirror Rails' `@conn`-delegated flags. */
   protected _hostAdapter?: VisitorHostAdapter;
+  /** @internal Quoter dispatches through the host adapter when threaded (polymorphic),
+   * else the dialect's standalone helpers. Widened from the base `SchemaQuoter` to expose
+   * `quote` for `add_sql_comment!`. */
+  declare protected adapter: MysqlSchemaQuoter;
 
   constructor(host?: VisitorHostAdapter) {
-    super("mysql", {
-      quoteIdentifier: quoteIdentifier,
-      quoteTableName: quoteTableName,
-      quoteDefaultExpression: quoteDefaultExpression,
-    });
+    super("mysql", mysqlSchemaQuoter(host));
     this._hostAdapter = host;
   }
 
@@ -404,6 +409,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected addSqlCommentBang(sql: string, comment: string | null | undefined): string {
     if (!comment?.trim()) return sql;
-    return `${sql} COMMENT ${mysqlQuoteString(comment)}`;
+    return `${sql} COMMENT ${this.adapter.quote(comment)}`;
   }
 }
