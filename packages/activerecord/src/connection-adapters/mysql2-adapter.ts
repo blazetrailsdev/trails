@@ -1369,10 +1369,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Functional-index expressions are surfaced on MySQL 8.0.13+ (detected
    * via statisticsHasExpressionColumn).
    */
-  async indexes(
-    tableName: string,
-  ): Promise<
-    Array<{ name: string; columns: string[]; unique: boolean; using?: string; type?: string }>
+  async indexes(tableName: string): Promise<
+    Array<{
+      name: string;
+      columns: string[];
+      unique: boolean;
+      using?: string;
+      type?: string;
+      comment?: string;
+    }>
   > {
     const { schema, table } = this.parseMysqlName(tableName);
     const hasExpr = await this.statisticsHasExpressionColumn();
@@ -1382,7 +1387,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
               column_name AS col,
               ${exprSelect},
               non_unique AS non_unique,
-              index_type AS idx_type
+              index_type AS idx_type,
+              index_comment AS idx_comment
          FROM information_schema.statistics
          WHERE table_schema = COALESCE(?, database())
          AND table_name = ?
@@ -1393,7 +1399,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
     const byIndex = new Map<
       string,
-      { columns: string[]; unique: boolean; using?: string; type?: string }
+      { columns: string[]; unique: boolean; using?: string; type?: string; comment?: string }
     >();
     for (const r of rows) {
       const name = String((r.name ?? r.NAME ?? r.INDEX_NAME) as string);
@@ -1424,17 +1430,23 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         } else {
           using = idxType.toLowerCase();
         }
-        byIndex.set(name, { columns: [], unique: nonUnique === 0, using, type });
+        const rawComment = r.idx_comment ?? r.IDX_COMMENT ?? r.INDEX_COMMENT;
+        const comment =
+          rawComment != null && String(rawComment) !== "" ? String(rawComment) : undefined;
+        byIndex.set(name, { columns: [], unique: nonUnique === 0, using, type, comment });
       }
       byIndex.get(name)!.columns.push(column);
     }
-    return Array.from(byIndex.entries()).map(([name, { columns, unique, using, type }]) => ({
-      name,
-      columns,
-      unique,
-      ...(using !== undefined ? { using } : {}),
-      ...(type !== undefined ? { type } : {}),
-    }));
+    return Array.from(byIndex.entries()).map(
+      ([name, { columns, unique, using, type, comment }]) => ({
+        name,
+        columns,
+        unique,
+        ...(using !== undefined ? { using } : {}),
+        ...(type !== undefined ? { type } : {}),
+        ...(comment !== undefined ? { comment } : {}),
+      }),
+    );
   }
 
   /**

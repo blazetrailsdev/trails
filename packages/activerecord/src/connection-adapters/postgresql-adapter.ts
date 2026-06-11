@@ -2970,6 +2970,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
               ) AS columns,
               pg_get_indexdef(ix.indexrelid) AS definition,
               ix.indoption AS options,
+              obj_description(ix.indexrelid, 'pg_class') AS comment,
               t.relname AS table_name
        FROM pg_class t
        JOIN pg_index ix ON t.oid = ix.indrelid
@@ -3049,6 +3050,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         include,
         where,
         nullsNotDistinct,
+        comment: (row.comment as string | null) ?? undefined,
       };
     });
   }
@@ -4022,6 +4024,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       ifNotExists?: boolean;
       nullsNotDistinct?: boolean;
       include?: string[];
+      comment?: string;
     } = {},
   ): Promise<string> {
     const cols = Array.isArray(columns) ? columns : [columns];
@@ -4073,6 +4076,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
 
     await this.exec(sql);
+
+    if (options.comment?.trim()) {
+      const { schema } = this.parseSchemaQualifiedName(tableName);
+      const qualifiedIndex = schema
+        ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(indexName)}`
+        : this.quoteIdentifier(indexName);
+      await this.exec(`COMMENT ON INDEX ${qualifiedIndex} IS ${this.quote(options.comment)}`);
+    }
+
     return sql;
   }
 

@@ -26,6 +26,7 @@ export interface PgIndexDefinition {
   include?: string[];
   where?: string;
   nullsNotDistinct?: boolean;
+  comment?: string;
 }
 
 export interface CreateDatabaseOptions {
