@@ -245,12 +245,16 @@ export function extractGeneratedType(
 export function extractValueFromDefault(dfltValue: string | null): unknown {
   if (dfltValue === null) return null;
   if (/^null$/i.test(dfltValue)) return null;
-  const single = /^'([\s\S]*)'$/.exec(dfltValue);
+  // Quoted types — `[^|]` mirrors Rails exactly (sqlite3_adapter.rb:527,530).
+  const single = /^'([^|]*)'$/.exec(dfltValue);
   if (single) return single[1].replace(/''/g, "'");
-  const double = /^"([\s\S]*)"$/.exec(dfltValue);
+  const double = /^"([^|]*)"$/.exec(dfltValue);
   if (double) return double[1].replace(/""/g, '"');
+  // Numeric types
   if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
-  const hex = /^x'([0-9a-fA-F]*)'$/i.exec(dfltValue);
+  // Binary columns — unanchored `x'(.*)'` + hex unpack, mirroring Rails'
+  // `[ $1 ].pack("H*")` (sqlite3_adapter.rb:536).
+  const hex = /x'(.*)'/.exec(dfltValue);
   if (hex) return Buffer.from(hex[1], "hex");
   return null;
 }
