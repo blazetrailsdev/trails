@@ -354,6 +354,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // applyPendingEncryptions() then wraps the resolved JSON type, so declaration
     // order (encrypts before attribute) is transparent.
     const adp = await freshAdapter();
+    // `articles_first` is a synthetic table exercising the declaration-order path
+    // (encrypts before attribute); it has no Rails/schema.rb counterpart, so it
+    // cannot reference the canonical schema.
+    // eslint-disable-next-line blazetrails/require-canonical-schema
     await defineSchema(adp, { articles_first: { settings: "json" } });
     const Article = class extends Base {
       static {

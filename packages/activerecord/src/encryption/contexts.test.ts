@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
 import "../relation.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
@@ -30,14 +31,18 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
   let titleCiphertext: unknown;
 
   beforeAll(async () => {
-    // Dedicated tables (limit 1024) so the JSON-wrapped, base64'd ciphertext is
-    // not truncated by a default VARCHAR(255) column.
     await defineSchema({
+      // `encrypted_posts` is not a canonical table: Rails' EncryptedPost rides the
+      // `posts` table, but our (larger, double-base64'd — see the skip note in
+      // encryptable-record.test.ts) ciphertext would be truncated by `posts.title`'s
+      // default VARCHAR(255) on MySQL. A dedicated table with limit-1024 ciphertext
+      // columns is required, so this entry stays inline rather than canonical.
+      // eslint-disable-next-line blazetrails/require-canonical-schema
       encrypted_posts: {
         title: { type: "string", limit: 1024 },
         body: { type: "string", limit: 1024 },
       },
-      encrypted_books: { name: { type: "string", limit: 1024, default: "<untitled>" } },
+      encrypted_books: TEST_SCHEMA.encrypted_books,
     });
   });
 

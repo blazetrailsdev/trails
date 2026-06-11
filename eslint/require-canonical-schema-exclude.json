@@ -55,8 +55,6 @@
   "packages/activerecord/src/date.test.ts",
   "packages/activerecord/src/defaults.test.ts",
   "packages/activerecord/src/dup.test.ts",
-  "packages/activerecord/src/encryption/contexts.test.ts",
-  "packages/activerecord/src/encryption/encryptable-record.test.ts",
   "packages/activerecord/src/excluding.test.ts",
   "packages/activerecord/src/inheritance.test.ts",
   "packages/activerecord/src/inherited.test.ts",
