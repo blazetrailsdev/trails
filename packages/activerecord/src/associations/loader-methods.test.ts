@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
+import { MigrationContext } from "../migration.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
@@ -51,14 +51,20 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
     adapter = createTestAdapter();
     // These `lo_*` tables back an internal-API test (Base#loadBelongsTo /
     // Base#loadHasOne) with no Rails counterpart, so they are test-local by
-    // design with no canonical-schema shape to reference.
-    /* eslint-disable blazetrails/require-canonical-schema */
-    await defineSchema(adapter, {
-      lo_authors: { name: "string" },
-      lo_posts: { title: "string", lo_author_id: "integer" },
-      lo_profiles: { bio: "string", lo_author_id: "integer" },
+    // design with no canonical-schema shape to reference; created via
+    // create_table (as Rails does for ad-hoc test tables).
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("lo_authors", { force: true }, (t) => {
+      t.string("name");
     });
-    /* eslint-enable blazetrails/require-canonical-schema */
+    await ctx.createTable("lo_posts", { force: true }, (t) => {
+      t.string("title");
+      t.integer("lo_author_id");
+    });
+    await ctx.createTable("lo_profiles", { force: true }, (t) => {
+      t.string("bio");
+      t.integer("lo_author_id");
+    });
     LoAuthor.adapter = adapter;
     LoPost.adapter = adapter;
     LoProfile.adapter = adapter;
