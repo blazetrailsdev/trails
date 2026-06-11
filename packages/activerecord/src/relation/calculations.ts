@@ -48,6 +48,7 @@ interface CalculationRelation {
       adapterName: AdapterName;
       visitor?: { compile(node: any): string; compileWithBinds?(node: any): [string, unknown[]] };
       toSql(arel: unknown): string;
+      quoteTableName(name: string): string;
       execute(sql: string): Promise<Record<string, unknown>[]>;
       selectAll(
         sql: string,
@@ -237,7 +238,7 @@ function prependCtes(rel: CalculationRelation, sql: string): string {
   const connection = rel._modelClass.connection;
   const compile = (node: Nodes.Node): string =>
     connection.visitor ? connection.visitor.compile(node) : connection.toSql(node);
-  return `${buildCteSql(rel._ctes, compile)} ${sql}`;
+  return `${buildCteSql(rel._ctes, compile, (name) => connection.quoteTableName(name))} ${sql}`;
 }
 
 // Mirrors relation.ts _safeAlias: quote alias if it contains non-identifier chars.

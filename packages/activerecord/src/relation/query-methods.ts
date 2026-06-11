@@ -295,15 +295,19 @@ function upsertCte(
 }
 
 /**
- * Render the `WITH [RECURSIVE] "name" AS (body), ...` clause for a set of CTEs.
- * `compile` lowers a CTE body node to SQL through the dialect's arel visitor.
- * `UnionAll` / `Grouping` bodies already emit their own surrounding parens, so
- * the `AS (...)` parens are only added for any other (bare) node.
+ * Render the `WITH [RECURSIVE] <name> AS (body), ...` clause for a set of CTEs.
+ * `compile` lowers a CTE body node to SQL through the dialect's arel visitor;
+ * `quoteName` quotes the CTE name through the adapter (double quotes on
+ * SQLite/PG, backticks on MySQL) — mirroring Rails' `visit_Arel_Nodes_Cte`,
+ * which renders the name via `quote_table_name`. `UnionAll` / `Grouping` bodies
+ * already emit their own surrounding parens, so the `AS (...)` parens are only
+ * added for any other (bare) node.
  * @internal
  */
 export function buildCteSql(
   ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>,
   compile: (node: Nodes.Node) => string,
+  quoteName: (name: string) => string,
 ): string {
   const recursive = ctes.some((c) => c.recursive);
   const defs = ctes
@@ -313,7 +317,7 @@ export function buildCteSql(
         c.expression instanceof Nodes.UnionAll || c.expression instanceof Nodes.Grouping
           ? body
           : `(${body})`;
-      return `"${c.name}" AS ${wrapped}`;
+      return `${quoteName(c.name)} AS ${wrapped}`;
     })
     .join(", ");
   return `WITH ${recursive ? "RECURSIVE " : ""}${defs}`;

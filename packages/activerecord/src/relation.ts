@@ -4083,7 +4083,11 @@ export class Relation<T extends Base> {
     // (build_with_expression_from_value) compiled through the dialect visitor —
     // UNION ALL operand parens are stripped on SQLite, kept on PG/MySQL.
     if (this._ctes.length > 0) {
-      sql = `${_qm.buildCteSql(this._ctes, (n) => this._compileArelNode(n))} ${sql}`;
+      sql = `${_qm.buildCteSql(
+        this._ctes,
+        (n) => this._compileArelNode(n),
+        (name) => this._modelClass.connection.quoteTableName(name),
+      )} ${sql}`;
     }
 
     return sql;
