@@ -31,7 +31,6 @@ import {
   type SchemaStatementsLike,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
-import { quote } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
@@ -1312,13 +1311,18 @@ export class SchemaStatements {
     return this._insertVersionsSql(smTable.tableName ?? "schema_migrations", versions);
   }
 
-  private _insertVersionsSql(tableName: string, versions: string | string[]): string {
+  private _insertVersionsSql(
+    tableName: string,
+    versions: string | number | Array<string | number>,
+  ): string {
     const smTable = this._qt(tableName);
     if (Array.isArray(versions)) {
-      const rows = versions.reverse().map((v) => `(${quote(v)})`);
+      // Ruby's Array#reverse returns a new array; copy before reversing so we
+      // don't mutate the caller's array (e.g. pool.schemaMigration.versions).
+      const rows = [...versions].reverse().map((v) => `(${this.adapter.quote(v)})`);
       return `INSERT INTO ${smTable} (version) VALUES\n${rows.join(",\n")};`;
     }
-    return `INSERT INTO ${smTable} (version) VALUES (${quote(versions)});`;
+    return `INSERT INTO ${smTable} (version) VALUES (${this.adapter.quote(versions)});`;
   }
 
   internalStringOptionsForPrimaryKey(): Record<string, unknown> {
@@ -1346,9 +1350,13 @@ export class SchemaStatements {
       ? (migrationContext.migrations ?? []).map((m: { version: number }) => m.version)
       : [];
 
-    // Insert the target version if not already migrated
+    // Insert the target version if not already migrated. Rails passes the
+    // numeric `version.to_i` to `quote`, emitting an unquoted numeric literal —
+    // pass `verNum`, not the `ver` string, so adapter dispatch matches.
     if (!migrated.includes(verNum)) {
-      await this.adapter.executeMutation(`INSERT INTO ${smTable} (version) VALUES (${quote(ver)})`);
+      await this.adapter.executeMutation(
+        `INSERT INTO ${smTable} (version) VALUES (${this.adapter.quote(verNum)})`,
+      );
     }
 
     // Insert all known migration versions below the target that haven't been run
@@ -1360,9 +1368,7 @@ export class SchemaStatements {
           `Duplicate migration ${duplicate}. Please renumber your migrations to resolve the conflict.`,
         );
       }
-      await this.adapter.executeMutation(
-        this._insertVersionsSql(smTableName, inserting.map(String)),
-      );
+      await this.adapter.executeMutation(this._insertVersionsSql(smTableName, inserting));
     }
   }
 
