@@ -15,7 +15,6 @@ import {
   quotedBinary,
   quotedFalse,
   quotedTrue,
-  quoteIdentifier,
   quoteSchemaName,
   quoteTableNameForAssignment,
   typeCast,
@@ -28,11 +27,6 @@ describe("PostgreSQL quoting", () => {
     // "TRUE"/"FALSE" from active_record/connection_adapters/abstract/quoting.rb:166.
     expect(quotedTrue()).toBe("TRUE");
     expect(quotedFalse()).toBe("FALSE");
-  });
-
-  it("quoteIdentifier wraps in double quotes and escapes embedded ones", () => {
-    expect(quoteIdentifier("foo")).toBe('"foo"');
-    expect(quoteIdentifier('foo"bar')).toBe('"foo""bar"');
   });
 
   it("type casts binary data to a Buffer for node-postgres bytea binding", () => {

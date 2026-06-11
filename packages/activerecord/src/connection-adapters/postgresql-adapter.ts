@@ -4452,9 +4452,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return { schema: pgName.schema, table: pgName.identifier };
   }
 
-  override quoteIdentifier(name: string): string {
-    return pgQuoteColumnName(name);
-  }
+  // quoteIdentifier is NOT overridden: PG's identifier quoting is
+  // byte-identical to AbstractAdapter's double-quote form (`"x"` with
+  // `"` → `""`), so the inherited base method produces the same SQL.
 
   /**
    * Mirrors: PostgreSQL::Quoting#quote_table_name_for_assignment

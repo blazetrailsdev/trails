@@ -67,7 +67,6 @@ import {
   quoteString as sqliteQuoteStringLiteral,
   quoteTableName,
   quoteColumnName,
-  quoteIdentifier as sqliteQuoteIdentifier,
   quoteTableNameForAssignment as sqliteQuoteTableNameForAssignment,
   quotedTrue as sqliteQuotedTrue,
   unquotedTrue as sqliteUnquotedTrue,
@@ -631,9 +630,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return s.replace(/'/g, "''");
   }
 
-  override quoteIdentifier(name: string): string {
-    return sqliteQuoteIdentifier(name);
-  }
+  // quoteIdentifier is NOT overridden: Rails has no `quote_identifier`
+  // method (it is a Trails-only uniform-interface alias), so SQLite inherits
+  // AbstractAdapter's double-quote form rather than carrying a redundant copy.
+  // quoteTableName / quoteColumnName ARE kept: Rails' SQLite3::Quoting defines
+  // both explicitly (sqlite3/quoting.rb:44-50) — column → `"x"`, table →
+  // dot-split `"."` — while Rails' abstract leaves quote_column_name a
+  // NotImplementedError and quote_table_name a no-split default
+  // (abstract/quoting.rb:60-67). Inheriting Trails' broader abstract here would
+  // diverge from SQLite's concrete Rails method.
 
   override quoteTableName(name: string): string {
     return quoteTableName(name);
