@@ -3,10 +3,17 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import { Base } from "./index.js";
+import { Base, registerModel } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+
+// The generated has_many reader (`record.comments`) is defined dynamically, so
+// it isn't on `Base`'s static type. This narrows it to the proxy surface these
+// tests use — `.load()` to hydrate, iteration to read the loaded targets.
+function collection(record: Base, name: string): { load(): Promise<unknown> } & Iterable<Base> {
+  return (record as unknown as Record<string, { load(): Promise<unknown> } & Iterable<Base>>)[name];
+}
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -169,12 +176,14 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     class PostJ1 extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("comments", { className: "CommentJ1", foreignKey: "post_id" });
       }
     }
+    registerModel(CommentJ1);
     const post = await PostJ1.create({ title: "Hello" });
-    const c1 = await CommentJ1.create({ body: "Great", post_id: post.id });
-    const c2 = await CommentJ1.create({ body: "Nice", post_id: post.id });
-    (post as any)._cachedAssociations = new Map([["comments", [c1, c2]]]);
+    await CommentJ1.create({ body: "Great", post_id: post.id });
+    await CommentJ1.create({ body: "Nice", post_id: post.id });
+    await collection(post, "comments").load();
     const json = post.asJson({ include: "comments" });
     expect(json.comments).toBeDefined();
     expect((json.comments as any[]).length).toBe(2);
@@ -191,11 +200,13 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     class PostJ2 extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("comments", { className: "CommentJ2", foreignKey: "post_id" });
       }
     }
+    registerModel(CommentJ2);
     const post = await PostJ2.create({ title: "Hello" });
-    const c1 = await CommentJ2.create({ body: "Great", post_id: post.id });
-    (post as any)._cachedAssociations = new Map([["comments", [c1]]]);
+    await CommentJ2.create({ body: "Great", post_id: post.id });
+    await collection(post, "comments").load();
     const json = post.asJson({ include: { comments: { only: ["body"] } } });
     expect((json.comments as any[])[0].body).toBe("Great");
     expect((json.comments as any[])[0].post_id).toBeUndefined();
@@ -212,18 +223,22 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
+        this.hasMany("replies", { className: "ReplyJ3", foreignKey: "comment_id" });
       }
     }
     class PostJ3 extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("comments", { className: "CommentJ3", foreignKey: "post_id" });
       }
     }
+    registerModel(CommentJ3);
+    registerModel(ReplyJ3);
     const post = await PostJ3.create({ title: "Hello" });
     const c = await CommentJ3.create({ body: "Great", post_id: post.id });
-    const r = await ReplyJ3.create({ text: "Indeed", comment_id: c.id });
-    (c as any)._cachedAssociations = new Map([["replies", [r]]]);
-    (post as any)._cachedAssociations = new Map([["comments", [c]]]);
+    await ReplyJ3.create({ text: "Indeed", comment_id: c.id });
+    await collection(post, "comments").load();
+    for (const comment of collection(post, "comments")) await collection(comment, "replies").load();
     const json = post.asJson({ include: { comments: { include: "replies" } } });
     const comments = json.comments as any[];
     expect(comments[0].replies).toBeDefined();
@@ -239,18 +254,26 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     class MidJ4 extends Base {
       static {
         this.attribute("val", "string");
+        this.hasMany("deeps", { className: "DeepJ4", foreignKey: "mid_id" });
       }
     }
     class TopJ4 extends Base {
       static {
         this.attribute("val", "string");
+        this.hasMany("mids", { className: "MidJ4", foreignKey: "top_id" });
       }
     }
+    registerModel(MidJ4);
+    registerModel(DeepJ4);
     const top = await TopJ4.create({ val: "top" });
     const mid = await MidJ4.create({ val: "mid" });
     const deep = await DeepJ4.create({ val: "deep" });
-    (mid as any)._cachedAssociations = new Map([["deeps", [deep]]]);
-    (top as any)._cachedAssociations = new Map([["mids", [mid]]]);
+    // This invented Top→Mid→Deep hierarchy has no fixtures to query, so the
+    // proxies are eager-loaded (Rails' `includes`) via _preloadedAssociations
+    // rather than a DB read. Serialization still resolves them through the
+    // real `send`/proxy reader, off each proxy's loaded target.
+    mid._preloadedAssociations.set("deeps", [deep]);
+    top._preloadedAssociations.set("mids", [mid]);
     const json = top.asJson({ include: { mids: { include: { deeps: {} } } } });
     expect((json.mids as any[])[0].deeps[0].val).toBe("deep");
   });
@@ -266,11 +289,13 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
+        this.hasMany("comments", { className: "CommentJ5", foreignKey: "post_id" });
       }
     }
+    registerModel(CommentJ5);
     const post = await PostJ5.create({ title: "Hello", author: "Alice" });
-    const c = await CommentJ5.create({ body: "Great", post_id: post.id });
-    (post as any)._cachedAssociations = new Map([["comments", [c]]]);
+    await CommentJ5.create({ body: "Great", post_id: post.id });
+    await collection(post, "comments").load();
     const json = post.asJson({ only: ["title"], include: "comments" });
     expect(json.title).toBe("Hello");
     expect(json.author).toBeUndefined();
@@ -328,11 +353,13 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     class AuthorJ9 extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("books", { className: "BookJ9", foreignKey: "author_id" });
       }
     }
+    registerModel(BookJ9);
     const a1 = await AuthorJ9.create({ name: "Alice" });
-    const b1 = await BookJ9.create({ title: "Book1", author_id: a1.id });
-    (a1 as any)._cachedAssociations = new Map([["books", [b1]]]);
+    await BookJ9.create({ title: "Book1", author_id: a1.id });
+    await collection(a1, "books").load();
     const result = [a1].map((a) => a.asJson({ include: "books" }));
     expect(result[0].books).toBeDefined();
     expect((result[0].books as any[])[0].title).toBe("Book1");
@@ -349,11 +376,13 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
+        this.hasMany("books", { className: "BookJ10", foreignKey: "author_id" });
       }
     }
+    registerModel(BookJ10);
     const a1 = await AuthorJ10.create({ name: "Alice", age: 30 });
-    const b1 = await BookJ10.create({ title: "Book1", author_id: a1.id });
-    (a1 as any)._cachedAssociations = new Map([["books", [b1]]]);
+    await BookJ10.create({ title: "Book1", author_id: a1.id });
+    await collection(a1, "books").load();
     const json = a1.asJson({ only: ["name"], include: { books: { only: ["title"] } } });
     expect(json.name).toBe("Alice");
     expect(json.age).toBeUndefined();

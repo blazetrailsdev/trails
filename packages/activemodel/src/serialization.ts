@@ -6,8 +6,6 @@ export interface SerializationRecord {
   _attributes?: unknown;
   attributes?: Record<string, unknown>;
   readAttribute?: (key: string) => unknown;
-  _preloadedAssociations?: Map<string, unknown> | null;
-  _cachedAssociations?: Map<string, unknown> | null;
   constructor: { name: string; _attributeDefinitions?: unknown };
 }
 
@@ -56,11 +54,18 @@ export function serializableHash(
   }
 
   serializableAddIncludes(record, options, (assocName, records, opts) => {
-    if (Array.isArray(records)) {
+    // Rails yields whatever `send(association)` returned. A collection
+    // (Ruby Enumerable / has_many) is mapped element-wise; a single
+    // associated record serializes through its own `serializable_hash`.
+    // The JS analog of "Enumerable" is any non-string iterable — a real
+    // array, or a host collection object (e.g. activerecord's
+    // `CollectionProxy`) iterating its loaded records.
+    if (isSerializableCollection(records)) {
+      const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
       safeSet(
         result,
         assocName,
-        records.map((r: SerializationRecord) => serializableHash(r, opts)),
+        items.map((r) => serializableHash(r as SerializationRecord, opts)),
       );
     } else if (
       records &&
@@ -203,11 +208,15 @@ export function serializableAttributes(
  *     end
  *   end
  *
- * The trails port resolves associations against the model's preload /
- * association cache rather than `send`, since trails uses explicit
- * cache slots instead of Ruby's method-missing-driven association
- * accessors. The yield contract is identical: `(association, records,
- * opts)` per included entry.
+ * The dispatch is Rails' `send(association)` (see `sendAssociation`):
+ * it reads the method/accessor named after the association off the
+ * record — exactly how a plain ActiveModel object with
+ * `attr_accessor :address` serializes `include: :address`, and how
+ * activerecord's generated association readers resolve `include:
+ * :comments`. activemodel has no association-specific knowledge; it
+ * just dispatches by name and yields `(association, records, opts)`
+ * per entry, skipping a nil/undefined result as Rails skips a nil
+ * `send`.
  *
  * @internal Rails-private helper.
  */
@@ -232,15 +241,44 @@ export function serializableAddIncludes(
   if (includeOpt == null || includeOpt === false) return;
   const includes = normalizeIncludes(includeOpt);
   for (const [assocName, assocOpts] of Object.entries(includes)) {
-    const cached =
-      record._preloadedAssociations?.get(assocName) ?? record._cachedAssociations?.get(assocName);
-    // Rails: `if records = send(association)` skips on nil. The trails
-    // preloader stores `null` in `_cachedAssociations` for has_one
-    // associations with no row, so guard both null and undefined.
-    if (cached !== null && cached !== undefined) {
-      callback(assocName, cached, assocOpts);
+    const records = sendAssociation(record, assocName);
+    // Rails: `if records = send(association)` skips on nil. `null` (a
+    // loaded singular with no row) and `undefined` (no such accessor /
+    // unloaded association) both map to Ruby's nil skip.
+    if (records !== null && records !== undefined) {
+      callback(assocName, records, assocOpts);
     }
   }
+}
+
+/**
+ * Rails' `send(association)` from `serializable_add_includes`: read the
+ * method/accessor named after the association off the record. For a plain
+ * ActiveModel object this is the value behind an `attr_accessor :address` /
+ * `:friends` (the Rails serialization tests' setup); for activerecord it is
+ * the generated association reader. A function-valued member is invoked,
+ * mirroring Ruby's `send(:friends)` calling the accessor method.
+ *
+ * @internal Rails-private helper.
+ */
+function sendAssociation(record: SerializationRecord, name: string): unknown {
+  const reader = record[name];
+  return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
+}
+
+/**
+ * Whether `send(association)` returned a collection to map element-wise — the
+ * JS analog of a Ruby Enumerable. A real array, or any non-string iterable
+ * host collection (e.g. activerecord's `CollectionProxy` iterating its loaded
+ * records). Single records, strings, and plain objects are not collections.
+ *
+ * @internal Rails-private helper.
+ */
+function isSerializableCollection(value: unknown): value is Iterable<unknown> {
+  if (Array.isArray(value)) return true;
+  if (value == null || typeof value !== "object") return false;
+  if ((value as SerializationRecord)._attributes) return false; // a single record
+  return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 }
 
 /**
