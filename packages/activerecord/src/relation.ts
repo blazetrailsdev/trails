@@ -4108,16 +4108,23 @@ export class Relation<T extends Base> {
   /**
    * Build the arel FROM source for a `from()` clause (mirrors Rails
    * `build_from`), or `undefined` when no `from()` was set. String and Arel-node
-   * values pass through to `SelectManager#from`; a Relation value becomes a
-   * `TableAlias` subquery (via `buildFrom`) so its bind params thread through the
-   * outer collector in document order — FROM before WHERE. Identifier quoting is
-   * left to the visitor. Set-operation subqueries have no AST representation, so
-   * they compile to SQL with their binds inlined.
+   * values pass through to `SelectManager#from`, so the node threads through the
+   * single outer collector (binds in document order, FROM before WHERE) and
+   * identifier quoting is left to the visitor.
+   *
+   * A Relation value is compiled through its own full `_toSql()` path — which,
+   * unlike `toArel()`, carries every clause Rails' `Relation#arel` does (joins,
+   * HAVING, nested FROM, LOCK, CTEs, set operations) — then wrapped as a
+   * `BoundSqlLiteral` so its binds inline at the FROM position. (Rails threads
+   * the subquery's `arel` as live bind params; trails has no full subquery AST
+   * for set operations, so the inlined form keeps every relation kind correct
+   * and ordering consistent. Parameterizing the subquery awaits a complete
+   * `Relation#arel`/union-AST convergence — out of scope for this story.)
    */
   private _buildFromNode(): Nodes.Node | string | undefined {
     if (this._fromClause.isEmpty()) return undefined;
     const raw = this._fromClause.value;
-    if (raw instanceof Relation && raw._setOperation) {
+    if (raw instanceof Relation) {
       const subSql = raw._toSql();
       const name = this._fromClause.name ?? "subquery";
       // PG renders $N placeholders; BoundSqlLiteral expects positional `?`.
