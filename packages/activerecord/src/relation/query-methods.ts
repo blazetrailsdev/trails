@@ -222,15 +222,17 @@ export function referencesFromConditions(conditions: unknown): string[] {
   return PredicateBuilder.references(conditions).map((ref) => ref.value);
 }
 
-// Resolve a single CTE sub-query value into an arel body node. A raw SQL string
-// or `SqlLiteral` becomes `Nodes.Grouping(SqlLiteral)` — mirroring Rails'
-// `build_with_expression_from_value` `when SqlLiteral then Grouping.new(value)`.
-// Relations / SelectManagers contribute their inlined SQL wrapped in the same
-// Grouping (the Relation/SelectManager `value.arel` branches are deferred — see
-// the RFC 0022 cte story); the Grouping supplies the operand parens.
+// Resolve a single CTE sub-query value into an arel body node, mirroring Rails'
+// `build_with_expression_from_value`. A raw SQL string / `SqlLiteral` becomes
+// `Nodes.Grouping(SqlLiteral)` (`when SqlLiteral then Grouping.new(value)`), so
+// it carries its own operand parens. A Relation / SelectManager contributes a
+// bare node — Rails uses `value.arel(.ast)`; we use its inlined SQL as a bare
+// `SqlLiteral` (the `value.arel` branches are deferred per the RFC 0022 cte
+// story), so UNION ALL leaves it unparenthesized exactly as Rails does.
 function buildCteLeaf(q: unknown): Nodes.Node {
-  const sql = typeof q === "string" ? q : (q as any).toSql();
-  return new Nodes.Grouping(arelSql(sql) as any);
+  if (typeof q === "string") return new Nodes.Grouping(arelSql(q) as any);
+  if (q instanceof Nodes.SqlLiteral) return new Nodes.Grouping(q as any);
+  return arelSql((q as any).toSql()) as unknown as Nodes.Node;
 }
 
 /** Validate and resolve a CTE name+query into an arel expression node. */
