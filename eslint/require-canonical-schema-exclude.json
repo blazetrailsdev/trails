@@ -101,9 +101,7 @@
   "packages/activerecord/src/transactions.test.ts",
   "packages/activerecord/src/unsafe-raw-sql.test.ts",
   "packages/activerecord/src/validations/association-validation.test.ts",
-  "packages/activerecord/src/validations/length-validation.test.ts",
   "packages/activerecord/src/validations/numericality-validation.test.ts",
-  "packages/activerecord/src/validations/presence-validation.test.ts",
   "packages/activerecord/src/validations/uniqueness-validation.test.ts",
   "packages/activerecord/src/validations/validations.test.ts"
 ]
