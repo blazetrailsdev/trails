@@ -211,6 +211,7 @@ export function sanitizeSqlForConditions(
  */
 export function sanitizeSqlForAssignment(
   this: QuoterHost & {
+    tableName?: string;
     sanitizeSql(input: string | [string, ...unknown[]]): string;
     sanitizeSqlHashForAssignment(
       attrs: Record<string, unknown>,
@@ -220,12 +221,14 @@ export function sanitizeSqlForAssignment(
       ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
     ): string;
   },
+  // Rails defaults `default_table_name` to the model's `table_name`
+  // (sanitization.rb:68); an explicitly-passed value still wins.
   assignments: string | [string, ...unknown[]] | Record<string, unknown>,
-  defaultTableName?: string,
+  defaultTableName: string = this.tableName ?? "",
 ): string {
   if (typeof assignments === "string") return assignments;
   if (Array.isArray(assignments)) return this.sanitizeSql(assignments);
-  return this.sanitizeSqlHashForAssignment(assignments, defaultTableName ?? "");
+  return this.sanitizeSqlHashForAssignment(assignments, defaultTableName);
 }
 
 /**
@@ -243,8 +246,12 @@ export function sanitizeSqlForOrder(
 ): string | Nodes.Node {
   if (condition instanceof Nodes.Node) return condition;
   if (Array.isArray(condition) && condition[0]?.toString().includes("?")) {
+    // Rails checks the *raw* first element (sanitization.rb:85-88), so Arel
+    // nodes (`Arel.sql("field(id, ?)")`) are permitted — `disallowRawSqlBang`
+    // skips Node instances — and only the bind-substituted result is returned.
+    // Checking the post-substitution string here would reject those forms.
+    this.disallowRawSqlBang([condition[0]]);
     const sanitized = this.sanitizeSqlArray(condition[0], ...condition.slice(1));
-    this.disallowRawSqlBang([sanitized]);
     return arelSql(sanitized);
   }
   return typeof condition === "string" ? condition : condition[0];
