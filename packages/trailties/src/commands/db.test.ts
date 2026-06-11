@@ -167,12 +167,15 @@ describe("connectAdapter", () => {
 
   it("creates SqliteAdapter for sqlite3", async () => {
     adapter = await connectAdapter({ adapter: "sqlite3", database: ":memory:" });
-    expect(adapter.constructor.name).toBe("SQLite3Adapter");
+    // trailties resolves SQLite through the driver registry (so a custom
+    // pre-registered driver wins), constructing the back-compat SQLite3Adapter
+    // alias — which is now the AbstractSQLite3Adapter base class.
+    expect(adapter.constructor.name).toBe("AbstractSQLite3Adapter");
   });
 
   it("creates SqliteAdapter for sqlite", async () => {
     adapter = await connectAdapter({ adapter: "sqlite", database: ":memory:" });
-    expect(adapter.constructor.name).toBe("SQLite3Adapter");
+    expect(adapter.constructor.name).toBe("AbstractSQLite3Adapter");
   });
 
   it("throws for unknown adapter", async () => {
