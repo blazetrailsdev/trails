@@ -13,7 +13,7 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
-import { buildJoinDependencies, QueryMethodBangs } from "./query-methods.js";
+import { buildCteSql, buildJoinDependencies, QueryMethodBangs } from "./query-methods.js";
 
 /**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
@@ -48,6 +48,7 @@ interface CalculationRelation {
       adapterName: AdapterName;
       visitor?: { compile(node: any): string; compileWithBinds?(node: any): [string, unknown[]] };
       toSql(arel: unknown): string;
+      quoteTableName(name: string): string;
       execute(sql: string): Promise<Record<string, unknown>[]>;
       selectAll(
         sql: string,
@@ -62,7 +63,7 @@ interface CalculationRelation {
   _isNone: boolean;
   _isDistinct: boolean;
   _groupColumns: string[];
-  _ctes: Array<{ name: string; sql: string; recursive: boolean }>;
+  _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _fromClause: { isEmpty(): boolean; value: any; name: string | null };
   _applyJoinsToManager(manager: any): void;
   _applyWheresToManager(manager: any, table: any): void;
@@ -234,9 +235,10 @@ function wrapBigintAgg(innerSql: string, grouped = false): string {
 
 function prependCtes(rel: CalculationRelation, sql: string): string {
   if (rel._ctes.length === 0) return sql;
-  const recursive = rel._ctes.some((c) => c.recursive);
-  const cteDefs = rel._ctes.map((c) => `"${c.name}" AS (${c.sql})`).join(", ");
-  return `WITH ${recursive ? "RECURSIVE " : ""}${cteDefs} ${sql}`;
+  const connection = rel._modelClass.connection;
+  const compile = (node: Nodes.Node): string =>
+    connection.visitor ? connection.visitor.compile(node) : connection.toSql(node);
+  return `${buildCteSql(rel._ctes, compile, (name) => connection.quoteTableName(name))} ${sql}`;
 }
 
 // Mirrors relation.ts _safeAlias: quote alias if it contains non-identifier chars.
