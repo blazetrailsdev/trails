@@ -60,11 +60,20 @@ describe("CollectionProxy#count — non-through fast path", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      authors: canonicalSchema.authors,
-      posts: canonicalSchema.posts,
-      comments: canonicalSchema.comments,
-    });
+    // The per-worker shared-cache DB is contended: a sibling file may create a
+    // divergent `posts`/`comments` shape first, after which our plain
+    // `defineSchema` (CREATE IF NOT EXISTS) is a no-op and is missing
+    // `author_id`. `dropExisting` bypasses that and rebuilds the canonical
+    // shape (mirrors locking.test.ts).
+    await defineSchema(
+      adapter,
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+      },
+      { dropExisting: true },
+    );
     CpcAuthor.adapter = adapter;
     CpcPost.adapter = adapter;
     CpcComment.adapter = adapter;
