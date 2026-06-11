@@ -25,41 +25,69 @@ import { Associations } from "../associations.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 
 describe("CollectionProxy#count — non-through fast path", () => {
   let adapter: TestDatabaseAdapter;
 
+  // Lightweight local models backed by the canonical `authors` / `posts` /
+  // `comments` tables (Author has_many posts, Post has_many comments). Keeping
+  // minimal model classes — rather than the heavy canonical Author/Post models
+  // with their many associations and callbacks — is what lets the single-SQL
+  // assertions below stay exact.
   class CpcAuthor extends Base {
     static {
-      this._tableName = "cpc_authors";
+      this._tableName = "authors";
       this.attribute("name", "string");
-      this.attribute("cpcPostsCounted_count", "integer");
     }
   }
   class CpcPost extends Base {
     static {
-      this._tableName = "cpc_posts";
-      this.attribute("cpc_author_id", "integer");
+      this._tableName = "posts";
+      this.attribute("author_id", "integer");
       this.attribute("title", "string");
+      this.attribute("body", "text");
+      this.attribute("legacy_comments_count", "integer");
+    }
+  }
+  class CpcComment extends Base {
+    static {
+      this._tableName = "comments";
+      this.attribute("post_id", "integer");
+      this.attribute("body", "text");
     }
   }
 
   beforeAll(async () => {
     adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      cpc_authors: { name: "string", cpcPostsCounted_count: "integer" },
-      cpc_posts: { cpc_author_id: "integer", title: "string" },
-      cpc_comments: { cpc_post_id: "integer", body: "string" },
-    });
+    // The per-worker shared-cache DB is contended: sibling files
+    // (callbacks.test.ts, belongs-to-associations.test.ts) call
+    // `defineSchema({ posts: { title: "string" } })` with no `dropExisting`,
+    // so whichever runs first in the worker leaves a two-column `posts`
+    // missing `author_id`. Our plain `defineSchema` (CREATE IF NOT EXISTS)
+    // would then no-op against that stale shape. `dropExisting` drops
+    // comments → posts → authors and rebuilds the canonical shape.
+    await defineSchema(
+      adapter,
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+      },
+      { dropExisting: true },
+    );
     CpcAuthor.adapter = adapter;
     CpcPost.adapter = adapter;
+    CpcComment.adapter = adapter;
     registerModel("CpcAuthor", CpcAuthor);
     registerModel("CpcPost", CpcPost);
+    registerModel("CpcComment", CpcComment);
     (CpcAuthor as any)._associations = [];
     (CpcPost as any)._associations = [];
+    (CpcComment as any)._associations = [];
     Associations.hasMany.call(CpcAuthor, "cpcPosts", {
       className: "CpcPost",
-      foreignKey: "cpc_author_id",
+      foreignKey: "author_id",
     });
   });
   withTransactionalFixtures(() => adapter);
@@ -68,9 +96,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
 
   it("issues a SELECT COUNT(*) and does not load individual rows", async () => {
     const author = await CpcAuthor.create({ name: "a" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p2" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p3" });
+    await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
+    await CpcPost.create({ author_id: author.id, title: "p2", body: "b2" });
+    await CpcPost.create({ author_id: author.id, title: "p3", body: "b3" });
 
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
@@ -122,9 +150,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
     // prior ids reader (`record.<assoc>Ids` → idsReader) has cached the ids on
     // the owner's association instance, size() returns their count, no SQL.
     const author = await CpcAuthor.create({ name: "ids" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p2" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p3" });
+    await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
+    await CpcPost.create({ author_id: author.id, title: "p2", body: "b2" });
+    await CpcPost.create({ author_id: author.id, title: "p3", body: "b3" });
 
     // Populate the cache via the real ids reader.
     const ids = await (author as any).association("cpcPosts").idsReader();
@@ -151,13 +179,13 @@ describe("CollectionProxy#count — non-through fast path", () => {
     // SELECT is valid SQL (PostgreSQL rejects `SELECT *` under GROUP BY).
     Associations.hasMany.call(CpcAuthor, "cpcPostsByTitle", {
       className: "CpcPost",
-      foreignKey: "cpc_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.group("title").select("title"),
     });
     const author = await CpcAuthor.create({ name: "g" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "X" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "X" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "Y" });
+    await CpcPost.create({ author_id: author.id, title: "X", body: "b1" });
+    await CpcPost.create({ author_id: author.id, title: "X", body: "b2" });
+    await CpcPost.create({ author_id: author.id, title: "Y", body: "b3" });
 
     const grouped = association(author, "cpcPostsByTitle") as any;
     expect(grouped.groupValues).toEqual(["title"]);
@@ -168,12 +196,12 @@ describe("CollectionProxy#count — non-through fast path", () => {
   it("size() with DISTINCT ignores the unsaved-records shortcut and counts via SQL", async () => {
     Associations.hasMany.call(CpcAuthor, "cpcPostsDistinct", {
       className: "CpcPost",
-      foreignKey: "cpc_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.distinct(),
     });
     const author = await CpcAuthor.create({ name: "d" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p2" });
+    await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
+    await CpcPost.create({ author_id: author.id, title: "p2", body: "b2" });
 
     const distinct = association(author, "cpcPostsDistinct") as any;
     expect(distinct.distinctValue).toBe(true);
@@ -183,19 +211,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
   });
 
   it("single-level through: count() emits a SELECT COUNT(*) (IN-subquery or JOIN form)", async () => {
-    class CpcComment extends Base {
-      static {
-        this._tableName = "cpc_comments";
-        this.attribute("cpc_post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    CpcComment.adapter = adapter;
-    registerModel("CpcComment", CpcComment);
-    (CpcComment as any)._associations = [];
     Associations.hasMany.call(CpcPost, "cpcComments", {
       className: "CpcComment",
-      foreignKey: "cpc_post_id",
+      foreignKey: "post_id",
     });
     Associations.hasMany.call(CpcAuthor, "cpcCommentsThrough", {
       className: "CpcComment",
@@ -204,9 +222,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
     });
 
     const author = await CpcAuthor.create({ name: "a" });
-    const post = (await CpcPost.create({ cpc_author_id: author.id, title: "p" })) as any;
-    await CpcComment.create({ cpc_post_id: post.id, body: "c1" });
-    await CpcComment.create({ cpc_post_id: post.id, body: "c2" });
+    const post = (await CpcPost.create({ author_id: author.id, title: "p", body: "b" })) as any;
+    await CpcComment.create({ post_id: post.id, body: "c1" });
+    await CpcComment.create({ post_id: post.id, body: "c2" });
 
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
@@ -239,11 +257,11 @@ describe("CollectionProxy#count — non-through fast path", () => {
     // rather than appending a duplicate to the loaded target.
     Associations.hasMany.call(CpcAuthor, "cpcPostsDedup", {
       className: "CpcPost",
-      foreignKey: "cpc_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.distinct(),
     });
     const author = await CpcAuthor.create({ name: "dedup" });
-    const post = await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
+    const post = await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
 
     const proxy = association(author, "cpcPostsDedup") as any;
     await proxy.load();
@@ -275,14 +293,14 @@ describe("CollectionProxy#count — non-through fast path", () => {
   it("count_records reads the active counter cache instead of querying", async () => {
     // Mirrors HasManyAssociation#count_records: when the reflection has an
     // active cached counter, size() reads owner.read_attribute(counter_cache_column)
-    // rather than emitting a COUNT(*). `counterCache: true` derives the column
-    // name from the association (`<name>_count`).
-    Associations.hasMany.call(CpcAuthor, "cpcPostsCounted", {
-      className: "CpcPost",
-      foreignKey: "cpc_author_id",
-      counterCache: true,
+    // rather than emitting a COUNT(*). Here the counter column is the canonical
+    // `posts.legacy_comments_count` (a real cached-counter column on the owner).
+    Associations.hasMany.call(CpcPost, "cpcCommentsCounted", {
+      className: "CpcComment",
+      foreignKey: "post_id",
+      counterCache: "legacy_comments_count",
     });
-    const author = await CpcAuthor.create({ name: "counted", cpcPostsCounted_count: 7 });
+    const post = await CpcPost.create({ title: "counted", body: "b", legacy_comments_count: 7 });
 
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
@@ -290,7 +308,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
       if (typeof event?.payload?.sql === "string") observed.push(event.payload.sql);
     });
     try {
-      expect(await association(author, "cpcPostsCounted").size()).toBe(7);
+      expect(await association(post, "cpcCommentsCounted").size()).toBe(7);
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -303,13 +321,13 @@ describe("CollectionProxy#count — non-through fast path", () => {
     // limit caps the reported size even when the DB holds more rows.
     Associations.hasMany.call(CpcAuthor, "cpcPostsLimited", {
       className: "CpcPost",
-      foreignKey: "cpc_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.limit(2),
     });
     const author = await CpcAuthor.create({ name: "limited" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p2" });
-    await CpcPost.create({ cpc_author_id: author.id, title: "p3" });
+    await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
+    await CpcPost.create({ author_id: author.id, title: "p2", body: "b2" });
+    await CpcPost.create({ author_id: author.id, title: "p3", body: "b3" });
 
     expect(await association(author, "cpcPostsLimited").size()).toBe(2);
   });
