@@ -349,9 +349,20 @@ describe("commitAndPush (git mutation flow)", () => {
       raceExitCode: 99,
     });
     expect(mutatorCalls).toBe(1);
-    // One leading `checkout` per generated file restores loadIndex()'s
-    // regenerated artifacts so the pull --rebase runs against a clean tree.
-    expect(seen).toEqual(["checkout", "checkout", "checkout", "pull", "add", "commit", "push"]);
+    // HEAD:main guard first probes origin/main (fetch + rev-list) to ensure HEAD
+    // carries no foreign commits, then one leading `checkout` per generated file
+    // restores loadIndex()'s regenerated artifacts so pull --rebase runs clean.
+    expect(seen).toEqual([
+      "fetch",
+      "rev-list",
+      "checkout",
+      "checkout",
+      "checkout",
+      "pull",
+      "add",
+      "commit",
+      "push",
+    ]);
   });
 
   // Mimic execFileSync's failure shape: attach .stderr to the error so
@@ -383,10 +394,13 @@ describe("commitAndPush (git mutation flow)", () => {
       raceExitCode: 99,
     });
     expect(mutatorCalls).toBe(2);
-    // Pre-loop: one checkout per generated file restores them.
+    // Pre-loop: HEAD:main guard (fetch, rev-list) then one checkout per
+    // generated file restores them.
     // First attempt: pull, add, commit, push(throws), reset.
     // Second attempt: pull, add, commit, push(ok).
     expect(seen).toEqual([
+      "fetch",
+      "rev-list",
       "checkout",
       "checkout",
       "checkout",
@@ -472,13 +486,14 @@ describe("commitAndPush (git mutation flow)", () => {
       raceExitCode: 4,
     });
     // One checkout per file (NOT a single multi-path checkout, which git fails
-    // atomically if any path is unknown), each preceding the pull.
-    expect(fullArgs.slice(0, 3).map((a) => a.slice(2))).toEqual([
+    // atomically if any path is unknown), each preceding the pull. The HEAD:main
+    // guard's fetch + rev-list run first, so the checkouts start at index 2.
+    expect(fullArgs.slice(2, 5).map((a) => a.slice(2))).toEqual([
       ["checkout", "--", "index.md"],
       ["checkout", "--", "index.json"],
       ["checkout", "--", "search.json"],
     ]);
-    expect(fullArgs[3]?.[2]).toBe("pull");
+    expect(fullArgs[5]?.[2]).toBe("pull");
   });
 
   // Partial restore: one unknown path (e.g. a checkout predating search.json)
@@ -509,9 +524,9 @@ describe("commitAndPush (git mutation flow)", () => {
     });
     // index.md and search.json still restored despite index.json failing...
     expect(restored).toEqual(["index.md", "search.json"]);
-    // ...and the mutation proceeded normally.
+    // ...and the mutation proceeded normally (after the HEAD:main guard probe).
     expect(mutatorCalls).toBe(1);
-    expect(seen).toEqual(["pull", "add", "commit", "push"]);
+    expect(seen).toEqual(["fetch", "rev-list", "pull", "add", "commit", "push"]);
   });
 
   // A bare-branch refspec (e.g. `pushRefspec: "main"`) pushes the LOCAL branch
@@ -577,6 +592,134 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(exit).toHaveBeenCalledWith(1);
     expect(seen).toEqual([]);
     expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/is on branch "\(detached HEAD\)", not "main"/);
+  });
+
+  // The HEAD:main path pushes every commit HEAD has that origin/main lacks.
+  // If the working checkout is parked on a feature branch with un-pushed work
+  // (e.g. a hand-authored RFC branch), that foreign commit would be shoved onto
+  // main. Guard it: bail with exit 1 before touching the tree.
+  it("refuses HEAD:main when HEAD is ahead of origin/main (foreign commits)", () => {
+    const { seen, exit } = setup();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "rev-list") return "2" as never; // HEAD is 2 commits ahead
+      seen.push(label);
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    expect(() =>
+      commitAndPush({
+        message: "claim: x",
+        fileToStage: "/some/file.md",
+        mutator: () => mutatorCalls++,
+        raceMessage: "lost claim race",
+        raceExitCode: 3,
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(exit).not.toHaveBeenCalledWith(3);
+    // The guard fires after the fetch probe but before the mutation loop: no
+    // checkout/pull/commit/push, the tree is untouched.
+    expect(seen).toEqual(["fetch"]);
+    expect(mutatorCalls).toBe(0);
+    expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/HEAD is 2 commit\(s\) ahead of origin\/main/);
+  });
+
+  // The guard is best-effort: an offline fetch leaves no baseline to compare
+  // against, so it must skip the check and let the mutation proceed rather than
+  // block all writes when origin is unreachable.
+  it("skips the HEAD:main guard when the fetch fails (offline) and proceeds", () => {
+    const { seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "fetch") throw new Error("fatal: unable to access origin");
+      seen.push(label);
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => mutatorCalls++,
+      raceMessage: "no",
+      raceExitCode: 4,
+    });
+    // fetch threw inside the guard's try → guard skipped; mutation proceeds.
+    expect(mutatorCalls).toBe(1);
+    expect(seen).toEqual(["checkout", "checkout", "checkout", "pull", "add", "commit", "push"]);
+  });
+
+  // The healthy steady state: a freshly-synced checkout sits exactly at
+  // origin/main, so `rev-list --count` returns the literal "0". That must NOT
+  // be confused with the empty-string offline sentinel — it means "even with
+  // origin/main, safe to push", so the mutation proceeds.
+  it("proceeds on HEAD:main when HEAD is even with origin/main (rev-list 0)", () => {
+    const { seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "rev-list") return "0" as never; // HEAD even with origin/main
+      seen.push(label);
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => mutatorCalls++,
+      raceMessage: "no",
+      raceExitCode: 4,
+    });
+    expect(mutatorCalls).toBe(1);
+    // rev-list is consumed by the guard (not pushed to seen); fetch precedes the
+    // restore checkouts and the mutation loop runs in full.
+    expect(seen).toEqual([
+      "fetch",
+      "checkout",
+      "checkout",
+      "checkout",
+      "pull",
+      "add",
+      "commit",
+      "push",
+    ]);
+  });
+
+  // The refine path passes an explicit `pushRefspec: "HEAD:main"` and a `cwd`
+  // (the agent's tasks worktree). The same guard must run there — probing
+  // origin/main *in that worktree* — so a refine agent that accidentally
+  // committed (rather than leaving working-tree edits) can't leak onto main.
+  it("applies the HEAD:main guard to the refine path (explicit cwd + refspec)", () => {
+    const { exit } = setup();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const seenWithDir: Array<{ label: string; dir: string }> = [];
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      const dir = args && args.length >= 2 ? args[1] : "";
+      if (label === "rev-list") {
+        seenWithDir.push({ label, dir });
+        return "1" as never; // the worktree carries a stray commit
+      }
+      if (label === "fetch") seenWithDir.push({ label, dir });
+      return "" as never;
+    });
+    expect(() =>
+      commitAndPush({
+        message: "refine: story-x",
+        fileToStage: "/wt/story.md",
+        mutator: () => {},
+        raceMessage: "no",
+        raceExitCode: 4,
+        cwd: "/wt",
+        pushRefspec: "HEAD:main",
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    // The probe ran against the worktree (`-C /wt`), not the canonical checkout.
+    expect(seenWithDir).toEqual([
+      { label: "fetch", dir: "/wt" },
+      { label: "rev-list", dir: "/wt" },
+    ]);
   });
 
   it("defaults to HEAD:main push refspec when no pushRefspec given", () => {
