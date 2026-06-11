@@ -3829,36 +3829,91 @@ export class Relation<T extends Base> {
   }
 
   private _toSql(): string {
-    // Set operations: SQLite rejects parens around compound-SELECT operands
-    // (Rails sqlite.rb#infix_value_with_paren strips them); PG/MySQL require
-    // parens when either operand carries its own ORDER BY/LIMIT/OFFSET so
-    // those clauses bind to the per-side SELECT instead of the compound.
     if (this._setOperation) {
-      const leftSql = this._toSqlWithoutSetOp();
-      const leftBinds = this._lastSelectBinds.slice();
-      const rightSql = this._setOperation.other._toSqlWithoutSetOp();
-      const rightBinds = this._setOperation.other._lastSelectBinds.slice();
-      this._lastSelectBinds = [...leftBinds, ...rightBinds];
-      const op = {
-        union: "UNION",
-        unionAll: "UNION ALL",
-        intersect: "INTERSECT",
-        except: "EXCEPT",
-      }[this._setOperation.type];
-      const isSqlite = this._modelClass.connection?.adapterName === "sqlite";
-      // PG uses numbered $N placeholders. Each side compiles independently with
-      // a fresh SQLString starting at $1, so both sides may contain $1, $2, etc.
-      // Renumber the right side to continue from where the left side left off so
-      // the combined SQL has globally unique placeholder numbers.
-      const rightSqlFinal =
-        leftBinds.length > 0 && /\$\d+/.test(rightSql)
-          ? rightSql.replace(/\$(\d+)/g, (_, n) => `$${parseInt(n, 10) + leftBinds.length}`)
-          : rightSql;
-      return isSqlite
-        ? `${leftSql} ${op} ${rightSqlFinal}`
-        : `(${leftSql}) ${op} (${rightSqlFinal})`;
+      // The Arel composition path builds each side as a bare SelectManager,
+      // which carries from() (applied to the manager AST) but not the CTE
+      // prefix, eager-load join dependency, or annotate() comments — those are
+      // applied in string space by _toSqlWithoutSetOp, and folding them into a
+      // composed AST needs bind threading through one collector (the deferred
+      // set-operations-bind-threading follow-on). When either operand uses one
+      // of those features, fall back to per-side string compilation so they are
+      // not silently dropped; otherwise compose the Union* node.
+      if (
+        this._setOpOperandUsesStringFeatures() ||
+        this._setOperation.other._setOpOperandUsesStringFeatures()
+      ) {
+        return this._toSqlSetOperationConcat();
+      }
+      return this._toSqlSetOperationArel();
     }
     return this._toSqlWithoutSetOp();
+  }
+
+  /**
+   * True when this relation, used as a set-operation operand, relies on SQL
+   * that _buildSelectManager does not encode in its manager AST: CTEs, an
+   * eager-load join dependency, or annotate() comments. Such operands must
+   * compile through the full _toSqlWithoutSetOp string path. from() is excluded
+   * — it is applied to the manager AST and threads through the composed node.
+   */
+  private _setOpOperandUsesStringFeatures(): boolean {
+    return this._ctes.length > 0 || this._eagerLoadingForSql() || this._annotations.length > 0;
+  }
+
+  /**
+   * Compose the Arel Union/UnionAll/Intersect/Except node from each side's
+   * SelectManager and let the visitor emit SQL. The cross-adapter paren
+   * difference (SQLite strips parens around compound-SELECT operands; PG/MySQL
+   * parenthesize) lives in the arel visitors, not here. Compiling the whole
+   * node through one collector also yields correctly-ordered binds and ($N)
+   * placeholder numbering for free — no manual renumbering.
+   */
+  private _toSqlSetOperationArel(): string {
+    const leftManager = this._buildSelectManager();
+    const rightManager = this._setOperation!.other._buildSelectManager();
+    const node = leftManager[this._setOperation!.type](rightManager);
+    const v = this._arelVisitor();
+    const [raw, binds, retryable] = v.compileWithBinds(node);
+    this._lastSelectRetryable = retryable;
+    this._lastSelectBinds = this._typeCastBinds(binds);
+    // The set-operation visitors wrap the compound SELECT in `( ... )` for
+    // embedded use (subquery / derived table). As a standalone statement
+    // SQLite rejects the leading paren, so strip the single enclosing pair the
+    // visitor added (operand-level parens for ORDER/LIMIT/OFFSET sides use no
+    // inner space and are preserved).
+    return raw.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
+  }
+
+  /**
+   * Per-side string-concatenation fallback for set operands that use features
+   * the composed AST cannot yet represent (CTE/eager/annotate). SQLite rejects
+   * parens around compound-SELECT operands (Rails sqlite.rb#infix_value_with_paren
+   * strips them); PG/MySQL require parens when either operand carries its own
+   * ORDER BY/LIMIT/OFFSET so those clauses bind to the per-side SELECT instead
+   * of the compound.
+   */
+  private _toSqlSetOperationConcat(): string {
+    const leftSql = this._toSqlWithoutSetOp();
+    const leftBinds = this._lastSelectBinds.slice();
+    const rightSql = this._setOperation!.other._toSqlWithoutSetOp();
+    const rightBinds = this._setOperation!.other._lastSelectBinds.slice();
+    this._lastSelectBinds = [...leftBinds, ...rightBinds];
+    const op = {
+      union: "UNION",
+      unionAll: "UNION ALL",
+      intersect: "INTERSECT",
+      except: "EXCEPT",
+    }[this._setOperation!.type];
+    const isSqlite = this._modelClass.connection?.adapterName === "sqlite";
+    // PG uses numbered $N placeholders. Each side compiles independently with a
+    // fresh SQLString starting at $1, so both sides may contain $1, $2, etc.
+    // Renumber the right side to continue from where the left side left off so
+    // the combined SQL has globally unique placeholder numbers.
+    const rightSqlFinal =
+      leftBinds.length > 0 && /\$\d+/.test(rightSql)
+        ? rightSql.replace(/\$(\d+)/g, (_, n) => `$${parseInt(n, 10) + leftBinds.length}`)
+        : rightSql;
+    return isSqlite ? `${leftSql} ${op} ${rightSqlFinal}` : `(${leftSql}) ${op} (${rightSqlFinal})`;
   }
 
   // Mirrors: ActiveRecord::Relation#eager_loading?
@@ -3984,20 +4039,19 @@ export class Relation<T extends Base> {
     return sql;
   }
 
-  private _toSqlWithoutSetOp(): string {
-    // Eager loading: emit JoinDependency SQL (mirrors Rails to_sql + eager_loading?)
-    if (this._eagerLoadingForSql()) {
-      const eagerSql = this._buildEagerSql();
-      if (eagerSql !== null) return eagerSql;
-      // If _buildEagerSql returns null (e.g. unresolvable association),
-      // fall through to plain SQL so toSql() always returns something useful.
-    }
-
+  /**
+   * Build the SelectManager for this relation: projections, joins, wheres,
+   * order, distinct, limit/offset, group, having, lock, hints, and from(). Does
+   * NOT apply the eager-load join dependency, annotate() comments, or CTE
+   * prefix — those remain in _toSqlWithoutSetOp. Used both for plain SELECT
+   * compilation and as each side of a set operation (where the arel Union* node
+   * composes the two managers).
+   */
+  private _buildSelectManager(): SelectManager {
     const table = this._modelClass.arelTable;
     const projections = this._buildProjections(table);
     const manager = table.project(...(projections as any));
 
-    // Apply joins
     this._applyJoinsToManager(manager);
 
     this._applyWheresToManager(manager, table);
@@ -4026,6 +4080,20 @@ export class Relation<T extends Base> {
     // in document order, rather than being spliced into the compiled SQL.
     const fromNode = this._buildFromNode();
     if (fromNode !== undefined && fromNode !== null) manager.from(fromNode as any);
+
+    return manager;
+  }
+
+  private _toSqlWithoutSetOp(): string {
+    // Eager loading: emit JoinDependency SQL (mirrors Rails to_sql + eager_loading?)
+    if (this._eagerLoadingForSql()) {
+      const eagerSql = this._buildEagerSql();
+      if (eagerSql !== null) return eagerSql;
+      // If _buildEagerSql returns null (e.g. unresolvable association),
+      // fall through to plain SQL so toSql() always returns something useful.
+    }
+
+    const manager = this._buildSelectManager();
 
     let sql = this._compileSelectSql(manager);
 
