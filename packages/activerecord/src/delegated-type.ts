@@ -39,7 +39,7 @@ const delegatedTypeRegistry = new WeakMap<
  *   });
  *
  * This adds:
- *   - entry.entryableClass         → current foreign_type string (Rails-divergence: Rails returns the constantized class; pre-existing from #1583)
+ *   - entry.entryableClass         → constantized model class for the current foreign_type (Rails: `entryable_class`)
  *   - entry.entryableName          → StringInquirer (e.g. inquiry("message"))
  *   - entry.isMessage()            → type predicate
  *   - entry.isComment()            → type predicate
@@ -88,12 +88,14 @@ export function delegatedType(
     configurable: true,
   });
 
-  // Add instance method: delegatedClass (e.g. entryableClass)
+  // Add instance method: delegatedClass (e.g. entryableClass).
+  // Rails: `define_method("#{role}_class") { public_send(role_type).constantize }`
+  // — the constantized model class for the current foreign_type.
   Object.defineProperty(modelClass.prototype, `${role}Class`, {
     get(this: Base) {
       const typeName = this.readAttribute(foreignType) as string | null;
       if (!typeName) return null;
-      return typeName;
+      return resolveModel(typeName);
     },
     configurable: true,
   });
@@ -103,9 +105,8 @@ export function delegatedType(
   // returns an ActiveSupport::StringInquirer so callers can do
   // entryable_name.message?. We derive the same string value directly from
   // foreign_type (underscore + tr("/","_"), matching ModelName#singular)
-  // rather than routing through `${role}Class`, which currently returns
-  // the foreign_type string instead of the constantized class (Rails
-  // divergence pre-existing from #1583).
+  // rather than routing through `${role}Class.modelName`, avoiding a registry
+  // lookup that an unsaved/unregistered foreign_type would make throw.
   Object.defineProperty(modelClass.prototype, `${role}Name`, {
     get(this: Base) {
       const typeName = this.readAttribute(foreignType) as string | null;

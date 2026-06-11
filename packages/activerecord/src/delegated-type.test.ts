@@ -77,16 +77,14 @@ describe("DelegatedTypeTest", () => {
   });
 
   it("delegated class", () => {
-    // Rails asserts the constantized class; trails' `entryableClass` returns the
-    // foreign_type string instead (pre-existing divergence, #1583).
-    expect((entryWithMessage as any).entryableClass).toBe("Message");
-    expect((entryWithComment as any).entryableClass).toBe("Comment");
+    expect((entryWithMessage as any).entryableClass).toBe(Message);
+    expect((entryWithComment as any).entryableClass).toBe(Comment);
   });
 
   it("delegated class with custom foreign_type", () => {
-    expect((entryWithMessage as any).thingClass).toBe("Message");
-    expect((entryWithComment as any).thingClass).toBe("Comment");
-    expect((entryWithPost as any).thingClass).toBe("Post");
+    expect((entryWithMessage as any).thingClass).toBe(Message);
+    expect((entryWithComment as any).thingClass).toBe(Comment);
+    expect((entryWithPost as any).thingClass).toBe(Post);
   });
 
   it("delegated type name", () => {
