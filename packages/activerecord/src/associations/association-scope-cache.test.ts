@@ -41,11 +41,15 @@ describe("Association scope cache", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
+    // cache_* tables are a test-local harness for the internal scope-cache
+    // memoization mechanism; no canonical-schema counterpart by design.
+    /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema(adapter, {
       cache_authors: { name: "string" },
       cache_posts: { cache_author_id: "integer", title: "string" },
       cache_comments: { cache_post_id: "integer", body: "string" },
     });
+    /* eslint-enable blazetrails/require-canonical-schema */
     CacheAuthor.adapter = adapter;
     CachePost.adapter = adapter;
     CacheComment.adapter = adapter;

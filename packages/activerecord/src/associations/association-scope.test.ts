@@ -10,6 +10,11 @@ describe("AssociationScope", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
+    // These prefixed tables (wr_/st_/np_/ho1_/hs_/hot_/mg_/int_/pst_) are
+    // test-local harnesses for the internal scope resolver's edge cases (write
+    // reflection, STI, namespaced polymorphism, hot-path hooks, multi-grouping,
+    // intersection). They have no canonical-schema counterpart by design.
+    /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema({
       wr_authors: {},
       wr_posts: { wr_author_id: "integer", kind: "string" },
@@ -52,6 +57,7 @@ describe("AssociationScope", () => {
         imageable_type: "string",
       },
     });
+    /* eslint-enable blazetrails/require-canonical-schema */
   });
 
   function makeModels() {

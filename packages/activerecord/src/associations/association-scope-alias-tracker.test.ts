@@ -43,9 +43,13 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
+    // Self-referential `at_users` is a test-local harness for the internal
+    // AliasTracker's repeat-visit aliasing; no canonical-schema counterpart.
+    /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema(adapter, {
       at_users: { parent_id: "integer", name: "string" },
     });
+    /* eslint-enable blazetrails/require-canonical-schema */
     AtUser.adapter = adapter;
     registerModel("AtUser", AtUser);
     (AtUser as any)._associations = [];

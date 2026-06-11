@@ -34,6 +34,9 @@ describe("AssociationRelation", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
+    // ar_* tables are a test-local harness for AssociationRelation chaining,
+    // validation, and inverse semantics; no canonical-schema counterpart.
+    /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema(adapter, {
       ar_blogs: { name: "string" },
       ar_posts: { title: "string", published: "boolean", ar_blog_id: "integer" },
@@ -44,6 +47,7 @@ describe("AssociationRelation", () => {
       ar_inv_blogs: { name: "string" },
       ar_inv_posts: { title: "string", ar_inv_blog_id: "integer" },
     });
+    /* eslint-enable blazetrails/require-canonical-schema */
     ArBlog.adapter = adapter;
     ArPost.adapter = adapter;
     registerModel(ArBlog);
