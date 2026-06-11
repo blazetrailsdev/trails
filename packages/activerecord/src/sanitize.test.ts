@@ -286,6 +286,17 @@ describe("sanitizeSql", () => {
     expect(User.sanitizeSql("name = 'Alice'")).toBe("name = 'Alice'");
   });
 
+  it("sanitizeSql returns null for blank input (Rails alias of sanitize_sql_for_conditions)", () => {
+    class User extends Base {
+      static _tableName = "users";
+    }
+    // Rails aliases sanitize_sql to sanitize_sql_for_conditions, whose first
+    // branch returns nil for condition.blank? (sanitization.rb:33-41).
+    expect(User.sanitizeSql("")).toBeNull();
+    expect(User.sanitizeSql("   ")).toBeNull();
+    expect(User.sanitizeSql([] as unknown as [string, ...unknown[]])).toBeNull();
+  });
+
   it("sanitizeSql handles array format", () => {
     class User extends Base {
       static _tableName = "users";
@@ -331,7 +342,9 @@ describe("sanitizeSql", () => {
   it("sanitizeSqlForConditions dispatches through this.sanitizeSql", () => {
     class Post extends Base {
       static _tableName = "posts";
-      static override sanitizeSql(_input: string | [string, ...unknown[]]): string {
+      static override sanitizeSql(
+        _input: string | [string, ...unknown[]] | null | undefined,
+      ): string | null {
         return "VIA_SANITIZE_SQL";
       }
     }
@@ -343,7 +356,9 @@ describe("sanitizeSql", () => {
   it("sanitizeSqlForAssignment dispatches array-form through this.sanitizeSql", () => {
     class Post extends Base {
       static _tableName = "posts";
-      static override sanitizeSql(_input: string | [string, ...unknown[]]): string {
+      static override sanitizeSql(
+        _input: string | [string, ...unknown[]] | null | undefined,
+      ): string | null {
         return "VIA_SANITIZE_SQL";
       }
     }
@@ -367,6 +382,34 @@ describe("sanitizeSql", () => {
     // produced the sanitized text.
     expect((result as { value?: string }).value).toBe("id, 1, 2");
     expect(disallowCalled).toBe(true);
+  });
+
+  it("sanitizeSqlForOrder substitutes binds when the first element is an Arel.sql literal", () => {
+    // Rails reads `condition.first.to_s` (sanitization.rb:84-97), so an
+    // Arel.sql literal — a Node whose text lives on `.value`, with no
+    // toString override — must still enter the `?` branch and substitute binds.
+    let sanitizeCalled = false;
+    class Post extends Base {
+      static _tableName = "posts";
+      static override sanitizeSqlArray(_template: string, ..._binds: unknown[]): string {
+        sanitizeCalled = true;
+        return "field(id, 1,3,2)";
+      }
+      static override disallowRawSqlBang(_args: unknown[]): void {}
+    }
+    const result = Post.sanitizeSqlForOrder([arelSql("field(id, ?)"), [1, 3, 2]]);
+    expect(sanitizeCalled).toBe(true);
+    expect((result as { value?: string }).value).toBe("field(id, 1,3,2)");
+  });
+
+  it("sanitizeSqlForOrder returns the full array unchanged when the first element has no bind", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    // Rails' else branch returns the original condition (sanitization.rb:99),
+    // not just its first element.
+    const condition: [string, ...unknown[]] = ["name ASC", "id DESC"];
+    expect(Post.sanitizeSqlForOrder(condition)).toEqual(condition);
   });
 
   it("Base exposes the full Rails Sanitization::ClassMethods surface", () => {
