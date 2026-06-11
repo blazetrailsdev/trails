@@ -1311,7 +1311,10 @@ export class SchemaStatements {
     return this._insertVersionsSql(smTable.tableName ?? "schema_migrations", versions);
   }
 
-  private _insertVersionsSql(tableName: string, versions: string | string[]): string {
+  private _insertVersionsSql(
+    tableName: string,
+    versions: string | number | Array<string | number>,
+  ): string {
     const smTable = this._qt(tableName);
     if (Array.isArray(versions)) {
       const rows = versions.reverse().map((v) => `(${this.adapter.quote(v)})`);
@@ -1345,10 +1348,12 @@ export class SchemaStatements {
       ? (migrationContext.migrations ?? []).map((m: { version: number }) => m.version)
       : [];
 
-    // Insert the target version if not already migrated
+    // Insert the target version if not already migrated. Rails passes the
+    // numeric `version.to_i` to `quote`, emitting an unquoted numeric literal —
+    // pass `verNum`, not the `ver` string, so adapter dispatch matches.
     if (!migrated.includes(verNum)) {
       await this.adapter.executeMutation(
-        `INSERT INTO ${smTable} (version) VALUES (${this.adapter.quote(ver)})`,
+        `INSERT INTO ${smTable} (version) VALUES (${this.adapter.quote(verNum)})`,
       );
     }
 
@@ -1361,9 +1366,7 @@ export class SchemaStatements {
           `Duplicate migration ${duplicate}. Please renumber your migrations to resolve the conflict.`,
         );
       }
-      await this.adapter.executeMutation(
-        this._insertVersionsSql(smTableName, inserting.map(String)),
-      );
+      await this.adapter.executeMutation(this._insertVersionsSql(smTableName, inserting));
     }
   }
 
