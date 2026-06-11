@@ -650,6 +650,78 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen).toEqual(["checkout", "checkout", "checkout", "pull", "add", "commit", "push"]);
   });
 
+  // The healthy steady state: a freshly-synced checkout sits exactly at
+  // origin/main, so `rev-list --count` returns the literal "0". That must NOT
+  // be confused with the empty-string offline sentinel — it means "even with
+  // origin/main, safe to push", so the mutation proceeds.
+  it("proceeds on HEAD:main when HEAD is even with origin/main (rev-list 0)", () => {
+    const { seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "rev-list") return "0" as never; // HEAD even with origin/main
+      seen.push(label);
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => mutatorCalls++,
+      raceMessage: "no",
+      raceExitCode: 4,
+    });
+    expect(mutatorCalls).toBe(1);
+    // rev-list is consumed by the guard (not pushed to seen); fetch precedes the
+    // restore checkouts and the mutation loop runs in full.
+    expect(seen).toEqual([
+      "fetch",
+      "checkout",
+      "checkout",
+      "checkout",
+      "pull",
+      "add",
+      "commit",
+      "push",
+    ]);
+  });
+
+  // The refine path passes an explicit `pushRefspec: "HEAD:main"` and a `cwd`
+  // (the agent's tasks worktree). The same guard must run there — probing
+  // origin/main *in that worktree* — so a refine agent that accidentally
+  // committed (rather than leaving working-tree edits) can't leak onto main.
+  it("applies the HEAD:main guard to the refine path (explicit cwd + refspec)", () => {
+    const { exit } = setup();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const seenWithDir: Array<{ label: string; dir: string }> = [];
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      const dir = args && args.length >= 2 ? args[1] : "";
+      if (label === "rev-list") {
+        seenWithDir.push({ label, dir });
+        return "1" as never; // the worktree carries a stray commit
+      }
+      if (label === "fetch") seenWithDir.push({ label, dir });
+      return "" as never;
+    });
+    expect(() =>
+      commitAndPush({
+        message: "refine: story-x",
+        fileToStage: "/wt/story.md",
+        mutator: () => {},
+        raceMessage: "no",
+        raceExitCode: 4,
+        cwd: "/wt",
+        pushRefspec: "HEAD:main",
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    // The probe ran against the worktree (`-C /wt`), not the canonical checkout.
+    expect(seenWithDir).toEqual([
+      { label: "fetch", dir: "/wt" },
+      { label: "rev-list", dir: "/wt" },
+    ]);
+  });
+
   it("defaults to HEAD:main push refspec when no pushRefspec given", () => {
     setup();
     const fullArgs: string[][] = [];

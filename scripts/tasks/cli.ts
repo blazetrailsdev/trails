@@ -409,14 +409,25 @@ export function commitAndPush(opts: {
   } else {
     // Colon refspec (`HEAD:main`, the per-worktree default): the push carries
     // *every* commit on HEAD that origin/main lacks — not just the mutation
-    // we're about to make. The intended workflow keeps the worktree branch at
-    // exactly origin/main (syncFromOrigin hard-resets it), so HEAD should be
-    // even with origin/main before we commit. If it is already AHEAD, those
-    // pre-existing commits are foreign work (e.g. a hand-authored RFC branch
-    // checked out in this same dir) that `git push HEAD:main` would silently
-    // shove onto main. Refuse loudly instead — this is the leak that put a
-    // `0000-` RFC placeholder onto main. Best-effort: a fetch failure (offline)
-    // leaves us no baseline, so we skip the check rather than block all writes.
+    // we're about to make. Both callers of this path expect HEAD to be even
+    // with origin/main *before* the mutation commit:
+    //   - story flips on the shared canonical checkout (resolved via a
+    //     per-worktree `<cwd>/tasks` symlink): syncFromOrigin hard-resets it to
+    //     origin/main, so it sits exactly at origin/main.
+    //   - `refine` in an agent's tasks worktree: the agent leaves *working-tree*
+    //     edits (re-applied by the mutator), never commits, so its branch HEAD
+    //     is still at origin/main.
+    // If HEAD is already AHEAD, those pre-existing commits are foreign work
+    // (e.g. a hand-authored RFC branch checked out in the shared dir, or an
+    // agent that committed when it should have left edits unstaged) that
+    // `git push HEAD:main` would silently shove onto main. That is exactly the
+    // leak that put a `0000-` RFC placeholder onto main. Refuse loudly instead.
+    //
+    // The fetch is a deliberate extra round-trip: the loop below also fetches
+    // (via `pull --rebase`), but the guard must establish a *current* baseline
+    // *before* the mutation commit, and a stale origin/main would mis-count.
+    // The second fetch is a near-noop. Best-effort: a fetch failure (offline)
+    // leaves no baseline, so we skip the check rather than block all writes.
     let ahead = "";
     try {
       git(["fetch", "--quiet", "origin", "main"], { silent: true, cwd });
@@ -431,8 +442,11 @@ export function commitAndPush(opts: {
         `error: ${where} HEAD is ${ahead} commit(s) ahead of origin/main; ` +
           `pushing "${pushRefspec}" would carry them onto main.\n` +
           `  This dir is the tasks CLI's working checkout — it must not hold un-pushed\n` +
-          `  branch work. Author RFCs/branches in a separate worktree (scripts/start-worktree.sh),\n` +
-          `  then reset this checkout: git -C "${where}" fetch origin && git -C "${where}" reset --hard origin/main`,
+          `  branch work. Author RFCs/branches in a separate worktree (scripts/start-worktree.sh).\n` +
+          `  To recover: first save those commits if you want them\n` +
+          `    git -C "${where}" branch -f <save-branch> HEAD\n` +
+          `  then return the checkout to origin/main (this discards them from HEAD):\n` +
+          `    git -C "${where}" fetch origin && git -C "${where}" reset --hard origin/main`,
       );
       process.exit(1);
     }
