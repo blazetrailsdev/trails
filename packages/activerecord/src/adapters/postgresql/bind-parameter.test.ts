@@ -3,7 +3,6 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -19,13 +18,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    // `dropExisting: true` makes this file repeatable against a
-    // non-empty PG test DB — a prior aborted run could leave `bind_test`
-    // behind, and the per-adapter signature cache starts empty in a
-    // fresh process, so defineSchema would otherwise try CREATE TABLE
-    // over an existing table.
-    // eslint-disable-next-line blazetrails/require-canonical-schema -- uniquely-named bind-probe table owns its schema; dropped in afterAll
-    await defineSchema(adapter, { bind_test: { name: "string" } }, { dropExisting: true });
+    // `force: true` makes this file repeatable against a non-empty PG test
+    // DB — a prior aborted run could leave `bind_test` behind, so drop it
+    // before recreating rather than failing on CREATE over an existing table.
+    await adapter.createTable("bind_test", { force: true }, (t) => {
+      t.string("name");
+    });
     await adapter.executeMutation(`INSERT INTO "bind_test" ("name") VALUES ('hello')`);
   });
 

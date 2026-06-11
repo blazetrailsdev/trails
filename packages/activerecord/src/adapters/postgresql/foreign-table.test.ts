@@ -8,7 +8,6 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base } from "../../index.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
@@ -42,13 +41,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       ctx.skip();
       return;
     }
-    await defineSchema(
-      {
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- FDW backing table owns its schema; dropped in beforeEach/afterEach, mirrors Rails foreign_table_test.rb
-        professors: { name: { type: "string", null: false } },
-      },
-      { dropExisting: true },
-    );
+    await adapter.createTable("professors", { force: true }, (t) => {
+      t.string("name", { null: false });
+    });
     await adapter.exec(
       `CREATE SERVER foreign_server FOREIGN DATA WRAPPER postgres_fdw ` +
         `OPTIONS (host ${quoteLit(fdwHost)}, port ${quoteLit(fdwPort)}, dbname ${quoteLit(fdwDb)})`,

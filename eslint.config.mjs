@@ -270,9 +270,16 @@ export default defineConfig(
   //    shared-DB shape collisions under parallel forks. ──
   {
     // test-helpers/ tests exercise defineSchema itself and intentionally pass
-    // inline schemas as part of the infrastructure test surface.
+    // inline schemas as part of the infrastructure test surface. The PG-types
+    // file is the same kind of surface: it asserts that defineSchema emits the
+    // correct DDL for PostgreSQL-only column types (citext/hstore/uuid/array),
+    // so by construction it must call defineSchema with inline non-canonical
+    // tables — there is no canonical table to reference.
     files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: ["packages/activerecord/src/test-helpers/**"],
+    ignores: [
+      "packages/activerecord/src/test-helpers/**",
+      "packages/activerecord/src/adapters/postgresql/define-schema-pg-types.test.ts",
+    ],
     rules: {
       "blazetrails/require-canonical-schema": "error",
     },

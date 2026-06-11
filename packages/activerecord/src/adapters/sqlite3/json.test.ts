@@ -5,7 +5,6 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { Base } from "../../index.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 
 let adapter: SQLite3Adapter;
 
@@ -19,9 +18,8 @@ afterEach(() => {
 
 describeIfSqlite("SQLite3JSONTest", () => {
   it("json string cast round-trip", async () => {
-    await defineSchema(adapter, {
-      // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated in-memory adapter; JSON type-test table owns its schema
-      json_string_cast: { data: "json" },
+    await adapter.createTable("json_string_cast", (t) => {
+      t.json("data");
     });
     class JsonStringCast extends Base {
       static {
@@ -38,12 +36,9 @@ describeIfSqlite("SQLite3JSONTest", () => {
   });
 
   it("test_default", async () => {
-    await defineSchema(adapter, {
-      // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated in-memory adapter; JSON type-test table owns its schema
-      json_data_type: {
-        payload: { type: "json", default: "{}" },
-        settings: "json",
-      },
+    await adapter.createTable("json_data_type", (t) => {
+      t.json("payload", { default: "{}" });
+      t.json("settings");
     });
 
     const defaultVal = { users: "read", posts: ["read", "write"] };

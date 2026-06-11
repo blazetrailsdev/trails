@@ -4,7 +4,6 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { defineFixtures } from "../../test-helpers/define-fixtures.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -51,9 +50,10 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("schema", async () => {
-      await defineSchema(adapter, {
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL introspection test owns its schema; dropped in finally, mirrors Rails schema_test.rb
-        posts: { title: "string", body: "text", type: "string" },
+      await adapter.createTable("posts", { force: true }, (t) => {
+        t.string("title");
+        t.text("body");
+        t.string("type");
       });
       try {
         class Post extends Base {
@@ -84,8 +84,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("primary key", async () => {
-      // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL introspection test owns its schema; dropped in finally, mirrors Rails schema_test.rb
-      await defineSchema(adapter, { topics: { title: "string" } });
+      await adapter.createTable("topics", { force: true }, (t) => t.string("title"));
       try {
         expect(await adapter.primaryKey("topics")).toBe("id");
       } finally {
@@ -94,8 +93,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("data source exists?", async () => {
-      // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL introspection test owns its schema; dropped in finally, mirrors Rails schema_test.rb
-      await defineSchema(adapter, { topics: { title: "string" } });
+      await adapter.createTable("topics", { force: true }, (t) => t.string("title"));
       try {
         const db = await adapter.currentDatabase();
         // Rails passes @omgpost.table_name, which is the qualified `db.topics` form.
@@ -175,8 +173,7 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
 
   it("primary key method with ansi quotes", async () => {
     const a = ansi!;
-    // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL introspection test owns its schema; dropped in finally, mirrors Rails schema_test.rb
-    await defineSchema(a, { topics: { title: "string" } });
+    await a.createTable("topics", { force: true }, (t) => t.string("title"));
     try {
       expect(await a.primaryKey("topics")).toBe("id");
     } finally {
@@ -189,15 +186,10 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
     // Mirrors Rails test/schema/schema.rb: lessons_students is id:false with a
     // bigint student_id referencing students(id). Bigint width matches the
     // default Rails PK so addForeignKey doesn't trip MySQL's type-match rule.
-    await defineSchema(a, {
-      // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL foreign-key test owns its schema; dropped in finally, mirrors Rails schema_test.rb
-      students: { name: "string" },
-      // eslint-disable-next-line blazetrails/require-canonical-schema -- DDL foreign-key test owns its schema; dropped in finally, mirrors Rails schema_test.rb
-      lessons_students: {
-        columns: { student_id: "big_integer" },
-        primaryKey: false,
-      },
-    });
+    await a.createTable("students", { force: true }, (t) => t.string("name"));
+    await a.createTable("lessons_students", { force: true, id: false }, (t) =>
+      t.bigint("student_id"),
+    );
     try {
       await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
       const fks = await a.foreignKeys("lessons_students");

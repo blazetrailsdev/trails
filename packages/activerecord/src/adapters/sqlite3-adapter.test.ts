@@ -9,7 +9,6 @@ import {
   loadBelongsTo,
   loadHasMany,
 } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 
 describe("SqliteAdapter", () => {
   let adapter: SQLite3Adapter;
@@ -129,9 +128,10 @@ describe("SqliteAdapter", () => {
     }
 
     beforeEach(async () => {
-      await defineSchema(adapter, {
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
-        users: { name: "string", email: "string", age: "integer" },
+      await adapter.createTable("users", (t) => {
+        t.string("name");
+        t.string("email");
+        t.integer("age");
       });
       User.adapter = adapter;
     });
@@ -237,9 +237,10 @@ describe("SqliteAdapter", () => {
     }
 
     beforeEach(async () => {
-      await defineSchema(adapter, {
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
-        products: { name: "string", price: "integer", category: "string" },
+      await adapter.createTable("products", (t) => {
+        t.string("name");
+        t.integer("price");
+        t.string("category");
       });
       Product.adapter = adapter;
       await Product.create({ name: "Apple", price: 1, category: "fruit" });
@@ -410,12 +411,9 @@ describe("SqliteAdapter", () => {
     }
 
     beforeEach(async () => {
-      await defineSchema(adapter, {
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
-        accounts: {
-          name: "string",
-          balance: { type: "integer", default: 0 },
-        },
+      await adapter.createTable("accounts", (t) => {
+        t.string("name");
+        t.integer("balance", { default: 0 });
       });
       Account.adapter = adapter;
     });
@@ -487,11 +485,12 @@ describe("SqliteAdapter", () => {
     }
 
     beforeEach(async () => {
-      await defineSchema(adapter, {
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
-        authors: { name: "string" },
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- isolated per-test in-memory adapter; no shared-DB collision
-        books: { title: "string", author_id: "integer" },
+      await adapter.createTable("authors", (t) => {
+        t.string("name");
+      });
+      await adapter.createTable("books", (t) => {
+        t.string("title");
+        t.integer("author_id");
       });
       Author.adapter = adapter;
       Book.adapter = adapter;

@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base } from "../../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
@@ -28,7 +27,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("MysqlExplainTest", () => {
     // mirrors Rails: fixtures :authors, :author_addresses
     // Scoped to its own sub-describe so transactional wrapping doesn't
-    // affect the defineSchema-based tests below.
+    // affect the createTable-based tests below.
     describe("fixture-backed", () => {
       const { authors } = useHandlerFixtures(["authors", "authorAddresses", "posts"], {
         schema: canonicalSchema,
@@ -125,9 +124,8 @@ describeIfMysql("Mysql2Adapter", () => {
       // Asserting backticks is the thing that discriminates the two
       // paths — plain "contains the table name" would pass either
       // way.
-      await defineSchema({
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- uniquely-named explain-probe table owns its schema; no shared-DB collision
-        ex_rel_mysqls: { name: "string" },
+      await adapter.createTable("ex_rel_mysqls", { force: true }, (t) => {
+        t.string("name");
       });
       class ExRelMysql extends Base {
         static {
@@ -149,11 +147,12 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("Relation#explain on MySQL captures preload queries", async () => {
       const { registerModel } = await import("../../index.js");
-      await defineSchema({
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- uniquely-named explain-probe table owns its schema; no shared-DB collision
-        ex_mysql_authors: { name: "string" },
-        // eslint-disable-next-line blazetrails/require-canonical-schema -- uniquely-named explain-probe table owns its schema; no shared-DB collision
-        ex_mysql_books: { title: "string", ex_mysql_author_id: "integer" },
+      await adapter.createTable("ex_mysql_authors", { force: true }, (t) => {
+        t.string("name");
+      });
+      await adapter.createTable("ex_mysql_books", { force: true }, (t) => {
+        t.string("title");
+        t.integer("ex_mysql_author_id");
       });
       class ExMysqlAuthor extends Base {
         static {
