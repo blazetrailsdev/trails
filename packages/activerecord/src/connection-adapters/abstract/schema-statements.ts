@@ -1317,7 +1317,9 @@ export class SchemaStatements {
   ): string {
     const smTable = this._qt(tableName);
     if (Array.isArray(versions)) {
-      const rows = versions.reverse().map((v) => `(${this.adapter.quote(v)})`);
+      // Ruby's Array#reverse returns a new array; copy before reversing so we
+      // don't mutate the caller's array (e.g. pool.schemaMigration.versions).
+      const rows = [...versions].reverse().map((v) => `(${this.adapter.quote(v)})`);
       return `INSERT INTO ${smTable} (version) VALUES\n${rows.join(",\n")};`;
     }
     return `INSERT INTO ${smTable} (version) VALUES (${this.adapter.quote(versions)});`;
