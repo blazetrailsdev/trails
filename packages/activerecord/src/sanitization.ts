@@ -11,6 +11,7 @@ import {
   quoteTableNameForAssignment as abstractQuoteTableNameForAssignment,
   quoteString as abstractQuoteString,
   castBoundValue as abstractCastBoundValue,
+  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting-interface.js";
 import {
@@ -180,6 +181,23 @@ function quoterFor(host: QuoterHost): Quoter {
 }
 
 /**
+ * Resolves the adapter's `column_name_with_order_matcher`
+ * (Rails `adapter_class.column_name_with_order_matcher`), falling back to the
+ * abstract matcher when no connection is resolvable. @internal
+ */
+function orderMatcherFor(host: QuoterHost): RegExp {
+  let conn: unknown;
+  try {
+    conn = host.connection;
+  } catch (err) {
+    if (!(err instanceof ConnectionNotDefined)) throw err;
+  }
+  const matcher = (conn as { constructor?: { columnNameWithOrderMatcher?: () => RegExp } } | null)
+    ?.constructor?.columnNameWithOrderMatcher;
+  return typeof matcher === "function" ? matcher() : abstractColumnNameWithOrderMatcher();
+}
+
+/**
  * Threads the active adapter as the quoter, matching Rails'
  * `connection.quote` dispatch.
  *
@@ -238,21 +256,28 @@ export function sanitizeSqlForAssignment(
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_order
  */
 export function sanitizeSqlForOrder(
-  this: {
+  this: QuoterHost & {
     disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permit?: RegExp): void;
     sanitizeSqlArray(template: string, ...binds: unknown[]): string;
   },
-  condition: string | [string, ...unknown[]] | Nodes.Node,
+  condition: string | [string | Nodes.Node, ...unknown[]] | Nodes.Node,
 ): string | Nodes.Node {
   if (condition instanceof Nodes.Node) return condition;
-  if (Array.isArray(condition) && condition[0]?.toString().includes("?")) {
-    // Rails checks the *raw* first element (sanitization.rb:85-88), so Arel
-    // nodes (`Arel.sql("field(id, ?)")`) are permitted — `disallowRawSqlBang`
-    // skips Node instances — and only the bind-substituted result is returned.
-    // Checking the post-substitution string here would reject those forms.
-    this.disallowRawSqlBang([condition[0]]);
-    const sanitized = this.sanitizeSqlArray(condition[0], ...condition.slice(1));
-    return arelSql(sanitized);
+  if (Array.isArray(condition)) {
+    const first: unknown = condition[0];
+    // Rails reads `condition.first.to_s`; a SqlLiteral carries its text on
+    // `.value` (it has no `toString()` override), so read that for the `?`
+    // check and the template passed to sanitizeSqlArray.
+    const firstText = first instanceof Nodes.SqlLiteral ? first.value : String(first);
+    if (firstText.includes("?")) {
+      // Rails checks the *raw* first element with the adapter order matcher
+      // (sanitization.rb:85-88); `disallowRawSqlBang` skips Node instances, so
+      // `Arel.sql("field(id, ?)")` is permitted and only the substituted
+      // result is returned.
+      this.disallowRawSqlBang([first as string | symbol | Nodes.Node], orderMatcherFor(this));
+      const sanitized = this.sanitizeSqlArray(firstText, ...condition.slice(1));
+      return arelSql(sanitized);
+    }
   }
   return typeof condition === "string" ? condition : condition[0];
 }

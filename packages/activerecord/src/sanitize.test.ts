@@ -369,6 +369,24 @@ describe("sanitizeSql", () => {
     expect(disallowCalled).toBe(true);
   });
 
+  it("sanitizeSqlForOrder substitutes binds when the first element is an Arel.sql literal", () => {
+    // Rails reads `condition.first.to_s` (sanitization.rb:84-97), so an
+    // Arel.sql literal — a Node whose text lives on `.value`, with no
+    // toString override — must still enter the `?` branch and substitute binds.
+    let sanitizeCalled = false;
+    class Post extends Base {
+      static _tableName = "posts";
+      static override sanitizeSqlArray(_template: string, ..._binds: unknown[]): string {
+        sanitizeCalled = true;
+        return "field(id, 1,3,2)";
+      }
+      static override disallowRawSqlBang(_args: unknown[]): void {}
+    }
+    const result = Post.sanitizeSqlForOrder([arelSql("field(id, ?)"), [1, 3, 2]]);
+    expect(sanitizeCalled).toBe(true);
+    expect((result as { value?: string }).value).toBe("field(id, 1,3,2)");
+  });
+
   it("Base exposes the full Rails Sanitization::ClassMethods surface", () => {
     class Post extends Base {
       static _tableName = "posts";
