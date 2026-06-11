@@ -14,6 +14,7 @@ import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 describe("StatementCacheTest", () => {
   let adapter: TestDatabaseAdapter;
@@ -21,8 +22,8 @@ describe("StatementCacheTest", () => {
   beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
-      books: { name: "string", title: "string" },
-      authors: { name: "string" },
+      books: canonicalSchema.books,
+      authors: canonicalSchema.authors,
     });
   });
   withTransactionalFixtures(() => adapter);
@@ -152,7 +153,7 @@ describe("StatementCacheTest", () => {
 
     const roundTripAdapter = new SQLite3Adapter(":memory:");
     try {
-      await defineSchema(roundTripAdapter, { books: { name: "string" } });
+      await defineSchema(roundTripAdapter, { books: canonicalSchema.books });
       await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', [
         "Rails Guide",
       ]);
@@ -190,7 +191,7 @@ describe("StatementCacheTest", () => {
 
     const roundTripAdapter = new SQLite3Adapter(":memory:");
     try {
-      await defineSchema(roundTripAdapter, { authors: { name: "string" } });
+      await defineSchema(roundTripAdapter, { authors: canonicalSchema.authors });
       await roundTripAdapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["Matz"]);
       await roundTripAdapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["DHH"]);
 
@@ -263,9 +264,9 @@ describe("StatementCacheTest", () => {
 
     const roundTripAdapter = new SQLite3Adapter(":memory:");
     try {
-      await defineSchema(roundTripAdapter, { books: { title: "string" } });
-      await roundTripAdapter.executeMutation('INSERT INTO "books" ("title") VALUES (?)', ["Ruby"]);
-      await roundTripAdapter.executeMutation('INSERT INTO "books" ("title") VALUES (?)', [
+      await defineSchema(roundTripAdapter, { books: canonicalSchema.books });
+      await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', ["Ruby"]);
+      await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', [
         "TypeScript",
       ]);
 
@@ -278,16 +279,16 @@ describe("StatementCacheTest", () => {
 
       // preparedStatements defaults to false — uses PartialQuery path
       const cache = StatementCache.create(roundTripAdapter, (params) => {
-        return Book.where({ title: params.bind() }) as any;
+        return Book.where({ name: params.bind() }) as any;
       });
 
       const r1 = await cache.execute(["Ruby"], roundTripAdapter);
       expect(r1).toHaveLength(1);
-      expect(r1[0].readAttribute("title")).toBe("Ruby");
+      expect(r1[0].readAttribute("name")).toBe("Ruby");
 
       const r2 = await cache.execute(["TypeScript"], roundTripAdapter);
       expect(r2).toHaveLength(1);
-      expect(r2[0].readAttribute("title")).toBe("TypeScript");
+      expect(r2[0].readAttribute("name")).toBe("TypeScript");
     } finally {
       roundTripAdapter.disconnectBang();
     }
