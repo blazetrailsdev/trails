@@ -2222,10 +2222,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         // Explicit driver name still resolves through the legacy registry.
         factory = getSqlite(driverOpt);
       } else {
-        // No driver configured: concrete subclasses (e.g. BetterSQLite3Adapter)
-        // return their bundled driver so no registry lookup is needed. The
-        // abstract base falls back to the registry for backward compatibility.
-        factory = this.defaultSqliteDriver() ?? getSqlite(undefined);
+        // No driver configured (driverOpt is undefined or null): concrete
+        // subclasses (e.g. BetterSQLite3Adapter) return their bundled driver so
+        // no registry lookup is needed. The abstract base falls back to the
+        // registry for backward compatibility. getSqlite resolves its argument
+        // by truthiness (resolveName: `if (name) return name`), so an undefined
+        // or null driverOpt selects the registry default identically.
+        factory = this.defaultSqliteDriver() ?? getSqlite(driverOpt ?? undefined);
       }
       if (!factory.openSync) {
         throw new Error(
