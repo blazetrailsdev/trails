@@ -90,14 +90,18 @@ export class PredicateBuilder {
         // Mirrors Rails PredicateBuilder#expand_from_hash: pass the
         // join-dependency resolver block to associatedTable so a nested-hash key
         // that is not a direct reflection (e.g. a join table name) still
-        // resolves to the right klass/table instead of being used verbatim.
+        // resolves to the right klass/table instead of being used verbatim. The
+        // block is NOT threaded into the recursive expansion: it resolves the
+        // caller relation's join deps by table name and has no valid context
+        // against the now-resolved associated table (Rails passes &block only to
+        // associated_table, then calls expand_from_hash with no block).
         const assocPb: PredicateBuilder = this._tableContext.associatedTable(
           key,
           block,
         ).predicateBuilder;
         const innerNodes = negated
-          ? assocPb.buildNegatedFromHash(value as Record<string, unknown>, block)
-          : assocPb.buildFromHash(value as Record<string, unknown>, block);
+          ? assocPb.buildNegatedFromHash(value as Record<string, unknown>)
+          : assocPb.buildFromHash(value as Record<string, unknown>);
         nodes.push(...innerNodes);
       } else if (
         !isPlainObject(value) &&
