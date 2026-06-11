@@ -4,6 +4,7 @@ import type { CollectionProxy } from "./associations/collection-proxy.js";
 import { _setAssociationRelationCtor } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
+import { _cacheSingularTarget } from "./associations.js";
 
 /**
  * A Relation produced by a collection association (e.g. `blog.posts`,
@@ -185,7 +186,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
         const childRec = r as unknown as {
           isPersisted?: () => boolean;
           _readAttribute: (n: string) => unknown;
-          _cachedAssociations?: Map<string, unknown>;
         };
         const childPersisted = childRec.isPersisted?.() ?? true;
         let inversable = !ownerPersisted || !childPersisted;
@@ -202,8 +202,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
           inversable = true;
         }
         if (!inversable) continue;
-        const cache = (childRec._cachedAssociations ??= new Map());
-        cache.set(inverseName, owner);
+        _cacheSingularTarget(r as Base, inverseName, owner as Base);
       }
     }
 

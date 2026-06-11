@@ -20,7 +20,12 @@ import {
   columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
   defaultSqlTimezone,
 } from "./connection-adapters/abstract/sql-formatting.js";
-import { habtmTargetFk, joinHabtmTableNames, modelRegistry } from "./associations.js";
+import {
+  habtmTargetFk,
+  joinHabtmTableNames,
+  modelRegistry,
+  _cacheSingularTarget,
+} from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import {
@@ -2524,10 +2529,7 @@ export class Relation<T extends Base> {
         if (inverseName) {
           const targets = isSingular ? (children[0] ? [children[0]] : []) : children;
           for (const child of targets) {
-            if (!(child as any)._cachedAssociations) {
-              (child as any)._cachedAssociations = new Map();
-            }
-            (child as any)._cachedAssociations.set(inverseName, parent);
+            _cacheSingularTarget(child as any, inverseName, parent as any);
           }
         }
       }

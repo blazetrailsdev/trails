@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { modelRegistry } from "./associations.js";
+import { modelRegistry, _cacheSingularTarget } from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
@@ -261,8 +261,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
           await (targetModel as any).create(
             { ...childAttrs, [foreignKey]: record.id },
             (child: any) => {
-              child._cachedAssociations = child._cachedAssociations ?? new Map();
-              child._cachedAssociations.set(inverseOf, record);
+              _cacheSingularTarget(child, inverseOf, record);
             },
           );
         } else {

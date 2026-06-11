@@ -175,7 +175,8 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     await post.save();
     post.strictLoadingBang();
     const author = new SrAuthor({ name: "dean" });
-    // Populate the direct cache (the path inverse_of uses).
+    // Populate the legacy _cachedAssociations mirror (written by
+    // _cacheSingularTarget alongside the holder; b4 deletes this map).
     (post as any)._cachedAssociations = new Map([["srAuthor", author]]);
     expect(() => (post as any).srAuthor).not.toThrow();
     expect(((post as any).srAuthor as SrAuthor).name).toBe("dean");
