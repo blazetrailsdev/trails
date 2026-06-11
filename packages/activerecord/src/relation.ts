@@ -4108,23 +4108,22 @@ export class Relation<T extends Base> {
   /**
    * Build the arel FROM source for a `from()` clause (mirrors Rails
    * `build_from`), or `undefined` when no `from()` was set. String and Arel-node
-   * values pass through to `SelectManager#from`, so the node threads through the
-   * single outer collector (binds in document order, FROM before WHERE) and
-   * identifier quoting is left to the visitor.
+   * values pass through to `SelectManager#from`; a normal Relation value becomes
+   * a live `TableAlias` subquery (via `buildFrom` → `opts.arel.as(name)`), so its
+   * binds parameterize and its retryability follows the actual child nodes. All
+   * of these thread through the single outer collector (binds in document order,
+   * FROM before WHERE) with identifier quoting left to the visitor.
    *
-   * A Relation value is compiled through its own full `_toSql()` path — which,
-   * unlike `toArel()`, carries every clause Rails' `Relation#arel` does (joins,
-   * HAVING, nested FROM, LOCK, CTEs, set operations) — then wrapped as a
-   * `BoundSqlLiteral` so its binds inline at the FROM position. (Rails threads
-   * the subquery's `arel` as live bind params; trails has no full subquery AST
-   * for set operations, so the inlined form keeps every relation kind correct
-   * and ordering consistent. Parameterizing the subquery awaits a complete
-   * `Relation#arel`/union-AST convergence — out of scope for this story.)
+   * Set-operation subqueries are the one case with no AST representation in
+   * trails (`_toSql` string-concatenates the operands), so they fall back to the
+   * full compiled SQL wrapped as a `BoundSqlLiteral`, binds inlined at the FROM
+   * position. Parameterizing those awaits a union-AST convergence — out of scope
+   * for this story.
    */
   private _buildFromNode(): Nodes.Node | string | undefined {
     if (this._fromClause.isEmpty()) return undefined;
     const raw = this._fromClause.value;
-    if (raw instanceof Relation) {
+    if (raw instanceof Relation && raw._setOperation) {
       const subSql = raw._toSql();
       const name = this._fromClause.name ?? "subquery";
       // PG renders $N placeholders; BoundSqlLiteral expects positional `?`.
