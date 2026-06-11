@@ -46,40 +46,43 @@ describe("ExplainTest", () => {
     }
   });
 
+  // The aggregate's return type is adapter-dependent (PG/MariaDB return AVG/SUM
+  // as decimal strings, SQLite as numbers), so — like Rails, which only asserts
+  // the EXPLAIN message — we run the aggregate alongside and assert the plan.
   itIfSupports("explain", "relation explain with average", async () => {
     const plan = await Car.all().explain();
     expect(plan).toMatch(/EXPLAIN/i);
-    expect(typeof (await Car.average("id"))).toBe("number");
+    expect(await Car.average("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with count", async () => {
     const plan = await Car.all().explain();
     expect(plan).toMatch(/EXPLAIN/i);
-    expect(typeof (await Car.count())).toBe("number");
+    expect(await Car.count()).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with count and argument", async () => {
     const plan = await Car.all().explain();
     expect(plan).toMatch(/EXPLAIN/i);
-    expect(typeof (await (Car as any).count("id"))).toBe("number");
+    expect(await (Car as any).count("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with minimum", async () => {
     const plan = await Car.all().explain();
     expect(plan).toMatch(/EXPLAIN/i);
-    expect(typeof (await Car.minimum("id"))).toBe("number");
+    expect(await Car.minimum("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with maximum", async () => {
     const plan = await Car.all().explain();
     expect(plan).toMatch(/EXPLAIN/i);
-    expect(typeof (await Car.maximum("id"))).toBe("number");
+    expect(await Car.maximum("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with sum", async () => {
     const plan = await Car.all().explain();
     expect(plan).toMatch(/EXPLAIN/i);
-    expect(typeof (await Car.sum("id"))).toBe("number");
+    expect(await Car.sum("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with first", async () => {
