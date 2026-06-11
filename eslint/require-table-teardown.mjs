@@ -1,11 +1,16 @@
 /**
  * ESLint rule: require-table-teardown
  *
- * Every `createTable("foo", …)` in an activerecord test must be balanced by a
- * `dropTable("foo")` somewhere in the same file. Tests that create a table but
- * never drop it leak that table into the shared per-worker database, where a
- * sibling file's differently-shaped `foo` collides under parallel forks — the
- * exact class of flake catalogued in the project's shared-DB memory notes.
+ * Every `createTable("foo", …)` in an activerecord test must be balanced by an
+ * explicit `dropTable("foo")` somewhere in the same file. Tests that create a
+ * table but never drop it leak that table into the shared per-worker database,
+ * where a sibling file's differently-shaped `foo` collides under parallel forks
+ * — the exact class of flake catalogued in the project's shared-DB memory notes.
+ *
+ * `dropAllTables()` is NOT accepted as that teardown — it is itself flagged
+ * (`noDropAllTables`). The carpet bomb wipes every table, including ones other
+ * code seeded, and obscures which tables a given file actually owns. A file
+ * should drop exactly the tables it created, by name.
  *
  *   ✗  beforeAll(async () => { await ctx.createTable("widgets", t => …); });
  *      // …no dropTable("widgets") anywhere in the file
@@ -41,9 +46,8 @@
  * finishes, where a concurrent sibling fork can collide with it. The leak the
  * rule guards against is the table outliving the test, which `force` doesn't fix.
  *
- * Escape hatch — a file that calls `dropAllTables(…)` (the canonical
- * rebuild/teardown pattern used by locking.test.ts / dirty.test.ts) is treated
- * as cleaning up *every* table, so its literal-named creates are all satisfied.
+ * The `test-helpers/**` infra tests are exempt (configured in eslint.config.mjs)
+ * — they exercise createTable/dropTable/dropAllTables as the subject under test.
  *
  * Existing files that pre-date the rule are grandfathered via
  * `eslint/require-table-teardown-exclude.json` (repo-relative paths) — a ratchet
@@ -128,12 +132,14 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        'Require each createTable("name") in an activerecord test to be balanced by a dropTable("name") (or a dropAllTables) in the same file.',
+        'Require each createTable("name") in an activerecord test to be torn down by an explicit dropTable("name") in the same file, and forbid the carpet-bomb dropAllTables().',
     },
     schema: [],
     messages: {
       missingTeardown:
-        'Table `{{table}}` is created with createTable() but never torn down. Add a matching `dropTable("{{table}}")` (in afterEach/afterAll or the test body), or `dropAllTables(adapter)` in teardown. Leaked tables collide with sibling files under parallel forks. If this is intentional, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
+        'Table `{{table}}` is created with createTable() but never torn down. Add a matching `dropTable("{{table}}")` (in afterEach/afterAll or the test body). Leaked tables collide with sibling files under parallel forks. If this is intentional, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
+      noDropAllTables:
+        'Avoid `dropAllTables()` — drop the specific tables this file created with `dropTable("…")` instead. The carpet-bomb teardown also wipes tables other code seeded, and hides which tables a test actually owns. If this is genuinely necessary, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
     },
   },
 
@@ -146,7 +152,6 @@ const rule = {
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
-    let dropsAll = false;
 
     return {
       CallExpression(node) {
@@ -154,8 +159,8 @@ const rule = {
         // (`createTable(...)`) or on a receiver (`ctx.createTable(...)`).
         const name = calledName(node.callee);
         if (name === "dropAllTables") {
-          // Satisfies every table in the file.
-          dropsAll = true;
+          // The carpet bomb is itself a violation — require explicit drops.
+          context.report({ node, messageId: "noDropAllTables" });
         } else if (name === "createTable") {
           const table = createdTableName(node);
           if (table !== null && !created.has(table)) created.set(table, node);
@@ -166,7 +171,6 @@ const rule = {
 
       // Deferred so creates and drops in any order across the file are matched.
       "Program:exit"() {
-        if (dropsAll) return;
         for (const [name, node] of created) {
           if (dropped.has(name)) continue;
           context.report({

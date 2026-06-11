@@ -279,12 +279,16 @@ export default defineConfig(
   },
 
   // ── require-table-teardown: every createTable("foo") in an AR test must be
-  //    balanced by a dropTable("foo") (or a dropAllTables) in the same file.
-  //    Leaked tables collide with sibling files under parallel forks. Existing
-  //    violators are grandfathered in eslint/require-table-teardown-exclude.json
-  //    and ratcheted down. See eslint/require-table-teardown.mjs. ──
+  //    balanced by an explicit dropTable("foo") in the same file, and the
+  //    carpet-bomb dropAllTables() is forbidden. Leaked tables collide with
+  //    sibling files under parallel forks. test-helpers/** is exempt — those
+  //    tests exercise createTable/dropTable/dropAllTables as the subject under
+  //    test. Existing violators are grandfathered in
+  //    eslint/require-table-teardown-exclude.json and ratcheted down.
+  //    See eslint/require-table-teardown.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
+    ignores: ["packages/activerecord/src/test-helpers/**"],
     rules: {
       "blazetrails/require-table-teardown": "error",
     },

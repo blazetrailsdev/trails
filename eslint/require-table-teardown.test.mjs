@@ -22,11 +22,6 @@ tester.run("require-table-teardown", rule, {
       'afterAll(async () => { await ctx.dropTable("widgets"); });',
     // Receiver-agnostic: create on ctx, drop on this.
     'await ctx.createTable("widgets", () => {});\nawait this.dropTable("widgets");',
-    // dropAllTables satisfies every created table.
-    'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
-      "afterAll(async () => { await dropAllTables(adapter); });",
-    // dropAllTables as a method call also counts.
-    'await ctx.createTable("a", () => {});\nafterAll(() => Base.adapter.dropAllTables());',
     // Computed-name create is skipped (can't match statically) — no report.
     "await ctx.createTable(tableName, () => {});",
     // Multiple tables, each with its own drop.
@@ -48,8 +43,6 @@ tester.run("require-table-teardown", rule, {
     "await ctx.createTable(`${schema}.widgets`, () => {});",
     // Bare (non-method) create + drop — receiver-agnostic for bare calls too.
     'await createTable("widgets", () => {});\nawait dropTable("widgets");',
-    // Bare create paired with bare dropAllTables.
-    'await createTable("widgets", () => {});\nafterAll(() => dropAllTables(adapter));',
   ],
   invalid: [
     // Created, never dropped.
@@ -97,6 +90,27 @@ tester.run("require-table-teardown", rule, {
     {
       code: 'await createTable("widgets", () => {});',
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // dropAllTables is itself forbidden — bare form.
+    {
+      code: "afterAll(() => dropAllTables(adapter));",
+      errors: [{ messageId: "noDropAllTables" }],
+    },
+    // dropAllTables is itself forbidden — method form.
+    {
+      code: "afterAll(() => Base.adapter.dropAllTables());",
+      errors: [{ messageId: "noDropAllTables" }],
+    },
+    // dropAllTables no longer satisfies a create: both the carpet bomb AND the
+    // unmatched create are reported.
+    {
+      code:
+        'await ctx.createTable("widgets", () => {});\n' +
+        "afterAll(async () => { await dropAllTables(adapter); });",
+      errors: [
+        { messageId: "missingTeardown", data: { table: "widgets" } },
+        { messageId: "noDropAllTables" },
+      ],
     },
   ],
 });
