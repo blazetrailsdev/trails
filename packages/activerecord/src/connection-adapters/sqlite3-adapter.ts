@@ -67,7 +67,6 @@ import {
   quoteString as sqliteQuoteStringLiteral,
   quoteTableName,
   quoteColumnName,
-  quoteIdentifier as sqliteQuoteIdentifier,
   quoteTableNameForAssignment as sqliteQuoteTableNameForAssignment,
   quotedTrue as sqliteQuotedTrue,
   unquotedTrue as sqliteUnquotedTrue,
@@ -631,17 +630,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return s.replace(/'/g, "''");
   }
 
-  override quoteIdentifier(name: string): string {
-    return sqliteQuoteIdentifier(name);
-  }
-
-  override quoteTableName(name: string): string {
-    return quoteTableName(name);
-  }
-
-  override quoteColumnName(name: string): string {
-    return quoteColumnName(name);
-  }
+  // quoteIdentifier / quoteTableName / quoteColumnName are NOT overridden:
+  // SQLite's identifier quoting is byte-identical to AbstractAdapter's
+  // double-quote form (`"x"` with `"` → `""`), so the inherited base
+  // methods produce the same SQL. The standalone sqlite3/quoting.ts
+  // `quoteTableName` / `quoteColumnName` stay — internal schema code calls
+  // them directly.
 
   override quoteTableNameForAssignment(table: string, attr: string): string {
     return sqliteQuoteTableNameForAssignment(table, attr);
