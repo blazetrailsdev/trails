@@ -13,10 +13,15 @@ describe("RequiredAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
+    // Mirrors Rails required_test.rb, which creates these scratch `parents` /
+    // `children` tables inline via `create_table` in setup — they have no
+    // schema.rb / canonical counterpart.
+    /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema({
       parents: {},
       children: { parent_id: "integer" },
     });
+    /* eslint-enable blazetrails/require-canonical-schema */
   });
 
   it("belongs_to associations can be optional by default", async () => {
@@ -183,6 +188,10 @@ describe("belongs_to required option", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
+    // Test-local scratch tables for `belongs_to required:` edge cases (no Rails
+    // fixture/canonical-schema counterpart); the `r_`/`rg_` prefixes keep them
+    // from colliding with canonical tables across parallel forks.
+    /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema({
       r_authors: { name: "string" },
       r_books: { title: "string", author_id: "integer" },
@@ -191,6 +200,7 @@ describe("belongs_to required option", () => {
       rg_parents: { name: "string" },
       rg_children: { title: "string", rg_parent_id: "integer" },
     });
+    /* eslint-enable blazetrails/require-canonical-schema */
   });
 
   it("validates presence of foreign key when required: true", async () => {

@@ -49,11 +49,16 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
+    // These `lo_*` tables back an internal-API test (Base#loadBelongsTo /
+    // Base#loadHasOne) with no Rails counterpart, so they are test-local by
+    // design with no canonical-schema shape to reference.
+    /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema(adapter, {
       lo_authors: { name: "string" },
       lo_posts: { title: "string", lo_author_id: "integer" },
       lo_profiles: { bio: "string", lo_author_id: "integer" },
     });
+    /* eslint-enable blazetrails/require-canonical-schema */
     LoAuthor.adapter = adapter;
     LoPost.adapter = adapter;
     LoProfile.adapter = adapter;
