@@ -1,217 +1,197 @@
 /**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/explain_test.rb
+ *
+ * Rails guards the whole suite on `supports_explain?` and rides
+ * `fixtures :cars` + the canonical `Car` model. Our `explain()` resolves to
+ * the rendered query-plan string rather than Rails' chainable proxy, so the
+ * per-aggregate tests assert the plan string (Rails' `assert_match(/^EXPLAIN/`)
+ * and exercise the matching aggregate alongside it.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { describe, it, expect } from "vitest";
+import { Base, ExplainRegistry, registerModel } from "./index.js";
+import { buildExplainClause } from "./explain.js";
 import { itIfSupports } from "./test-helpers/supports.js";
-
 import type { DatabaseAdapter } from "./adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Car } from "./test-helpers/models/car.js";
+import { Bulb } from "./test-helpers/models/bulb.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
+registerModel(Car);
+registerModel(Bulb);
 
 describe("ExplainTest", () => {
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", score: "integer" },
-      blogs: { name: "string" },
-      articles: { title: "string", blog_id: "integer" },
-    });
-  });
-
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    return { Post };
-  }
+  useHandlerFixtures(["cars", "bulbs"], { schema: canonicalSchema });
 
   itIfSupports("explain", "relation explain", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    const result = await Post.all().explain();
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
+    const message = await Car.where({ name: "honda" }).explain();
+    expect(message).toMatch(/EXPLAIN/i);
   });
 
   itIfSupports("explain", "collecting queries for explain", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    const result = await Post.where({ title: "a" }).explain();
-    expect(typeof result).toBe("string");
+    const { queries } = await Base.collectingQueriesForExplain(async () => {
+      await Car.where({ name: "honda" }).toArray();
+    });
+
+    const [sql, binds] = queries[0];
+    expect(sql).toContain("SELECT");
+    // Rails: `if binds.any?` — when the adapter parameterizes the predicate the
+    // value rides in `binds`; otherwise the literal is interpolated into the SQL.
+    // ExplainRegistry collects plain bind values (no Attribute wrappers).
+    if (binds.length > 0) {
+      expect(binds.length).toBe(1);
+      expect(binds[binds.length - 1]).toBe("honda");
+    } else {
+      expect(sql).toContain("honda");
+    }
   });
 
+  // The aggregate's return type is adapter-dependent (PG/MariaDB return AVG/SUM
+  // as decimal strings, SQLite as numbers), so — like Rails, which only asserts
+  // the EXPLAIN message — we run the aggregate alongside and assert the plan.
   itIfSupports("explain", "relation explain with average", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", score: 10 });
-    // explain() returns query plan, average() returns the value
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const avg = await Post.average("score");
-    expect(avg).toBe(10);
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await Car.average("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with count", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const count = await Post.count();
-    expect(count).toBe(1);
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await Car.count()).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with count and argument", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", score: 5 });
-    await Post.create({ title: "b" });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const count = await (Post as any).count("score");
-    expect(typeof count).toBe("number");
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await (Car as any).count("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with minimum", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", score: 3 });
-    await Post.create({ title: "b", score: 7 });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const min = await Post.minimum("score");
-    expect(min).toBe(3);
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await Car.minimum("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with maximum", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", score: 3 });
-    await Post.create({ title: "b", score: 7 });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const max = await Post.maximum("score");
-    expect(max).toBe(7);
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await Car.maximum("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with sum", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", score: 3 });
-    await Post.create({ title: "b", score: 7 });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const sum = await Post.sum("score");
-    expect(sum).toBe(10);
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await Car.sum("id")).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with first", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const first = await Post.first();
-    expect(first).not.toBeNull();
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await Car.first()).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with last", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const last = await Post.last();
-    expect(last).not.toBeNull();
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await Car.last()).not.toBeNull();
   });
 
   itIfSupports("explain", "relation explain with pluck", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "hello" });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const titles = await Post.pluck("title");
-    expect(titles).toContain("hello");
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    expect(await Car.pluck("name")).toContain("honda");
   });
 
   itIfSupports("explain", "relation explain with pluck with args", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", score: 1 });
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    const values = await Post.pluck("title", "score");
-    expect(values.length).toBe(1);
+    const plan = await Car.all().explain();
+    expect(plan).toMatch(/EXPLAIN/i);
+    const values = await Car.pluck("id", "name");
+    expect(values.length).toBeGreaterThan(0);
   });
 
   itIfSupports("explain", "exec explain with no binds", async () => {
-    const { Post } = makeModel();
-    const plan = await Post.all().explain();
-    expect(typeof plan).toBe("string");
-    expect(plan.length).toBeGreaterThan(0);
+    // Mirrors Rails: stub the connection's `explain` to return canned plans, then
+    // assert `exec_explain` renders `<clause> <sql>\n<plan>` per query. Our impl
+    // separates blocks with a blank line (`\n\n`) rather than Rails' single `\n`.
+    const sqls = ["foo", "bar"];
+    const queries: [string, unknown[]][] = [
+      [sqls[0], []],
+      [sqls[1], []],
+    ];
+    const adapter = Base.connection as unknown as {
+      explain: (...args: unknown[]) => Promise<string>;
+    };
+    const original = adapter.explain;
+    let called = 0;
+    adapter.explain = async () => `query plan ${sqls[called++]}`;
+    try {
+      const clause = buildExplainClause(adapter);
+      const expected = sqls.map((sql) => `${clause} ${sql}\nquery plan ${sql}`).join("\n\n");
+      expect(await Base.execExplain(queries)).toBe(expected);
+    } finally {
+      adapter.explain = original;
+    }
   });
 
   itIfSupports("explain", "exec explain with binds", async () => {
-    const { Post } = makeModel();
-    const plan = await Post.where({ title: "bound" }).explain();
-    expect(typeof plan).toBe("string");
-    expect(plan.length).toBeGreaterThan(0);
+    // Mirrors Rails' bind variant. ExplainRegistry collects plain bind values, so
+    // `render_bind` emits the value-only inspect form (`[1]`) rather than Rails'
+    // `[["wadus", 1]]` name/value tuples (which only apply to Attribute binds).
+    const sqls = ["foo", "bar"];
+    const queries: [string, unknown[]][] = [
+      [sqls[0], [1]],
+      [sqls[1], [2]],
+    ];
+    const adapter = Base.connection as unknown as {
+      explain: (...args: unknown[]) => Promise<string>;
+    };
+    const original = adapter.explain;
+    let called = 0;
+    adapter.explain = async () => `query plan ${sqls[called++]}`;
+    try {
+      const clause = buildExplainClause(adapter);
+      const expected = [
+        `${clause} ${sqls[0]} [1]\nquery plan ${sqls[0]}`,
+        `${clause} ${sqls[1]} [2]\nquery plan ${sqls[1]}`,
+      ].join("\n\n");
+      expect(await Base.execExplain(queries)).toBe(expected);
+    } finally {
+      adapter.explain = original;
+    }
   });
 
   it("explain returns query plan string (Rails-guided)", async () => {
-    const { Post } = makeModel();
-    const plan = await Post.all().explain();
+    const plan = await Car.all().explain();
     expect(typeof plan).toBe("string");
     expect(plan.length).toBeGreaterThan(0);
   });
 
   it("prints one EXPLAIN block per collected query with the header prefix", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    const plan = await Post.where({ title: "a" }).explain();
+    const plan = await Car.where({ name: "honda" }).explain();
     expect(plan).toMatch(/EXPLAIN.*for:/);
     expect(plan.toLowerCase()).toContain("select");
   });
 
   it("captures queries for eager-loaded associations, one block per query", async () => {
-    class Blog extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Article extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("blog_id", "integer");
-      }
-    }
-    Blog.hasMany("articles", { className: "Article" });
-    registerModel(Blog);
-    registerModel(Article);
-    const blog = (await Blog.create({ name: "dev" })) as any;
-    await Article.create({ title: "a", blog_id: blog.id });
-    await Article.create({ title: "b", blog_id: blog.id });
-
-    const plan = await Blog.all().preload("articles").explain();
+    const plan = await Car.all().preload("bulbs").explain();
     const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
     expect(blocks.length).toBeGreaterThanOrEqual(2);
-    expect(plan.toLowerCase()).toContain("blogs");
-    expect(plan.toLowerCase()).toContain("articles");
+    expect(plan.toLowerCase()).toContain("cars");
+    expect(plan.toLowerCase()).toContain("bulbs");
   });
 
   it("resets ExplainRegistry after the call (no leaked collection state)", async () => {
-    const { Post } = makeModel();
-    const { ExplainRegistry } = await import("./index.js");
-    await Post.all().explain();
+    await Car.all().explain();
     expect(ExplainRegistry.collect).toBe(false);
     expect(ExplainRegistry.queries).toEqual([]);
   });
 
   it("falls back to explaining toSql when no queries were collected", async () => {
-    const { Post } = makeModel();
     // `none()` short-circuits before any SQL runs — collectingQueries
     // captures nothing. The fallback should still produce a non-empty
     // plan instead of a silent empty string.
-    const plan = await Post.none().explain();
+    const plan = await Car.none().explain();
     expect(plan.length).toBeGreaterThan(0);
     expect(plan.toLowerCase()).toContain("select");
   });
@@ -224,8 +204,7 @@ describe("ExplainTest", () => {
     // Ruby's `Array#inspect` output: strings double-quoted, numbers
     // bare, nil as `nil`, booleans as `true/false`. The BigInt case
     // is the one that used to crash raw `JSON.stringify`.
-    const { Post } = makeModel();
-    const rel = Post.all() as unknown as {
+    const rel = Car.all() as unknown as {
       _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
     };
     // Booleans go through the adapter's typeCast: SQLite collapses
@@ -244,8 +223,7 @@ describe("ExplainTest", () => {
     // End-to-end on sqlite: where-literals are interpolated into the
     // SQL (no binds reach the adapter), so the round-trip still
     // returns non-empty output.
-    await Post.create({ title: "x" });
-    const plan = await Post.all().explain();
+    const plan = await Car.all().explain();
     expect(plan.length).toBeGreaterThan(0);
   });
 
@@ -253,8 +231,7 @@ describe("ExplainTest", () => {
     // _normalizeExplainBindValue is reached directly only when a caller bypasses
     // the adapter typeCast (which rejects raw Date post-PR-6); the branch still
     // exists as a defensive boundary handler for legacy / test code paths.
-    const { Post } = makeModel();
-    const rel = Post.all() as unknown as {
+    const rel = Car.all() as unknown as {
       _normalizeExplainBindValue: (v: unknown) => unknown;
     };
     expect(rel._normalizeExplainBindValue(new Date("2026-04-15T12:00:00.000Z"))).toBe(
@@ -270,8 +247,7 @@ describe("ExplainTest", () => {
     // Buffer / Uint8Array / ArrayBuffer bind gets normalized to the
     // same byte-count string before rubyInspect sees it, so an
     // EXPLAIN over a BYTEA/BLOB column doesn't dump the raw buffer.
-    const { Post } = makeModel();
-    const rel = Post.all() as unknown as {
+    const rel = Car.all() as unknown as {
       _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
     };
     const buf = Buffer.from("hello world"); // 11 bytes
@@ -285,8 +261,7 @@ describe("ExplainTest", () => {
     // raw wrapper would stringify to "[object Object]" via
     // `rubyInspect`'s object fallback. Normalization recurses on
     // `.value` so we show the actual payload instead of the envelope.
-    const { Post } = makeModel();
-    const rel = Post.all() as unknown as {
+    const rel = Car.all() as unknown as {
       _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
     };
     // Skip typeCast here — we're testing the normalization of a
@@ -303,15 +278,13 @@ describe("ExplainTest", () => {
   });
 
   it("rejects multiple hash options (Rails extract_options! semantics)", async () => {
-    const { Post } = makeModel();
-    await expect(
-      Post.all().explain({ format: "json" }, { format: "xml" } as never),
-    ).rejects.toThrow(/at most one option hash/);
+    await expect(Car.all().explain({ format: "json" }, { format: "xml" } as never)).rejects.toThrow(
+      /at most one option hash/,
+    );
   });
 
   it("rejects a non-trailing hash option", async () => {
-    const { Post } = makeModel();
-    await expect(Post.all().explain({ format: "json" } as never, "analyze")).rejects.toThrow(
+    await expect(Car.all().explain({ format: "json" } as never, "analyze")).rejects.toThrow(
       /last argument/,
     );
   });
@@ -321,12 +294,9 @@ describe("ExplainTest", () => {
     // collected queries. Without async-context isolation a global
     // collect flag + shared queries array leaks across the await
     // boundaries of concurrent tasks.
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-
     const [plan1, plan2] = await Promise.all([
-      Post.where({ title: "a" }).explain(),
-      Post.all().explain(),
+      Car.where({ name: "honda" }).explain(),
+      Car.all().explain(),
     ]);
     expect(plan1.length).toBeGreaterThan(0);
     expect(plan2.length).toBeGreaterThan(0);
