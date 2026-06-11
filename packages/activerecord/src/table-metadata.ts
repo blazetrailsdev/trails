@@ -66,12 +66,21 @@ export class TableMetadata {
         associationKlass = reflection.klass;
       }
     } else if (fallback) {
+      // Rails passes lookup_table_klass_from_join_dependencies here so a key
+      // that is a join's table name (not a direct reflection) still resolves.
       associationKlass = fallback(tableName);
     }
 
     if (associationKlass) {
       let arelTable = (associationKlass as any).arelTable;
-      if (arelTable && arelTable.name !== tableName) {
+      // Only alias to the key when it was resolved as a real table name (the
+      // no-reflection join-dependency path). A reflection key may be a camelCase
+      // association name that differs from — and is not a valid alias of — the
+      // join's table, so the association's own table name is the correct SQL
+      // identifier. (Rails aliases the join to the association name and so
+      // aliases here too; trails does not alias the join, so we mirror the
+      // join's actual table name instead.)
+      if (!reflection && arelTable && arelTable.name !== tableName) {
         arelTable = arelTable.alias(tableName);
       }
       return new TableMetadata(associationKlass, arelTable, reflection);
