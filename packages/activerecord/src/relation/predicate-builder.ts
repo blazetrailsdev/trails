@@ -60,17 +60,24 @@ export class PredicateBuilder {
     this.relationHandler = new RelationHandler();
   }
 
-  buildFromHash(conditions: Record<string, unknown>): Nodes.Node[] {
-    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), false);
+  buildFromHash(
+    conditions: Record<string, unknown>,
+    block?: (tableName: string) => unknown,
+  ): Nodes.Node[] {
+    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), false, block);
   }
 
-  buildNegatedFromHash(conditions: Record<string, unknown>): Nodes.Node[] {
-    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), true);
+  buildNegatedFromHash(
+    conditions: Record<string, unknown>,
+    block?: (tableName: string) => unknown,
+  ): Nodes.Node[] {
+    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), true, block);
   }
 
   private buildFromHashInternal(
     conditions: Record<string, unknown>,
     negated: boolean,
+    block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
     const nodes: Nodes.Node[] = [];
     for (const [key, value] of Object.entries(conditions)) {
@@ -80,10 +87,17 @@ export class PredicateBuilder {
         typeof this._tableContext.associatedTable === "function" &&
         !this._tableContext.hasColumn?.(key)
       ) {
-        const assocPb: PredicateBuilder = this._tableContext.associatedTable(key).predicateBuilder;
+        // Mirrors Rails PredicateBuilder#expand_from_hash: pass the
+        // join-dependency resolver block to associatedTable so a nested-hash key
+        // that is not a direct reflection (e.g. a join table name) still
+        // resolves to the right klass/table instead of being used verbatim.
+        const assocPb: PredicateBuilder = this._tableContext.associatedTable(
+          key,
+          block,
+        ).predicateBuilder;
         const innerNodes = negated
-          ? assocPb.buildNegatedFromHash(value as Record<string, unknown>)
-          : assocPb.buildFromHash(value as Record<string, unknown>);
+          ? assocPb.buildNegatedFromHash(value as Record<string, unknown>, block)
+          : assocPb.buildFromHash(value as Record<string, unknown>, block);
         nodes.push(...innerNodes);
       } else if (
         !isPlainObject(value) &&

@@ -280,6 +280,8 @@ describe("PredicateBuilderTest", () => {
       static {
         this.tableName = "posts";
         this.belongsTo("author");
+        // Association name (writer) deliberately differs from the table (authors).
+        this.belongsTo("writer", { className: "Author" });
       }
     }
 
@@ -301,6 +303,16 @@ describe("PredicateBuilderTest", () => {
       expect(sql).toContain('"authors"."name"');
       expect(sql).toContain("Rails");
       expect(sql).not.toContain('"posts"."authors"');
+    });
+
+    it("expands a nested hash keyed by an association name that differs from the table to the underlying table", () => {
+      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const builder = meta.predicateBuilder;
+      const nodes = builder.buildFromHash({ writer: { name: "Rails" } });
+      const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
+      expect(sql).toContain('"authors"."name"');
+      expect(sql).toContain("Rails");
+      expect(sql).not.toContain('"writer"."name"');
     });
 
     it("negated form expands whereNot({authors: {name: 'Rails'}}) to NOT \"authors\".\"name\" = 'Rails'", () => {

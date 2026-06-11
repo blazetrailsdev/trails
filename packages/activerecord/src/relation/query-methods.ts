@@ -823,7 +823,9 @@ export function buildWhereClause(
           ? value.map((v) => this._castWhereValue(resolved, v))
           : this._castWhereValue(resolved, value);
     }
-    const parts = this.predicateBuilder.buildFromHash(normalized);
+    const parts = this.predicateBuilder.buildFromHash(normalized, (tableName: string) =>
+      lookupTableKlassFromJoinDependencies.call(this, tableName),
+    );
     return new WhereClause(parts);
   }
 
@@ -2212,10 +2214,9 @@ export function buildWithValueFromHash(
 }
 
 // Rails passes lookupTableKlassFromJoinDependencies as a block to
-// predicate_builder.build_from_hash so polymorphic associations resolve to the
-// right model. Our PredicateBuilder#buildFromHash doesn't yet accept that
-// callback. These helpers exist for private-API parity; they are not yet wired
-// through the current buildArel() → buildJoins() path.
+// predicate_builder.build_from_hash so a nested-hash key that is a join's table
+// name (rather than a direct reflection) resolves to the right model. It is
+// wired through buildWhereClause's buildFromHash call above.
 /** @internal */
 export function lookupTableKlassFromJoinDependencies(
   this: QueryMethodsHost,
