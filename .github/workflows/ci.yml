@@ -513,7 +513,7 @@ jobs:
       - run: pnpm vitest run packages/tse-compiler
 
   sqlite-tests:
-    name: SQLite Tests
+    name: Active Record SQLite Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
@@ -541,7 +541,7 @@ jobs:
       - run: pnpm vitest run packages/activerecord-cli
 
   postgres-tests:
-    name: PostgreSQL Tests
+    name: Active Record PostgreSQL Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
@@ -589,9 +589,16 @@ jobs:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
 
   mysql-tests:
-    name: MySQL Tests
+    name: Active Record MySQL Tests
     needs: changes
+    # TEMPORARILY DISABLED. mysql:8 fsyncs every DDL to disk and ran ~2.15x
+    # slower than mariadb:11 on this DDL-heavy suite, dominating PR cycle
+    # time. The maria-tests-* jobs below stand in for MySQL/MariaDB coverage
+    # while this is parked. To re-enable, delete the leading `false &&` from
+    # the `if:` below. The aggregate `ci` job already treats this job's skip
+    # as always-legitimate (see the mysql-tests case there).
     if: >-
+      false &&
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
@@ -615,6 +622,67 @@ jobs:
         options: >-
           --mount type=tmpfs,destination=/var/lib/mysql
           --health-cmd "mysqladmin ping -h localhost --silent"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # Trailing slash is load-bearing: the bare `packages/activerecord` filter
+      # is a substring match that also sweeps in packages/activerecord-cli/**.
+      # Those already run in the dedicated step below, so the slash avoids a
+      # redundant double-run and keeps the CLI's subprocess tests out of this
+      # large suite's worker scheduler (they otherwise starve its reporter RPC
+      # / perturb fork scheduling — see trails-models-dump tests).
+      - run: pnpm vitest run packages/activerecord/
+        env:
+          ARCONN: mysql2
+          MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
+          AR_DB_FORKS: 8
+      # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
+      # covers the SQLite E2E until a mysql suite lands and can be wired up.
+      - run: pnpm vitest run packages/activerecord-cli
+
+  # MariaDB stand-in runner. mysql-tests is temporarily disabled (see above);
+  # this provides MySQL/MariaDB-family coverage via the mysql2 adapter against
+  # MariaDB, which runs far faster than mysql:8 on this DDL-heavy suite. Gates
+  # on the same activerecord_affected trigger the mysql job used. Rails'
+  # devcontainer tracks `mariadb:latest`; we pin to `mariadb:11` (current LTS
+  # line) for reproducible CI.
+  #
+  # tmpfs: the data dir is mounted in RAM so MariaDB's per-DDL fsync traffic
+  # never hits disk. A side-by-side CI experiment measured tmpfs at ~7m45s vs
+  # ~9m23s on normal storage (~17% faster) on this suite, so we keep tmpfs.
+  # The DB is throwaway per-run, so losing it on container stop is fine.
+  # --mount is a `docker create` flag, so it goes in options (service
+  # containers can't override the image command to pass server args directly).
+  maria-tests:
+    name: Active Record MariaDB Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_DATABASE: rails_js_test
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+        ports:
+          - 3306:3306
+        options: >-
+          --mount type=tmpfs,destination=/var/lib/mysql
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 10
@@ -1049,6 +1117,7 @@ jobs:
       - sqlite-tests
       - postgres-tests
       - mysql-tests
+      - maria-tests
       - website
       - pr-attribution
       - rails-comparison
@@ -1112,7 +1181,12 @@ jobs:
                   # legitimate (non-PR events, or any other author).
                   continue
                   ;;
-                sqlite-tests|postgres-tests|mysql-tests)
+                mysql-tests)
+                  # Temporarily disabled (if: false) — its skip is always
+                  # legitimate until the job is re-enabled.
+                  continue
+                  ;;
+                sqlite-tests|postgres-tests|maria-tests)
                   # AR test skip is legitimate when no AR-affecting paths changed.
                   [ "$AR_AFFECTED" = "false" ] && continue
                   ;;
