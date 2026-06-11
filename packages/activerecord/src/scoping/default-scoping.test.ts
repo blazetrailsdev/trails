@@ -3,19 +3,17 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/scoping/default_scoping_test.rb
  *
- * Tests that exercise behavior the engine does not yet implement are left
- * unported (tracked as engine gaps, not fabricated): default-scope `where`
- * conditions applied as attributes on `new`/`create`, `allQueries` scopes on
- * `update_columns`/`reload`, default scope through joins, `unscope`
- * ArgumentError validation, `unscope(:where)` merging, `create_with` merge
- * precedence, reversing a multi-column order, `allQueries` scope on `update`
- * for a mixed-scope model, and `includes` + nested-table `where`. The
- * `DefaultScopingWithThreadTest` cases are `unless in_memory_db?` in Rails and
- * so do not apply on sqlite.
+ * Every Rails test is ported with a faithful body. Cases that exercise behavior
+ * the engine does not yet implement are kept as `it.skip` (the migration
+ * backlog) rather than fabricated passing stubs, so their names stay tracked by
+ * test:compare; each skip carries a one-line note on the missing capability.
+ * The `DefaultScopingWithThreadTest` cases are `unless in_memory_db?` in Rails
+ * and so do not apply on the in-memory sqlite suite.
  */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../index.js";
+import { registerModel } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -37,11 +35,31 @@ import {
   DeveloperwithDefaultMentorScopeNot,
   DeveloperWithDefaultMentorScopeAllQueries,
   DeveloperWithDefaultNilableFirmScopeAllQueries,
+  DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries,
   DeveloperWithSelect,
+  DeveloperWithIncludes,
+  ThreadsafeDeveloper,
 } from "../test-helpers/models/developer.js";
 import { Mentor } from "../test-helpers/models/mentor.js";
-import { Post } from "../test-helpers/models/post.js";
+import {
+  Comment,
+  SpecialComment,
+  CommentWithDefaultScopeReferencesAssociation,
+} from "../test-helpers/models/comment.js";
+import {
+  Post,
+  SpecialPostWithDefaultScope,
+  ConditionalStiPost,
+  SubConditionalStiPost,
+  PostWithCommentWithDefaultScopeReferencesAssociation,
+} from "../test-helpers/models/post.js";
+import { Project } from "../test-helpers/models/project.js";
 import { Lion } from "../test-helpers/models/cat.js";
+
+// Register the models whose associations are resolved by active tests
+// (Developer's `projects` HABTM is dereferenced in the eager_load/preload ports).
+registerModel(Developer);
+registerModel(Project);
 
 const names = (rows: any[]) => rows.map((r) => r.name);
 const salaries = (rows: any[]) => rows.map((r) => r.salary);
@@ -528,5 +546,375 @@ describe("DefaultScopingTest", () => {
   it("with abstract class scope should be executed in correct context", () => {
     expect(Lion.all().toSql()).toMatch(/lions.+is_vegetarian/i);
     expect((Lion as any).female().toSql()).toMatch(/lions.+gender/i);
+  });
+
+  it("default scope select ignored by grouped aggregations", async () => {
+    const all = await Developer.all().toArray();
+    const expected: Record<string, number> = {};
+    for (const d of all as any[]) expected[d.salary] = (expected[d.salary] ?? 0) + 1;
+    const received = await DeveloperWithSelect.group("salary").count();
+    expect(received).toEqual(expected);
+  });
+
+  it("unscope having", async () => {
+    const expected = names(await DeveloperOrderedBySalary.all().toArray());
+    const received = names(
+      await DeveloperOrderedBySalary.having("name IN ('Jamis', 'David')")
+        .unscope("having")
+        .toArray(),
+    );
+    expect(received).toEqual(expected);
+  });
+
+  it("unscope includes", async () => {
+    const expected = names(await Developer.all().toArray());
+    const received = names(
+      await Developer.includes("projects").select("id").unscope("includes", "select").toArray(),
+    );
+    expect(received).toEqual(expected);
+  });
+
+  it("unscope left outer joins", async () => {
+    const expected = names(await Developer.all().toArray());
+    const received = names(
+      await Developer.leftOuterJoins("projects")
+        .select("id")
+        .unscope("leftOuterJoins", "select")
+        .toArray(),
+    );
+    expect(received).toEqual(expected);
+  });
+
+  it("unscope eager load", async () => {
+    const expected = names(await Developer.all().toArray());
+    const received = Developer.eagerLoad("projects").select("id").unscope("eagerLoad", "select");
+    const rows = await received.toArray();
+    expect(names(rows)).toEqual(expected);
+    expect(((rows[0] as any).projects as any).loaded).toBe(false);
+  });
+
+  it("unscope preloads", async () => {
+    const expected = names(await Developer.all().toArray());
+    const received = Developer.preload("projects").select("id").unscope("preload", "select");
+    const rows = await received.toArray();
+    expect(names(rows)).toEqual(expected);
+    expect(((rows[0] as any).projects as any).loaded).toBe(false);
+  });
+
+  it("unscope joins and select on developers projects", async () => {
+    const expected = names(await Developer.all().toArray());
+    const received = names(
+      await Developer.joins("JOIN developers_projects ON id = developer_id")
+        .select("id")
+        .unscope("joins", "select")
+        .toArray(),
+    );
+    expect(received).toEqual(expected);
+  });
+
+  it("unscope comparison where clauses", async () => {
+    const expected = names(await Developer.order("salary DESC").toArray());
+    const received = names(
+      await DeveloperOrderedBySalary.where({ id: [1, 2] })
+        .unscope({ where: "id" })
+        .toArray(),
+    );
+    expect(received.sort()).toEqual(expected.sort());
+  });
+
+  it("unscope string where clauses involved", async () => {
+    const expected = names(
+      await Developer.order("salary DESC").where("legacy_created_at > ?", "2020-01-01").toArray(),
+    );
+    const received = names(
+      await DeveloperOrderedBySalary.where({ name: "Jamis" })
+        .where("legacy_created_at > ?", "2020-01-01")
+        .unscope({ where: ["name"] })
+        .toArray(),
+    );
+    expect(received.sort()).toEqual(expected.sort());
+  });
+
+  it("unscope and scope", async () => {
+    class DeveloperWithByNameScope extends Developer {
+      declare static byName: (name: string) => any;
+      static {
+        this.scope("byName", (q: any, name: string) =>
+          q.unscope({ where: "name" }).where({ name }),
+        );
+      }
+    }
+    const expected = namesAndIds(
+      await (DeveloperWithByNameScope as any).where({ name: "Jamis" }).toArray(),
+    );
+    const received = namesAndIds(
+      await (DeveloperWithByNameScope as any).where({ name: "David" }).byName("Jamis").toArray(),
+    );
+    expect(received).toEqual(expected);
+  });
+
+  // ── Migration backlog: faithful Rails ports awaiting engine support. Kept as
+  //    `it.skip` (not fabricated passing stubs) so the Rails test names remain
+  //    tracked by test:compare while the behavior is unimplemented. Each notes
+  //    the missing capability.
+
+  // default-scope `where` conditions are not yet applied as attributes on new/create.
+  it.skip("default scope with conditions hash", async () => {
+    const expected = (await Developer.where({ name: "Jamis" }).toArray())
+      .map((d: any) => d.id)
+      .sort();
+    const received = (await DeveloperCalledJamis.all().toArray()).map((d: any) => d.id).sort();
+    expect(received).toEqual(expected);
+    expect(((await DeveloperCalledJamis.create()) as any).name).toBe("Jamis");
+  });
+
+  // default-scope `where` → attribute propagation on new is unimplemented.
+  it.skip("default scope attribute", () => {
+    const jamis = PoorDeveloperCalledJamis.new({ name: "David" }) as any;
+    expect(jamis.salary).toBe(50000);
+  });
+
+  // default-scope `where` → attribute propagation on create is unimplemented.
+  it.skip("create attribute overwrites default values", async () => {
+    expect(((await PoorDeveloperCalledJamis.create({ salary: null })) as any).salary).toBeNull();
+    expect(((await PoorDeveloperCalledJamis.create({ name: "David" })) as any).salary).toBe(50000);
+  });
+
+  // `create_with` merge precedence (later create_with wins) is unimplemented.
+  it.skip("create with merge", () => {
+    const aaron = (PoorDeveloperCalledJamis.createWith({ name: "foo", salary: 20 }) as any)
+      .merge(PoorDeveloperCalledJamis.createWith({ name: "Aaron" }))
+      .new();
+    expect(aaron.salary).toBe(20);
+    expect(aaron.name).toBe("Aaron");
+  });
+
+  // `create_with` + nested attributes inside a `scoping` block is unimplemented.
+  it.skip("create with nested attributes", async () => {
+    await (Developer.createWith({ projectsAttributes: [{ name: "p1" }] }) as any).scoping(() =>
+      Developer.create({ name: "Aaron" }),
+    );
+    expect(await Project.count()).toBeGreaterThan(0);
+  });
+
+  // `allQueries` default scope is not applied to update_columns yet.
+  it.skip("default scope with all queries runs on update columns", async () => {
+    await Mentor.create();
+    const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
+    const updateSql = (await capSql(() => dev.updateColumns({ name: "Not Eileen" })))[0];
+    expect(updateSql).toMatch(/mentor_id/);
+  });
+
+  // `allQueries` default scope is not applied to reload yet.
+  it.skip("default scope with all queries runs on reload", async () => {
+    await Mentor.create();
+    const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
+    const reloadSql = (await capSql(() => dev.reload()))[0];
+    expect(reloadSql).toMatch(/mentor_id/);
+  });
+
+  // `allQueries` default scope on reload (mixed-scope model) is unimplemented.
+  it.skip("default scope with all queries runs on reload but default scope without all queries does not", async () => {
+    await Mentor.create();
+    const dev =
+      (await DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries.create(
+        { name: "Eileen" },
+      )) as any;
+    const reloadSql = (await capSql(() => dev.reload()))[0];
+    expect(reloadSql).not.toMatch(/mentor_id/);
+    expect(reloadSql).toMatch(/firm_id/);
+  });
+
+  // `allQueries` default scope on update for a mixed-scope model is unimplemented.
+  it.skip("combined default scope without and with all queries works", async () => {
+    await Mentor.create();
+    const klass =
+      DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries;
+    const createSql = (await capSql(() => klass.create({ name: "Steve" })))[1];
+    expect(createSql).toMatch(/mentor_id/);
+    expect(createSql).toMatch(/firm_id/);
+    const developer = (await klass.findBy({ name: "Steve" })) as any;
+    const updateSql = (await capSql(() => developer.update({ name: "Stephen" })))[1];
+    expect(updateSql).not.toMatch(/mentor_id/);
+    expect(updateSql).toMatch(/firm_id/);
+  });
+
+  // `unscope` does not raise ArgumentError on invalid arguments yet.
+  it.skip("unscope errors with invalid value", () => {
+    expect(() => Developer.where({ name: "Jamis" }).unscope("incorrect_value" as any)).toThrow();
+    expect(() =>
+      Developer.all().unscope("includes", "select", "some_broken_value" as any),
+    ).toThrow();
+    expect(() =>
+      Developer.order("name DESC")
+        .reverseOrder()
+        .unscope("reverse_order" as any),
+    ).toThrow();
+    expect(() => Developer.order("name DESC").where({ name: "Jamis" }).unscope()).toThrow();
+  });
+
+  // `unscope` does not validate non-where hash keys yet.
+  it.skip("unscope errors with non where hash keys", () => {
+    expect(() =>
+      Developer.where({ name: "Jamis" })
+        .limit(4)
+        .unscope({ limit: 4 } as any),
+    ).toThrow();
+    expect(() => Developer.where({ name: "Jamis" }).unscope({ where: "name" } as any)).toThrow();
+  });
+
+  // `unscope` does not reject non-symbol/hash arguments yet.
+  it.skip("unscope errors with non symbol or hash arguments", () => {
+    expect(() => Developer.where({ name: "Jamis" }).limit(3).unscope("limit")).toThrow();
+    expect(() => Developer.select("id").unscope("select")).toThrow();
+    expect(() => Developer.select("id").unscope(5 as any)).toThrow();
+  });
+
+  // `unscope(:left_joins)` is not a recognized unscope key yet.
+  it.skip("unscope left joins", async () => {
+    const expected = names(await Developer.all().toArray());
+    const received = names(
+      await (Developer.leftJoins("projects") as any)
+        .select("id")
+        .unscope("leftJoins", "select")
+        .toArray(),
+    );
+    expect(received).toEqual(expected);
+  });
+
+  // `merge` of an `unscope(:where)` relation does not clear the where clause yet.
+  it.skip("unscope merging", () => {
+    const merged = Developer.where({ name: "Jamis" }).merge(Developer.unscope("where"));
+    expect((merged as any)._whereClause.isEmpty()).toBe(true);
+    expect((merged.where({ name: "Jon" }) as any)._whereClause.isEmpty()).toBe(false);
+  });
+
+  // Reversing a multi-column order is not yet supported (IrreversibleOrderError).
+  it.skip("order to unscope reordering", () => {
+    const scope = DeveloperOrderedBySalary.order("salary DESC, name ASC")
+      .reverseOrder()
+      .unscope("order");
+    expect(scope.toSql()).not.toMatch(/order/i);
+  });
+
+  // A model's default scope is not yet applied through an association join.
+  it.skip("default scope with joins", async () => {
+    const ids = (await SpecialPostWithDefaultScope.all().toArray()).map((p: any) => p.id);
+    expect(await Comment.where({ post_id: ids }).count()).toBe(
+      await Comment.joins("specialPostWithDefaultScope").count(),
+    );
+    const postIds = (await Post.all().toArray()).map((p: any) => p.id);
+    expect(await Comment.where({ post_id: postIds }).count()).toBe(
+      await Comment.joins("post").count(),
+    );
+  });
+
+  // Scoping a join with `Post.where(...).scoping` is unimplemented.
+  it.skip("joins not affected by scope other than default or unscoped", async () => {
+    const without = (await Comment.joins("post").toArray()).map((c: any) => c.id).sort();
+    let withScope: any[] = [];
+    await (Post.where({ id: [1, 5, 6] }) as any).scoping(async () => {
+      withScope = (await Comment.joins("post").toArray()).map((c: any) => c.id).sort();
+    });
+    expect(withScope).toEqual(without);
+  });
+
+  // Default scope through join inside `unscoped` block is unimplemented.
+  it.skip("unscoped with joins should not have default scope", async () => {
+    const expected = (await Comment.joins("post").toArray()).map((c: any) => c.id).sort();
+    const received = await (SpecialPostWithDefaultScope as any).unscoped(async () =>
+      (await Comment.joins("specialPostWithDefaultScope").toArray()).map((c: any) => c.id).sort(),
+    );
+    expect(received).toEqual(expected);
+  });
+
+  // STI association behavior with `unscoped` default scope is unimplemented.
+  it.skip("sti association with unscoped not affected by default scope", async () => {
+    const post = (await Post.first()) as any;
+    await (SpecialComment as any).unscoped(async () => {
+      const found = await Post.joins("specialComments").find(post.id);
+      expect(found.id).toBe(post.id);
+    });
+  });
+
+  // STI default-scope conditions leaking through `unscope(:title)` is unimplemented.
+  it.skip("sti conditions are not carried in default scope", async () => {
+    await ConditionalStiPost.create({ body: "" });
+    await SubConditionalStiPost.create({ body: "" });
+    await SubConditionalStiPost.create({ title: "Hello world", body: "" });
+    expect(await ConditionalStiPost.count()).toBe(2);
+    expect(await ConditionalStiPost.unscope({ where: "title" }).count()).toBe(3);
+  });
+
+  // `includes` + nested-table `where` count is unimplemented.
+  it.skip("default scope include with count", async () => {
+    const d = (await DeveloperWithIncludes.create()) as any;
+    await (await d.auditLogs).create({ message: "foo" });
+    expect(await DeveloperWithIncludes.where({ auditLogs: { message: "foo" } }).count()).toBe(1);
+  });
+
+  // `references`/`includes` through a collection association is unimplemented.
+  it.skip("default scope with references works through collection association", async () => {
+    const post = (await PostWithCommentWithDefaultScopeReferencesAssociation.create({
+      title: "Hello World",
+      body: "Here we go.",
+    })) as any;
+    const comment = await (
+      await post.commentWithDefaultScopeReferencesAssociations
+    ).create({
+      body: "Great post.",
+      developer_id: 1,
+    });
+    const first = (await (await post.commentWithDefaultScopeReferencesAssociations).toArray())[0];
+    expect((first as any).id).toBe((comment as any).id);
+  });
+
+  // `references`/`includes` through a singular association is unimplemented.
+  it.skip("default scope with references works through association", async () => {
+    const post = (await PostWithCommentWithDefaultScopeReferencesAssociation.create({
+      title: "Hello World",
+      body: "Here we go.",
+    })) as any;
+    const comment = await (
+      await post.commentWithDefaultScopeReferencesAssociations
+    ).create({
+      body: "Great post.",
+      developer_id: 1,
+    });
+    expect((await post.firstComment).id).toBe((comment as any).id);
+  });
+
+  // `references` default scope with `find_by` is unimplemented.
+  it.skip("default scope with references works with find by", async () => {
+    const post = (await PostWithCommentWithDefaultScopeReferencesAssociation.create({
+      title: "Hello World",
+      body: "Here we go.",
+    })) as any;
+    const comment = await (
+      await post.commentWithDefaultScopeReferencesAssociations
+    ).create({
+      body: "Great post.",
+      developer_id: 1,
+    });
+    const found = await CommentWithDefaultScopeReferencesAssociation.findBy({
+      id: (comment as any).id,
+    });
+    expect((found as any).id).toBe((comment as any).id);
+  });
+});
+
+// `DefaultScopingWithThreadTest` is `unless in_memory_db?` in Rails; the suite
+// runs against in-memory sqlite, so these thread cases do not apply here. Kept
+// as `it.skip` to keep the Rails names tracked by test:compare.
+describe("DefaultScopingWithThreadTest", () => {
+  it.skip("default scoping with threads", () => {
+    expect(DeveloperOrderedBySalary.all().toSql()).toContain("salary DESC");
+  });
+
+  it.skip("default scope is threadsafe", async () => {
+    await ThreadsafeDeveloper.unscoped().create();
+    await ThreadsafeDeveloper.unscoped().create();
+    expect(await ThreadsafeDeveloper.unscoped().count()).not.toBe(1);
+    expect((await ThreadsafeDeveloper.all().toArray()).length).toBe(1);
   });
 });
