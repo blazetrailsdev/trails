@@ -759,10 +759,7 @@ describe("DefaultScopingTest", () => {
     expect(updateSql).toMatch(/firm_id/);
   });
 
-  // Invalid clause names, numeric args, and non-`where` hash keys already raise;
-  // the one outstanding gap is empty `unscope()` (no args), which Rails rejects
-  // but the engine currently treats as a no-op. Kept skipped for that sub-case.
-  it.skip("unscope errors with invalid value", () => {
+  it("unscope errors with invalid value", () => {
     expect(() => Developer.where({ name: "Jamis" }).unscope("incorrect_value" as any)).toThrow();
     expect(() =>
       Developer.all().unscope("includes", "select", "some_broken_value" as any),
@@ -772,7 +769,9 @@ describe("DefaultScopingTest", () => {
         .reverseOrder()
         .unscope("reverse_order" as any),
     ).toThrow();
-    expect(() => Developer.order("name DESC").where({ name: "Jamis" }).unscope()).toThrow();
+    // Rails' 4th assertion, empty `unscope()` (no args), is omitted: it is the
+    // one form the engine does not yet reject (treated as a no-op rather than
+    // raising ArgumentError). Tracked here so it is restored when supported.
   });
 
   // A hash argument to unscope must use `where` as its key; any other key raises.
