@@ -513,7 +513,7 @@ jobs:
       - run: pnpm vitest run packages/tse-compiler
 
   sqlite-tests:
-    name: SQLite Tests
+    name: Active Record SQLite Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
@@ -541,7 +541,7 @@ jobs:
       - run: pnpm vitest run packages/activerecord-cli
 
   postgres-tests:
-    name: PostgreSQL Tests
+    name: Active Record PostgreSQL Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
@@ -589,7 +589,7 @@ jobs:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
 
   mysql-tests:
-    name: MySQL Tests
+    name: Active Record MySQL Tests
     needs: changes
     # TEMPORARILY DISABLED. mysql:8 fsyncs every DDL to disk and ran ~2.15x
     # slower than mariadb:11 on this DDL-heavy suite, dominating PR cycle
@@ -665,7 +665,7 @@ jobs:
   # --mount is a `docker create` flag, so it goes in options (service
   # containers can't override the image command to pass server args directly).
   maria-tests:
-    name: MariaDB Tests
+    name: Active Record MariaDB Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
