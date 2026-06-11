@@ -1,35 +1,19 @@
 /**
  * Mirrors: activerecord/test/cases/unsafe_raw_sql_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, UnknownAttributeReference } from "./index.js";
+import { describe, it, expect } from "vitest";
+import { UnknownAttributeReference } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-
-class Post extends Base {
-  static {
-    this.attribute("title", "string");
-    this.attribute("author_id", "integer");
-    this.attribute("type", "string");
-    this.attribute("tags_count", "integer");
-  }
-}
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Post } from "./test-helpers/models/post.js";
+import "./test-helpers/models/comment.js";
 
 describe("UnsafeRawSqlTest", () => {
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", author_id: "integer", type: "string", tags_count: "integer" },
-    });
-
-    await Post.create({ title: "Alpha", author_id: 2, tags_count: 3 });
-    await Post.create({ title: "Beta", author_id: 1, tags_count: 1 });
-    await Post.create({ title: "Gamma", author_id: 1, tags_count: 2 });
-  });
+  // Rails `fixtures :posts, :comments` — seed the canonical rows so the
+  // ordering/pluck comparisons (Arel.sql vs string column name) read back the
+  // same set of records.
+  useHandlerFixtures(["posts", "comments"], { schema: canonicalSchema });
 
   it("order: allows string column name", async () => {
     const idsExpected = await Post.order(arelSql("title")).pluck("id");
