@@ -166,7 +166,7 @@ describe("DefaultScopingTest", () => {
   it("nilable default scope with all queries runs on create", async () => {
     const createSql = (
       await capSql(() => DeveloperWithDefaultNilableFirmScopeAllQueries.create({ name: "Nikita" }))
-    )[1];
+    )[0];
     expect(createSql).not.toMatch(/AND$/);
   });
 
