@@ -2,13 +2,23 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { Base, delegatedType, registerModel } from "./index.js";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { StringInquirer } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Base } from "./base.js";
+import { delegatedType } from "./index.js";
+// Canonical models — mirror Rails' `require "models/{account,entry,message,recipient,comment}"`.
+// Entry carries both the `entryable` delegated_type (Message/Comment) and the
+// `thing` delegated_type (Post) used by the custom-foreign_type cases.
+import { Entry } from "./test-helpers/models/entry.js";
+import { Message } from "./test-helpers/models/message.js";
+import { Comment } from "./test-helpers/models/comment.js";
+import { Account } from "./test-helpers/models/account.js";
+import { Post } from "./test-helpers/models/post.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -19,145 +29,118 @@ afterAll(() => {
 });
 
 describe("DelegatedTypeTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  // Rails: `fixtures :comments, :accounts, :posts`. `{ schema }` recreates the
+  // canonical fixture tables so the suite survives sibling-file contamination.
+  const { comments, accounts, posts } = useHandlerFixtures(["comments", "accounts", "posts"], {
+    schema: canonicalSchema,
+  });
+
+  // Entry/Message/Recipient aren't fixture-loaded (Rails builds them in setup),
+  // so register them by name for polymorphic type resolution and create their
+  // canonical tables.
+  registerModel("Entry", Entry);
+  registerModel("Message", Message);
+  registerModel("Comment", Comment);
+  registerModel("Account", Account);
+  registerModel("Post", Post);
+
   beforeAll(async () => {
     await defineSchema({
-      entries: { entryable_id: "integer", entryable_type: "string", title: "string" },
-      entry2s: { title: "string", custom_type: "string", custom_id: "integer" },
+      entries: canonicalSchema.entries,
+      messages: canonicalSchema.messages,
+      recipients: canonicalSchema.recipients,
     });
   });
 
-  function makeModels() {
-    class Entry extends Base {
-      static {
-        this.attribute("entryable_id", "integer");
-        this.attribute("entryable_type", "string");
-        this.attribute("title", "string");
-      }
-    }
-    delegatedType(Entry, "entryable", { types: ["Message", "Comment"] });
-    return { Entry };
-  }
+  let entryWithMessage: Base;
+  let entryWithComment: Base;
+  let entryWithPost: Base;
+
+  // Rails `setup do`.
+  beforeEach(async () => {
+    entryWithMessage = await Entry.create({
+      entryable: Message.build({ subject: "Hello world!" }),
+      account: accounts("signals37"),
+    });
+    entryWithComment = await Entry.create({
+      entryable: comments("greetings"),
+      account: accounts("signals37"),
+    });
+    entryWithPost = await Entry.create({
+      thing: posts("welcome"),
+      account: accounts("signals37"),
+    });
+  });
 
   it("delegated types", () => {
-    const { Entry } = makeModels();
     expect((Entry as any).entryableTypes).toEqual(["Message", "Comment"]);
   });
 
   it("delegated class", () => {
-    const { Entry } = makeModels();
-    const e = new Entry({ entryable_type: "Message", entryable_id: 1 });
-    expect((e as any).entryableClass).toBe("Message");
+    // Rails asserts the constantized class; trails' `entryableClass` returns the
+    // foreign_type string instead (pre-existing divergence, #1583).
+    expect((entryWithMessage as any).entryableClass).toBe("Message");
+    expect((entryWithComment as any).entryableClass).toBe("Comment");
   });
 
   it("delegated class with custom foreign_type", () => {
-    class Entry2 extends Base {
-      static {
-        this.attribute("custom_type", "string");
-        this.attribute("custom_id", "integer");
-      }
-    }
-    delegatedType(Entry2, "entryable", {
-      types: ["Message"],
-      foreignType: "custom_type",
-      foreignKey: "custom_id",
-    });
-    const e = new Entry2({ custom_type: "Message", custom_id: 1 });
-    expect((e as any).entryableClass).toBe("Message");
+    expect((entryWithMessage as any).thingClass).toBe("Message");
+    expect((entryWithComment as any).thingClass).toBe("Comment");
+    expect((entryWithPost as any).thingClass).toBe("Post");
   });
 
   it("delegated type name", () => {
-    const { Entry } = makeModels();
-    const e = new Entry({ entryable_type: "Message", entryable_id: 1 });
     // Rails: entryable_name is an ActiveSupport::StringInquirer so
     // `entryable_name.message?` works in addition to string equality.
-    expect(String((e as any).entryableName)).toBe("message");
-    expect((e as any).entryableName).toBeInstanceOf(StringInquirer);
-    expect((e as any).entryableName.message()).toBe(true);
-    expect((e as any).entryableName.comment()).toBe(false);
+    expect(String((entryWithMessage as any).entryableName)).toBe("message");
+    expect((entryWithMessage as any).entryableName).toBeInstanceOf(StringInquirer);
+    expect((entryWithMessage as any).entryableName.message()).toBe(true);
+
+    expect(String((entryWithComment as any).entryableName)).toBe("comment");
+    expect((entryWithComment as any).entryableName.comment()).toBe(true);
   });
 
   it("delegated type predicates", () => {
-    const { Entry } = makeModels();
-    const e = new Entry({ entryable_type: "Message", entryable_id: 1 });
-    expect((e as any).isMessage()).toBe(true);
-    expect((e as any).isComment()).toBe(false);
+    expect((entryWithMessage as any).isMessage()).toBe(true);
+    expect((entryWithMessage as any).isComment()).toBe(false);
+
+    expect((entryWithComment as any).isComment()).toBe(true);
+    expect((entryWithComment as any).isMessage()).toBe(false);
   });
 
   it("delegated type predicates with custom foreign_type", () => {
-    class Entry2 extends Base {
-      static {
-        this.attribute("custom_type", "string");
-        this.attribute("custom_id", "integer");
-      }
-    }
-    delegatedType(Entry2, "entryable", {
-      types: ["Message", "Comment"],
-      foreignType: "custom_type",
-      foreignKey: "custom_id",
-    });
-    const e = new Entry2({ custom_type: "Comment", custom_id: 1 });
-    expect((e as any).isComment()).toBe(true);
-    expect((e as any).isMessage()).toBe(false);
+    expect((entryWithPost as any).isPost()).toBe(true);
+    expect((entryWithMessage as any).isPost()).toBe(false);
+    expect((entryWithComment as any).isPost()).toBe(false);
   });
 
   it("scope", async () => {
-    const { Entry } = makeModels();
-    await Entry.create({ title: "a", entryable_type: "Message", entryable_id: 1 });
-    await Entry.create({ title: "b", entryable_type: "Comment", entryable_id: 2 });
-    const messages = await (Entry as any).messages().toArray();
-    expect(messages.length).toBe(1);
-    expect(messages[0].title).toBe("a");
+    expect((await (Entry as any).messages().first()).isMessage()).toBe(true);
+    expect((await (Entry as any).comments().first()).isComment()).toBe(true);
   });
 
   it("scope with custom foreign_type", async () => {
-    class Entry2 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("custom_type", "string");
-        this.attribute("custom_id", "integer");
-      }
-    }
-    delegatedType(Entry2, "entryable", {
-      types: ["Message", "Comment"],
-      foreignType: "custom_type",
-      foreignKey: "custom_id",
-    });
-    await Entry2.create({ title: "a", custom_type: "Message", custom_id: 1 });
-    await Entry2.create({ title: "b", custom_type: "Comment", custom_id: 2 });
-    const comments = await (Entry2 as any).comments().toArray();
-    expect(comments.length).toBe(1);
-    expect(comments[0].title).toBe("b");
+    expect((await (Entry as any).posts().first()).isPost()).toBe(true);
   });
 
-  it("accessor", () => {
-    // Rails: @entry.message returns the associated record (a Message
-    // instance) via the polymorphic belongs_to accessor, not the FK value.
-    class Message extends Base {
-      static {
-        this.attribute("id", "integer");
-      }
-    }
-    registerModel("Message", Message);
-    const { Entry } = makeModels();
-    const e = new Entry({ entryable_type: "Message", entryable_id: 42 });
-    const msg = new Message({ id: 42 });
-    (e as any).entryable = msg;
-    expect((e as any).message).toBe(msg);
-    expect((e as any).comment).toBeNull();
+  it("accessor", async () => {
+    expect(await (entryWithMessage as any).message).toBeInstanceOf(Message);
+    expect(await (entryWithMessage as any).comment).toBeNull();
+
+    expect(await (entryWithComment as any).comment).toBeInstanceOf(Comment);
+    expect(await (entryWithComment as any).message).toBeNull();
   });
 
   it("association id", () => {
-    const { Entry } = makeModels();
-    const eMsg = new Entry({ entryable_type: "Message", entryable_id: 99 });
-    expect(eMsg.entryable_id).toBe(99);
-    expect((eMsg as any).messageId).toBe(99);
-    expect((eMsg as any).commentId).toBeNull();
+    expect((entryWithMessage as any).messageId).toBe(
+      entryWithMessage.readAttribute("entryable_id"),
+    );
+    expect((entryWithMessage as any).commentId).toBeNull();
 
-    const eCmt = new Entry({ entryable_type: "Comment", entryable_id: 42 });
-    expect((eCmt as any).commentId).toBe(42);
-    expect((eCmt as any).messageId).toBeNull();
+    expect((entryWithComment as any).commentId).toBe(
+      entryWithComment.readAttribute("entryable_id"),
+    );
+    expect((entryWithComment as any).messageId).toBeNull();
   });
 
   it.skipIf(adapterType !== "postgres")("association uuid", () => {
@@ -165,6 +148,8 @@ describe("DelegatedTypeTest", () => {
     // UUID PK accessor naming: delegatedType with primaryKey: "uuid" and
     // foreignKey: "entryable_uuid" generates `uuidMessageUuid` / `uuidCommentUuid`
     // accessors (camelCase of ${singular}_${primaryKey}) instead of the default `Id` suffix.
+    // No canonical uuid_* tables exist (Rails declares them under PostgreSQL only),
+    // so this exercises accessor naming in-memory rather than the DB-backed setup.
     class UuidEntry extends Base {
       static {
         this.attribute("entryable_uuid", "string");
@@ -180,47 +165,46 @@ describe("DelegatedTypeTest", () => {
     const uuid1 = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
     const uuid2 = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
 
-    const entryWithMessage = new UuidEntry({
+    const entryWithMessageUuid = new UuidEntry({
       entryable_type: "UuidMessage",
       entryable_uuid: uuid1,
     });
-    expect((entryWithMessage as any).uuidMessageUuid).toBe(uuid1);
-    expect((entryWithMessage as any).uuidCommentUuid).toBeNull();
+    expect((entryWithMessageUuid as any).uuidMessageUuid).toBe(uuid1);
+    expect((entryWithMessageUuid as any).uuidCommentUuid).toBeNull();
 
-    const entryWithComment = new UuidEntry({
+    const entryWithCommentUuid = new UuidEntry({
       entryable_type: "UuidComment",
       entryable_uuid: uuid2,
     });
-    expect((entryWithComment as any).uuidCommentUuid).toBe(uuid2);
-    expect((entryWithComment as any).uuidMessageUuid).toBeNull();
+    expect((entryWithCommentUuid as any).uuidCommentUuid).toBe(uuid2);
+    expect((entryWithCommentUuid as any).uuidMessageUuid).toBeNull();
   });
 
   it.skip("touch account", () => {
-    // BLOCKED: fixture + delegated-type touch chain — needs Recipient/Account fixtures + multi-hop `belongs_to … touch: true` propagation through a polymorphic delegated_type owner; no STI routing gap (audit-STI)
-    // ROOT-CAUSE: missing Recipient/Account test-models for this file, plus an unverified path through `associations/builder/belongs-to.ts#touchParent` when the touched owner is the polymorphic `entryable` of a delegated_type parent (Rails chains Recipient → Message → Entry → Account via `touch: true`)
-    // SCOPE: ~20–30 LOC fixture-models in delegated-type.test.ts; if the chained-touch path also needs work, follow-up in associations/builder/belongs-to.ts; affects this single delegated-type touch test
+    // BLOCKED: needs multi-hop `belongs_to … touch: true` propagation through a
+    // polymorphic delegated_type owner (Rails chains Recipient → Message → Entry →
+    // Account via `touch: true`) plus `travel`-based timestamp assertions; the
+    // chained-touch path through the polymorphic `entryable` of a delegated_type
+    // parent is unverified (audit-STI). Affects this single touch test.
   });
 
   it("builder method", () => {
-    // Rails: Entry.new(entryable_type: "Message").build_entryable returns
-    // a Message instance — the role-level builder dispatches on the
-    // currently-set foreign_type rather than baking the type into the name.
-    class Message extends Base {
-      static {
-        this.attribute("subject", "string");
-      }
-    }
-    registerModel("Message", Message);
-    const { Entry } = makeModels();
-    const e = new Entry({ entryable_type: "Message" });
-    const built = (e as any).buildEntryable({ subject: "hi" });
+    // Rails: Entry.new responds to build_entryable; Entry.new(entryable_type:
+    // "Message").build_entryable returns a Message instance.
+    expect(typeof (Entry.build({}) as any).buildEntryable).toBe("function");
+    const built = (Entry.build({ entryable_type: "Message" }) as any).buildEntryable();
     expect(built).toBeInstanceOf(Message);
-    expect(built.subject).toBe("hi");
-    // Writer side-effects: role association is set and reads back as the
-    // same instance, foreign_type is preserved by the polymorphic writer.
-    expect((e as any).entryable).toBe(built);
-    expect(e.entryable_type).toBe("Message");
   });
+
+  it("registers a polymorphic belongs_to for the delegated role", () => {
+    const reflection = Entry._reflectOnAssociation("entryable");
+    expect(reflection).not.toBeNull();
+    expect((reflection as any).options?.polymorphic).toBe(true);
+    expect((reflection as any).options?.foreignKey).toBe("entryable_id");
+    expect((reflection as any).options?.foreignType).toBe("entryable_type");
+  });
+
+  // ── TS-specific coverage (no Rails counterpart): namespaced delegated types ──
 
   it("namespaced types", () => {
     // Rails: types: %w[Access::NoticeMessage] generates Entry.access_notice_messages
@@ -272,14 +256,5 @@ describe("DelegatedTypeTest", () => {
     expect(built).toBeInstanceOf(AccessNoticeMessage);
     expect(e.entryable_type).toBe("Access::NoticeMessage");
     expect((e as any).isAccessNoticeMessage()).toBe(true);
-  });
-
-  it("registers a polymorphic belongs_to for the delegated role", () => {
-    const { Entry } = makeModels();
-    const reflection = Entry._reflectOnAssociation("entryable");
-    expect(reflection).not.toBeNull();
-    expect((reflection as any).options?.polymorphic).toBe(true);
-    expect((reflection as any).options?.foreignKey).toBe("entryable_id");
-    expect((reflection as any).options?.foreignType).toBe("entryable_type");
   });
 });

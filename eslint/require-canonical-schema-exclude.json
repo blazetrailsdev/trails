@@ -56,7 +56,6 @@
   "packages/activerecord/src/custom-locking.test.ts",
   "packages/activerecord/src/date.test.ts",
   "packages/activerecord/src/defaults.test.ts",
-  "packages/activerecord/src/delegated-type.test.ts",
   "packages/activerecord/src/dup.test.ts",
   "packages/activerecord/src/encryption/contexts.test.ts",
   "packages/activerecord/src/encryption/encryptable-record.test.ts",
