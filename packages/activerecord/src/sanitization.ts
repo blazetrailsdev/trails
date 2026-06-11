@@ -144,20 +144,29 @@ export function sanitizeSqlLike(value: string, escapeChar: string = "\\"): strin
 }
 
 /**
- * Dispatches through `this.sanitizeSqlArray`, so subclass overrides of
- * `sanitizeSqlArray` take effect — matching Rails'
- * `Sanitization::ClassMethods#sanitize_sql`, which calls `sanitize_sql_array`
- * via `self`.
+ * In Rails, `sanitize_sql` is an alias of `sanitize_sql_for_conditions`
+ * (sanitization.rb:41), so blank input returns `nil` and an Array dispatches
+ * to `sanitize_sql_array`. We dispatch through `this.sanitizeSqlArray` so
+ * subclass overrides take effect.
  *
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql
  */
 export function sanitizeSql(
   this: { sanitizeSqlArray(template: string, ...binds: unknown[]): string },
-  input: string | [string, ...unknown[]],
-): string {
+  input: string | [string, ...unknown[]] | null | undefined,
+): string | null {
+  if (isBlankCondition(input)) return null;
   if (typeof input === "string") return input;
-  const [template, ...binds] = input;
+  const [template, ...binds] = input as [string, ...unknown[]];
   return this.sanitizeSqlArray(template, ...binds);
+}
+
+/** Rails `Object#blank?` for the condition inputs we accept. @internal */
+function isBlankCondition(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
 }
 
 /** @internal */
@@ -214,10 +223,12 @@ export function sanitizeSqlArray(this: QuoterHost, template: string, ...binds: u
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_conditions
  */
 export function sanitizeSqlForConditions(
-  this: QuoterHost & { sanitizeSql(input: string | [string, ...unknown[]]): string },
+  this: QuoterHost & {
+    sanitizeSql(input: string | [string, ...unknown[]] | null | undefined): string | null;
+  },
   condition: string | [string, ...unknown[]] | null | undefined,
 ): string | null {
-  if (!condition || (typeof condition === "string" && condition.trim() === "")) return null;
+  if (isBlankCondition(condition)) return null;
   return this.sanitizeSql(condition);
 }
 
@@ -230,7 +241,7 @@ export function sanitizeSqlForConditions(
 export function sanitizeSqlForAssignment(
   this: QuoterHost & {
     tableName?: string;
-    sanitizeSql(input: string | [string, ...unknown[]]): string;
+    sanitizeSql(input: string | [string, ...unknown[]] | null | undefined): string | null;
     sanitizeSqlHashForAssignment(
       attrs: Record<string, unknown>,
       table: string,
@@ -245,7 +256,9 @@ export function sanitizeSqlForAssignment(
   defaultTableName: string = this.tableName ?? "",
 ): string {
   if (typeof assignments === "string") return assignments;
-  if (Array.isArray(assignments)) return this.sanitizeSql(assignments);
+  // A non-empty Array is never blank, so `sanitizeSql` returns a string here;
+  // `?? ""` only guards the degenerate empty-array case (Rails returns "").
+  if (Array.isArray(assignments)) return this.sanitizeSql(assignments) ?? "";
   return this.sanitizeSqlHashForAssignment(assignments, defaultTableName);
 }
 
@@ -261,7 +274,7 @@ export function sanitizeSqlForOrder(
     sanitizeSqlArray(template: string, ...binds: unknown[]): string;
   },
   condition: string | [string | Nodes.Node, ...unknown[]] | Nodes.Node,
-): string | Nodes.Node {
+): string | Nodes.Node | [string | Nodes.Node, ...unknown[]] {
   if (condition instanceof Nodes.Node) return condition;
   if (Array.isArray(condition)) {
     const first: unknown = condition[0];
@@ -279,7 +292,10 @@ export function sanitizeSqlForOrder(
       return arelSql(sanitized);
     }
   }
-  return typeof condition === "string" ? condition : condition[0];
+  // Rails' `else` branch returns the original `condition` unchanged
+  // (sanitization.rb:99) — for a non-bind array, the full array, not just its
+  // first element.
+  return condition;
 }
 
 /**

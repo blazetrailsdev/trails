@@ -62,7 +62,7 @@ export async function countBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number> {
-  const sanitized = typeof sql === "string" ? sql : this.sanitizeSql(sql);
+  const sanitized = typeof sql === "string" ? sql : (this.sanitizeSql(sql) ?? "");
   // Rails: connection.select_value(sanitize_sql(sql)).to_i
   // Our adapters return rows; extract the first scalar value.
   const rows = await this.connection.execute(sanitized);
@@ -93,7 +93,7 @@ export async function _queryBySql(
   opts: { preparable?: boolean | null; async?: boolean; allowRetry?: boolean } = {},
 ): Promise<Record<string, unknown>[]> {
   // Rails: connection.select_all(sanitize_sql(sql), "#{name} Load", binds, allow_retry:)
-  const resolvedSql = Array.isArray(sql) ? this.sanitizeSql(sql) : sql;
+  const resolvedSql = Array.isArray(sql) ? (this.sanitizeSql(sql) ?? "") : sql;
   const resolvedBinds = Array.isArray(sql) ? [] : binds;
   const result = await this.connection.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, {
     allowRetry: opts.allowRetry ?? false,
