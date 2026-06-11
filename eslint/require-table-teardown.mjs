@@ -25,12 +25,20 @@
  * that for each created table name a matching drop exists in the file — not that
  * the lifecycle is symmetric, since legitimate patterns mix hooks freely.
  *
- * Only `createTable`/`dropTable` calls whose **first argument is a string
- * literal** participate. A `createTable(tableName, …)` with a computed name
- * can't be matched statically and is skipped (neither flagged nor counted as
- * cleanup for a literal-named create). The receiver is ignored, so this catches
- * `defineSchema`-free raw DDL regardless of whether it runs on `ctx`, `adapter`,
- * `this`, `conn`, a SchemaMigration, etc.
+ * Only **statically-known** table names participate: a plain string literal
+ * (`"foo"`) or a template literal with no substitutions (`` `foo` ``). A name
+ * built with an interpolation (`` `${schema}.foo` ``) or held in a variable
+ * can't be matched statically and is skipped — neither flagged as a create nor
+ * counted as cleanup for a literal-named create. `dropTable` accepts several
+ * names at once (`dropTable("a", "b")`); every static name it lists counts as
+ * dropped. The receiver is ignored, so this catches `defineSchema`-free raw DDL
+ * regardless of whether it runs on `ctx`, `adapter`, `this`, `conn`, a
+ * SchemaMigration, etc.
+ *
+ * `createTable("foo", { force: true })` is NOT exempt: `force` drops-then-recreates
+ * on the *next* run, but the table still sits in the shared DB after this test
+ * finishes, where a concurrent sibling fork can collide with it. The leak the
+ * rule guards against is the table outliving the test, which `force` doesn't fix.
  *
  * Escape hatch — a file that calls `dropAllTables(…)` (the canonical
  * rebuild/teardown pattern used by locking.test.ts / dirty.test.ts) is treated
@@ -79,13 +87,33 @@ function calleeMethodName(callee) {
   return callee.property.name;
 }
 
-/** First-arg string-literal table name, or null when it isn't a plain string. */
-function literalTableArg(call) {
-  const arg = call.arguments[0];
-  if (arg && arg.type === "Literal" && typeof arg.value === "string") {
-    return arg.value;
+/**
+ * The static string value of a node, or null when it isn't statically known.
+ * Plain string literals (`"foo"`) and template literals with no substitutions
+ * (`` `foo` ``) both qualify; a template with an interpolation (`` `${s}.foo` ``)
+ * does not — its table name can't be matched statically, so it's skipped.
+ */
+function staticString(node) {
+  if (!node) return null;
+  if (node.type === "Literal" && typeof node.value === "string") return node.value;
+  if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
+    return node.quasis[0].value.cooked;
   }
   return null;
+}
+
+/** The created table name (createTable's first arg), or null if not static. */
+function createdTableName(call) {
+  return staticString(call.arguments[0]);
+}
+
+/**
+ * Every statically-known table name a dropTable() call removes. dropTable
+ * accepts multiple table names (`dropTable("a", "b")`); the trailing options
+ * object is an ObjectExpression and yields no string, so it's skipped naturally.
+ */
+function droppedTableNames(call) {
+  return call.arguments.map(staticString).filter((n) => n !== null);
 }
 
 const rule = {
@@ -93,12 +121,12 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require each createTable(\"name\") in an activerecord test to be balanced by a dropTable(\"name\") (or a dropAllTables) in the same file.",
+        'Require each createTable("name") in an activerecord test to be balanced by a dropTable("name") (or a dropAllTables) in the same file.',
     },
     schema: [],
     messages: {
       missingTeardown:
-        "Table `{{table}}` is created with createTable() but never torn down. Add a matching `dropTable(\"{{table}}\")` (in afterEach/afterAll or the test body), or `dropAllTables(adapter)` in teardown. Leaked tables collide with sibling files under parallel forks. If this is intentional, add `// eslint-disable-next-line blazetrails/require-table-teardown`.",
+        'Table `{{table}}` is created with createTable() but never torn down. Add a matching `dropTable("{{table}}")` (in afterEach/afterAll or the test body), or `dropAllTables(adapter)` in teardown. Leaked tables collide with sibling files under parallel forks. If this is intentional, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
     },
   },
 
@@ -125,11 +153,10 @@ const rule = {
 
         const method = calleeMethodName(node.callee);
         if (method === "createTable") {
-          const name = literalTableArg(node);
+          const name = createdTableName(node);
           if (name !== null && !created.has(name)) created.set(name, node);
         } else if (method === "dropTable") {
-          const name = literalTableArg(node);
-          if (name !== null) dropped.add(name);
+          for (const name of droppedTableNames(node)) dropped.add(name);
         }
       },
 

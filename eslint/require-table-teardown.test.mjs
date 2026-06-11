@@ -36,6 +36,16 @@ tester.run("require-table-teardown", rule, {
     'await ctx.createTable("widgets", () => {});\nawait ctx.dropTable("widgets", { ifExists: true });',
     // No createTable at all.
     'await ctx.dropTable("widgets");',
+    // dropTable removing several tables in one call satisfies each.
+    'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+      'await ctx.dropTable("a", "b");',
+    // No-substitution template literal names match (template↔template and template↔string).
+    "await ctx.createTable(`widgets`, () => {});\nawait ctx.dropTable(`widgets`);",
+    'await ctx.createTable(`widgets`, () => {});\nawait ctx.dropTable("widgets");',
+    // force:true does not exempt, but a real drop satisfies it.
+    'await ctx.createTable("widgets", { force: true }, () => {});\nawait ctx.dropTable("widgets");',
+    // Interpolated create name is skipped entirely (not statically knowable).
+    "await ctx.createTable(`${schema}.widgets`, () => {});",
   ],
   invalid: [
     // Created, never dropped.
@@ -61,6 +71,23 @@ tester.run("require-table-teardown", rule, {
         'await conn.createTable("select", { force: true }, () => {});\n' +
         "for (const t of TABLES) await conn.dropTable(t);",
       errors: [{ messageId: "missingTeardown", data: { table: "select" } }],
+    },
+    // force:true alone is not teardown — the table still leaks after the test.
+    {
+      code: 'await ctx.createTable("widgets", { force: true }, () => {});',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // Multi-arg dropTable that omits one created table flags the omitted one.
+    {
+      code:
+        'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+        'await ctx.dropTable("a", "c");',
+      errors: [{ messageId: "missingTeardown", data: { table: "b" } }],
+    },
+    // Interpolated drop name cannot satisfy a static create name.
+    {
+      code: 'await ctx.createTable("widgets", () => {});\nawait ctx.dropTable(`${schema}.widgets`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
     },
   ],
 });
