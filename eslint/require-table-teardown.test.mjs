@@ -46,6 +46,10 @@ tester.run("require-table-teardown", rule, {
     'await ctx.createTable("widgets", { force: true }, () => {});\nawait ctx.dropTable("widgets");',
     // Interpolated create name is skipped entirely (not statically knowable).
     "await ctx.createTable(`${schema}.widgets`, () => {});",
+    // Bare (non-method) create + drop — receiver-agnostic for bare calls too.
+    'await createTable("widgets", () => {});\nawait dropTable("widgets");',
+    // Bare create paired with bare dropAllTables.
+    'await createTable("widgets", () => {});\nafterAll(() => dropAllTables(adapter));',
   ],
   invalid: [
     // Created, never dropped.
@@ -87,6 +91,11 @@ tester.run("require-table-teardown", rule, {
     // Interpolated drop name cannot satisfy a static create name.
     {
       code: 'await ctx.createTable("widgets", () => {});\nawait ctx.dropTable(`${schema}.widgets`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // Bare (non-method) create with no drop is flagged like a method create.
+    {
+      code: 'await createTable("widgets", () => {});',
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
     },
   ],

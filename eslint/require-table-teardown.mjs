@@ -31,9 +31,10 @@
  * can't be matched statically and is skipped — neither flagged as a create nor
  * counted as cleanup for a literal-named create. `dropTable` accepts several
  * names at once (`dropTable("a", "b")`); every static name it lists counts as
- * dropped. The receiver is ignored, so this catches `defineSchema`-free raw DDL
- * regardless of whether it runs on `ctx`, `adapter`, `this`, `conn`, a
- * SchemaMigration, etc.
+ * dropped. The call is matched by name whether it's bare (`createTable(...)`,
+ * e.g. an imported test helper) or invoked on a receiver (`ctx.createTable(...)`,
+ * `adapter.`, `this.`, `conn.`, a SchemaMigration, …) — only a dynamic/computed
+ * callee (`recv[fn](...)`) is invisible.
  *
  * `createTable("foo", { force: true })` is NOT exempt: `force` drops-then-recreates
  * on the *next* run, but the table still sits in the shared DB after this test
@@ -80,8 +81,14 @@ function repoRel(filename) {
   return m ? m[1] : null;
 }
 
-/** Static method name of `recv.foo(...)`; null for dynamic/computed callees. */
-function calleeMethodName(callee) {
+/**
+ * The called function's name, whether it's a bare call (`createTable(...)`) or
+ * a method call (`recv.createTable(...)`). Receiver-agnostic by design — the
+ * rule cares about the operation, not what it's invoked on. Returns null for
+ * dynamic/computed callees (`recv[fn](...)`).
+ */
+function calledName(callee) {
+  if (callee.type === "Identifier") return callee.name;
   if (callee.type !== "MemberExpression") return null;
   if (callee.computed || callee.property.type !== "Identifier") return null;
   return callee.property.name;
@@ -143,20 +150,17 @@ const rule = {
 
     return {
       CallExpression(node) {
-        // dropAllTables(...) — receiver-agnostic, satisfies every table.
-        const direct =
-          node.callee.type === "Identifier" ? node.callee.name : calleeMethodName(node.callee);
-        if (direct === "dropAllTables") {
+        // All three operations are matched identically whether invoked bare
+        // (`createTable(...)`) or on a receiver (`ctx.createTable(...)`).
+        const name = calledName(node.callee);
+        if (name === "dropAllTables") {
+          // Satisfies every table in the file.
           dropsAll = true;
-          return;
-        }
-
-        const method = calleeMethodName(node.callee);
-        if (method === "createTable") {
-          const name = createdTableName(node);
-          if (name !== null && !created.has(name)) created.set(name, node);
-        } else if (method === "dropTable") {
-          for (const name of droppedTableNames(node)) dropped.add(name);
+        } else if (name === "createTable") {
+          const table = createdTableName(node);
+          if (table !== null && !created.has(table)) created.set(table, node);
+        } else if (name === "dropTable") {
+          for (const table of droppedTableNames(node)) dropped.add(table);
         }
       },
 
