@@ -11,7 +11,6 @@
 import type { DatabaseAdapter } from "../../adapter.js";
 import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { extractValueFromDefault } from "./quoting.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
@@ -237,6 +236,23 @@ export function extractGeneratedType(
     default:
       return undefined;
   }
+}
+
+/**
+ * Mirrors: SQLite3Adapter#extract_value_from_default
+ * @internal
+ */
+export function extractValueFromDefault(dfltValue: string | null): unknown {
+  if (dfltValue === null) return null;
+  if (/^null$/i.test(dfltValue)) return null;
+  const single = /^'([\s\S]*)'$/.exec(dfltValue);
+  if (single) return single[1].replace(/''/g, "'");
+  const double = /^"([\s\S]*)"$/.exec(dfltValue);
+  if (double) return double[1].replace(/""/g, '"');
+  if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
+  const hex = /^x'([0-9a-fA-F]*)'$/i.exec(dfltValue);
+  if (hex) return Buffer.from(hex[1], "hex");
+  return null;
 }
 
 export { extractValueFromDefault as _extractValueFromDefault };

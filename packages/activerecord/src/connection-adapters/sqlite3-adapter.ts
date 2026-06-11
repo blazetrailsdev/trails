@@ -14,7 +14,10 @@ import type { SQLite3AdapterOptions } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
-import { dataSourceSql as sqliteDataSourceSql } from "./sqlite3/schema-statements.js";
+import {
+  dataSourceSql as sqliteDataSourceSql,
+  extractValueFromDefault as sqliteExtractValueFromDefault,
+} from "./sqlite3/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -71,7 +74,6 @@ import {
   quotedFalse as sqliteQuotedFalse,
   unquotedFalse as sqliteUnquotedFalse,
   quotedBinary as sqliteQuotedBinary,
-  extractValueFromDefault as sqliteExtractValueFromDefault,
 } from "./sqlite3/quoting.js";
 import {
   CheckConstraintDefinition,
