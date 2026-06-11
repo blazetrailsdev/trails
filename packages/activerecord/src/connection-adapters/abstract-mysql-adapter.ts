@@ -608,11 +608,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * @internal
    */
   dataSourceSql(name?: string | null, options: { type?: string } = {}): string {
-    return mysqlDataSourceSql(name, options);
+    return mysqlDataSourceSql.call(this, name, options);
   }
 
   async tableComment(tableName: string): Promise<string | null> {
-    const scope = quotedScope(tableName);
+    const scope = quotedScope.call(this, tableName);
     if (!scope.name) return null;
     const rows = await this.schemaQuery(
       `SELECT table_comment FROM information_schema.tables` +
@@ -986,7 +986,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:545
       throw new NotImplementedError("check constraints are not supported by this database");
     }
-    const scope = quotedScope(tableName);
+    const scope = quotedScope.call(this, tableName);
 
     let sql = `SELECT cc.constraint_name AS 'name',
         cc.check_clause AS 'expression'

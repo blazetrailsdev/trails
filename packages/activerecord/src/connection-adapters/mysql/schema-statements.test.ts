@@ -17,6 +17,11 @@ import {
   limitToSize,
   integerToSql,
 } from "./schema-statements.js";
+import { quote } from "./quoting.js";
+
+// quotedScope/dataSourceSql dispatch quoting through the adapter instance
+// (`this.quote`); supply a minimal host carrying the MySQL `quote` standalone.
+const quoteHost = { quote };
 
 describe("MySQL::SchemaStatements", () => {
   it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", () => {
@@ -273,25 +278,27 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("dataSourceSql: generates information_schema query", () => {
-    const sql = dataSourceSql();
+    const sql = dataSourceSql.call(quoteHost);
     expect(sql).toContain("SELECT table_name FROM information_schema.tables");
     expect(sql).toContain("WHERE table_schema = database()");
-    expect(dataSourceSql("users")).toContain("AND table_name = 'users'");
-    expect(dataSourceSql(undefined, { type: "BASE TABLE" })).toContain(
+    expect(dataSourceSql.call(quoteHost, "users")).toContain("AND table_name = 'users'");
+    expect(dataSourceSql.call(quoteHost, undefined, { type: "BASE TABLE" })).toContain(
       "AND table_type = 'BASE TABLE'",
     );
-    const qualified = dataSourceSql("mydb.users");
+    const qualified = dataSourceSql.call(quoteHost, "mydb.users");
     expect(qualified).toContain("table_schema = 'mydb'");
     expect(qualified).toContain("table_name = 'users'");
   });
 
   it("quotedScope builds scope hash", () => {
-    expect(quotedScope().schema).toBe("database()");
-    expect(quotedScope("users").name).toBe("'users'");
-    const q = quotedScope("mydb.users");
+    expect(quotedScope.call(quoteHost).schema).toBe("database()");
+    expect(quotedScope.call(quoteHost, "users").name).toBe("'users'");
+    const q = quotedScope.call(quoteHost, "mydb.users");
     expect(q.schema).toBe("'mydb'");
     expect(q.name).toBe("'users'");
-    expect(quotedScope(undefined, { type: "BASE TABLE" }).type).toBe("'BASE TABLE'");
+    expect(quotedScope.call(quoteHost, undefined, { type: "BASE TABLE" }).type).toBe(
+      "'BASE TABLE'",
+    );
   });
 
   it("typeWithSizeToSql: builds prefixed type names", () => {

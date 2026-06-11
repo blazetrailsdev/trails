@@ -18,8 +18,7 @@ import type {
   PrimaryKeyType,
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
-import { quoteIdentifier, quoteTableName } from "./quoting.js";
-import { quoteDefaultExpression } from "../abstract/quoting.js";
+import { mysqlSchemaQuoter } from "./schema-quoter.js";
 import {
   SchemaCreation as MysqlSchemaCreation,
   type VisitorHostAdapter,
@@ -88,11 +87,7 @@ export class TableDefinition extends AbstractTableDefinition {
       charset: rest.charset ?? undefined,
       collation: rest.collation ?? undefined,
       adapterName: "mysql",
-      adapter: {
-        quoteIdentifier: quoteIdentifier,
-        quoteTableName: quoteTableName,
-        quoteDefaultExpression: quoteDefaultExpression,
-      },
+      adapter: mysqlSchemaQuoter(adapter),
     });
     this._mysqlAdapter = adapter;
   }
