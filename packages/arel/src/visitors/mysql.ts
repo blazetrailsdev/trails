@@ -1,7 +1,7 @@
 import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { ToSql } from "./to-sql.js";
+import { ToSql, cteRelationSelfWraps } from "./to-sql.js";
 import type { ArelConnection } from "./connection.js";
 import { mysqlDefaultQuoter } from "./default-quoter.js";
 
@@ -226,12 +226,12 @@ export class MySQL extends ToSql {
     // MATERIALIZED / NOT MATERIALIZED modifiers Postgres supports are
     // ignored. Mirrors Rails' MySQL visit_Arel_Nodes_Cte which calls
     // `quote_table_name` (which emits backticks on the MySQL adapter).
-    // Parens: Trails stores a SelectStatement in Cte.relation (not a
-    // SelectManager as Rails does), so we add them explicitly. But
-    // buildWithExpressionFromValue wraps SqlLiteral relations in a Grouping,
-    // which visits with its own parens — skip the explicit wrap in that case.
+    // Parens: Trails stores a bare SelectStatement in Cte.relation (not a
+    // SelectManager as Rails does), so we add them explicitly. But a
+    // Grouping (SqlLiteral path) or a set-operation node (array CTE → UnionAll)
+    // visits with its own parens — skip the explicit wrap in that case.
     collector.append(`${this.connection.quoteTableName(node.name)} AS `);
-    if (node.relation instanceof Nodes.Grouping) {
+    if (cteRelationSelfWraps(node.relation)) {
       this.visit(node.relation, collector);
     } else {
       collector.append("(");

@@ -320,6 +320,28 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(stmt.ast);
       expect(sql).not.toContain("MATERIALIZED");
     });
+
+    it("wraps a bare SelectStatement body in exactly one set of parens", () => {
+      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
+      const sql = new Visitors.ToSql().compile(cte);
+      expect(sql).toBe('"t" AS (SELECT "users"."id" FROM "users")');
+    });
+
+    it("does not double-wrap a Grouping body (SqlLiteral path)", () => {
+      const cte = new Nodes.Cte("t", new Nodes.Grouping(new Nodes.SqlLiteral("SELECT 1")));
+      const sql = new Visitors.ToSql().compile(cte);
+      expect(sql).toBe('"t" AS (SELECT 1)');
+    });
+
+    it("does not double-wrap a UnionAll body (array CTE path)", () => {
+      const union = new Nodes.UnionAll(
+        new Nodes.Grouping(new Nodes.SqlLiteral("SELECT 1")),
+        new Nodes.Grouping(new Nodes.SqlLiteral("SELECT 2")),
+      );
+      const cte = new Nodes.Cte("t", union);
+      const sql = new Visitors.ToSql().compile(cte);
+      expect(sql).toBe('"t" AS ( (SELECT 1) UNION ALL (SELECT 2) )');
+    });
   });
 
   describe("Nodes::With", () => {
