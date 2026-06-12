@@ -1296,7 +1296,11 @@ export interface SchemaStatementsLike {
   addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
   removeIndex(
     tableName: string,
-    options?: { column?: string | string[]; name?: string },
+    columnOrOptions?:
+      | string
+      | string[]
+      | { column?: string | string[]; name?: string; ifExists?: boolean },
+    options?: { column?: string | string[]; name?: string; ifExists?: boolean },
   ): Promise<void>;
   addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   removeReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;

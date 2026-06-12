@@ -303,6 +303,23 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     });
   }
 
+  // Whether a query should use the pooled (prepared) statement path by default.
+  // Mirrors the mysql2 adapter's `_shouldPrepare`: only bound queries are pooled,
+  // and only while prepared statements + a non-empty pool are enabled. Matches
+  // Rails' `exec_query` default of `prepare: false` for unbound/raw SQL.
+  private _shouldPrepareQuery(binds: unknown[]): boolean {
+    if (!this.preparedStatements || binds.length === 0) return false;
+    return this._statementLimit > 0;
+  }
+
+  // A statement prepared outside the pool — Rails' non-`prepare` branch, which
+  // prepares a fresh statement per call rather than caching it.
+  private async _freshStatement(sql: string): Promise<SqliteStatement> {
+    const stmt = await this.driver.prepare(sql);
+    this._maybeEnableReadBigInts(sql, stmt);
+    return stmt;
+  }
+
   private async _cachedStatement(sql: string): Promise<SqliteStatement> {
     // When preparedStatements is off, skip the pool and prepare per call —
     // matches Rails' `statement_pool` behavior gated on
@@ -506,7 +523,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * (INSERT/UPDATE/DELETE/DDL) yields an empty Result, while a row-returning
    * statement reports its column set from the prepared statement even when it
    * matches no rows — the default `execQuery` (Result.fromRowHashes) drops the
-   * columns on a zero-row result.
+   * columns on a zero-row result. Like Rails' `perform_query`, the statement is
+   * pooled only on the `prepare` branch; otherwise a fresh statement is used.
    */
   override async execQuery(
     sql: string,
@@ -514,10 +532,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     binds: unknown[] = [],
     options: { prepare?: boolean; allowRetry?: boolean } = {},
   ): Promise<Result> {
-    void options;
     const processed = this.preprocessQuery(sql);
     await this.materializeTransactions();
     const driverBinds = (binds ?? []).map(sqliteTypeCast) as SqliteBinds;
+    // Rails' SQLite `perform_query` pools the statement only when `prepare` is
+    // true (`@statements[sql] ||= ...`) and otherwise prepares a fresh one. The
+    // default (Rails' `exec_query` passes `prepare: false`) is mirrored by
+    // `_shouldPrepareQuery`, which — like the mysql2 adapter's `_shouldPrepare`
+    // — only prepares bound queries while statement pooling is enabled.
+    const prepare = options.prepare ?? this._shouldPrepareQuery(binds ?? []);
     const txPublic = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: processed,
@@ -530,7 +553,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        const stmt = await this._cachedStatement(processed);
+        const stmt = await (prepare
+          ? this._cachedStatement(processed)
+          : this._freshStatement(processed));
         if (!stmt.reader) {
           await stmt.run(driverBinds);
           return Result.empty();
