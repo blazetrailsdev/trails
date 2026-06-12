@@ -184,10 +184,9 @@ export function performValidations(
  * columns.
  */
 export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
-  const cached = this._cachedAssociations?.get?.(attribute);
-  if (cached !== undefined) return cached;
-  const preloaded = this._preloadedAssociations?.get?.(attribute);
-  if (preloaded !== undefined) return preloaded;
+  // A loaded collection proxy (incl. in-memory built records on an unloaded
+  // proxy) is the canonical has_many target; check it before the holder so an
+  // unsaved `record.collection << x` is seen.
   const proxy = this._collectionProxies?.get?.(attribute) as
     | { loaded?: boolean; target?: unknown[] }
     | undefined;
@@ -197,14 +196,25 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
   ) {
     return proxy.target;
   }
+  // RFC 0022 b1+: a loaded singular target lives on the SingularAssociation
+  // holder; `association(name)` hydrates it from any loaded proxy / preload /
+  // cache mirror, so the loaded target is read through the holder rather than
+  // off `_cachedAssociations` directly.
   if (typeof this.association === "function") {
     try {
       const assoc = this.association(attribute);
       if (assoc && (assoc.loaded === true || assoc.target != null)) return assoc.target;
     } catch {
-      // Not an association — fall through
+      // Not a declared association — fall through.
     }
   }
+  // Transitional: undeclared in-memory pokes (FakeTopic/FakeReply test seeds)
+  // still write `_cachedAssociations` / `_preloadedAssociations` directly; those
+  // pokes and these fallback reads are removed together in RFC 0022 b4.
+  const cached = this._cachedAssociations?.get?.(attribute);
+  if (cached !== undefined) return cached;
+  const preloaded = this._preloadedAssociations?.get?.(attribute);
+  if (preloaded !== undefined) return preloaded;
   return this.readAttribute(attribute);
 }
 

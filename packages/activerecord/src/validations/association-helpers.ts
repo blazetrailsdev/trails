@@ -6,13 +6,8 @@ export function isAssociation(record: any, attribute: string): boolean {
 }
 
 export function resolveAssociation(record: any, attribute: string, fallback: unknown): unknown {
-  // Check cached/preloaded associations first
-  const cached = record._cachedAssociations?.get?.(attribute);
-  if (cached !== undefined) return cached;
-  const preloaded = record._preloadedAssociations?.get?.(attribute);
-  if (preloaded !== undefined) return preloaded;
-
-  // Check collection proxies — only use when loaded or has in-memory records
+  // Check collection proxies first — only use when loaded or has in-memory
+  // records — so an unsaved `record.collection << x` is seen before the holder.
   const proxy = record._collectionProxies?.get?.(attribute);
   if (
     proxy &&
@@ -21,11 +16,20 @@ export function resolveAssociation(record: any, attribute: string, fallback: unk
     return proxy.target;
   }
 
-  // Only use association target when actually loaded
+  // RFC 0022 b1+: a loaded singular target lives on the SingularAssociation
+  // holder; read it through `association(name)` (which hydrates from any loaded
+  // proxy / preload / cache mirror) rather than off `_cachedAssociations`.
   if (typeof record.association === "function" && isAssociation(record, attribute)) {
     const assoc = record.association(attribute);
     if (assoc?.loaded === true && assoc.target !== undefined) return assoc.target;
   }
+
+  // Transitional: undeclared in-memory pokes still write `_cachedAssociations` /
+  // `_preloadedAssociations` directly; removed with the pokes in RFC 0022 b4.
+  const cached = record._cachedAssociations?.get?.(attribute);
+  if (cached !== undefined) return cached;
+  const preloaded = record._preloadedAssociations?.get?.(attribute);
+  if (preloaded !== undefined) return preloaded;
 
   if (attribute in record) return record[attribute];
   return fallback;

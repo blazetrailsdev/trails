@@ -82,8 +82,13 @@ function _loadedAssociation(record: any, name: string): any | null {
   const proxyHasBuiltRecords = Array.isArray(proxy?.target) && proxy.target.length > 0;
   const existingHasBuiltRecords =
     Array.isArray(existing?.target) && (existing.target as unknown[]).length > 0;
+  // RFC 0022 b1+: a loaded singular target lives on the holder, surfacing here
+  // through `existing.isLoaded()` — there is no direct `_cachedAssociations.has`
+  // read (the map mirror, removed in b4). The gate stays on these cheap signals
+  // so an unloaded, misconfigured through-association is not eagerly built,
+  // which would surface a source-reflection error before the association is
+  // actually used.
   const hasCachedData =
-    record._cachedAssociations?.has(name) ||
     record._preloadedAssociations?.has(name) ||
     !!proxy?.loaded ||
     proxyHasBuiltRecords ||

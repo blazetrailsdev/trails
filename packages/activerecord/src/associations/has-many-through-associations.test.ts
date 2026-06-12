@@ -5929,8 +5929,7 @@ describe("HasManyThroughAssociationsTest", () => {
     // Pre-populate the through-association target so autosave attempts join
     // creation when the new owner is saved — mirrors Rails' constructor-form
     // collection writer `Category.new(name:, authors: [author])`.
-    (owner as any)._cachedAssociations = (owner as any)._cachedAssociations ?? new Map();
-    (owner as any)._cachedAssociations.set("fbang_items", [item]);
+    owner.association("fbang_items").setTarget([item] as any);
 
     const result = await owner.save();
     expect(result).toBeFalsy();
