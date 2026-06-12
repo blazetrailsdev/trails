@@ -26,7 +26,7 @@ import {
   parsePostgresTimestampAsInstant,
   parsePostgresInstant,
 } from "../../abstract/temporal-wire.js";
-import { defaultSqlTimezone, formatInstantForSql } from "../../abstract/quoting.js";
+import { defaultSqlTimezone, formatInstantForSql } from "../../abstract/sql-datetime.js";
 
 type PgDateTimeResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 

@@ -12,9 +12,5 @@
  *
  * @internal
  */
-export {
-  columnNameMatcher,
-  columnNameWithOrderMatcher,
-  defaultSqlTimezone,
-  formatInstantForSql,
-} from "./quoting.js";
+export { columnNameMatcher, columnNameWithOrderMatcher } from "./quoting.js";
+export { defaultSqlTimezone, formatInstantForSql } from "./sql-datetime.js";
