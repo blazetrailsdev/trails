@@ -10,8 +10,6 @@ import {
   unquotedTrue,
   quotedFalse,
   unquotedFalse,
-  formatInstantForSql,
-  formatPlainTimeForSql,
   quotedBinary,
   typeCast,
   castBoundValue,
@@ -19,6 +17,10 @@ import {
   columnNameMatcher,
   columnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
+import {
+  formatInstantForSql,
+  formatPlainTimeForSql,
+} from "./connection-adapters/abstract/sql-datetime.js";
 
 describe("QuotingTest", () => {
   it("quoted true", () => {

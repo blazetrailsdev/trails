@@ -13,7 +13,7 @@ import {
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
   formatPlainTimeForSql,
-} from "../abstract/quoting.js";
+} from "../abstract/sql-datetime.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BinaryData } from "@blazetrails/activemodel";
 

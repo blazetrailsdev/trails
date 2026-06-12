@@ -18,7 +18,7 @@ import {
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
-import { defaultSqlTimezone } from "./quoting.js";
+import { defaultSqlTimezone } from "./sql-datetime.js";
 
 export { DateInfinity, DateNegativeInfinity };
 
