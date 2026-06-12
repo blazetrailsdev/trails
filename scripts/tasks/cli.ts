@@ -371,25 +371,34 @@ export function removeFrontmatterKey(file: string, key: string): void {
 // ──────────────────── critical-section lock ────────────────────
 //
 // Every `pnpm tasks` mutation runs pull→commit→push against a checkout that
-// shares ONE git object store with every other agent's checkout — the
-// canonical tree and each per-worktree `tasks/` symlink are all worktrees of
-// the same clone (scripts/start-worktree.sh: `git worktree add`). Without
-// serialization, concurrent mutations race on the push: a loser rebases,
-// retries, loses again, then `reset --hard` discards its edit — a claim or
-// done silently vanishes (observed during the 2026-06-08 p3 work). An
-// exclusive advisory file lock in the shared common git dir funnels all of
-// them through the critical section one at a time, so no edit is ever dropped
-// to a rival; a mutation that cannot get in within the timeout fails loudly
-// with a distinct exit code instead.
-//
-// Distinct from every race exit code (2/3/4/99): a lock timeout is not a lost
-// race, it is "the lock is held/stuck — retry or clear it".
+// shares ONE git object store with every other agent's (canonical tree + each
+// per-worktree `tasks/` symlink are worktrees of the same clone). Unserialized,
+// concurrent mutations race on the push: a loser rebases, retries, loses again,
+// then `reset --hard` discards its edit — a claim/done silently vanishes
+// (observed 2026-06-08). An exclusive advisory file lock in the shared common
+// git dir funnels them through one at a time; a mutation that can't get in
+// within the timeout fails loudly with LOCK_TIMEOUT_EXIT (distinct from every
+// race code 2/3/4/99 — "lock held/stuck", not "lost a race").
 export const LOCK_TIMEOUT_EXIT = 75;
-const LOCK_WAIT_MS = 120_000;
-// Steal a lock older than this: its holder exited via process.exit (error/race
-// path) without releasing, or crashed. A real critical section is seconds.
-const LOCK_STALE_MS = 60_000;
+// Steal a lock older than this (holder crashed, or exited a process.exit path
+// without releasing). A synchronous CLI can't refresh the mtime mid-section
+// (it's blocked in a git call), so this sits well above any real
+// pull→commit→push — else a waiter could reclaim a live holder's lock and
+// re-enter concurrently, the race we prevent.
+const LOCK_STALE_MS = 120_000;
+// Exceeds LOCK_STALE_MS so a waiter reclaims a dead lock before giving up;
+// timing out only happens under sustained contention from live agents.
+const LOCK_WAIT_MS = 180_000;
 const LOCK_POLL_MS = 100;
+
+// Test seam: when set, the lock file is placed here instead of the checkout's
+// real common git dir, so the commitAndPush unit tests never contend on the
+// shared production lock (which would block them behind a live agent's
+// mutation). Production never sets this.
+let lockDirForTest: string | null = null;
+export function __setLockDirForTest(dir: string | null): void {
+  lockDirForTest = dir;
+}
 
 // Synchronous sleep with no node timer and no busy-spin: block this thread on
 // an Atomics wait against a throwaway shared buffer. The CLI is short-lived and
@@ -418,12 +427,11 @@ export function gitCommonDir(dir: string): string {
   }
 }
 
-// Acquire the exclusive tasks-CLI lock for `cwd`. Returns the lock-file path to
-// hand to releaseTasksLock, or null when no shared git dir is resolvable (unit
-// tests / misconfigured env) — nothing to serialize, so proceed unlocked.
-// Creation is atomic via the `wx` flag: exactly one agent wins each round; the
-// rest poll, stealing a stale lock or timing out loudly (never proceeding
-// silently while another holds it).
+// Acquire the exclusive tasks-CLI lock for `cwd`. Returns the lock-file path
+// for releaseTasksLock, or null when no shared git dir is resolvable (proceed
+// unlocked — nothing to serialize). Creation is atomic via the `wx` flag: one
+// agent wins each round, the rest poll, steal a stale lock, or time out loudly
+// (never proceeding silently while another holds it).
 export function acquireTasksLock(
   cwd: string | undefined,
   opts: { waitMs?: number; staleMs?: number; pollMs?: number } = {},
@@ -433,7 +441,7 @@ export function acquireTasksLock(
   const pollMs = opts.pollMs ?? LOCK_POLL_MS;
   let lockPath: string;
   try {
-    lockPath = join(gitCommonDir(cwd ?? TASKS_DIR), "tasks-cli.lock");
+    lockPath = join(lockDirForTest ?? gitCommonDir(cwd ?? TASKS_DIR), "tasks-cli.lock");
   } catch {
     return null; // no resolvable git dir — nothing to lock against
   }

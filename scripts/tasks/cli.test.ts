@@ -28,6 +28,7 @@ afterEach(() => {
 
 import {
   bestBundle,
+  __setLockDirForTest,
   acquireTasksLock,
   buildStoryContent,
   checkPrNotOpen,
@@ -334,7 +335,13 @@ describe("numberFlag / stringFlag (value-flag validation)", () => {
 });
 
 describe("commitAndPush (git mutation flow)", () => {
+  // commitAndPush acquires the real shared file lock. Redirect it to a throwaway
+  // dir so these tests never block behind a live agent's mutation, and never
+  // leave a lock in the real tasks repo. git itself stays fully mocked.
+  afterEach(() => __setLockDirForTest(null));
   function setup() {
+    const lockDir = mkdtempSync(join(tmpdir(), "trails-cap-lock-"));
+    __setLockDirForTest(lockDir);
     const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Error(`exit ${code}`);
     }) as never);
@@ -347,8 +354,23 @@ describe("commitAndPush (git mutation flow)", () => {
       seen.push(label);
       return "" as never;
     });
-    return { exit, seen };
+    return { exit, seen, lockDir };
   }
+
+  // commitAndPush runs the critical section under the lock and must release it,
+  // or the next agent blocks until the stale-steal timeout. (The exit paths
+  // release explicitly — see the race test.) No lock file left = no leak.
+  it("releases the critical-section lock after a successful push", () => {
+    const { lockDir } = setup();
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => {},
+      raceMessage: "no",
+      raceExitCode: 99,
+    });
+    expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
+  });
 
   it("happy path: pull → add → commit → push, no retry", () => {
     const { seen } = setup();
