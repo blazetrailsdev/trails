@@ -3136,6 +3136,12 @@ export class Relation<T extends Base> {
     if (this._limitValue !== null) manager.take(this._limitValue);
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
 
+    // Rails' pluck executes the full relation arel (calculations.rb), and
+    // build_arel applies group/having before from/select (query_methods.rb), so
+    // carry those clauses here too rather than only joins/wheres/order/etc.
+    for (const col of this._groupColumns) manager.group(groupColumnToArel(col, table));
+    if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
+
     // Thread from()/CTE through the manager just like a normal read (Rails'
     // pluck builds on the relation arel, honoring from_clause / with). FROM
     // goes on the manager so its source — and any subquery binds — flow through
