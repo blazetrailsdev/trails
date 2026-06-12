@@ -422,22 +422,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((projects[0] as any).name).toBe("HashProj");
   });
 
-  it("distinct after the fact", async () => {
-    // Verify loaded HABTM results are distinct (no duplicate projects)
-    const dev = await Developer.create({ name: "DistDev2", salary: 60000 });
-    const proj = await Project.create({ name: "DistProj" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
-    // Even with one join record, verify distinct behavior
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-    });
-    expect(projects.length).toBe(1);
-    const ids = projects.map((p: any) => p.id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
   it("distinct before the fact", async () => {
     // Loaded HABTM should return distinct records by default
     const dev = await Developer.create({ name: "DistBefore", salary: 60000 });
@@ -1623,6 +1607,17 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     for (const [key, model] of Object.entries(canonicalHabtmJoinModels)) {
       if (model) modelRegistry.set(key, model);
     }
+  });
+
+  it("distinct after the fact", async () => {
+    const dev = developers("jamis");
+    const activeRecord = projects("active_record");
+    await association<CanonicalProject>(dev, "projects").push(activeRecord);
+    await association<CanonicalProject>(dev, "projects").push(activeRecord);
+    expect(await association<CanonicalProject>(dev, "projects").size()).toBe(3);
+    expect((await association<CanonicalProject>(dev, "projects").distinct().toArray()).length).toBe(
+      1,
+    );
   });
 
   it("find in association", async () => {
