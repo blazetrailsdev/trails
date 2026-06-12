@@ -3127,11 +3127,16 @@ export class Relation<T extends Base> {
         /\s+AS\s+/i.test(c);
       return isComplex ? new Nodes.SqlLiteral(c) : table.get(c);
     });
-    // Rails' pluck sets select_values = columns and executes the full relation
-    // arel (calculations.rb), so build the same manager as a normal read and
-    // swap in the pluck projections — joins/wheres/order/group/having/from/lock/
-    // optimizer-hints thread through identically.
-    const manager = this._buildSelectManager();
+    // Rails' pluck spawns, sets select_values = columns, then executes the full
+    // relation arel (calculations.rb), so build the same manager as a normal
+    // read — joins/wheres/order/group/having/from/lock/optimizer-hints thread
+    // through identically — but with the pluck columns as the select. Clearing
+    // the spawn's select before building is essential: resolving the discarded
+    // select list would mutate _referencesValues and could promote includes
+    // (adding joins Rails would not add for the pluck columns).
+    const rel = this._clone();
+    rel._selectColumns = null;
+    const manager = rel._buildSelectManager();
     manager.projections = projections as any;
 
     const [compiledSql, managerBinds] = this._compileAstWithBinds(manager.ast);
