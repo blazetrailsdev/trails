@@ -887,18 +887,26 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * Reopen the underlying driver handle. Rails' concrete `reconnect`
-   * (sqlite3_adapter.rb) closes and reopens the connection; the abstract base
-   * leaves it a no-op for in-memory databases. We close-and-reopen so
-   * `reconnect!` actually clears server-side transaction state (the abstract
-   * `reconnectBang` lifecycle then re-runs `configure_connection`).
+   * Mirrors Rails' private `reconnect` (sqlite3_adapter.rb): if the handle is
+   * still live, roll back any in-flight raw transaction in place (preserving an
+   * in-memory database); otherwise open a fresh connection. The abstract
+   * `reconnectBang` lifecycle then re-runs `configure_connection`.
    *
    * @internal
    */
   override reconnect(): void {
-    if (this.driver?.isOpen()) this.driver.close();
+    if (this.active) {
+      // Mirrors `@raw_connection.rollback rescue nil` — a ROLLBACK with no
+      // active transaction raises, which we swallow like Rails does.
+      try {
+        this.driver.exec("ROLLBACK");
+      } catch {
+        // no active transaction
+      }
+    } else {
+      this.connect();
+    }
     this._inTransaction = false;
-    this.connect();
   }
 
   // --- Database info ---
