@@ -217,7 +217,10 @@ export class StatementInvalid extends AdapterError {
     this.name = "StatementInvalid";
     this.sql = options?.sql;
     this.binds = options?.binds;
-    this._querySet = options?.sql !== undefined || options?.binds !== undefined;
+    // Mirrors Rails set_query's `unless @sql` guard: a later setQuery only
+    // fills in sql/binds when none were supplied at construction. translate_exception
+    // builds the error with sql: null, so the log() rescue can still attach them.
+    this._querySet = options?.sql != null;
   }
 
   setQuery(sql: string, binds: unknown[]): this {

@@ -276,11 +276,26 @@ describe("InstrumentationTest", () => {
     expect(capturedRowCount).toBe(10);
   });
 
-  it.skip("payload row count on cache", () => {
-    // BLOCKED: relation — ActiveSupport::Notifications instrumentation gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#instrumentQuery not fully publishing AR notification events
-    // SCOPE: ~30 LOC fix in abstract-adapter.ts; affects ~5 tests in instrumentation.test.ts
-    /* needs query cache */
+  it("payload row count on cache", async () => {
+    class Book extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    await Book.create({ name: "row count book" });
+    const events: any[] = [];
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if ((event.payload?.sql as string)?.includes("SELECT")) events.push(event.payload);
+    });
+    await (Base.connection as any).cache(async () => {
+      await Book.first();
+      await Book.first();
+    });
+    expect(events.length).toBe(2);
+    expect(events[0].cached).toBeFalsy();
+    expect(events[1].cached).toBe(true);
+    expect(events[0].row_count).toBe(1);
+    expect(events[1].row_count).toBe(1);
   });
 
   it("payload connection with query cache disabled", async () => {
@@ -298,11 +313,22 @@ describe("InstrumentationTest", () => {
     expect(capturedConnection).toBe((connection as any).inner ?? connection);
   });
 
-  it.skip("payload connection with query cache enabled", () => {
-    // BLOCKED: relation — ActiveSupport::Notifications instrumentation gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#instrumentQuery not fully publishing AR notification events
-    // SCOPE: ~30 LOC fix in abstract-adapter.ts; affects ~5 tests in instrumentation.test.ts
-    /* needs query cache */
+  it("payload connection with query cache enabled", async () => {
+    class Book extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const connection = Base.connection;
+    let capturedConnection: unknown;
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      capturedConnection = event.payload.connection;
+    });
+    await (connection as any).cache(async () => {
+      await Book.first();
+      await Book.first();
+    });
+    expect(capturedConnection).toBe((connection as any).inner ?? connection);
   });
 
   it("no instantiation notification when no records", async () => {
