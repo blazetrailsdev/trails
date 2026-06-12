@@ -403,11 +403,12 @@ describe("AdapterTest", () => {
   });
 });
 
-// Model-backed AdapterTest cases. Unlike the inline-DDL block above, these
-// mirror Rails' `@connection = ActiveRecord::Base.lease_connection` against the
-// canonical Book/Post/Author models + handler-resolved schema, since they
-// exercise create/reload/update/find and relation-typed select methods.
-describe("AdapterTest model-backed", () => {
+// Model-backed AdapterTest cases. Same Rails class (AdapterTest) as the
+// inline-DDL block above, kept in a second describe so it can wire the handler
+// suite + canonical Book/Post/Author models + fixtures (Rails'
+// `@connection = ActiveRecord::Base.lease_connection`), since these exercise
+// create/reload/update/find and relation-typed select methods.
+describe("AdapterTest", () => {
   registerModel("Author", Author);
   registerModel("Post", Post);
   registerModel("Book", Book);
