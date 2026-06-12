@@ -283,18 +283,35 @@ export class SchemaStatements {
 
   async removeIndex(
     tableName: string,
+    columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
-    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    let indexName: string;
-    if (options.name) {
-      indexName = options.name;
-    } else if (options.column) {
-      const cols = Array.isArray(options.column) ? options.column : [options.column];
-      indexName = `index_${tableName}_on_${cols.join("_and_")}`;
+    // Rails: `remove_index(table_name, column_name = nil, **options)` — the column
+    // can be passed positionally or via the options hash.
+    let columnName: string | string[] | undefined;
+    let opts: { column?: string | string[]; name?: string };
+    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
+      columnName = columnOrOptions;
+      opts = options;
     } else {
-      throw new Error("Must specify either name or column for remove_index");
+      columnName = undefined;
+      opts = columnOrOptions;
     }
+    // An array column spec is routed through `options.column` so the legacy
+    // string-typed `index_name_for_remove(column_name)` parameter is preserved.
+    if (Array.isArray(columnName)) {
+      opts = { ...opts, column: columnName };
+      columnName = undefined;
+    }
+
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
+    // Preserve the legacy message for the bare no-spec call; otherwise resolve
+    // the concrete name (and validate name/column matches) via the canonical
+    // index_name_for_remove port below.
+    if (columnName == null && opts.name == null && opts.column == null) {
+      throw new ArgumentError("Must specify either name or column for remove_index");
+    }
+    const indexName = await this.indexNameForRemove(tableName, columnName ?? null, opts);
 
     if (this.adapterName === "mysql") {
       await this.adapter.executeMutation(

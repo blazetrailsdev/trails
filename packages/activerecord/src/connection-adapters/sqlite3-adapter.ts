@@ -48,6 +48,7 @@ import {
   BooleanType,
   BinaryType,
   DecimalType,
+  ArgumentError,
 } from "@blazetrails/activemodel";
 import { getFs, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
@@ -491,6 +492,58 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         return 0;
       } catch (e: any) {
         const translated = this._translateException(e, sql, []);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
+      }
+    });
+  }
+
+  /**
+   * Run a query and return an ActiveRecord::Result.
+   *
+   * Mirrors Rails' SQLite3Adapter#perform_query: a non-row-returning statement
+   * (INSERT/UPDATE/DELETE/DDL) yields an empty Result, while a row-returning
+   * statement reports its column set from the prepared statement even when it
+   * matches no rows — the default `execQuery` (Result.fromRowHashes) drops the
+   * columns on a zero-row result.
+   */
+  override async execQuery(
+    sql: string,
+    name: string | null = "SQL",
+    binds: unknown[] = [],
+    options: { prepare?: boolean; allowRetry?: boolean } = {},
+  ): Promise<Result> {
+    void options;
+    const processed = this.preprocessQuery(sql);
+    await this.materializeTransactions();
+    const driverBinds = (binds ?? []).map(sqliteTypeCast) as SqliteBinds;
+    const txPublic = this.currentTransaction().userTransaction;
+    const payload: Record<string, unknown> = {
+      sql: processed,
+      name: name ?? "SQL",
+      binds,
+      type_casted_binds: typeCastedBinds(binds ?? []),
+      connection: this,
+      row_count: 0,
+      transaction: txPublic.isOpen() ? txPublic : null,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        const stmt = await this._cachedStatement(processed);
+        if (!stmt.reader) {
+          await stmt.run(driverBinds);
+          return Result.empty();
+        }
+        const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+        payload.row_count = rows.length;
+        if (rows.length > 0) return Result.fromRowHashes(rows);
+        return new Result(
+          stmt.columns().map((c) => c.name),
+          [],
+        );
+      } catch (e: any) {
+        const translated = this._translateException(e, processed, binds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
@@ -981,23 +1034,59 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async removeIndex(
     tableName: string,
     columnOrOptions?: string | string[] | { name?: string; column?: string | string[] },
+    options: { name?: string; column?: string | string[] } = {},
   ): Promise<void> {
-    let indexName: string;
-    if (typeof columnOrOptions === "string") {
-      indexName = `index_${tableName}_on_${columnOrOptions}`;
-    } else if (Array.isArray(columnOrOptions)) {
-      indexName = `index_${tableName}_on_${columnOrOptions.join("_and_")}`;
-    } else if (columnOrOptions?.name) {
-      indexName = columnOrOptions.name;
-    } else if (columnOrOptions?.column) {
-      const cols = Array.isArray(columnOrOptions.column)
-        ? columnOrOptions.column.join("_and_")
-        : columnOrOptions.column;
-      indexName = `index_${tableName}_on_${cols}`;
+    // Rails: `remove_index(table_name, column_name = nil, **options)` — column
+    // may be positional or in the options hash.
+    let columnName: string | string[] | undefined;
+    let opts: { name?: string; column?: string | string[] };
+    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
+      columnName = columnOrOptions;
+      opts = options;
     } else {
-      throw new Error("No index name or column specified");
+      columnName = undefined;
+      opts = columnOrOptions ?? {};
     }
+    const indexName = await this._indexNameForRemove(tableName, columnName, opts);
     await this.executeMutation(`DROP INDEX IF EXISTS ${quoteColumnName(indexName)}`);
+  }
+
+  // Rails: `index_name_for_remove` — resolve the concrete index name from a
+  // name and/or column spec, raising ArgumentError on no-match / multi-match.
+  private async _indexNameForRemove(
+    tableName: string,
+    columnName: string | string[] | undefined,
+    options: { name?: string; column?: string | string[] },
+  ): Promise<string> {
+    if (columnName == null && options.name != null && options.column == null) {
+      return options.name;
+    }
+    const cols = columnName ?? options.column;
+    const columnNames = cols == null ? [] : Array.isArray(cols) ? cols : [cols];
+    const indexNameFor = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
+    const checks: Array<(i: { name: string; columns: string[] }) => boolean> = [];
+    if (options.name != null) {
+      const name = options.name;
+      checks.push((i) => i.name === name);
+    }
+    if (columnNames.length > 0) {
+      const target = indexNameFor(columnNames);
+      checks.push((i) => indexNameFor(i.columns) === target);
+    }
+    if (checks.length === 0) {
+      throw new ArgumentError("No index name or column specified");
+    }
+    const all = (await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>;
+    const matching = all.filter((i) => checks.every((check) => check(i)));
+    if (matching.length > 1) {
+      throw new ArgumentError(
+        `Multiple indexes found on ${tableName} columns ${columnNames}. ` +
+          `Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
+      );
+    } else if (matching.length === 0) {
+      throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
+    }
+    return matching[0].name;
   }
 
   createSchemaDumper(
