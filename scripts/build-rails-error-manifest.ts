@@ -1,16 +1,12 @@
 /**
- * Builds eslint/rails-error-classes.json by scanning the vendored Rails
- * source for error-class declarations (sibling of
- * scripts/build-rails-privates-manifest.ts, but regex over Ruby source
- * lines — Rails declares errors with single-line `class X < Y` headers).
- *
- * An error class is every `class X < Y` in a package's `errors.rb`, plus
- * any `class X < Y` under `lib/**` whose parent is a known Ruby error base
- * or a class already recognised as an error (grown to a fixpoint, so e.g.
- * `RecordInvalid < ActiveRecordError` in validations.rb is captured).
- *
- * Output: { generatedAt, packages: { activerecord: [{ name, parent, rubyFile }], … } }
- * where rubyFile is POSIX-relative to the package's `lib/` directory.
+ * Builds eslint/rails-error-classes.json by regex-scanning the vendored Rails
+ * source for error declarations (Rails uses single-line `class X < Y`
+ * headers). An error class is every `class X < Y` in a package's `errors.rb`
+ * plus any under `lib/**` whose parent is a known Ruby error base or an
+ * already-recognised error (grown to a fixpoint, so `RecordInvalid <
+ * ActiveRecordError` in validations.rb is captured). Output:
+ * `{ generatedAt, packages: { activerecord: [{ name, parent, rubyFile }], … } }`
+ * (rubyFile POSIX-relative to the package's `lib/`).
  *
  *   pnpm tsx scripts/build-rails-error-manifest.ts
  */
@@ -82,8 +78,7 @@ async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
   const libDir = path.join(ROOT, "vendor/rails", pkg, "lib");
   const files = await walkRubyFiles(libDir);
 
-  // Pass 1: collect every `class X < Y` declaration with its source file,
-  // and seed the recognised-error set from errors.rb + ROOT_BASES.
+  // Pass 1: collect every `class X < Y` declaration with its source file.
   interface Decl {
     name: string;
     parent: string;
@@ -94,10 +89,8 @@ async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
   const decls: Decl[] = [];
   for (const file of files) {
     const rel = path.relative(libDir, file).split(path.sep).join("/");
-    // Code generators live under `generators/` and subclass an external
-    // `Base` (Rails::Generators::Base) whose bare last segment collides
-    // with our error `Base` (Encryption::Errors::Base). They are never
-    // error classes — skip the directory wholesale.
+    // Code generators subclass an external `Base` (Rails::Generators::Base)
+    // whose bare leaf collides with our error `Base` — never error classes.
     if (rel.includes("generators/")) continue;
     const fromErrorsFile = path.basename(file) === "errors.rb";
     const text = await readFile(file, "utf8");
@@ -117,17 +110,14 @@ async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
   const known = new Set<string>(ROOT_BASES);
   for (const d of decls) if (d.fromErrorsFile) known.add(d.name);
 
-  // A declaration is recognised when its parent is already known AND the
-  // reference is unambiguous: either a bare name (resolves within the
-  // package) or a qualified name whose last segment is a Ruby built-in
-  // base (e.g. `< ::RangeError`). A qualified non-root parent such as
-  // `ActiveJob::Base` is an external class that merely shares a leaf name
-  // with one of ours, so it does not propagate.
+  // Recognised when the parent is known AND the reference is unambiguous: a
+  // bare name (resolves within the package) or a qualified built-in base
+  // (`< ::RangeError`). A qualified non-root parent like `ActiveJob::Base` is
+  // an external class sharing a leaf name with ours, so it does not propagate.
   const recognises = (d: Decl): boolean =>
     known.has(d.parent) && (!d.qualifiedParent || ROOT_BASES.has(d.parent));
 
-  // Pass 2: grow the recognised set to a fixpoint — any class whose parent
-  // is already recognised is itself an error class.
+  // Pass 2: grow the recognised set to a fixpoint.
   let changed = true;
   while (changed) {
     changed = false;
@@ -140,9 +130,8 @@ async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
     }
   }
 
-  // Emit recognised error classes (skip the bare ROOT_BASES themselves —
-  // they are Ruby built-ins, not declared here). Dedup by name, preferring
-  // the errors.rb declaration when a name appears more than once.
+  // Emit recognised classes, deduping by name and preferring the errors.rb
+  // declaration when a name appears more than once.
   const byName = new Map<string, ErrorClass>();
   for (const d of decls) {
     if (!known.has(d.name)) continue;
@@ -157,6 +146,19 @@ async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
 async function main() {
   const packages: Record<string, ErrorClass[]> = {};
   for (const pkg of PACKAGES) packages[pkg] = await scanPackage(pkg);
+
+  // `vendor/rails` is a symlink populated by `pnpm vendor:fetch`; it is absent
+  // in the lint CI job, which runs this builder via `prelint`. Unlike the
+  // gitignored privates manifest, ours is committed, so when no source is
+  // found we must NOT overwrite it with empty data — leave the committed
+  // manifest in place for the ESLint rule to consume.
+  if (PACKAGES.every((p) => packages[p].length === 0)) {
+    console.warn(
+      "[build-rails-error-manifest] no vendored Rails source found; " +
+        "preserving committed eslint/rails-error-classes.json. Run `pnpm vendor:fetch` to regenerate.",
+    );
+    return;
+  }
 
   // `generatedAt` is fixed (not Date.now()) so the committed manifest is
   // reproducible and only changes when the Rails source does.

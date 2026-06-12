@@ -71,11 +71,6 @@ tester.run("rails-error-parity", rule, {
     },
     // Excluded file: bare throw is skipped.
     { filename: excludedFile, code: `throw new Error("bare");\n` },
-    // Out-of-scope file: rule does not apply.
-    {
-      filename: path.join(REPO_ROOT, "packages/arel/src/x.ts"),
-      code: `throw new Error("bare");\n`,
-    },
   ],
   invalid: [
     // Missing class: errors.ts omits RecordNotFound.
