@@ -20,7 +20,8 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { AbstractAdapter } from "./index.js";
 
 // D-1 non-candidates: makeSQLiteTopic / makeSQLiteMovie and the inline
@@ -31,10 +32,10 @@ import { AbstractAdapter } from "./index.js";
 // would wrap the entire test in a transaction, which conflicts with
 // asserting rollback behavior inside nested transactions. Isolated adapters
 // are structurally required for deterministic assertions in these tests.
-const openAdapters: SQLite3Adapter[] = [];
+const openAdapters: AbstractSQLite3Adapter[] = [];
 
 function makeSQLiteTopic() {
-  const adp = new SQLite3Adapter(":memory:");
+  const adp = new BetterSQLite3Adapter(":memory:");
   openAdapters.push(adp);
   adp.exec(
     "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
@@ -50,7 +51,7 @@ function makeSQLiteTopic() {
 }
 
 function makeSQLiteMovie() {
-  const adp = new SQLite3Adapter(":memory:");
+  const adp = new BetterSQLite3Adapter(":memory:");
   openAdapters.push(adp);
   adp.exec("CREATE TABLE movies (movieid INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
   class Movie extends Base {
@@ -66,7 +67,7 @@ function makeSQLiteMovie() {
 }
 
 function makeSQLiteCpkBook() {
-  const adp = new SQLite3Adapter(":memory:");
+  const adp = new BetterSQLite3Adapter(":memory:");
   openAdapters.push(adp);
   adp.exec(
     "CREATE TABLE cpk_books (author_id INTEGER, id INTEGER, title TEXT, PRIMARY KEY(author_id, id))",
@@ -1059,7 +1060,7 @@ describe("TransactionTest", () => {
   });
 
   it("restore frozen state after double destroy", async () => {
-    const adp = new SQLite3Adapter(":memory:");
+    const adp = new BetterSQLite3Adapter(":memory:");
     openAdapters.push(adp);
     adp.exec(
       "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, parent_id INTEGER, type TEXT)",

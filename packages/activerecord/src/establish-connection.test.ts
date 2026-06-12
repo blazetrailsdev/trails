@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import { writeFileSync, mkdirSync, rmSync } from "fs";
@@ -40,19 +40,19 @@ describe("Base.establishConnection", () => {
   it("creates a SqliteAdapter from a :memory: URL", async () => {
     await Base.establishConnection(":memory:");
     const pool = Base.connectionHandler.retrieveConnectionPool("Base");
-    expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
+    expect(pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
 
   it("creates a SqliteAdapter from a .sqlite3 file path", async () => {
     await Base.establishConnection(join(tmpdir(), "test.sqlite3"));
     const pool = Base.connectionHandler.retrieveConnectionPool("Base");
-    expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
+    expect(pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
 
   it("accepts a config object with adapter name", async () => {
     await Base.establishConnection({ adapter: "sqlite", database: ":memory:" });
     const pool = Base.connectionHandler.retrieveConnectionPool("Base");
-    expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
+    expect(pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
 
   it("throws for an unrecognized URL scheme", async () => {
@@ -75,7 +75,7 @@ describe("Base.establishConnection", () => {
   it("accepts sqlite3 as an adapter name alias", async () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
     const pool = Base.connectionHandler.retrieveConnectionPool("Base");
-    expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
+    expect(pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
 
   it("accepts postgres as an adapter name alias", async () => {
@@ -93,7 +93,7 @@ describe("Base.establishConnection", () => {
   it("parses sqlite:// URLs into file paths", async () => {
     await Base.establishConnection("sqlite3:///tmp/test.sqlite3");
     const pool = Base.connectionHandler.retrieveConnectionPool("Base");
-    expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
+    expect(pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
 });
 
@@ -130,7 +130,7 @@ describe("Base.establishConnection with config file", () => {
   it("connects from DATABASE_URL", async () => {
     process.env.DATABASE_URL = ":memory:";
     await Base.establishConnection();
-    expect(Base.connection).toBeInstanceOf(SQLite3Adapter);
+    expect(Base.connection).toBeInstanceOf(BetterSQLite3Adapter);
   });
 
   it("connects from config/database.json", async () => {
@@ -147,7 +147,7 @@ describe("Base.establishConnection with config file", () => {
     );
 
     await Base.establishConnection();
-    expect(Base.connection).toBeInstanceOf(SQLite3Adapter);
+    expect(Base.connection).toBeInstanceOf(BetterSQLite3Adapter);
   });
 
   it("uses NODE_ENV to select the environment from config", async () => {
@@ -242,7 +242,7 @@ describe("Base.establishConnection with JS config file", () => {
     );
 
     await Base.establishConnection();
-    expect(Base.connection).toBeInstanceOf(SQLite3Adapter);
+    expect(Base.connection).toBeInstanceOf(BetterSQLite3Adapter);
   });
 });
 

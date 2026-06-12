@@ -3,13 +3,14 @@
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
-import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
-let adapter: SQLite3Adapter;
+let adapter: AbstractSQLite3Adapter;
 
 beforeEach(async () => {
-  adapter = new SQLite3Adapter(":memory:");
+  adapter = new BetterSQLite3Adapter(":memory:");
   await adapter.createVirtualTable("searchables", "fts5", [
     "content",
     "meta UNINDEXED",
@@ -39,7 +40,7 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
     expect(await adapter.virtualTableExists("searchables")).toBe(true);
 
     // Re-create via createVirtualTable (mirrors Schema.define creating the table)
-    const adapter2 = new SQLite3Adapter(":memory:");
+    const adapter2 = new BetterSQLite3Adapter(":memory:");
     await adapter2.createVirtualTable("emails", "fts5", ["content", "meta UNINDEXED"]);
     expect(await adapter2.virtualTableExists("emails")).toBe(true);
     adapter2.close();

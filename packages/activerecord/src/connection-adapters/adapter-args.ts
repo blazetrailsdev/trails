@@ -15,9 +15,15 @@
 /**
  * Normalize adapter aliases to their canonical name.
  *
- *   postgres / postgresql  → postgresql
- *   mysql / mysql2         → mysql
- *   sqlite / sqlite3       → sqlite
+ *   postgres / postgresql          → postgresql
+ *   mysql / mysql2                 → mysql
+ *   sqlite / sqlite3 / node-sqlite → sqlite
+ *
+ * SQLite client-library adapters share the `(filename, options)` constructor
+ * shape (their subclasses inherit it from `AbstractSQLite3Adapter`), so they
+ * normalize to `sqlite` for argument building. This only affects
+ * constructor-argument shape; class resolution still keys off the raw name.
+ * (`expo-sqlite` is not yet an openable adapter — see connection-adapters.ts.)
  */
 export function normalizeAdapterName(name: string): string {
   switch (name) {
@@ -29,6 +35,7 @@ export function normalizeAdapterName(name: string): string {
       return "mysql";
     case "sqlite":
     case "sqlite3":
+    case "node-sqlite":
       return "sqlite";
     default:
       return name;

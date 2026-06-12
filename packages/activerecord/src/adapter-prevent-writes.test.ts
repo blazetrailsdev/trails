@@ -2,13 +2,14 @@
  * Mirrors Rails activerecord/test/cases/adapter_prevent_writes_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "./errors.js";
 
-let adapter: SQLite3Adapter;
+let adapter: AbstractSQLite3Adapter;
 
 beforeEach(() => {
-  adapter = new SQLite3Adapter(":memory:");
+  adapter = new BetterSQLite3Adapter(":memory:");
   adapter.exec(`CREATE TABLE "subscribers" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "nick" TEXT)`);
 });
 

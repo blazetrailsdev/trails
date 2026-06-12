@@ -106,15 +106,21 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
 // Pre-registered adapters matching Rails' canonical names.
 const sqlite3Loader: AdapterLoader = async () =>
   // The `sqlite3` adapter name defaults to the better-sqlite3-backed subclass.
-  // BetterSQLite3Adapter bundles its own driver (no registry lookup needed);
-  // importing it also self-registers better-sqlite3 for any code still resolving
-  // a driver by name through the legacy registry.
+  // BetterSQLite3Adapter bundles its own driver via defaultSqliteDriver().
   (await import("./connection-adapters/better-sqlite3-adapter.js")).BetterSQLite3Adapter as any;
+const nodeSqliteLoader: AdapterLoader = async () =>
+  (await import("./connection-adapters/node-sqlite-adapter.js")).NodeSQLiteAdapter as any;
 const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
 register("sqlite3", sqlite3Loader);
+register("node-sqlite", nodeSqliteLoader);
+// `expo-sqlite` is intentionally NOT registered as an openable adapter yet:
+// its driver only implements async `open()`, and the adapter's constructor
+// uses the sync `openSync()` path, so construction would always throw. The
+// `ExpoSQLiteAdapter` class ships ready for when the async constructor path
+// lands; register it here at that point.
 register("mysql2", mysql2Loader);
 register("postgresql", postgresqlLoader);
 

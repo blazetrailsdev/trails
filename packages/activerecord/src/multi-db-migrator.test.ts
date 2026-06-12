@@ -9,8 +9,8 @@ import type { MigrationProxy } from "./migration.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 async function makeSqliteAdapter(): Promise<DatabaseAdapter> {
-  const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
-  return new SQLite3Adapter(":memory:");
+  const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
+  return new BetterSQLite3Adapter(":memory:");
 }
 
 function sensor(

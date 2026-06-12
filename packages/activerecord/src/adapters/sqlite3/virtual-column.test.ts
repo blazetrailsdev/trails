@@ -3,13 +3,14 @@
  */
 import { expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
-import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 
-let adapter: SQLite3Adapter;
+let adapter: AbstractSQLite3Adapter;
 
 beforeEach(() => {
-  adapter = new SQLite3Adapter(":memory:");
+  adapter = new BetterSQLite3Adapter(":memory:");
 });
 
 afterEach(() => {

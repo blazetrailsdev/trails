@@ -999,7 +999,8 @@ describe("ConnectionPool schema cache", () => {
     const path = await import("node:path");
     const os = await import("node:os");
     const { SchemaCache } = await import("./connection-adapters/schema-cache.js");
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-raw-cache-"));
     const dbFile = path.join(tmp, "raw.sqlite3");
     const dbConfig = new HashConfig("test", "primary", {
@@ -1008,7 +1009,7 @@ describe("ConnectionPool schema cache", () => {
       reapingFrequency: null,
     });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new SQLite3Adapter(dbFile),
+      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
     });
     const pool = new ConnectionPool(pc);
     try {
@@ -1091,7 +1092,8 @@ describe("ConnectionPool schema cache", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const os = await import("node:os");
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-lazy-load-"));
     const dbFile = path.join(tmp, "lazy.sqlite3");
@@ -1108,7 +1110,7 @@ describe("ConnectionPool schema cache", () => {
       schemaCachePath: cacheFile,
     });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new SQLite3Adapter(dbFile),
+      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
     });
     const pool = new ConnectionPool(pc);
     try {
@@ -1134,7 +1136,8 @@ describe("ConnectionPool schema cache", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const os = await import("node:os");
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-stale-cache-"));
     const dbFile = path.join(tmp, "stale.sqlite3");
@@ -1152,7 +1155,7 @@ describe("ConnectionPool schema cache", () => {
       schemaCachePath: cacheFile,
     });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new SQLite3Adapter(dbFile),
+      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
     });
     const pool = new ConnectionPool(pc);
     try {
@@ -1176,7 +1179,8 @@ describe("ConnectionPool schema cache", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const os = await import("node:os");
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-lazy-"));
     const dbFile = path.join(tmp, "no_lazy.sqlite3");
@@ -1191,7 +1195,7 @@ describe("ConnectionPool schema cache", () => {
       schemaCachePath: cacheFile,
     });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new SQLite3Adapter(dbFile),
+      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
     });
     const pool = new ConnectionPool(pc);
     try {
@@ -1214,10 +1218,11 @@ describe("ConnectionPool schema cache", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const os = await import("node:os");
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-pool-schema-"));
     const dbFile = path.join(tmp, "pool.sqlite3");
-    const seeded = new SQLite3Adapter(dbFile);
+    const seeded = new BetterSQLite3Adapter(dbFile);
     try {
       await seeded.executeMutation(
         "CREATE TABLE gizmos (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
@@ -1232,7 +1237,7 @@ describe("ConnectionPool schema cache", () => {
       reapingFrequency: null,
     });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new SQLite3Adapter(dbFile),
+      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
     });
     const pool = new ConnectionPool(pc);
     try {

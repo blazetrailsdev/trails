@@ -3138,8 +3138,9 @@ describe("Migrator DDL transaction wrapping", () => {
   // not depend on an external DB connection.
   const openAdapters: Array<{ close?: () => void | Promise<void> }> = [];
   async function makeSqliteBase() {
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
-    const adapter = new SQLite3Adapter(":memory:");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+    const adapter = new BetterSQLite3Adapter(":memory:");
     openAdapters.push(adapter);
     return adapter;
   }

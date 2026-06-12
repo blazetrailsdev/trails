@@ -430,23 +430,41 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
 
   switch (adapter) {
     case "sqlite3":
-    case "sqlite": {
-      // The `sqlite3` adapter name resolves to the better-sqlite3-backed
-      // subclass, matching `ConnectionAdapters.resolve("sqlite3")`.
-      // BetterSQLite3Adapter bundles its own driver, so no registry dance is
-      // needed. (Alternative client libs — node-sqlite, expo-sqlite — get their
-      // own adapter names/subclasses in the follow-up PR; until then they are
-      // not selectable via the `sqlite3` name.)
-      let BetterSQLite3Adapter;
+    case "sqlite":
+    case "node-sqlite": {
+      // Each SQLite adapter name resolves to its own concrete subclass, matching
+      // `ConnectionAdapters.resolve(name)`. Each subclass bundles its own client
+      // library via defaultSqliteDriver(), so no registry dance is needed. The
+      // `sqlite3`/`sqlite` names map to the better-sqlite3-backed default.
+      // Literal `import()` specifiers (not a computed path) so bundlers and the
+      // vitest alias map can statically resolve each subclass module. `expo-sqlite`
+      // is intentionally absent: its async-only driver can't drive the sync
+      // constructor path yet (see connection-adapters.ts).
+      type SqliteCtor = new (
+        filename: string,
+        options?: Record<string, unknown>,
+      ) => DatabaseAdapter;
+      const load = async (): Promise<SqliteCtor> => {
+        if (adapter === "node-sqlite") {
+          return (
+            await import("@blazetrails/activerecord/connection-adapters/node-sqlite-adapter.js")
+          ).NodeSQLiteAdapter as unknown as SqliteCtor;
+        }
+        return (
+          await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
+        ).BetterSQLite3Adapter as unknown as SqliteCtor;
+      };
+      const need =
+        adapter === "node-sqlite"
+          ? "Node 22.5+ with the built-in `node:sqlite` module"
+          : "the `better-sqlite3` package (e.g. `npm add better-sqlite3`)";
+      let SQLiteAdapter: SqliteCtor;
       try {
-        ({ BetterSQLite3Adapter } =
-          await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js"));
+        SQLiteAdapter = await load();
       } catch (cause) {
-        throw new Error(
-          "trailties needs the `better-sqlite3` package to open a SQLite database. " +
-            "Install it with your package manager (e.g. `npm add better-sqlite3`).",
-          { cause },
-        );
+        throw new Error(`trailties needs ${need} to open a "${adapter}" SQLite database.`, {
+          cause,
+        });
       }
       // Forward adapter-level options from database.yml (driver, readonly,
       // statementLimit, pragmas, …). Stripping adapter/database/url keeps
@@ -455,10 +473,7 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       void _a;
       void _d;
       void _u;
-      return new BetterSQLite3Adapter(
-        config.database ?? ":memory:",
-        rest as Record<string, unknown>,
-      );
+      return new SQLiteAdapter(config.database ?? ":memory:", rest as Record<string, unknown>);
     }
     case "postgresql":
     case "postgres": {

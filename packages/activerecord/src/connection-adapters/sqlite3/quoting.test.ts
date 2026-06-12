@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BinaryData } from "@blazetrails/activemodel";
-import { SQLite3Adapter, SQLiteDateTimeType } from "../sqlite3-adapter.js";
+import { AbstractSQLite3Adapter, SQLiteDateTimeType } from "../sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { Date as DateType } from "../../type/date.js";
 import { Time as TimeType } from "../../type/time.js";
 import {
@@ -283,10 +284,10 @@ describe("SQLite3::Quoting", () => {
   });
 
   describe("SQLite microsecond round-trip — integration", () => {
-    let adapter: SQLite3Adapter;
+    let adapter: AbstractSQLite3Adapter;
 
     beforeEach(() => {
-      adapter = new SQLite3Adapter(":memory:");
+      adapter = new BetterSQLite3Adapter(":memory:");
       adapter.exec(`CREATE TABLE "events" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "ts"  DATETIME,

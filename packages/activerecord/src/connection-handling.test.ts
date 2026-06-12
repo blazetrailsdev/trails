@@ -5,7 +5,7 @@ import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import {
   connectedToStack,
   currentRole,
@@ -594,7 +594,7 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
       {
         owner: "UnrelatedAbstract",
         role: "writing",
-        adapterFactory: () => new SQLite3Adapter(),
+        adapterFactory: () => new BetterSQLite3Adapter(),
       },
     );
     const conn = UnrelatedAbstract.leaseConnection();
@@ -620,11 +620,11 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
     }
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "AnimalsRecord", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "AnimalsRecord", role: "writing", adapterFactory: () => new SQLite3Adapter() },
+      { owner: "AnimalsRecord", role: "writing", adapterFactory: () => new BetterSQLite3Adapter() },
     );
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "MealsRecord", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "MealsRecord", role: "writing", adapterFactory: () => new SQLite3Adapter() },
+      { owner: "MealsRecord", role: "writing", adapterFactory: () => new BetterSQLite3Adapter() },
     );
     const animals = AnimalsRecord.leaseConnection();
     const meals = MealsRecord.leaseConnection();
@@ -657,11 +657,15 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
     }
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "ApplicationRecord", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: ApplicationRecord, role: "writing", adapterFactory: () => new SQLite3Adapter() },
+      {
+        owner: ApplicationRecord,
+        role: "writing",
+        adapterFactory: () => new BetterSQLite3Adapter(),
+      },
     );
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "OtherAbstract", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "OtherAbstract", role: "writing", adapterFactory: () => new SQLite3Adapter() },
+      { owner: "OtherAbstract", role: "writing", adapterFactory: () => new BetterSQLite3Adapter() },
     );
     const appConn = ApplicationRecord.leaseConnection();
     const otherConn = OtherAbstract.leaseConnection();

@@ -13,14 +13,13 @@ const DB_ALIAS: Record<string, DatabaseName> = {
 
 export type AppDatabase = "sqlite" | "postgres" | "mysql" | DatabaseName;
 export type PackageManager = "pnpm" | "npm" | "yarn";
-export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
+// `expo-sqlite` is intentionally omitted: its async-only driver can't drive the
+// sync adapter constructor path yet, so a scaffolded expo app wouldn't boot.
+// Re-add it once the async constructor path lands (see connection-adapters.ts).
+export type SqliteDriver = "better-sqlite3" | "node-sqlite";
 
 export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn"];
-export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = [
-  "better-sqlite3",
-  "node-sqlite",
-  "expo-sqlite",
-];
+export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = ["better-sqlite3", "node-sqlite"];
 
 export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "appPath"> {
   appPath?: string;
@@ -91,8 +90,8 @@ export class AppGenerator extends AppBase {
 
   private createRootFiles(name: string): void {
     const dep = this.database.pkgDependency;
-    // For sqlite3, omit the driver dep when using node-sqlite (built-in) or
-    // expo-sqlite (app responsibility). Other databases always include it.
+    // For sqlite3, omit the driver dep when using node-sqlite (built-in).
+    // Other databases always include it.
     const dbDep =
       this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
         ? {}
@@ -1011,24 +1010,27 @@ dist
   },
 };
 `;
-      default:
-        return `import "@blazetrails/activerecord/sqlite/${this.sqliteDriver}";
-
-export default {
+      default: {
+        // Each SQLite driver maps to its own registered adapter name; the
+        // adapter subclass bundles its driver, so no side-effect import is
+        // needed. better-sqlite3 backs the canonical `sqlite3` name.
+        const adapter = this.sqliteDriver === "better-sqlite3" ? "sqlite3" : this.sqliteDriver;
+        return `export default {
   development: {
-    adapter: "sqlite3",
+    adapter: "${adapter}",
     database: "db/development.sqlite3",
   },
   test: {
-    adapter: "sqlite3",
+    adapter: "${adapter}",
     database: "db/test.sqlite3",
   },
   production: {
-    adapter: "sqlite3",
+    adapter: "${adapter}",
     database: "db/production.sqlite3",
   },
 };
 `;
+      }
     }
   }
 }

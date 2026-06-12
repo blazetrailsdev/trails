@@ -143,10 +143,11 @@ describe("StatementCacheTest", () => {
   });
 
   it("execute round-trip with Query and BindMap", async () => {
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
     const { Base } = await import("./base.js");
 
-    const roundTripAdapter = new SQLite3Adapter(":memory:");
+    const roundTripAdapter = new BetterSQLite3Adapter(":memory:");
     try {
       await defineSchema(roundTripAdapter, { books: canonicalSchema.books });
       await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', [
@@ -181,10 +182,11 @@ describe("StatementCacheTest", () => {
 
   it("StatementCache.create → execute round-trip with Substitute", async () => {
     await import("./relation.js");
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
     const { Base } = await import("./base.js");
 
-    const roundTripAdapter = new SQLite3Adapter(":memory:");
+    const roundTripAdapter = new BetterSQLite3Adapter(":memory:");
     try {
       await defineSchema(roundTripAdapter, { authors: canonicalSchema.authors });
       await roundTripAdapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["Matz"]);
@@ -254,10 +256,11 @@ describe("StatementCacheTest", () => {
 
   it("StatementCache.create unprepared path uses PartialQuery with Substitute slots", async () => {
     await import("./relation.js");
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
     const { Base } = await import("./base.js");
 
-    const roundTripAdapter = new SQLite3Adapter(":memory:");
+    const roundTripAdapter = new BetterSQLite3Adapter(":memory:");
     try {
       await defineSchema(roundTripAdapter, { books: canonicalSchema.books });
       await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', ["Ruby"]);

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { queryTransformers, type QueryTransformer } from "../query-transformers.js";
 
 // Integration proof for QL PR 3: a registered query transformer is applied in
@@ -9,11 +10,11 @@ import { queryTransformers, type QueryTransformer } from "../query-transformers.
 // payload — the Rails-faithful ordering where preprocess_query runs before
 // raw_execute's log block.
 describe("SQLite3Adapter queryTransformers wiring", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
   let savedTransformers: QueryTransformer[];
 
   beforeEach(() => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
     savedTransformers = queryTransformers.slice();
     queryTransformers.length = 0;
   });

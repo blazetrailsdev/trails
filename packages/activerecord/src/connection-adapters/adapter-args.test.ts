@@ -59,6 +59,12 @@ describe("buildAdapterArg", () => {
         }),
       ).toEqual(["mutated.db"]);
     });
+
+    it("uses the sqlite (filename, options) shape for node-sqlite", () => {
+      expect(
+        buildAdapterArg("node-sqlite", { adapter: "node-sqlite", database: "x.db", strict: true }),
+      ).toEqual(["x.db", { strict: true }]);
+    });
   });
 
   describe("postgresql / mysql2", () => {
@@ -132,6 +138,10 @@ describe("normalizeAdapterName", () => {
     expect(normalizeAdapterName("mysql")).toBe("mysql");
     expect(normalizeAdapterName("sqlite3")).toBe("sqlite");
     expect(normalizeAdapterName("custom")).toBe("custom");
+  });
+
+  it("normalizes the node-sqlite adapter to the sqlite arg shape", () => {
+    expect(normalizeAdapterName("node-sqlite")).toBe("sqlite");
   });
 });
 

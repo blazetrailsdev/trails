@@ -161,8 +161,4 @@ describe("DevcontainerGeneratorTest", () => {
     run({ sqliteDriver: "node-sqlite" });
     expect(features()).not.toHaveProperty("ghcr.io/rails/devcontainer/features/sqlite3");
   });
-  it("test_sqlite_driver_expo_sqlite", () => {
-    run({ sqliteDriver: "expo-sqlite" });
-    expect(features()).not.toHaveProperty("ghcr.io/rails/devcontainer/features/sqlite3");
-  });
 });
