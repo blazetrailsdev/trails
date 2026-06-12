@@ -331,7 +331,8 @@ describe("commitAndPush (git mutation flow)", () => {
   // so these tests don't block behind a live agent. git itself stays mocked.
   afterEach(() => __setLockDirForTest(null));
   function setup() {
-    __setLockDirForTest(mkdtempSync(join(tmpdir(), "trails-cap-lock-")));
+    const lockDir = mkdtempSync(join(tmpdir(), "trails-cap-lock-"));
+    __setLockDirForTest(lockDir);
     const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Error(`exit ${code}`);
     }) as never);
@@ -344,7 +345,7 @@ describe("commitAndPush (git mutation flow)", () => {
       seen.push(label);
       return "" as never;
     });
-    return { exit, seen };
+    return { exit, seen, lockDir };
   }
 
   it("happy path: pull → add → commit → push, no retry", () => {
@@ -678,7 +679,7 @@ describe("commitAndPush (git mutation flow)", () => {
   // reapply it, injecting conflict markers — so refuse before pulling and tell
   // the user to commit, never running the mutator/pull/commit/push.
   it("refuses to mutate when the working tree has uncommitted edits", () => {
-    const { seen, exit } = setup();
+    const { seen, exit, lockDir } = setup();
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
@@ -704,6 +705,9 @@ describe("commitAndPush (git mutation flow)", () => {
     const msg = errSpy.mock.calls.at(-1)?.[0] as string;
     expect(msg).toMatch(/has uncommitted changes/);
     expect(msg).toMatch(/foo\.md/);
+    // The refusal must NOT leak the shared lock: the dirty check runs before the
+    // lock is acquired, so no lock file is left behind for the next mutation.
+    expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
   });
 
   // A regenerated index file is throwaway (restoreGeneratedFiles reset it, the

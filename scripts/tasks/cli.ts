@@ -639,19 +639,23 @@ export function commitAndPush(opts: {
       process.exit(1);
     }
   }
+  // Clear any loadIndex()-regenerated artifacts so the dirty-tree check and the
+  // pull below see a clean tree. Done BEFORE acquiring the lock: both operate
+  // only on this worktree's own files, and assertCleanWorktree may process.exit
+  // (skipping the lock's finally) — keeping them outside the critical section
+  // means that refusal can't leak the shared lock. Only needed before the first
+  // attempt — the retry path resets hard to origin/main, which discards them.
+  restoreGeneratedFiles(cwd);
+  // Bail before touching the remote if the user left hand edits in the tree —
+  // the pull below would corrupt them. (refine pre-cleans its file, so it sails
+  // past.)
+  assertCleanWorktree(cwd);
   // Serialize the whole pull→commit→push section against every other agent's
   // checkout. process.exit skips the `finally`, so the exit paths release
   // explicitly too (releaseTasksLock is idempotent; stale-steal backstops a
   // crash where neither runs).
   const lock = acquireTasksLock(cwd);
   try {
-    // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
-    // tree. Only needed before the first attempt — the retry path resets hard to
-    // origin/main, which already discards them.
-    restoreGeneratedFiles(cwd);
-    // Bail before the loop if the user left hand edits in the tree — the pull
-    // below would corrupt them. (refine pre-cleans its file, so it sails past.)
-    assertCleanWorktree(cwd);
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
