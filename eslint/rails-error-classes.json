@@ -33,11 +33,6 @@
         "rubyFile": "active_record/associations/errors.rb"
       },
       {
-        "name": "ArelError",
-        "parent": "StandardError",
-        "rubyFile": "arel/errors.rb"
-      },
-      {
         "name": "AssociationNotFoundError",
         "parent": "ConfigurationError",
         "rubyFile": "active_record/associations/errors.rb"
@@ -61,11 +56,6 @@
         "name": "Base",
         "parent": "StandardError",
         "rubyFile": "active_record/encryption/errors.rb"
-      },
-      {
-        "name": "BindError",
-        "parent": "ArelError",
-        "rubyFile": "arel/errors.rb"
       },
       {
         "name": "ColumnNotSerializableError",
@@ -171,11 +161,6 @@
         "name": "EagerLoadPolymorphicError",
         "parent": "ActiveRecordError",
         "rubyFile": "active_record/associations/errors.rb"
-      },
-      {
-        "name": "EmptyJoinError",
-        "parent": "ArelError",
-        "rubyFile": "arel/errors.rb"
       },
       {
         "name": "Encoding",
@@ -561,11 +546,6 @@
         "name": "UnmodifiableRelation",
         "parent": "ActiveRecordError",
         "rubyFile": "active_record/errors.rb"
-      },
-      {
-        "name": "UnsupportedVisitError",
-        "parent": "StandardError",
-        "rubyFile": "arel/visitors/to_sql.rb"
       },
       {
         "name": "ValueTooLong",

@@ -24,6 +24,15 @@ const ROOT = path.resolve(__dirname, "..");
 const PACKAGES = ["activerecord", "activemodel", "activesupport"] as const;
 type Pkg = (typeof PACKAGES)[number];
 
+// Each package's own Ruby lib namespace. The closure runs over the whole lib
+// tree, but only classes under this prefix are emitted — Arel is vendored
+// under activerecord/lib/arel yet is a separate package.
+const PKG_NS: Record<Pkg, string> = {
+  activerecord: "active_record/",
+  activemodel: "active_model/",
+  activesupport: "active_support/",
+};
+
 // Ruby exception bases that root our error hierarchy. A `class X < Base`
 // where Base is one of these is treated as an error class outright. These
 // also serve as "root extends an Error-equivalent" parents for the rule.
@@ -137,6 +146,7 @@ async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
   const byName = new Map<string, ErrorClass>();
   for (const d of decls) {
     if (!known.has(d.name)) continue;
+    if (!d.rubyFile.startsWith(PKG_NS[pkg])) continue; // skip vendored foreign libs (Arel)
     const existing = byName.get(d.name);
     if (existing && !d.fromErrorsFile) continue;
     byName.set(d.name, { name: d.name, parent: d.parent, rubyFile: d.rubyFile });
@@ -148,8 +158,8 @@ async function main() {
   const packages: Record<string, ErrorClass[]> = {};
   for (const pkg of PACKAGES) packages[pkg] = await scanPackage(pkg);
 
-  // Fixed timestamp source: avoid Date.now() so the manifest is
-  // reproducible across runs unless the underlying Rails source changes.
+  // `generatedAt` is fixed (not Date.now()) so the committed manifest is
+  // reproducible and only changes when the Rails source does.
   const manifest = { generatedAt: "vendored", packages };
   await mkdir(path.dirname(OUT), { recursive: true });
   await writeFile(OUT, JSON.stringify(manifest, null, 2) + "\n");

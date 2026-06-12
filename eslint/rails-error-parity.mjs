@@ -89,12 +89,7 @@ function repoRel(filename) {
   return m ? { rel: m[1], pkg: m[2] } : null;
 }
 
-/**
- * Map a manifest `rubyFile` (relative to the package's lib/, e.g.
- * `active_record/errors.rb`) to a package-src-relative TS path
- * (`errors.ts`). The leading `active_record/` segment is the package
- * namespace, which the TS layout drops.
- */
+/** `active_record/errors.rb` → `errors.ts` (drop namespace segment, .rb→.ts). */
 function rubyToSrcRel(rubyFile) {
   const parts = rubyFile.split("/");
   const tail = parts.slice(1).join("/");
