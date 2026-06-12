@@ -237,14 +237,19 @@ function _selfJoinAlias(
   const candidate = `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`;
   const aliasedName = candidate.slice(0, aliasLength).replace(/\./g, "_");
   const truncated = aliasedName.slice(0, aliasLength - 2);
-  // The first request emits `aliasedName`; later ones emit `<truncated>_<n>`.
-  // Count both forms (and a real table already named `aliasedName`) so the
-  // running count matches Rails' `aliases[aliased_name]` increments.
-  const suffixed = new RegExp(`^${truncated.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_\\d+$`);
-  const used = clauses.filter((j) => {
-    const emitted = j.as ?? j.table;
-    return emitted === aliasedName || suffixed.test(emitted);
-  }).length;
+  // Rails keys the running count on the base `aliased_name` only: `initial_count_for`
+  // seeds it from joins whose name exactly equals the candidate (not its suffixed
+  // variants), and the in-memory counter then emits `<truncated>_<n>` for repeats
+  // (alias_tracker.rb:28-43, 67-72). Reconstruct that from the emitted clause names:
+  // count exact `aliasedName` occurrences, and only fold in `<truncated>_<n>`
+  // siblings once the base has actually been claimed in this sequence — otherwise
+  // an unrelated join already named `<truncated>_<n>` would wrongly bump the count.
+  const baseUsed = clauses.filter((j) => (j.as ?? j.table) === aliasedName).length;
+  let used = baseUsed;
+  if (baseUsed > 0) {
+    const suffixed = new RegExp(`^${truncated.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_\\d+$`);
+    used += clauses.filter((j) => suffixed.test(j.as ?? j.table)).length;
+  }
   const count = used + 1;
   return count > 1 ? `${truncated}_${count}` : aliasedName;
 }
