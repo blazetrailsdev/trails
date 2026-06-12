@@ -45,16 +45,27 @@ class DebugLogSubscriber extends LogSubscriber {
 
 function logBinds(binds: unknown[], sql = "select * from topics where id = ?"): string {
   const subscriber = new DebugLogSubscriber();
+  // Rails' assert_logs_binds helpers build the payload with
+  // `@connection.send(:type_casted_binds, binds)` — use the connection's real
+  // type_casted_binds (abstract/quoting.ts) rather than hand-casting.
+  const conn = Topic.leaseConnection() as any;
   const event = new Event("sql.active_record", Temporal.Now.instant(), {
     name: "SQL",
     sql,
     binds,
-    type_casted_binds: binds.map((b) => (b instanceof QueryAttribute ? b.valueForDatabase : b)),
+    type_casted_binds: conn.typeCastedBinds(binds),
   });
   subscriber.sql(event);
   return subscriber.capture.debugs[0] ?? "";
 }
 
+// Rails wraps the entire class in `if Base.lease_connection.prepared_statements`
+// (bind_parameter_test.rb:9), so on adapters with prepared statements off (MySQL/
+// MariaDB default) NONE of these run. Deliberate deviation: we keep the
+// prepared-statement-INDEPENDENT cases (too many binds, find one uses binds, the
+// log-render tests — all adapter-agnostic) running on every backend for broader
+// coverage, and gate only the one prepared-statement-SPECIFIC case
+// (`nested unprepared statements`) via ctx.skip below.
 describe("BindParameterTest", () => {
   // Rails: `fixtures :topics, :authors, :author_addresses, :posts`.
   useHandlerFixtures(["topics", "authors", "authorAddresses", "posts"], {
@@ -150,6 +161,13 @@ describe("BindParameterTest", () => {
     const sub = Notifications.subscribe("sql.active_record", (e: Event) => subscriber.call(e));
     try {
       await Topic.find(1);
+      // Rails asserts `attr.value == 1` on the QueryAttribute payload binds
+      // (bind_parameter_test.rb:148-152). trails type-casts binds to primitives
+      // in the relation layer, so the payload carries `[1]` rather than Attribute
+      // objects — the `?? attr` fallback matches the primitive trails emits. (The
+      // payload can't preserve Attribute objects without production changes; the
+      // stronger `binds are logged` assertion is deferred to
+      // f9-statement-cache-pool-introspection for exactly that reason.)
       const message = subscriber.events.find((e) =>
         (e.payload.binds as any[])?.some((attr) => (attr?.value ?? attr) === 1),
       );
@@ -161,12 +179,15 @@ describe("BindParameterTest", () => {
 
   it("logs binds after type cast", () => {
     const binds = [new QueryAttribute("id", "10", new IntegerType())];
-    expect(logBinds(binds)).toMatch(/\["id",10\]\]/);
+    // Rails anchors the binds render to end-of-line: %r(\[\["id", 10\]\]\z)
+    // (bind_parameter_test.rb:309). trails' safeJsonStringify drops the space.
+    expect(logBinds(binds)).toMatch(/\["id",10\]\]$/);
   });
 
   it("logs unnamed binds", () => {
     const binds = ["abcd"];
-    expect(logBinds(binds, "select * from topics where title = $1")).toMatch(/\[null,"abcd"\]\]/);
+    // Rails: %r(\[\[nil, "abcd"\]\]\z) (bind_parameter_test.rb:340), end-anchored.
+    expect(logBinds(binds, "select * from topics where title = $1")).toMatch(/\[null,"abcd"\]\]$/);
   });
 
   it("binds with filtered attributes", () => {
