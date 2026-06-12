@@ -1,11 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { minutes } from "@blazetrails/activesupport";
 import {
   quote,
   quoteString,
   quoteColumnName,
   quoteTableName,
   quoteTableNameForAssignment,
+  quotedDate,
+  quotedTime,
   quotedTrue,
   unquotedTrue,
   quotedFalse,
@@ -21,6 +24,11 @@ import {
   formatInstantForSql,
   formatPlainTimeForSql,
 } from "./connection-adapters/abstract/sql-datetime.js";
+import { setDefaultTimezone } from "./type/internal/timezone.js";
+
+afterEach(() => {
+  setDefaultTimezone("utc");
+});
 
 describe("QuotingTest", () => {
   it("quoted true", () => {
@@ -109,50 +117,54 @@ describe("QuotingTest", () => {
     expect(result).toBe('"users"."name"');
   });
 
-  it.skip("quote duration", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote duration", () => {
+    // Rails: quote(30.minutes) raises "can't quote ActiveSupport::Duration".
+    // A Duration is an object instance, so it falls through to the final throw.
+    expect(() => quote(minutes(30))).toThrow(TypeError);
+    expect(() => quote(minutes(30))).toThrow(/Duration/);
   });
-  it.skip("quote table name calls quote column name", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote table name calls quote column name", () => {
+    // Rails delegates quote_table_name to quote_column_name per identifier part;
+    // for a bare name the two produce the same quoted identifier.
+    expect(quoteTableName("foo")).toBe(quoteColumnName("foo"));
   });
-  it.skip("quoted timestamp local", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quoted timestamp local", () => {
+    setDefaultTimezone("local");
+    const zone = Temporal.Now.timeZoneId();
+    const zdt = Temporal.ZonedDateTime.from(`2026-04-07T15:30:00[${zone}]`);
+    expect(quotedDate(zdt.toInstant())).toBe("2026-04-07 15:30:00");
   });
-  it.skip("quoted time local", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quoted time local", () => {
+    setDefaultTimezone("local");
+    const t = Temporal.PlainTime.from("15:30:45");
+    expect(quotedTime(t)).toBe("15:30:45");
   });
-  it.skip("quoted datetime utc", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quoted datetime utc", () => {
+    const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
+    expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
-  it.skip("quoted datetime local", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quoted datetime local", () => {
+    // DateTime has no getlocal, so the local setting is a no-op for naive values.
+    setDefaultTimezone("local");
+    const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
+    expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
-  it.skip("quote bigdecimal", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote bigdecimal", () => {
+    // Rails: BigDecimal((1 << 100).to_s) quotes bare via to_s("F"); the trails
+    // representation of an exact arbitrary-precision integer is a bigint.
+    const bigdec = 1n << 100n;
+    expect(quote(bigdec)).toBe(bigdec.toString());
   });
-  it.skip("dates and times", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("dates and times", () => {
+    // quote wraps the serialized date/time in single quotes.
+    expect(quote(Temporal.PlainDate.from("2026-04-07"))).toBe("'2026-04-07'");
+    expect(quote(Temporal.Instant.from("2026-04-07T15:30:00Z"))).toBe("'2026-04-07 15:30:00'");
+    expect(quote(Temporal.PlainDateTime.from("2026-04-07T15:30:00"))).toBe("'2026-04-07 15:30:00'");
   });
-  it.skip("quote as mb chars no column", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote as mb chars no column", () => {
+    // JS strings are already the multibyte representation, so a "Chars" value is
+    // a plain string; backslash escaping matches quote_string_no_column.
+    expect(quote("lo\\l")).toBe("'lo\\\\l'");
   });
 });
 
@@ -178,15 +190,13 @@ describe("TypeCastingTest", () => {
     expect(() => typeCast(new Date())).toThrow(TypeError);
     expect(() => typeCast(new Date())).toThrow(/Temporal/);
   });
-  it.skip("type cast time", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("type cast time", () => {
+    // Rails (non-mysql): type_cast(time) returns quoted_date(time).
+    const t = Temporal.Instant.from("2026-04-07T15:30:00Z");
+    expect(typeCast(t)).toBe("2026-04-07 15:30:00");
   });
-  it.skip("type cast duration should raise error", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("type cast duration should raise error", () => {
+    expect(() => typeCast(minutes(30))).toThrow(TypeError);
   });
 });
 
@@ -242,14 +252,13 @@ describe("QuoteBooleanTest", () => {
     expect(formatPlainTimeForSql(t)).toBe("08:15:30");
   });
 
-  it.skip("quote returns frozen string", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote returns frozen string", () => {
+    // JS string primitives are immutable; Object.isFrozen reports true for them.
+    expect(Object.isFrozen(quote(true))).toBe(true);
+    expect(Object.isFrozen(quote(false))).toBe(true);
   });
-  it.skip("type cast returns frozen value", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("type cast returns frozen value", () => {
+    expect(Object.isFrozen(typeCast(true))).toBe(true);
+    expect(Object.isFrozen(typeCast(false))).toBe(true);
   });
 });
