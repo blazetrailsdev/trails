@@ -121,12 +121,16 @@ describe("QuotingTest", () => {
     // Rails: quote(30.minutes) raises "can't quote ActiveSupport::Duration".
     // A Duration is an object instance, so it falls through to the final throw.
     expect(() => quote(minutes(30))).toThrow(TypeError);
+    expect(() => quote(minutes(30))).toThrow(/can't quote/);
     expect(() => quote(minutes(30))).toThrow(/Duration/);
   });
   it("quote table name calls quote column name", () => {
-    // Rails delegates quote_table_name to quote_column_name per identifier part;
-    // for a bare name the two produce the same quoted identifier.
+    // Rails dispatches quote_table_name through quote_column_name per identifier
+    // part. trails has no module-level method dispatch to monkey-patch, so the
+    // ported assertion checks that both routes share the same identifier-quoting
+    // logic — including the "" escape of an embedded quote, not just a bare name.
     expect(quoteTableName("foo")).toBe(quoteColumnName("foo"));
+    expect(quoteTableName('a"b')).toBe(quoteColumnName('a"b'));
   });
   it("quoted timestamp local", () => {
     setDefaultTimezone("local");
@@ -151,9 +155,10 @@ describe("QuotingTest", () => {
   });
   it("quote bigdecimal", () => {
     // Rails: BigDecimal((1 << 100).to_s) quotes bare via to_s("F"); the trails
-    // representation of an exact arbitrary-precision integer is a bigint.
-    const bigdec = 1n << 100n;
-    expect(quote(bigdec)).toBe(bigdec.toString());
+    // representation of an exact arbitrary-precision integer is a bigint, which
+    // quotes to the bare decimal digits (Rails emits a trailing ".0" that the
+    // integral bigint has no place for).
+    expect(quote(1n << 100n)).toBe("1267650600228229401496703205376");
   });
   it("dates and times", () => {
     // quote wraps the serialized date/time in single quotes.
