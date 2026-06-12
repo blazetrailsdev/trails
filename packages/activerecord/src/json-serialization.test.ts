@@ -165,6 +165,8 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       author_j10s: { name: "string", age: "integer" },
       book_j10s: { title: "string", author_id: "integer" },
       post_j11s: { title: "string" },
+      post_j12s: { title: "string" },
+      comment_j12s: { body: "string", post_id: "integer" },
     });
   });
   it("includes uses association name", async () => {
@@ -419,5 +421,28 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     expect(encoded.length).toBe(2);
     expect(encoded[0].title).toBe("First");
     expect(encoded[1].title).toBe("Second");
+  });
+
+  it("raises when including an unloaded has_many (sync serialization cannot query)", async () => {
+    // Rails' `to_ary` would lazily load the rows; trails serialization is
+    // synchronous and must not query, so an unloaded collection fails loud
+    // rather than silently serializing as `[]`.
+    class CommentJ12 extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+      }
+    }
+    class PostJ12 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.hasMany("comments", { className: "CommentJ12", foreignKey: "post_id" });
+      }
+    }
+    registerModel(CommentJ12);
+    const post = await PostJ12.create({ title: "Hello" });
+    await CommentJ12.create({ body: "Hi", post_id: post.id });
+    // No load() — `post.comments` is unloaded.
+    expect(() => post.asJson({ include: "comments" })).toThrow(/not loaded/);
   });
 });

@@ -62,11 +62,22 @@ export function serializableHash(
     // or a host collection object (e.g. activerecord's `CollectionProxy`).
     //
     // Divergence (forced by synchronous serialization): Rails' `to_ary` lazily
-    // loads an unloaded collection from the DB; trails iterates the proxy's
-    // already-loaded records (an unloaded collection yields no rows). The RFC
-    // 0022 b2 constraint is that serialization issues no DB load — callers
-    // load/preload the association first, exactly as eager loading would.
+    // loads an unloaded collection from the DB. trails serialization is
+    // synchronous and must not query (RFC 0022 b2). A lazy host collection
+    // (activerecord's `CollectionProxy`, like Rails' `CollectionProxy#loaded?`)
+    // advertises its load state via a `loaded` flag; rather than silently
+    // emitting `[]` for one that hasn't loaded — which reads as "no records"
+    // when it means "not fetched" — fail loud so the caller preloads first
+    // (await the association, or eager-load via includes/preload). Iterables
+    // with no `loaded` flag (plain arrays, `to_ary`-style wrappers) are ready.
     if (isSerializableCollection(records)) {
+      if ((records as { loaded?: unknown }).loaded === false) {
+        throw new Error(
+          `Cannot serialize the '${assocName}' association: its collection is not ` +
+            `loaded. Load it first (await the association, or eager-load via ` +
+            `includes / preload) — synchronous serialization cannot query the database.`,
+        );
+      }
       const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
       safeSet(
         result,
