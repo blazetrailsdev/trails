@@ -3127,30 +3127,12 @@ export class Relation<T extends Base> {
         /\s+AS\s+/i.test(c);
       return isComplex ? new Nodes.SqlLiteral(c) : table.get(c);
     });
-    const manager = table.project(...projections);
-    this._applyJoinsToManager(manager);
-    this._applyWheresToManager(manager, table);
-    this._applyOrderToManager(manager, table);
-
-    if (this._isDistinct) manager.distinct();
-    if (this._limitValue !== null) manager.take(this._limitValue);
-    if (this._offsetValue !== null) manager.skip(this._offsetValue);
-
-    // Rails' pluck executes the full relation arel (calculations.rb), and
-    // build_arel applies group/having, optimizer hints, from, and lock
-    // (query_methods.rb) before returning the manager, so carry those clauses
-    // here too rather than only joins/wheres/order/distinct/limit/offset.
-    for (const col of this._groupColumns) manager.group(groupColumnToArel(col, table));
-    if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
-    if (this._lockValue) manager.lock(this._lockValue);
-    if (this._optimizerHints.length > 0) manager.optimizerHints(...this._optimizerHints);
-
-    // Thread from()/CTE through the manager just like a normal read (Rails'
-    // pluck builds on the relation arel, honoring from_clause / with). FROM
-    // goes on the manager so its source — and any subquery binds — flow through
-    // the single collector in document order.
-    const fromNode = this._buildFromNode();
-    if (fromNode !== undefined && fromNode !== null) manager.from(fromNode as any);
+    // Rails' pluck sets select_values = columns and executes the full relation
+    // arel (calculations.rb), so build the same manager as a normal read and
+    // swap in the pluck projections — joins/wheres/order/group/having/from/lock/
+    // optimizer-hints thread through identically.
+    const manager = this._buildSelectManager();
+    manager.projections = projections as any;
 
     const [compiledSql, managerBinds] = this._compileAstWithBinds(manager.ast);
     let pluckSql = compiledSql;
