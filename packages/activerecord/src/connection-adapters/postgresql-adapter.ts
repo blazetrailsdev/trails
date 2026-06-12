@@ -4151,7 +4151,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
         : [];
     // Rails: `return if options[:if_exists] && !index_exists?(...)`.
-    if (opts.ifExists && !indexExistsForRemoveFrom(all, columnName, resolveOpts)) {
+    if (opts.ifExists && !indexExistsForRemoveFrom(all, bareTable, columnName, resolveOpts)) {
       return;
     }
     const indexName = indexNameForRemoveFrom(all, bareTable, columnName, resolveOpts);

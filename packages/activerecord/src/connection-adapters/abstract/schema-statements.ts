@@ -43,12 +43,29 @@ export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 type RemoveIndexOptions = { name?: string; column?: string | string[] };
 type IndexInfo = { name: string; columns: string[] };
 
-function removeIndexColumnNames(
+// Rails: `expression_column_name?` — a String column carrying a non-word char
+// (e.g. `"lower(email)"`) is an expression index, not a plain column.
+/** @internal */
+function isExpressionColumnName(columnName: string | string[] | undefined): columnName is string {
+  return typeof columnName === "string" && /\W/.test(columnName);
+}
+
+// Normalize a remove-index spec into the effective name + column list, applying
+// Rails' expression branch: an expression positional column with no `name`
+// resolves to the generated index name (`index_<table>_on_<\w+ joined by _>`)
+// and matches by name only.
+function removeIndexSpec(
+  tableName: string,
   columnName: string | string[] | undefined,
   options: RemoveIndexOptions,
-): string[] {
+): { name?: string; columnNames: string[] } {
+  if (options.name == null && isExpressionColumnName(columnName)) {
+    const expr = (columnName.match(/\w+/g) ?? []).join("_");
+    return { name: `index_${tableName}_on_${expr}`, columnNames: [] };
+  }
   const raw = columnName ?? options.column;
-  return raw == null || raw === "" ? [] : Array.isArray(raw) ? raw : [raw];
+  const columnNames = raw == null || raw === "" ? [] : Array.isArray(raw) ? raw : [raw];
+  return { name: options.name, columnNames };
 }
 
 /**
@@ -70,11 +87,10 @@ export function indexNameForRemoveFrom(
     return options.name;
   }
   const conventional = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
-  const columnNames = removeIndexColumnNames(columnName, options);
+  const { name, columnNames } = removeIndexSpec(tableName, columnName, options);
   const checks: Array<(i: IndexInfo) => boolean> = [];
-  if (options.name != null) {
-    const n = options.name;
-    checks.push((i) => i.name === n);
+  if (name != null) {
+    checks.push((i) => i.name === name);
   }
   if (columnNames.length > 0) {
     const target = conventional(columnNames);
@@ -105,18 +121,19 @@ export function indexNameForRemoveFrom(
  */
 export function indexExistsForRemoveFrom(
   allIndexes: ReadonlyArray<IndexInfo>,
+  tableName: string,
   columnName: string | string[] | undefined,
   options: RemoveIndexOptions,
 ): boolean {
-  const columnNames = removeIndexColumnNames(columnName, options);
+  const { name, columnNames } = removeIndexSpec(tableName, columnName, options);
   return allIndexes.some((i) => {
-    if (options.name != null && i.name !== options.name) return false;
+    if (name != null && i.name !== name) return false;
     if (columnNames.length > 0) {
       return (
         i.columns.length === columnNames.length && columnNames.every((c, k) => c === i.columns[k])
       );
     }
-    return options.name != null;
+    return name != null;
   });
 }
 
