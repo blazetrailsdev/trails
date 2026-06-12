@@ -180,6 +180,7 @@ function _addAssocJoin(
   leftOuterJoinsValues: ReadonlyArray<unknown> | undefined,
   ownerTable: string,
   quoteTable: (name: string) => string,
+  aliasLength: number,
 ): string | undefined {
   // If the association is already covered by _leftOuterJoinsValues (deferred
   // LEFT OUTER JOIN path), skip — the join will be emitted when the manager
@@ -194,7 +195,7 @@ function _addAssocJoin(
     // (`aliased_table_for` → `reflection.alias_candidate(parent.table_name)` =
     // `"#{plural_assoc}_#{owner_table}"`). Mirror that here so the second join
     // is emitted as `<table> AS <alias>` instead of colliding.
-    const alias = _selfJoinAlias(assocName, ownerTable, clauses);
+    const alias = _selfJoinAlias(assocName, ownerTable, clauses, aliasLength);
     const qTable = quoteTable(join.table);
     const qAlias = quoteTable(alias);
     // The ON SQL references the target table as `<quotedTable>.<col>`; rebind
@@ -211,21 +212,30 @@ function _addAssocJoin(
 /**
  * Compute a Rails-`AliasTracker`-faithful self-join alias for a sibling
  * association join that collides with an existing join on the same table.
- * Mirrors `reflection.alias_candidate(parent.table_name)` =
- * `"#{plural_name}_#{owner_table}"`, with the `_<count>` suffix Rails appends
- * when the same candidate is reused (`count > 1`).
+ *
+ * Mirrors `AliasTracker#aliased_table_for` (alias_tracker.rb:60-77): the
+ * candidate `reflection.alias_candidate(parent.table_name)` =
+ * `"#{plural_name}_#{owner_table}"` (reflection.rb:328-330) is normalized via
+ * `table_alias_for` — truncated to the adapter's `table_alias_length` with dots
+ * replaced by underscores (alias_tracker.rb:82-84) — before the count keyed off
+ * that normalized name decides the `_<count>` suffix, which is itself applied to
+ * a `truncate`d (`length - 2`) base (alias_tracker.rb:67-72, 86-88). Without
+ * this, long names diverge from Rails and can exceed adapter alias limits.
  */
 function _selfJoinAlias(
   assocName: string,
   ownerTable: string,
   clauses: ReadonlyArray<{ as?: string }>,
+  aliasLength: number,
 ): string {
   const candidate = `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`;
+  const aliasedName = candidate.slice(0, aliasLength).replace(/\./g, "_");
+  const truncated = aliasedName.slice(0, aliasLength - 2);
   const used = clauses.filter(
-    (j) => j.as === candidate || (j.as != null && j.as.startsWith(`${candidate}_`)),
+    (j) => j.as === aliasedName || (j.as != null && j.as.startsWith(`${truncated}_`)),
   ).length;
   const count = used + 1;
-  return count > 1 ? `${candidate}_${count}` : candidate;
+  return count > 1 ? `${truncated}_${count}` : aliasedName;
 }
 
 /**
@@ -520,6 +530,7 @@ export class Relation<T extends Base> {
       const cloned = rel._clone();
       const ownerTable = (rel._modelClass as any).tableName;
       const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
+      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
       let effectiveTable = target.table;
       for (const join of target.joins) {
         const alias = _addAssocJoin(
@@ -531,6 +542,7 @@ export class Relation<T extends Base> {
           cloned._leftOuterJoinsValues,
           ownerTable,
           quoteTable,
+          aliasLength,
         );
         if (alias && join.table === target.table) effectiveTable = alias;
       }
@@ -564,6 +576,7 @@ export class Relation<T extends Base> {
       const cloned = rel._clone();
       const ownerTable = (rel._modelClass as any).tableName;
       const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
+      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
       let effectiveTable = target.table;
       for (const join of target.joins) {
         const alias = _addAssocJoin(
@@ -575,6 +588,7 @@ export class Relation<T extends Base> {
           cloned._leftOuterJoinsValues,
           ownerTable,
           quoteTable,
+          aliasLength,
         );
         if (alias && join.table === target.table) effectiveTable = alias;
       }
