@@ -1127,17 +1127,21 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     registerModel("Eye", Eye);
     registerModel("Iris", Iris);
+    // No `inverseOf`: wiring the inverse target both ways turns the mutual
+    // hasOne-autosave / belongsTo-autosave pair into a save cycle (saving the
+    // iris autosaves its eye, whose hasOne then re-autosaves the iris). SQLite
+    // tolerated the re-entrant savepoint; PostgreSQL's transaction
+    // instrumentation rejects the double-start. The counter assertions only
+    // exercise one direction per test, so the inverse link is unnecessary.
     Associations.hasOne.call(Eye, "iris", {
       autosave: true,
       className: "Iris",
       foreignKey: "eye_id",
-      inverseOf: "eye",
     });
     Associations.belongsTo.call(Iris, "eye", {
       autosave: true,
       className: "Eye",
       foreignKey: "eye_id",
-      inverseOf: "iris",
     });
     return { Eye, Iris };
   }
