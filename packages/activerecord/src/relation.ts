@@ -4210,7 +4210,11 @@ export class Relation<T extends Base> {
     // helper instead of throwing. `?.bind` also handles the unconnected case.
     const adapter = this._resolveAdapter();
     const sanitize = adapter?.sanitizeAsSqlComment?.bind(adapter) ?? sanitizeAsSqlComment;
-    return this._annotations.map((c) => `/* ${sanitize(c)} */`).join(" ");
+    // Mirror build_arel: uniq the annotate values when more than one before
+    // rendering the comment node (query_methods.rb `annotates.uniq`).
+    const annotations =
+      this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
+    return annotations.map((c) => `/* ${sanitize(c)} */`).join(" ");
   }
 
   private _arelVisitor(): Visitors.ToSql {
