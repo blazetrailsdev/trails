@@ -3148,22 +3148,35 @@ export class Relation<T extends Base> {
     // Thread from()/CTE through the manager just like a normal read (Rails'
     // pluck builds on the relation arel, honoring from_clause / with). FROM
     // goes on the manager so its source — and any subquery binds — flow through
-    // the single collector in document order; CTE bodies are prepended as SQL
-    // (their binds inline via _compileArelNode), matching _toSqlWithoutSetOp.
+    // the single collector in document order.
     const fromNode = this._buildFromNode();
     if (fromNode !== undefined && fromNode !== null) manager.from(fromNode as any);
 
-    const [compiledSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
+    const [compiledSql, managerBinds] = this._compileAstWithBinds(manager.ast);
     let pluckSql = compiledSql;
+    let pluckBinds = managerBinds;
     // annotate() comments — appended like _toSqlWithoutSetOp (build_arel adds
     // them to the manager's comment node).
     if (this._annotations.length > 0) pluckSql = `${pluckSql} ${this._annotationComments()}`;
+    // Prepend CTE clauses, threading their bind values ahead of the main
+    // query's and shifting any $N placeholders up (PG numbers globally) —
+    // matching _toSqlWithoutSetOp.
     if (this._ctes.length > 0) {
-      pluckSql = `${_qm.buildCteSql(
+      const { sql: cteSql, binds: cteBinds } = _qm.buildCteSql(
         this._ctes,
-        (n) => this._compileArelNode(n),
+        (n) => this._compileArelNodeWithBinds(n),
         (name) => this._modelClass.connection.quoteTableName(name),
-      )} ${pluckSql}`;
+      );
+      if (cteBinds.length > 0) {
+        const shifted = pluckSql.replace(
+          /\$(\d+)/g,
+          (_m, n) => `$${parseInt(n, 10) + cteBinds.length}`,
+        );
+        pluckSql = `${cteSql} ${shifted}`;
+        pluckBinds = [...cteBinds, ...pluckBinds];
+      } else {
+        pluckSql = `${cteSql} ${pluckSql}`;
+      }
     }
     const result = await this._modelClass.connection.selectAll(
       pluckSql,
