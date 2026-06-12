@@ -173,6 +173,7 @@ function _addAssocJoin(
     quoted?: boolean;
     as?: string;
     aliasBase?: string;
+    assoc?: string;
   }>,
   type: "inner" | "left",
   join: { table: string; on: string },
@@ -187,6 +188,15 @@ function _addAssocJoin(
   // LEFT OUTER JOIN path), skip — the join will be emitted when the manager
   // is built, so adding a second join here would cause ambiguous column names.
   if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return undefined;
+  // Association-level dedup (Rails `left_outer_joins_values |= args` /
+  // `joins_values |= args`, query_methods.rb:124-128, 889-890): a repeat of the
+  // same association reuses its existing join. We must do this BEFORE the raw
+  // table/ON collision check below — once a sibling join has been aliased its ON
+  // references the alias, so it no longer equals this call's freshly-derived
+  // (unaliased) ON and would be mistaken for a new collision, minting a second
+  // alias for an association that's already joined.
+  const sameAssoc = clauses.find((j) => j.assoc === assocName && j.table === join.table);
+  if (sameAssoc) return sameAssoc.as;
   const sameTableJoins = clauses.filter((j) => j.table === join.table);
   if (sameTableJoins.length > 0) {
     if (sameTableJoins.every((j) => j.on === join.on)) return undefined; // all compatible — skip
@@ -213,10 +223,11 @@ function _addAssocJoin(
       quoted: true,
       as: alias,
       aliasBase: base,
+      assoc: assocName,
     });
     return alias;
   }
-  clauses.push({ type, table: join.table, on: join.on, quoted: true });
+  clauses.push({ type, table: join.table, on: join.on, quoted: true, assoc: assocName });
   return undefined;
 }
 
@@ -395,6 +406,13 @@ export class Relation<T extends Base> {
     on: string;
     quoted?: boolean;
     as?: string;
+    // The association this join was derived from (when added via
+    // whereAssociated/whereMissing), so a repeat of the same association reuses
+    // the existing join instead of minting a duplicate alias.
+    assoc?: string;
+    // The base alias candidate a self-join alias was minted from (see
+    // _selfJoinAlias) — used to attribute repeat counts to the right candidate.
+    aliasBase?: string;
   }> = [];
   private _joinValues: (string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
