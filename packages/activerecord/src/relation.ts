@@ -166,26 +166,90 @@ function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | 
 }
 
 function _addAssocJoin(
-  clauses: Array<{ type: "inner" | "left"; table: string; on: string; quoted?: boolean }>,
+  clauses: Array<{
+    type: "inner" | "left";
+    table: string;
+    on: string;
+    quoted?: boolean;
+    as?: string;
+    aliasBase?: string;
+    assoc?: string;
+  }>,
   type: "inner" | "left",
   join: { table: string; on: string },
   assocName: string,
   modelClass: any,
-  leftOuterJoinsValues?: ReadonlyArray<unknown>,
-): void {
+  leftOuterJoinsValues: ReadonlyArray<unknown> | undefined,
+  ownerTable: string,
+  quoteTable: (name: string) => string,
+  aliasLength: number,
+): string | undefined {
   // If the association is already covered by _leftOuterJoinsValues (deferred
   // LEFT OUTER JOIN path), skip — the join will be emitted when the manager
   // is built, so adding a second join here would cause ambiguous column names.
-  if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return;
+  if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return undefined;
+  // Association-level dedup (Rails `left_outer_joins_values |= args`,
+  // query_methods.rb:124-128) must run BEFORE the table/ON collision check: an
+  // already-aliased sibling join's ON references the alias, so it no longer
+  // equals a repeat call's freshly-derived ON and would mint a second alias.
+  const sameAssoc = clauses.find((j) => j.assoc === assocName && j.table === join.table);
+  if (sameAssoc) return sameAssoc.as;
   const sameTableJoins = clauses.filter((j) => j.table === join.table);
   if (sameTableJoins.length > 0) {
-    if (sameTableJoins.every((j) => j.on === join.on)) return; // all compatible — skip
-    throw new Error(
-      `where${type === "inner" ? "Associated" : "Missing"}: cannot add ${type.toUpperCase()} JOIN for '${assocName}' on ${modelClass.name} ` +
-        `— a different join to '${join.table}' already exists and cannot be represented without aliasing.`,
-    );
+    if (sameTableJoins.every((j) => j.on === join.on)) return undefined; // all compatible — skip
+    // Two sibling associations target the same table under different ON
+    // conditions — alias the later join per Rails' AliasTracker (see below).
+    const { alias, base } = _selfJoinAlias(assocName, ownerTable, clauses, aliasLength);
+    const qTable = quoteTable(join.table);
+    const qAlias = quoteTable(alias);
+    // ON references the target as `<quotedTable>.<col>`; rebind to the alias.
+    const reboundOn = join.on.split(`${qTable}.`).join(`${qAlias}.`);
+    clauses.push({
+      type,
+      table: join.table,
+      on: reboundOn,
+      quoted: true,
+      as: alias,
+      aliasBase: base,
+      assoc: assocName,
+    });
+    return alias;
   }
-  clauses.push({ type, table: join.table, on: join.on, quoted: true });
+  clauses.push({ type, table: join.table, on: join.on, quoted: true, assoc: assocName });
+  return undefined;
+}
+
+/**
+ * Compute a Rails-`AliasTracker`-faithful self-join alias for a sibling
+ * association join colliding on the same table. Mirrors `aliased_table_for`
+ * (alias_tracker.rb:60-77): the candidate `"#{plural_name}_#{owner_table}"`
+ * (reflection.rb:328-330) is normalized to `table_alias_length` (dots →
+ * underscores), and a `_<count>` suffix on a `truncate`d (`length - 2`) base is
+ * appended for repeats — so long names neither diverge from Rails nor exceed
+ * adapter alias limits.
+ *
+ * The count keys on the base name: a seed from pre-existing joins whose emitted
+ * name exactly equals the candidate (`initial_count_for`, alias_tracker.rb:28-43),
+ * plus the aliases this helper already minted for the SAME candidate — tracked
+ * via `aliasBase`, not by matching the suffix pattern, so an unrelated join
+ * named `<truncated>_<n>` can't perturb the count. `base` is returned so the
+ * caller can stamp it onto the clause for that attribution.
+ */
+function _selfJoinAlias(
+  assocName: string,
+  ownerTable: string,
+  clauses: ReadonlyArray<{ table: string; as?: string; aliasBase?: string }>,
+  aliasLength: number,
+): { alias: string; base: string } {
+  const candidate = `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`;
+  const aliasedName = candidate.slice(0, aliasLength).replace(/\./g, "_");
+  const truncated = aliasedName.slice(0, aliasLength - 2);
+  const seed = clauses.filter(
+    (j) => j.aliasBase === undefined && (j.as ?? j.table) === aliasedName,
+  ).length;
+  const minted = clauses.filter((j) => j.aliasBase === aliasedName).length;
+  const count = seed + minted + 1;
+  return { alias: count > 1 ? `${truncated}_${count}` : aliasedName, base: aliasedName };
 }
 
 /**
@@ -317,6 +381,14 @@ export class Relation<T extends Base> {
     table: string;
     on: string;
     quoted?: boolean;
+    as?: string;
+    // The association this join was derived from (when added via
+    // whereAssociated/whereMissing), so a repeat of the same association reuses
+    // the existing join instead of minting a duplicate alias.
+    assoc?: string;
+    // The base alias candidate a self-join alias was minted from (see
+    // _selfJoinAlias) — used to attribute repeat counts to the right candidate.
+    aliasBase?: string;
   }> = [];
   private _joinValues: (string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
@@ -477,17 +549,25 @@ export class Relation<T extends Base> {
         );
       }
       const cloned = rel._clone();
+      const ownerTable = (rel._modelClass as any).tableName;
+      const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
+      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
+      let effectiveTable = target.table;
       for (const join of target.joins) {
-        _addAssocJoin(
+        const alias = _addAssocJoin(
           cloned._joinClauses,
           "inner",
           join,
           assocName,
           rel._modelClass as any,
           cloned._leftOuterJoinsValues,
+          ownerTable,
+          quoteTable,
+          aliasLength,
         );
+        if (alias && join.table === target.table) effectiveTable = alias;
       }
-      const tgtTable = new Table(target.table);
+      const tgtTable = new Table(effectiveTable);
       for (const pk of target.pks) {
         cloned._whereClause.predicates.push(tgtTable.get(pk).notEq(null));
       }
@@ -515,17 +595,25 @@ export class Relation<T extends Base> {
         );
       }
       const cloned = rel._clone();
+      const ownerTable = (rel._modelClass as any).tableName;
+      const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
+      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
+      let effectiveTable = target.table;
       for (const join of target.joins) {
-        _addAssocJoin(
+        const alias = _addAssocJoin(
           cloned._joinClauses,
           "left",
           join,
           assocName,
           rel._modelClass as any,
           cloned._leftOuterJoinsValues,
+          ownerTable,
+          quoteTable,
+          aliasLength,
         );
+        if (alias && join.table === target.table) effectiveTable = alias;
       }
-      const tgtTable = new Table(target.table);
+      const tgtTable = new Table(effectiveTable);
       for (const pk of target.pks) {
         cloned._whereClause.predicates.push(tgtTable.get(pk).eq(null));
       }
@@ -2875,7 +2963,11 @@ export class Relation<T extends Base> {
     }
     if (leadingJoins.length > 0) manager.prependJoinNodes(...leadingJoins);
     for (const join of this._joinClauses) {
-      const tableNode = join.quoted ? new Table(join.table) : join.table;
+      const tableNode = join.quoted
+        ? join.as
+          ? new Table(join.table, { as: join.as })
+          : new Table(join.table)
+        : join.table;
       const onNode = new Nodes.SqlLiteral(join.on);
       if (join.type === "inner") {
         manager.join(tableNode, onNode);
