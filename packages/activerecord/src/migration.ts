@@ -685,16 +685,25 @@ export abstract class Migration {
     await this.schema.addIndex(tableName, columns, options);
   }
 
+  // Rails migration compatibility: `remove_index(table_name, column_name = nil, **options)`.
   async removeIndex(
     tableName: string,
+    columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recorder.record("removeIndex", [tableName, options]);
+      // Record args as actually passed so command-recorder inversion sees the
+      // same shape: positional column → [table, column, options]; options-hash
+      // form → [table, options] (no spurious trailing hash to mis-strip).
+      const recordArgs =
+        typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)
+          ? [tableName, columnOrOptions, options]
+          : [tableName, columnOrOptions];
+      this._recorder.record("removeIndex", recordArgs);
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.removeIndex(tableName, options);
+    await this.schema.removeIndex(tableName, columnOrOptions, options);
   }
 
   async changeColumn(

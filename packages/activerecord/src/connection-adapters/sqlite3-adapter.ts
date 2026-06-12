@@ -17,6 +17,7 @@ import {
   dataSourceSql as sqliteDataSourceSql,
   extractValueFromDefault as sqliteExtractValueFromDefault,
 } from "./sqlite3/schema-statements.js";
+import { indexNameForRemoveFrom, indexExistsForRemoveFrom } from "./abstract/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -302,6 +303,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     });
   }
 
+  // A statement prepared outside the pool — Rails' non-`prepare` branch, which
+  // prepares a fresh statement per call rather than caching it.
+  private async _freshStatement(sql: string): Promise<SqliteStatement> {
+    const stmt = await this.driver.prepare(sql);
+    this._maybeEnableReadBigInts(sql, stmt);
+    return stmt;
+  }
+
   private async _cachedStatement(sql: string): Promise<SqliteStatement> {
     // When preparedStatements is off, skip the pool and prepare per call —
     // matches Rails' `statement_pool` behavior gated on
@@ -491,6 +500,66 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         return 0;
       } catch (e: any) {
         const translated = this._translateException(e, sql, []);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
+      }
+    });
+  }
+
+  /**
+   * Run a query and return an ActiveRecord::Result.
+   *
+   * Mirrors Rails' SQLite3Adapter#perform_query: a non-row-returning statement
+   * (INSERT/UPDATE/DELETE/DDL) yields an empty Result, while a row-returning
+   * statement reports its column set from the prepared statement even when it
+   * matches no rows — the default `execQuery` (Result.fromRowHashes) drops the
+   * columns on a zero-row result. Like Rails' `perform_query`, the statement is
+   * pooled only on the `prepare` branch; otherwise a fresh statement is used.
+   */
+  override async execQuery(
+    sql: string,
+    name: string | null = "SQL",
+    binds: unknown[] = [],
+    options: { prepare?: boolean; allowRetry?: boolean } = {},
+  ): Promise<Result> {
+    const processed = this.preprocessQuery(sql);
+    await this.materializeTransactions();
+    const driverBinds = (binds ?? []).map(sqliteTypeCast) as SqliteBinds;
+    // Rails' SQLite `perform_query` pools the statement only when `prepare` is
+    // true (`@statements[sql] ||= ...`) and otherwise prepares a fresh one. The
+    // `exec_query` keyword defaults to `false` (database_statements.rb), so we
+    // default to a fresh statement and pool only on an explicit `prepare: true`;
+    // the preparable decision lives upstream, not here.
+    const prepare = options.prepare ?? false;
+    const txPublic = this.currentTransaction().userTransaction;
+    const payload: Record<string, unknown> = {
+      sql: processed,
+      name: name ?? "SQL",
+      binds,
+      type_casted_binds: typeCastedBinds(binds ?? []),
+      connection: this,
+      row_count: 0,
+      transaction: txPublic.isOpen() ? txPublic : null,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        const stmt = await (prepare
+          ? this._cachedStatement(processed)
+          : this._freshStatement(processed));
+        if (!stmt.reader) {
+          await stmt.run(driverBinds);
+          return Result.empty();
+        }
+        const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+        payload.row_count = rows.length;
+        if (rows.length > 0) return Result.fromRowHashes(rows);
+        return new Result(
+          stmt.columns().map((c) => c.name),
+          [],
+        );
+      } catch (e: any) {
+        const translated = this._translateException(e, processed, binds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
@@ -1003,26 +1072,40 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       : { schema: tableName.slice(0, dot), bare: tableName.slice(dot + 1) };
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#remove_index
   async removeIndex(
     tableName: string,
-    columnOrOptions?: string | string[] | { name?: string; column?: string | string[] },
+    columnOrOptions?:
+      | string
+      | string[]
+      | { name?: string; column?: string | string[]; ifExists?: boolean },
+    options: { name?: string; column?: string | string[]; ifExists?: boolean } = {},
   ): Promise<void> {
-    let indexName: string;
-    if (typeof columnOrOptions === "string") {
-      indexName = `index_${tableName}_on_${columnOrOptions}`;
-    } else if (Array.isArray(columnOrOptions)) {
-      indexName = `index_${tableName}_on_${columnOrOptions.join("_and_")}`;
-    } else if (columnOrOptions?.name) {
-      indexName = columnOrOptions.name;
-    } else if (columnOrOptions?.column) {
-      const cols = Array.isArray(columnOrOptions.column)
-        ? columnOrOptions.column.join("_and_")
-        : columnOrOptions.column;
-      indexName = `index_${tableName}_on_${cols}`;
+    // Rails: `remove_index(table_name, column_name = nil, **options)` — column
+    // may be positional or in the options hash.
+    let columnName: string | string[] | undefined;
+    let opts: { name?: string; column?: string | string[]; ifExists?: boolean };
+    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
+      columnName = columnOrOptions;
+      opts = options;
     } else {
-      throw new Error("No index name or column specified");
+      columnName = undefined;
+      opts = columnOrOptions ?? {};
     }
-    await this.executeMutation(`DROP INDEX IF EXISTS ${quoteColumnName(indexName)}`);
+
+    // A bare `{ name }` resolves without introspection (Rails
+    // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
+    const canRemoveByName = columnName == null && opts.name != null && opts.column == null;
+    const all =
+      opts.ifExists || !canRemoveByName
+        ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
+        : [];
+    // Rails: `return if options[:if_exists] && !index_exists?(...)`.
+    if (opts.ifExists && !indexExistsForRemoveFrom(all, tableName, columnName, opts)) {
+      return;
+    }
+    const indexName = indexNameForRemoveFrom(all, tableName, columnName, opts);
+    await this.executeMutation(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
   createSchemaDumper(

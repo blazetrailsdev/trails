@@ -263,9 +263,9 @@ describe("TableDefinition#toSql", () => {
 
   it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers (no-adapter fallback)", () => {
     // No adapter provided → PgSchemaCreation falls back to abstract typeToSql,
-    // whose default branch uppercases bare keywords. In production with a real
-    // PostgreSQLAdapter, typeToSql("cidr") returns "cidr" (lowercase) via
-    // NATIVE_DATABASE_TYPES. Both are valid SQL; DBs fold type-name case.
+    // whose default branch returns an unrecognized type verbatim (Rails parity:
+    // `type.to_s` — it never uppercases). This matches the real-PostgreSQLAdapter
+    // path, where typeToSql("cidr") also returns "cidr" via NATIVE_DATABASE_TYPES.
     const td = new TableDefinition("widgets", { id: false });
     td.cidr("net");
     td.inet("addr");
@@ -280,18 +280,19 @@ describe("TableDefinition#toSql", () => {
     td.oid("oid_col");
     td.tsrange("during");
     const sql = td.toSql();
-    expect(sql).toContain('"net" CIDR');
-    expect(sql).toContain('"addr" INET');
-    expect(sql).toContain('"props" HSTORE');
-    expect(sql).toContain('"mac" MACADDR');
-    expect(sql).toContain('"path" LTREE');
-    expect(sql).toContain('"doc" TSVECTOR');
-    expect(sql).toContain('"payload" XML');
+    expect(sql).toContain('"net" cidr');
+    expect(sql).toContain('"addr" inet');
+    expect(sql).toContain('"props" hstore');
+    expect(sql).toContain('"mac" macaddr');
+    expect(sql).toContain('"path" ltree');
+    expect(sql).toContain('"doc" tsvector');
+    expect(sql).toContain('"payload" xml');
+    // BIT / BIT VARYING come from the pgColumn helpers verbatim (already uppercase).
     expect(sql).toContain('"flags" BIT(8)');
     expect(sql).toContain('"flex" BIT VARYING(16)');
-    expect(sql).toContain('"price" MONEY');
-    expect(sql).toContain('"oid_col" OID');
-    expect(sql).toContain('"during" TSRANGE');
+    expect(sql).toContain('"price" money');
+    expect(sql).toContain('"oid_col" oid');
+    expect(sql).toContain('"during" tsrange');
   });
 
   it("emits PG-specific long-tail column SQL types lowercase when adapter provides typeToSql", () => {
