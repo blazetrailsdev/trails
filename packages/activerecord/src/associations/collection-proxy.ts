@@ -1153,15 +1153,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // hasMany-source throughs can't produce duplicate join rows, so they
       // keep the cheaper COUNT(*); diverged proxies (whereBang / orderBang)
       // fall through to the generic count path so their mutations are honored.
+      //
+      // Branch on the *scoped relation's* distinct value (mirroring Rails'
+      // `association_scope.distinct_value` in CollectionAssociation#size), not
+      // the proxy's own `distinctValue`: a HABTM declared with a `-> { distinct }`
+      // scope applies DISTINCT only inside `_buildThroughScope()`, so the scoped
+      // relation is the authoritative source for whether the count should dedup.
       const sourceRefl = (refl as { sourceReflection?: { belongsTo?: () => boolean } } | undefined)
         ?.sourceReflection;
       if (
         !this._assocDef.options.disableJoins &&
-        !this.distinctValue &&
         !this._relationStateDiverged() &&
         typeof sourceRefl?.belongsTo === "function" &&
         sourceRefl.belongsTo() &&
-        _canRouteThroughViaAssociationScope(refl, this._assocDef.options)
+        _canRouteThroughViaAssociationScope(refl, this._assocDef.options) &&
+        !this.scope().distinctValue
       ) {
         const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
         return results.length;
