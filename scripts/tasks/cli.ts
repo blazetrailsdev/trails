@@ -17,7 +17,15 @@
 // schema migration cost. If we hit dep-graph queries the JSON+JS shape
 // can't handle, switch in a follow-up.
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -360,6 +368,113 @@ export function removeFrontmatterKey(file: string, key: string): void {
   writeFileSync(file, m[1] + lines.join("\n") + m[3] + m[4]);
 }
 
+// ──────────────────── critical-section lock ────────────────────
+//
+// Every `pnpm tasks` mutation runs pull→commit→push against a checkout that
+// shares ONE git object store with every other agent's checkout — the
+// canonical tree and each per-worktree `tasks/` symlink are all worktrees of
+// the same clone (scripts/start-worktree.sh: `git worktree add`). Without
+// serialization, concurrent mutations race on the push: a loser rebases,
+// retries, loses again, then `reset --hard` discards its edit — a claim or
+// done silently vanishes (observed during the 2026-06-08 p3 work). An
+// exclusive advisory file lock in the shared common git dir funnels all of
+// them through the critical section one at a time, so no edit is ever dropped
+// to a rival; a mutation that cannot get in within the timeout fails loudly
+// with a distinct exit code instead.
+//
+// Distinct from every race exit code (2/3/4/99): a lock timeout is not a lost
+// race, it is "the lock is held/stuck — retry or clear it".
+export const LOCK_TIMEOUT_EXIT = 75;
+const LOCK_WAIT_MS = 120_000;
+// Steal a lock older than this: its holder exited via process.exit (error/race
+// path) without releasing, or crashed. A real critical section is seconds.
+const LOCK_STALE_MS = 60_000;
+const LOCK_POLL_MS = 100;
+
+// Synchronous sleep with no node timer and no busy-spin: block this thread on
+// an Atomics wait against a throwaway shared buffer. The CLI is short-lived and
+// single-purpose, so parking the event loop here is fine.
+function sleepMs(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// Resolve the shared common git dir for a checkout WITHOUT shelling out to git
+// (so commitAndPush's git-call sequence is unaffected). `.git` is a directory
+// in the main checkout, or a `gitdir: <path>` pointer file in a linked
+// worktree whose `commondir` names the shared dir every worktree shares.
+export function gitCommonDir(dir: string): string {
+  const dotgit = join(dir, ".git");
+  if (statSync(dotgit).isDirectory()) return dotgit;
+  const gitdir = resolve(
+    dir,
+    readFileSync(dotgit, "utf8")
+      .replace(/^gitdir:\s*/, "")
+      .trim(),
+  );
+  try {
+    return resolve(gitdir, readFileSync(join(gitdir, "commondir"), "utf8").trim());
+  } catch {
+    return gitdir;
+  }
+}
+
+// Acquire the exclusive tasks-CLI lock for `cwd`. Returns the lock-file path to
+// hand to releaseTasksLock, or null when no shared git dir is resolvable (unit
+// tests / misconfigured env) — nothing to serialize, so proceed unlocked.
+// Creation is atomic via the `wx` flag: exactly one agent wins each round; the
+// rest poll, stealing a stale lock or timing out loudly (never proceeding
+// silently while another holds it).
+export function acquireTasksLock(
+  cwd: string | undefined,
+  opts: { waitMs?: number; staleMs?: number; pollMs?: number } = {},
+): string | null {
+  const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
+  const staleMs = opts.staleMs ?? LOCK_STALE_MS;
+  const pollMs = opts.pollMs ?? LOCK_POLL_MS;
+  let lockPath: string;
+  try {
+    lockPath = join(gitCommonDir(cwd ?? TASKS_DIR), "tasks-cli.lock");
+  } catch {
+    return null; // no resolvable git dir — nothing to lock against
+  }
+  for (let waited = 0; ; waited += pollMs) {
+    try {
+      writeFileSync(lockPath, `${today()} ${cwd ?? TASKS_DIR}\n`, { flag: "wx" });
+      return lockPath;
+    } catch (e) {
+      if ((e as { code?: string }).code !== "EEXIST") return null; // dir gone — best effort
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > staleMs) {
+          unlinkSync(lockPath); // holder died without releasing — reclaim
+          continue;
+        }
+      } catch {
+        continue; // lock vanished between create and stat — retry create
+      }
+      if (waited >= waitMs) {
+        console.error(
+          `error: timed out after ${Math.round(waitMs / 1000)}s waiting for the tasks-CLI ` +
+            `lock at ${lockPath}. Another mutation is holding it; retry, or remove the file ` +
+            `if no agent is running.`,
+        );
+        process.exit(LOCK_TIMEOUT_EXIT);
+      }
+      sleepMs(pollMs);
+    }
+  }
+}
+
+// Release a lock acquired by acquireTasksLock. Idempotent: a no-op for the
+// null (unlocked) case and tolerant of a lock already stolen as stale.
+export function releaseTasksLock(lockPath: string | null): void {
+  if (!lockPath) return;
+  try {
+    unlinkSync(lockPath);
+  } catch {
+    /* already removed (e.g. reclaimed as stale by another agent) */
+  }
+}
+
 // Pull-rebase → run mutator → commit → push, retrying once on
 // non-fast-forward. `mutator` is run inside each attempt so a rebased
 // index file is re-read between tries. Throws (and asks caller to
@@ -451,34 +566,46 @@ export function commitAndPush(opts: {
       process.exit(1);
     }
   }
-  // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
-  // tree. Only needed before the first attempt — the retry path resets hard to
-  // origin/main, which already discards them.
-  restoreGeneratedFiles(cwd);
-  for (let attempt = 0; attempt < 2; attempt++) {
-    git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
-    opts.mutator();
-    git(["add", opts.fileToStage], { cwd });
-    git(["commit", "-q", "-m", opts.message], { cwd });
-    try {
-      git(["push", "--quiet", "origin", pushRefspec], { silent: true, cwd });
-      return;
-    } catch (e) {
-      const stderr = String(((e as { stderr?: unknown }).stderr ?? "") || "");
-      // git push prints "[rejected]" / "non-fast-forward" / "fetch first"
-      // on the lost-race case. Anything else (auth, network, branch
-      // protection, pre-receive hook failure) is a real error and must
-      // be surfaced verbatim — not silently reset-and-retried.
-      if (!/rejected|non-fast-forward|fetch first/i.test(stderr)) {
-        console.error(stderr.trim() || "git push failed (no stderr)");
-        process.exit(1);
-      }
-      git(["reset", "--hard", "origin/main"], { silent: true, cwd });
-      if (attempt === 1) {
-        console.error(opts.raceMessage);
-        process.exit(opts.raceExitCode);
+  // Serialize the whole pull→commit→push section against every other agent's
+  // checkout (they share one git object store). Held until we return or exit.
+  // process.exit below skips the `finally`, so release explicitly before each
+  // exit too; releaseTasksLock is idempotent, and the stale-steal backstops the
+  // crash case where neither runs.
+  const lock = acquireTasksLock(cwd);
+  try {
+    // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
+    // tree. Only needed before the first attempt — the retry path resets hard to
+    // origin/main, which already discards them.
+    restoreGeneratedFiles(cwd);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
+      opts.mutator();
+      git(["add", opts.fileToStage], { cwd });
+      git(["commit", "-q", "-m", opts.message], { cwd });
+      try {
+        git(["push", "--quiet", "origin", pushRefspec], { silent: true, cwd });
+        return;
+      } catch (e) {
+        const stderr = String(((e as { stderr?: unknown }).stderr ?? "") || "");
+        // git push prints "[rejected]" / "non-fast-forward" / "fetch first"
+        // on the lost-race case. Anything else (auth, network, branch
+        // protection, pre-receive hook failure) is a real error and must
+        // be surfaced verbatim — not silently reset-and-retried.
+        if (!/rejected|non-fast-forward|fetch first/i.test(stderr)) {
+          console.error(stderr.trim() || "git push failed (no stderr)");
+          releaseTasksLock(lock);
+          process.exit(1);
+        }
+        git(["reset", "--hard", "origin/main"], { silent: true, cwd });
+        if (attempt === 1) {
+          console.error(opts.raceMessage);
+          releaseTasksLock(lock);
+          process.exit(opts.raceExitCode);
+        }
       }
     }
+  } finally {
+    releaseTasksLock(lock);
   }
 }
 

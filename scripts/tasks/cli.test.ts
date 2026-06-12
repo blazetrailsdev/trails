@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,12 +28,16 @@ afterEach(() => {
 
 import {
   bestBundle,
+  acquireTasksLock,
   buildStoryContent,
   checkPrNotOpen,
   claimState,
   commitAndPush,
   editFrontmatter,
+  gitCommonDir,
   Index,
+  LOCK_TIMEOUT_EXIT,
+  releaseTasksLock,
   listFiltered,
   newStory,
   nextBundle,
@@ -1084,5 +1096,77 @@ describe("resolveTasksDir (TASKS_DIR resolution order)", () => {
     withEnv({ TASKS_DIR: undefined, RFCS_DIR: undefined }, () => {
       expect(resolveTasksDir(cwd)).toBe(join(homedir(), "github", "blazetrailsdev", "tasks"));
     });
+  });
+});
+
+describe("tasks-CLI critical-section lock", () => {
+  // A checkout with `.git` as a directory (the main worktree shape).
+  function repo(): string {
+    const dir = mkdtempSync(join(tmpdir(), "trails-lock-"));
+    mkdirSync(join(dir, ".git"));
+    return dir;
+  }
+
+  it("resolves the common git dir for a main checkout and a linked worktree", () => {
+    const main = repo();
+    expect(gitCommonDir(main)).toBe(join(main, ".git"));
+
+    // Linked worktree: `.git` is a pointer file; `commondir` names the shared dir.
+    const wt = mkdtempSync(join(tmpdir(), "trails-lock-wt-"));
+    const gitdir = join(wt, "gitdir");
+    mkdirSync(gitdir);
+    writeFileSync(join(wt, ".git"), `gitdir: ${gitdir}\n`);
+    writeFileSync(join(gitdir, "commondir"), "../shared\n");
+    expect(gitCommonDir(wt)).toBe(join(wt, "shared"));
+  });
+
+  // The core guarantee: while one agent holds the lock, a second cannot enter
+  // the critical section — it blocks and then fails loudly with a distinct,
+  // non-race exit code rather than racing in and clobbering the first edit.
+  it("two concurrent mutations both land instead of one being silently dropped", () => {
+    const dir = repo();
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Agent A enters first and is mid-mutation (lock held).
+    const a = acquireTasksLock(dir);
+    expect(a).not.toBeNull();
+    expect(existsSync(join(dir, ".git", "tasks-cli.lock"))).toBe(true);
+
+    // Agent B tries to enter concurrently: it must NOT proceed. With a short
+    // wait it times out loudly with LOCK_TIMEOUT_EXIT (distinct from the
+    // 2/3/4 race codes) — never silently entering while A holds the lock.
+    expect(() => acquireTasksLock(dir, { waitMs: 0, pollMs: 1, staleMs: 60_000 })).toThrow(
+      `exit ${LOCK_TIMEOUT_EXIT}`,
+    );
+    expect(exit).toHaveBeenCalledWith(LOCK_TIMEOUT_EXIT);
+
+    // A finishes and releases; only now can B acquire and land its own edit.
+    releaseTasksLock(a);
+    expect(existsSync(join(dir, ".git", "tasks-cli.lock"))).toBe(false);
+    const b = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 });
+    expect(b).not.toBeNull();
+    releaseTasksLock(b);
+  });
+
+  it("reclaims a stale lock left by a holder that exited without releasing", () => {
+    const dir = repo();
+    const lockPath = join(dir, ".git", "tasks-cli.lock");
+    writeFileSync(lockPath, "stale\n");
+    // Backdate the lock well past the stale threshold (holder crashed long ago).
+    const old = statSync(dir).mtime.getTime() / 1000 - 3600;
+    utimesSync(lockPath, old, old);
+
+    const got = acquireTasksLock(dir, { staleMs: 1000, waitMs: 0, pollMs: 1 });
+    expect(got).toBe(lockPath);
+    releaseTasksLock(got);
+  });
+
+  it("returns null (proceeds unlocked) when no git dir is resolvable", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-nogit-"));
+    expect(acquireTasksLock(dir)).toBeNull();
+    expect(() => releaseTasksLock(null)).not.toThrow();
   });
 });
