@@ -54,21 +54,12 @@ export function serializableHash(
   }
 
   serializableAddIncludes(record, options, (assocName, records, opts) => {
-    // Rails (serialization.rb:140-145): `records.to_ary.map { |a|
-    // a.serializable_hash }` for a collection, else `records.serializable_hash`.
-    // A collection (Ruby Enumerable / has_many) is mapped element-wise; a
-    // single associated record serializes through its own `serializable_hash`.
-    // The JS analog of "Enumerable" is any non-string iterable — a real array,
-    // or a host collection object (e.g. activerecord's `CollectionProxy`).
-    //
-    // Divergence (forced by synchronous serialization): Rails' `to_ary` lazily
-    // loads an unloaded collection from the DB. trails serialization is
-    // synchronous and must not query (RFC 0022 b2). A lazy host collection
-    // (activerecord's `CollectionProxy`, like Rails' `CollectionProxy#loaded?`)
-    // advertises its load state via a `loaded` flag; rather than silently
-    // emitting `[]` for one that hasn't loaded — which reads as "no records"
-    // when it means "not fetched" — fail loud so the caller preloads first
-    // (await the association, or eager-load via includes/preload). Iterables
+    // Mirrors `records.to_ary.map` / `records.serializable_hash`
+    // (serialization.rb:140-145). Non-obvious divergence: Rails' `to_ary`
+    // lazily loads an unloaded collection from the DB, which synchronous
+    // serialization cannot do (RFC 0022 b2). A lazy host collection advertises
+    // its load state via `loaded` (Rails' `CollectionProxy#loaded?`); we fail
+    // loud on an unloaded one rather than emit a misleading `[]`. Iterables
     // with no `loaded` flag (plain arrays, `to_ary`-style wrappers) are ready.
     if (isSerializableCollection(records)) {
       if ((records as { loaded?: unknown }).loaded === false) {
