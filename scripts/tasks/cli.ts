@@ -19,11 +19,9 @@
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
-  linkSync,
   mkdirSync,
   readFileSync,
   readdirSync,
-  renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -379,6 +377,12 @@ export function removeFrontmatterKey(file: string, key: string): void {
 // claim/done silently vanishes (observed 2026-06-08). An advisory file lock in
 // the shared common git dir serializes them; a mutation that can't get in by the
 // timeout fails loudly with LOCK_TIMEOUT_EXIT (distinct from race codes 2/3/4/99).
+//
+// Deliberately NOT self-healing: a waiter NEVER removes a lock it didn't create.
+// Auto-reclaiming a "stale" lock means deleting then recreating the path, and a
+// third waiter can `wx`-acquire in that vacancy — two holders, a SILENTLY dropped
+// edit (the exact bug we fix). No POSIX primitive removes a path conditional on
+// identity, so reclaim can't be race-free; instead we fail loudly (rm a dead lock).
 export const LOCK_TIMEOUT_EXIT = 75;
 const LOCK_WAIT_MS = 180_000;
 const LOCK_POLL_MS = 100;
@@ -421,11 +425,10 @@ function newLockToken(): string {
   return `${process.pid}.${++lockSeq}.${Date.now()}`;
 }
 
-// A held lock is reclaimable ONLY when its owner process is gone. Agents share
-// one working tree → one host, so PID-liveness is authoritative — and liveness
-// (not elapsed time) makes release safe: a live holder's lock is never stolen,
-// so nobody interposes between its read-token and unlink. Unparseable: not stolen.
-function lockReclaimable(content: string): boolean {
+// Is the lock's owner process gone? Agents share one working tree → one host, so
+// PID-liveness is authoritative. A dead owner's lock is never released, so fail
+// fast instead of waiting. Unparseable content counts as live (wait, time out).
+function lockHolderDead(content: string): boolean {
   const pid = Number(content.split(".")[0]);
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -444,7 +447,8 @@ export interface LockHandle {
 // Acquire the exclusive tasks-CLI lock for `cwd`. Returns an owner handle, or
 // null when no shared git dir is resolvable (proceed unlocked — nothing to
 // serialize). Creation is atomic via `wx`: one agent wins each round, the rest
-// poll, reclaim a dead holder's lock, or time out loudly.
+// poll a live holder until it releases, then fail loudly — either on a dead
+// holder (rm the lock) or on the wait timeout. NEVER removes another's lock.
 export function acquireTasksLock(
   cwd: string | undefined,
   opts: { waitMs?: number; pollMs?: number } = {},
@@ -470,42 +474,19 @@ export function acquireTasksLock(
       } catch {
         continue; // vanished between create and read — retry create
       }
-      if (lockReclaimable(observed)) {
-        // Atomically grab the path (one waiter wins; losers get ENOENT, retry
-        // `wx`), but DISCARD it only if it still carries the exact dead token —
-        // else a fresh lock raced in, so restore it via EXCL link (never
-        // clobbering a newer holder) and back off. A refreshed lock is never deleted.
-        const stolen = `${lockPath}.dead.${token}`;
-        try {
-          renameSync(lockPath, stolen);
-        } catch {
-          continue; // another waiter moved it first — retry create
-        }
-        let grabbed = "";
-        try {
-          grabbed = readFileSync(stolen, "utf8").trim();
-        } catch {
-          /* unreadable — treat as not-the-dead-one and restore below */
-        }
-        if (grabbed !== observed) {
-          try {
-            linkSync(stolen, lockPath);
-          } catch {
-            /* path already retaken by a newer holder — leave it intact */
-          }
-        }
-        try {
-          unlinkSync(stolen);
-        } catch {
-          /* best-effort cleanup */
-        }
-        continue; // retry create
+      // Holder crashed: its lock will never be released. Fail fast and loud
+      // (don't silently steal — see the section header), naming it for cleanup.
+      if (lockHolderDead(observed)) {
+        console.error(
+          `error: tasks-CLI lock at ${lockPath} is held by a dead process (${observed}). ` +
+            `No agent can be holding it; remove it to proceed:\n  rm ${lockPath}`,
+        );
+        process.exit(LOCK_TIMEOUT_EXIT);
       }
       if (waited >= waitMs) {
         console.error(
           `error: timed out after ${Math.round(waitMs / 1000)}s waiting for the tasks-CLI ` +
-            `lock at ${lockPath}. Another mutation is holding it; retry, or remove the file ` +
-            `if no agent is running.`,
+            `lock at ${lockPath}. Another mutation is holding it; retry shortly.`,
         );
         process.exit(LOCK_TIMEOUT_EXIT);
       }
@@ -515,9 +496,9 @@ export function acquireTasksLock(
 }
 
 // Release a lock from acquireTasksLock. Idempotent and ownership-safe: removes
-// it ONLY while it carries our token. Safe read-then-unlink: we're alive while
-// releasing and lockReclaimable never steals a live holder's lock, so no waiter
-// can recreate the path between the two calls.
+// it ONLY while it carries our token. The read-then-unlink is race-free because
+// no waiter ever removes/recreates a lock it didn't create (acquire only `wx`s
+// onto a free path), so while we hold the path nobody else touches it.
 export function releaseTasksLock(lock: LockHandle | null): void {
   if (!lock) return;
   try {

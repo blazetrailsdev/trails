@@ -1139,19 +1139,31 @@ describe("tasks-CLI critical-section lock", () => {
     releaseTasksLock(b);
   });
 
-  // Ownership-safe: B reclaims a DEAD holder's lock; the prior holder's late
-  // release (token mismatch) must NOT delete B's lock.
-  it("reclaims a dead holder's lock and a later release by the prior holder is a no-op", () => {
+  // A dead holder's lock is NEVER stolen: fail loudly, leave it for cleanup.
+  it("fails loudly on a dead holder's lock and never removes it", () => {
     const dir = repo();
     const lockPath = join(dir, ".git", "tasks-cli.lock");
-    const deadToken = "2147483646.0.0"; // pid far above any live process → ESRCH
-    writeFileSync(lockPath, `${deadToken}\n`);
-    const b = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 }); // B reclaims it.
-    expect(b?.path).toBe(lockPath);
-    expect(b?.token).not.toBe(deadToken);
-    releaseTasksLock({ path: lockPath, token: deadToken }); // no-op — not the owner.
-    expect(readFileSync(lockPath, "utf8").trim()).toBe(b?.token);
-    releaseTasksLock(b);
+    writeFileSync(lockPath, "2147483646.0.0\n"); // pid far above any live process → ESRCH
+    vi.spyOn(process, "exit").mockImplementation(((c?: number) => {
+      throw new Error(`exit ${c}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => acquireTasksLock(dir, { waitMs: 0, pollMs: 1 })).toThrow(
+      `exit ${LOCK_TIMEOUT_EXIT}`,
+    );
+    expect(existsSync(lockPath)).toBe(true); // never removed — no unsafe reclaim
+  });
+
+  // Release removes the lock only while it carries our token.
+  it("release only removes a lock that still carries our token", () => {
+    const dir = repo();
+    const lockPath = join(dir, ".git", "tasks-cli.lock");
+    const a = acquireTasksLock(dir);
+    writeFileSync(lockPath, "someone-else\n"); // content no longer ours
+    releaseTasksLock(a); // no-op
+    expect(existsSync(lockPath)).toBe(true);
+    writeFileSync(lockPath, `${a?.token}\n`); // ours again
+    releaseTasksLock(a);
     expect(existsSync(lockPath)).toBe(false);
   });
 
