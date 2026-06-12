@@ -92,9 +92,21 @@ const TEST_SCHEMA: Schema = {
       shop_id: "integer",
       id: "integer",
       items_count: "integer",
+      books_count: { type: "integer", default: 0 },
     },
     primaryKey: ["shop_id", "id"],
   },
+  cpk_books: {
+    columns: { author_id: "integer", id: "integer", shop_id: "integer", order_id: "integer" },
+    primaryKey: ["author_id", "id"],
+  },
+  dog_lovers: {
+    bred_dogs_count: { type: "integer", default: 0 },
+    trained_dogs_count: { type: "integer", default: 0 },
+  },
+  dogs: { trainer_id: "integer", breeder_id: "integer" },
+  subscribers: { name: "string", books_count: { type: "integer", default: 0 } },
+  subscriptions: { subscriber_id: "integer", book_id: "integer" },
   friend_people: {
     name: "string",
     friends_too_count: "integer",
@@ -526,10 +538,37 @@ describe("CounterCacheTest", () => {
     const after = await Topic.find(t.id);
     expect(after.replies_count).toBe(1);
   });
-  it.skip("reset counters with modular association", () => {
-    // BLOCKED: associations — modular (namespaced) class name resolution
-    // ROOT-CAUSE: resetCounters does not resolve "Module::Class" via modelRegistry _registryKeys / "::Name" suffix
-    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters target lookup
+  it("reset counters with modular association", async () => {
+    class BlogTopic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+      }
+    }
+    class BlogReply extends Base {
+      static {
+        this._tableName = "replies";
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+      }
+    }
+    Associations.hasMany.call(BlogTopic, "replies", {
+      className: "Blog::Reply",
+      foreignKey: "topic_id",
+    });
+    Associations.belongsTo.call(BlogReply, "topic", {
+      className: "Blog::Topic",
+      foreignKey: "topic_id",
+      counterCache: "replies_count",
+    });
+    registerModel("Blog::Topic", BlogTopic);
+    registerModel("Blog::Reply", BlogReply);
+    const t = await BlogTopic.create({ title: "test" });
+    await BlogReply.create({ content: "r1", topic_id: t.id });
+    await BlogTopic.incrementCounter("replies_count", t.id);
+    await BlogTopic.resetCounters(t.id, "replies");
+    expect((await BlogTopic.find(t.id)).replies_count).toBe(1);
   });
   it("update counter caches on destroy", async () => {
     class Topic extends Base {
@@ -1520,10 +1559,37 @@ describe("CounterCacheTest", () => {
     const after = await Topic.find(t.id);
     expect(after.replies_count).toBe(1);
   });
-  it.skip("reset counters with modularized and camelized classnames", () => {
-    // BLOCKED: associations — modular (namespaced) class name resolution in resetCounters
-    // ROOT-CAUSE: same gap as "reset counters with modular association" — namespaced target
-    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters (shared with modular case)
+  it("reset counters with modularized and camelized classnames", async () => {
+    class SpecialTopic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+      }
+    }
+    class SpecialReply extends Base {
+      static {
+        this._tableName = "replies";
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+      }
+    }
+    Associations.hasMany.call(SpecialTopic, "special_replies", {
+      className: "SpecialReply",
+      foreignKey: "topic_id",
+    });
+    Associations.belongsTo.call(SpecialReply, "specialTopic", {
+      className: "SpecialTopic",
+      foreignKey: "topic_id",
+      counterCache: "replies_count",
+    });
+    registerModel(SpecialTopic);
+    registerModel(SpecialReply);
+    const special = await SpecialTopic.create({ title: "Special" });
+    await SpecialReply.create({ content: "r1", topic_id: special.id });
+    await SpecialTopic.incrementCounter("replies_count", special.id);
+    await SpecialTopic.resetCounters(special.id, "special_replies");
+    expect((await SpecialTopic.find(special.id)).replies_count).toBe(1);
   });
   it("reset counter with belongs_to which has class_name", async () => {
     // Rails: Engine `belongs_to :my_car, class_name: "Car", counter_cache: :engines_count`.
@@ -1557,11 +1623,51 @@ describe("CounterCacheTest", () => {
     const after = await Car.find(car.id);
     expect(after.engines_count).toBe(1);
   });
-  it.skip("reset the right counter if two have the same class_name", () => {
-    // BLOCKED: associations — multiple belongs_to to same target class
-    // ROOT-CAUSE: resetCounters keys off class name; with two belongs_to to the same class
-    //   (e.g. Reply belongs_to :topic, :other_topic) it picks the wrong reflection
-    // SCOPE: ~15 LOC — dispatch on reflection name, not class_name
+  it("reset the right counter if two have the same class_name", async () => {
+    class DogLover extends Base {
+      static {
+        this.attribute("bred_dogs_count", "integer", { default: 0 });
+        this.attribute("trained_dogs_count", "integer", { default: 0 });
+      }
+    }
+    class Dog extends Base {
+      static {
+        this.attribute("breeder_id", "integer");
+        this.attribute("trainer_id", "integer");
+      }
+    }
+    Associations.hasMany.call(DogLover, "bred_dogs", {
+      className: "Dog",
+      foreignKey: "breeder_id",
+    });
+    Associations.hasMany.call(DogLover, "trained_dogs", {
+      className: "Dog",
+      foreignKey: "trainer_id",
+    });
+    Associations.belongsTo.call(Dog, "breeder", {
+      className: "DogLover",
+      foreignKey: "breeder_id",
+      counterCache: "bred_dogs_count",
+    });
+    Associations.belongsTo.call(Dog, "trainer", {
+      className: "DogLover",
+      foreignKey: "trainer_id",
+      counterCache: "trained_dogs_count",
+    });
+    registerModel(DogLover);
+    registerModel(Dog);
+    const david = await DogLover.create({});
+    await Dog.create({ breeder_id: david.id, trainer_id: david.id });
+    await DogLover.incrementCounter("bred_dogs_count", david.id);
+    await DogLover.incrementCounter("trained_dogs_count", david.id);
+
+    await DogLover.resetCounters(david.id, "bred_dogs");
+    const afterBred = await DogLover.find(david.id);
+    expect(afterBred.bred_dogs_count).toBe(1);
+    expect(afterBred.trained_dogs_count).toBe(2); // untouched
+
+    await DogLover.resetCounters(david.id, "trained_dogs");
+    expect((await DogLover.find(david.id)).trained_dogs_count).toBe(1);
   });
   it("reset counter skips query for correct counter", async () => {
     class Topic extends Base {
@@ -1632,17 +1738,43 @@ describe("CounterCacheTest", () => {
     }
     expect(updateCount).toBe(1);
   });
-  it.skip("reset counters for cpk model", () => {
-    // BLOCKED: associations — composite primary key in resetCounters
-    // ROOT-CAUSE: resetCounters' UPDATE WHERE (record.id, mirroring Rails'
-    //   `unscoped.where(primary_key => [object.id])`) is already CPK-aware
-    //   because trails' id getter returns the composite tuple. The blocker
-    //   is countHasMany, which raises CompositePrimaryKeyMismatchError when
-    //   the parent has a CPK and the hasMany uses a scalar foreignKey —
-    //   Rails' Cpk::Order/Cpk::Book setup uses a composite FK
-    //   ([:shop_id, :order_id]) which we do not yet support for hasMany.
-    // SCOPE: ~30 LOC in associations.ts to thread composite FK through
-    //   computeHasManyWhere / buildHasManyRelation; punt to follow-up PR.
+  it("reset counters for cpk model", async () => {
+    class Order extends Base {
+      static {
+        this._tableName = "cpk_orders";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("books_count", "integer", { default: 0 });
+        this.primaryKey = ["shop_id", "id"];
+      }
+    }
+    class Book extends Base {
+      static {
+        this._tableName = "cpk_books";
+        this.attribute("author_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.primaryKey = ["author_id", "id"];
+      }
+    }
+    Associations.hasMany.call(Order, "books", {
+      className: "Book",
+      foreignKey: ["shop_id", "order_id"],
+    });
+    Associations.belongsTo.call(Book, "order", {
+      className: "Order",
+      foreignKey: ["shop_id", "order_id"],
+      primaryKey: ["shop_id", "id"],
+      counterCache: true,
+    });
+    registerModel(Order);
+    registerModel(Book);
+    const order = await Order.create({ shop_id: 1, id: 1 });
+    await Book.create({ author_id: 1, id: 1, shop_id: 1, order_id: 1 });
+    await Order.updateCounters(order.id, { books_count: 2 }); // throw it off
+    await Order.resetCounters(order.id, "books");
+    expect(((await Order.find([1, 1])) as any).books_count).toBe(1);
   });
   it("update counter for decrement", async () => {
     class Topic extends Base {
@@ -1740,11 +1872,47 @@ describe("CounterCacheTest", () => {
     const after = await FriendPerson.find(michael.id);
     expect(after.friends_too_count).toBe(1);
   });
-  it.skip("reset counter of has_many :through association", () => {
-    // BLOCKED: associations — has_many :through target in resetCounters
-    // ROOT-CAUSE: resetCounters expects a direct has_many reflection; through reflections
-    //   need to walk to the join model and count via that table
-    // SCOPE: ~30 LOC in counter-cache.ts#resetCounters — through-reflection branch
+  it("reset counter of has_many :through association", async () => {
+    class Subscriber extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("books_count", "integer", { default: 0 });
+      }
+    }
+    class Subscription extends Base {
+      static {
+        this.attribute("subscriber_id", "integer");
+        this.attribute("book_id", "integer");
+      }
+    }
+    class Book extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    Associations.hasMany.call(Subscriber, "subscriptions", { foreignKey: "subscriber_id" });
+    Associations.hasMany.call(Subscriber, "books", {
+      through: "subscriptions",
+      source: "book",
+      className: "Book",
+    });
+    Associations.belongsTo.call(Subscription, "subscriber", {
+      foreignKey: "subscriber_id",
+      counterCache: "books_count",
+    });
+    Associations.belongsTo.call(Subscription, "book", { foreignKey: "book_id" });
+    registerModel(Subscriber);
+    registerModel(Subscription);
+    registerModel(Book);
+    const subscriber = await Subscriber.create({ name: "second" });
+    const book = await Book.create({ title: "Awakening" });
+    await Subscription.create({ subscriber_id: subscriber.id, book_id: book.id });
+    await Subscriber.resetCounters(subscriber.id, "books");
+    await Subscriber.incrementCounter("books_count", subscriber.id);
+    expect((await Subscriber.find(subscriber.id)).books_count).toBe(2);
+    await Subscriber.resetCounters(subscriber.id, "books");
+    expect((await Subscriber.find(subscriber.id)).books_count).toBe(1);
   });
   it("the passed symbol needs to be an association name or counter name", async () => {
     class Topic extends Base {
@@ -1758,11 +1926,38 @@ describe("CounterCacheTest", () => {
     const t = await Topic.create({ title: "test" });
     await expect(Topic.resetCounters(t.id, "nonexistent")).rejects.toThrow(/nonexistent/);
   });
-  it.skip("reset counter works with select declared on association", () => {
-    // BLOCKED: associations — select scope on association ignored by resetCounters COUNT(*)
-    // ROOT-CAUSE: resetCounters builds the COUNT bypassing the association scope; Rails
-    //   composes the scope (select, where) before counting
-    // SCOPE: ~15 LOC in counter-cache.ts#resetCounters — apply reflection.scope
+  it("reset counter works with select declared on association", async () => {
+    class SpecialTopic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+      }
+    }
+    class SpecialReply extends Base {
+      static {
+        this._tableName = "replies";
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+      }
+    }
+    Associations.hasMany.call(SpecialTopic, "lightweight_special_replies", {
+      className: "SpecialReply",
+      foreignKey: "topic_id",
+      scope: (rel: any) => rel.select("replies.id", "replies.content"),
+    });
+    Associations.belongsTo.call(SpecialReply, "specialTopic", {
+      className: "SpecialTopic",
+      foreignKey: "topic_id",
+      counterCache: "replies_count",
+    });
+    registerModel(SpecialTopic);
+    registerModel(SpecialReply);
+    const special = await SpecialTopic.create({ title: "Special" });
+    await SpecialReply.create({ content: "r1", topic_id: special.id });
+    await SpecialTopic.incrementCounter("replies_count", special.id);
+    await SpecialTopic.resetCounters(special.id, "lightweight_special_replies");
+    expect((await SpecialTopic.find(special.id)).replies_count).toBe(1);
   });
   it("update counters doesn't touch timestamps with touch: []", async () => {
     class Topic extends Base {

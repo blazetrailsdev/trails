@@ -160,11 +160,17 @@ export async function resetCounters(
         }
       }
       if (!assoc) {
-        throw new Error(
-          `'${counterName}' is not a valid counter name or hasMany association on ${this.name}`,
-        );
+        // Mirrors Rails' ArgumentError in CounterCache::ClassMethods#reset_counters.
+        throw new Error(`'${this.name}' has no association called '${counterName}'`);
       }
       counterColumn = resolveCounterColumn(this, assoc, assoc.name);
+    }
+
+    // Mirrors Rails: for a `has_many :through`, the counter column comes from the
+    // through (join) reflection, while the count still runs against the through.
+    if (assoc.options.through) {
+      const through = hasManyAssocs.find((a) => a.name === assoc!.options.through);
+      if (through) counterColumn = resolveCounterColumn(this, through, through.name);
     }
 
     const count = await countHasMany(record, assoc.name, assoc.options);
