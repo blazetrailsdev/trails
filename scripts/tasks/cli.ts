@@ -285,7 +285,13 @@ const GENERATED_INDEX_FILES = ["index.md", "index.json", "search.json"];
 function restoreGeneratedFiles(cwd: string | undefined): void {
   for (const file of GENERATED_INDEX_FILES) {
     try {
-      git(["checkout", "--", file], { silent: true, cwd });
+      // `checkout HEAD --`, not `checkout --`: the latter only restores the
+      // worktree from the index, leaving a *staged* generated-file change (e.g.
+      // `M  index.json`) in place. assertCleanWorktree filters generated paths
+      // by name regardless of staged state, so that residue would slip through
+      // to `git pull --rebase`, which then aborts on a dirty index. Resetting to
+      // HEAD discards both index and worktree state for the path.
+      git(["checkout", "HEAD", "--", file], { silent: true, cwd });
     } catch {
       /* path unknown to git or already clean — nothing to restore here */
     }

@@ -501,10 +501,12 @@ describe("commitAndPush (git mutation flow)", () => {
     // One checkout per file (NOT a single multi-path checkout, which git fails
     // atomically if any path is unknown), each preceding the pull. The HEAD:main
     // guard's fetch + rev-list run first, so the checkouts start at index 2.
+    // `checkout HEAD --` (not bare `checkout --`) so a staged generated-file
+    // change is discarded from the index too, not just the worktree.
     expect(fullArgs.slice(2, 5).map((a) => a.slice(2))).toEqual([
-      ["checkout", "--", "index.md"],
-      ["checkout", "--", "index.json"],
-      ["checkout", "--", "search.json"],
+      ["checkout", "HEAD", "--", "index.md"],
+      ["checkout", "HEAD", "--", "index.json"],
+      ["checkout", "HEAD", "--", "search.json"],
     ]);
     // The dirty-tree `status` probe sits between the restores and the pull.
     expect(fullArgs[5]?.[2]).toBe("status");
@@ -711,14 +713,15 @@ describe("commitAndPush (git mutation flow)", () => {
   });
 
   // A regenerated index file is throwaway (restoreGeneratedFiles reset it, the
-  // pre-commit hook rebuilds it) — it must NOT trip the dirty-tree guard. A
-  // status that reports only generated files proceeds normally.
+  // pre-commit hook rebuilds it) — it must NOT trip the dirty-tree guard, whether
+  // the change is unstaged (` M`) or staged (`M `). Both are filtered by path.
   it("does not treat regenerated index files as a dirty tree", () => {
     const { seen } = setup();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      if (label === "status") return " M index.json\n M search.json" as never;
+      // index.json staged (`M  index.json`), search.json unstaged (` M ...`).
+      if (label === "status") return "M  index.json\n M search.json" as never;
       return "" as never;
     });
     let mutatorCalls = 0;
