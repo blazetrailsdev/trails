@@ -262,7 +262,11 @@ export interface AbstractAdapter {
   addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
   removeIndex(
     tableName: string,
-    options?: { column?: string | string[]; name?: string },
+    columnOrOptions?:
+      | string
+      | string[]
+      | { column?: string | string[]; name?: string; ifExists?: boolean },
+    options?: { column?: string | string[]; name?: string; ifExists?: boolean },
   ): Promise<void>;
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
   indexName(tableName: string, options: { column?: string | string[] }): string;

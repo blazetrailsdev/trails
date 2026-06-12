@@ -179,7 +179,14 @@ export interface SchemaStatements {
     columnName: string | string[],
     options?: Record<string, unknown>,
   ): unknown;
-  removeIndex(tableName: string, options: { name: string; algorithm?: string }): Promise<void>;
+  removeIndex(
+    tableName: string,
+    columnOrOptions?:
+      | string
+      | string[]
+      | { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean },
+    options?: { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean },
+  ): Promise<void>;
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
   indexName(tableName: string, options: { column?: string | string[] }): string;
   addForeignKey(
