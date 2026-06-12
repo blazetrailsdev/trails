@@ -1510,6 +1510,11 @@ export function extractOptionKeys(
     .getPropertiesOfType(type)
     .map((s) => s.getName())
     .filter((n) => !n.startsWith("__"));
+  // No named props — e.g. `opts: {}` or a marker interface. Deliberately
+  // `undefined` ("nothing to check"), NOT `[]`: an empty object type is
+  // structurally "any object", so diffing it would flag every Ruby key as a
+  // bogus `missingInTs`. Use `Record<string, unknown>` to mean a real keyed bag
+  // (that path returns `null` above).
   if (names.length === 0) return undefined;
   return [...new Set(names)].sort();
 }

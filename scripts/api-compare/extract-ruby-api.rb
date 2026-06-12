@@ -805,6 +805,10 @@ class ApiExtractor
 
   # Record a `VALID_OPTIONS`-named symbol array so a later
   # `assert_valid_keys(VALID_OPTIONS)` can expand it. Handles `[...].freeze`.
+  # Source-order dependent: a method defined BEFORE the constant won't see it
+  # (the AST is walked top-to-bottom). Ruby places class-scope constants above
+  # methods by convention, so this only ever causes a silent miss (consistent
+  # with the under-approximation the whole option-key heuristic accepts).
   def maybe_record_valid_options(lhs, rhs)
     return unless lhs.is_a?(Array) && lhs[0] == :var_field
     const = lhs[1]
@@ -847,7 +851,9 @@ class ApiExtractor
     when :aref
       # options[:foo]
       traverse_for_symbols(node[2], keys) if option_var?(node[1], vars)
-    when :method_add_arg, :command_call, :call
+    when :method_add_arg, :command_call
+      # `options.fetch(:k)` (parens) and `options.assert_valid_keys :a` (no
+      # parens). A bare `:call` (`options.keys`) never carries a key arg.
       handle_option_call(node, vars, consts, keys)
     end
     node.each { |child| walk_for_option_keys(child, vars, consts, keys) if child.is_a?(Array) }
@@ -866,7 +872,7 @@ class ApiExtractor
       meth = ident_name(node[3])
       args = node[4]
     else
-      return # bare :call (e.g. options.keys) — no key argument
+      return
     end
     return unless meth && option_var?(recv, vars)
 
