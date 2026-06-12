@@ -48,33 +48,39 @@ describe("CloneTest", () => {
     expect(cloned.author_name).toBe("Aaron");
   });
 
-  // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; these tests create
-  // Post without body. The inline schema `{ title: "string" }` is a subset of the
-  // canonical posts schema so D-Y skips DDL (reusing the canonical table), but the
-  // canonical constraint rejects the insert. Phase G: supply body in the create call
-  // or migrate to useFixtures().
-  it.skip("stays frozen", async () => {
-    class Post extends Base {
+  it("stays frozen", async () => {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
+        this.attribute("author_name", "string");
       }
     }
-    const p = await Post.create({ title: "test" });
-    p.freeze();
-    expect(p.isFrozen()).toBe(true);
+    const topic = await Topic.create({ title: "test", author_name: "David" });
+    topic.freeze();
+
+    const cloned = topic.clone();
+    expect(cloned.isPersisted()).toBe(true);
+    expect(cloned.isNewRecord()).toBe(false);
+    expect(cloned.isFrozen()).toBe(true);
+    expect(() => {
+      cloned.author_name = "Aaron";
+    }).toThrow(/frozen/i);
   });
 
-  it.skip("freezing a cloned model does not freeze clone", async () => {
-    class Post extends Base {
+  it("freezing a cloned model does not freeze clone", async () => {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
+        this.attribute("author_name", "string");
       }
     }
-    const p = await Post.create({ title: "orig" });
-    const c = p.clone();
-    c.freeze();
-    expect(c.isFrozen()).toBe(true);
-    expect(p.isFrozen()).toBe(false);
+    const cloned = new Topic({});
+    const clone = cloned.clone();
+    cloned.freeze();
+    expect(clone.isFrozen()).toBe(false);
+    expect(() => {
+      cloned.author_name = "Aaron";
+    }).toThrow(/frozen/i);
   });
 });
 

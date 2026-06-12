@@ -46,6 +46,11 @@ const TEST_SCHEMA: Schema = {
     name: "string",
     type: "string",
   },
+  memberships: {
+    type: "string",
+    favorite: "boolean",
+    member_id: "integer",
+  },
 };
 
 describe("InheritanceTest", () => {
@@ -1386,15 +1391,41 @@ describe("InheritanceTest", () => {
   });
 
   it.skip("scope inherited properly", async () => {
-    // BLOCKED: fixture — STI subclass with default_scope; no STI routing gap (audit-STI: STI dispatch works)
-    // ROOT-CAUSE: test/models fixtures — Rails' SpecialComment / VerySpecialComment hierarchy with `default_scope` on a subclass is not declared in the trails test-models registry
-    // SCOPE: ~10–20 LOC fixture-models setup in inheritance.test.ts; affects 2 default-scope inheritance tests
+    // FOLLOW-UP (f9g2-inheritance-of-first-firm-scope): Rails' `of_first_firm`
+    // scope is `joins(account: :firm).where("companies.id": 1)` — it needs the
+    // companies↔accounts has_one/belongs_to association graph (Account
+    // belongs_to :firm class_name "Company"; Company has_one :account
+    // foreign_key "firm_id") plus an `accounts` fixture table. That
+    // association-fixture setup is its own contained chunk; tracked separately
+    // to keep this PR within the size ceiling.
   });
 
-  it.skip("inheritance with default scope", async () => {
-    // BLOCKED: fixture — STI subclass with default_scope; no STI routing gap (audit-STI: STI dispatch works)
-    // ROOT-CAUSE: test/models fixtures — Rails' SpecialComment / VerySpecialComment hierarchy with `default_scope` on a subclass is not declared in the trails test-models registry
-    // SCOPE: ~10–20 LOC fixture-models setup in inheritance.test.ts; affects 2 default-scope inheritance tests
+  it("inheritance with default scope", async () => {
+    // Mirrors Rails SelectedMembership < Membership with a default_scope; STI
+    // count must filter by type and still return the single SelectedMembership.
+    class Membership extends Base {
+      static {
+        this.attribute("type", "string");
+        this.attribute("favorite", "boolean");
+        this.attribute("member_id", "integer");
+        this._tableName = "memberships";
+        enableSti(Membership);
+      }
+    }
+    class SelectedMembership extends Membership {
+      static {
+        registerSubclass(SelectedMembership);
+        this.defaultScope((rel: any) => rel.select("'1' as foo"));
+      }
+    }
+    registerModel(Membership);
+
+    await Membership.create({ type: "CurrentMembership", member_id: 1 });
+    await Membership.create({ type: "Membership", favorite: true, member_id: 1 });
+    await Membership.create({ type: "SuperMembership", member_id: 1 });
+    await SelectedMembership.create({ member_id: 1 });
+
+    expect(await SelectedMembership.count()).toBe(1);
   });
 
   it("company descends from active record", async () => {

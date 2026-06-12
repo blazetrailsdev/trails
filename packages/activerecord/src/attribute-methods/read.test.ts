@@ -3,16 +3,12 @@ import { Base } from "../index.js";
 import { createSidecarTestAdapter } from "../test-adapter.js";
 
 describe("ReadTest", () => {
-  it.skip("define attribute methods", () => {
-    // BLOCKED: type — read type/attribute gap
-    // ROOT-CAUSE: read.ts or attribute-methods/read.ts missing Rails parity
-    // SCOPE: ~20 LOC fix; affects ~1 test in read.test.ts
-  });
-  it.skip("attribute methods generated?", () => {
-    // BLOCKED: type — read type/attribute gap
-    // ROOT-CAUSE: read.ts or attribute-methods/read.ts missing Rails parity
-    // SCOPE: ~20 LOC fix; affects ~1 test in read.test.ts
-  });
+  // "define attribute methods" and "attribute methods generated?" are
+  // reclassified as permanently unported in scripts/api-compare/unported-files.ts:
+  // both assert attribute accessor methods are *absent* until
+  // `define_attribute_methods` runs. The trails port generates accessors
+  // eagerly when `attribute()` is declared (there is no lazy generation gate),
+  // so the pre-generation assertions can never hold.
 
   it("_read_attribute returns value for existing attribute", () => {
     createSidecarTestAdapter();

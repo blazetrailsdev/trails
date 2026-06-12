@@ -903,6 +903,21 @@ export const UNPORTED_FILES: UnportedFile[] = [
   // (SQLite) variant is portable and already implemented+passing
   // (adapter-prevent-writes.test.ts:60); only the PG `assert_raises` variant is
   // skipped, and that is an adapter behavior, not a JS-runtime impossibility.
+  // --- Permanently not-portable: eager vs lazy attribute-method generation ---
+  {
+    testFile: "attribute_methods/read_test.rb",
+    tests: ["define attribute methods", "attribute methods generated?"],
+    reason:
+      "Both tests assert that attribute accessor methods are ABSENT until " +
+      "`define_attribute_methods` is invoked, then present afterward. Rails " +
+      "generates attribute methods lazily on first access via a generated " +
+      "module mixed into the class. The trails port generates accessors " +
+      "eagerly at `attribute()` declaration time (attribute-methods.ts) — there " +
+      "is no lazy generation gate — so the pre-generation `assert_not_includes` " +
+      "/ `assert_not method_defined?` assertions can never hold. The live " +
+      "read-path behavior is covered by the portable `_read_attribute` tests in " +
+      "attribute-methods/read.test.ts.",
+  },
   // --- Documented JS-vs-Ruby divergence (workplan Wave 0) ---
   {
     testFile: "database_configurations/resolver_test.rb",
