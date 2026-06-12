@@ -360,13 +360,15 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(mutatorCalls).toBe(1);
     // HEAD:main guard first probes origin/main (fetch + rev-list) to ensure HEAD
     // carries no foreign commits, then one leading `checkout` per generated file
-    // restores loadIndex()'s regenerated artifacts so pull --rebase runs clean.
+    // restores loadIndex()'s regenerated artifacts, and a `status` probe refuses
+    // a dirty tree before pull --rebase runs clean.
     expect(seen).toEqual([
       "fetch",
       "rev-list",
       "checkout",
       "checkout",
       "checkout",
+      "status",
       "pull",
       "add",
       "commit",
@@ -413,6 +415,7 @@ describe("commitAndPush (git mutation flow)", () => {
       "checkout",
       "checkout",
       "checkout",
+      "status",
       "pull",
       "add",
       "commit",
@@ -502,7 +505,9 @@ describe("commitAndPush (git mutation flow)", () => {
       ["checkout", "--", "index.json"],
       ["checkout", "--", "search.json"],
     ]);
-    expect(fullArgs[5]?.[2]).toBe("pull");
+    // The dirty-tree `status` probe sits between the restores and the pull.
+    expect(fullArgs[5]?.[2]).toBe("status");
+    expect(fullArgs[6]?.[2]).toBe("pull");
   });
 
   // Partial restore: one unknown path (e.g. a checkout predating search.json)
@@ -535,7 +540,7 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(restored).toEqual(["index.md", "search.json"]);
     // ...and the mutation proceeded normally (after the HEAD:main guard probe).
     expect(mutatorCalls).toBe(1);
-    expect(seen).toEqual(["fetch", "rev-list", "pull", "add", "commit", "push"]);
+    expect(seen).toEqual(["fetch", "rev-list", "status", "pull", "add", "commit", "push"]);
   });
 
   // A bare-branch refspec (e.g. `pushRefspec: "main"`) pushes the LOCAL branch
@@ -656,7 +661,111 @@ describe("commitAndPush (git mutation flow)", () => {
     });
     // fetch threw inside the guard's try → guard skipped; mutation proceeds.
     expect(mutatorCalls).toBe(1);
-    expect(seen).toEqual(["checkout", "checkout", "checkout", "pull", "add", "commit", "push"]);
+    expect(seen).toEqual([
+      "checkout",
+      "checkout",
+      "checkout",
+      "status",
+      "pull",
+      "add",
+      "commit",
+      "push",
+    ]);
+  });
+
+  // A hand edit left in a story file (e.g. the user edited frontmatter then ran
+  // `priority`) sits dirty in the tree. The leading pull --rebase would stash +
+  // reapply it, injecting conflict markers — so refuse before pulling and tell
+  // the user to commit, never running the mutator/pull/commit/push.
+  it("refuses to mutate when the working tree has uncommitted edits", () => {
+    const { seen, exit } = setup();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "status") return " M rfcs/0001/stories/foo.md" as never;
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    expect(() =>
+      commitAndPush({
+        message: "priority: foo",
+        fileToStage: "/some/file.md",
+        mutator: () => mutatorCalls++,
+        raceMessage: "no",
+        raceExitCode: 4,
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(mutatorCalls).toBe(0);
+    // The guard fires right after `status`: no pull/add/commit/push.
+    expect(seen).not.toContain("pull");
+    expect(seen).not.toContain("commit");
+    const msg = errSpy.mock.calls.at(-1)?.[0] as string;
+    expect(msg).toMatch(/has uncommitted changes/);
+    expect(msg).toMatch(/foo\.md/);
+  });
+
+  // A regenerated index file is throwaway (restoreGeneratedFiles reset it, the
+  // pre-commit hook rebuilds it) — it must NOT trip the dirty-tree guard. A
+  // status that reports only generated files proceeds normally.
+  it("does not treat regenerated index files as a dirty tree", () => {
+    const { seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "status") return " M index.json\n M search.json" as never;
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => mutatorCalls++,
+      raceMessage: "no",
+      raceExitCode: 4,
+    });
+    expect(mutatorCalls).toBe(1);
+    expect(seen).toContain("pull");
+    expect(seen).toContain("push");
+  });
+
+  // A divergent remote whose commits conflict makes `git pull --rebase` exit
+  // mid-rebase with a detached HEAD. commitAndPush must abort the rebase (to
+  // restore a clean tip) and exit 1 with a recoverable message — never leave the
+  // user stranded in a half-finished rebase.
+  it("aborts the rebase and exits 1 when pull --rebase conflicts", () => {
+    const { seen, exit } = setup();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "pull") {
+        const e = new Error("Command failed") as Error & { stderr?: string };
+        e.stderr = "CONFLICT (content): Merge conflict in rfcs/0001/stories/foo.md";
+        throw e;
+      }
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    expect(() =>
+      commitAndPush({
+        message: "claim: foo",
+        fileToStage: "/some/file.md",
+        mutator: () => mutatorCalls++,
+        raceMessage: "no",
+        raceExitCode: 4,
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(mutatorCalls).toBe(0);
+    // The rebase was aborted; the mutation never committed or pushed.
+    expect(seen).toContain("rebase");
+    expect(seen).not.toContain("commit");
+    expect(seen).not.toContain("push");
+    const msg = errSpy.mock.calls.at(-1)?.[0] as string;
+    expect(msg).toMatch(/pull --rebase onto origin\/main failed/);
+    expect(msg).toMatch(/rebase aborted/);
   });
 
   // The healthy steady state: a freshly-synced checkout sits exactly at
@@ -687,6 +796,7 @@ describe("commitAndPush (git mutation flow)", () => {
       "checkout",
       "checkout",
       "checkout",
+      "status",
       "pull",
       "add",
       "commit",

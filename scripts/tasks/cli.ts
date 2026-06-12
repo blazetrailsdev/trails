@@ -292,6 +292,46 @@ function restoreGeneratedFiles(cwd: string | undefined): void {
   }
 }
 
+// Refuse to mutate when the working tree has uncommitted edits the user made by
+// hand (e.g. editing a story's frontmatter, then running `priority`). The
+// mutation loop's leading `git pull --rebase` runs *before* the mutator, so such
+// edits sit dirty during the rebase: with rebase.autoStash off the pull aborts
+// ("cannot pull with rebase: You have unstaged changes"), and with it on the
+// edits are stashed, rebased over, and reapplied — writing literal git conflict
+// markers into the story frontmatter when upstream touched the same lines. Both
+// corrupt or strand the edit, so stop up front and tell the user to commit.
+// GENERATED_INDEX_FILES are excluded: restoreGeneratedFiles already reset them
+// to HEAD, and the tasks pre-commit hook rebuilds + re-stages them anyway.
+// Untracked files (`??`) are ignored — they don't block a rebase.
+function assertCleanWorktree(cwd: string | undefined): void {
+  let porcelain: string;
+  try {
+    porcelain = git(["status", "--porcelain"], { silent: true, cwd });
+  } catch {
+    return; // not a git repo / git unavailable — the pull path surfaces it
+  }
+  // git() trims its output, so the first line loses porcelain's leading status
+  // column space (" M foo" → "M foo"); re-trim every line and strip the 1–2
+  // char XY code + whitespace to recover the path, rather than slicing a fixed
+  // offset. Untracked files (`??`) don't block a rebase, so they're ignored.
+  const dirty = porcelain
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("??"))
+    .filter((l) => !GENERATED_INDEX_FILES.includes(l.replace(/^\S{1,2}\s+/, "")));
+  if (dirty.length === 0) return;
+  const where = cwd ?? TASKS_DIR;
+  console.error(
+    `error: ${where} has uncommitted changes; commit or stash them before mutating:\n` +
+      dirty.map((l) => `  ${l}`).join("\n") +
+      `\n  The tasks CLI rebases onto origin/main, which would corrupt or discard these edits.\n` +
+      `  Commit them first:\n` +
+      `    git -C "${where}" add -A && git -C "${where}" commit -m "wip"\n` +
+      `  or stash them:  git -C "${where}" stash`,
+  );
+  process.exit(1);
+}
+
 // Fetch + hard-reset the per-worktree tasks checkout to origin/main before
 // read commands. Keeps `ready`/`next-bundle`/`list`/`status` from serving
 // a stale index when the checkout hasn't been updated since spawn. Only
@@ -609,8 +649,35 @@ export function commitAndPush(opts: {
     // tree. Only needed before the first attempt — the retry path resets hard to
     // origin/main, which already discards them.
     restoreGeneratedFiles(cwd);
+    // Bail before the loop if the user left hand edits in the tree — the pull
+    // below would corrupt them. (refine pre-cleans its file, so it sails past.)
+    assertCleanWorktree(cwd);
     for (let attempt = 0; attempt < 2; attempt++) {
-      git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
+      try {
+        git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
+      } catch (e) {
+        // A rebase conflict (divergent remote whose commits touch the same
+        // lines) leaves the repo mid-rebase with a detached HEAD and conflict
+        // markers in the tree. Abort it so the checkout returns to a clean
+        // branch tip, then surface a recoverable message rather than stranding
+        // the user in a half-finished rebase to discover by hand.
+        try {
+          git(["rebase", "--abort"], { silent: true, cwd });
+        } catch {
+          /* nothing in progress to abort (e.g. fetch failed before rebase) */
+        }
+        const where = cwd ?? TASKS_DIR;
+        const stderr = String(((e as { stderr?: unknown }).stderr ?? "") || "").trim();
+        console.error(
+          `error: git pull --rebase onto origin/main failed in ${where} ` +
+            `(rebase aborted, working tree restored).\n` +
+            (stderr ? `${stderr}\n` : "") +
+            `  Reconcile with the remote manually, then retry the command:\n` +
+            `    git -C "${where}" pull --rebase origin main`,
+        );
+        releaseTasksLock(lock);
+        process.exit(1);
+      }
       opts.mutator();
       git(["add", opts.fileToStage], { cwd });
       git(["commit", "-q", "-m", opts.message], { cwd });
