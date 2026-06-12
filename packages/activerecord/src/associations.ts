@@ -1436,6 +1436,49 @@ export function buildHasManyRelation(
 }
 
 /**
+ * Build the JOIN-based AssociationScope relation for a through / HABTM
+ * association without executing it — the exact relation `loadHasMany` runs to
+ * materialize rows (`SELECT target.* FROM target INNER JOIN join_table ...`).
+ *
+ * Counting over this relation yields Rails' `scope.count(:all)`: a single
+ * `COUNT(*)` over the JOIN that preserves join-row multiplicity (three
+ * `developers_projects` rows for one project count as 3). This is distinct
+ * from the proxy's `_buildThroughScope()`, which models the target as an
+ * `id IN (SELECT source_fk ...)` subquery that structurally collapses
+ * duplicate join rows to one row per id — wrong for a non-distinct `size`.
+ *
+ * Returns null when the owner FK is absent (unsaved owner / null PK), matching
+ * the short-circuit in `loadHasMany`.
+ */
+export function buildThroughJoinScope(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): any | null {
+  const ctor = record.constructor as typeof Base;
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (!reflection) return null;
+  // Null-FK short-circuit on the owner-side column — for a through reflection
+  // that's the through_reflection's joinForeignKey (the owner FK on the join
+  // table), mirroring loadHasMany.
+  const reflForOwnerFk = (reflection as any).throughReflection ?? reflection;
+  const fkCols = Array.isArray(reflForOwnerFk.joinForeignKey)
+    ? reflForOwnerFk.joinForeignKey
+    : [reflForOwnerFk.joinForeignKey];
+  for (const col of fkCols) {
+    const v = record._readAttribute(col);
+    if (v === null || v === undefined) return null;
+  }
+  const className = options.className ?? camelize(singularize(assocName));
+  const targetModel = resolveAssocClass(record, assocName, className);
+  const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+  const baseRelation = _scopeForAssociation(targetModel);
+  let rel = baseRelation.merge(built);
+  rel = applyAssociationScope(rel, options.scope, record, (reflection as any).scope);
+  return rel;
+}
+
+/**
  * Count associated records for a hasMany association using COUNT(*)
  * without loading records into memory. Bypasses strict loading checks
  * so resetCounters works on strict-loading models.

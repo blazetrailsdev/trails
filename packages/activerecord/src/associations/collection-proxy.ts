@@ -45,6 +45,7 @@ import {
   resolveAssocClass,
   fireAssocCallbacks,
   buildHasManyRelation,
+  buildThroughJoinScope,
   loadHasMany,
   _canRouteThroughViaAssociationScope,
   ownerHasUnresolvedThroughKey,
@@ -1143,21 +1144,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         return results.length;
       }
       // Non-distinct through with a belongsTo source (the shape HABTM lowers
-      // to): `scope()` models the target as an `id IN (SELECT source_fk ...)`
-      // subquery, which structurally collapses duplicate join rows to one
-      // target row per id. Rails counts join-row multiplicity instead — a
-      // HABTM with three `developers_projects` rows pointing at the same
-      // project counts 3 (see `test_distinct_after_the_fact`) — so route
-      // through the loader, which preserves duplicate join rows. Distinct
-      // collections keep the deduping subquery count (correct under DISTINCT);
-      // hasMany-source throughs can't produce duplicate join rows, so they
-      // keep the cheaper COUNT(*); diverged proxies (whereBang / orderBang)
-      // fall through to the generic count path so their mutations are honored.
+      // to): the proxy's `scope()` (`_buildThroughScope`) models the target as
+      // an `id IN (SELECT source_fk ...)` subquery, which structurally
+      // collapses duplicate join rows to one target row per id. Rails counts
+      // join-row multiplicity instead via `scope.count(:all)` over the JOIN —
+      // a HABTM with three `developers_projects` rows pointing at the same
+      // project counts 3 (see `test_distinct_after_the_fact`). Count over the
+      // JOIN-based AssociationScope relation (the exact one `loadHasMany`
+      // executes), emitting a single `SELECT COUNT(*) ... INNER JOIN ...`.
+      //
+      // Distinct collections keep the deduping subquery count (correct under
+      // DISTINCT); hasMany-source throughs can't produce duplicate join rows,
+      // so they keep the existing path; diverged proxies (whereBang /
+      // orderBang) fall through to the generic count path so their mutations
+      // are honored.
       //
       // Branch on the *scoped relation's* distinct value (mirroring Rails'
       // `association_scope.distinct_value` in CollectionAssociation#size), not
       // the proxy's own `distinctValue`: a HABTM declared with a `-> { distinct }`
-      // scope applies DISTINCT only inside `_buildThroughScope()`, so the scoped
+      // scope applies DISTINCT only inside the association scope, so the scoped
       // relation is the authoritative source for whether the count should dedup.
       const sourceRefl = (refl as { sourceReflection?: { belongsTo?: () => boolean } } | undefined)
         ?.sourceReflection;
@@ -1169,8 +1174,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         _canRouteThroughViaAssociationScope(refl, this._assocDef.options) &&
         !this.scope().distinctValue
       ) {
-        const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
-        return results.length;
+        const joinRel = buildThroughJoinScope(
+          this._record,
+          this._assocName,
+          this._assocDef.options,
+        );
+        if (!joinRel) return 0;
+        const counted = await joinRel.count();
+        if (typeof counted !== "number") {
+          throw new Error("Grouped counts are not supported for association collection counts");
+        }
+        return counted;
       }
     }
     // On the diverged path `this` carries in-place proxy mutations
