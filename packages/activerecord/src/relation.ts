@@ -3219,16 +3219,44 @@ export class Relation<T extends Base> {
         /\s+AS\s+/i.test(c);
       return isComplex ? new Nodes.SqlLiteral(c) : table.get(c);
     });
-    const manager = table.project(...projections);
-    this._applyJoinsToManager(manager);
-    this._applyWheresToManager(manager, table);
-    this._applyOrderToManager(manager, table);
+    // Rails' pluck spawns, sets select_values = columns, then executes the full
+    // relation arel (calculations.rb), so build the same manager as a normal
+    // read — joins/wheres/order/group/having/from/lock/optimizer-hints thread
+    // through identically — but with the pluck columns as the select. Clearing
+    // the spawn's select before building is essential: resolving the discarded
+    // select list would mutate _referencesValues and could promote includes
+    // (adding joins Rails would not add for the pluck columns).
+    const rel = this._clone();
+    rel._selectColumns = null;
+    const manager = rel._buildSelectManager();
+    manager.projections = projections as any;
 
-    if (this._isDistinct) manager.distinct();
-    if (this._limitValue !== null) manager.take(this._limitValue);
-    if (this._offsetValue !== null) manager.skip(this._offsetValue);
-
-    const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
+    const [compiledSql, managerBinds] = this._compileAstWithBinds(manager.ast);
+    let pluckSql = compiledSql;
+    let pluckBinds = managerBinds;
+    // annotate() comments — appended like _toSqlWithoutSetOp (build_arel adds
+    // them to the manager's comment node).
+    if (this._annotations.length > 0) pluckSql = `${pluckSql} ${this._annotationComments()}`;
+    // Prepend CTE clauses, threading their bind values ahead of the main
+    // query's and shifting any $N placeholders up (PG numbers globally) —
+    // matching _toSqlWithoutSetOp.
+    if (this._ctes.length > 0) {
+      const { sql: cteSql, binds: cteBinds } = _qm.buildCteSql(
+        this._ctes,
+        (n) => this._compileArelNodeWithBinds(n),
+        (name) => this._modelClass.connection.quoteTableName(name),
+      );
+      if (cteBinds.length > 0) {
+        const shifted = pluckSql.replace(
+          /\$(\d+)/g,
+          (_m, n) => `$${parseInt(n, 10) + cteBinds.length}`,
+        );
+        pluckSql = `${cteSql} ${shifted}`;
+        pluckBinds = [...cteBinds, ...pluckBinds];
+      } else {
+        pluckSql = `${cteSql} ${pluckSql}`;
+      }
+    }
     const result = await this._modelClass.connection.selectAll(
       pluckSql,
       `${this._modelClass.name} Pluck`,
@@ -4242,7 +4270,11 @@ export class Relation<T extends Base> {
     // helper instead of throwing. `?.bind` also handles the unconnected case.
     const adapter = this._resolveAdapter();
     const sanitize = adapter?.sanitizeAsSqlComment?.bind(adapter) ?? sanitizeAsSqlComment;
-    return this._annotations.map((c) => `/* ${sanitize(c)} */`).join(" ");
+    // Mirror build_arel: uniq the annotate values when more than one before
+    // rendering the comment node (query_methods.rb `annotates.uniq`).
+    const annotations =
+      this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
+    return annotations.map((c) => `/* ${sanitize(c)} */`).join(" ");
   }
 
   private _arelVisitor(): Visitors.ToSql {

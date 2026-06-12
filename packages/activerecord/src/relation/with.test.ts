@@ -24,13 +24,12 @@ const POSTS_WITH_TAGS_AND_MULTIPLE_COMMENTS = POSTS_WITH_MULTIPLE_COMMENTS.filte
   POSTS_WITH_TAGS.includes(id),
 ).sort((a, b) => a - b);
 
-// Rails asserts `relation.order(:id).pluck(:id)`. trails' `pluck` builds its
-// projection off the model's arel_table and does not thread the `from("cte AS
-// posts")` / CTE clause, so it would read the real `posts` table. We mirror the
-// assertion through `order("id").toArray()` + id extraction instead (no re-sort:
-// the ordering is supplied by `order("id")`, exactly as in Rails).
-function pluckIds(records: any[]): number[] {
-  return records.map((r) => Number(r.id));
+// Rails asserts `relation.order(:id).pluck(:id)`. trails' `pluck` now threads
+// the `from("cte AS posts")` / CTE clause through its manager, so it reads from
+// the CTE source like Rails. Cast to Number since adapters may surface ids as
+// strings (e.g. PG bigint).
+function toIds(ids: any[]): number[] {
+  return ids.map((id) => Number(id));
 }
 
 // ==========================================================================
@@ -63,7 +62,7 @@ describe("WithTest", () => {
       posts_with_comments: Post.where("legacy_comments_count > 0"),
     }).from("posts_with_comments AS posts");
 
-    expect(pluckIds(await relation.order("id").toArray())).toEqual(POSTS_WITH_COMMENTS);
+    expect(toIds(await relation.order("id").pluck("id"))).toEqual(POSTS_WITH_COMMENTS);
   });
 
   it("with when hash with multiple elements of different type is passed as an argument", async () => {
@@ -82,7 +81,7 @@ describe("WithTest", () => {
       "posts_with_tags_and_multiple_comments AS posts",
     );
 
-    expect(pluckIds(await relation.order("id").toArray())).toEqual(
+    expect(toIds(await relation.order("id").pluck("id"))).toEqual(
       POSTS_WITH_TAGS_AND_MULTIPLE_COMMENTS,
     );
   });
@@ -102,7 +101,7 @@ describe("WithTest", () => {
         ) as any,
       });
 
-    expect(pluckIds(await relation.order("id").toArray())).toEqual(POSTS_WITH_TAGS_AND_COMMENTS);
+    expect(toIds(await relation.order("id").pluck("id"))).toEqual(POSTS_WITH_TAGS_AND_COMMENTS);
   });
 
   it("multiple dupicate with calls", async () => {
@@ -114,7 +113,7 @@ describe("WithTest", () => {
       .with({ posts_with_tags: postsWithTags })
       .from("posts_with_tags AS posts");
 
-    expect(pluckIds(await relation.order("id").toArray())).toEqual(POSTS_WITH_TAGS);
+    expect(toIds(await relation.order("id").pluck("id"))).toEqual(POSTS_WITH_TAGS);
   });
 
   it("count after with call", async () => {
@@ -130,7 +129,7 @@ describe("WithTest", () => {
   });
 
   it("with when called from active record scope", async () => {
-    expect(pluckIds(await (Post as any).withTagsCte().order("id").toArray())).toEqual(
+    expect(toIds(await (Post as any).withTagsCte().order("id").pluck("id"))).toEqual(
       POSTS_WITH_TAGS,
     );
   });
@@ -154,7 +153,7 @@ describe("WithTest", () => {
     const expected = [...SPECIAL_POSTS, ...POSTS_WITH_TAGS, ...POSTS_WITH_COMMENTS].sort(
       (a, b) => a - b,
     );
-    expect(pluckIds(await relation.order("id").toArray())).toEqual(expected);
+    expect(toIds(await relation.order("id").pluck("id"))).toEqual(expected);
   });
 
   it("with when passing single item array", async () => {
@@ -162,7 +161,7 @@ describe("WithTest", () => {
       posts_with_special_type_or_tags_or_comments: [Post.where({ type: "SpecialPost" })],
     }).from("posts_with_special_type_or_tags_or_comments AS posts");
 
-    expect(pluckIds(await relation.order("id").toArray())).toEqual(
+    expect(toIds(await relation.order("id").pluck("id"))).toEqual(
       [...SPECIAL_POSTS].sort((a, b) => a - b),
     );
   });
@@ -184,7 +183,7 @@ describe("WithTest", () => {
       ],
     }).from("top_companies_and_children AS companies");
 
-    expect(pluckIds(await relation.order("id").toArray())).toEqual(topCompaniesAndChildren);
+    expect(toIds(await relation.order("id").pluck("id"))).toEqual(topCompaniesAndChildren);
     expect(relation.toSql()).toMatch("WITH RECURSIVE");
   });
 
@@ -197,7 +196,7 @@ describe("WithTest", () => {
       "JOIN commented_posts ON commented_posts.post_id = posts.id",
     );
 
-    expect(pluckIds(await relation.order("id").toArray())).toEqual(POSTS_WITH_COMMENTS);
+    expect(toIds(await relation.order("id").pluck("id"))).toEqual(POSTS_WITH_COMMENTS);
   });
 
   it("with left joins", async () => {
