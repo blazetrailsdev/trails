@@ -986,7 +986,12 @@ export class AbstractAdapter implements Quoting {
   }
 
   disconnectBang(): void {
+    // Mirrors Rails AbstractAdapter#disconnect! (abstract_adapter.rb): clear the
+    // statement cache, discard any open transaction state, and mark the raw
+    // connection clean so the next reconnect can restore.
     this.clearCacheBang();
+    this.resetTransaction();
+    this._rawConnectionDirty = false;
     this._connection = null;
   }
 
