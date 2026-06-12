@@ -1127,12 +1127,19 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     registerModel("Eye", Eye);
     registerModel("Iris", Iris);
-    // No `inverseOf`: wiring the inverse target both ways turns the mutual
-    // hasOne-autosave / belongsTo-autosave pair into a save cycle (saving the
-    // iris autosaves its eye, whose hasOne then re-autosaves the iris). SQLite
-    // tolerated the re-entrant savepoint; PostgreSQL's transaction
-    // instrumentation rejects the double-start. The counter assertions only
-    // exercise one direction per test, so the inverse link is unnecessary.
+    // The explicit `foreignKey` (equal to the inferred `eye_id`) suppresses
+    // automatic inverse_of inference — `canFindInverseOfAutomatically` bails
+    // when `options.foreignKey` is set, mirroring Rails reflection.rb. Rails'
+    // Eye/Iris fixtures declare no foreign_key, so the inverse IS inferred
+    // there; the mutual hasOne-autosave / belongsTo-autosave pair then forms a
+    // save cycle (saving the iris autosaves its new eye, whose hasOne
+    // re-enters the iris save). The autosave logic terminates, but the
+    // re-entrant savepoint materialization double-starts the transaction
+    // instrumenter — InstrumentationAlreadyStartedError on PostgreSQL (SQLite
+    // tolerated it). Suppressing the inverse here keeps these callback-counter
+    // tests green; fixing the materialize re-entrancy so the Rails-shaped
+    // (no-FK, inferred-inverse) models work is tracked as story
+    // `savepoint-materialize-reentrancy` (RFC 0016).
     Associations.hasOne.call(Eye, "iris", {
       autosave: true,
       className: "Iris",
