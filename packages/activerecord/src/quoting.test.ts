@@ -161,7 +161,11 @@ describe("QuotingTest", () => {
     expect(quote(1n << 100n)).toBe("1267650600228229401496703205376");
   });
   it("dates and times", () => {
-    // quote wraps the serialized date/time in single quotes.
+    // Rails monkey-patches quoted_date to verify quote() dispatches through it.
+    // trails' quote() branches on instanceof and calls the formatters directly —
+    // there is no quoted_date method on a host to override — so the faithful port
+    // asserts the concrete serialized output, which also guards against formatting
+    // regressions the Rails dispatch-only test would miss. quote wraps in quotes.
     expect(quote(Temporal.PlainDate.from("2026-04-07"))).toBe("'2026-04-07'");
     expect(quote(Temporal.Instant.from("2026-04-07T15:30:00Z"))).toBe("'2026-04-07 15:30:00'");
     expect(quote(Temporal.PlainDateTime.from("2026-04-07T15:30:00"))).toBe("'2026-04-07 15:30:00'");
