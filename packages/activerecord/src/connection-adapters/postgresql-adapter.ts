@@ -4363,7 +4363,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
       : this.quoteIdentifier(enumName);
     const valueList = values.map((v) => this.quoteLiteral(v)).join(", ");
-    await this.exec(`CREATE TYPE ${qualifiedName} AS ENUM (${valueList})`);
+    // Mirrors Rails create_enum: guard with IF NOT EXISTS so re-running a
+    // Schema.define under a different search_path is idempotent. The schema
+    // scope defaults to the search path (current_schemas) when unqualified.
+    const schemaScope = schema ? this.quoteLiteral(schema) : "ANY (current_schemas(false))";
+    await this.exec(`
+      DO $$
+      BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_type t
+            JOIN pg_namespace n ON t.typnamespace = n.oid
+            WHERE t.typname = ${this.quoteLiteral(enumName)}
+              AND n.nspname = ${schemaScope}
+          ) THEN
+              CREATE TYPE ${qualifiedName} AS ENUM (${valueList});
+          END IF;
+      END
+      $$;
+    `);
+    await this.reloadTypeMap();
   }
 
   async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {

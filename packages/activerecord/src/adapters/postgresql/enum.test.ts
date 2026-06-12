@@ -5,16 +5,19 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 
 // Rails: class PostgresqlEnum < ActiveRecord::Base
 //   enum :current_mood, { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" }, prefix: true
-// Note: the public enumMethod only accepts integer values (Record<string, number>); string-value
-// enum DSL is not yet exposed via the public API. The bang/predicate methods for "works with
-// activerecord enum" require the enum DSL and are blocked until the API is extended.
 class PostgresqlEnum extends Base {
   static {
     this.tableName = "postgresql_enums";
+    this.enum(
+      "current_mood",
+      { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" },
+      { prefix: true },
+    );
   }
 }
 
@@ -106,17 +109,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((enumRecord as any).readAttribute("current_mood")).toBe("happy");
     });
 
-    // Needs ORM enum validation (string enum setter does not call assertValidValue)
-    it.skip("invalid enum update", () => {
-      // BLOCKED: enum — _enum setter silently writes invalid values; assertValidValue
-      //   is declared on EnumType but not wired into the string-enum attribute setter
-      // SCOPE: ~5 LOC fix in enum.ts; affects this test
+    it("invalid enum update", async () => {
+      await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
+      const enumRecord = await PostgresqlEnum.first();
+      expect(() => {
+        (enumRecord as any).current_mood = "angry";
+      }).toThrow(ArgumentError);
     });
 
     // Needs stderr capture
     it.skip("no oid warning", () => {
-      // BLOCKED: infra — no vitest equivalent of Ruby capture(:stderr)
-      // SCOPE: process stream mocking; affects this test
+      // BLOCKED: infra — no vitest equivalent of Ruby capture(:stderr); the PG
+      //   adapter has no stderr/warn sink to assert against (no process.* per
+      //   repo rules). Tracked as follow-up story p3-pg-enum-no-oid-warning.
+      // SCOPE: console/stderr hook helper + adapter warn plumbing.
     });
 
     it("enum type cast", async () => {
@@ -210,12 +216,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       await expect(adapter.dropEnum("unused")).rejects.toThrow();
     });
 
-    // Needs ORM enum getter for label/value asymmetry (okay: "ok")
-    it.skip("works with activerecord enum", () => {
-      // BLOCKED: enum — string enum getter returns raw DB value ("ok") instead of
-      //   label name ("okay") when label ≠ DB value; reverseMap lookup at line 509
-      //   of enum.ts guards on typeof raw === "number", missing the string case
-      // SCOPE: ~3 LOC fix in enum.ts getter; affects this test
+    it("works with activerecord enum", async () => {
+      let model = await PostgresqlEnum.create();
+      // Rails: model.current_mood_okay! — our _enum bang is in-memory; persist with save().
+      (model as any).current_mood_okayBang();
+      await model.save();
+
+      model = (await PostgresqlEnum.find((model as any).id))!;
+      expect((model as any).current_mood).toBe("okay");
+
+      (model as any).current_mood = "happy";
+      await model.save();
+
+      model = (await PostgresqlEnum.find((model as any).id))!;
+      expect((model as any).isCurrent_mood_happy()).toBe(true);
     });
 
     it("enum type scoped to schemas", async () => {
@@ -255,17 +269,73 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // Needs schema dumper with search-path-scoped enum filtering
-    it.skip("schema dump scoped to schemas", () => {
-      // BLOCKED: schema-dumper — enumTypes() returns all enums in all schemas; needs
-      //   search-path-aware filtering to match Rails' dump_all_table_schema behavior
-      // SCOPE: ~20 LOC in PG schema-dumper types(); affects this test
+    it("schema dump scoped to schemas", async () => {
+      await adapter.createSchema("other_schema");
+      try {
+        await adapter.createEnum("other_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
+
+        await withTestSchema(adapter, "test_schema", async () => {
+          await adapter.createEnum("mood_in_test_schema", ["sad", "ok", "happy"]);
+          await adapter.exec(`
+            CREATE TABLE "postgresql_enums_in_test_schema" (
+              "id" SERIAL PRIMARY KEY,
+              "current_mood" mood_in_test_schema
+            )
+          `);
+
+          const output = await SchemaDumper.dump(adapter);
+
+          expect(output).toContain('await ctx.createEnum("public.mood", ["sad","ok","happy"]);');
+          expect(output).toContain(
+            'await ctx.createEnum("mood_in_test_schema", ["sad","ok","happy"]);',
+          );
+          expect(output).toContain('t.enum("current_mood", { enum_type: "mood_in_test_schema" })');
+          expect(output).not.toContain("other_schema.mood_in_other_schema");
+        });
+      } finally {
+        await adapter.dropSchema("other_schema", { cascade: true });
+      }
     });
 
-    it.skip("schema load scoped to schemas", () => {
-      // BLOCKED: schema — schema cache does not clear across search-path switches;
-      //   Schema.define inside withTestSchema leaves stale OID mappings
-      // SCOPE: schema cache invalidation work; affects this test
+    it("schema load scoped to schemas", async () => {
+      try {
+        await withTestSchema(
+          adapter,
+          "test_schema",
+          async () => {
+            await Schema.define(adapter, async (schema) => {
+              await schema.createEnum("mood_in_test_schema", ["sad", "ok", "happy"]);
+              await schema.createEnum("public.mood", ["sad", "ok", "happy"]);
+              // Torn down by `dropSchema("test_schema", { cascade: true })` in the
+              // outer finally — the table lives in the non-default schema.
+              // eslint-disable-next-line blazetrails/require-table-teardown
+              await schema.createTable(
+                "postgresql_enums_in_test_schema",
+                { force: "cascade" },
+                async (t) => {
+                  await t.enum("current_mood", { enum_type: "mood_in_test_schema" });
+                },
+              );
+            });
+
+            const cols = await adapter.columns("postgresql_enums_in_test_schema");
+            const col = cols.find((c) => c.name === "current_mood");
+            expect(col).toBeDefined();
+            expect(col!.sqlType).toBe("mood_in_test_schema");
+          },
+          { drop: false },
+        );
+
+        // Outside withTestSchema — query the schema-qualified table explicitly.
+        // The enum sql_type is schema-qualified now that test_schema is off the
+        // search path (Rails asserts "test_schema.mood_in_test_schema").
+        const cols = await adapter.columns("test_schema.postgresql_enums_in_test_schema");
+        const col = cols.find((c) => c.name === "current_mood");
+        expect(col).toBeDefined();
+        expect(col!.sqlType).toBe("test_schema.mood_in_test_schema");
+      } finally {
+        await adapter.dropSchema("test_schema", { cascade: true });
+      }
     });
   });
 });

@@ -270,7 +270,10 @@ export class EnumType extends ValueType<string> {
     this._mapping = mapping;
     const reverse = new Map<number | string, string>();
     for (const [k, v] of mapping) {
-      reverse.set(v, k);
+      // Keep the first label for a given value — mirrors Ruby Hash#key, so an
+      // aliased value (e.g. aliased_field: "happy") deserializes to the
+      // canonical label ("happy"), not the alias.
+      if (!reverse.has(v)) reverse.set(v, k);
     }
     this._reverseMapping = reverse;
     this._raiseOnInvalidValues = raiseOnInvalidValues;
@@ -347,7 +350,7 @@ export class EnumType extends ValueType<string> {
       const num = Number(value);
       if (!Number.isNaN(num) && this._reverseMapping.has(num)) return;
     }
-    throw new Error(`'${value}' is not a valid ${this.name}`);
+    throw new ArgumentError(`'${value}' is not a valid ${this.name}`);
   }
 
   /** @internal */
@@ -436,7 +439,7 @@ export class EnumMethods {
 export function enumMethod(
   this: typeof Base,
   attribute: string,
-  mapping: Record<string, number>,
+  mapping: Record<string, number | string>,
   options?: { prefix?: boolean | string; suffix?: boolean | string },
 ): void {
   _enum.call(this, attribute, mapping, options);
@@ -525,6 +528,9 @@ export function _enum(
       return this._attributes.get(attrName);
     },
     set(this: Base, value: unknown) {
+      // Mirrors Rails' attribute writer invoking EnumType#assert_valid_value on
+      // user assignment — `record.current_mood = "angry"` raises ArgumentError.
+      enumType.assertValidValue(value);
       this.writeAttribute(attrName, value);
     },
     configurable: true,
