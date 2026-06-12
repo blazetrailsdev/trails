@@ -97,33 +97,16 @@ const TEST_SCHEMA: Schema = {
     primaryKey: ["shop_id", "id"],
   },
   cpk_books: {
-    columns: {
-      author_id: "integer",
-      id: "integer",
-      title: "string",
-      shop_id: "integer",
-      order_id: "integer",
-    },
+    columns: { author_id: "integer", id: "integer", shop_id: "integer", order_id: "integer" },
     primaryKey: ["author_id", "id"],
   },
   dog_lovers: {
-    trained_dogs_count: { type: "integer", default: 0 },
     bred_dogs_count: { type: "integer", default: 0 },
-    dogs_count: { type: "integer", default: 0 },
+    trained_dogs_count: { type: "integer", default: 0 },
   },
-  dogs: {
-    trainer_id: "integer",
-    breeder_id: "integer",
-    dog_lover_id: "integer",
-  },
-  subscribers: {
-    name: "string",
-    books_count: { type: "integer", default: 0 },
-  },
-  subscriptions: {
-    subscriber_id: "integer",
-    book_id: "integer",
-  },
+  dogs: { trainer_id: "integer", breeder_id: "integer" },
+  subscribers: { name: "string", books_count: { type: "integer", default: 0 } },
+  subscriptions: { subscriber_id: "integer", book_id: "integer" },
   friend_people: {
     name: "string",
     friends_too_count: "integer",
@@ -1577,7 +1560,6 @@ describe("CounterCacheTest", () => {
     expect(after.replies_count).toBe(1);
   });
   it("reset counters with modularized and camelized classnames", async () => {
-    // Rails: SpecialTopic has_many :special_replies (class SpecialReply).
     class SpecialTopic extends Base {
       static {
         this._tableName = "topics";
@@ -1642,7 +1624,6 @@ describe("CounterCacheTest", () => {
     expect(after.engines_count).toBe(1);
   });
   it("reset the right counter if two have the same class_name", async () => {
-    // Rails: Dog belongs_to :breeder & :trainer, both "DogLover" but distinct FKs.
     class DogLover extends Base {
       static {
         this.attribute("bred_dogs_count", "integer", { default: 0 });
@@ -1758,7 +1739,6 @@ describe("CounterCacheTest", () => {
     expect(updateCount).toBe(1);
   });
   it("reset counters for cpk model", async () => {
-    // Rails: Cpk::Order has_many :books via composite FK [:shop_id, :order_id].
     class Order extends Base {
       static {
         this._tableName = "cpk_orders";
@@ -1893,7 +1873,6 @@ describe("CounterCacheTest", () => {
     expect(after.friends_too_count).toBe(1);
   });
   it("reset counter of has_many :through association", async () => {
-    // Rails: Subscriber has_many :books, through: :subscriptions.
     class Subscriber extends Base {
       static {
         this.attribute("name", "string");
@@ -1948,7 +1927,6 @@ describe("CounterCacheTest", () => {
     await expect(Topic.resetCounters(t.id, "nonexistent")).rejects.toThrow(/nonexistent/);
   });
   it("reset counter works with select declared on association", async () => {
-    // Rails: a has_many with a select scope — reset_counters' COUNT(*) ignores it.
     class SpecialTopic extends Base {
       static {
         this._tableName = "topics";
