@@ -21,6 +21,7 @@ import { Reference } from "./test-helpers/models/reference.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { LockWithoutDefault } from "./test-helpers/models/lock-without-default.js";
 import { LockWithCustomColumnWithoutDefault } from "./test-helpers/models/lock-with-custom-column-without-default.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 
 describe("OptimisticLockingTest", () => {
   // Mirrors Rails `fixtures :people, :legacy_things, :references,
@@ -347,8 +348,28 @@ describe("OptimisticLockingTest", () => {
     expect(t1.isDestroyed()).toBe(true);
   });
 
-  it.skip("lock without default queries count", () => {
-    // BLOCKED: unknown — needs query counting infrastructure (spy on execute call count)
+  it("lock without default queries count", async () => {
+    const t1 = await LockWithoutDefault.create({ title: "title1" });
+    expect(t1.title).toBe("title1");
+    expect(t1.lock_version).toBe(0);
+
+    await assertQueriesCount(3, false, async () => {
+      await t1.update({ title: "title2" });
+    });
+
+    await t1.reload();
+    expect(t1.title).toBe("title2");
+    expect(t1.lock_version).toBe(1);
+
+    const t2 = new LockWithoutDefault({ title: "title1" });
+
+    await assertQueriesCount(3, false, async () => {
+      await t2.saveBang();
+    });
+
+    await t2.reload();
+    expect(t2.title).toBe("title1");
+    expect(t2.lock_version).toBe(0);
   });
 
   it("lock with custom column without default sets version to zero", async () => {
@@ -380,8 +401,28 @@ describe("OptimisticLockingTest", () => {
     expect(t2.title).toBe("new title2");
   });
 
-  it.skip("lock with custom column without default queries count", () => {
-    // BLOCKED: unknown — needs query counting infrastructure
+  it("lock with custom column without default queries count", async () => {
+    const t1 = await LockWithCustomColumnWithoutDefault.create({ title: "title1" });
+    expect(t1.title).toBe("title1");
+    expect(t1.custom_lock_version).toBe(0);
+
+    await assertQueriesCount(3, false, async () => {
+      await t1.update({ title: "title2" });
+    });
+
+    await t1.reload();
+    expect(t1.title).toBe("title2");
+    expect(t1.custom_lock_version).toBe(1);
+
+    const t2 = new LockWithCustomColumnWithoutDefault({ title: "title1" });
+
+    await assertQueriesCount(3, false, async () => {
+      await t2.saveBang();
+    });
+
+    await t2.reload();
+    expect(t2.title).toBe("title1");
+    expect(t2.custom_lock_version).toBe(0);
   });
 
   it("readonly attributes", async () => {
