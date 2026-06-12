@@ -1067,8 +1067,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   // Rails: `index_name_for_remove` (the name + column branch) — confirm the
-  // named index actually covers the given columns, raising ArgumentError on a
-  // no-match / multi-match.
+  // named index covers the given columns. Raise ArgumentError only when the
+  // named index is positively found on different columns; fall back to the name
+  // when it can't be located so a legitimate drop is never blocked.
   private async _indexNameForRemove(
     tableName: string,
     columnNames: string[],
@@ -1077,16 +1078,19 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const indexNameFor = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
     const target = indexNameFor(columnNames);
     const all = (await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>;
-    const matching = all.filter((i) => i.name === name && indexNameFor(i.columns) === target);
+    const named = all.filter((i) => i.name === name);
+    const matching = named.filter((i) => indexNameFor(i.columns) === target);
     if (matching.length > 1) {
       throw new ArgumentError(
         `Multiple indexes found on ${tableName} columns ${columnNames}. ` +
           `Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
       );
-    } else if (matching.length === 0) {
+    }
+    if (matching.length === 1) return matching[0].name;
+    if (named.length > 0) {
       throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
     }
-    return matching[0].name;
+    return name;
   }
 
   createSchemaDumper(

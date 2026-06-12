@@ -306,15 +306,14 @@ export class SchemaStatements {
 
     let indexName: string;
     if (opts.name != null && cols.length > 0) {
-      // Both a name and a column are given: validate they describe the same
-      // index (Rails `index_name_for_remove` raises ArgumentError on a mismatch
-      // or an ambiguous spec). Only this path needs index introspection — the
-      // name-only / column-only paths keep the legacy conventional-name compute.
-      // An array column is threaded through `options.column` since the canonical
-      // helper takes a string-typed positional `column_name`.
-      const positional = typeof columnName === "string" ? columnName : null;
-      const validateOpts = positional == null ? { ...opts, column: cols } : opts;
-      indexName = await this.indexNameForRemove(tableName, positional, validateOpts);
+      // Both a name and a column are given: Rails `index_name_for_remove` raises
+      // ArgumentError when the named index does not cover the requested columns.
+      // We only raise when introspection positively finds the named index on
+      // *different* columns; if the named index can't be located (e.g. the
+      // command-recorder revert path on an adapter whose mid-transaction index
+      // introspection lags), we fall back to the name and let DROP ... IF EXISTS
+      // do the right thing — never converting a valid revert into a hard error.
+      indexName = await this.resolveNamedIndexForRemove(tableName, opts.name, cols);
     } else if (opts.name != null) {
       indexName = opts.name;
     } else if (cols.length > 0) {
@@ -330,6 +329,33 @@ export class SchemaStatements {
     } else {
       await this.adapter.executeMutation(`DROP INDEX IF EXISTS ${this._qi(indexName)}`);
     }
+  }
+
+  // Validate that the named index covers `cols`, raising ArgumentError only when
+  // the named index is positively found on different columns (Rails'
+  // `index_name_for_remove` mismatch case). Falls back to the name when the
+  // index can't be located so a legitimate drop is never blocked.
+  private async resolveNamedIndexForRemove(
+    tableName: string,
+    name: string,
+    cols: string[],
+  ): Promise<string> {
+    const conventional = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
+    const target = conventional(cols);
+    const all = await this.indexes(tableName);
+    const named = all.filter((i) => i.name === name);
+    const matching = named.filter((i) => conventional(i.columns) === target);
+    if (matching.length > 1) {
+      throw new ArgumentError(
+        `Multiple indexes found on ${tableName} columns ${cols}. ` +
+          `Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
+      );
+    }
+    if (matching.length === 1) return matching[0].name;
+    if (named.length > 0) {
+      throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
+    }
+    return name;
   }
 
   async changeColumn(
