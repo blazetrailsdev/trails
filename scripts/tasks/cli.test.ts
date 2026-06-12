@@ -38,6 +38,7 @@ import {
   parseFlags,
   ready,
   removeFrontmatterKey,
+  setFrontmatterList,
   resolveTasksDir,
   STORY_STATUSES,
   stringFlag,
@@ -293,6 +294,99 @@ describe("removeFrontmatterKey (priority --clear)", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => removeFrontmatterKey(file, "deps")).toThrow(/exit 1/);
     expect(errSpy.mock.calls[0]?.[0]).toMatch(/refusing to remove list-valued/);
+  });
+});
+
+describe("setFrontmatterList", () => {
+  function writeStory(body: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "rfcs-cli-"));
+    const file = join(dir, "story.md");
+    writeFileSync(file, body);
+    return file;
+  }
+
+  // Mirror of rfcs/0000-template/stories/template-story.md frontmatter,
+  // including the inline comment on `priority:`.
+  const TEMPLATE = `---
+title: "Short prose title"
+status: draft
+updated: 2026-06-04
+rfc: "0000-your-slug"
+cluster: cluster-name-1
+deps: []
+deps-rfc: []
+est-loc: null
+priority: null # optional integer; LOWER = higher ready-queue priority (absent = unprioritized)
+pr: null
+claim: null
+assignee: null
+blocked-by: null
+---
+
+## Context
+
+Body text.
+`;
+
+  it("converts an inline empty list to a block list", () => {
+    const file = writeStory(`---\ndeps: []\nstatus: ready\n---\nbody\n`);
+    setFrontmatterList(file, "deps", ["a", "b"]);
+    expect(readFileSync(file, "utf8")).toBe(`---\ndeps:\n  - a\n  - b\nstatus: ready\n---\nbody\n`);
+  });
+
+  it("converts a block list to an inline empty list", () => {
+    const file = writeStory(`---\ndeps:\n  - a\n  - b\nstatus: ready\n---\nbody\n`);
+    setFrontmatterList(file, "deps", []);
+    expect(readFileSync(file, "utf8")).toBe(`---\ndeps: []\nstatus: ready\n---\nbody\n`);
+  });
+
+  it("replaces an inline flow list", () => {
+    const file = writeStory(`---\ndeps: [a, b]\nstatus: ready\n---\nbody\n`);
+    setFrontmatterList(file, "deps", ["c"]);
+    expect(readFileSync(file, "utf8")).toBe(`---\ndeps:\n  - c\nstatus: ready\n---\nbody\n`);
+  });
+
+  it("inserts an absent key in its canonical position", () => {
+    const file = writeStory(`---\nstatus: ready\ndeps: []\npr: null\n---\nbody\n`);
+    setFrontmatterList(file, "deps-rfc", ["0024-x"]);
+    expect(readFileSync(file, "utf8")).toBe(
+      `---\nstatus: ready\ndeps: []\ndeps-rfc:\n  - 0024-x\npr: null\n---\nbody\n`,
+    );
+  });
+
+  it("preserves all non-target lines, including inline comments, on round-trip", () => {
+    const file = writeStory(TEMPLATE);
+    setFrontmatterList(file, "deps", ["alpha", "beta"]);
+    setFrontmatterList(file, "deps", []);
+    expect(readFileSync(file, "utf8")).toBe(TEMPLATE);
+  });
+
+  it("appends an absent key with no canonical position at the end of the block", () => {
+    // RFC-README keys like `clusters`/`packages` are not in the story key order;
+    // they fall back to an end-of-block append.
+    const file = writeStory(`---\ntitle: "R"\nstatus: active\n---\nbody\n`);
+    setFrontmatterList(file, "clusters", ["c1", "c2"]);
+    expect(readFileSync(file, "utf8")).toBe(
+      `---\ntitle: "R"\nstatus: active\nclusters:\n  - c1\n  - c2\n---\nbody\n`,
+    );
+  });
+
+  it("leaves a multi-line body untouched when replacing a key", () => {
+    const file = writeStory(`---\ndeps: []\nstatus: ready\n---\n# Heading\n\nline one\nline two\n`);
+    setFrontmatterList(file, "deps", ["a"]);
+    expect(readFileSync(file, "utf8")).toBe(
+      `---\ndeps:\n  - a\nstatus: ready\n---\n# Heading\n\nline one\nline two\n`,
+    );
+  });
+
+  it("refuses a nested/multi-level structure", () => {
+    const file = writeStory(`---\ndeps:\n  - name: a\n    version: 1\nstatus: ready\n---\nbody\n`);
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => setFrontmatterList(file, "deps", ["x"])).toThrow(/exit 1/);
+    expect(errSpy.mock.calls[0]?.[0]).toMatch(/refusing to set nested\/multi-level/);
   });
 });
 
