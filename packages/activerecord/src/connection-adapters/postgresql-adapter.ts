@@ -4123,23 +4123,42 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
     }
 
+    // Rails strips the schema from the table (PG `index_name` resolves against
+    // the unqualified table) and, when a name is given, splits its schema off:
+    // the bare identifier becomes the name to match, the index is dropped in the
+    // table's schema (or the name's schema when the table is unqualified), and a
+    // conflicting schema pair raises.
+    const { schema: tableSchema, table: bareTable } = this.parseSchemaQualifiedName(tableName);
+    let dropSchema = tableSchema;
+    let resolveOpts = opts;
+    if (opts.name != null) {
+      const { schema: nameSchema, table: nameIdent } = this.parseSchemaQualifiedName(opts.name);
+      resolveOpts = { ...opts, name: nameIdent };
+      if (!tableSchema) dropSchema = nameSchema;
+      if (nameSchema && tableSchema && nameSchema !== tableSchema) {
+        throw new ArgumentError(
+          `Index schema '${nameSchema}' does not match table schema '${tableSchema}'`,
+        );
+      }
+    }
+
     // A bare `{ name }` resolves without introspection (Rails
     // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
-    const canRemoveByName = columnName == null && opts.name != null && opts.column == null;
+    const canRemoveByName =
+      columnName == null && resolveOpts.name != null && resolveOpts.column == null;
     const all =
       opts.ifExists || !canRemoveByName
         ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
         : [];
     // Rails: `return if options[:if_exists] && !index_exists?(...)`.
-    if (opts.ifExists && !indexExistsForRemoveFrom(all, columnName, opts)) {
+    if (opts.ifExists && !indexExistsForRemoveFrom(all, columnName, resolveOpts)) {
       return;
     }
-    const indexName = indexNameForRemoveFrom(all, tableName, columnName, opts);
+    const indexName = indexNameForRemoveFrom(all, bareTable, columnName, resolveOpts);
 
     const concurrently = opts.algorithm === "concurrently" ? " CONCURRENTLY" : "";
-    const { schema } = this.parseSchemaQualifiedName(tableName);
-    const qualifiedIndex = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(indexName)}`
+    const qualifiedIndex = dropSchema
+      ? `${this.quoteIdentifier(dropSchema)}.${this.quoteIdentifier(indexName)}`
       : this.quoteIdentifier(indexName);
     await this.exec(`DROP INDEX${concurrently} ${qualifiedIndex}`);
   }
