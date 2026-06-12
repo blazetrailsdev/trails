@@ -223,15 +223,25 @@ export function referencesFromConditions(conditions: unknown): string[] {
 }
 
 // Resolve a single CTE sub-query value into an arel body node, mirroring Rails'
-// `build_with_expression_from_value`. A raw SQL string / `SqlLiteral` becomes
-// `Nodes.Grouping(SqlLiteral)` (`when SqlLiteral then Grouping.new(value)`), so
-// it carries its own operand parens. A Relation / SelectManager contributes a
-// bare node — Rails uses `value.arel(.ast)`; we use its inlined SQL as a bare
-// `SqlLiteral` (the `value.arel` branches are deferred per the RFC 0022 cte
-// story), so UNION ALL leaves it unparenthesized exactly as Rails does.
-function buildCteLeaf(q: unknown): Nodes.Node {
+// `build_with_expression_from_value(value, nested)`. A raw SQL string /
+// `SqlLiteral` becomes `Nodes.Grouping(SqlLiteral)`
+// (`when SqlLiteral then Grouping.new(value)`), so it carries its own operand
+// parens. A `Relation` contributes its real Arel SelectStatement node
+// (`value._cteBodyArelNode()`, mirroring `value.arel(.ast)`) and an
+// `Arel::SelectManager` its `.ast` — so adapter quoting and bind collection are
+// preserved through to the visitor rather than frozen at `toSql()` time. Rails'
+// `nested` flag selects `value.arel` (a manager) vs `value.arel.ast` (a node);
+// trails' Cte/UnionAll operands must be visitable AST nodes, so both branches
+// resolve to the SelectStatement node — `nested` is threaded to match Rails'
+// reduction shape and the single-element unwrap below. A relation whose SQL
+// `_buildSelectManager` cannot fully encode (set-op/eager body) returns null and
+// falls back to its inlined SQL as a bare `SqlLiteral`.
+function buildCteLeaf(q: unknown, nested: boolean): Nodes.Node {
   if (typeof q === "string") return new Nodes.Grouping(arelSql(q) as any);
   if (q instanceof Nodes.SqlLiteral) return new Nodes.Grouping(q as any);
+  if (q instanceof SelectManager) return q.ast as unknown as Nodes.Node;
+  const node = (q as any)._cteBodyArelNode?.(nested);
+  if (node) return node as Nodes.Node;
   return arelSql((q as any).toSql()) as unknown as Nodes.Node;
 }
 
@@ -260,10 +270,12 @@ function resolveCteEntry(name: string, query: unknown): Nodes.Node {
     }
     // Rails reduces array sub-queries into a left-nested `Arel::Nodes::UnionAll`
     // AST (build_with_expression_from_value). A single-element array unwraps to
-    // its sole leaf. The SQLite visitor strips the leaves' `Grouping` parens
+    // its sole leaf with `nested = false`; multi-element leaves are resolved with
+    // `nested = true`. The SQLite visitor strips the leaves' `Grouping` parens
     // inside UNION ALL (infix_value_with_paren); PG/MySQL keep them.
+    if (query.length === 1) return buildCteLeaf(query[0], false);
     return (query as unknown[])
-      .map(buildCteLeaf)
+      .map((q) => buildCteLeaf(q, true))
       .reduce((left, right) => new Nodes.UnionAll(left as any, right as any));
   }
   const q = query as any;
@@ -276,7 +288,7 @@ function resolveCteEntry(name: string, query: unknown): Nodes.Node {
       `Unsupported argument type for CTE "${name}": expected a SQL string or Relation, got ${typeName}`,
     );
   }
-  return buildCteLeaf(query);
+  return buildCteLeaf(query, false);
 }
 
 /** Upsert a CTE into _ctes by name (last-write-wins), matching Rails behavior. */
@@ -296,23 +308,39 @@ function upsertCte(
 
 /**
  * Render the `WITH [RECURSIVE] <name> AS (body), ...` clause for a set of CTEs.
- * `compile` lowers a CTE body node to SQL through the dialect's arel visitor;
- * `quoteName` quotes the CTE name through the adapter (double quotes on
- * SQLite/PG, backticks on MySQL) — mirroring Rails' `visit_Arel_Nodes_Cte`,
- * which renders the name via `quote_table_name`. `UnionAll` / `Grouping` bodies
- * already emit their own surrounding parens, so the `AS (...)` parens are only
- * added for any other (bare) node.
+ * `compile` lowers a CTE body node to `[sql, binds]` through the dialect's arel
+ * visitor (binds collected, not inlined — Relation/SelectManager bodies thread
+ * their bind values to the caller in body order); `quoteName` quotes the CTE
+ * name through the adapter (double quotes on SQLite/PG, backticks on MySQL) —
+ * mirroring Rails' `visit_Arel_Nodes_Cte`, which renders the name via
+ * `quote_table_name`. `UnionAll` / `Grouping` bodies already emit their own
+ * surrounding parens, so the `AS (...)` parens are only added for any other
+ * (bare) node. Returns the clause SQL plus the concatenated body binds (in CTE
+ * declaration order); the caller prepends these to the main query's binds since
+ * the `WITH` clause renders first.
  * @internal
  */
 export function buildCteSql(
   ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>,
-  compile: (node: Nodes.Node) => string,
+  compile: (node: Nodes.Node) => [string, unknown[]],
   quoteName: (name: string) => string,
-): string {
+): { sql: string; binds: unknown[] } {
   const recursive = ctes.some((c) => c.recursive);
+  const binds: unknown[] = [];
   const defs = ctes
     .map((c) => {
-      const body = compile(c.expression);
+      // Each body compiles with a fresh collector, so PG `$N` placeholders
+      // restart at `$1` per CTE. Shift this body's placeholders up by the binds
+      // already emitted by earlier CTEs so the concatenated WITH clause numbers
+      // globally (mirrors Rails compiling all with_statements through one
+      // collector). SQLite/MySQL use positional `?`, so the shift is a no-op.
+      const offset = binds.length;
+      const [rawBody, bodyBinds] = compile(c.expression);
+      const body =
+        offset > 0
+          ? rawBody.replace(/\$(\d+)/g, (_m, n) => `$${parseInt(n, 10) + offset}`)
+          : rawBody;
+      binds.push(...bodyBinds);
       const wrapped =
         c.expression instanceof Nodes.UnionAll || c.expression instanceof Nodes.Grouping
           ? body
@@ -320,7 +348,7 @@ export function buildCteSql(
       return `${quoteName(c.name)} AS ${wrapped}`;
     })
     .join(", ");
-  return `WITH ${recursive ? "RECURSIVE " : ""}${defs}`;
+  return { sql: `WITH ${recursive ? "RECURSIVE " : ""}${defs}`, binds };
 }
 
 function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>>): any {

@@ -4105,13 +4105,24 @@ export class Relation<T extends Base> {
 
     // Prepend CTE clauses. The bodies are arel expression nodes
     // (build_with_expression_from_value) compiled through the dialect visitor —
-    // UNION ALL operand parens are stripped on SQLite, kept on PG/MySQL.
+    // UNION ALL operand parens are stripped on SQLite, kept on PG/MySQL. Relation
+    // bodies thread their bind values through the visitor; since the `WITH`
+    // clause renders before the main SELECT, those binds precede the main
+    // query's, and any `$N` placeholders in the already-compiled main SQL are
+    // shifted up by the CTE bind count (PG numbers globally).
     if (this._ctes.length > 0) {
-      sql = `${_qm.buildCteSql(
+      const { sql: cteSql, binds: cteBinds } = _qm.buildCteSql(
         this._ctes,
-        (n) => this._compileArelNode(n),
+        (n) => this._compileArelNodeWithBinds(n),
         (name) => this._modelClass.connection.quoteTableName(name),
-      )} ${sql}`;
+      );
+      if (cteBinds.length > 0) {
+        const shifted = sql.replace(/\$(\d+)/g, (_m, n) => `$${parseInt(n, 10) + cteBinds.length}`);
+        sql = `${cteSql} ${shifted}`;
+        this._lastSelectBinds = [...cteBinds, ...this._lastSelectBinds];
+      } else {
+        sql = `${cteSql} ${sql}`;
+      }
     }
 
     return sql;
@@ -4217,6 +4228,35 @@ export class Relation<T extends Base> {
 
   private _compileArelNode(node: Nodes.Node): string {
     return this._arelVisitor().compile(node);
+  }
+
+  /**
+   * Compile a CTE body node, collecting its bind values (type-cast as in
+   * `_compileSelectSql`) rather than inlining them — so a Relation/SelectManager
+   * CTE body parameterizes through the visitor. Folds the body's retryability
+   * into the relation's so a non-retryable CTE body marks the whole query.
+   */
+  private _compileArelNodeWithBinds(node: Nodes.Node): [string, unknown[]] {
+    const [sql, binds, retryable] = this._arelVisitor().compileWithBinds(node);
+    this._lastSelectRetryable = this._lastSelectRetryable && retryable;
+    return [sql, this._typeCastBinds(binds)];
+  }
+
+  /**
+   * Resolve this relation to the Arel SelectStatement node used as a CTE body,
+   * mirroring Rails' `build_with_expression_from_value` Relation branch
+   * (`value.arel(.ast)`). `_buildSelectManager` threads joins/wheres/from/having
+   * — matching `_toSqlWithoutSetOp` minus the CTE/eager/annotate prefix — so a
+   * recursive body's string JOIN survives (with_recursive). Returns null for
+   * relations whose SQL `_buildSelectManager` does not fully encode (set-op or
+   * eager-load bodies), letting the caller fall back to pre-rendered SQL.
+   * `nested` is accepted to mirror Rails' threading; both branches resolve to the
+   * AST node since trails' Cte/UnionAll operands must be visitable nodes.
+   * @internal
+   */
+  _cteBodyArelNode(_nested = false): Nodes.Node | null {
+    if (this._setOperation || this._eagerLoadingForSql()) return null;
+    return this._buildSelectManager().ast as unknown as Nodes.Node;
   }
 
   /** Compile an Arel node, returning [sql, type-cast binds]. */
