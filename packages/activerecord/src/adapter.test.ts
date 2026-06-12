@@ -33,6 +33,27 @@ async function withSchema(
   }
 }
 
+// Open a fresh in-memory adapter (no schema), run the body, then close.
+// Used by the connection/transaction-state tests, which only exercise
+// transaction bookkeeping and need no tables.
+async function withConnection(
+  body: (conn: AbstractSQLite3Adapter) => Promise<void>,
+): Promise<void> {
+  const conn = new BetterSQLite3Adapter(":memory:");
+  try {
+    await body(conn);
+  } finally {
+    if (conn.active) await conn.close();
+  }
+}
+
+// Mirrors Rails' `raw_transaction_open?` SQLite branch: whether a BEGIN is
+// actually live on the raw connection (tracked by the adapter's _inTransaction
+// flag, flipped by begin/commit/rollback DbTransaction).
+function rawTransactionOpen(conn: AbstractSQLite3Adapter): boolean {
+  return conn.inTransaction;
+}
+
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
 
@@ -441,15 +462,24 @@ describe("AdapterTestWithoutTransaction", () => {
 });
 
 describe("AdapterConnectionTest", () => {
-  it.skip("reconnect after a disconnect", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts: disconnect!/reconnect!/active? lifecycle wiring
-    // SCOPE: ~20 LOC; affects ~17 tests
+  it("reconnect after a disconnect", async () => {
+    await withConnection(async (conn) => {
+      conn.disconnectBang();
+      expect(conn.active).toBe(false);
+      await conn.reconnectBang();
+      expect(conn.active).toBe(true);
+    });
   });
-  it.skip("materialized transaction state is reset after a reconnect", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract/transaction.ts: materializeTransactions + reconnect! must reset open-transaction state
-    // SCOPE: ~25 LOC; affects ~7 tests
+  it("materialized transaction state is reset after a reconnect", async () => {
+    await withConnection(async (conn) => {
+      await conn.transactionManager.beginTransaction();
+      expect(conn.isTransactionOpen()).toBe(true);
+      await conn.materializeTransactions();
+      expect(rawTransactionOpen(conn)).toBe(true);
+      await conn.reconnectBang();
+      expect(conn.isTransactionOpen()).toBe(false);
+      expect(rawTransactionOpen(conn)).toBe(false);
+    });
   });
   it.skip("materialized transaction state can be restored after a reconnect", () => {
     // BLOCKED: transactions
@@ -459,15 +489,27 @@ describe("AdapterConnectionTest", () => {
     // reconnect! (Rails gates the whole suite `unless in_memory_db?`).
     // SCOPE: adapter raw-reconnect wiring; affects ~2 tests
   });
-  it.skip("materialized transaction state is reset after a disconnect", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#disconnect!: must clear materialized transaction state
-    // SCOPE: ~15 LOC; affects ~7 tests
+  it("materialized transaction state is reset after a disconnect", async () => {
+    await withConnection(async (conn) => {
+      await conn.transactionManager.beginTransaction();
+      expect(conn.isTransactionOpen()).toBe(true);
+      await conn.materializeTransactions();
+      expect(rawTransactionOpen(conn)).toBe(true);
+      conn.disconnectBang();
+      expect(conn.isTransactionOpen()).toBe(false);
+    });
   });
-  it.skip("unmaterialized transaction state is reset after a reconnect", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract/transaction.ts: unmaterialized (lazy) transaction reset after reconnect!
-    // SCOPE: ~15 LOC; affects ~7 tests
+  it("unmaterialized transaction state is reset after a reconnect", async () => {
+    await withConnection(async (conn) => {
+      await conn.transactionManager.beginTransaction();
+      expect(conn.isTransactionOpen()).toBe(true);
+      expect(rawTransactionOpen(conn)).toBe(false);
+      await conn.reconnectBang();
+      expect(conn.isTransactionOpen()).toBe(false);
+      expect(rawTransactionOpen(conn)).toBe(false);
+      await conn.materializeTransactions();
+      expect(rawTransactionOpen(conn)).toBe(false);
+    });
   });
   it.skip("unmaterialized transaction state can be restored after a reconnect", () => {
     // BLOCKED: transactions
@@ -477,10 +519,14 @@ describe("AdapterConnectionTest", () => {
     // reconnect! (Rails gates the whole suite `unless in_memory_db?`).
     // SCOPE: adapter raw-reconnect wiring; affects ~2 tests
   });
-  it.skip("unmaterialized transaction state is reset after a disconnect", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#disconnect!: must clear unmaterialized transaction state
-    // SCOPE: ~10 LOC; affects ~7 tests
+  it("unmaterialized transaction state is reset after a disconnect", async () => {
+    await withConnection(async (conn) => {
+      await conn.transactionManager.beginTransaction();
+      expect(conn.isTransactionOpen()).toBe(true);
+      expect(rawTransactionOpen(conn)).toBe(false);
+      conn.disconnectBang();
+      expect(conn.isTransactionOpen()).toBe(false);
+    });
   });
   it("active? detects remote disconnection", () => {
     const a = new LifecycleTestAdapter();
@@ -962,8 +1008,13 @@ describe("AdvisoryLocksEnabledTest", () => {
 
 describe("InvalidateTransactionTest", () => {
   it.skip("invalidates transaction on rollback error", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract/transaction.ts: currentTransaction#invalidated? after Deadlocked inside withRawConnection
-    // SCOPE: ~15 LOC; affects ~1 test
+    // BLOCKED: adapter-mysql
+    // ROOT-CAUSE: invalidateTransaction only fires when
+    // isSavepointErrorsInvalidateTransactions() is true (mysql2-adapter.ts);
+    // the abstract/sqlite/pg default is false, matching Rails
+    // savepoint_errors_invalidate_transactions?. A Deadlocked inside
+    // withRawConnection therefore invalidates the current transaction on MySQL
+    // only — needs MYSQL_TEST_URL test context (local-verify until RFC 0012).
+    // SCOPE: ~15 LOC port behind describeIfMysql; affects ~1 test
   });
 });
