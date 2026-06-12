@@ -361,6 +361,24 @@ Body text.
     expect(readFileSync(file, "utf8")).toBe(TEMPLATE);
   });
 
+  it("appends an absent key with no canonical position at the end of the block", () => {
+    // RFC-README keys like `clusters`/`packages` are not in the story key order;
+    // they fall back to an end-of-block append.
+    const file = writeStory(`---\ntitle: "R"\nstatus: active\n---\nbody\n`);
+    setFrontmatterList(file, "clusters", ["c1", "c2"]);
+    expect(readFileSync(file, "utf8")).toBe(
+      `---\ntitle: "R"\nstatus: active\nclusters:\n  - c1\n  - c2\n---\nbody\n`,
+    );
+  });
+
+  it("leaves a multi-line body untouched when replacing a key", () => {
+    const file = writeStory(`---\ndeps: []\nstatus: ready\n---\n# Heading\n\nline one\nline two\n`);
+    setFrontmatterList(file, "deps", ["a"]);
+    expect(readFileSync(file, "utf8")).toBe(
+      `---\ndeps:\n  - a\nstatus: ready\n---\n# Heading\n\nline one\nline two\n`,
+    );
+  });
+
   it("refuses a nested/multi-level structure", () => {
     const file = writeStory(`---\ndeps:\n  - name: a\n    version: 1\nstatus: ready\n---\nbody\n`);
     vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
