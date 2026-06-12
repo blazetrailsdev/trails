@@ -14,9 +14,8 @@ import {
   formatInstantForSqlMysql,
   formatPlainDateTimeForSqlMysql,
   formatPlainTimeForSqlMysql,
-  quote,
-  typeCast,
-} from "./quoting.js";
+} from "./sql-datetime.js";
+import { quote, typeCast } from "./quoting.js";
 import { temporalToBindString } from "./database-statements.js";
 
 describe("formatInstantForSql", () => {

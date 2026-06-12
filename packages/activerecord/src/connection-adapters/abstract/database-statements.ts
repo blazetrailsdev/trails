@@ -18,7 +18,7 @@ import {
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
   formatPlainTimeForSql,
-} from "./quoting.js";
+} from "./sql-datetime.js";
 import type { Quoting } from "./quoting-interface.js";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";

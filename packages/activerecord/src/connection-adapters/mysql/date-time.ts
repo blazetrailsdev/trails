@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { formatInstantForSqlMysql } from "../abstract/quoting.js";
+import { formatInstantForSqlMysql } from "../abstract/sql-datetime.js";
 import { DateTime as ARDateTime } from "../../type/date-time.js";
 
 /**

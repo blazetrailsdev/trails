@@ -13,7 +13,7 @@ import {
   DateInfinity,
   DateNegativeInfinity,
 } from "./temporal-wire.js";
-import { formatInstantForSql } from "./quoting.js";
+import { formatInstantForSql } from "./sql-datetime.js";
 import { getDefaultTimezone, setDefaultTimezone } from "../../type/internal/timezone.js";
 
 describe("parsePostgresInstant", () => {
