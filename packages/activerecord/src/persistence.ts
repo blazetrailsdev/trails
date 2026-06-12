@@ -1149,32 +1149,31 @@ export async function reload<T extends ReloadRecord>(this: T): Promise<T> {
     this as unknown as ThisParameterType<typeof strictLoadedAssociations>,
   );
   let freshPreloaded: Map<string, unknown> | undefined;
-  let freshCached: Map<string, unknown> | undefined;
   if (strictPreloads.length > 0) {
     try {
       const fresh = (await _findRecord.call(this as never)) as {
         _preloadedAssociations?: Map<string, unknown>;
-        _cachedAssociations?: Map<string, unknown>;
       };
       freshPreloaded = fresh._preloadedAssociations;
-      freshCached = fresh._cachedAssociations;
     } catch {
       // A default scope (or similar) may exclude the just-refetched row from
       // the preloading query; degrade to the plain cache-clear below.
     }
   }
 
+  // RFC 0022 b1+: reset the singular holder / collection proxy. The holder
+  // (`_associationInstances`) is the source of truth, but it still re-syncs its
+  // target from the transitional `_cachedAssociations` mirror until b4 deletes
+  // it — so the mirror is cleared alongside the holder to avoid resurfacing a
+  // stale singular target. Reload no longer *copies* a fresh `_cachedAssociations`
+  // snapshot back: re-preloaded strict-loaded targets come back through
+  // `_preloadedAssociations`, which the rebuilt holders sync from on next access.
   this._collectionProxies.clear();
   this._associationInstances.clear();
   this._preloadedAssociations.clear();
+  this._cachedAssociations?.clear();
   if (freshPreloaded) {
     for (const [name, value] of freshPreloaded) this._preloadedAssociations.set(name, value);
-  }
-  if (this._cachedAssociations) {
-    this._cachedAssociations.clear();
-    if (freshCached) {
-      for (const [name, value] of freshCached) this._cachedAssociations.set(name, value);
-    }
   }
   clearAutosaveState(this as unknown as Parameters<typeof clearAutosaveState>[0]);
   return this;

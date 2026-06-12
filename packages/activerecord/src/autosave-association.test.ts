@@ -185,8 +185,7 @@ const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
 };
 
 function cacheAssoc(record: Base, name: string, value: unknown) {
-  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-  (record as any)._cachedAssociations.set(name, value);
+  record.association(name).setTarget(value as any);
 }
 
 setupHandlerSuite();
@@ -196,8 +195,7 @@ beforeAll(async () => {
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
   useHandlerTransactionalFixtures();
 
@@ -644,8 +642,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
   useHandlerTransactionalFixtures();
 
@@ -1069,8 +1066,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
   useHandlerTransactionalFixtures();
 
@@ -1520,8 +1516,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   useHandlerTransactionalFixtures();
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
 
   function makeModels() {
@@ -1826,8 +1821,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
   useHandlerTransactionalFixtures();
 
@@ -2039,8 +2033,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
 describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
   useHandlerTransactionalFixtures();
 
@@ -2199,8 +2192,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
   useHandlerTransactionalFixtures();
 
@@ -3039,8 +3031,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
   useHandlerTransactionalFixtures();
 
@@ -3308,8 +3299,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
   useHandlerTransactionalFixtures();
 
@@ -3857,7 +3847,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     const { Pirate, Bird } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const invalidBird = new Bird({ name: "" });
-    ((pirate as any)._cachedAssociations ??= new Map()).set("birds", [invalidBird]);
+    pirate.association("birds").setTarget([invalidBird] as any);
     const saved = await pirate.save();
     expect(saved).toBe(false);
   });
@@ -4339,7 +4329,7 @@ describe("ChangedForAutosaveTest", () => {
     (child as any)._dirty.snapshot(child._attributes);
     child.writeAttribute("name", "modified");
 
-    (parent as any)._cachedAssociations = new Map([["children", [child]]]);
+    parent.association("children").setTarget([child] as any);
 
     expect(parent.changedForAutosave()).toBe(true);
   });
@@ -4367,7 +4357,7 @@ describe("ChangedForAutosaveTest", () => {
     (child as any)._newRecord = false;
     child.markForDestruction();
 
-    (parent as any)._cachedAssociations = new Map([["child", child]]);
+    parent.association("child").setTarget(child as any);
 
     expect(parent.changedForAutosave()).toBe(true);
   });
@@ -4397,8 +4387,8 @@ describe("ChangedForAutosaveTest", () => {
     const b = new B({ id: 2 });
     (b as any)._newRecord = false;
 
-    (a as any)._cachedAssociations = new Map([["b", b]]);
-    (b as any)._cachedAssociations = new Map([["a", a]]);
+    a.association("b").setTarget(b as any);
+    b.association("a").setTarget(a as any);
 
     // Should not stack overflow
     expect(a.changedForAutosave()).toBe(false);
@@ -4442,7 +4432,7 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     });
     const owner = new QcOwner({ tenant_id: 5, id: 11, name: "Corp" });
     const child = new QcChild({ title: "Doc" });
-    (owner as any)._cachedAssociations = new Map([["qcChild", child]]);
+    owner.association("qcChild").setTarget(child as any);
     const saved = await owner.save();
     expect(saved).toBe(true);
     expect(child.isNewRecord()).toBe(false);
@@ -4489,7 +4479,7 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     });
     const owner = new QcNoCollapse({ tenant_id: 9, id: 77, value: "v" });
     const child = new QcNoCollapseChild({ label: "l" });
-    (owner as any)._cachedAssociations = new Map([["qcNoCollapseChild", child]]);
+    owner.association("qcNoCollapseChild").setTarget(child as any);
     const saved = await owner.save();
     expect(saved).toBe(true);
     expect(child.isNewRecord()).toBe(false);
@@ -4536,7 +4526,7 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     Associations.hasOne.call(QcTenant, "qcTenantRecord", { autosave: true });
     const tenant = new QcTenant({ tenant_id: 7, id: 42, name: "Acme" });
     const rec = new QcTenantRecord({ note: "hello" });
-    (tenant as any)._cachedAssociations = new Map([["qcTenantRecord", rec]]);
+    tenant.association("qcTenantRecord").setTarget(rec as any);
     const saved = await tenant.save();
     expect(saved).toBe(true);
     expect(rec.isNewRecord()).toBe(false);

@@ -140,8 +140,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const book = new Book({ title: "My Book" });
 
     // Cache the association
-    (author as any)._cachedAssociations = new Map();
-    (author as any)._cachedAssociations.set("books", [book]);
+    author.association("books").setTarget([book] as any);
 
     const saved = await author.save();
     expect(saved).toBe(true);
@@ -186,8 +185,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const account = new Account({ credit_limit: 100 });
 
     // Cache the account association
-    (company as any)._cachedAssociations = new Map();
-    (company as any)._cachedAssociations.set("account", account);
+    company.association("account").setTarget(account as any);
 
     // Save company — should save and propagate FK
     const saved = await company.save();
@@ -215,8 +213,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     });
 
     const badAccount = new StrictAccount({});
-    (company2 as any)._cachedAssociations = new Map();
-    (company2 as any)._cachedAssociations.set("strictAccount", badAccount);
+    company2.association("strictAccount").setTarget(badAccount as any);
 
     const saved = await company2.save();
     expect(saved).toBe(false);
@@ -235,8 +232,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
     markForDestruction(account);
 
-    (company as any)._cachedAssociations = new Map();
-    (company as any)._cachedAssociations.set("account", account);
+    company.association("account").setTarget(account as any);
 
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -279,8 +275,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     const author = new Author({ name: "Dean" });
     const post = new Post({ title: "Hello" });
 
-    (post as any)._cachedAssociations = new Map();
-    (post as any)._cachedAssociations.set("author", author);
+    post.association("author").setTarget(author as any);
 
     const saved = await post.save();
     expect(saved).toBe(true);
@@ -293,8 +288,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     const author = new Author({ name: "New Author" });
     const post = new Post({ title: "Title" });
 
-    (post as any)._cachedAssociations = new Map();
-    (post as any)._cachedAssociations.set("author", author);
+    post.association("author").setTarget(author as any);
 
     await post.save();
 
@@ -306,8 +300,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     const author = new Author({ name: "Author 1" });
     const post = new Post({ title: "Post 1" });
 
-    (post as any)._cachedAssociations = new Map();
-    (post as any)._cachedAssociations.set("author", author);
+    post.association("author").setTarget(author as any);
 
     await post.save();
 
@@ -353,8 +346,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const company = new Company({ name: "Acme" });
     const badEmployee = new Employee({ name: "" }); // fails validates presence
 
-    (company as any)._cachedAssociations = new Map();
-    (company as any)._cachedAssociations.set("employees", [badEmployee]);
+    company.association("employees").setTarget([badEmployee] as any);
 
     const saved = await company.save();
     expect(saved).toBe(false);
@@ -364,8 +356,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const company = new Company({ name: "Acme" });
     const employee = new Employee({ name: "Alice" });
 
-    (company as any)._cachedAssociations = new Map();
-    (company as any)._cachedAssociations.set("employees", [employee]);
+    company.association("employees").setTarget([employee] as any);
 
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -379,8 +370,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
     markForDestruction(employee);
 
-    (company as any)._cachedAssociations = new Map();
-    (company as any)._cachedAssociations.set("employees", [employee]);
+    company.association("employees").setTarget([employee] as any);
 
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -392,8 +382,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const employee = await Employee.create({ name: "Bob", company_id: company.id });
 
     // employee is persisted and unchanged
-    (company as any)._cachedAssociations = new Map();
-    (company as any)._cachedAssociations.set("employees", [employee]);
+    company.association("employees").setTarget([employee] as any);
 
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -440,8 +429,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 
     markForDestruction(part1);
 
-    (ship as any)._cachedAssociations = new Map();
-    (ship as any)._cachedAssociations.set("parts", [part1, part2]);
+    ship.association("parts").setTarget([part1, part2] as any);
 
     await ship.save();
 
@@ -453,8 +441,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const ship = await Ship.create({ name: "HMS Victory" });
     const part = await Part.create({ name: "Cannon", ship_id: ship.id });
 
-    (ship as any)._cachedAssociations = new Map();
-    (ship as any)._cachedAssociations.set("parts", [part]);
+    ship.association("parts").setTarget([part] as any);
 
     await ship.save();
 
@@ -485,8 +472,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 
     markForDestruction(ship);
 
-    (pirate as any)._cachedAssociations = new Map();
-    (pirate as any)._cachedAssociations.set("pirateShip", ship);
+    pirate.association("pirateShip").setTarget(ship as any);
 
     await pirate.save();
 

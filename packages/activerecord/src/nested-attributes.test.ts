@@ -2454,8 +2454,7 @@ describe("Nested Attributes (Rails-guided)", () => {
   });
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
 
   function makeModels() {
@@ -2671,8 +2670,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   });
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
 
   function makeModels() {
@@ -2881,8 +2879,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   });
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-    (record as any)._cachedAssociations.set(name, value);
+    record.association(name).setTarget(value as any);
   }
 
   function makeModels() {

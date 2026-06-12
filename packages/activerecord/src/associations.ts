@@ -2270,17 +2270,15 @@ export async function updateCounterCaches(
     // is already loaded in memory (wired via inverse-of from a collection proxy
     // create/push), update it directly so the caller sees the new count without
     // a reload. Otherwise fall back to a fresh DB fetch.
-    // `_cachedAssociations` stores a scalar Base for belongs-to and an array
-    // for has-many; skip the array branch (wrong direction) and null (no assoc).
+    // RFC 0022 b1+: the loaded belongs_to owner lives on the SingularAssociation
+    // holder (`record.association(name).target`); read it there rather than off
+    // the legacy `_cachedAssociations` mirror. The holder's target is a scalar
+    // Base (or null) for belongs_to; the Array guard below is defensive.
     // Guard against a stale cached owner: mirrors Rails' Association#target which
     // returns nil when stale_target? (FK changed after wiring). Check the cached
     // owner's PK still matches the record's current FK before using it.
     const targetPk = targetModel.primaryKey as string;
-    const loadedOwner = (record as any)._cachedAssociations?.get(assoc.name) as
-      | Base
-      | Base[]
-      | null
-      | undefined;
+    const loadedOwner = record.association(assoc.name).target as Base | Base[] | null | undefined;
     const cachedPkValue =
       loadedOwner != null && !Array.isArray(loadedOwner)
         ? (loadedOwner as any)._readAttribute?.(targetPk)
