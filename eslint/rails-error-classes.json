@@ -1,0 +1,716 @@
+{
+  "generatedAt": "vendored",
+  "packages": {
+    "activerecord": [
+      {
+        "name": "ActiveRecordError",
+        "parent": "StandardError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "AdapterError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "AdapterNotFound",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "AdapterNotSpecified",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "AdapterTimeout",
+        "parent": "QueryAborted",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "AmbiguousSourceReflectionForThroughAssociation",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "ArelError",
+        "parent": "StandardError",
+        "rubyFile": "arel/errors.rb"
+      },
+      {
+        "name": "AssociationNotFoundError",
+        "parent": "ConfigurationError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "AssociationTypeMismatch",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "AsynchronousQueryInsideTransactionError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "AttributeAssignmentError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "Base",
+        "parent": "StandardError",
+        "rubyFile": "active_record/encryption/errors.rb"
+      },
+      {
+        "name": "BindError",
+        "parent": "ArelError",
+        "rubyFile": "arel/errors.rb"
+      },
+      {
+        "name": "ColumnNotSerializableError",
+        "parent": "StandardError",
+        "rubyFile": "active_record/attribute_methods/serialization.rb"
+      },
+      {
+        "name": "CompositePrimaryKeyMismatchError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "ConcurrentMigrationError",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "Configuration",
+        "parent": "Base",
+        "rubyFile": "active_record/encryption/errors.rb"
+      },
+      {
+        "name": "ConfigurationError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "ConnectionFailed",
+        "parent": "QueryAborted",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "ConnectionNotDefined",
+        "parent": "ConnectionNotEstablished",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "ConnectionNotEstablished",
+        "parent": "AdapterError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "ConnectionTimeoutError",
+        "parent": "ConnectionNotEstablished",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "DangerousAttributeError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "DatabaseAlreadyExists",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "DatabaseConnectionError",
+        "parent": "ConnectionNotEstablished",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "DatabaseNotSupported",
+        "parent": "StandardError",
+        "rubyFile": "active_record/tasks/database_tasks.rb"
+      },
+      {
+        "name": "DatabaseVersionError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "Deadlocked",
+        "parent": "TransactionRollbackError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "Decryption",
+        "parent": "Base",
+        "rubyFile": "active_record/encryption/errors.rb"
+      },
+      {
+        "name": "DeleteRestrictionError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "DestroyAssociationAsyncError",
+        "parent": "StandardError",
+        "rubyFile": "active_record/destroy_association_async_job.rb"
+      },
+      {
+        "name": "DuplicateMigrationNameError",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "DuplicateMigrationVersionError",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "EagerLoadPolymorphicError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "EmptyJoinError",
+        "parent": "ArelError",
+        "rubyFile": "arel/errors.rb"
+      },
+      {
+        "name": "Encoding",
+        "parent": "Base",
+        "rubyFile": "active_record/encryption/errors.rb"
+      },
+      {
+        "name": "EncryptedContentIntegrity",
+        "parent": "Base",
+        "rubyFile": "active_record/encryption/errors.rb"
+      },
+      {
+        "name": "Encryption",
+        "parent": "Base",
+        "rubyFile": "active_record/encryption/errors.rb"
+      },
+      {
+        "name": "EnvironmentMismatchError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "EnvironmentStorageError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "ExclusiveConnectionTimeoutError",
+        "parent": "ConnectionTimeoutError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "FixtureError",
+        "parent": "StandardError",
+        "rubyFile": "active_record/fixtures.rb"
+      },
+      {
+        "name": "ForbiddenClass",
+        "parent": "Base",
+        "rubyFile": "active_record/encryption/errors.rb"
+      },
+      {
+        "name": "FormatError",
+        "parent": "FixtureError",
+        "rubyFile": "active_record/fixtures.rb"
+      },
+      {
+        "name": "HasManyThroughAssociationNotFoundError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasManyThroughAssociationPointlessSourceTypeError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasManyThroughAssociationPolymorphicSourceError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasManyThroughAssociationPolymorphicThroughError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasManyThroughCantAssociateThroughHasOneOrManyReflection",
+        "parent": "ThroughCantAssociateThroughHasOneOrManyReflection",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasManyThroughNestedAssociationsAreReadonly",
+        "parent": "ThroughNestedAssociationsAreReadonly",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasManyThroughOrderError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasManyThroughSourceAssociationNotFoundError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasOneAssociationPolymorphicThroughError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasOneThroughCantAssociateThroughCollection",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasOneThroughCantAssociateThroughHasOneOrManyReflection",
+        "parent": "ThroughCantAssociateThroughHasOneOrManyReflection",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "HasOneThroughNestedAssociationsAreReadonly",
+        "parent": "ThroughNestedAssociationsAreReadonly",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "IllegalMigrationNameError",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "InstrumentationAlreadyStartedError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/connection_adapters/abstract/transaction.rb"
+      },
+      {
+        "name": "InstrumentationNotStartedError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/connection_adapters/abstract/transaction.rb"
+      },
+      {
+        "name": "IntegerOutOf64BitRange",
+        "parent": "StandardError",
+        "rubyFile": "active_record/connection_adapters/postgresql/quoting.rb"
+      },
+      {
+        "name": "InvalidConfigurationError",
+        "parent": "StandardError",
+        "rubyFile": "active_record/database_configurations.rb"
+      },
+      {
+        "name": "InvalidForeignKey",
+        "parent": "WrappedDatabaseException",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "InvalidMigrationTimestampError",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "InverseOfAssociationNotFoundError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "InverseOfAssociationRecursiveError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "IrreversibleMigration",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "IrreversibleOrderError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "LockWaitTimeout",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "MigrationError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "MinimumLengthError",
+        "parent": "StandardError",
+        "rubyFile": "active_record/secure_token.rb"
+      },
+      {
+        "name": "MismatchedForeignKey",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "MultiparameterAssignmentErrors",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "NoDatabaseError",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "NoEnvironmentInSchemaError",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "NotNullViolation",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "PendingMigrationError",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "PreparedStatementCacheExpired",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "PreparedStatementInvalid",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "PrimaryKeyError",
+        "parent": "StandardError",
+        "rubyFile": "active_record/fixture_set/table_row.rb"
+      },
+      {
+        "name": "ProtectedEnvironmentError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "QueryAborted",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "QueryCanceled",
+        "parent": "QueryAborted",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "RangeError",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "ReadonlyAttributeError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/readonly_attributes.rb"
+      },
+      {
+        "name": "ReadOnlyError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "ReadOnlyRecord",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "RecordInvalid",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/validations.rb"
+      },
+      {
+        "name": "RecordNotDestroyed",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "RecordNotFound",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "RecordNotSaved",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "RecordNotUnique",
+        "parent": "WrappedDatabaseException",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "Rollback",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "SerializationFailure",
+        "parent": "TransactionRollbackError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "SerializationTypeMismatch",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "SoleRecordExceeded",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "SQLWarning",
+        "parent": "AdapterError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "StaleObjectError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "StatementInvalid",
+        "parent": "AdapterError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "StatementTimeout",
+        "parent": "QueryAborted",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "StrictLoadingViolationError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "SubclassNotFound",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "TableNotSpecified",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "ThroughCantAssociateThroughHasOneOrManyReflection",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "ThroughNestedAssociationsAreReadonly",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/associations/errors.rb"
+      },
+      {
+        "name": "TooManyRecords",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/nested_attributes.rb"
+      },
+      {
+        "name": "TransactionIsolationError",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "TransactionRollbackError",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "TypeConflictError",
+        "parent": "StandardError",
+        "rubyFile": "active_record/type/adapter_specific_registry.rb"
+      },
+      {
+        "name": "UnknownAttributeReference",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "UnknownMigrationVersionError",
+        "parent": "MigrationError",
+        "rubyFile": "active_record/migration.rb"
+      },
+      {
+        "name": "UnknownPrimaryKey",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "UnmodifiableRelation",
+        "parent": "ActiveRecordError",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "UnsupportedVisitError",
+        "parent": "StandardError",
+        "rubyFile": "arel/visitors/to_sql.rb"
+      },
+      {
+        "name": "ValueTooLong",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      },
+      {
+        "name": "WrappedDatabaseException",
+        "parent": "StatementInvalid",
+        "rubyFile": "active_record/errors.rb"
+      }
+    ],
+    "activemodel": [
+      {
+        "name": "ForbiddenAttributesError",
+        "parent": "StandardError",
+        "rubyFile": "active_model/forbidden_attributes_protection.rb"
+      },
+      {
+        "name": "MissingAttributeError",
+        "parent": "NoMethodError",
+        "rubyFile": "active_model/attribute_methods.rb"
+      },
+      {
+        "name": "RangeError",
+        "parent": "RangeError",
+        "rubyFile": "active_model/errors.rb"
+      },
+      {
+        "name": "StrictValidationFailed",
+        "parent": "StandardError",
+        "rubyFile": "active_model/errors.rb"
+      },
+      {
+        "name": "UnknownAttributeError",
+        "parent": "NoMethodError",
+        "rubyFile": "active_model/errors.rb"
+      },
+      {
+        "name": "ValidationError",
+        "parent": "StandardError",
+        "rubyFile": "active_model/validations.rb"
+      }
+    ],
+    "activesupport": [
+      {
+        "name": "DelegationError",
+        "parent": "NoMethodError",
+        "rubyFile": "active_support/delegation.rb"
+      },
+      {
+        "name": "DeprecationException",
+        "parent": "StandardError",
+        "rubyFile": "active_support/deprecation/behaviors.rb"
+      },
+      {
+        "name": "DisallowedType",
+        "parent": "StandardError",
+        "rubyFile": "active_support/core_ext/hash/conversions.rb"
+      },
+      {
+        "name": "FormatError",
+        "parent": "StandardError",
+        "rubyFile": "active_support/configuration_file.rb"
+      },
+      {
+        "name": "InstrumentationSubscriberError",
+        "parent": "RuntimeError",
+        "rubyFile": "active_support/notifications/fanout.rb"
+      },
+      {
+        "name": "InvalidContentError",
+        "parent": "RuntimeError",
+        "rubyFile": "active_support/encrypted_configuration.rb"
+      },
+      {
+        "name": "InvalidKeyError",
+        "parent": "RuntimeError",
+        "rubyFile": "active_support/encrypted_configuration.rb"
+      },
+      {
+        "name": "InvalidKeyLengthError",
+        "parent": "RuntimeError",
+        "rubyFile": "active_support/encrypted_file.rb"
+      },
+      {
+        "name": "InvalidMessage",
+        "parent": "StandardError",
+        "rubyFile": "active_support/message_encryptor.rb"
+      },
+      {
+        "name": "InvalidSignature",
+        "parent": "StandardError",
+        "rubyFile": "active_support/message_verifier.rb"
+      },
+      {
+        "name": "MissingClassError",
+        "parent": "StandardError",
+        "rubyFile": "active_support/message_pack/extensions.rb"
+      },
+      {
+        "name": "MissingContentError",
+        "parent": "RuntimeError",
+        "rubyFile": "active_support/encrypted_file.rb"
+      },
+      {
+        "name": "MissingKeyError",
+        "parent": "RuntimeError",
+        "rubyFile": "active_support/encrypted_file.rb"
+      },
+      {
+        "name": "MultipleIncludedBlocks",
+        "parent": "StandardError",
+        "rubyFile": "active_support/concern.rb"
+      },
+      {
+        "name": "MultiplePrependBlocks",
+        "parent": "StandardError",
+        "rubyFile": "active_support/concern.rb"
+      },
+      {
+        "name": "NonActionable",
+        "parent": "StandardError",
+        "rubyFile": "active_support/actionable_error.rb"
+      },
+      {
+        "name": "ParsingError",
+        "parent": "ArgumentError",
+        "rubyFile": "active_support/duration/iso8601_parser.rb"
+      },
+      {
+        "name": "SafeConcatError",
+        "parent": "StandardError",
+        "rubyFile": "active_support/core_ext/string/output_safety.rb"
+      },
+      {
+        "name": "SoleItemExpectedError",
+        "parent": "StandardError",
+        "rubyFile": "active_support/core_ext/enumerable.rb"
+      },
+      {
+        "name": "UnserializableObjectError",
+        "parent": "StandardError",
+        "rubyFile": "active_support/message_pack/extensions.rb"
+      }
+    ]
+  }
+}
