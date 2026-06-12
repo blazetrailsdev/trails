@@ -1077,8 +1077,6 @@ function main() {
         }
       }
 
-      // Advisory arity check for one name-matched pair: flag when the Ruby and
-      // TS positional-arg ranges don't overlap (see arity.ts).
       // Advisory option-key check: diff the Ruby method's consumed option
       // symbols against the TS options-object keys (see options-keys.ts).
       const checkOptionKeys = (rubyName: string, tsName: string, tsFile: string) => {
@@ -1100,6 +1098,9 @@ function main() {
         });
       };
 
+      // Advisory arity check for one name-matched pair: flag when the Ruby and
+      // TS positional-arg ranges don't overlap (see arity.ts). Also drives the
+      // option-key check, which shares the same matched (ruby, ts) pairs.
       const checkArity = (rubyName: string, tsName: string, tsFile: string) => {
         checkOptionKeys(rubyName, tsName, tsFile);
         if (ARITY_OVERRIDES.has(rubyName)) return;
@@ -1429,6 +1430,8 @@ function main() {
           "and `extraInTs` is informational.",
         compared: results.reduce((n, r) => n + r.optionKeys.compared, 0),
         mismatched: optionKeysFlat.length,
+        // The likely-real subset: pairs where Ruby honours a key TS omits.
+        withMissingInTs: optionKeysFlat.filter((m) => m.missingInTs.length > 0).length,
         mismatches: optionKeysFlat,
       },
       null,
@@ -1480,6 +1483,7 @@ function printReport(
   let grandArityMismatched = 0;
   let grandOptKeysCompared = 0;
   let grandOptKeysMismatched = 0;
+  let grandOptKeysMissing = 0;
 
   for (const pkg of results) {
     grandTotal += pkg.totalMethods;
@@ -1492,6 +1496,7 @@ function printReport(
     grandArityMismatched += pkg.arity.mismatched;
     grandOptKeysCompared += pkg.optionKeys.compared;
     grandOptKeysMismatched += pkg.optionKeys.mismatched;
+    grandOptKeysMissing += pkg.optionKeys.mismatches.filter((m) => m.missingInTs.length > 0).length;
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
@@ -1609,11 +1614,10 @@ function printReport(
     );
   }
   if (grandOptKeysCompared > 0) {
-    const okOk = grandOptKeysCompared - grandOptKeysMismatched;
-    const okPct = Math.round((okOk / grandOptKeysCompared) * 1000) / 10;
     console.log(
-      `  Option keys (advisory): ${okOk}/${grandOptKeysCompared} (${okPct}%) — ` +
-        `${grandOptKeysMismatched} differ, see output/options-key-mismatches.json`,
+      `  Option keys (advisory): ${grandOptKeysCompared} pairs compared, ` +
+        `${grandOptKeysMissing} with keys missing in TS (likely-real), ` +
+        `${grandOptKeysMismatched} differ total — see output/options-key-mismatches.json`,
     );
   }
   console.log(`${"=".repeat(100)}\n`);
