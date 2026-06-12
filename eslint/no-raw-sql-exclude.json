@@ -1,0 +1,12 @@
+[
+  "packages/activerecord/src/migrator.ts",
+  "packages/activerecord/src/persistence.ts",
+  "packages/activerecord/src/relation.ts",
+  "packages/activerecord/src/relation/calculations.ts",
+  "packages/activerecord/src/relation/query-methods.ts",
+  "packages/activerecord/src/relation/where-clause.ts",
+  "packages/activerecord/src/test-helpers/define-fixtures.ts",
+  "packages/activerecord/src/test-helpers/drop-all-tables.ts",
+  "packages/activerecord/src/test-helpers/template-global-setup.ts",
+  "packages/activerecord/src/test-setup-worker-db.ts"
+]
