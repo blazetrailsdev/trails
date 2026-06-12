@@ -2666,6 +2666,25 @@ describe("RelationTest", () => {
       .toSql();
     expect(sql).toContain("UNION");
   });
+
+  it("union threads binds from both operands through one collector", async () => {
+    // Multiple bound params per side stress global numbering: a renumber bug
+    // (or per-side $1 collision on PostgreSQL) would error or return wrong rows.
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    await User.create({ name: "Alice", age: 20 });
+    await User.create({ name: "Bob", age: 30 });
+    await User.create({ name: "Charlie", age: 25 });
+
+    const left = User.where({ name: "Alice", age: 20 });
+    const right = User.where({ name: "Bob", age: 30 });
+    const result = await left.union(right).toArray();
+    expect(result.map((u) => u.name).sort()).toEqual(["Alice", "Bob"]);
+  });
 });
 
 describe("RelationTest", () => {
