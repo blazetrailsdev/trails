@@ -355,7 +355,22 @@ function replaceBindVariables(quoter: Quoter, statement: string, values: unknown
  * @internal
  */
 function replaceBindVariable(quoter: Quoter, value: unknown): string {
+  // Rails checks `ActiveRecord::Relation === value` first and inlines the
+  // relation's SQL as a subquery. Duck-typed here to avoid importing Relation
+  // (circular): a Relation exposes both `toSql` and `toArray`, which a record
+  // or scalar bind value does not.
+  if (isRelationLike(value)) {
+    return (value as { toSql(): string }).toSql();
+  }
   return quoteBoundValue(quoter, value);
+}
+
+function isRelationLike(value: unknown): value is { toSql(): string } {
+  return (
+    value != null &&
+    typeof (value as { toSql?: unknown }).toSql === "function" &&
+    typeof (value as { toArray?: unknown }).toArray === "function"
+  );
 }
 
 /**

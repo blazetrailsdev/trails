@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
+import { adapterType } from "./test-adapter.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -97,12 +98,25 @@ describe("UnsafeRawSqlTest", () => {
     expect(ids).toEqual(idsExpected);
   });
 
-  it.skip("order: allows NULLS FIRST and NULLS LAST too", () => {
-    // BLOCKED: relation — unsafe-raw-sql feature gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for unsafe_raw_sql
-    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in unsafe-raw-sql.test.ts
-    // PostgreSQL-only (type cast syntax `::text`); skip for in-memory adapter.
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "order: allows NULLS FIRST and NULLS LAST too",
+    async () => {
+      const first = await Post.order("id").first();
+      const last = await Post.order("id").last();
+      await first!.updateColumn("type", null);
+      await last!.updateColumn("type", "Programming");
+
+      for (const direction of ["asc", "desc", ""]) {
+        for (const position of ["first", "last"]) {
+          const idsExpected = await Post.order(
+            arelSql(`type::text ${direction} nulls ${position}`),
+          ).pluck("id");
+          const ids = await Post.order(`type::text ${direction} nulls ${position}`).pluck("id");
+          expect(ids).toEqual(idsExpected);
+        }
+      }
+    },
+  );
 
   it("order: disallows invalid column name", async () => {
     await expect(async () => {
@@ -151,11 +165,15 @@ describe("UnsafeRawSqlTest", () => {
     expect(ids).toEqual(idsExpected);
   });
 
-  it.skip("order: allows valid arguments with COLLATE", () => {
-    // BLOCKED: relation — unsafe-raw-sql feature gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for unsafe_raw_sql
-    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in unsafe-raw-sql.test.ts
-    // COLLATE syntax is adapter-specific.
+  it("order: allows valid arguments with COLLATE", async () => {
+    const collationName = { postgres: "C", mysql: "utf8mb4_bin", sqlite: "binary" }[adapterType];
+    const idsExpected = await Post.order(
+      arelSql(`author_id, title COLLATE "${collationName}" DESC`),
+    ).pluck("id");
+    const ids = await Post.order(["author_id", `title COLLATE "${collationName}" DESC`]).pluck(
+      "id",
+    );
+    expect(ids).toEqual(idsExpected);
   });
 
   it("order: allows nested functions", async () => {

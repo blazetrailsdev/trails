@@ -2824,11 +2824,40 @@ describe("ReflectionTest", () => {
     }
     expect(reflectOnAssociation(Person, "nonexistent")).toBeNull();
   });
-  it.skip("using query constraints warns about changing behavior", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    /* fixture-dependent */
+  it("using query constraints warns about changing behavior", () => {
+    class Firm extends Base {
+      static {
+        this.attribute("id", "integer");
+      }
+    }
+    registerModel(Firm);
+
+    expect(() =>
+      Associations.hasMany.call(Firm, "clients", {
+        queryConstraints: ["firm_id", "firm_name"],
+      }),
+    ).toThrow(
+      "Setting `queryConstraints:` option on `Firm.hasMany :clients` is not allowed. " +
+        "To get the same behavior, use the `foreignKey` option instead.",
+    );
+
+    expect(() =>
+      Associations.hasOne.call(Firm, "account", {
+        queryConstraints: ["firm_id", "firm_name"],
+      }),
+    ).toThrow(
+      "Setting `queryConstraints:` option on `Firm.hasOne :account` is not allowed. " +
+        "To get the same behavior, use the `foreignKey` option instead.",
+    );
+
+    expect(() =>
+      Associations.belongsTo.call(Firm, "client", {
+        queryConstraints: ["firm_id", "firm_name"],
+      }),
+    ).toThrow(
+      "Setting `queryConstraints:` option on `Firm.belongsTo :client` is not allowed. " +
+        "To get the same behavior, use the `foreignKey` option instead.",
+    );
   });
 
   it("counter cache column option extracts the explicit column from raw forms", () => {
