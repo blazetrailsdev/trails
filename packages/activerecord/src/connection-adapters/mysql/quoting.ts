@@ -157,7 +157,7 @@ export function columnNameWithOrderMatcher(): RegExp {
   const fnCall2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
   const fnCall1 = String.raw`\w+\(\s*(?:\*|${col}|${fnCall2})?\s*\)`;
   const expr = String.raw`(?:${col}|${fnCall1})`;
-  const collate = String.raw`(?:\s+COLLATE\s+\w+)?`;
+  const collate = String.raw`(?:\s+COLLATE\s+(?:\w+|"\w+"))?`;
   const dir = String.raw`(?:\s+ASC|\s+DESC)?`;
   const nulls = String.raw`(?:\s+NULLS\s+(?:FIRST|LAST))?`;
   const ordered = String.raw`${expr}${collate}${dir}${nulls}`;
