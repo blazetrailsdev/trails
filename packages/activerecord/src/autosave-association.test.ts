@@ -24,6 +24,7 @@ import {
 } from "./autosave-association.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 
 const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
   pirates: { catchphrase: "string" },
@@ -182,6 +183,10 @@ const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
   parrots_pirates: { pirate_id: "integer", parrot_id: "integer" },
   nauto_articles: { title: "string" },
   nauto_tags: { name: "string", nauto_article_id: "integer" },
+  pwacc_posts: { title: "string", body: "string", author_id: "integer" },
+  pwacc_comments: { post_id: "integer", body: "string" },
+  pwacc_categories: { name: "string" },
+  pwacc_categories_posts: { category_id: "integer", post_id: "integer" },
 };
 
 function cacheAssoc(record: Base, name: string, value: unknown) {
@@ -1089,6 +1094,54 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     return { Firm, Account };
   }
 
+  function makeIrisModels() {
+    class Eye extends Base {
+      static {
+        this._tableName = "eyes";
+      }
+    }
+    class Iris extends Base {
+      static {
+        this._tableName = "iris";
+        this.attribute("color", "string");
+        this.attribute("eye_id", "integer");
+        this.beforeValidation((r: any) => {
+          r.beforeValidationCounter = (r.beforeValidationCounter ?? 0) + 1;
+        });
+        this.afterValidation((r: any) => {
+          r.afterValidationCounter = (r.afterValidationCounter ?? 0) + 1;
+        });
+        this.beforeCreate((r: any) => {
+          r.beforeCreateCounter = (r.beforeCreateCounter ?? 0) + 1;
+        });
+        this.afterCreate((r: any) => {
+          r.afterCreateCounter = (r.afterCreateCounter ?? 0) + 1;
+        });
+        this.beforeSave((r: any) => {
+          r.beforeSaveCounter = (r.beforeSaveCounter ?? 0) + 1;
+        });
+        this.afterSave((r: any) => {
+          r.afterSaveCounter = (r.afterSaveCounter ?? 0) + 1;
+        });
+      }
+    }
+    registerModel("Eye", Eye);
+    registerModel("Iris", Iris);
+    Associations.hasOne.call(Eye, "iris", {
+      autosave: true,
+      className: "Iris",
+      foreignKey: "eye_id",
+      inverseOf: "eye",
+    });
+    Associations.belongsTo.call(Iris, "eye", {
+      autosave: true,
+      className: "Eye",
+      foreignKey: "eye_id",
+      inverseOf: "iris",
+    });
+    return { Eye, Iris };
+  }
+
   it("should save parent but not invalid child", async () => {
     // Without autosave: invalid has_one child does not block parent save
     class PFirm extends Base {
@@ -1354,11 +1407,20 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(log).toContain("child_after_save");
     expect(child.isNewRecord()).toBe(false);
   });
-  it.skip("callbacks on child when parent autosaves child twice", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs more callback infrastructure */
+  it("callbacks on child when parent autosaves child twice", async () => {
+    const { Eye, Iris } = makeIrisModels();
+    const eye = await Eye.create({});
+    cacheAssoc(eye, "iris", new Iris({ color: "blue" }));
+    await eye.save();
+    const iris = new Iris({ color: "green" });
+    cacheAssoc(eye, "iris", iris);
+    await eye.save();
+    expect((iris as any).beforeValidationCounter).toBe(1);
+    expect((iris as any).beforeCreateCounter).toBe(1);
+    expect((iris as any).beforeSaveCounter).toBe(1);
+    expect((iris as any).afterValidationCounter).toBe(1);
+    expect((iris as any).afterCreateCounter).toBe(1);
+    expect((iris as any).afterSaveCounter).toBe(1);
   });
   it("callbacks on child when parent autosaves polymorphic child with inverse of", async () => {
     const log: string[] = [];
@@ -1443,11 +1505,19 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(log).toContain("owner_after_save");
     expect(owner.isNewRecord()).toBe(false);
   });
-  it.skip("callbacks on child when child autosaves parent twice", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs more callback infrastructure */
+  it("callbacks on child when child autosaves parent twice", async () => {
+    const { Eye, Iris } = makeIrisModels();
+    const iris = new Iris({ color: "blue" });
+    cacheAssoc(iris, "eye", new Eye({}));
+    await iris.save();
+    cacheAssoc(iris, "eye", new Eye({}));
+    await iris.save();
+    expect((iris as any).beforeValidationCounter).toBe(2);
+    expect((iris as any).beforeCreateCounter).toBe(1);
+    expect((iris as any).beforeSaveCounter).toBe(2);
+    expect((iris as any).afterValidationCounter).toBe(2);
+    expect((iris as any).afterCreateCounter).toBe(1);
+    expect((iris as any).afterSaveCounter).toBe(2);
   });
   it("callbacks on child when polymorphic child with inverse of autosaves parent", async () => {
     const log: string[] = [];
@@ -1574,11 +1644,43 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     expect(ship.isNewRecord()).toBe(false);
   });
 
-  it.skip("should automatically save bang the associated model if it sets the inverse record", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* inverse not fully implemented */
+  it("should automatically save bang the associated model if it sets the inverse record", async () => {
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+      }
+    }
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.validates("name", { presence: true });
+      }
+    }
+    registerModel("Pirate", Pirate);
+    registerModel("Ship", Ship);
+    Associations.hasOne.call(Pirate, "ship", {
+      autosave: true,
+      className: "Ship",
+      foreignKey: "pirate_id",
+      inverseOf: "pirate",
+    });
+    Associations.belongsTo.call(Ship, "pirate", {
+      className: "Pirate",
+      foreignKey: "pirate_id",
+      inverseOf: "ship",
+    });
+    const pirate = new Pirate({ catchphrase: "Savvy?" });
+    const ship = new Ship({ name: "Black Pearl" });
+    setBelongsTo(ship, "pirate", pirate, {
+      className: "Pirate",
+      foreignKey: "pirate_id",
+      inverseOf: "ship",
+    });
+    await pirate.save();
+    const reloaded = await Pirate.find(pirate.id!);
+    const reloadedShip = (await reloaded.association("ship").loadTarget()) as Base;
+    expect(reloadedShip.name).toBe("Black Pearl");
   });
 
   it("should automatically validate the associated model", async () => {
@@ -1844,6 +1946,41 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     return { Author, Post };
   }
 
+  function makeOrderModels() {
+    class Customer extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Order extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("billing_customer_id", "integer");
+        this.attribute("shipping_customer_id", "integer");
+      }
+    }
+    registerModel("Customer", Customer);
+    registerModel("Order", Order);
+    Associations.belongsTo.call(Order, "billing", {
+      autosave: true,
+      className: "Customer",
+      foreignKey: "billing_customer_id",
+    });
+    Associations.belongsTo.call(Order, "shipping", {
+      autosave: true,
+      className: "Customer",
+      foreignKey: "shipping_customer_id",
+    });
+    return { Customer, Order };
+  }
+
+  function setBilling(order: Base, customer: Base) {
+    (order.association("billing") as any).writer(customer);
+  }
+  function setShipping(order: Base, customer: Base) {
+    (order.association("shipping") as any).writer(customer);
+  }
+
   it("should save parent but not invalid child", async () => {
     const { Author, Post } = makeModels();
     const author = new Author({ name: "" }); // invalid
@@ -1915,23 +2052,61 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     expect(post.author_id).toBe(author.id);
   });
 
-  it.skip("store association in two relations with one save", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs autosave FK sync on cached belongs_to */
+  it("store association in two relations with one save", async () => {
+    const { Customer, Order } = makeOrderModels();
+    const numOrders = (await Order.count()) as number;
+    const numCustomers = (await Customer.count()) as number;
+    const order = new Order({});
+    const customer = new Customer({ name: "C" });
+    setBilling(order, customer);
+    setShipping(order, customer);
+    expect(await order.save()).toBe(true);
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    await order.reload();
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    expect(await Order.count()).toBe(numOrders + 1);
+    expect(await Customer.count()).toBe(numCustomers + 1);
   });
-  it.skip("store association in two relations with one save in existing object", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs autosave FK sync */
+  it("store association in two relations with one save in existing object", async () => {
+    const { Customer, Order } = makeOrderModels();
+    const numOrders = (await Order.count()) as number;
+    const numCustomers = (await Customer.count()) as number;
+    const order = await Order.create({});
+    const customer = new Customer({ name: "C" });
+    setBilling(order, customer);
+    setShipping(order, customer);
+    expect(await order.save()).toBe(true);
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    await order.reload();
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    expect(await Order.count()).toBe(numOrders + 1);
+    expect(await Customer.count()).toBe(numCustomers + 1);
   });
-  it.skip("store association in two relations with one save in existing object with values", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs autosave FK sync */
+  it("store association in two relations with one save in existing object with values", async () => {
+    const { Customer, Order } = makeOrderModels();
+    const numOrders = (await Order.count()) as number;
+    const numCustomers = (await Customer.count()) as number;
+    const order = await Order.create({});
+    let customer = new Customer({ name: "C" });
+    setBilling(order, customer);
+    setShipping(order, customer);
+    expect(await order.save()).toBe(true);
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    await order.reload();
+    customer = new Customer({ name: "C2" });
+    setBilling(order, customer);
+    setShipping(order, customer);
+    expect(await order.save()).toBe(true);
+    await order.reload();
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
+    expect(await Order.count()).toBe(numOrders + 1);
+    expect(await Customer.count()).toBe(numCustomers + 2);
   });
 
   it("store association with a polymorphic relationship", async () => {
@@ -3118,11 +3293,24 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     expect(reloaded.name).toBe("Updated Pearl");
   });
 
-  it.skip("when extra records exist for associations, validate should not load them up", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires lazy-loading tracking */
+  it("when extra records exist for associations, validate should not load them up", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = new Ship({ name: "Pearl" });
+    cacheAssoc(pirate, "ships", [ship]);
+    const part = new Part({ name: "Mast" });
+    cacheAssoc(ship, "parts", [part]);
+    await pirate.save();
+    part.name = "changed";
+    // Extra records in the DB that are absent from the already-loaded
+    // collections. `valid?` calls `nested_records_changed_for_autosave?`,
+    // which must consult the loaded target only — never reload — so these
+    // extras are not pulled in.
+    await Ship.create({ name: "Black Rock", pirate_id: pirate.id });
+    await Part.create({ name: "Stern", ship_id: ship.id });
+    await assertNoQueries(false, async () => {
+      await pirate.isValid();
+    });
   });
 });
 
@@ -3355,11 +3543,22 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     expect(newPart.isNewRecord()).toBe(false);
   });
 
-  it.skip("when extra records exist for associations, validate should not load them up", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires lazy-loading tracking */
+  it("when extra records exist for associations, validate should not load them up", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = new Ship({ name: "Pearl" });
+    cacheAssoc(pirate, "ship", ship);
+    const part = new Part({ name: "Mast" });
+    cacheAssoc(ship, "part", part);
+    await pirate.save();
+    part.name = "changed";
+    // Extra record in the DB absent from the already-loaded singular
+    // associations. `valid?` must consult the loaded target only — never
+    // reload — so this extra is not pulled in.
+    await Part.create({ name: "Stern", ship_id: ship.id });
+    await assertNoQueries(false, async () => {
+      await pirate.isValid();
+    });
   });
 });
 
@@ -3486,11 +3685,60 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     expect(ship.isNewRecord()).toBe(false);
   });
 
-  it.skip("autosave new record with after create callback and habtm association", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs HABTM autosave integration */
+  it("autosave new record with after create callback and habtm association", async () => {
+    class Comment extends Base {
+      static {
+        this._tableName = "pwacc_comments";
+        this.attribute("post_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    class Category extends Base {
+      static {
+        this._tableName = "pwacc_categories";
+        this.attribute("name", "string");
+      }
+    }
+    class PostWithAfterCreateCallback extends Base {
+      static {
+        this._tableName = "pwacc_posts";
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("Comment", Comment);
+    registerModel("Category", Category);
+    registerModel("PostWithAfterCreateCallback", PostWithAfterCreateCallback);
+    Associations.hasMany.call(PostWithAfterCreateCallback, "comments", {
+      className: "Comment",
+      foreignKey: "post_id",
+    });
+    Associations.hasAndBelongsToMany.call(PostWithAfterCreateCallback, "categories", {
+      className: "Category",
+      joinTable: "pwacc_categories_posts",
+      foreignKey: "post_id",
+      autosave: true,
+    });
+    // Registered after the association so the habtm autosave after_create
+    // callback fires first — matching Rails, where `has_and_belongs_to_many`
+    // is declared before the model's own `after_create` block.
+    PostWithAfterCreateCallback.afterCreate(async (post: any) => {
+      const firstComment = post.association("comments").target[0];
+      await post.updateAttribute("author_id", firstComment.id);
+    });
+
+    const post = new PostWithAfterCreateCallback({
+      title: "Captain Murphy",
+      body: "is back",
+    });
+    (post as any).comments.build({ body: "foo" });
+    (post as any).categories.build({ name: "bar" });
+    await post.save();
+
+    const fresh = await PostWithAfterCreateCallback.find(post.id!);
+    const categories = (await fresh.association("categories").loadTarget()) as Base[];
+    expect(categories.length).toBe(1);
   });
 });
 

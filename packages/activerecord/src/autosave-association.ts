@@ -759,7 +759,8 @@ async function _autosaveBelongsTo(
     (typeof (assocRecord as any).changedForAutosave === "function"
       ? (assocRecord as any).changedForAutosave()
       : !!(assocRecord as any).changed);
-  if (assocRecord.isNewRecord() || beChangedForSave) {
+  const isNewOrChanged = assocRecord.isNewRecord() || beChangedForSave;
+  if (isNewOrChanged) {
     _setAutosavingBelongsToFor(record, assoc, true);
     let saved: boolean | undefined;
     try {
@@ -779,7 +780,17 @@ async function _autosaveBelongsTo(
       }
       return true;
     }
+  }
 
+  // Rails save_belongs_to_association:560 — the FK write is gated on
+  // `association.updated?`, independent of whether the target itself needed
+  // saving. This matters when two relations share one target (e.g. an order's
+  // billing and shipping pointing at the same customer): the second relation
+  // re-assigns an already-persisted, unchanged record, so the save above is
+  // skipped, but its FK must still be propagated. We keep `isNewOrChanged` in
+  // the guard so the `setTarget` test shortcut — which bypasses the writer and
+  // leaves `updated?` false — still propagates the FK as before.
+  if (isNewOrChanged || inst?.isUpdated?.()) {
     const foreignKey = _resolveBelongsToForeignKey(assoc, assocRecord, reflection);
     // Pair against the target's PK columns in the same shape the writer
     // (BelongsToAssociation#replaceKeys) used, so autosave FK
