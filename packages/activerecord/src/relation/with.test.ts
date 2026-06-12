@@ -3,10 +3,11 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/relation/with_test.rb
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import "../index.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -37,6 +38,25 @@ function pluckIds(records: any[]): number[] {
 // ==========================================================================
 describe("WithTest", () => {
   useHandlerFixtures(["comments", "posts", "companies"], { schema: canonicalSchema });
+  // Force-recreate `comments`/`posts`/`companies` to the canonical shape. Under
+  // vitest's per-file module isolation the signature/schema caches reset to
+  // canonical each file, so `useHandlerFixtures`' own `defineSchema` sees a
+  // cache-hit and skips the repair — leaving a reduced `comments` shape (no STI
+  // `type` column) that a sibling handler-suite file co-scheduled earlier in the
+  // same fork wrote to the shared worker DB. `dropExisting` drops + recreates
+  // unconditionally, so the comments fixture INSERT (which carries a `type`
+  // value) finds the column. Registered after `useHandlerFixtures` so this
+  // `beforeAll` runs last and wins.
+  beforeAll(async () => {
+    await defineSchema(
+      {
+        comments: canonicalSchema.comments,
+        posts: canonicalSchema.posts,
+        companies: canonicalSchema.companies,
+      },
+      { dropExisting: true },
+    );
+  });
 
   it("with when hash is passed as an argument", async () => {
     const relation = Post.with({
