@@ -342,7 +342,12 @@ export class SchemaStatements {
   ): Promise<string> {
     const conventional = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
     const target = conventional(cols);
-    const all = await this.indexes(tableName);
+    // Use the adapter's `indexes()` (full column parsing) rather than the crude
+    // SchemaStatements helper, whose PG `array_agg` columns don't round-trip
+    // cleanly and would spuriously fail the column comparison.
+    const all = (await (
+      this.adapter as unknown as { indexes(t: string): Promise<IndexDefinition[]> }
+    ).indexes(tableName)) as IndexDefinition[];
     const named = all.filter((i) => i.name === name);
     const matching = named.filter((i) => conventional(i.columns) === target);
     if (matching.length > 1) {
