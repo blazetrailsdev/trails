@@ -2,6 +2,17 @@ import { describe, it, expect } from "vitest";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Model } from "./index.js";
 
+// Plain ActiveModel serializes `include:` entries via `send(association)` —
+// the value behind a Ruby `attr_accessor :address` / `:friends` (see Rails'
+// serialization_test.rb). The trails analog is a plain property on the
+// instance; serialization reads it through the same `send` baseline. (For
+// activerecord, `send` reaches the generated association reader instead.)
+function setAssociationAccessors(record: unknown, entries: Record<string, unknown>): void {
+  for (const [name, value] of Object.entries(entries)) {
+    (record as Record<string, unknown>)[name] = value;
+  }
+}
+
 describe("SerializationTest", () => {
   it("should use read attribute for serialization", () => {
     class Person extends Model {
@@ -17,26 +28,37 @@ describe("SerializationTest", () => {
   });
 
   it("include option with empty association", () => {
+    // Rails: `@user.friends = []` then `serializable_hash(include: :friends)`
+    // yields `friends: []` — the accessor exists and returns an empty array.
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
     const p = new Person({ name: "Alice" });
+    setAssociationAccessors(p, { posts: [] });
     const hash = p.serializableHash({ include: "posts" });
-    // No association loaded, so posts won't appear
     expect(hash["name"]).toBe("Alice");
+    expect(hash["posts"]).toEqual([]);
   });
 
   it("include option with ary", () => {
+    // Rails wraps the association in a `FriendList` that responds to `to_ary`
+    // (a non-array Enumerable). serialization maps over it element-wise.
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
+    const friend = { _attributes: new Map([["name", "Joe"]]) };
+    const friendList: Iterable<unknown> = {
+      [Symbol.iterator]: () => [friend][Symbol.iterator](),
+    };
     const p = new Person({ name: "Alice" });
-    const hash = p.serializableHash({ include: ["posts", "comments"] });
+    setAssociationAccessors(p, { friends: friendList });
+    const hash = p.serializableHash({ include: "friends" });
     expect(hash["name"]).toBe("Alice");
+    expect((hash["friends"] as Array<{ name: string }>)[0].name).toBe("Joe");
   });
 
   it("only include", () => {
@@ -189,7 +211,7 @@ describe("SerializationTest", () => {
   it("include option with singular association", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
     const comment = { _attributes: new Map([["text", "Great!"]]) };
-    (p as any)._preloadedAssociations = new Map([["comments", [comment]]]);
+    setAssociationAccessors(p, { comments: [comment] });
     const result = p.serializableHash({ include: ["comments"] });
     expect(Array.isArray(result.comments)).toBe(true);
     expect((result.comments as any[])[0].text).toBe("Great!");
@@ -204,10 +226,7 @@ describe("SerializationTest", () => {
       ]),
     };
     const tag = { _attributes: new Map([["name", "rails"]]) };
-    (p as any)._preloadedAssociations = new Map<string, unknown>([
-      ["comments", [comment]],
-      ["tags", [tag]],
-    ]);
+    setAssociationAccessors(p, { comments: [comment], tags: [tag] });
     const result = p.serializableHash({
       include: ["tags", { comments: { only: ["text"] } }],
     });
@@ -224,7 +243,7 @@ describe("SerializationTest", () => {
         ["author", "Bob"],
       ]),
     };
-    (p as any)._preloadedAssociations = new Map([["comments", [comment]]]);
+    setAssociationAccessors(p, { comments: [comment] });
     const result = p.serializableHash({ include: { comments: { only: ["text"] } } });
     expect((result.comments as any[])[0].text).toBe("Great!");
     expect((result.comments as any[])[0].author).toBeUndefined();
@@ -310,17 +329,12 @@ describe("SerializationTest", () => {
         }
       }
       const b = new Blog({ name: "b" });
-      (b as unknown as { _cachedAssociations: Map<string, unknown> })._cachedAssociations = new Map(
-        [
-          [
-            "posts",
-            [
-              new Post({ id: "1000000000000", title: "p1" }),
-              new Post({ id: "2000000000000", title: "p2" }),
-            ],
-          ],
+      setAssociationAccessors(b, {
+        posts: [
+          new Post({ id: "1000000000000", title: "p1" }),
+          new Post({ id: "2000000000000", title: "p2" }),
         ],
-      );
+      });
       const json = b.asJson({ include: "posts" });
       expect(Array.isArray(json.posts)).toBe(true);
       // Each post's BigInt id is coerced to a string.
@@ -435,12 +449,8 @@ describe("SerializationTest", () => {
       }
       const a = new Node({ name: "a" });
       const b = new Node({ name: "b" });
-      (a as unknown as { _cachedAssociations: Map<string, unknown> })._cachedAssociations = new Map(
-        [["next", b]],
-      );
-      (b as unknown as { _cachedAssociations: Map<string, unknown> })._cachedAssociations = new Map(
-        [["next", a]],
-      );
+      setAssociationAccessors(a, { next: b });
+      setAssociationAccessors(b, { next: a });
       // serializableHash only traverses associations that are
       // explicitly included. Here we include "next" on `a`, so that
       // association is serialized once; it won't keep traversing
@@ -597,7 +607,7 @@ describe("Serialization", () => {
   it("include as string for single association", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
     const author = { _attributes: new Map([["name", "Alice"]]) };
-    (p as any)._preloadedAssociations = new Map([["author", author]]);
+    setAssociationAccessors(p, { author });
     const result = p.serializableHash({ include: "author" });
     expect((result.author as any).name).toBe("Alice");
   });
