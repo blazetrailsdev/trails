@@ -1,0 +1,14 @@
+{
+  "files": {
+    "packages/activerecord/src/connection-adapters/mysql/schema-definitions.ts": [
+      "unsignedDecimal",
+      "unsignedFloat"
+    ],
+    "packages/activerecord/src/connection-handling.ts": [
+      "connection"
+    ],
+    "packages/activesupport/src/core-ext/benchmark.ts": [
+      "ms"
+    ]
+  }
+}

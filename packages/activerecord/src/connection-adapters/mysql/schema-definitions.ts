@@ -50,7 +50,9 @@ export interface ColumnMethods {
   longtext(name: string, options?: ColumnOptions): unknown;
   unsignedInteger(name: string, options?: ColumnOptions): unknown;
   unsignedBigint(name: string, options?: ColumnOptions): unknown;
+  /** @deprecated */
   unsignedFloat(name: string, options?: ColumnOptions): unknown;
+  /** @deprecated */
   unsignedDecimal(name: string, options?: ColumnOptions): unknown;
 }
 
@@ -153,11 +155,13 @@ export class TableDefinition extends AbstractTableDefinition {
     return this.mysqlColumn(name, "bigint" as ColumnType, "BIGINT UNSIGNED", options);
   }
 
+  /** @deprecated */
   unsignedFloat(name: string, options: ColumnOptions = {}): this {
     deprecator().warn(UNSIGNED_FLOAT_DEPRECATION);
     return this.mysqlColumn(name, "float" as ColumnType, "FLOAT UNSIGNED", options);
   }
 
+  /** @deprecated */
   unsignedDecimal(name: string, options: ColumnOptions = {}): this {
     deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
     if (options.scale !== undefined && options.precision === undefined) {
@@ -282,11 +286,13 @@ export class Table extends AbstractTable {
     await this.column(name, "unsigned_bigint" as ColumnType, options);
   }
 
+  /** @deprecated */
   async unsignedFloat(name: string, options: ColumnOptions = {}): Promise<void> {
     deprecator().warn(UNSIGNED_FLOAT_DEPRECATION);
     await this.column(name, "unsigned_float" as ColumnType, options);
   }
 
+  /** @deprecated */
   async unsignedDecimal(name: string, options: ColumnOptions = {}): Promise<void> {
     deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
     await this.column(name, "unsigned_decimal" as ColumnType, options);
