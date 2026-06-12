@@ -48,6 +48,7 @@ interface CalculationRelation {
       adapterName: AdapterName;
       visitor?: { compile(node: any): string; compileWithBinds?(node: any): [string, unknown[]] };
       toSql(arel: unknown): string;
+      quote(value: unknown): string;
       quoteTableName(name: string): string;
       execute(sql: string): Promise<Record<string, unknown>[]>;
       selectAll(
@@ -236,9 +237,23 @@ function wrapBigintAgg(innerSql: string, grouped = false): string {
 function prependCtes(rel: CalculationRelation, sql: string): string {
   if (rel._ctes.length === 0) return sql;
   const connection = rel._modelClass.connection;
-  const compile = (node: Nodes.Node): string =>
-    connection.visitor ? connection.visitor.compile(node) : connection.toSql(node);
-  return `${buildCteSql(rel._ctes, compile, (name) => connection.quoteTableName(name))} ${sql}`;
+  // The aggregate call sites thread `fromBinds`/`managerBinds` positionally and
+  // do not carry a slot for CTE-prefix binds, so inline any Relation-body binds
+  // back into the CTE SQL (matching the pre-AST `value.toSql()` behavior) and
+  // report zero binds to buildCteSql. The SELECT path (relation.ts) collects
+  // them through the visitor instead.
+  const compile = (node: Nodes.Node): [string, unknown[]] => {
+    if (!connection.visitor?.compileWithBinds) return [connection.toSql(node), []];
+    const [body, binds] = connection.visitor.compileWithBinds(node) as [string, unknown[]];
+    if (binds.length === 0) return [body, []];
+    let i = 0;
+    const inlined = body.replace(/\?|\$\d+/g, (m) => {
+      const v = binds[i++];
+      return v === undefined ? m : connection.quote(typeCastCalcBind(v));
+    });
+    return [inlined, []];
+  };
+  return `${buildCteSql(rel._ctes, compile, (name) => connection.quoteTableName(name)).sql} ${sql}`;
 }
 
 // Mirrors relation.ts _safeAlias: quote alias if it contains non-identifier chars.
