@@ -1031,15 +1031,19 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       : { schema: tableName.slice(0, dot), bare: tableName.slice(dot + 1) };
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#remove_index
   async removeIndex(
     tableName: string,
-    columnOrOptions?: string | string[] | { name?: string; column?: string | string[] },
-    options: { name?: string; column?: string | string[] } = {},
+    columnOrOptions?:
+      | string
+      | string[]
+      | { name?: string; column?: string | string[]; ifExists?: boolean },
+    options: { name?: string; column?: string | string[]; ifExists?: boolean } = {},
   ): Promise<void> {
     // Rails: `remove_index(table_name, column_name = nil, **options)` — column
     // may be positional or in the options hash.
     let columnName: string | string[] | undefined;
-    let opts: { name?: string; column?: string | string[] };
+    let opts: { name?: string; column?: string | string[]; ifExists?: boolean };
     if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
       columnName = columnOrOptions;
       opts = options;
@@ -1047,50 +1051,86 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       columnName = undefined;
       opts = columnOrOptions ?? {};
     }
-    const columnSpec = columnName ?? opts.column;
-    const cols = columnSpec == null ? [] : Array.isArray(columnSpec) ? columnSpec : [columnSpec];
 
-    let indexName: string;
-    if (opts.name != null && cols.length > 0) {
-      // Name + column both given: validate they describe the same index
-      // (Rails `index_name_for_remove` raises ArgumentError on mismatch). Only
-      // this path needs introspection; the others keep the legacy compute.
-      indexName = await this._indexNameForRemove(tableName, cols, opts.name);
-    } else if (opts.name != null) {
-      indexName = opts.name;
-    } else if (cols.length > 0) {
-      indexName = `index_${tableName}_on_${cols.join("_and_")}`;
-    } else {
-      throw new ArgumentError("No index name or column specified");
+    // Rails: `return if options[:if_exists] && !index_exists?(...)`.
+    if (opts.ifExists && !(await this._indexExistsForRemove(tableName, columnName, opts))) {
+      return;
     }
-    await this.executeMutation(`DROP INDEX IF EXISTS ${quoteColumnName(indexName)}`);
+
+    const indexName = await this._indexNameForRemove(tableName, columnName, opts);
+    await this.executeMutation(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
-  // Rails: `index_name_for_remove` (the name + column branch) — confirm the
-  // named index covers the given columns. Raise ArgumentError only when the
-  // named index is positively found on different columns; fall back to the name
-  // when it can't be located so a legitimate drop is never blocked.
+  // Rails: `index_name_for_remove` — resolve the concrete index name from a name
+  // and/or column spec via introspection, raising ArgumentError on a no-match or
+  // ambiguous match (and `DROP INDEX` then drops by that real name).
   private async _indexNameForRemove(
     tableName: string,
-    columnNames: string[],
-    name: string,
+    columnName: string | string[] | undefined,
+    options: { name?: string; column?: string | string[] },
   ): Promise<string> {
+    // can_remove_index_by_name?: a bare `{ name }` needs no introspection.
+    if (columnName == null && options.name != null && options.column == null) {
+      return options.name;
+    }
     const indexNameFor = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
-    const target = indexNameFor(columnNames);
+    const rawColumn = columnName ?? options.column;
+    const columnNames =
+      rawColumn == null || rawColumn === ""
+        ? []
+        : Array.isArray(rawColumn)
+          ? rawColumn
+          : [rawColumn];
+
+    const checks: Array<(i: { name: string; columns: string[] }) => boolean> = [];
+    if (options.name != null) {
+      const n = options.name;
+      checks.push((i) => i.name === n);
+    }
+    if (columnNames.length > 0) {
+      const target = indexNameFor(columnNames);
+      checks.push((i) => indexNameFor(i.columns) === target);
+    }
+    if (checks.length === 0) {
+      throw new ArgumentError("No name or columns specified");
+    }
+
     const all = (await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>;
-    const named = all.filter((i) => i.name === name);
-    const matching = named.filter((i) => indexNameFor(i.columns) === target);
+    const matching = all.filter((i) => checks.every((check) => check(i)));
     if (matching.length > 1) {
       throw new ArgumentError(
         `Multiple indexes found on ${tableName} columns ${columnNames}. ` +
           `Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
       );
     }
-    if (matching.length === 1) return matching[0].name;
-    if (named.length > 0) {
+    if (matching.length === 0) {
       throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
     }
-    return name;
+    return matching[0].name;
+  }
+
+  private async _indexExistsForRemove(
+    tableName: string,
+    columnName: string | string[] | undefined,
+    options: { name?: string; column?: string | string[] },
+  ): Promise<boolean> {
+    const all = (await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>;
+    const rawColumn = columnName ?? options.column;
+    const columnNames =
+      rawColumn == null || rawColumn === ""
+        ? []
+        : Array.isArray(rawColumn)
+          ? rawColumn
+          : [rawColumn];
+    return all.some((i) => {
+      if (options.name != null && i.name !== options.name) return false;
+      if (columnNames.length > 0) {
+        return (
+          i.columns.length === columnNames.length && columnNames.every((c, k) => c === i.columns[k])
+        );
+      }
+      return options.name != null;
+    });
   }
 
   createSchemaDumper(

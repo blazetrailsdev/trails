@@ -50,7 +50,8 @@ describe("InvertibleMigrationTest", () => {
       }
     }
     const m = makeMigration(new BadRemoveIndex());
-    await expect(m.up()).rejects.toThrow("Must specify either name or column");
+    // Rails' index_name_for_remove raises ArgumentError "No name or columns specified".
+    await expect(m.up()).rejects.toThrow("No name or columns specified");
   });
 
   it("migrate up", async () => {

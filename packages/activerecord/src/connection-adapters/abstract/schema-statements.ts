@@ -284,12 +284,12 @@ export class SchemaStatements {
   async removeIndex(
     tableName: string,
     columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
-    options: { column?: string | string[]; name?: string } = {},
+    options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
     // Rails: `remove_index(table_name, column_name = nil, **options)` — the column
     // can be passed positionally or via the options hash.
     let columnName: string | string[] | undefined;
-    let opts: { column?: string | string[]; name?: string };
+    let opts: { column?: string | string[]; name?: string; ifExists?: boolean };
     if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
       columnName = columnOrOptions;
       opts = options;
@@ -297,70 +297,33 @@ export class SchemaStatements {
       columnName = undefined;
       opts = columnOrOptions;
     }
-    // An array column spec is routed through `options.column` so the legacy
-    // conventional-name computation below sees the same shape it always has.
-    const columnSpec = columnName ?? opts.column;
-    const cols = columnSpec == null ? [] : Array.isArray(columnSpec) ? columnSpec : [columnSpec];
+
+    // Rails: `return if options[:if_exists] && !index_exists?(...)` — only an
+    // explicit `ifExists` short-circuits a missing index.
+    if (opts.ifExists) {
+      const colSpec = columnName ?? opts.column;
+      const present =
+        colSpec != null
+          ? await this.indexExists(tableName, colSpec, opts)
+          : opts.name != null && (await this.isIndexNameExists(tableName, opts.name));
+      if (!present) return;
+    }
 
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-
-    let indexName: string;
-    if (opts.name != null && cols.length > 0) {
-      // Both a name and a column are given: Rails `index_name_for_remove` raises
-      // ArgumentError when the named index does not cover the requested columns.
-      // We only raise when introspection positively finds the named index on
-      // *different* columns; if the named index can't be located (e.g. the
-      // command-recorder revert path on an adapter whose mid-transaction index
-      // introspection lags), we fall back to the name and let DROP ... IF EXISTS
-      // do the right thing — never converting a valid revert into a hard error.
-      indexName = await this.resolveNamedIndexForRemove(tableName, opts.name, cols);
-    } else if (opts.name != null) {
-      indexName = opts.name;
-    } else if (cols.length > 0) {
-      indexName = `index_${tableName}_on_${cols.join("_and_")}`;
-    } else {
-      throw new ArgumentError("Must specify either name or column for remove_index");
-    }
+    // Rails resolves the concrete index name via `index_name_for_remove`, which
+    // raises ArgumentError when the spec matches no index (or is ambiguous), and
+    // then drops by that real name — never a silent DROP ... IF EXISTS.
+    const positional = typeof columnName === "string" ? columnName : null;
+    const resolveOpts = Array.isArray(columnName) ? { ...opts, column: columnName } : opts;
+    const indexName = await this.indexNameForRemove(tableName, positional, resolveOpts);
 
     if (this.adapterName === "mysql") {
       await this.adapter.executeMutation(
         `DROP INDEX ${this._qi(indexName)} ON ${this._qi(tableName)}`,
       );
     } else {
-      await this.adapter.executeMutation(`DROP INDEX IF EXISTS ${this._qi(indexName)}`);
+      await this.adapter.executeMutation(`DROP INDEX ${this._qi(indexName)}`);
     }
-  }
-
-  // Validate that the named index covers `cols`, raising ArgumentError only when
-  // the named index is positively found on different columns (Rails'
-  // `index_name_for_remove` mismatch case). Falls back to the name when the
-  // index can't be located so a legitimate drop is never blocked.
-  private async resolveNamedIndexForRemove(
-    tableName: string,
-    name: string,
-    cols: string[],
-  ): Promise<string> {
-    const conventional = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
-    const target = conventional(cols);
-    // Use the adapter's `indexes()` (full column parsing) rather than the crude
-    // SchemaStatements helper, whose PG `array_agg` columns don't round-trip
-    // cleanly and would spuriously fail the column comparison.
-    const all = (await (
-      this.adapter as unknown as { indexes(t: string): Promise<IndexDefinition[]> }
-    ).indexes(tableName)) as IndexDefinition[];
-    const named = all.filter((i) => i.name === name);
-    const matching = named.filter((i) => conventional(i.columns) === target);
-    if (matching.length > 1) {
-      throw new ArgumentError(
-        `Multiple indexes found on ${tableName} columns ${cols}. ` +
-          `Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
-      );
-    }
-    if (matching.length === 1) return matching[0].name;
-    if (named.length > 0) {
-      throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
-    }
-    return name;
   }
 
   async changeColumn(
@@ -1081,12 +1044,26 @@ export class SchemaStatements {
     }
   }
 
+  // The adapter's own `indexes()` parses index columns fully (e.g. PostgreSQL's
+  // `array_agg`/`pg_get_indexdef` columns), unlike the lighter SchemaStatements
+  // `indexes()` helper whose columns don't round-trip cleanly on every adapter.
+  // Used by the index-name resolution / existence paths that compare columns.
+  private adapterIndexes(
+    tableName: string,
+  ): Promise<Array<{ name: string; columns: string[]; unique: boolean }>> {
+    return (
+      this.adapter as unknown as {
+        indexes(t: string): Promise<Array<{ name: string; columns: string[]; unique: boolean }>>;
+      }
+    ).indexes(tableName);
+  }
+
   async indexExists(
     tableName: string,
     columnName: string | string[],
     options?: { unique?: boolean; name?: string },
   ): Promise<boolean> {
-    const allIndexes = await this.indexes(tableName);
+    const allIndexes = await this.adapterIndexes(tableName);
     const targetCols = Array.isArray(columnName) ? columnName : [columnName];
 
     return allIndexes.some((idx) => {
@@ -1804,7 +1781,7 @@ export class SchemaStatements {
 
     if (checks.length === 0) throw new ArgumentError("No name or columns specified");
 
-    const allIndexes = await this.indexes(tableName);
+    const allIndexes = await this.adapterIndexes(tableName);
     const matching = allIndexes.filter((i) => checks.every((c) => c(i)));
 
     if (matching.length > 1) {
