@@ -91,6 +91,14 @@ describe("WhereChainTest", () => {
     foreignKey: "wc_author_id",
     scope: (rel: any) => rel.merge((WcBook as any).reading()),
   });
+  // Second has_one targeting the SAME table (WcBook), scoped to a different enum
+  // value. `missing(:unreadListing)` joined alongside `joins(:readingListing)`
+  // forces a same-table sibling join that Rails aliases via AliasTracker.
+  Associations.hasOne.call(WcAuthor, "unreadListing", {
+    className: "WcBook",
+    foreignKey: "wc_author_id",
+    scope: (rel: any) => rel.merge((WcBook as any).unread()),
+  });
   const NamedExtension = { namedExtension: () => true };
 
   // Seeds three authors; only the middle one owns a *reading* book. Returns
@@ -464,23 +472,59 @@ describe("WhereChainTest", () => {
   // The missing-with-enum cluster joins `reading_listing` (inner) AND
   // left-joins `unread_listing` — two has_one associations targeting the SAME
   // table (Book) differentiated only by an enum scope. Rails aliases the second
-  // join; we don't yet, so `_addAssocJoin` throws on the same-table collision.
-  // BLOCKED on join table-aliasing (separate from the predicate-builder /
-  // scoped-join enum-cast fix landed here).
-  it.skip("missing with enum", () => {
-    /* blocked: same-table join aliasing (reading_listing + unread_listing → Book) */
+  // join via AliasTracker (`unread_listings_<owner_table>`); the reader (who owns
+  // a *reading* book and no *unread* book) is the only author kept by both the
+  // inner reading join and the `missing(:unreadListing)` IS NULL filter.
+  it("missing with enum", async () => {
+    const readerId = await seedReadingFixture();
+    const results = await WcAuthor.all()
+      .joins("readingListing")
+      .where()
+      .missing("unreadListing")
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
-  it.skip("missing with enum ordered", () => {
-    /* blocked: same-table join aliasing (reading_listing + unread_listing → Book) */
+  it("missing with enum ordered", async () => {
+    const readerId = await seedReadingFixture();
+    const results = await WcAuthor.all()
+      .order({ id: "desc" })
+      .joins("readingListing")
+      .where()
+      .missing("unreadListing")
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
-  it.skip("missing with enum unscoped", () => {
-    /* blocked: same-table join aliasing (reading_listing + unread_listing → Book) */
+  it("missing with enum unscoped", async () => {
+    const readerId = await seedReadingFixture();
+    const results = await WcAuthor.all()
+      .unscope("where")
+      .joins("readingListing")
+      .where()
+      .missing("unreadListing")
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
-  it.skip("missing with enum extended early", () => {
-    /* blocked: same-table join aliasing (reading_listing + unread_listing → Book) */
+  it("missing with enum extended early", async () => {
+    const readerId = await seedReadingFixture();
+    const results = await WcAuthor.all()
+      .extending(NamedExtension)
+      .order({ id: "desc" })
+      .joins("readingListing")
+      .where()
+      .missing("unreadListing")
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
-  it.skip("missing with enum extended late", () => {
-    /* blocked: same-table join aliasing (reading_listing + unread_listing → Book) */
+  it("missing with enum extended late", async () => {
+    const readerId = await seedReadingFixture();
+    const results = await WcAuthor.all()
+      .order({ id: "desc" })
+      .joins("readingListing")
+      .where()
+      .missing("unreadListing")
+      .extending(NamedExtension)
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
   it("missing with composite primary key", async () => {
     class CpkAuthor extends Base {

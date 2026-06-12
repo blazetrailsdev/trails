@@ -166,26 +166,66 @@ function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | 
 }
 
 function _addAssocJoin(
-  clauses: Array<{ type: "inner" | "left"; table: string; on: string; quoted?: boolean }>,
+  clauses: Array<{
+    type: "inner" | "left";
+    table: string;
+    on: string;
+    quoted?: boolean;
+    as?: string;
+  }>,
   type: "inner" | "left",
   join: { table: string; on: string },
   assocName: string,
   modelClass: any,
-  leftOuterJoinsValues?: ReadonlyArray<unknown>,
-): void {
+  leftOuterJoinsValues: ReadonlyArray<unknown> | undefined,
+  ownerTable: string,
+  quoteTable: (name: string) => string,
+): string | undefined {
   // If the association is already covered by _leftOuterJoinsValues (deferred
   // LEFT OUTER JOIN path), skip — the join will be emitted when the manager
   // is built, so adding a second join here would cause ambiguous column names.
-  if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return;
+  if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return undefined;
   const sameTableJoins = clauses.filter((j) => j.table === join.table);
   if (sameTableJoins.length > 0) {
-    if (sameTableJoins.every((j) => j.on === join.on)) return; // all compatible — skip
-    throw new Error(
-      `where${type === "inner" ? "Associated" : "Missing"}: cannot add ${type.toUpperCase()} JOIN for '${assocName}' on ${modelClass.name} ` +
-        `— a different join to '${join.table}' already exists and cannot be represented without aliasing.`,
-    );
+    if (sameTableJoins.every((j) => j.on === join.on)) return undefined; // all compatible — skip
+    // Same table joined under different ON conditions (two sibling associations
+    // targeting the same table). Rails' AliasTracker keeps the first occurrence
+    // on the bare table name and aliases later ones to the association name
+    // (`aliased_table_for` → `reflection.alias_candidate(parent.table_name)` =
+    // `"#{plural_assoc}_#{owner_table}"`). Mirror that here so the second join
+    // is emitted as `<table> AS <alias>` instead of colliding.
+    const alias = _selfJoinAlias(assocName, ownerTable, clauses);
+    const qTable = quoteTable(join.table);
+    const qAlias = quoteTable(alias);
+    // The ON SQL references the target table as `<quotedTable>.<col>`; rebind
+    // those references to the alias. The owner table is a different identifier,
+    // so this never rewrites the source side of the predicate.
+    const reboundOn = join.on.split(`${qTable}.`).join(`${qAlias}.`);
+    clauses.push({ type, table: join.table, on: reboundOn, quoted: true, as: alias });
+    return alias;
   }
   clauses.push({ type, table: join.table, on: join.on, quoted: true });
+  return undefined;
+}
+
+/**
+ * Compute a Rails-`AliasTracker`-faithful self-join alias for a sibling
+ * association join that collides with an existing join on the same table.
+ * Mirrors `reflection.alias_candidate(parent.table_name)` =
+ * `"#{plural_name}_#{owner_table}"`, with the `_<count>` suffix Rails appends
+ * when the same candidate is reused (`count > 1`).
+ */
+function _selfJoinAlias(
+  assocName: string,
+  ownerTable: string,
+  clauses: ReadonlyArray<{ as?: string }>,
+): string {
+  const candidate = `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`;
+  const used = clauses.filter(
+    (j) => j.as === candidate || (j.as != null && j.as.startsWith(`${candidate}_`)),
+  ).length;
+  const count = used + 1;
+  return count > 1 ? `${candidate}_${count}` : candidate;
 }
 
 /**
@@ -317,6 +357,7 @@ export class Relation<T extends Base> {
     table: string;
     on: string;
     quoted?: boolean;
+    as?: string;
   }> = [];
   private _joinValues: (string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
@@ -477,17 +518,23 @@ export class Relation<T extends Base> {
         );
       }
       const cloned = rel._clone();
+      const ownerTable = (rel._modelClass as any).tableName;
+      const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
+      let effectiveTable = target.table;
       for (const join of target.joins) {
-        _addAssocJoin(
+        const alias = _addAssocJoin(
           cloned._joinClauses,
           "inner",
           join,
           assocName,
           rel._modelClass as any,
           cloned._leftOuterJoinsValues,
+          ownerTable,
+          quoteTable,
         );
+        if (alias && join.table === target.table) effectiveTable = alias;
       }
-      const tgtTable = new Table(target.table);
+      const tgtTable = new Table(effectiveTable);
       for (const pk of target.pks) {
         cloned._whereClause.predicates.push(tgtTable.get(pk).notEq(null));
       }
@@ -515,17 +562,23 @@ export class Relation<T extends Base> {
         );
       }
       const cloned = rel._clone();
+      const ownerTable = (rel._modelClass as any).tableName;
+      const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
+      let effectiveTable = target.table;
       for (const join of target.joins) {
-        _addAssocJoin(
+        const alias = _addAssocJoin(
           cloned._joinClauses,
           "left",
           join,
           assocName,
           rel._modelClass as any,
           cloned._leftOuterJoinsValues,
+          ownerTable,
+          quoteTable,
         );
+        if (alias && join.table === target.table) effectiveTable = alias;
       }
-      const tgtTable = new Table(target.table);
+      const tgtTable = new Table(effectiveTable);
       for (const pk of target.pks) {
         cloned._whereClause.predicates.push(tgtTable.get(pk).eq(null));
       }
@@ -2875,7 +2928,11 @@ export class Relation<T extends Base> {
     }
     if (leadingJoins.length > 0) manager.prependJoinNodes(...leadingJoins);
     for (const join of this._joinClauses) {
-      const tableNode = join.quoted ? new Table(join.table) : join.table;
+      const tableNode = join.quoted
+        ? join.as
+          ? new Table(join.table, { as: join.as })
+          : new Table(join.table)
+        : join.table;
       const onNode = new Nodes.SqlLiteral(join.on);
       if (join.type === "inner") {
         manager.join(tableNode, onNode);
