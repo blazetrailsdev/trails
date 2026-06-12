@@ -1,9 +1,45 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
+import { StringType } from "@blazetrails/activemodel";
+import { Table } from "@blazetrails/arel";
+import { Base } from "./index.js";
+import { TableMetadata } from "./table-metadata.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+
+class AuditLog extends Base {
+  static override _tableName = "audit_logs";
+  static {
+    this.attribute("message", "string");
+    this.attribute("developer_id", "integer");
+  }
+}
+
+class AuditRequiredDeveloper extends Base {
+  static override _tableName = "developers";
+  static {
+    this.attribute("name", "string");
+  }
+}
 
 describe("TableMetadataTest", () => {
-  it.skip("#associated_table creates the right type caster for joined table with different association name", () => {
-    // BLOCKED: schema — TableMetadata feature gap
-    // ROOT-CAUSE: table-metadata.ts#TableMetadata not fully implementing column/binding metadata
-    // SCOPE: ~20 LOC fix in table-metadata.ts; affects ~1 test in table-metadata.test.ts
+  setupHandlerSuite();
+  beforeAll(async () => {
+    await defineSchema({
+      developers: TEST_SCHEMA.developers,
+      audit_logs: TEST_SCHEMA.audit_logs,
+    });
+    await AuditLog.loadSchema();
+    await AuditRequiredDeveloper.loadSchema();
+  });
+
+  it("#associated_table creates the right type caster for joined table with different association name", () => {
+    const baseTableMetadata = new TableMetadata(AuditRequiredDeveloper, new Table("developers"));
+
+    const associatedTableMetadata = baseTableMetadata.associatedTable("audit_logs");
+
+    expect(associatedTableMetadata.arelTable.typeForAttribute("message")).toBeInstanceOf(
+      StringType,
+    );
   });
 });
