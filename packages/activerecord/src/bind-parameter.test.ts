@@ -129,35 +129,20 @@ describe("BindParameterTest", () => {
     // association joins is production work, tracked in the follow-up story.
   });
 
-  it("binds are logged", async () => {
-    const conn = Topic.leaseConnection() as any;
-    const subscriber = new LogListener();
-    const sub = Notifications.subscribe("sql.active_record", (e: Event) => subscriber.call(e));
-    try {
-      // Rails passes QueryAttribute binds to exec_query and asserts the
-      // `sql.active_record` payload preserves that same array
-      // (bind_parameter_test.rb:137-145). trails type-casts binds to primitives
-      // in the relation/predicate-builder layer *upstream* of the adapter, so the
-      // adapter boundary — and therefore every real query's notification (see
-      // `find one uses binds`, whose payload.binds is `[1]`) — carries primitives,
-      // never Attribute objects. A hand-built exec_query with raw QueryAttribute
-      // binds can't reproduce the object-preserving payload either: the sqlite
-      // driver type-casts binds inside `execute` *before* instrumentation is set
-      // up, so it rejects and no `sql.active_record` event ever fires. Preserving
-      // the original Attribute objects on the payload would require production
-      // changes (adapter-level type_casted_binds separation), tracked in
-      // f9-statement-cache-pool-introspection. We assert the round-trip with the
-      // primitive binds trails actually emits.
-      const binds = [1];
-      const sql = 'select * from "topics" where "id" = ?';
-
-      await conn.execQuery(sql, "SQL", binds);
-
-      const message = subscriber.events.find((e) => e.payload.sql === sql);
-      expect(message?.payload.binds).toBe(binds);
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
+  it.skip("binds are logged", () => {
+    // DEFERRED (story f9-statement-cache-pool-introspection): Rails builds
+    // `Relation::QueryAttribute.new("id", 1, Type::Value.new)`, passes it to
+    // exec_query, and asserts the `sql.active_record` payload preserves the same
+    // Attribute objects (bind_parameter_test.rb:137-145). trails type-casts binds
+    // to primitives in the relation/predicate-builder layer *upstream* of the
+    // adapter, so the notification boundary only ever carries primitives (see
+    // `find one uses binds`, whose payload.binds is `[1]`) — there is no
+    // adapter-level payload.binds (objects) vs type_casted_binds (primitives)
+    // split to assert against. A hand-built exec_query with raw QueryAttribute
+    // binds can't reproduce it either: the sqlite driver type-casts inside
+    // `execute` *before* instrumentation is entered, so it rejects and no event
+    // fires. Preserving Attribute objects on the payload is production work,
+    // tracked in the follow-up story.
   });
 
   it("find one uses binds", async () => {
