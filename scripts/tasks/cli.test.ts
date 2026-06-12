@@ -20,12 +20,17 @@ afterEach(() => {
 
 import {
   bestBundle,
+  __setLockDirForTest,
+  acquireTasksLock,
   buildStoryContent,
   checkPrNotOpen,
   claimState,
   commitAndPush,
   editFrontmatter,
+  gitCommonDir,
   Index,
+  LOCK_TIMEOUT_EXIT,
+  releaseTasksLock,
   listFiltered,
   newStory,
   nextBundle,
@@ -322,7 +327,11 @@ describe("numberFlag / stringFlag (value-flag validation)", () => {
 });
 
 describe("commitAndPush (git mutation flow)", () => {
+  // commitAndPush acquires the real shared lock — redirect it to a throwaway dir
+  // so these tests don't block behind a live agent. git itself stays mocked.
+  afterEach(() => __setLockDirForTest(null));
   function setup() {
+    __setLockDirForTest(mkdtempSync(join(tmpdir(), "trails-cap-lock-")));
     const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Error(`exit ${code}`);
     }) as never);
@@ -1084,5 +1093,83 @@ describe("resolveTasksDir (TASKS_DIR resolution order)", () => {
     withEnv({ TASKS_DIR: undefined, RFCS_DIR: undefined }, () => {
       expect(resolveTasksDir(cwd)).toBe(join(homedir(), "github", "blazetrailsdev", "tasks"));
     });
+  });
+});
+
+describe("tasks-CLI critical-section lock", () => {
+  function repo(): string {
+    const dir = mkdtempSync(join(tmpdir(), "trails-lock-"));
+    mkdirSync(join(dir, ".git"));
+    return dir;
+  }
+
+  it("resolves the common git dir for a main checkout and a linked worktree", () => {
+    const main = repo();
+    expect(gitCommonDir(main)).toBe(join(main, ".git"));
+    // Linked worktree: `.git` is a pointer file; `commondir` names the shared dir.
+    const wt = mkdtempSync(join(tmpdir(), "trails-lock-wt-"));
+    const gitdir = join(wt, "gitdir");
+    mkdirSync(gitdir);
+    writeFileSync(join(wt, ".git"), `gitdir: ${gitdir}\n`);
+    writeFileSync(join(gitdir, "commondir"), "../shared\n");
+    expect(gitCommonDir(wt)).toBe(join(wt, "shared"));
+  });
+
+  // Core guarantee: while A holds the lock B can't enter (fails loud), then lands.
+  it("two concurrent mutations both land instead of one being silently dropped", () => {
+    const dir = repo();
+    const lockPath = join(dir, ".git", "tasks-cli.lock");
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const a = acquireTasksLock(dir); // A holds (a live pid).
+    expect(existsSync(lockPath)).toBe(true);
+    // B can't enter while A is alive (a live holder is never reclaimed): it
+    // times out loudly rather than silently entering.
+    expect(() => acquireTasksLock(dir, { waitMs: 0, pollMs: 1 })).toThrow(
+      `exit ${LOCK_TIMEOUT_EXIT}`,
+    );
+    expect(exit).toHaveBeenCalledWith(LOCK_TIMEOUT_EXIT);
+    releaseTasksLock(a); // Only now can B acquire and land its edit.
+    expect(existsSync(lockPath)).toBe(false);
+    const b = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 });
+    expect(b).not.toBeNull();
+    releaseTasksLock(b);
+  });
+
+  // A dead holder's lock is NEVER stolen: fail loudly, leave it for cleanup.
+  it("fails loudly on a dead holder's lock and never removes it", () => {
+    const dir = repo();
+    const lockPath = join(dir, ".git", "tasks-cli.lock");
+    writeFileSync(lockPath, "2147483646.0.0\n"); // pid far above any live process → ESRCH
+    vi.spyOn(process, "exit").mockImplementation(((c?: number) => {
+      throw new Error(`exit ${c}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => acquireTasksLock(dir, { waitMs: 0, pollMs: 1 })).toThrow(
+      `exit ${LOCK_TIMEOUT_EXIT}`,
+    );
+    expect(existsSync(lockPath)).toBe(true); // never removed — no unsafe reclaim
+  });
+
+  // Release removes the lock only while it carries our token.
+  it("release only removes a lock that still carries our token", () => {
+    const dir = repo();
+    const lockPath = join(dir, ".git", "tasks-cli.lock");
+    const a = acquireTasksLock(dir);
+    writeFileSync(lockPath, "someone-else\n"); // content no longer ours
+    releaseTasksLock(a); // no-op
+    expect(existsSync(lockPath)).toBe(true);
+    writeFileSync(lockPath, `${a?.token}\n`); // ours again
+    releaseTasksLock(a);
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("returns null (proceeds unlocked) when no git dir is resolvable", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-nogit-"));
+    expect(acquireTasksLock(dir)).toBeNull();
+    expect(() => releaseTasksLock(null)).not.toThrow();
   });
 });

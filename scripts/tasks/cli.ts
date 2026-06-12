@@ -17,7 +17,15 @@
 // schema migration cost. If we hit dep-graph queries the JSON+JS shape
 // can't handle, switch in a follow-up.
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -360,6 +368,146 @@ export function removeFrontmatterKey(file: string, key: string): void {
   writeFileSync(file, m[1] + lines.join("\n") + m[3] + m[4]);
 }
 
+// ──────────────────── critical-section lock ────────────────────
+//
+// Every `pnpm tasks` mutation runs pull→commit→push against a checkout sharing
+// ONE git object store with every other agent's (canonical tree + per-worktree
+// `tasks/` symlinks are worktrees of the same clone). Unserialized, a push loser
+// rebases, retries, loses again, then `reset --hard` discards its edit — a
+// claim/done silently vanishes (observed 2026-06-08). An advisory file lock in
+// the shared common git dir serializes them; a mutation that can't get in by the
+// timeout fails loudly with LOCK_TIMEOUT_EXIT (distinct from race codes 2/3/4/99).
+//
+// Deliberately NOT self-healing: a waiter NEVER removes a lock it didn't create.
+// Auto-reclaiming a "stale" lock means deleting then recreating the path, and a
+// third waiter can `wx`-acquire in that vacancy — two holders, a SILENTLY dropped
+// edit (the exact bug we fix). No POSIX primitive removes a path conditional on
+// identity, so reclaim can't be race-free; instead we fail loudly (rm a dead lock).
+export const LOCK_TIMEOUT_EXIT = 75;
+const LOCK_WAIT_MS = 180_000;
+const LOCK_POLL_MS = 100;
+
+// Test seam: redirect the lock file off the real shared lock. Production never sets it.
+let lockDirForTest: string | null = null;
+export function __setLockDirForTest(dir: string | null): void {
+  lockDirForTest = dir;
+}
+
+// Synchronous sleep with no node timer: park on an Atomics wait against a
+// throwaway shared buffer. The CLI is short-lived, so this is fine.
+function sleepMs(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// Resolve the shared common git dir WITHOUT shelling out to git: `.git` is a
+// directory in the main checkout, or a `gitdir:` pointer file in a worktree
+// whose `commondir` names the shared dir.
+export function gitCommonDir(dir: string): string {
+  const dotgit = join(dir, ".git");
+  if (statSync(dotgit).isDirectory()) return dotgit;
+  const gitdir = resolve(
+    dir,
+    readFileSync(dotgit, "utf8")
+      .replace(/^gitdir:\s*/, "")
+      .trim(),
+  );
+  try {
+    return resolve(gitdir, readFileSync(join(gitdir, "commondir"), "utf8").trim());
+  } catch {
+    return gitdir;
+  }
+}
+
+// Stamp `pid.seq.now`: pid drives liveness-based staleness, seq distinguishes
+// acquisitions within one process (unit tests), now disambiguates a reused pid.
+let lockSeq = 0;
+function newLockToken(): string {
+  return `${process.pid}.${++lockSeq}.${Date.now()}`;
+}
+
+// Is the lock's owner process gone? Agents share one working tree → one host, so
+// PID-liveness is authoritative. A dead owner's lock is never released, so fail
+// fast instead of waiting. Unparseable content counts as live (wait, time out).
+function lockHolderDead(content: string): boolean {
+  const pid = Number(content.split(".")[0]);
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return false; // signal 0 succeeded — holder is alive
+  } catch (e) {
+    return (e as { code?: string }).code === "ESRCH"; // ESRCH = gone; EPERM = alive (other uid)
+  }
+}
+
+export interface LockHandle {
+  path: string;
+  token: string;
+}
+
+// Acquire the exclusive tasks-CLI lock for `cwd`. Returns an owner handle, or
+// null when no shared git dir is resolvable (proceed unlocked — nothing to
+// serialize). Creation is atomic via `wx`: one agent wins each round, the rest
+// poll a live holder until it releases, then fail loudly — either on a dead
+// holder (rm the lock) or on the wait timeout. NEVER removes another's lock.
+export function acquireTasksLock(
+  cwd: string | undefined,
+  opts: { waitMs?: number; pollMs?: number } = {},
+): LockHandle | null {
+  const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
+  const pollMs = opts.pollMs ?? LOCK_POLL_MS;
+  let lockPath: string;
+  try {
+    lockPath = join(lockDirForTest ?? gitCommonDir(cwd ?? TASKS_DIR), "tasks-cli.lock");
+  } catch {
+    return null; // no resolvable git dir — nothing to lock against
+  }
+  const token = newLockToken();
+  for (let waited = 0; ; waited += pollMs) {
+    try {
+      writeFileSync(lockPath, `${token}\n`, { flag: "wx" });
+      return { path: lockPath, token };
+    } catch (e) {
+      if ((e as { code?: string }).code !== "EEXIST") return null; // dir gone — best effort
+      let observed = "";
+      try {
+        observed = readFileSync(lockPath, "utf8").trim();
+      } catch {
+        continue; // vanished between create and read — retry create
+      }
+      // Holder crashed: its lock will never be released. Fail fast and loud
+      // (don't silently steal — see the section header), naming it for cleanup.
+      if (lockHolderDead(observed)) {
+        console.error(
+          `error: tasks-CLI lock at ${lockPath} is held by a dead process (${observed}). ` +
+            `No agent can be holding it; remove it to proceed:\n  rm ${lockPath}`,
+        );
+        process.exit(LOCK_TIMEOUT_EXIT);
+      }
+      if (waited >= waitMs) {
+        console.error(
+          `error: timed out after ${Math.round(waitMs / 1000)}s waiting for the tasks-CLI ` +
+            `lock at ${lockPath}. Another mutation is holding it; retry shortly.`,
+        );
+        process.exit(LOCK_TIMEOUT_EXIT);
+      }
+      sleepMs(pollMs);
+    }
+  }
+}
+
+// Release a lock from acquireTasksLock. Idempotent and ownership-safe: removes
+// it ONLY while it carries our token. The read-then-unlink is race-free because
+// no waiter ever removes/recreates a lock it didn't create (acquire only `wx`s
+// onto a free path), so while we hold the path nobody else touches it.
+export function releaseTasksLock(lock: LockHandle | null): void {
+  if (!lock) return;
+  try {
+    if (readFileSync(lock.path, "utf8").trim() === lock.token) unlinkSync(lock.path);
+  } catch {
+    /* already removed / unreadable — nothing of ours to release */
+  }
+}
+
 // Pull-rebase → run mutator → commit → push, retrying once on
 // non-fast-forward. `mutator` is run inside each attempt so a rebased
 // index file is re-read between tries. Throws (and asks caller to
@@ -451,34 +599,45 @@ export function commitAndPush(opts: {
       process.exit(1);
     }
   }
-  // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
-  // tree. Only needed before the first attempt — the retry path resets hard to
-  // origin/main, which already discards them.
-  restoreGeneratedFiles(cwd);
-  for (let attempt = 0; attempt < 2; attempt++) {
-    git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
-    opts.mutator();
-    git(["add", opts.fileToStage], { cwd });
-    git(["commit", "-q", "-m", opts.message], { cwd });
-    try {
-      git(["push", "--quiet", "origin", pushRefspec], { silent: true, cwd });
-      return;
-    } catch (e) {
-      const stderr = String(((e as { stderr?: unknown }).stderr ?? "") || "");
-      // git push prints "[rejected]" / "non-fast-forward" / "fetch first"
-      // on the lost-race case. Anything else (auth, network, branch
-      // protection, pre-receive hook failure) is a real error and must
-      // be surfaced verbatim — not silently reset-and-retried.
-      if (!/rejected|non-fast-forward|fetch first/i.test(stderr)) {
-        console.error(stderr.trim() || "git push failed (no stderr)");
-        process.exit(1);
-      }
-      git(["reset", "--hard", "origin/main"], { silent: true, cwd });
-      if (attempt === 1) {
-        console.error(opts.raceMessage);
-        process.exit(opts.raceExitCode);
+  // Serialize the whole pull→commit→push section against every other agent's
+  // checkout. process.exit skips the `finally`, so the exit paths release
+  // explicitly too (releaseTasksLock is idempotent; stale-steal backstops a
+  // crash where neither runs).
+  const lock = acquireTasksLock(cwd);
+  try {
+    // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
+    // tree. Only needed before the first attempt — the retry path resets hard to
+    // origin/main, which already discards them.
+    restoreGeneratedFiles(cwd);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
+      opts.mutator();
+      git(["add", opts.fileToStage], { cwd });
+      git(["commit", "-q", "-m", opts.message], { cwd });
+      try {
+        git(["push", "--quiet", "origin", pushRefspec], { silent: true, cwd });
+        return;
+      } catch (e) {
+        const stderr = String(((e as { stderr?: unknown }).stderr ?? "") || "");
+        // git push prints "[rejected]" / "non-fast-forward" / "fetch first"
+        // on the lost-race case. Anything else (auth, network, branch
+        // protection, pre-receive hook failure) is a real error and must
+        // be surfaced verbatim — not silently reset-and-retried.
+        if (!/rejected|non-fast-forward|fetch first/i.test(stderr)) {
+          console.error(stderr.trim() || "git push failed (no stderr)");
+          releaseTasksLock(lock);
+          process.exit(1);
+        }
+        git(["reset", "--hard", "origin/main"], { silent: true, cwd });
+        if (attempt === 1) {
+          console.error(opts.raceMessage);
+          releaseTasksLock(lock);
+          process.exit(opts.raceExitCode);
+        }
       }
     }
+  } finally {
+    releaseTasksLock(lock);
   }
 }
 
