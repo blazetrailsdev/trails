@@ -188,34 +188,22 @@ function _addAssocJoin(
   // LEFT OUTER JOIN path), skip — the join will be emitted when the manager
   // is built, so adding a second join here would cause ambiguous column names.
   if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return undefined;
-  // Association-level dedup (Rails `left_outer_joins_values |= args` /
-  // `joins_values |= args`, query_methods.rb:124-128, 889-890): a repeat of the
-  // same association reuses its existing join. We must do this BEFORE the raw
-  // table/ON collision check below — once a sibling join has been aliased its ON
-  // references the alias, so it no longer equals this call's freshly-derived
-  // (unaliased) ON and would be mistaken for a new collision, minting a second
-  // alias for an association that's already joined.
+  // Association-level dedup (Rails `left_outer_joins_values |= args`,
+  // query_methods.rb:124-128) must run BEFORE the table/ON collision check: an
+  // already-aliased sibling join's ON references the alias, so it no longer
+  // equals a repeat call's freshly-derived ON and would mint a second alias.
   const sameAssoc = clauses.find((j) => j.assoc === assocName && j.table === join.table);
   if (sameAssoc) return sameAssoc.as;
   const sameTableJoins = clauses.filter((j) => j.table === join.table);
   if (sameTableJoins.length > 0) {
     if (sameTableJoins.every((j) => j.on === join.on)) return undefined; // all compatible — skip
-    // Same table joined under different ON conditions (two sibling associations
-    // targeting the same table). Rails' AliasTracker keeps the first occurrence
-    // on the bare table name and aliases later ones to the association name
-    // (`aliased_table_for` → `reflection.alias_candidate(parent.table_name)` =
-    // `"#{plural_assoc}_#{owner_table}"`). Mirror that here so the second join
-    // is emitted as `<table> AS <alias>` instead of colliding.
+    // Two sibling associations target the same table under different ON
+    // conditions — alias the later join per Rails' AliasTracker (see below).
     const { alias, base } = _selfJoinAlias(assocName, ownerTable, clauses, aliasLength);
     const qTable = quoteTable(join.table);
     const qAlias = quoteTable(alias);
-    // The ON SQL references the target table as `<quotedTable>.<col>`; rebind
-    // those references to the alias. The owner table is a different identifier,
-    // so this never rewrites the source side of the predicate.
+    // ON references the target as `<quotedTable>.<col>`; rebind to the alias.
     const reboundOn = join.on.split(`${qTable}.`).join(`${qAlias}.`);
-    // `aliasBase` records the candidate this alias was minted from, so a later
-    // `_selfJoinAlias` for the same candidate counts only the aliases we actually
-    // produced — never an unrelated join that merely matches the suffix pattern.
     clauses.push({
       type,
       table: join.table,
@@ -233,31 +221,19 @@ function _addAssocJoin(
 
 /**
  * Compute a Rails-`AliasTracker`-faithful self-join alias for a sibling
- * association join that collides with an existing join on the same table.
+ * association join colliding on the same table. Mirrors `aliased_table_for`
+ * (alias_tracker.rb:60-77): the candidate `"#{plural_name}_#{owner_table}"`
+ * (reflection.rb:328-330) is normalized to `table_alias_length` (dots →
+ * underscores), and a `_<count>` suffix on a `truncate`d (`length - 2`) base is
+ * appended for repeats — so long names neither diverge from Rails nor exceed
+ * adapter alias limits.
  *
- * Mirrors `AliasTracker#aliased_table_for` (alias_tracker.rb:60-77): the
- * candidate `reflection.alias_candidate(parent.table_name)` =
- * `"#{plural_name}_#{owner_table}"` (reflection.rb:328-330) is normalized via
- * `table_alias_for` — truncated to the adapter's `table_alias_length` with dots
- * replaced by underscores (alias_tracker.rb:82-84) — before the count keyed off
- * that normalized name decides the `_<count>` suffix, which is itself applied to
- * a `truncate`d (`length - 2`) base (alias_tracker.rb:67-72, 86-88). Without
- * this, long names diverge from Rails and can exceed adapter alias limits.
- *
- * Rails keys the running count on the base `aliased_name`: `initial_count_for`
- * (alias_tracker.rb:28-43) seeds it from joins whose name exactly equals the
- * candidate, and `aliased_table_for` then increments that base key, emitting
- * `<truncated>_<count>` for repeats (`:67-72`). We reconstruct the seed and the
- * increment separately:
- *   - the seed counts pre-existing joins (not minted here) whose emitted name
- *     exactly equals the candidate — its real table or some other alias;
- *   - the increment counts the aliases this helper already produced for the
- *     SAME candidate, tracked via `aliasBase` rather than by matching the
- *     suffix pattern, so an unrelated join named `<truncated>_<n>` never bumps
- *     the count (which would otherwise re-emit a colliding or skipped suffix).
- *
- * Returns both the final `alias` and the `base` candidate, the latter stamped
- * onto the emitted clause so subsequent calls can attribute it correctly.
+ * The count keys on the base name: a seed from pre-existing joins whose emitted
+ * name exactly equals the candidate (`initial_count_for`, alias_tracker.rb:28-43),
+ * plus the aliases this helper already minted for the SAME candidate — tracked
+ * via `aliasBase`, not by matching the suffix pattern, so an unrelated join
+ * named `<truncated>_<n>` can't perturb the count. `base` is returned so the
+ * caller can stamp it onto the clause for that attribution.
  */
 function _selfJoinAlias(
   assocName: string,
