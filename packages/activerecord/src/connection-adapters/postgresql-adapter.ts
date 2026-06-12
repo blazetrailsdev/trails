@@ -5382,7 +5382,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     exception: unknown,
     opts: { message?: string; sql?: string; binds?: unknown[] } = {},
   ): Error {
-    return this._translateException(exception, opts.sql ?? "", opts.binds ?? []);
+    // Pass sql/binds through without coercing nullish → "" / []. Rails'
+    // translate_exception keeps sql: nil when called from with_raw_connection
+    // (it has no statement yet) so StatementInvalid#set_query can fill it in
+    // later via AbstractAdapter#log. Coercing null → "" would make the error
+    // look like it already had a (blank) statement and suppress that attach.
+    return this._translateException(exception, opts.sql as string, opts.binds ?? []);
   }
 
   /**
