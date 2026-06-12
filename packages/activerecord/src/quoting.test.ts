@@ -1,11 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { minutes } from "@blazetrails/activesupport";
 import {
   quote,
   quoteString,
   quoteColumnName,
   quoteTableName,
   quoteTableNameForAssignment,
+  quotedDate,
+  quotedTime,
   quotedTrue,
   unquotedTrue,
   quotedFalse,
@@ -21,6 +24,11 @@ import {
   formatInstantForSql,
   formatPlainTimeForSql,
 } from "./connection-adapters/abstract/sql-datetime.js";
+import { setDefaultTimezone } from "./type/internal/timezone.js";
+
+afterEach(() => {
+  setDefaultTimezone("utc");
+});
 
 describe("QuotingTest", () => {
   it("quoted true", () => {
@@ -109,50 +117,66 @@ describe("QuotingTest", () => {
     expect(result).toBe('"users"."name"');
   });
 
-  it.skip("quote duration", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote duration", () => {
+    // Rails: quote(30.minutes) raises "can't quote ActiveSupport::Duration".
+    // A Duration is an object instance, so it falls through to the final throw.
+    expect(() => quote(minutes(30))).toThrow(TypeError);
+    expect(() => quote(minutes(30))).toThrow(/can't quote/);
+    expect(() => quote(minutes(30))).toThrow(/Duration/);
   });
-  it.skip("quote table name calls quote column name", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote table name calls quote column name", () => {
+    // Rails dispatches quote_table_name through quote_column_name per identifier
+    // part. trails has no module-level method dispatch to monkey-patch, so the
+    // ported assertion checks that both routes share the same identifier-quoting
+    // logic — including the "" escape of an embedded quote, not just a bare name.
+    expect(quoteTableName("foo")).toBe(quoteColumnName("foo"));
+    expect(quoteTableName('a"b')).toBe(quoteColumnName('a"b'));
   });
-  it.skip("quoted timestamp local", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quoted timestamp local", () => {
+    setDefaultTimezone("local");
+    const zone = Temporal.Now.timeZoneId();
+    const zdt = Temporal.ZonedDateTime.from(`2026-04-07T15:30:00[${zone}]`);
+    expect(quotedDate(zdt.toInstant())).toBe("2026-04-07 15:30:00");
   });
-  it.skip("quoted time local", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quoted time local", () => {
+    // Mirrors Rails' with_timezone_config(:local); quotedTime takes only naive
+    // types (PlainTime/PlainDateTime), so the local setting is intentionally a
+    // no-op here — kept to parallel the Rails test's structure.
+    setDefaultTimezone("local");
+    const t = Temporal.PlainTime.from("15:30:45");
+    expect(quotedTime(t)).toBe("15:30:45");
   });
-  it.skip("quoted datetime utc", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quoted datetime utc", () => {
+    const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
+    expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
-  it.skip("quoted datetime local", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quoted datetime local", () => {
+    // DateTime has no getlocal, so the local setting is a no-op for naive values.
+    setDefaultTimezone("local");
+    const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
+    expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
-  it.skip("quote bigdecimal", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote bigdecimal", () => {
+    // Rails: BigDecimal((1 << 100).to_s) quotes bare via to_s("F"); the trails
+    // representation of an exact arbitrary-precision integer is a bigint, which
+    // quotes to the bare decimal digits (Rails emits a trailing ".0" that the
+    // integral bigint has no place for).
+    expect(quote(1n << 100n)).toBe("1267650600228229401496703205376");
   });
-  it.skip("dates and times", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("dates and times", () => {
+    // Rails monkey-patches quoted_date to verify quote() dispatches through it.
+    // trails' quote() branches on instanceof and calls the formatters directly —
+    // there is no quoted_date method on a host to override — so the faithful port
+    // asserts the concrete serialized output, which also guards against formatting
+    // regressions the Rails dispatch-only test would miss. quote wraps in quotes.
+    expect(quote(Temporal.PlainDate.from("2026-04-07"))).toBe("'2026-04-07'");
+    expect(quote(Temporal.Instant.from("2026-04-07T15:30:00Z"))).toBe("'2026-04-07 15:30:00'");
+    expect(quote(Temporal.PlainDateTime.from("2026-04-07T15:30:00"))).toBe("'2026-04-07 15:30:00'");
   });
-  it.skip("quote as mb chars no column", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote as mb chars no column", () => {
+    // JS strings are already the multibyte representation, so a "Chars" value is
+    // a plain string; backslash escaping matches quote_string_no_column.
+    expect(quote("lo\\l")).toBe("'lo\\\\l'");
   });
 });
 
@@ -178,15 +202,13 @@ describe("TypeCastingTest", () => {
     expect(() => typeCast(new Date())).toThrow(TypeError);
     expect(() => typeCast(new Date())).toThrow(/Temporal/);
   });
-  it.skip("type cast time", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("type cast time", () => {
+    // Rails (non-mysql): type_cast(time) returns quoted_date(time).
+    const t = Temporal.Instant.from("2026-04-07T15:30:00Z");
+    expect(typeCast(t)).toBe("2026-04-07 15:30:00");
   });
-  it.skip("type cast duration should raise error", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("type cast duration should raise error", () => {
+    expect(() => typeCast(minutes(30))).toThrow(TypeError);
   });
 });
 
@@ -242,14 +264,13 @@ describe("QuoteBooleanTest", () => {
     expect(formatPlainTimeForSql(t)).toBe("08:15:30");
   });
 
-  it.skip("quote returns frozen string", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("quote returns frozen string", () => {
+    // JS string primitives are immutable; Object.isFrozen reports true for them.
+    expect(Object.isFrozen(quote(true))).toBe(true);
+    expect(Object.isFrozen(quote(false))).toBe(true);
   });
-  it.skip("type cast returns frozen value", () => {
-    // BLOCKED: schema — adapter quoting / type-cast gap
-    // ROOT-CAUSE: connection-adapters/abstract/quoting.ts#quote or quoteColumnName missing Rails parity
-    // SCOPE: ~30 LOC fix in abstract/quoting.ts; affects ~13 tests in quoting.test.ts
+  it("type cast returns frozen value", () => {
+    expect(Object.isFrozen(typeCast(true))).toBe(true);
+    expect(Object.isFrozen(typeCast(false))).toBe(true);
   });
 });
