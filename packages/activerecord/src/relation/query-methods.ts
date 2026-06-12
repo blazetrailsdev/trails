@@ -329,7 +329,17 @@ export function buildCteSql(
   const binds: unknown[] = [];
   const defs = ctes
     .map((c) => {
-      const [body, bodyBinds] = compile(c.expression);
+      // Each body compiles with a fresh collector, so PG `$N` placeholders
+      // restart at `$1` per CTE. Shift this body's placeholders up by the binds
+      // already emitted by earlier CTEs so the concatenated WITH clause numbers
+      // globally (mirrors Rails compiling all with_statements through one
+      // collector). SQLite/MySQL use positional `?`, so the shift is a no-op.
+      const offset = binds.length;
+      const [rawBody, bodyBinds] = compile(c.expression);
+      const body =
+        offset > 0
+          ? rawBody.replace(/\$(\d+)/g, (_m, n) => `$${parseInt(n, 10) + offset}`)
+          : rawBody;
       binds.push(...bodyBinds);
       const wrapped =
         c.expression instanceof Nodes.UnionAll || c.expression instanceof Nodes.Grouping
