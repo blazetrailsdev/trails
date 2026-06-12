@@ -1,89 +1,234 @@
-import { describe, it } from "vitest";
+/**
+ * Tests to increase Rails test coverage matching.
+ * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/bind_parameter_test.rb
+ */
+import { describe, it, expect, afterEach } from "vitest";
+import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { IntegerType, StringType } from "@blazetrails/activemodel";
+import { LogSubscriber } from "./log-subscriber.js";
+import { QueryAttribute } from "./relation/query-attribute.js";
+import { Base } from "./index.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Topic } from "./test-helpers/models/topic.js";
 
+// Captures `sql.active_record` notification events, mirroring Rails'
+// LogListener subscribed in the test's `setup`.
+class LogListener {
+  events: Event[] = [];
+  call(event: Event): void {
+    this.events.push(event);
+  }
+}
+
+// Test-only LogSubscriber subclass that captures rendered debug lines,
+// mirroring the anonymous LogSubscriber subclass in Rails' assert_logs_binds.
+class CaptureLogger extends Logger {
+  debugs: string[] = [];
+  constructor() {
+    super(null);
+  }
+  override debug(message?: string | (() => string)): boolean {
+    this.debugs.push(typeof message === "function" ? message() : (message ?? ""));
+    return true;
+  }
+}
+
+class DebugLogSubscriber extends LogSubscriber {
+  capture = new CaptureLogger();
+  override get logger(): Logger {
+    return this.capture;
+  }
+}
+
+function logBinds(binds: unknown[], sql = "select * from topics where id = ?"): string {
+  const subscriber = new DebugLogSubscriber();
+  // Rails' assert_logs_binds helpers build the payload with
+  // `@connection.send(:type_casted_binds, binds)` — use the connection's real
+  // type_casted_binds (abstract/quoting.ts) rather than hand-casting.
+  const conn = Topic.leaseConnection() as any;
+  const event = new Event("sql.active_record", Temporal.Now.instant(), {
+    name: "SQL",
+    sql,
+    binds,
+    type_casted_binds: conn.typeCastedBinds(binds),
+  });
+  subscriber.sql(event);
+  return subscriber.capture.debugs[0] ?? "";
+}
+
+// Rails wraps the entire class in `if Base.lease_connection.prepared_statements`
+// (bind_parameter_test.rb:9), so on adapters with prepared statements off (MySQL/
+// MariaDB default) NONE of these run. Deliberate deviation: we keep the
+// prepared-statement-INDEPENDENT cases (too many binds, find one uses binds, the
+// log-render tests — all adapter-agnostic) running on every backend for broader
+// coverage, and gate only the one prepared-statement-SPECIFIC case
+// (`nested unprepared statements`) via ctx.skip below.
 describe("BindParameterTest", () => {
+  // Rails: `fixtures :topics, :authors, :author_addresses, :posts`.
+  useHandlerFixtures(["topics", "authors", "authorAddresses", "posts"], {
+    schema: canonicalSchema,
+  });
+
+  afterEach(() => {
+    Notifications.unsubscribeAll();
+    Base.filterAttributes = [];
+  });
+
   it.skip("statement cache", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-statement-cache-pool-introspection): requires adapter-uniform `sql_key` + prepared-statement-pool
+    // introspection. sqlite keys a plain Map by SQL; PG/MySQL use a
+    // StatementPool with adapter-specific keying — there is no test-only
+    // accessor mirroring Rails' `@statements.send(:cache)` / `sql_key`.
   });
   it.skip("statement cache with query cache", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-statement-cache-pool-introspection): see "statement cache".
   });
   it.skip("statement cache with find", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-statement-cache-pool-introspection): `cached_find_by_statement`
+    // exists (core.ts) but `find` does not route through it, so the per-class
+    // statement cache is never populated. Production wiring, separate story.
   });
   it.skip("statement cache with find by", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-statement-cache-pool-introspection): see "statement cache with find".
   });
   it.skip("statement cache with in clause", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-statement-cache-pool-introspection): see "statement cache".
   });
   it.skip("statement cache with sql string literal", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-statement-cache-pool-introspection): see "statement cache".
   });
-  it.skip("too many binds", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+
+  it("too many binds", async () => {
+    const conn = Topic.leaseConnection() as any;
+    const bindParamsLength = conn.bindParamsLength();
+
+    const ids = Array.from({ length: bindParamsLength }, (_, i) => i + 1);
+    ids.push((2n ** 63n) as unknown as number);
+
+    let topics = Topic.where({ id: ids });
+    expect(await topics.count()).toBe(await Topic.count());
+
+    topics = Topic.whereNot({ id: ids });
+    expect(await topics.count()).toBe(0);
   });
-  it.skip("too many binds with query cache", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+
+  it("too many binds with query cache", async () => {
+    const conn = Topic.leaseConnection() as any;
+    conn.enableQueryCacheBang();
+    try {
+      const bindParamsLength = conn.bindParamsLength();
+      const ids = Array.from({ length: bindParamsLength + 1 }, (_, i) => i + 1);
+
+      let topics = Topic.where({ id: ids });
+      expect(await topics.count()).toBe(await Topic.count());
+
+      topics = Topic.whereNot({ id: ids });
+      expect(await topics.count()).toBe(0);
+    } finally {
+      conn.disableQueryCacheBang();
+    }
   });
+
   it.skip("bind from join in subquery", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-bind-params-to-sql-and-join-subquery): needs association-name joins (`joins(:thinking_posts)`) plus
+    // bind threading through `from(subquery)`. trails' `joins(table, on)` is the
+    // manual SQL-fragment form only — a bare association name renders as a raw
+    // table alias (`FROM authors thinkingPosts`), never an INNER JOIN. Wiring
+    // association joins is production work, tracked in the follow-up story.
   });
+
   it.skip("binds are logged", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-statement-cache-pool-introspection): Rails builds
+    // `Relation::QueryAttribute.new("id", 1, Type::Value.new)`, passes it to
+    // exec_query, and asserts the `sql.active_record` payload preserves the same
+    // Attribute objects (bind_parameter_test.rb:137-145). trails type-casts binds
+    // to primitives in the relation/predicate-builder layer *upstream* of the
+    // adapter, so the notification boundary only ever carries primitives (see
+    // `find one uses binds`, whose payload.binds is `[1]`) — there is no
+    // adapter-level payload.binds (objects) vs type_casted_binds (primitives)
+    // split to assert against. A hand-built exec_query with raw QueryAttribute
+    // binds can't reproduce it either: the sqlite driver type-casts inside
+    // `execute` *before* instrumentation is entered, so it rejects and no event
+    // fires. Preserving Attribute objects on the payload is production work,
+    // tracked in the follow-up story.
   });
-  it.skip("find one uses binds", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+
+  it("find one uses binds", async () => {
+    const subscriber = new LogListener();
+    const sub = Notifications.subscribe("sql.active_record", (e: Event) => subscriber.call(e));
+    try {
+      await Topic.find(1);
+      // Rails asserts `attr.value == 1` on the QueryAttribute payload binds
+      // (bind_parameter_test.rb:148-152). trails type-casts binds to primitives
+      // in the relation layer, so the payload carries `[1]` rather than Attribute
+      // objects — the `?? attr` fallback matches the primitive trails emits. (The
+      // payload can't preserve Attribute objects without production changes; the
+      // stronger `binds are logged` assertion is deferred to
+      // f9-statement-cache-pool-introspection for exactly that reason.)
+      const message = subscriber.events.find((e) =>
+        (e.payload.binds as any[])?.some((attr) => (attr?.value ?? attr) === 1),
+      );
+      expect(message).toBeTruthy();
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
   });
-  it.skip("logs binds after type cast", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+
+  it("logs binds after type cast", () => {
+    const binds = [new QueryAttribute("id", "10", new IntegerType())];
+    // Rails anchors the binds render to end-of-line: %r(\[\["id", 10\]\]\z)
+    // (bind_parameter_test.rb:309). trails' safeJsonStringify drops the space.
+    expect(logBinds(binds)).toMatch(/\["id",10\]\]$/);
   });
-  it.skip("logs unnamed binds", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+
+  it("logs unnamed binds", () => {
+    const binds = ["abcd"];
+    // Rails: %r(\[\[nil, "abcd"\]\]\z) (bind_parameter_test.rb:340), end-anchored.
+    expect(logBinds(binds, "select * from topics where title = $1")).toMatch(/\[null,"abcd"\]\]$/);
   });
+
+  it("binds with filtered attributes", () => {
+    Base.filterAttributes = ["auth"];
+    const binds = [new QueryAttribute("auth_token", "abcd", new StringType())];
+    expect(logBinds(binds, "select * from users where auth_token = ?")).toContain(
+      '["auth_token","[FILTERED]"]',
+    );
+  });
+
   it.skip("bind params to sql with prepared statements", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-bind-params-to-sql-and-join-subquery): Rails builds the expected SQL with `@connection.send(:collector)`
+    // + `visitor.compile(bind_params, collector)` to render adapter-correct
+    // placeholders ($1/?/literal) with shared bind numbering. trails' `compile`
+    // takes a single node with no shared collector state, so the multi-bind
+    // numbering can't be reproduced test-only — tracked in the follow-up story.
   });
   it.skip("bind params to sql with unprepared statements", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+    // DEFERRED (story f9-bind-params-to-sql-and-join-subquery): see
+    // "bind params to sql with prepared statements".
   });
-  it.skip("nested unprepared statements", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
-  });
-  it.skip("binds with filtered attributes", () => {
-    // BLOCKED: relation — Relation API gap in bind-parameter
-    // ROOT-CAUSE: relation/bind-parameter.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in bind-parameter.test.ts
+
+  it("nested unprepared statements", async (ctx) => {
+    const conn = Topic.leaseConnection() as any;
+    // Rails wraps the whole BindParameterTest in
+    // `if lease_connection.prepared_statements`. MySQL/MariaDB default prepared
+    // statements off, so this prepared-statement toggle behavior isn't exercised
+    // there — mirror the gate instead of asserting an adapter-specific default.
+    ctx.skip(!conn.preparedStatements);
+    expect(conn.preparedStatements).toBe(true);
+
+    await conn.unpreparedStatement(async () => {
+      expect(conn.preparedStatements).toBe(false);
+
+      await conn.unpreparedStatement(async () => {
+        expect(conn.preparedStatements).toBe(false);
+      });
+
+      expect(conn.preparedStatements).toBe(false);
+    });
+
+    expect(conn.preparedStatements).toBe(true);
   });
 });
