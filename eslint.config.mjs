@@ -18,6 +18,7 @@ import testFixtureParity from "./eslint/test-fixture-parity.mjs";
 import useFixturesSchema from "./eslint/use-fixtures-schema.mjs";
 import requireCanonicalSchema from "./eslint/require-canonical-schema.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
+import noRawSql from "./eslint/no-raw-sql.mjs";
 
 export default defineConfig(
   {
@@ -122,6 +123,7 @@ export default defineConfig(
           "use-fixtures-schema": useFixturesSchema,
           "require-canonical-schema": requireCanonicalSchema,
           "require-table-teardown": requireTableTeardown,
+          "no-raw-sql": noRawSql,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
         },
@@ -291,6 +293,27 @@ export default defineConfig(
     ignores: ["packages/activerecord/src/test-helpers/**"],
     rules: {
       "blazetrails/require-table-teardown": "error",
+    },
+  },
+
+  // ── no-raw-sql: ban raw SQL strings passed to execution sinks (and the
+  //    RFC-0022 `sql.replace`/`sql.concat` string-surgery pattern) outside the
+  //    adapter/DDL layer. Build queries with @blazetrails/arel. The adapter
+  //    layer, migrations, and schema dumpers legitimately render SQL and are
+  //    excluded. Existing violators are grandfathered in
+  //    eslint/no-raw-sql-exclude.json and ratcheted down (RFC-0022 burndown).
+  //    See eslint/no-raw-sql.mjs. ──
+  {
+    files: ["packages/activerecord/src/**/*.ts"],
+    ignores: [
+      "packages/activerecord/src/**/*.test.ts",
+      "packages/activerecord/src/connection-adapters/**",
+      "packages/activerecord/src/adapters/**",
+      "packages/activerecord/src/tasks/**",
+      "packages/activerecord/src/**/schema-*.ts",
+    ],
+    rules: {
+      "blazetrails/no-raw-sql": "error",
     },
   },
 
