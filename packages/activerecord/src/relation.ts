@@ -3876,7 +3876,13 @@ export class Relation<T extends Base> {
       if (this._ctes.some((c) => c.recursive)) manager.withRecursive(...cteNodes);
       else manager.with(...cteNodes);
     }
-    if (this._annotations.length > 0) manager.comment(...this._annotations);
+    if (this._annotations.length > 0) {
+      // Rails dedupes annotations before attaching them to the Arel manager
+      // (query_methods.rb#build_arel: `annotates.uniq if annotates.size > 1`).
+      const annotates =
+        this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
+      manager.comment(...annotates);
+    }
     return manager;
   }
 
