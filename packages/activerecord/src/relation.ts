@@ -3137,10 +3137,13 @@ export class Relation<T extends Base> {
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
 
     // Rails' pluck executes the full relation arel (calculations.rb), and
-    // build_arel applies group/having before from/select (query_methods.rb), so
-    // carry those clauses here too rather than only joins/wheres/order/etc.
+    // build_arel applies group/having, optimizer hints, from, and lock
+    // (query_methods.rb) before returning the manager, so carry those clauses
+    // here too rather than only joins/wheres/order/distinct/limit/offset.
     for (const col of this._groupColumns) manager.group(groupColumnToArel(col, table));
     if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
+    if (this._lockValue) manager.lock(this._lockValue);
+    if (this._optimizerHints.length > 0) manager.optimizerHints(...this._optimizerHints);
 
     // Thread from()/CTE through the manager just like a normal read (Rails'
     // pluck builds on the relation arel, honoring from_clause / with). FROM
@@ -3152,6 +3155,9 @@ export class Relation<T extends Base> {
 
     const [compiledSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
     let pluckSql = compiledSql;
+    // annotate() comments — appended like _toSqlWithoutSetOp (build_arel adds
+    // them to the manager's comment node).
+    if (this._annotations.length > 0) pluckSql = `${pluckSql} ${this._annotationComments()}`;
     if (this._ctes.length > 0) {
       pluckSql = `${_qm.buildCteSql(
         this._ctes,
