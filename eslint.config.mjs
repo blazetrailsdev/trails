@@ -8,6 +8,7 @@ import vitest from "@vitest/eslint-plugin";
 import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
+import railsErrorParity from "./eslint/rails-error-parity.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
@@ -113,6 +114,7 @@ export default defineConfig(
           "no-node-builtins": noNodeBuiltins,
           "no-process-bypass": noProcessBypass,
           "rails-private-jsdoc": railsPrivateJsdoc,
+          "rails-error-parity": railsErrorParity,
           "no-native-date": noNativeDate,
           "sqlite-driver-await": sqliteDriverAwait,
           "nie-requires-annotation": nieRequiresAnnotation,
@@ -195,6 +197,21 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-private-jsdoc": "error",
+    },
+  },
+
+  // ── rails-error-parity: errors.ts must mirror Rails' error-class
+  //    hierarchy (name + parent), and Rails-mirroring source must throw
+  //    ported error classes rather than the bare global `Error`. Manifest:
+  //    eslint/rails-error-classes.json (built by
+  //    `pnpm tsx scripts/build-rails-error-manifest.ts`). Pre-existing
+  //    violators are grandfathered in eslint/rails-error-parity-exclude.json
+  //    and ratcheted down. ──
+  {
+    files: ["packages/activerecord/src/**/*.ts", "packages/activemodel/src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/rails-error-parity": "error",
     },
   },
 
