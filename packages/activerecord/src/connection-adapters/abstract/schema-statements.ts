@@ -40,6 +40,86 @@ import { SchemaDumper } from "./schema-dumper.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
+type RemoveIndexOptions = { name?: string; column?: string | string[] };
+type IndexInfo = { name: string; columns: string[] };
+
+function removeIndexColumnNames(
+  columnName: string | string[] | undefined,
+  options: RemoveIndexOptions,
+): string[] {
+  const raw = columnName ?? options.column;
+  return raw == null || raw === "" ? [] : Array.isArray(raw) ? raw : [raw];
+}
+
+/**
+ * Rails: `index_name_for_remove` — resolve the concrete index name from the
+ * given (already-fetched) indexes plus a name and/or column spec. Raises
+ * ArgumentError on a no-match / ambiguous match. Shared by the SQLite and
+ * PostgreSQL adapters, whose `removeIndex` overrides are self-contained.
+ *
+ * @internal
+ */
+export function indexNameForRemoveFrom(
+  allIndexes: ReadonlyArray<IndexInfo>,
+  tableName: string,
+  columnName: string | string[] | undefined,
+  options: RemoveIndexOptions,
+): string {
+  // can_remove_index_by_name?: a bare `{ name }` needs no introspection.
+  if (columnName == null && options.name != null && options.column == null) {
+    return options.name;
+  }
+  const conventional = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
+  const columnNames = removeIndexColumnNames(columnName, options);
+  const checks: Array<(i: IndexInfo) => boolean> = [];
+  if (options.name != null) {
+    const n = options.name;
+    checks.push((i) => i.name === n);
+  }
+  if (columnNames.length > 0) {
+    const target = conventional(columnNames);
+    checks.push((i) => conventional(i.columns) === target);
+  }
+  if (checks.length === 0) {
+    throw new ArgumentError("No name or columns specified");
+  }
+  const matching = allIndexes.filter((i) => checks.every((check) => check(i)));
+  if (matching.length > 1) {
+    throw new ArgumentError(
+      `Multiple indexes found on ${tableName} columns ${columnNames}. ` +
+        `Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
+    );
+  }
+  if (matching.length === 0) {
+    throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
+  }
+  return matching[0].name;
+}
+
+/**
+ * Rails: `index_exists?` for the remove path — true when an index matches the
+ * given name and/or columns. Shared by the SQLite / PostgreSQL `removeIndex`
+ * overrides for their `ifExists` short-circuit.
+ *
+ * @internal
+ */
+export function indexExistsForRemoveFrom(
+  allIndexes: ReadonlyArray<IndexInfo>,
+  columnName: string | string[] | undefined,
+  options: RemoveIndexOptions,
+): boolean {
+  const columnNames = removeIndexColumnNames(columnName, options);
+  return allIndexes.some((i) => {
+    if (options.name != null && i.name !== options.name) return false;
+    if (columnNames.length > 0) {
+      return (
+        i.columns.length === columnNames.length && columnNames.every((c, k) => c === i.columns[k])
+      );
+    }
+    return options.name != null;
+  });
+}
+
 /** Options accepted by `createJoinTable`. Extends the `createTable` option set with join-specific keys. */
 export type JoinTableOptions = {
   tableName?: string;

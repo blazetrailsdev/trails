@@ -17,6 +17,7 @@ import {
   dataSourceSql as sqliteDataSourceSql,
   extractValueFromDefault as sqliteExtractValueFromDefault,
 } from "./sqlite3/schema-statements.js";
+import { indexNameForRemoveFrom, indexExistsForRemoveFrom } from "./abstract/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -48,7 +49,6 @@ import {
   BooleanType,
   BinaryType,
   DecimalType,
-  ArgumentError,
 } from "@blazetrails/activemodel";
 import { getFs, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
@@ -1068,85 +1068,19 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       opts = columnOrOptions ?? {};
     }
 
+    // A bare `{ name }` resolves without introspection (Rails
+    // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
+    const canRemoveByName = columnName == null && opts.name != null && opts.column == null;
+    const all =
+      opts.ifExists || !canRemoveByName
+        ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
+        : [];
     // Rails: `return if options[:if_exists] && !index_exists?(...)`.
-    if (opts.ifExists && !(await this._indexExistsForRemove(tableName, columnName, opts))) {
+    if (opts.ifExists && !indexExistsForRemoveFrom(all, columnName, opts)) {
       return;
     }
-
-    const indexName = await this._indexNameForRemove(tableName, columnName, opts);
+    const indexName = indexNameForRemoveFrom(all, tableName, columnName, opts);
     await this.executeMutation(`DROP INDEX ${quoteColumnName(indexName)}`);
-  }
-
-  // Rails: `index_name_for_remove` — resolve the concrete index name from a name
-  // and/or column spec via introspection, raising ArgumentError on a no-match or
-  // ambiguous match (and `DROP INDEX` then drops by that real name).
-  private async _indexNameForRemove(
-    tableName: string,
-    columnName: string | string[] | undefined,
-    options: { name?: string; column?: string | string[] },
-  ): Promise<string> {
-    // can_remove_index_by_name?: a bare `{ name }` needs no introspection.
-    if (columnName == null && options.name != null && options.column == null) {
-      return options.name;
-    }
-    const indexNameFor = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
-    const rawColumn = columnName ?? options.column;
-    const columnNames =
-      rawColumn == null || rawColumn === ""
-        ? []
-        : Array.isArray(rawColumn)
-          ? rawColumn
-          : [rawColumn];
-
-    const checks: Array<(i: { name: string; columns: string[] }) => boolean> = [];
-    if (options.name != null) {
-      const n = options.name;
-      checks.push((i) => i.name === n);
-    }
-    if (columnNames.length > 0) {
-      const target = indexNameFor(columnNames);
-      checks.push((i) => indexNameFor(i.columns) === target);
-    }
-    if (checks.length === 0) {
-      throw new ArgumentError("No name or columns specified");
-    }
-
-    const all = (await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>;
-    const matching = all.filter((i) => checks.every((check) => check(i)));
-    if (matching.length > 1) {
-      throw new ArgumentError(
-        `Multiple indexes found on ${tableName} columns ${columnNames}. ` +
-          `Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
-      );
-    }
-    if (matching.length === 0) {
-      throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
-    }
-    return matching[0].name;
-  }
-
-  private async _indexExistsForRemove(
-    tableName: string,
-    columnName: string | string[] | undefined,
-    options: { name?: string; column?: string | string[] },
-  ): Promise<boolean> {
-    const all = (await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>;
-    const rawColumn = columnName ?? options.column;
-    const columnNames =
-      rawColumn == null || rawColumn === ""
-        ? []
-        : Array.isArray(rawColumn)
-          ? rawColumn
-          : [rawColumn];
-    return all.some((i) => {
-      if (options.name != null && i.name !== options.name) return false;
-      if (columnNames.length > 0) {
-        return (
-          i.columns.length === columnNames.length && columnNames.every((c, k) => c === i.columns[k])
-        );
-      }
-      return options.name != null;
-    });
   }
 
   createSchemaDumper(

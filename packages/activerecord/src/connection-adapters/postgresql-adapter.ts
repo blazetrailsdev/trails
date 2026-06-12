@@ -69,6 +69,7 @@ import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements, JoinTableOptions } from "./abstract/schema-statements.js";
+import { indexNameForRemoveFrom, indexExistsForRemoveFrom } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
@@ -4089,24 +4090,57 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return sql;
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#remove_index
   async removeIndex(
     tableName: string,
-    options: { name: string; algorithm?: string },
+    columnOrOptions?:
+      | string
+      | string[]
+      | { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean },
+    options: {
+      name?: string;
+      column?: string | string[];
+      algorithm?: string;
+      ifExists?: boolean;
+    } = {},
   ): Promise<void> {
-    if (!options.name) {
-      throw new Error("Index name is required to remove an index");
+    // Rails: `remove_index(table_name, column_name = nil, **options)` — column
+    // may be positional or in the options hash.
+    let columnName: string | string[] | undefined;
+    let opts: { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean };
+    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
+      columnName = columnOrOptions;
+      opts = options;
+    } else {
+      columnName = undefined;
+      opts = columnOrOptions ?? {};
     }
-    if (options.algorithm && options.algorithm !== "concurrently") {
-      throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
+
+    if (opts.algorithm && opts.algorithm !== "concurrently") {
+      throw new Error(`Unknown algorithm: ${opts.algorithm}. Only 'concurrently' is supported.`);
     }
-    if (options.algorithm === "concurrently" && this._inTransaction) {
+    if (opts.algorithm === "concurrently" && this._inTransaction) {
       throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
     }
-    const concurrently = options.algorithm === "concurrently" ? " CONCURRENTLY" : "";
+
+    // A bare `{ name }` resolves without introspection (Rails
+    // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
+    const canRemoveByName = columnName == null && opts.name != null && opts.column == null;
+    const all =
+      opts.ifExists || !canRemoveByName
+        ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
+        : [];
+    // Rails: `return if options[:if_exists] && !index_exists?(...)`.
+    if (opts.ifExists && !indexExistsForRemoveFrom(all, columnName, opts)) {
+      return;
+    }
+    const indexName = indexNameForRemoveFrom(all, tableName, columnName, opts);
+
+    const concurrently = opts.algorithm === "concurrently" ? " CONCURRENTLY" : "";
     const { schema } = this.parseSchemaQualifiedName(tableName);
     const qualifiedIndex = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(options.name)}`
-      : this.quoteIdentifier(options.name);
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(indexName)}`
+      : this.quoteIdentifier(indexName);
     await this.exec(`DROP INDEX${concurrently} ${qualifiedIndex}`);
   }
 
