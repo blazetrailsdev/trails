@@ -448,17 +448,29 @@ export function resolveCounterColumn(
   if (childAssocs) {
     // Check against parent name and STI base class name
     const parentNames = new Set([parentModel.name]);
+    // Registry keys let namespaced (modular) class_name: "Mod::Name" resolve.
+    for (const key of (parentModel as any)._registryKeys ?? []) parentNames.add(key);
     let proto = Object.getPrototypeOf(parentModel);
     while (proto && proto.name && proto !== Function.prototype) {
       parentNames.add(proto.name);
       proto = Object.getPrototypeOf(proto);
     }
-    const belongsTo = childAssocs.find(
+    // Mirror Rails: pick the child `belongs_to` whose foreign key matches the
+    // has_many's (so two associations to the same class resolve correctly).
+    const hmForeignKey = assoc.options.foreignKey ?? `${underscore(parentModel.name)}_id`;
+    const fkEq = (a: AssociationDefinition): boolean => {
+      const fk = a.options.foreignKey ?? `${underscore(a.name)}_id`;
+      const left = Array.isArray(fk) ? fk : [fk];
+      const right = Array.isArray(hmForeignKey) ? hmForeignKey : [hmForeignKey];
+      return left.length === right.length && left.every((k, i) => String(k) === String(right[i]));
+    };
+    const candidates = childAssocs.filter(
       (a) =>
         a.type === "belongsTo" &&
         a.options.counterCache &&
         (parentNames.has(a.options.className ?? "") || parentNames.has(camelize(a.name))),
     );
+    const belongsTo = candidates.find(fkEq) ?? candidates[0];
     if (belongsTo) {
       if (typeof belongsTo.options.counterCache === "string") {
         return belongsTo.options.counterCache;
