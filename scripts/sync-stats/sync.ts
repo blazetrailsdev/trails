@@ -2,9 +2,9 @@ import { execSync } from "child_process";
 import { mkdirSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
-import "@blazetrails/activerecord/sqlite/better-sqlite3";
 import { Base, MigrationContext } from "@blazetrails/activerecord";
-import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
+import type { AbstractSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 
 const REPO = "blazetrailsdev/trails";
 const [REPO_OWNER, REPO_NAME] = REPO.split("/");
@@ -390,7 +390,7 @@ class SyncLog extends Base {
 // Schema setup via MigrationContext
 // ---------------------------------------------------------------------------
 
-async function tableExists(adapter: SQLite3Adapter, name: string): Promise<boolean> {
+async function tableExists(adapter: AbstractSQLite3Adapter, name: string): Promise<boolean> {
   const rows = await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
     [name],
@@ -399,7 +399,7 @@ async function tableExists(adapter: SQLite3Adapter, name: string): Promise<boole
 }
 
 async function columnExists(
-  adapter: SQLite3Adapter,
+  adapter: AbstractSQLite3Adapter,
   table: string,
   column: string,
 ): Promise<boolean> {
@@ -408,7 +408,7 @@ async function columnExists(
   return cols.some((c: any) => c.name === column);
 }
 
-async function migrateDb(adapter: SQLite3Adapter) {
+async function migrateDb(adapter: AbstractSQLite3Adapter) {
   const ctx = new MigrationContext(adapter);
 
   const hasExistingSchema = await tableExists(adapter, "sync_log");
@@ -2317,7 +2317,7 @@ async function main() {
     console.log("Running full refresh sync.\n");
   }
 
-  const adapter = new SQLite3Adapter(DB_PATH);
+  const adapter = new BetterSQLite3Adapter(DB_PATH);
   Base.adapter = adapter;
 
   try {

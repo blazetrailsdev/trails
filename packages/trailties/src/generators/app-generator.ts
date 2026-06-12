@@ -1011,24 +1011,27 @@ dist
   },
 };
 `;
-      default:
-        return `import "@blazetrails/activerecord/sqlite/${this.sqliteDriver}";
-
-export default {
+      default: {
+        // Each SQLite driver maps to its own registered adapter name; the
+        // adapter subclass bundles its driver, so no side-effect import is
+        // needed. better-sqlite3 backs the canonical `sqlite3` name.
+        const adapter = this.sqliteDriver === "better-sqlite3" ? "sqlite3" : this.sqliteDriver;
+        return `export default {
   development: {
-    adapter: "sqlite3",
+    adapter: "${adapter}",
     database: "db/development.sqlite3",
   },
   test: {
-    adapter: "sqlite3",
+    adapter: "${adapter}",
     database: "db/test.sqlite3",
   },
   production: {
-    adapter: "sqlite3",
+    adapter: "${adapter}",
     database: "db/production.sqlite3",
   },
 };
 `;
+      }
     }
   }
 }

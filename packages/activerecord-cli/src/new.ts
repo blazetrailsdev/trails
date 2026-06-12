@@ -22,7 +22,7 @@ const DRIVERS: Record<Driver, { adapter: string; devDb: string; testDb: string; 
       prodDb: "db/production.sqlite3",
     },
     "node-sqlite": {
-      adapter: "sqlite3",
+      adapter: "node-sqlite",
       devDb: "db/development.sqlite3",
       testDb: ":memory:",
       prodDb: "db/production.sqlite3",

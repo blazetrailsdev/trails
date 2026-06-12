@@ -6,20 +6,33 @@ import { FRESH_TSCONFIG, mergeTsconfig, TsconfigMergeResult } from "./tsconfig-m
 // The files `ar init` writes, mirroring the §4.7 layout in the
 // standalone-activerecord-cli proposal. `db/migrate/` is a directory, kept
 // under git via a `.gitkeep`.
-const CONFIG_DATABASE = `/**
+// Each SQLite driver is its own registered adapter name; the adapter subclass
+// bundles its driver, so the config alone selects the backend (no side-effect
+// driver import needed). better-sqlite3 backs the canonical `sqlite3` name.
+const SQLITE_ADAPTER: Record<string, string> = {
+  "better-sqlite3": "sqlite3",
+  "node-sqlite": "node-sqlite",
+  "expo-sqlite": "expo-sqlite",
+};
+
+function configDatabase(adapter: string): string {
+  return `/**
  * Connection config — Rails' \`config/database.yml\`. \`establishConnection()\`
  * reads it; \`TRAILS_ENV\` selects the entry (default "development"). We key on
  * \`TRAILS_ENV\`, not \`NODE_ENV\`, which the JS ecosystem treats as a build-time
  * hint — reusing it to pick a database selects the wrong one.
  */
 const config = {
-  development: { adapter: "sqlite3", database: "db/development.sqlite3", pool: 5 },
-  test: { adapter: "sqlite3", database: ":memory:", pool: 1 },
-  production: { adapter: "sqlite3", database: "db/production.sqlite3", pool: 5 },
+  development: { adapter: "${adapter}", database: "db/development.sqlite3", pool: 5 },
+  test: { adapter: "${adapter}", database: ":memory:", pool: 1 },
+  production: { adapter: "${adapter}", database: "db/production.sqlite3", pool: 5 },
 };
 
 export default config;
 `;
+}
+
+const CONFIG_DATABASE = configDatabase("sqlite3");
 
 // The empty starter manifest is rendered by the generator itself, so
 // `ar init` and `ar generate:manifest` agree byte-for-byte — re-running the
@@ -43,11 +56,6 @@ export async function connect(): Promise<void> {
   connected = true;
 }
 `;
-
-// node-sqlite is a Node.js built-in (22.5+) — no npm install needed, but the
-// driver must be registered explicitly before establishConnection() is called.
-export const DB_GLUE_NODE_SQLITE =
-  `import "@blazetrails/activerecord/sqlite/node-sqlite";\n` + DB_GLUE;
 
 const DB_SEEDS = `/**
  * Idempotent seed data — the analog of Rails' \`db/seeds.rb\`, run by
@@ -243,9 +251,13 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
     skipPackageJson = false,
     skipTsconfig = false,
   } = opts;
+  // Non-better-sqlite3 SQLite drivers select their adapter purely via
+  // config/database.ts (the adapter subclass bundles its own driver). A
+  // caller-supplied override still wins.
+  const driverAdapter = SQLITE_ADAPTER[driver];
   const effectiveOverrides: Record<string, string> =
-    driver === "node-sqlite" && !Object.prototype.hasOwnProperty.call(overrides, "db.ts")
-      ? { ...overrides, "db.ts": DB_GLUE_NODE_SQLITE }
+    driverAdapter && driverAdapter !== "sqlite3"
+      ? { "config/database.ts": configDatabase(driverAdapter), ...overrides }
       : overrides;
   const created: string[] = [];
   const skipped: string[] = [];

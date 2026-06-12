@@ -166,7 +166,7 @@ the second argument accepts the same adapter knobs.
 ```ts
 import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
 import { Mysql2Adapter } from "@blazetrails/activerecord/connection-adapters/mysql2-adapter.js";
-import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 
 // PG defaults preparedStatements to true (matches Rails, where
 // PostgreSQLAdapter inherits AbstractAdapter#default_prepared_statements = true).
@@ -184,7 +184,9 @@ new Mysql2Adapter({
 });
 
 // SQLite3 defaults preparedStatements to true (matches Rails' abstract default).
-new SQLite3Adapter("db/app.sqlite3", { statementLimit: 200 });
+// BetterSQLite3Adapter is the concrete `sqlite3` adapter (subclass of
+// AbstractSQLite3Adapter, bound to the better-sqlite3 client library).
+new BetterSQLite3Adapter("db/app.sqlite3", { statementLimit: 200 });
 ```
 
 Adapter-level keys are stripped from the config hash before it's
