@@ -243,11 +243,21 @@ describe("SanitizeTest", () => {
     );
   });
 
-  it.skip("sanitize sql array handles relations", () => {
-    // BLOCKED: relation — SQL sanitization gap
-    // ROOT-CAUSE: relation.ts#sanitizeSql or Sanitization module not fully implementing Rails parity
-    // SCOPE: ~30 LOC fix in relation.ts; affects ~4 tests in sanitize.test.ts
-    /* needs Relation#toSql integration with sanitize */
+  it("sanitize sql array handles relations", () => {
+    class Post extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+      }
+    }
+    const subQueryPattern = /\(\bselect\b.*?\bwhere\b.*?\)/i;
+    const davidPosts = Post.where({ author_id: 1 }).select("id");
+
+    const selectAuthorSql = Post.sanitizeSqlArray("id in (?)", davidPosts);
+    expect(selectAuthorSql).toMatch(subQueryPattern);
+
+    const namedSql = Post.sanitizeSqlArray("id in (:post_ids)", { post_ids: davidPosts });
+    expect(namedSql).toMatch(subQueryPattern);
   });
 });
 

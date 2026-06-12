@@ -172,7 +172,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const fn2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
     const fn1 = String.raw`\w+\(\s*(?:\*|${col}|${fn2})?\s*\)`;
     const expr = String.raw`(?:${col}|${fn1})`;
-    const ordered = String.raw`${expr}(?:\s+COLLATE\s+\w+)?(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?`;
+    const ordered = String.raw`${expr}(?:\s+COLLATE\s+(?:\w+|"\w+"))?(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?`;
     return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
   }
 

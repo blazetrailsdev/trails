@@ -640,9 +640,15 @@ export class AssociationReflection extends MacroReflection {
     const opts = { ...options };
 
     if (opts.queryConstraints) {
-      throw new ArgumentError(
-        `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${name}\` is not allowed. ` +
-          `To get the same behavior, use the \`foreignKey\` option instead.`,
+      // Mirrors Rails' ConfigurationError raised from AssociationReflection's
+      // constructor. `this` is unavailable before super(), so the macro is
+      // derived from new.target (the concrete subclass being constructed) to
+      // name the offending declaration (e.g. `Firm.hasMany :clients`).
+      const macro = new.target.name.replace(/Reflection$/, "");
+      const macroName = macro.charAt(0).toLowerCase() + macro.slice(1);
+      throw new ConfigurationError(
+        `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${macroName} :${name}\` ` +
+          `is not allowed. To get the same behavior, use the \`foreignKey\` option instead.`,
       );
     }
 
