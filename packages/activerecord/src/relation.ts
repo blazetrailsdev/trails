@@ -172,6 +172,7 @@ function _addAssocJoin(
     on: string;
     quoted?: boolean;
     as?: string;
+    aliasBase?: string;
   }>,
   type: "inner" | "left",
   join: { table: string; on: string },
@@ -195,14 +196,24 @@ function _addAssocJoin(
     // (`aliased_table_for` → `reflection.alias_candidate(parent.table_name)` =
     // `"#{plural_assoc}_#{owner_table}"`). Mirror that here so the second join
     // is emitted as `<table> AS <alias>` instead of colliding.
-    const alias = _selfJoinAlias(assocName, ownerTable, clauses, aliasLength);
+    const { alias, base } = _selfJoinAlias(assocName, ownerTable, clauses, aliasLength);
     const qTable = quoteTable(join.table);
     const qAlias = quoteTable(alias);
     // The ON SQL references the target table as `<quotedTable>.<col>`; rebind
     // those references to the alias. The owner table is a different identifier,
     // so this never rewrites the source side of the predicate.
     const reboundOn = join.on.split(`${qTable}.`).join(`${qAlias}.`);
-    clauses.push({ type, table: join.table, on: reboundOn, quoted: true, as: alias });
+    // `aliasBase` records the candidate this alias was minted from, so a later
+    // `_selfJoinAlias` for the same candidate counts only the aliases we actually
+    // produced — never an unrelated join that merely matches the suffix pattern.
+    clauses.push({
+      type,
+      table: join.table,
+      on: reboundOn,
+      quoted: true,
+      as: alias,
+      aliasBase: base,
+    });
     return alias;
   }
   clauses.push({ type, table: join.table, on: join.on, quoted: true });
@@ -222,36 +233,36 @@ function _addAssocJoin(
  * a `truncate`d (`length - 2`) base (alias_tracker.rb:67-72, 86-88). Without
  * this, long names diverge from Rails and can exceed adapter alias limits.
  *
- * The count is seeded from every existing join's *emitted* name — its alias if
- * aliased, else its real table name — mirroring `AliasTracker.initial_count_for`
- * (alias_tracker.rb:28-43), which scans the join list for table names AND
- * aliases before `aliased_table_for` increments. This prevents minting an alias
- * that collides with a real table already joined under the candidate's name.
+ * Rails keys the running count on the base `aliased_name`: `initial_count_for`
+ * (alias_tracker.rb:28-43) seeds it from joins whose name exactly equals the
+ * candidate, and `aliased_table_for` then increments that base key, emitting
+ * `<truncated>_<count>` for repeats (`:67-72`). We reconstruct the seed and the
+ * increment separately:
+ *   - the seed counts pre-existing joins (not minted here) whose emitted name
+ *     exactly equals the candidate — its real table or some other alias;
+ *   - the increment counts the aliases this helper already produced for the
+ *     SAME candidate, tracked via `aliasBase` rather than by matching the
+ *     suffix pattern, so an unrelated join named `<truncated>_<n>` never bumps
+ *     the count (which would otherwise re-emit a colliding or skipped suffix).
+ *
+ * Returns both the final `alias` and the `base` candidate, the latter stamped
+ * onto the emitted clause so subsequent calls can attribute it correctly.
  */
 function _selfJoinAlias(
   assocName: string,
   ownerTable: string,
-  clauses: ReadonlyArray<{ table: string; as?: string }>,
+  clauses: ReadonlyArray<{ table: string; as?: string; aliasBase?: string }>,
   aliasLength: number,
-): string {
+): { alias: string; base: string } {
   const candidate = `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`;
   const aliasedName = candidate.slice(0, aliasLength).replace(/\./g, "_");
   const truncated = aliasedName.slice(0, aliasLength - 2);
-  // Rails keys the running count on the base `aliased_name` only: `initial_count_for`
-  // seeds it from joins whose name exactly equals the candidate (not its suffixed
-  // variants), and the in-memory counter then emits `<truncated>_<n>` for repeats
-  // (alias_tracker.rb:28-43, 67-72). Reconstruct that from the emitted clause names:
-  // count exact `aliasedName` occurrences, and only fold in `<truncated>_<n>`
-  // siblings once the base has actually been claimed in this sequence — otherwise
-  // an unrelated join already named `<truncated>_<n>` would wrongly bump the count.
-  const baseUsed = clauses.filter((j) => (j.as ?? j.table) === aliasedName).length;
-  let used = baseUsed;
-  if (baseUsed > 0) {
-    const suffixed = new RegExp(`^${truncated.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_\\d+$`);
-    used += clauses.filter((j) => suffixed.test(j.as ?? j.table)).length;
-  }
-  const count = used + 1;
-  return count > 1 ? `${truncated}_${count}` : aliasedName;
+  const seed = clauses.filter(
+    (j) => j.aliasBase === undefined && (j.as ?? j.table) === aliasedName,
+  ).length;
+  const minted = clauses.filter((j) => j.aliasBase === aliasedName).length;
+  const count = seed + minted + 1;
+  return { alias: count > 1 ? `${truncated}_${count}` : aliasedName, base: aliasedName };
 }
 
 /**
