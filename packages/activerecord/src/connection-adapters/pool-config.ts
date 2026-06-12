@@ -265,13 +265,12 @@ export interface TrailsAdapterOptions {
 export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
   readonly?: boolean;
   /**
-   * Selects a registered SQLite driver. Pass the registered name string
-   * (e.g. `"better-sqlite3"`, `"node-sqlite"`) or a SqliteDriver instance
-   * directly to bypass the registry. When omitted, resolution follows
-   * AR_SQLITE_DRIVER, then exactly-one-registered fallback.
-   * Mirrors database.yml `driver:`.
+   * Binds the adapter to a specific SQLite client library. Pass a SqliteDriver
+   * instance directly. When omitted, the concrete adapter subclass (e.g.
+   * `BetterSQLite3Adapter`) supplies its bundled driver via
+   * `defaultSqliteDriver()`. Mirrors database.yml `driver:`.
    */
-  driver?: string | import("../sqlite-adapter.js").SqliteDriver;
+  driver?: import("../sqlite-adapter.js").SqliteDriver;
   // Mirrors: database.yml `pragmas:` — applied via PRAGMA on each connection.
   // Keys must be simple SQLite pragma identifiers (word characters only, e.g. "cache_size").
   // String values must be identifier-like enum words (e.g. "WAL", "NORMAL") — arbitrary

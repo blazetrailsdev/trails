@@ -280,8 +280,9 @@ export class SQLiteDatabaseTasks {
   }
 
   private async connectAdapter(): Promise<DatabaseAdapter> {
-    const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
-    return new SQLite3Adapter(this.resolveDbPath());
+    const { BetterSQLite3Adapter } =
+      await import("../connection-adapters/better-sqlite3-adapter.js");
+    return new BetterSQLite3Adapter(this.resolveDbPath());
   }
 
   /**

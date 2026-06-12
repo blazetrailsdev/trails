@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 
 describe("SQLite3Adapter table-rebuild cluster", () => {
-  let db: SQLite3Adapter;
+  let db: AbstractSQLite3Adapter;
 
   beforeEach(() => {
-    db = new SQLite3Adapter(":memory:");
+    db = new BetterSQLite3Adapter(":memory:");
   });
 
   afterEach(async () => {

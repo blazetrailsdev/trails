@@ -1,7 +1,8 @@
 /**
  * SQLite driver adapter — generic "open a SQLite handle and run statements"
- * abstraction. Mirrors the `fs-adapter.ts` registry shape: drivers register
- * themselves on import, and consumers resolve an instance via `getSqlite()`.
+ * abstraction. A driver is bound to a concrete adapter subclass via the
+ * `defaultSqliteDriver()` hook (e.g. `BetterSQLite3Adapter`), or passed
+ * directly through `config.driver`.
  *
  * The driver is opaque to query construction: bytes-in (SQL string + binds),
  * rows-out (raw row values + column metadata). Type coercion and Date encoding
@@ -156,64 +157,4 @@ export interface SqliteDriver {
    * (e.g. expo-sqlite) omit it and callers fall back to a file clone.
    */
   restoreFromPath?(sourcePath: string, destination: string): Promise<void>;
-}
-
-// Stash the registry on globalThis under a Symbol so that module duplication
-// (vi.resetModules in tests, or pkg-manager hoisting splits in apps) doesn't
-// drop driver registrations. Drivers self-register on import; without this,
-// the second module instance starts empty and breaks any consumer holding the
-// first instance's getSqlite reference (and vice versa).
-const REGISTRY_KEY = Symbol.for("@blazetrails/activerecord/sqlite-adapter/registry");
-type GlobalWithRegistry = typeof globalThis & {
-  [REGISTRY_KEY]?: Map<string, SqliteDriver>;
-};
-const registry: Map<string, SqliteDriver> = ((globalThis as GlobalWithRegistry)[REGISTRY_KEY] ??=
-  new Map());
-
-export function registerSqliteDriver(driver: SqliteDriver): void {
-  if (registry.has(driver.name)) {
-    console.warn(
-      `SQLite driver "${driver.name}" is already registered; overwriting prior registration.`,
-    );
-  }
-  registry.set(driver.name, driver);
-}
-
-export function clearSqliteDrivers(): void {
-  registry.clear();
-}
-
-function resolveName(name?: string): string {
-  if (name) return name;
-  const env =
-    typeof globalThis.process !== "undefined" && globalThis.process.versions?.node
-      ? globalThis.process.env?.AR_SQLITE_DRIVER
-      : undefined;
-  if (env) return env;
-  if (registry.size === 1) return registry.keys().next().value as string;
-  if (registry.size === 0) {
-    throw new Error(
-      "No SQLite driver registered. Import `@blazetrails/activerecord/sqlite/better-sqlite3` " +
-        "or register a custom driver via `registerSqliteDriver()`.",
-    );
-  }
-  throw new Error(
-    `Multiple SQLite drivers registered (${[...registry.keys()].join(", ")}). ` +
-      "Pass a name to `getSqlite(name)` or set AR_SQLITE_DRIVER.",
-  );
-}
-
-export function getSqlite(name?: string): SqliteDriver {
-  const resolved = resolveName(name);
-  const driver = registry.get(resolved);
-  if (!driver) {
-    throw new Error(
-      `SQLite driver "${resolved}" is not registered. Registered drivers: [${[...registry.keys()].join(", ") || "none"}].`,
-    );
-  }
-  return driver;
-}
-
-export async function getSqliteAsync(name?: string): Promise<SqliteDriver> {
-  return getSqlite(name);
 }

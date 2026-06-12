@@ -1,6 +1,5 @@
 import { createRequire } from "node:module";
 import {
-  registerSqliteDriver,
   type ColumnInfo,
   type RunResult,
   type SqliteBinds,
@@ -198,5 +197,3 @@ export const expoSqliteDriver: SqliteDriver = {
     return new ExpoSqliteConnection(db);
   },
 };
-
-registerSqliteDriver(expoSqliteDriver);

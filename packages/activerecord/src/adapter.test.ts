@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import type { DatabaseAdapter } from "./adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
 import {
   Base,
@@ -21,9 +22,9 @@ import { Result } from "./result.js";
 // rather than leaning on a shared handler DB.
 async function withSchema(
   ddl: string[],
-  body: (conn: SQLite3Adapter) => Promise<void>,
+  body: (conn: AbstractSQLite3Adapter) => Promise<void>,
 ): Promise<void> {
-  const conn = new SQLite3Adapter(":memory:");
+  const conn = new BetterSQLite3Adapter(":memory:");
   try {
     for (const stmt of ddl) await conn.executeMutation(stmt);
     await body(conn);
@@ -153,7 +154,7 @@ describe("AdapterTest", () => {
     // SCOPE: ~20 LOC port (Book wiring + setup); affects ~1 test
   });
   it("valid column", async () => {
-    const conn = new SQLite3Adapter(":memory:");
+    const conn = new BetterSQLite3Adapter(":memory:");
     try {
       for (const type of Object.keys(conn.nativeDatabaseTypes())) {
         expect(conn.isValidType(type)).toBe(true);
@@ -163,7 +164,7 @@ describe("AdapterTest", () => {
     }
   });
   it("invalid column", async () => {
-    const conn = new SQLite3Adapter(":memory:");
+    const conn = new BetterSQLite3Adapter(":memory:");
     try {
       expect(conn.isValidType("foobar")).toBe(false);
     } finally {
@@ -220,7 +221,7 @@ describe("AdapterTest", () => {
     );
   });
   it("returns empty indexes for non existing table", async () => {
-    const conn = new SQLite3Adapter(":memory:");
+    const conn = new BetterSQLite3Adapter(":memory:");
     try {
       expect(await conn.indexes("nonexistingtable")).toEqual([]);
     } finally {
@@ -271,12 +272,12 @@ describe("AdapterTest", () => {
     // the adapter with `preparedStatements: true` on each side of the toggle.
     const original = disablePreparedStatements;
     try {
-      const enabled = new SQLite3Adapter(":memory:", { preparedStatements: true });
+      const enabled = new BetterSQLite3Adapter(":memory:", { preparedStatements: true });
       expect(enabled.preparedStatements).toBe(true);
       await enabled.close();
 
       setDisablePreparedStatements(true);
-      const disabled = new SQLite3Adapter(":memory:", { preparedStatements: true });
+      const disabled = new BetterSQLite3Adapter(":memory:", { preparedStatements: true });
       expect(disabled.preparedStatements).toBe(false);
       await disabled.close();
     } finally {

@@ -18,6 +18,14 @@
       "types": "./dist/connection-adapters/better-sqlite3-adapter.d.ts",
       "default": "./dist/connection-adapters/better-sqlite3-adapter.js"
     },
+    "./connection-adapters/node-sqlite-adapter.js": {
+      "types": "./dist/connection-adapters/node-sqlite-adapter.d.ts",
+      "default": "./dist/connection-adapters/node-sqlite-adapter.js"
+    },
+    "./connection-adapters/expo-sqlite-adapter.js": {
+      "types": "./dist/connection-adapters/expo-sqlite-adapter.d.ts",
+      "default": "./dist/connection-adapters/expo-sqlite-adapter.js"
+    },
     "./connection-adapters/postgresql-adapter.js": {
       "types": "./dist/connection-adapters/postgresql-adapter.d.ts",
       "default": "./dist/connection-adapters/postgresql-adapter.js"

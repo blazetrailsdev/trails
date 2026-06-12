@@ -97,8 +97,9 @@ describe("SQLiteDatabaseTasks", () => {
       database: dbPath,
     });
 
-    const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
-    const seedAdapter = new SQLite3Adapter(dbPath);
+    const { BetterSQLite3Adapter } =
+      await import("../connection-adapters/better-sqlite3-adapter.js");
+    const seedAdapter = new BetterSQLite3Adapter(dbPath);
     await seedAdapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, updated_at TEXT)",
     );
@@ -125,7 +126,7 @@ describe("SQLiteDatabaseTasks", () => {
     fs.writeFileSync(loadDbPath, "");
     await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath);
 
-    const loadedAdapter = new SQLite3Adapter(loadDbPath);
+    const loadedAdapter = new BetterSQLite3Adapter(loadDbPath);
     try {
       const tables = (await loadedAdapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",

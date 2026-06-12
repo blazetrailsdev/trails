@@ -20,12 +20,10 @@
 
 import pg from "pg";
 import mysql from "mysql2/promise";
-// Self-register better-sqlite3 here (not just in test-setup-ar.ts): this
+// Eagerly load better-sqlite3 here (not just in test-setup-ar.ts): this
 // setupFile runs first, and ensureWorkerClone() needs the driver's
 // restoreFromPath backup primitive to clone the template into the per-worker
-// file. The import body runs once per module realm; should a module reset
-// re-evaluate it, registerSqliteDriver() simply overwrites the same driver
-// (it logs an "already registered" warning, harmless here).
+// file.
 import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./test-helpers/sqlite-template.js";
 

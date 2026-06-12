@@ -2,13 +2,14 @@
  * Mirrors Rails activerecord/test/cases/connection_adapters/type_lookup_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { IntegerType } from "@blazetrails/activemodel";
 
-let adapter: SQLite3Adapter;
+let adapter: AbstractSQLite3Adapter;
 
 beforeEach(() => {
-  adapter = new SQLite3Adapter(":memory:");
+  adapter = new BetterSQLite3Adapter(":memory:");
 });
 
 afterEach(() => {

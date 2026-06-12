@@ -8,12 +8,13 @@
  */
 import { it, expect, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
-import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 
 const SHARED_CACHE_DB = "file::memory:?cache=shared";
 
-const openAdapters: SQLite3Adapter[] = [];
+const openAdapters: AbstractSQLite3Adapter[] = [];
 afterEach(() => {
   while (openAdapters.length) {
     try {
@@ -24,14 +25,14 @@ afterEach(() => {
   }
 });
 
-function withConn(opts: { sharedCache?: boolean } = {}): SQLite3Adapter {
+function withConn(opts: { sharedCache?: boolean } = {}): AbstractSQLite3Adapter {
   const filename = opts.sharedCache ? SHARED_CACHE_DB : ":memory:";
-  const adapter = new SQLite3Adapter(filename);
+  const adapter = new BetterSQLite3Adapter(filename);
   openAdapters.push(adapter);
   return adapter;
 }
 
-function readUncommitted(conn: SQLite3Adapter): boolean {
+function readUncommitted(conn: AbstractSQLite3Adapter): boolean {
   const row = ((conn as any).driver.prepare("PRAGMA read_uncommitted") as any).get() as {
     read_uncommitted: number;
   };

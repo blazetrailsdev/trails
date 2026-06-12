@@ -120,8 +120,9 @@ function _establishPooledTestPool(): Promise<
       // cache=shared in the URI is what provides shared-cache semantics across
       // pool connections; no need to limit pool size to 1.
       configuration = { adapter: adapterName, database };
-      const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
-      adapterFactory = () => new SQLite3Adapter(database) as unknown as DatabaseAdapter;
+      const { BetterSQLite3Adapter } =
+        await import("./connection-adapters/better-sqlite3-adapter.js");
+      adapterFactory = () => new BetterSQLite3Adapter(database) as unknown as DatabaseAdapter;
     }
 
     newRawTestAdapter = adapterFactory;

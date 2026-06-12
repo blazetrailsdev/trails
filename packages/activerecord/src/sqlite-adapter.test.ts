@@ -1,96 +1,35 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  clearSqliteDrivers,
-  getSqlite,
-  getSqliteAsync,
-  registerSqliteDriver,
-  type SqliteDriver,
-  type SyncSqliteConnection,
-} from "./sqlite-adapter.js";
+import { describe, expect, it } from "vitest";
+import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
+import { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
 import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
 
-function stubDriver(name: string): SqliteDriver {
-  return {
-    name,
-    capabilities: {
-      inProcessSync: true,
-      streaming: false,
-      loadExtension: false,
-      concurrentStatements: true,
-      foreignKeysOnByDefault: false,
-      immediateTransactions: false,
-    },
-    open: () => Promise.reject(new Error("stub")),
-    openSync: () => ({}) as SyncSqliteConnection,
-  };
-}
-
-describe("sqlite-adapter registry", () => {
-  beforeEach(() => clearSqliteDrivers());
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    clearSqliteDrivers();
-  });
-  // Restore the real better-sqlite3 registration after the suite so sibling
-  // tests in the `sqlite-drivers` vitest project — sharing the same worker
-  // (and globalThis-keyed registry) — don't see an empty registry from our
-  // last clearSqliteDrivers().
-  afterAll(() => registerSqliteDriver(betterSqlite3Driver));
-
-  it("returns the only registered driver when no name is passed", () => {
-    const a = stubDriver("a");
-    registerSqliteDriver(a);
-    expect(getSqlite()).toBe(a);
+describe("SQLite adapter driver binding", () => {
+  it("BetterSQLite3Adapter binds its bundled driver and opens", () => {
+    const adapter = new BetterSQLite3Adapter(":memory:");
+    expect(adapter).toBeInstanceOf(AbstractSQLite3Adapter);
+    adapter.disconnectBang();
   });
 
-  it("resolves by explicit name", () => {
-    registerSqliteDriver(stubDriver("a"));
-    const b = stubDriver("b");
-    registerSqliteDriver(b);
-    expect(getSqlite("b")).toBe(b);
+  it("the abstract base has no bundled driver and cannot open directly", () => {
+    expect(() => new AbstractSQLite3Adapter(":memory:")).toThrow(/No SQLite driver configured/);
   });
 
-  it("throws when no drivers are registered", () => {
-    expect(() => getSqlite()).toThrow(/No SQLite driver registered/);
+  it("accepts an explicit SqliteDriver via config.driver", () => {
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver: betterSqlite3Driver });
+    expect(adapter).toBeInstanceOf(AbstractSQLite3Adapter);
+    adapter.disconnectBang();
   });
 
-  it("throws when multiple drivers are registered without a selection", () => {
-    registerSqliteDriver(stubDriver("a"));
-    registerSqliteDriver(stubDriver("b"));
-    expect(() => getSqlite()).toThrow(/Multiple SQLite drivers registered/);
+  it("rejects an invalid driver object", () => {
+    expect(
+      () => new AbstractSQLite3Adapter(":memory:", { driver: { name: "x" } as never }),
+    ).toThrow(/config.driver must be a SqliteDriver/);
   });
 
-  it("throws when an explicit name is unknown", () => {
-    registerSqliteDriver(stubDriver("a"));
-    expect(() => getSqlite("missing")).toThrow(/"missing" is not registered/);
-  });
-
-  it("AR_SQLITE_DRIVER overrides the implicit default", () => {
-    const a = stubDriver("a");
-    const b = stubDriver("b");
-    registerSqliteDriver(a);
-    registerSqliteDriver(b);
-    vi.stubEnv("AR_SQLITE_DRIVER", "a");
-    expect(getSqlite()).toBe(a);
-  });
-
-  it("warns and overwrites on duplicate registration", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    registerSqliteDriver(stubDriver("dup"));
-    registerSqliteDriver(stubDriver("dup"));
-    expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
-  });
-
-  it("clearSqliteDrivers empties the registry", () => {
-    registerSqliteDriver(stubDriver("a"));
-    clearSqliteDrivers();
-    expect(() => getSqlite()).toThrow(/No SQLite driver registered/);
-  });
-
-  it("getSqliteAsync mirrors sync resolution", async () => {
-    const a = stubDriver("a");
-    registerSqliteDriver(a);
-    await expect(getSqliteAsync()).resolves.toBe(a);
+  it("NodeSQLiteAdapter and ExpoSQLiteAdapter are thin AbstractSQLite3Adapter subclasses", () => {
+    expect(Object.getPrototypeOf(NodeSQLiteAdapter)).toBe(AbstractSQLite3Adapter);
+    expect(Object.getPrototypeOf(ExpoSQLiteAdapter)).toBe(AbstractSQLite3Adapter);
   });
 });

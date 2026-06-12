@@ -54,8 +54,9 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       arunit: { adapter: "sqlite3", database: dbFile },
     });
     DatabaseTasks.registerTask("sqlite", { create: async () => {} });
-    const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
-    const adapter = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("../connection-adapters/better-sqlite3-adapter.js");
+    const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       await adapter.executeMutation(
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
@@ -773,9 +774,10 @@ describe("DatabaseTasksMigrateTest", () => {
     try {
       await DatabaseTasks.migrateAll();
       // Verify schema_migrations was created in both databases.
-      const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
+      const { BetterSQLite3Adapter } =
+        await import("../connection-adapters/better-sqlite3-adapter.js");
       for (const dbFile of [primaryDb, animalsDb]) {
-        const a = new SQLite3Adapter(dbFile);
+        const a = new BetterSQLite3Adapter(dbFile);
         try {
           const rows = await a.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
@@ -813,8 +815,9 @@ describe("DatabaseTasksMigrateTest", () => {
     try {
       await DatabaseTasks.migrate();
       // schema_migrations must exist in primary (config target), not just animals.
-      const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
-      const a = new SQLite3Adapter(primaryDb);
+      const { BetterSQLite3Adapter } =
+        await import("../connection-adapters/better-sqlite3-adapter.js");
+      const a = new BetterSQLite3Adapter(primaryDb);
       try {
         const rows = await a.execute(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
@@ -2211,8 +2214,9 @@ describe("initializeDatabase", () => {
     const dbFile = path.join(tmp, "test.sqlite3");
     try {
       // Pre-create the DB file with schema_migrations so initializeDatabase sees it.
-      const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
-      const setup = new SQLite3Adapter(dbFile);
+      const { BetterSQLite3Adapter } =
+        await import("../connection-adapters/better-sqlite3-adapter.js");
+      const setup = new BetterSQLite3Adapter(dbFile);
       await setup.executeMutation(
         "CREATE TABLE schema_migrations (version VARCHAR(255) NOT NULL PRIMARY KEY)",
       );

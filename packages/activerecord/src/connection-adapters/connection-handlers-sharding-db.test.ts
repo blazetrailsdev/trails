@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { Base } from "../base.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { currentRole, connectedToStack } from "../core.js";
 
 async function withBaseConfigs(
@@ -170,7 +170,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
           database: ":memory:",
           ...(replica ? { replica: true } : {}),
         }),
-        { owner: "Base", role, shard, adapterFactory: () => new SQLite3Adapter() },
+        { owner: "Base", role, shard, adapterFactory: () => new BetterSQLite3Adapter() },
       );
 
     try {
@@ -443,7 +443,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     const makePool = (owner: string, shard: string) =>
       Base.connectionHandler.establishConnection(
         new HashConfig("test", owner, { adapter: "sqlite3", database: ":memory:" }),
-        { owner, role: "writing", shard, adapterFactory: () => new SQLite3Adapter() },
+        { owner, role: "writing", shard, adapterFactory: () => new BetterSQLite3Adapter() },
       );
 
     try {
@@ -501,7 +501,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
           owner: "SecondaryBase",
           role: "writing",
           shard,
-          adapterFactory: () => new SQLite3Adapter(),
+          adapterFactory: () => new BetterSQLite3Adapter(),
         },
       );
 

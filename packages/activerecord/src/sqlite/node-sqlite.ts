@@ -1,7 +1,6 @@
 import { createRequire } from "node:module";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
 import {
-  registerSqliteDriver,
   type ColumnInfo,
   type RunResult,
   type SqliteBinds,
@@ -216,5 +215,3 @@ export const nodeSqliteDriver: SqliteDriver = {
     }
   },
 };
-
-registerSqliteDriver(nodeSqliteDriver);

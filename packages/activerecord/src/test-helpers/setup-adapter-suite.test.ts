@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterAll } from "vitest";
-import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { setupAdapterSuite } from "./setup-adapter-suite.js";
 
 interface RawAdapter {
@@ -8,12 +9,12 @@ interface RawAdapter {
 }
 
 describe("setupAdapterSuite — schema + transactional rollback", () => {
-  const setup = vi.fn(async (adapter: SQLite3Adapter) => {
+  const setup = vi.fn(async (adapter: AbstractSQLite3Adapter) => {
     await adapter.exec(`CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`);
   });
 
   const suite = setupAdapterSuite({
-    factory: () => new SQLite3Adapter(":memory:"),
+    factory: () => new BetterSQLite3Adapter(":memory:"),
     setup,
   });
 
@@ -51,7 +52,7 @@ describe("setupAdapterSuite — close() and teardown semantics", () => {
   describe("closeOnTeardown defaults to true", () => {
     setupAdapterSuite({
       factory: () => {
-        const adapter = new SQLite3Adapter(":memory:");
+        const adapter = new BetterSQLite3Adapter(":memory:");
         const realClose = adapter.close.bind(adapter);
         adapter.close = async () => {
           await defaultCloseSpy();
@@ -71,7 +72,7 @@ describe("setupAdapterSuite — close() and teardown semantics", () => {
   describe("closeOnTeardown:false skips close()", () => {
     setupAdapterSuite({
       factory: () => {
-        const adapter = new SQLite3Adapter(":memory:");
+        const adapter = new BetterSQLite3Adapter(":memory:");
         optOutRealClose = adapter.close.bind(adapter);
         adapter.close = async () => {
           await optOutCloseSpy();

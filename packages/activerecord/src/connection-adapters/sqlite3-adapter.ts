@@ -4,7 +4,6 @@ import type {
   SqliteDriver,
   SqliteStatement,
 } from "../sqlite-adapter.js";
-import { getSqlite } from "../sqlite-adapter.js";
 import { Visitors } from "@blazetrails/arel";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
@@ -2214,28 +2213,29 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     try {
       const driverOpt = (this._config as SQLite3AdapterOptions).driver;
       let factory: SqliteDriver;
-      if (driverOpt !== null && typeof driverOpt === "object") {
+      if (driverOpt != null) {
         if (
           typeof (driverOpt as SqliteDriver).name !== "string" ||
           typeof (driverOpt as SqliteDriver).open !== "function"
         ) {
           throw new TypeError(
-            "config.driver must be a registered driver name or a SqliteDriver " +
+            "config.driver must be a SqliteDriver " +
               "(object with `name: string` and `open(config)` function).",
           );
         }
-        factory = driverOpt as SqliteDriver;
-      } else if (typeof driverOpt === "string") {
-        // Explicit driver name still resolves through the legacy registry.
-        factory = getSqlite(driverOpt);
+        factory = driverOpt;
       } else {
-        // No driver configured (driverOpt is undefined or null): concrete
-        // subclasses (e.g. BetterSQLite3Adapter) return their bundled driver so
-        // no registry lookup is needed. The abstract base falls back to the
-        // registry for backward compatibility. getSqlite resolves its argument
-        // by truthiness (resolveName: `if (name) return name`), so an undefined
-        // or null driverOpt selects the registry default identically.
-        factory = this.defaultSqliteDriver() ?? getSqlite(driverOpt ?? undefined);
+        // No driver configured: concrete subclasses (e.g. BetterSQLite3Adapter)
+        // bind their bundled driver via defaultSqliteDriver(). The abstract base
+        // returns undefined and cannot be opened directly.
+        const def = this.defaultSqliteDriver();
+        if (!def) {
+          throw new Error(
+            "No SQLite driver configured. Use a concrete adapter subclass " +
+              "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
+          );
+        }
+        factory = def;
       }
       if (!factory.openSync) {
         throw new Error(
@@ -2494,13 +2494,3 @@ dirtiesQueryCache(AbstractSQLite3Adapter, "executeMutation");
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers
 // gate behavior on the sqlite3 adapter being loaded.
 runLoadHooks("active_record_sqlite3adapter", AbstractSQLite3Adapter);
-
-/**
- * Backward-compatible alias. Historically the single concrete SQLite adapter
- * was `SQLite3Adapter`; it is now the abstract base. Existing call sites and
- * tests that import `SQLite3Adapter` keep working — `new SQLite3Adapter()`
- * resolves a driver through the legacy registry, and instances of the concrete
- * `BetterSQLite3Adapter` subclass are `instanceof SQLite3Adapter`. New code
- * should prefer `AbstractSQLite3Adapter` / `BetterSQLite3Adapter`.
- */
-export { AbstractSQLite3Adapter as SQLite3Adapter };
