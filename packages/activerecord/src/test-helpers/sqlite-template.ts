@@ -37,7 +37,7 @@
 import type { FsAdapter } from "@blazetrails/activesupport/fs-adapter";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync } from "@blazetrails/activesupport";
-import { getSqliteAsync } from "../sqlite-adapter.js";
+import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
 
 /** WAL sidecars sqlite writes alongside a file DB, plus the DB file itself. */
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
@@ -105,7 +105,7 @@ export async function ensureWorkerClone(): Promise<string | null> {
   const dest = path.join(await tmpRoot(), `ar-test-worker-${runToken}-${slot}.sqlite`);
 
   if (!(await fs.exists(dest))) {
-    const driver = await getSqliteAsync();
+    const driver = betterSqlite3Driver;
     if (driver.restoreFromPath) {
       await driver.restoreFromPath(template, dest);
     } else {

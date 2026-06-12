@@ -7,7 +7,8 @@ import {
   type SidecarAdapter,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
-import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { defineSchema } from "./define-schema.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
@@ -73,10 +74,10 @@ describe("withTransactionalFixtures", () => {
 // schemaCache.clear() after rollback to keep that in-memory reflection in
 // sync with the rolled-back DB.
 describe("withTransactionalFixtures (schema-cache invalidation)", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
 
   beforeAll(async () => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
     await defineSchema(adapter, { cache_inval_users: { name: "string" } });
   });
 
@@ -114,10 +115,10 @@ describe("withTransactionalFixtures (schema-cache invalidation)", () => {
 // signature entry — the next test's `defineSchema` would think the table
 // still exists and skip recreating it.
 describe("withTransactionalFixtures (defineSchema signature cache invalidation)", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
 
   beforeAll(async () => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
   });
 
   afterAll(async () => {
@@ -152,10 +153,10 @@ describe("withTransactionalFixtures (defineSchema signature cache invalidation)"
 // a follow-up `defineSchema(adapter, sameSpec)` to CREATE TABLE over
 // the still-existing beforeAll table and fail.
 describe("withTransactionalFixtures (preserves beforeAll signatures across rollback)", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
 
   beforeAll(async () => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
     // Outer-transaction table — must survive rollback in afterEach.
     await defineSchema(adapter, { outer_table: { name: "string" } });
   });
@@ -187,12 +188,12 @@ describe("withTransactionalFixtures (preserves beforeAll signatures across rollb
 // The helper must accept that shape — `transactionManager` lives on the
 // adapter itself via AbstractAdapter, not behind an `innerAdapter` wrapper.
 describe("withTransactionalFixtures (raw adapter)", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
   const exec = (sql: string) => adapter.exec(sql);
   const query = (sql: string) => adapter.execute(sql);
 
   beforeAll(async () => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
     await defineSchema(adapter, { raw_fixture_users: { name: "string" } });
   });
 
@@ -218,10 +219,10 @@ describe("withTransactionalFixtures (raw adapter)", () => {
 // in afterEach. Cached column reflection survives across tests — pay this
 // cost only when the file does pure DML.
 describe("withTransactionalFixtures (invalidateSchemaCache: false)", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
 
   beforeAll(async () => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
     await defineSchema(adapter, { opt_out_cache_users: { name: "string" } });
   });
 

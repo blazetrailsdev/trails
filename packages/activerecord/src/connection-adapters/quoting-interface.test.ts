@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Quoting } from "./abstract/quoting-interface.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 
 // Compile-time guard: AbstractAdapter (the base, not a subclass) must
 // itself satisfy Quoting. A subclass-only assignment would let a
@@ -28,7 +28,7 @@ void _abstractAdapterIsQuoting;
  */
 describe("Quoting interface", () => {
   it("AbstractAdapter implements every Quoting method", () => {
-    const adapter = new SQLite3Adapter(":memory:");
+    const adapter = new BetterSQLite3Adapter(":memory:");
     try {
       // Compile-time guard: SQLite3Adapter (extends AbstractAdapter)
       // is assignable to Quoting. If the interface adds a method that
@@ -56,7 +56,7 @@ describe("Quoting interface", () => {
   });
 
   it("SQLite3Adapter dispatches quote/quotedTrue to its own dialect", () => {
-    const adapter = new SQLite3Adapter(":memory:");
+    const adapter = new BetterSQLite3Adapter(":memory:");
     try {
       // SQLite is the only adapter whose quotedTrue diverges from the
       // abstract default. Pinning this here confirms the dispatch

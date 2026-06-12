@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { RecordNotUnique, TransactionIsolationError } from "../errors.js";
 
 // Audit: Sqlite3Adapter uses only explicit BEGIN/COMMIT/ROLLBACK/SAVEPOINT SQL
@@ -10,12 +11,12 @@ import { RecordNotUnique, TransactionIsolationError } from "../errors.js";
 // This keeps the adapter portable to async drivers (node:sqlite, wa-sqlite, expo-sqlite).
 
 describe("SQLite3Adapter transaction control", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
   let tmpDir: string;
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-tx-"));
-    adapter = new SQLite3Adapter(path.join(tmpDir, "db.sqlite3"));
+    adapter = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"));
     await adapter.executeMutation(
       "CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
@@ -143,7 +144,7 @@ describe("SQLite3Adapter transaction control", () => {
 
   describe("cross-connection isolation", () => {
     it("writer changes are not visible to reader until committed", async () => {
-      const reader = new SQLite3Adapter(path.join(tmpDir, "db.sqlite3"), { readonly: true });
+      const reader = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"), { readonly: true });
       try {
         // Confirm the readonly flag is honored — SQLite rejects writes with
         // "attempt to write a readonly database" (StatementInvalid, not ReadOnlyError,

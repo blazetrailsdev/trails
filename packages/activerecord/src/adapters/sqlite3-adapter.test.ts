@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import {
   Base,
   Migration,
@@ -12,10 +13,10 @@ import {
 import { defineSchema } from "../test-helpers/define-schema.js";
 
 describe("SqliteAdapter", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
 
   beforeEach(() => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
   });
 
   afterEach(() => {
@@ -557,9 +558,9 @@ describe("SqliteAdapter", () => {
 
 describe("SQLite3Adapter._isMemoryFilename", () => {
   // Access the private static via `as any` — avoids opening any real DB connection.
-  const isMemoryFilename = (SQLite3Adapter as any)._isMemoryFilename.bind(SQLite3Adapter) as (
-    filename: string,
-  ) => boolean;
+  const isMemoryFilename = (AbstractSQLite3Adapter as any)._isMemoryFilename.bind(
+    AbstractSQLite3Adapter,
+  ) as (filename: string) => boolean;
 
   it("treats :memory: as in-memory", () => {
     expect(isMemoryFilename(":memory:")).toBe(true);
@@ -584,7 +585,7 @@ describe("SQLite3Adapter._isMemoryFilename", () => {
 });
 
 describe("SQLite3Adapter pragmas option", () => {
-  let adapter: SQLite3Adapter | undefined;
+  let adapter: AbstractSQLite3Adapter | undefined;
 
   afterEach(() => {
     adapter?.close();
@@ -592,7 +593,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("applies a valid numeric pragma on construction", () => {
-    adapter = new SQLite3Adapter(":memory:", { pragmas: { cache_size: 500 } });
+    adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { cache_size: 500 } });
     const result = (adapter.raw as import("better-sqlite3").Database).pragma(
       "cache_size",
     ) as Array<{ cache_size: number }>;
@@ -600,7 +601,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("converts boolean true to 1 for pragma", () => {
-    adapter = new SQLite3Adapter(":memory:", { pragmas: { foreign_keys: true } });
+    adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { foreign_keys: true } });
     const result = (adapter.raw as import("better-sqlite3").Database).pragma(
       "foreign_keys",
     ) as Array<{ foreign_keys: number }>;
@@ -608,7 +609,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("converts boolean false to 0 for pragma", () => {
-    adapter = new SQLite3Adapter(":memory:", { pragmas: { foreign_keys: false } });
+    adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { foreign_keys: false } });
     const result = (adapter.raw as import("better-sqlite3").Database).pragma(
       "foreign_keys",
     ) as Array<{ foreign_keys: number }>;
@@ -616,7 +617,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("applies a valid string enum pragma", () => {
-    adapter = new SQLite3Adapter(":memory:", { pragmas: { synchronous: "FULL" } });
+    adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { synchronous: "FULL" } });
     const result = (adapter.raw as import("better-sqlite3").Database).pragma(
       "synchronous",
     ) as Array<{ synchronous: number }>;
@@ -626,7 +627,7 @@ describe("SQLite3Adapter pragmas option", () => {
 
   it("warns and skips an invalid pragma name", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new SQLite3Adapter(":memory:", {
+    adapter = new BetterSQLite3Adapter(":memory:", {
       pragmas: { "bad-name!": 1 } as Record<string, number>,
     });
     expect(console.warn).toHaveBeenCalledWith(
@@ -636,7 +637,7 @@ describe("SQLite3Adapter pragmas option", () => {
 
   it("warns and skips a string value with unsafe characters", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new SQLite3Adapter(":memory:", {
+    adapter = new BetterSQLite3Adapter(":memory:", {
       pragmas: { synchronous: "FULL; DROP TABLE users" },
     });
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unsafe characters"));

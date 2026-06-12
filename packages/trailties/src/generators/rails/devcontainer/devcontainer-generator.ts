@@ -2,7 +2,7 @@
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 export const TRAILS_DEV_PATH = "/workspaces/trails";
-export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
+export type SqliteDriver = "better-sqlite3" | "node-sqlite";
 export interface DevcontainerGeneratorOptions extends GeneratorOptions {
   appName?: string;
   database?: DatabaseName;

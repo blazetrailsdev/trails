@@ -1,15 +1,16 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
 import { BigIntegerType, IntegerType, BooleanType } from "@blazetrails/activemodel";
-import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 
-let adapter: SQLite3Adapter;
+let adapter: AbstractSQLite3Adapter;
 const bigType = new BigIntegerType();
 const intType = new IntegerType();
 const boolType = new BooleanType();
 
 beforeEach(() => {
-  adapter = new SQLite3Adapter(":memory:");
+  adapter = new BetterSQLite3Adapter(":memory:");
   adapter.exec(`
     CREATE TABLE "big_items" (
       "id"     INTEGER PRIMARY KEY AUTOINCREMENT,

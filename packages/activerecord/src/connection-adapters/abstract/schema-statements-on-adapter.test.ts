@@ -4,10 +4,11 @@
  * `connection.create_table(...)` works without going through MigrationContext.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { SQLite3Adapter } from "../sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 
-let adapter: SQLite3Adapter | undefined;
+let adapter: AbstractSQLite3Adapter | undefined;
 
 afterEach(async () => {
   await adapter?.close();
@@ -35,7 +36,7 @@ class StubAdapter extends AbstractAdapter {
 
 describe("SchemaStatements mixed into AbstractAdapter", () => {
   it("createTable is callable directly on the adapter", async () => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("things", (t) => {
       t.string("name");
       t.integer("quantity");
@@ -48,7 +49,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("dropTable removes the table", async () => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("temp_table", (t) => t.string("value"));
     expect(await adapter.tableExists("temp_table")).toBe(true);
     await adapter.dropTable("temp_table");
@@ -56,7 +57,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addColumn and columnExists work on adapter", async () => {
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("widgets", { id: false }, (t) => {
       t.string("title");
     });

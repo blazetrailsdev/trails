@@ -132,23 +132,28 @@ describe("ArInitTest", () => {
     expect(pkg.dependencies["@blazetrails/activerecord"]).toBe("*");
   });
 
-  it("injects node-sqlite registration import into db.ts when driver is node-sqlite", async () => {
+  it("config/database.ts uses the node-sqlite adapter when driver is node-sqlite", async () => {
     const { created } = await init(root, { driver: "node-sqlite" });
-    expect(created).toContain("db.ts");
-    const dbTs = await readFile(join(root, "db.ts"), "utf8");
-    expect(dbTs).toContain('import "@blazetrails/activerecord/sqlite/node-sqlite"');
-  });
-
-  it("leaves db.ts without node-sqlite import for default (better-sqlite3) driver", async () => {
-    await init(root);
+    expect(created).toContain("config/database.ts");
+    const config = await readFile(join(root, "config/database.ts"), "utf8");
+    expect(config).toContain('adapter: "node-sqlite"');
+    // No side-effect driver import: the node-sqlite adapter subclass bundles
+    // its driver, so config alone selects the backend.
     const dbTs = await readFile(join(root, "db.ts"), "utf8");
     expect(dbTs).not.toContain("node-sqlite");
   });
 
-  it("respects a caller-supplied db.ts override even when driver is node-sqlite", async () => {
+  it("config/database.ts uses the sqlite3 adapter for the default (better-sqlite3) driver", async () => {
+    await init(root);
+    const config = await readFile(join(root, "config/database.ts"), "utf8");
+    expect(config).toContain('adapter: "sqlite3"');
+    expect(config).not.toContain("node-sqlite");
+  });
+
+  it("respects a caller-supplied config/database.ts override even when driver is node-sqlite", async () => {
     const custom = "// custom\n";
-    await init(root, { driver: "node-sqlite", overrides: { "db.ts": custom } });
-    expect(await readFile(join(root, "db.ts"), "utf8")).toBe(custom);
+    await init(root, { driver: "node-sqlite", overrides: { "config/database.ts": custom } });
+    expect(await readFile(join(root, "config/database.ts"), "utf8")).toBe(custom);
   });
 });
 

@@ -1,7 +1,6 @@
 import Database from "better-sqlite3";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
 import {
-  registerSqliteDriver,
   type ColumnInfo,
   type RunResult,
   type SqliteBinds,
@@ -186,5 +185,3 @@ export const betterSqlite3Driver: SqliteDriver = {
     }
   },
 };
-
-registerSqliteDriver(betterSqlite3Driver);

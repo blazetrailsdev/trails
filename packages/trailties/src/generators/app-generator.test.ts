@@ -179,10 +179,11 @@ describe("AppGenerator", () => {
     expect(dbConfig).toContain("sqlite3");
   });
 
-  it("sqlite database config includes driver import", async () => {
+  it("sqlite database config uses the sqlite3 adapter without a side-effect driver import", async () => {
     await makeGen("sqlite").run();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("@blazetrails/activerecord/sqlite/better-sqlite3");
+    expect(dbConfig).toContain('adapter: "sqlite3"');
+    expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/");
   });
 
   it("--package-manager npm uses npm install in bin/setup", async () => {
@@ -224,21 +225,21 @@ describe("AppGenerator", () => {
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("@blazetrails/activerecord/sqlite/node-sqlite");
+    expect(dbConfig).toContain('adapter: "node-sqlite"');
+    expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/node-sqlite");
   });
 
-  it("--sqlite-driver expo-sqlite omits driver dep", async () => {
-    const gen = new AppGenerator({
-      cwd: tmpDir,
-      output: (m) => lines.push(m),
-      appPath: "my-app",
-      sqliteDriver: "expo-sqlite",
-    });
-    await gen.run();
-    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
-    const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("@blazetrails/activerecord/sqlite/expo-sqlite");
+  it("rejects an unknown sqlite driver", () => {
+    expect(
+      () =>
+        new AppGenerator({
+          cwd: tmpDir,
+          output: (m) => lines.push(m),
+          appPath: "my-app",
+          // expo-sqlite is not yet an openable adapter (async-only driver).
+          sqliteDriver: "expo-sqlite" as never,
+        }),
+    ).toThrow(/Unknown SQLite driver/);
   });
 
   it("skips docker files when --skip-docker", async () => {

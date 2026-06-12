@@ -177,6 +177,11 @@ describe("connectAdapter", () => {
     expect(adapter.constructor.name).toBe("BetterSQLite3Adapter");
   });
 
+  it("creates NodeSQLiteAdapter for node-sqlite", async () => {
+    adapter = await connectAdapter({ adapter: "node-sqlite", database: ":memory:" });
+    expect(adapter.constructor.name).toBe("NodeSQLiteAdapter");
+  });
+
   it("throws for unknown adapter", async () => {
     await expect(connectAdapter({ adapter: "oracle" })).rejects.toThrow(/Unknown database adapter/);
   });
@@ -668,9 +673,9 @@ describe("full migration flow", () => {
   });
 
   it("migrate, status, rollback with SQLite", async () => {
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    adapter = new SQLite3Adapter(":memory:");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    adapter = new BetterSQLite3Adapter(":memory:");
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-posts.ts"),
@@ -724,9 +729,9 @@ export class CreatePosts extends Migration {
   });
 
   it("forward moves the schema forward one migration", async () => {
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    adapter = new SQLite3Adapter(":memory:");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    adapter = new BetterSQLite3Adapter(":memory:");
 
     const a = "20260101000000-create-posts.ts";
     const b = "20260102000000-create-comments.ts";
@@ -768,9 +773,9 @@ export class CreateComments extends Migration {
   });
 
   it("currentVersion reports the highest applied version", async () => {
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    adapter = new SQLite3Adapter(":memory:");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    adapter = new BetterSQLite3Adapter(":memory:");
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-posts.ts"),
@@ -790,9 +795,9 @@ export class CreatePosts extends Migration {
   });
 
   it("run executes a single migration up then down by version", async () => {
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    adapter = new SQLite3Adapter(":memory:");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    adapter = new BetterSQLite3Adapter(":memory:");
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-widgets.ts"),
@@ -818,10 +823,10 @@ export class CreateWidgets extends Migration {
   });
 
   it("run throws UnknownMigrationVersionError for missing versions", async () => {
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const { UnknownMigrationVersionError } = await import("@blazetrails/activerecord");
-    adapter = new SQLite3Adapter(":memory:");
+    adapter = new BetterSQLite3Adapter(":memory:");
 
     const migrator = new Migrator(adapter, []);
     await expect(migrator.run("up", "99999999999999")).rejects.toBeInstanceOf(
@@ -830,9 +835,9 @@ export class CreateWidgets extends Migration {
   });
 
   it("pendingMigrations reflects abort_if_pending_migrations semantics", async () => {
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    adapter = new SQLite3Adapter(":memory:");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    adapter = new BetterSQLite3Adapter(":memory:");
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-posts.ts"),
@@ -855,12 +860,12 @@ export class CreatePosts extends Migration {
 describe("schema dump and load", () => {
   it("dumps schema from SQLite and loads it into a fresh database", async () => {
     const { SchemaDumper, MigrationContext } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const { AdapterSchemaSource } = await import("../schema-source.js");
 
-    const sourceAdapter = new SQLite3Adapter(":memory:");
-    const targetAdapter = new SQLite3Adapter(":memory:");
+    const sourceAdapter = new BetterSQLite3Adapter(":memory:");
+    const targetAdapter = new BetterSQLite3Adapter(":memory:");
     try {
       // Create a database with a table
       const ctx = new MigrationContext(sourceAdapter);
@@ -1036,9 +1041,9 @@ export class CreatePosts extends Migration {
     expect(fs.existsSync(path.join(tmpDir, "db", "schema.ts"))).toBe(true);
 
     // Table was created.
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const a = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const a = new BetterSQLite3Adapter(dbFile);
     try {
       const tables = await a.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
@@ -1070,9 +1075,9 @@ export class CreatePosts extends Migration {
     await runDb(["migrate:up", "--version=20260101000000"]);
     await runDb(["migrate:down", "--version=20260101000000"]);
 
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const a = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const a = new BetterSQLite3Adapter(dbFile);
     try {
       const tables = await a.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
@@ -1103,9 +1108,9 @@ export class CreatePosts extends Migration {
 
     await runDb(["environment:set"]);
 
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const a = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const a = new BetterSQLite3Adapter(dbFile);
     try {
       const rows = await a.execute(
         `SELECT value FROM ar_internal_metadata WHERE key = 'environment'`,
@@ -1132,11 +1137,11 @@ export class CreatePosts extends Migration {
       DatabaseConfigurations,
       HashConfig,
     } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "prod.sqlite3");
-    const adapter = new SQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       const migrator = new Migrator(adapter, []);
       await migrator.internalMetadata.createTable();
@@ -1172,11 +1177,11 @@ export class CreatePosts extends Migration {
       DatabaseConfigurations,
       HashConfig,
     } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "staging.sqlite3");
-    const adapter = new SQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       const migrator = new Migrator(adapter, []);
       await migrator.internalMetadata.createTable();
@@ -1204,11 +1209,11 @@ export class CreatePosts extends Migration {
   it("DISABLE_DATABASE_ENVIRONMENT_CHECK bypasses the check", async () => {
     const { DatabaseTasks, Migrator, DatabaseConfigurations, HashConfig } =
       await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "prod2.sqlite3");
-    const adapter = new SQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       const migrator = new Migrator(adapter, []);
       await migrator.internalMetadata.createTable();
@@ -1239,11 +1244,11 @@ export class CreatePosts extends Migration {
 
   it("Migrator.checkProtectedEnvironments is read-only and a no-op on fresh DB", async () => {
     const { Migrator, ProtectedEnvironmentError, Base } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "fresh.sqlite3");
-    const adapter = new SQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter(dbFile);
     const previousProtected = Base.protectedEnvironments;
     Base.protectedEnvironments = ["production"];
     try {
@@ -1272,11 +1277,11 @@ export class CreatePosts extends Migration {
 
   it("InternalMetadata with enabled=false refuses set writes with EnvironmentStorageError", async () => {
     const { EnvironmentStorageError, InternalMetadata } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "disabled.sqlite3");
-    const adapter = new SQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       const disabledMeta = new InternalMetadata(adapter, { enabled: false });
       expect(disabledMeta.enabled).toBe(false);
@@ -1299,11 +1304,11 @@ export class CreatePosts extends Migration {
 
   it("Migrator plumbs internalMetadataEnabled=false through to InternalMetadata", async () => {
     const { Migrator, EnvironmentStorageError } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "disabled-migrator.sqlite3");
-    const adapter = new SQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       const migrator = new Migrator(adapter, [], { internalMetadataEnabled: false });
       expect(migrator.internalMetadata.enabled).toBe(false);
@@ -1317,11 +1322,11 @@ export class CreatePosts extends Migration {
 
   it("Migrator with internalMetadataEnabled=false migrates without stamping", async () => {
     const { Migrator } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "no-metadata-migrate.sqlite3");
-    const adapter = new SQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       // Low-level MigrationLike shape (same pattern migrator.test.ts uses)
       // — bypasses the Migration base class so the test doesn't depend on
@@ -1373,11 +1378,11 @@ export class CreatePosts extends Migration {
 
   it("lastStoredEnvironment returns null when metadata is disabled even if table exists", async () => {
     const { Migrator, InternalMetadata } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "stale-metadata.sqlite3");
-    const adapter = new SQLite3Adapter(dbFile);
+    const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       // Seed a real metadata table + environment value with a separate
       // enabled=true instance.
@@ -1400,11 +1405,11 @@ export class CreatePosts extends Migration {
       Migrator,
       HashConfig: HC,
     } = await import("@blazetrails/activerecord");
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "truncate.sqlite3");
-    const seedAdapter = new SQLite3Adapter(dbFile);
+    const seedAdapter = new BetterSQLite3Adapter(dbFile);
     try {
       await seedAdapter.executeMutation("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)");
       await seedAdapter.executeMutation("INSERT INTO posts (title) VALUES ('a'), ('b')");
@@ -1426,7 +1431,7 @@ export class CreatePosts extends Migration {
     });
     await new SQLiteDatabaseTasks(config).truncateAll();
 
-    const verify = new SQLite3Adapter(dbFile);
+    const verify = new BetterSQLite3Adapter(dbFile);
     try {
       const postsCount = (await verify.execute(`SELECT COUNT(*) AS c FROM posts`)) as Array<{
         c: number;
@@ -1457,9 +1462,9 @@ export class CreatePosts extends Migration {
 };`,
     );
 
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const seed = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const seed = new BetterSQLite3Adapter(dbFile);
     try {
       await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
       await seed.executeMutation("INSERT INTO widgets (name) VALUES ('x'), ('y')");
@@ -1470,7 +1475,7 @@ export class CreatePosts extends Migration {
     await runDb(["truncate_all"]);
     expect(process.exitCode).toBeUndefined();
 
-    const verify = new SQLite3Adapter(dbFile);
+    const verify = new BetterSQLite3Adapter(dbFile);
     try {
       const rows = (await verify.execute(`SELECT COUNT(*) AS c FROM widgets`)) as Array<{
         c: number;
@@ -1510,9 +1515,9 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
     expect(fs.existsSync(dbFile)).toBe(true);
     expect(fs.existsSync(seedMarker)).toBe(true);
 
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const a = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const a = new BetterSQLite3Adapter(dbFile);
     try {
       const tables = await a.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'`,
@@ -1542,9 +1547,9 @@ const prev = fs.existsSync(${JSON.stringify(seedMarker)})
 fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     );
 
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const seed = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const seed = new BetterSQLite3Adapter(dbFile);
     try {
       await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
       await seed.executeMutation("INSERT INTO widgets (name) VALUES ('keep-me')");
@@ -1555,7 +1560,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     await runDb(["seed:replant"]);
     expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
 
-    const verify = new SQLite3Adapter(dbFile);
+    const verify = new BetterSQLite3Adapter(dbFile);
     try {
       const rows = (await verify.execute(`SELECT COUNT(*) AS c FROM widgets`)) as Array<{
         c: number;
@@ -1575,9 +1580,9 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
   test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
 };`,
     );
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const seed = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const seed = new BetterSQLite3Adapter(dbFile);
     try {
       await seed.executeMutation(
         "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
@@ -1627,9 +1632,9 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
   test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
 };`,
     );
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const seed = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const seed = new BetterSQLite3Adapter(dbFile);
     try {
       await seed.executeMutation(
         "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)",
@@ -1697,9 +1702,9 @@ export class CreateDogs extends Migration {
     await runDb(["migrate"]);
 
     // Verify each DB got its own migration applied.
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const pAdapter = new SQLite3Adapter(primaryDb);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const pAdapter = new BetterSQLite3Adapter(primaryDb);
     try {
       const users = await pAdapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
@@ -1713,7 +1718,7 @@ export class CreateDogs extends Migration {
     } finally {
       await pAdapter.close();
     }
-    const aAdapter = new SQLite3Adapter(animalsDb);
+    const aAdapter = new BetterSQLite3Adapter(animalsDb);
     try {
       const dogs = await aAdapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
@@ -1777,9 +1782,9 @@ export class CreateDogs extends Migration {
     // Only migrate animals — primary should stay unmigrated.
     await runDb(["migrate", "--database=animals"]);
 
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const pAdapter = new SQLite3Adapter(primaryDb);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const pAdapter = new BetterSQLite3Adapter(primaryDb);
     try {
       const users = await pAdapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
@@ -1788,7 +1793,7 @@ export class CreateDogs extends Migration {
     } finally {
       await pAdapter.close();
     }
-    const aAdapter = new SQLite3Adapter(animalsDb);
+    const aAdapter = new BetterSQLite3Adapter(animalsDb);
     try {
       const dogs = await aAdapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
@@ -1840,9 +1845,9 @@ export class CreateCats extends Migration {
     await runDb(["create"]);
     await runDb(["migrate", "--database=animals"]);
 
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const a = new SQLite3Adapter(animalsDb);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const a = new BetterSQLite3Adapter(animalsDb);
     try {
       const cats = await a.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='cats'",
@@ -1873,15 +1878,15 @@ export class CreateCats extends Migration {
   },
 };`,
     );
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const seedPrimary = new SQLite3Adapter(primaryDb);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const seedPrimary = new BetterSQLite3Adapter(primaryDb);
     try {
       await seedPrimary.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY)");
     } finally {
       await seedPrimary.close();
     }
-    const seedAnimals = new SQLite3Adapter(animalsDb);
+    const seedAnimals = new BetterSQLite3Adapter(animalsDb);
     try {
       await seedAnimals.executeMutation("CREATE TABLE dogs (id INTEGER PRIMARY KEY)");
     } finally {
@@ -1909,9 +1914,9 @@ export class CreateCats extends Migration {
   test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
 };`,
     );
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const seed = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const seed = new BetterSQLite3Adapter(dbFile);
     try {
       await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
     } finally {
@@ -1938,9 +1943,9 @@ export class CreateCats extends Migration {
   test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
 };`,
     );
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const seed = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const seed = new BetterSQLite3Adapter(dbFile);
     try {
       await seed.executeMutation("CREATE TABLE items (id INTEGER PRIMARY KEY)");
     } finally {
@@ -1965,9 +1970,9 @@ export class CreateCats extends Migration {
   test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
 };`,
     );
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const seed = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const seed = new BetterSQLite3Adapter(dbFile);
     try {
       await seed.executeMutation(
         "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
@@ -1982,7 +1987,7 @@ export class CreateCats extends Migration {
 
     // Drop the table behind the CLI's back, then load from the dump to
     // prove structureLoad actually replays the DDL.
-    const dropper = new SQLite3Adapter(dbFile);
+    const dropper = new BetterSQLite3Adapter(dbFile);
     try {
       await dropper.executeMutation("DROP TABLE gadgets");
     } finally {
@@ -1991,7 +1996,7 @@ export class CreateCats extends Migration {
 
     await runDb(["schema:load", "--format=sql"]);
 
-    const verify = new SQLite3Adapter(dbFile);
+    const verify = new BetterSQLite3Adapter(dbFile);
     try {
       const tables = (await verify.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='gadgets'",
@@ -2068,9 +2073,9 @@ export class CreatePosts extends Migration {
 
     // Drop schema_migrations + the user table to prove load replays
     // both the DDL and the version INSERTs.
-    const { SQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-    const dropper = new SQLite3Adapter(dbFile);
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const dropper = new BetterSQLite3Adapter(dbFile);
     try {
       await dropper.executeMutation("DROP TABLE schema_migrations");
       await dropper.executeMutation("DROP TABLE ar_internal_metadata");
@@ -2081,7 +2086,7 @@ export class CreatePosts extends Migration {
 
     await runDb(["schema:load", "--format=sql"]);
 
-    const verify = new SQLite3Adapter(dbFile);
+    const verify = new BetterSQLite3Adapter(dbFile);
     try {
       const rows = (await verify.execute(
         "SELECT version FROM schema_migrations ORDER BY version",
@@ -2138,8 +2143,8 @@ export class CreateThings extends Migration {
     // Create the DB file so the adapter can connect, but don't create
     // a structure.sql — the CLI should bail out cleanly.
     new (
-      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js")
-    ).SQLite3Adapter(dbFile).close();
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
+    ).BetterSQLite3Adapter(dbFile).close();
 
     await runDb(["schema:load", "--format=sql"]);
 

@@ -2,15 +2,16 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 
 describe("SQLite3Adapter schema introspection", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: AbstractSQLite3Adapter;
   let tmpDir: string;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-introspect-"));
-    adapter = new SQLite3Adapter(path.join(tmpDir, "db.sqlite3"));
+    adapter = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"));
   });
 
   afterEach(async () => {

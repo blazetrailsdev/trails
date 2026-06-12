@@ -3,7 +3,8 @@
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
-import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type {
   SqliteDriver,
@@ -13,10 +14,10 @@ import type {
 } from "../../sqlite-adapter.js";
 import { assertLogged } from "./test-helper.js";
 
-let adapter: SQLite3Adapter;
+let adapter: AbstractSQLite3Adapter;
 
 beforeEach(() => {
-  adapter = new SQLite3Adapter(":memory:");
+  adapter = new BetterSQLite3Adapter(":memory:");
 });
 
 afterEach(async () => {
@@ -39,7 +40,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const nested = path.join(baseDir, "sub", "dir");
     fs.mkdirSync(nested, { recursive: true });
     const dbPath = path.join(nested, "test.db");
-    const a = new SQLite3Adapter(dbPath);
+    const a = new BetterSQLite3Adapter(dbPath);
     expect(a.isOpen).toBe(true);
     await a.close();
     fs.rmSync(baseDir, { recursive: true, force: true });
@@ -51,20 +52,20 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("database exists returns true for an in memory db", async () => {
-    const memAdapter = new SQLite3Adapter(":memory:");
+    const memAdapter = new BetterSQLite3Adapter(":memory:");
     expect(memAdapter).toBeDefined();
     await memAdapter.close();
   });
 
   it("connect with url", async () => {
     // better-sqlite3 doesn't use URLs, but we can open a :memory: db
-    const a = new SQLite3Adapter(":memory:");
+    const a = new BetterSQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     await a.close();
   });
 
   it("connect memory with url", async () => {
-    const a = new SQLite3Adapter(":memory:");
+    const a = new BetterSQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     await a.close();
   });
@@ -109,7 +110,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const path = await import("path");
     expect(
       () =>
-        new SQLite3Adapter(path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"), {
+        new BetterSQLite3Adapter(path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"), {
           readonly: true,
         }),
     ).toThrow();
@@ -117,20 +118,20 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("bad timeout", async () => {
     // better-sqlite3 accepts timeout option; a negative value is accepted but harmless
-    const a = new SQLite3Adapter(":memory:");
+    const a = new BetterSQLite3Adapter(":memory:");
     expect(a).toBeDefined();
     await a.close();
   });
 
   it("nil timeout", async () => {
     // No timeout specified — default constructor works fine
-    const a = new SQLite3Adapter(":memory:");
+    const a = new BetterSQLite3Adapter(":memory:");
     expect(a).toBeDefined();
     await a.close();
   });
 
   it("connect", async () => {
-    const a = new SQLite3Adapter(":memory:");
+    const a = new BetterSQLite3Adapter(":memory:");
     expect(a).toBeDefined();
     await a.close();
   });
@@ -512,20 +513,20 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("statement closed", async () => {
-    const a = new SQLite3Adapter(":memory:");
+    const a = new BetterSQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     await a.close();
     expect(a.isOpen).toBe(false);
   });
 
   it("db is not readonly when readonly option is false", async () => {
-    const a = new SQLite3Adapter(":memory:", { readonly: false });
+    const a = new BetterSQLite3Adapter(":memory:", { readonly: false });
     expect(a.isOpen).toBe(true);
     await a.close();
   });
 
   it("db is not readonly when readonly option is unspecified", async () => {
-    const a = new SQLite3Adapter(":memory:");
+    const a = new BetterSQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     await a.close();
   });
@@ -536,10 +537,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const path = await import("path");
     const os = await import("os");
     const tmpFile = path.join(os.tmpdir(), `sqlite-readonly-test-${Date.now()}.db`);
-    const writer = new SQLite3Adapter(tmpFile);
+    const writer = new BetterSQLite3Adapter(tmpFile);
     await writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await writer.close();
-    const reader = new SQLite3Adapter(tmpFile, { readonly: true });
+    const reader = new BetterSQLite3Adapter(tmpFile, { readonly: true });
     const rows = await reader.execute(`SELECT * FROM "test"`);
     expect(rows).toHaveLength(0);
     await reader.close();
@@ -551,10 +552,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const path = await import("path");
     const os = await import("os");
     const tmpFile = path.join(os.tmpdir(), `sqlite-readonly-write-${Date.now()}.db`);
-    const writer = new SQLite3Adapter(tmpFile);
+    const writer = new BetterSQLite3Adapter(tmpFile);
     await writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await writer.close();
-    const reader = new SQLite3Adapter(tmpFile, { readonly: true });
+    const reader = new BetterSQLite3Adapter(tmpFile, { readonly: true });
     await expect(
       reader.executeMutation(`INSERT INTO "test" ("name") VALUES ('fail')`),
     ).rejects.toThrow();
@@ -564,8 +565,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("strict strings by default", async () => {
     // Default class config is false — new connections are non-strict.
-    expect(SQLite3Adapter.strictStringsByDefault).toBe(false);
-    const conn = new SQLite3Adapter(":memory:");
+    expect(AbstractSQLite3Adapter.strictStringsByDefault).toBe(false);
+    const conn = new BetterSQLite3Adapter(":memory:");
     expect(conn.strictStrings).toBe(false);
     // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
     // — non-strict connections allow DQS fallback so unknown double-quoted
@@ -575,9 +576,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.close();
 
     // Setting the class config propagates to new connections.
-    SQLite3Adapter.strictStringsByDefault = true;
+    AbstractSQLite3Adapter.strictStringsByDefault = true;
     try {
-      const strict = new SQLite3Adapter(":memory:");
+      const strict = new BetterSQLite3Adapter(":memory:");
       expect(strict.strictStrings).toBe(true);
       await strict.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
       await expect(
@@ -585,13 +586,13 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       ).rejects.toThrow(/no such column/i);
       await strict.close();
     } finally {
-      SQLite3Adapter.strictStringsByDefault = false;
+      AbstractSQLite3Adapter.strictStringsByDefault = false;
     }
   });
 
   it("strict strings by default and true in database yml", async () => {
     // Explicit strict: true in options always enables strict mode.
-    const conn = new SQLite3Adapter(":memory:", { strict: true });
+    const conn = new BetterSQLite3Adapter(":memory:", { strict: true });
     try {
       expect(conn.strictStrings).toBe(true);
       await conn.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
@@ -603,9 +604,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     }
 
     // Explicit strict: true also overrides the class config (still strict).
-    SQLite3Adapter.strictStringsByDefault = true;
+    AbstractSQLite3Adapter.strictStringsByDefault = true;
     try {
-      const strict = new SQLite3Adapter(":memory:", { strict: true });
+      const strict = new BetterSQLite3Adapter(":memory:", { strict: true });
       try {
         expect(strict.strictStrings).toBe(true);
         await strict.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
@@ -616,13 +617,13 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         await strict.close();
       }
     } finally {
-      SQLite3Adapter.strictStringsByDefault = false;
+      AbstractSQLite3Adapter.strictStringsByDefault = false;
     }
   });
 
   it("strict strings by default and false in database yml", async () => {
     // Explicit strict: false in options disables strict mode.
-    const conn = new SQLite3Adapter(":memory:", { strict: false });
+    const conn = new BetterSQLite3Adapter(":memory:", { strict: false });
     try {
       expect(conn.strictStrings).toBe(false);
       // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
@@ -633,16 +634,16 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     }
 
     // Explicit strict: false overrides strictStringsByDefault = true.
-    SQLite3Adapter.strictStringsByDefault = true;
+    AbstractSQLite3Adapter.strictStringsByDefault = true;
     try {
-      const strict = new SQLite3Adapter(":memory:", { strict: false });
+      const strict = new BetterSQLite3Adapter(":memory:", { strict: false });
       try {
         expect(strict.strictStrings).toBe(false);
       } finally {
         await strict.close();
       }
     } finally {
-      SQLite3Adapter.strictStringsByDefault = false;
+      AbstractSQLite3Adapter.strictStringsByDefault = false;
     }
   });
 
@@ -685,10 +686,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       },
     };
 
-    const originalDefault = SQLite3Adapter.strictStringsByDefault;
-    SQLite3Adapter.strictStringsByDefault = true;
+    const originalDefault = AbstractSQLite3Adapter.strictStringsByDefault;
+    AbstractSQLite3Adapter.strictStringsByDefault = true;
     try {
-      const conn = new SQLite3Adapter(":memory:", { driver: fakeDriver });
+      const conn = new BetterSQLite3Adapter(":memory:", { driver: fakeDriver });
       try {
         expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(true);
         expect(conn.strictStrings).toBe(true);
@@ -696,11 +697,11 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         await conn.close();
       }
     } finally {
-      SQLite3Adapter.strictStringsByDefault = originalDefault;
+      AbstractSQLite3Adapter.strictStringsByDefault = originalDefault;
     }
 
     capture.config = null;
-    const explicit = new SQLite3Adapter(":memory:", {
+    const explicit = new BetterSQLite3Adapter(":memory:", {
       driver: fakeDriver,
       strict: false,
     });

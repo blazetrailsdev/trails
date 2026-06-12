@@ -28,7 +28,7 @@ import { onLoad, Railtie as BaseRailtie, registerRailtie } from "@blazetrails/ac
 import { Base } from "./base.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
-import type { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import type { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import { deprecator } from "./deprecator.js";
 import {
@@ -147,7 +147,7 @@ const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
   onLoad("active_record", { once: true }, pushTimestamptzToTimeZoneAwareTypes);
 };
 
-const setSqlite3StrictStringsByDefault = (adapter: typeof SQLite3Adapter): void => {
+const setSqlite3StrictStringsByDefault = (adapter: typeof AbstractSQLite3Adapter): void => {
   adapter.strictStringsByDefault = true;
 };
 

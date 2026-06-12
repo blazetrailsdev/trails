@@ -50,10 +50,10 @@ const ADAPTER_SPECIFIC_EXCLUDE =
       ? [...PG_ADAPTER_DIRS, ...SQLITE_ADAPTER_DIRS]
       : [...PG_ADAPTER_DIRS, ...MYSQL_ADAPTER_DIRS]; // default: sqlite3
 
-// Low-level SQLite driver wrappers + the driver registry. These are pure unit
-// tests (they register/swap drivers directly) and must NOT load test-setup-ar,
-// whose connection bootstrap calls getSqlite() with no name and throws once a
-// test has registered a second driver. Run them in their own setup-free project.
+// Low-level SQLite driver wrappers + the adapter driver-binding tests. These
+// are pure unit tests that construct adapters/drivers directly and must NOT
+// load test-setup-ar, whose connection bootstrap opens a DB at module load.
+// Run them in their own setup-free project.
 const SQLITE_DRIVER_TESTS = [
   "packages/activerecord/src/sqlite/**/*.test.ts",
   "packages/activerecord/src/sqlite-adapter.test.ts",
@@ -121,6 +121,14 @@ const alias = {
   "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js": path.resolve(
     __dirname,
     "packages/activerecord/src/connection-adapters/better-sqlite3-adapter.ts",
+  ),
+  "@blazetrails/activerecord/connection-adapters/node-sqlite-adapter.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/connection-adapters/node-sqlite-adapter.ts",
+  ),
+  "@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/connection-adapters/expo-sqlite-adapter.ts",
   ),
   "@blazetrails/activerecord/adapters/postgresql-adapter.js": path.resolve(
     __dirname,
@@ -238,9 +246,9 @@ export default defineConfig({
         },
       },
       {
-        // SQLite driver wrappers + registry: pure unit tests, no AR setup
-        // (see SQLITE_DRIVER_TESTS). Excluded from the "activerecord" project
-        // above so they don't load the connection bootstrap.
+        // SQLite driver wrappers + driver-binding tests: pure unit tests, no
+        // AR setup (see SQLITE_DRIVER_TESTS). Excluded from the "activerecord"
+        // project above so they don't load the connection bootstrap.
         resolve: { alias },
         test: {
           name: "sqlite-drivers",

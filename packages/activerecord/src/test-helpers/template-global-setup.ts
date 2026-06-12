@@ -18,7 +18,7 @@ import mysql from "mysql2/promise";
 import "../sqlite/better-sqlite3.js";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { DatabaseAdapter } from "../adapter.js";
-import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { defineSchema } from "./define-schema.js";
 import { generateSchemaFile } from "./schema-file-generator.js";
@@ -90,7 +90,7 @@ const sqliteAdapter: DbTemplateAdapter = {
     const runToken = `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
     const templatePath = await templatePathFor(runToken);
 
-    const adapter = new SQLite3Adapter(templatePath);
+    const adapter = new BetterSQLite3Adapter(templatePath);
     await buildTemplateSchema(adapter as unknown as DatabaseAdapter, () => adapter.close());
 
     process.env[TEMPLATE_PATH_ENV] = templatePath;

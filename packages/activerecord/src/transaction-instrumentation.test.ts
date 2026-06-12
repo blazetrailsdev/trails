@@ -9,7 +9,8 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 
 // Use an isolated in-memory SQLite3 adapter per test. The transaction
 // instrumentation assertions exercise the TransactionManager directly
@@ -31,8 +32,8 @@ import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 // writes match the Rails counterpart verbatim (fixture names `first`, `fifth`);
 // callback-leak tests keep a throwaway subclass, exactly as Rails uses
 // `Class.new`.
-async function freshIsolatedAdapter(): Promise<SQLite3Adapter> {
-  const adapter = new SQLite3Adapter(":memory:");
+async function freshIsolatedAdapter(): Promise<AbstractSQLite3Adapter> {
+  const adapter = new BetterSQLite3Adapter(":memory:");
   await defineSchema(adapter, { topics: canonicalSchema.topics });
   return adapter;
 }
@@ -56,7 +57,7 @@ function makeTopic(adp: DatabaseAdapter) {
 }
 
 describe("TransactionInstrumentationTest", () => {
-  let sharedAdapter: SQLite3Adapter;
+  let sharedAdapter: AbstractSQLite3Adapter;
   beforeEach(async () => {
     // Close the prior test's adapter here (not in afterEach) so the
     // useFixtures afterEach DELETE always runs against an open connection.
