@@ -31,6 +31,12 @@ export interface MethodInfo {
    * out of normal coverage and only include them behind an opt-in flag.
    */
   internal?: boolean;
+  /** Ruby-side option symbols consumed from an `options`/`opts`/`**kwargs`
+   *  param (raw snake_case); advisory under-approximation. See options-keys.ts. */
+  option_keys?: string[];
+  /** TS-side property names of the trailing options-object param; `null` when
+   *  uncheckable (`any`/`Record<string, unknown>`), absent when not an object. */
+  optionKeys?: string[] | null;
 }
 
 export interface ClassInfo {

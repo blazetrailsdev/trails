@@ -402,6 +402,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         }
       } else if (ts.isFunctionDeclaration(node) && node.name && isExported(node)) {
         const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
+        const fnOptionKeys = extractOptionKeys(node.parameters, checker);
         fileFunctions.push({
           name: node.name.text,
           visibility: "public",
@@ -409,6 +410,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           isStatic: false,
           line,
           file: relPath,
+          ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
         });
       } else if (ts.isVariableStatement(node) && isExported(node)) {
         // Capture `export const X = { method() {...}, foo, bar: ... }`
@@ -1096,9 +1098,11 @@ export function harvestObjectLiteralMethods(
     // identifier references (`qux,` / `foo: NS.bar`) whose signature lives
     // elsewhere — the arity check tolerates that via its global candidate pool.
     let params: ParamInfo[] = [];
+    let optionKeys: string[] | null | undefined;
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
+      optionKeys = extractOptionKeys(prop.parameters, checker);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
@@ -1106,6 +1110,7 @@ export function harvestObjectLiteralMethods(
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
         mname = prop.name.text;
         params = extractParameters(init.parameters);
+        optionKeys = extractOptionKeys(init.parameters, checker);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -1116,7 +1121,14 @@ export function harvestObjectLiteralMethods(
     }
     if (!mname) continue;
     const line = prop.getSourceFile().getLineAndCharacterOfPosition(prop.getStart()).line + 1;
-    out.push({ name: mname, visibility: "public", params, line, file });
+    out.push({
+      name: mname,
+      visibility: "public",
+      params,
+      line,
+      file,
+      ...(optionKeys !== undefined ? { optionKeys } : {}),
+    });
   }
   return out;
 }
@@ -1223,6 +1235,7 @@ export function extractClass(
 
     if (ts.isMethodDeclaration(member) && memberName) {
       const params = extractParameters(member.parameters);
+      const optionKeys = extractOptionKeys(member.parameters, checker);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -1231,6 +1244,7 @@ export function extractClass(
         file,
         isStatic,
         ...(internal ? { internal: true } : {}),
+        ...(optionKeys !== undefined ? { optionKeys } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -1461,6 +1475,56 @@ function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): Param
     }
     return result;
   });
+}
+
+/**
+ * Advisory option-key extraction (see options-keys.ts). Resolves the LAST
+ * parameter's object type to its property names. Returns: undefined (no
+ * options-shaped trailing param), null (uncheckable — `any`/`unknown` or a
+ * string-index bag like `Record<string, unknown>`, distinct from `[]`), or the
+ * sorted/deduped property names. Only interface/type-literal/intersection
+ * trailing params are inspected.
+ */
+export function extractOptionKeys(
+  parameters: ts.NodeArray<ts.ParameterDeclaration>,
+  checker: ts.TypeChecker,
+): string[] | null | undefined {
+  if (parameters.length === 0) return undefined;
+  const last = parameters[parameters.length - 1];
+  if (last.dotDotDotToken || !last.type) return undefined;
+  const tn = last.type;
+  if (!ts.isTypeLiteralNode(tn) && !ts.isIntersectionTypeNode(tn) && !ts.isTypeReferenceNode(tn)) {
+    return undefined;
+  }
+  // A string/number index signature accepts ANY key, so the named props aren't
+  // an enumerable contract — treat the param as uncheckable. Inline-literal index
+  // signatures don't survive `getTypeFromTypeNode`, so check syntax too.
+  if (hasSyntacticIndexSignature(tn)) return null;
+  const type = checker.getTypeFromTypeNode(tn);
+  if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return null;
+  const hasStringIndex = checker
+    .getIndexInfosOfType(type)
+    .some((i) => (i.keyType.flags & (ts.TypeFlags.String | ts.TypeFlags.Number)) !== 0);
+  if (hasStringIndex) return null;
+  const names = checker
+    .getPropertiesOfType(type)
+    .map((s) => s.getName())
+    .filter((n) => !n.startsWith("__"));
+  if (names.length === 0) return undefined;
+  return [...new Set(names)].sort();
+}
+
+/** Does a type node carry a string/number index signature in its syntax? Covers
+ *  inline `{ [k: string]: … }` literals (whose index info is lost by
+ *  `getTypeFromTypeNode`) and intersection arms that contain one. */
+function hasSyntacticIndexSignature(tn: ts.TypeNode): boolean {
+  if (ts.isTypeLiteralNode(tn)) {
+    return tn.members.some((m) => ts.isIndexSignatureDeclaration(m));
+  }
+  if (ts.isIntersectionTypeNode(tn)) {
+    return tn.types.some(hasSyntacticIndexSignature);
+  }
+  return false;
 }
 
 function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {

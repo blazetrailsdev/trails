@@ -179,7 +179,14 @@ class ApiExtractor
     # as instance methods of every `include`r drowns hosts like
     # `Rack::ContentLength` in 30+ phantom misses.
     @module_function_stack = [false]
+    # `VALID_OPTIONS`-named symbol arrays per class FQN, expanded when a method
+    # body passes the constant to `assert_valid_keys`. See collect_option_keys.
+    @const_symbol_arrays = {}
   end
+
+  # Options-hash reads where only the FIRST symbol arg is the key
+  # (`options.fetch(:k, default)`).
+  OPTION_READER_METHODS = %w[fetch delete key? has_key? include? member?].to_set
 
   def process_file(filepath, package_root)
     source = File.read(filepath)
@@ -300,6 +307,7 @@ class ApiExtractor
       # Handle `CONST = Struct.new(...) do ... end` — methods defined in the
       # block belong to the struct, not to the enclosing module.
       lhs, rhs = node[1], node[2]
+      maybe_record_valid_options(lhs, rhs)
       # Only enter the struct-class path when:
       #   lhs = [:var_field, [:@const, "Name", ...]]
       #   rhs = [:method_add_block, [:method_add_arg, [:call, Struct, ., :new], ...], block]
@@ -414,6 +422,8 @@ class ApiExtractor
     method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
+    opt_keys = collect_option_keys(body, params, fqn)
+    method_info[:option_keys] = opt_keys unless opt_keys.empty?
 
     if @in_sclass
       target[:classMethods] << method_info
@@ -459,6 +469,8 @@ class ApiExtractor
     method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
+    opt_keys = collect_option_keys(body, params, fqn)
+    method_info[:option_keys] = opt_keys unless opt_keys.empty?
 
     target[:classMethods] << method_info
 
@@ -789,6 +801,91 @@ class ApiExtractor
     calls = []
     walk_for_calls(body_node, calls)
     calls.uniq
+  end
+
+  # Record a `VALID_OPTIONS`-named symbol array so a later
+  # `assert_valid_keys(VALID_OPTIONS)` can expand it. Handles `[...].freeze`.
+  def maybe_record_valid_options(lhs, rhs)
+    return unless lhs.is_a?(Array) && lhs[0] == :var_field
+    const = lhs[1]
+    return unless const.is_a?(Array) && const[0] == :@const
+    return unless const[1].include?("VALID_OPTIONS")
+    return unless rhs.is_a?(Array)
+    syms = []
+    traverse_for_symbols(rhs, syms)
+    return if syms.empty?
+    (@const_symbol_arrays[current_fqn] ||= {})[const[1]] = syms
+  end
+
+  # Advisory option-key collection (see options-keys.ts): the sorted, deduped
+  # symbol keys read off an `options`/`opts`/`**kwargs` param in the body. An
+  # UNDER-approximation — dynamic access and keys consumed in callees are missed.
+  def collect_option_keys(body, params, fqn)
+    vars = option_var_names(params)
+    return [] if vars.empty?
+    keys = []
+    consts = @const_symbol_arrays[fqn] || {}
+    walk_for_option_keys(body, vars, consts, keys)
+    keys.uniq.sort
+  end
+
+  def option_var_names(params)
+    names = Set.new
+    (params || []).each do |p|
+      if %w[options opts].include?(p[:name])
+        names << p[:name]
+      elsif p[:kind] == "keyword_rest" && p[:name] != "**"
+        names << p[:name]
+      end
+    end
+    names
+  end
+
+  def walk_for_option_keys(node, vars, consts, keys)
+    return unless node.is_a?(Array)
+    case node[0]
+    when :aref
+      # options[:foo]
+      traverse_for_symbols(node[2], keys) if option_var?(node[1], vars)
+    when :method_add_arg, :command_call, :call
+      handle_option_call(node, vars, consts, keys)
+    end
+    node.each { |child| walk_for_option_keys(child, vars, consts, keys) if child.is_a?(Array) }
+  end
+
+  def handle_option_call(node, vars, consts, keys)
+    case node[0]
+    when :method_add_arg
+      inner = node[1]
+      return unless inner.is_a?(Array) && inner[0] == :call
+      recv = inner[1]
+      meth = ident_name(inner[3])
+      args = node[2]
+    when :command_call
+      recv = node[1]
+      meth = ident_name(node[3])
+      args = node[4]
+    else
+      return # bare :call (e.g. options.keys) — no key argument
+    end
+    return unless meth && option_var?(recv, vars)
+
+    if meth == "assert_valid_keys"
+      traverse_for_symbols(args, keys)
+      const_refs = []
+      traverse_for_consts(args, const_refs)
+      const_refs.each { |c| (consts[c] || []).each { |s| keys << s } }
+    elsif OPTION_READER_METHODS.include?(meth)
+      syms = []
+      traverse_for_symbols(args, syms)
+      keys << syms.first if syms.first
+    end
+  end
+
+  def option_var?(node, vars)
+    return false unless node.is_a?(Array) && node[0] == :var_ref
+    id = ident_name(node[1])
+    !id.nil? && vars.include?(id)
   end
 
   def walk_for_calls(node, calls)

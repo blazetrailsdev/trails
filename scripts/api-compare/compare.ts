@@ -48,6 +48,7 @@ import {
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { ARITY_OVERRIDES, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { matchArityAgainst, renderSig, shouldSkipArity, type ArityRange } from "./arity.js";
+import { matchOptionKeysAgainst } from "./options-keys.js";
 import { isSourceUnported } from "./unported-files.js";
 
 const DETAIL_PACKAGES = new Set([
@@ -112,6 +113,7 @@ interface PackageResult {
   files: FileResult[];
   inheritance: InheritanceResult;
   arity: ArityResult;
+  optionKeys: OptionKeyResult;
 }
 
 // Advisory signature comparison: for a name-matched (ruby, ts) pair whose
@@ -132,6 +134,23 @@ interface ArityResult {
   compared: number;
   mismatched: number;
   mismatches: ArityMismatch[];
+}
+
+// Advisory option-key comparison: for a name-matched pair where Ruby consumed
+// option symbols and TS exposed a checkable options type. Never affects parity.
+interface OptionKeyMismatch {
+  rubyFile: string;
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  missingInTs: string[];
+  extraInTs: string[];
+}
+
+interface OptionKeyResult {
+  compared: number;
+  mismatched: number;
+  mismatches: OptionKeyMismatch[];
 }
 
 interface InheritanceMismatch {
@@ -696,10 +715,18 @@ function main() {
     // pooling all signatures and matching ANY (see matchArityAgainst) finds the
     // true arity and keeps those bindings/overloads from false-positiving.
     const tsParamsByName = new Map<string, ParamInfo[][]>();
+    // Per-name resolved options-object keys (null = uncheckable). Pooled
+    // GLOBALLY like tsParamsByName so a real options type wins over a binding.
+    const tsOptionKeysByName = new Map<string, (string[] | null)[]>();
     const recordTsParams = (m: MethodInfo) => {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
+      if (m.optionKeys !== undefined) {
+        const ok = tsOptionKeysByName.get(m.name) ?? [];
+        ok.push(m.optionKeys);
+        tsOptionKeysByName.set(m.name, ok);
+      }
     };
 
     if (tsPkg) {
@@ -999,6 +1026,8 @@ function main() {
     let totalMisplaced = 0;
     let arityCompared = 0;
     const arityMismatches: ArityMismatch[] = [];
+    let optionKeysCompared = 0;
+    const optionKeyMismatches: OptionKeyMismatch[] = [];
     const fileResults: FileResult[] = [];
 
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -1033,6 +1062,8 @@ function main() {
       const seen = new Map<string, { rubyName: string; rubyModule: string }>();
       // First-sighting Ruby params per name (mirrors `seen`'s dedup) for arity.
       const rubyParamsByName = new Map<string, ParamInfo[]>();
+      // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
+      const rubyOptionKeysByName = new Map<string, string[]>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
@@ -1040,12 +1071,37 @@ function main() {
           if (!methodMatchesMode(rm)) continue;
           dedupeRubyMethodInto(seen, rm, item.fqn);
           if (!rubyParamsByName.has(rm.name)) rubyParamsByName.set(rm.name, rm.params);
+          if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
+            rubyOptionKeysByName.set(rm.name, rm.option_keys);
+          }
         }
       }
 
       // Advisory arity check for one name-matched pair: flag when the Ruby and
       // TS positional-arg ranges don't overlap (see arity.ts).
+      // Advisory option-key check: diff the Ruby method's consumed option
+      // symbols against the TS options-object keys (see options-keys.ts).
+      const checkOptionKeys = (rubyName: string, tsName: string, tsFile: string) => {
+        const rubyKeys = rubyOptionKeysByName.get(rubyName);
+        if (!rubyKeys) return;
+        const candidates = tsOptionKeysByName.get(tsName);
+        if (!candidates || candidates.length === 0) return;
+        const verdict = matchOptionKeysAgainst(rubyKeys, candidates);
+        if (!verdict.comparable) return;
+        optionKeysCompared++;
+        if (verdict.missingInTs.length === 0 && verdict.extraInTs.length === 0) return;
+        optionKeyMismatches.push({
+          rubyFile,
+          tsFile,
+          rubyName,
+          tsName,
+          missingInTs: verdict.missingInTs,
+          extraInTs: verdict.extraInTs,
+        });
+      };
+
       const checkArity = (rubyName: string, tsName: string, tsFile: string) => {
+        checkOptionKeys(rubyName, tsName, tsFile);
         if (ARITY_OVERRIDES.has(rubyName)) return;
         // Ruby writers (`foo=`) map to a TS setter/assignable property; the name
         // match already confirms it exists and arity isn't meaningful here.
@@ -1318,6 +1374,11 @@ function main() {
         mismatched: arityMismatches.length,
         mismatches: arityMismatches,
       },
+      optionKeys: {
+        compared: optionKeysCompared,
+        mismatched: optionKeyMismatches.length,
+        mismatches: optionKeyMismatches,
+      },
     });
   }
 
@@ -1345,6 +1406,30 @@ function main() {
         compared: results.reduce((n, r) => n + r.arity.compared, 0),
         mismatched: arityFlat.length,
         mismatches: arityFlat,
+      },
+      null,
+      2,
+    ),
+  );
+
+  // Advisory option-key artifact — always written; flat across packages; same
+  // header shape as arity-mismatches.json plus a `note` on the heuristic.
+  const optionKeysPath = path.join(OUTPUT_DIR, `options-key-mismatches${modeSuffix}.json`);
+  const optionKeysFlat = results.flatMap((r) =>
+    r.optionKeys.mismatches.map((m) => ({ package: r.package, ...m })),
+  );
+  fs.writeFileSync(
+    optionKeysPath,
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        note:
+          "Advisory. Ruby keys are an UNDER-approximation (only keys read directly " +
+          "in the body are detected), so `missingInTs` is the likely-real finding " +
+          "and `extraInTs` is informational.",
+        compared: results.reduce((n, r) => n + r.optionKeys.compared, 0),
+        mismatched: optionKeysFlat.length,
+        mismatches: optionKeysFlat,
       },
       null,
       2,
@@ -1393,6 +1478,8 @@ function printReport(
   let grandInhMatched = 0;
   let grandArityCompared = 0;
   let grandArityMismatched = 0;
+  let grandOptKeysCompared = 0;
+  let grandOptKeysMismatched = 0;
 
   for (const pkg of results) {
     grandTotal += pkg.totalMethods;
@@ -1403,6 +1490,8 @@ function printReport(
     grandInhMatched += pkg.inheritance.matched;
     grandArityCompared += pkg.arity.compared;
     grandArityMismatched += pkg.arity.mismatched;
+    grandOptKeysCompared += pkg.optionKeys.compared;
+    grandOptKeysMismatched += pkg.optionKeys.mismatched;
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
@@ -1517,6 +1606,14 @@ function printReport(
   if (grandArityMismatched > 0 && !showArity) {
     console.log(
       `  (${grandArityMismatched} arity mismatches — rerun with --arity for the breakdown, or see output/arity-mismatches.json)`,
+    );
+  }
+  if (grandOptKeysCompared > 0) {
+    const okOk = grandOptKeysCompared - grandOptKeysMismatched;
+    const okPct = Math.round((okOk / grandOptKeysCompared) * 1000) / 10;
+    console.log(
+      `  Option keys (advisory): ${okOk}/${grandOptKeysCompared} (${okPct}%) — ` +
+        `${grandOptKeysMismatched} differ, see output/options-key-mismatches.json`,
     );
   }
   console.log(`${"=".repeat(100)}\n`);
