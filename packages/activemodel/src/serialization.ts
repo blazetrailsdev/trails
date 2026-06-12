@@ -54,12 +54,18 @@ export function serializableHash(
   }
 
   serializableAddIncludes(record, options, (assocName, records, opts) => {
-    // Rails yields whatever `send(association)` returned. A collection
-    // (Ruby Enumerable / has_many) is mapped element-wise; a single
-    // associated record serializes through its own `serializable_hash`.
-    // The JS analog of "Enumerable" is any non-string iterable — a real
-    // array, or a host collection object (e.g. activerecord's
-    // `CollectionProxy`) iterating its loaded records.
+    // Rails (serialization.rb:140-145): `records.to_ary.map { |a|
+    // a.serializable_hash }` for a collection, else `records.serializable_hash`.
+    // A collection (Ruby Enumerable / has_many) is mapped element-wise; a
+    // single associated record serializes through its own `serializable_hash`.
+    // The JS analog of "Enumerable" is any non-string iterable — a real array,
+    // or a host collection object (e.g. activerecord's `CollectionProxy`).
+    //
+    // Divergence (forced by synchronous serialization): Rails' `to_ary` lazily
+    // loads an unloaded collection from the DB; trails iterates the proxy's
+    // already-loaded records (an unloaded collection yields no rows). The RFC
+    // 0022 b2 constraint is that serialization issues no DB load — callers
+    // load/preload the association first, exactly as eager loading would.
     if (isSerializableCollection(records)) {
       const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
       safeSet(
@@ -242,9 +248,14 @@ export function serializableAddIncludes(
   const includes = normalizeIncludes(includeOpt);
   for (const [assocName, assocOpts] of Object.entries(includes)) {
     const records = sendAssociation(record, assocName);
-    // Rails: `if records = send(association)` skips on nil. `null` (a
-    // loaded singular with no row) and `undefined` (no such accessor /
-    // unloaded association) both map to Ruby's nil skip.
+    // Rails: `if records = send(association)` skips on nil. A loaded singular
+    // with no row (`null`) maps to Ruby's nil skip.
+    //
+    // Divergence: where the record has no accessor for the name, JS yields
+    // `undefined` (skipped here) whereas Ruby's `send` raises NoMethodError.
+    // Matching the raise would require an `in`/respond_to? probe and is a
+    // separate error-semantics change; this preserves the pre-RFC skip that
+    // existing tests assert.
     if (records !== null && records !== undefined) {
       callback(assocName, records, assocOpts);
     }
