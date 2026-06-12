@@ -189,8 +189,13 @@ describe("BindParameterTest", () => {
     // "bind params to sql with prepared statements".
   });
 
-  it("nested unprepared statements", async () => {
+  it("nested unprepared statements", async (ctx) => {
     const conn = Topic.leaseConnection() as any;
+    // Rails wraps the whole BindParameterTest in
+    // `if lease_connection.prepared_statements`. MySQL/MariaDB default prepared
+    // statements off, so this prepared-statement toggle behavior isn't exercised
+    // there — mirror the gate instead of asserting an adapter-specific default.
+    ctx.skip(!conn.preparedStatements);
     expect(conn.preparedStatements).toBe(true);
 
     await conn.unpreparedStatement(async () => {
