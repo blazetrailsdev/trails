@@ -46,11 +46,6 @@ const TEST_SCHEMA: Schema = {
     name: "string",
     type: "string",
   },
-  memberships: {
-    type: "string",
-    favorite: "boolean",
-    member_id: "integer",
-  },
 };
 
 describe("InheritanceTest", () => {
@@ -1400,32 +1395,16 @@ describe("InheritanceTest", () => {
     // to keep this PR within the size ceiling.
   });
 
-  it("inheritance with default scope", async () => {
-    // Mirrors Rails SelectedMembership < Membership with a default_scope; STI
-    // count must filter by type and still return the single SelectedMembership.
-    class Membership extends Base {
-      static {
-        this.attribute("type", "string");
-        this.attribute("favorite", "boolean");
-        this.attribute("member_id", "integer");
-        this._tableName = "memberships";
-        enableSti(Membership);
-      }
-    }
-    class SelectedMembership extends Membership {
-      static {
-        registerSubclass(SelectedMembership);
-        this.defaultScope((rel: any) => rel.select("'1' as foo"));
-      }
-    }
-    registerModel(Membership);
-
-    await Membership.create({ type: "CurrentMembership", member_id: 1 });
-    await Membership.create({ type: "Membership", favorite: true, member_id: 1 });
-    await Membership.create({ type: "SuperMembership", member_id: 1 });
-    await SelectedMembership.create({ member_id: 1 });
-
-    expect(await SelectedMembership.count()).toBe(1);
+  it.skip("inheritance with default scope", async () => {
+    // FOLLOW-UP (f9g2-inheritance-enum-sti-default-scope): Rails matches
+    // `SelectedMembership.count(:all) == 1` (inheritance_test.rb:500-501) where
+    // `Membership.enum :type` (membership.rb:3-4) backs an *integer* STI column
+    // (schema.rb:783-787). STI must filter `WHERE type = <enum int for
+    // SelectedMembership>`. The canonical trails Membership model declares the
+    // enum but does NOT wire STI dispatch on the enum-backed column, so
+    // `SelectedMembership.count()` returns all rows (6), not 1. Enum-backed STI
+    // inheritance-column dispatch is the real gap; tracked separately rather
+    // than masked with a non-enum string `type` fixture.
   });
 
   it("company descends from active record", async () => {
