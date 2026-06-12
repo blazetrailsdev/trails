@@ -1,25 +1,18 @@
 /**
- * ESLint rule: rails-error-parity
- *
- * Error classes are observable API (`catch (e) { if (e instanceof
- * RecordNotFound) … }`), so our hierarchy must mirror Rails and
- * Rails-mirroring source must throw ported error classes. Two checks,
- * scoped (via eslint.config.mjs) to
+ * ESLint rule: rails-error-parity. Error classes are observable API, so our
+ * hierarchy must mirror Rails and Rails-mirroring source must throw ported
+ * error classes. Scoped (via eslint.config.mjs) to
  * `packages/{activerecord,activemodel}/src/**\/*.ts` excluding `*.test.ts`:
  *
- *   1. On files named `errors.ts`: every manifest error class whose Rails
- *      source maps to this TS file must have an exported class of the same
- *      name (Rails `ActiveRecord::Foo` → TS `Foo`) whose `extends` names the
- *      manifest parent. Root classes (Rails parent is a Ruby built-in base
- *      like StandardError) pass on any Error-equivalent. Missing/wrong-parent
- *      reports on line 1.
- *   2. Everywhere in scope: `throw new Error(` (and TypeError/RangeError/…)
- *      is flagged — keyed on the constructor identifier only, so ported
- *      subclasses are fine.
+ *   1. On `errors.ts`: every manifest error class whose Rails source maps to
+ *      this TS file must have an exported class of the same name whose
+ *      `extends` names the manifest parent (root classes must extend a global
+ *      Error type). Missing/wrong-parent reports on line 1.
+ *   2. Everywhere in scope: `throw new Error(` (and TypeError/globalThis.Error/
+ *      …) is flagged — keyed on the constructor only, so ported subclasses pass.
  *
- * Pre-existing violators are grandfathered via
- * `eslint/rails-error-parity-exclude.json` (a ratchet baseline mirroring
- * require-canonical-schema-exclude.json — it only shrinks). Manifest:
+ * Pre-existing violators are grandfathered via the ratchet baseline
+ * `eslint/rails-error-parity-exclude.json` (it only shrinks). Manifest:
  *   pnpm tsx scripts/build-rails-error-manifest.ts
  */
 import fs from "fs";
@@ -107,6 +100,20 @@ function superClassName(node) {
   return null;
 }
 
+/** Constructor name of `new X` / `new globalThis.X` (else null). */
+function newCalleeName(callee) {
+  if (callee?.type === "Identifier") return callee.name;
+  if (
+    callee?.type === "MemberExpression" &&
+    callee.object?.type === "Identifier" &&
+    (callee.object.name === "globalThis" || callee.object.name === "window") &&
+    callee.property?.type === "Identifier"
+  ) {
+    return callee.property.name;
+  }
+  return null;
+}
+
 function checkParity(context, exportedClasses) {
   const scope = repoRel(context.filename ?? context.getFilename?.() ?? "");
   if (!scope) return;
@@ -114,8 +121,7 @@ function checkParity(context, exportedClasses) {
   const ns = PKG_NS[pkg];
   if (!ns) return;
 
-  // package-src-relative path of the current file, e.g. `errors.ts`.
-  const srcRel = scope.rel.replace(/^packages\/[^/]+\/src\//, "");
+  const srcRel = scope.rel.replace(/^packages\/[^/]+\/src\//, ""); // e.g. `errors.ts`
   const manifest = loadManifest();
   const classes = manifest.packages?.[pkg] ?? [];
 
@@ -131,7 +137,17 @@ function checkParity(context, exportedClasses) {
       });
       continue;
     }
-    if (ROOT_BASES.has(entry.parent)) continue; // root: any Error-equivalent ok
+    if (ROOT_BASES.has(entry.parent)) {
+      // Root class must still extend a global Error type (`class Foo {}` isn't).
+      if (!found.parent || !NATIVE_ERRORS.has(found.parent)) {
+        context.report({
+          loc: { line: 1, column: 0 },
+          messageId: "rootExtends",
+          data: { name: entry.name, actual: found.parent ?? "(none)" },
+        });
+      }
+      continue;
+    }
     if (found.parent !== entry.parent) {
       context.report({
         loc: { line: 1, column: 0 },
@@ -155,6 +171,8 @@ const rule = {
         "Rails error class `{{name}}` (extends `{{parent}}`) has no matching exported class in this file.",
       wrongParent:
         "Rails error class `{{name}}` should extend `{{expected}}` but extends `{{actual}}`.",
+      rootExtends:
+        "Rails root error class `{{name}}` must extend a global Error type but extends `{{actual}}`.",
       bareThrow: "throw a ported Rails error class instead of `new {{name}}`.",
     },
   },
@@ -168,15 +186,14 @@ const rule = {
     const exportedClasses = new Map();
 
     return {
-      // Bare global-error throw, anywhere in scope.
       ThrowStatement(node) {
         const arg = node.argument;
         if (arg?.type !== "NewExpression") return;
-        if (arg.callee?.type !== "Identifier") return;
-        if (!NATIVE_ERRORS.has(arg.callee.name)) return;
-        context.report({ node: arg, messageId: "bareThrow", data: { name: arg.callee.name } });
+        const name = newCalleeName(arg.callee);
+        if (!name || !NATIVE_ERRORS.has(name)) return;
+        context.report({ node: arg, messageId: "bareThrow", data: { name } });
       },
-      // Collect exported class declarations for the errors.ts parity check.
+      // Collect exported classes for the errors.ts parity check.
       "ExportNamedDeclaration > ClassDeclaration"(node) {
         if (!isErrorsFile || node.id?.type !== "Identifier") return;
         exportedClasses.set(node.id.name, { parent: superClassName(node) });

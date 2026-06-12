@@ -7,8 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Hermetic fixtures: point the rule at tmp manifest + exclude files via the
-// env overrides it reads lazily, so the test never depends on the committed
-// generated manifest and never mutates it.
+// env overrides it reads lazily, so the test never touches the committed one.
 const MANIFEST_FIXTURE = path.join(__dirname, ".tmp-rails-error-classes.test.json");
 const EXCLUDE_FIXTURE = path.join(__dirname, ".tmp-rails-error-parity-exclude.test.json");
 
@@ -43,14 +42,12 @@ const errorsFile = path.join(REPO_ROOT, "packages/activerecord/src/errors.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const excludedFile = path.join(REPO_ROOT, excludedRel);
 
-// A full, correct errors.ts mirroring the fixture manifest.
-const goodErrors = [
-  `export class ActiveRecordError extends Error {}`,
-  `export class AdapterError extends ActiveRecordError {}`,
-  `export class RecordNotFound extends ActiveRecordError {}`,
-  `export class StatementInvalid extends AdapterError {}`,
-  ``,
-].join("\n");
+// Class declarations for synthetic errors.ts files; `nl` joins into a file.
+const AD = "export class AdapterError extends ActiveRecordError {}";
+const RNF = "export class RecordNotFound extends ActiveRecordError {}";
+const SI = "export class StatementInvalid extends AdapterError {}";
+const ARE = "export class ActiveRecordError extends Error {}";
+const nl = (...lines) => lines.join("\n") + "\n";
 
 const tester = new RuleTester({
   languageOptions: {
@@ -63,50 +60,37 @@ const tester = new RuleTester({
 tester.run("rails-error-parity", rule, {
   valid: [
     // errors.ts mirrors every manifest class with correct parents.
-    { filename: errorsFile, code: goodErrors },
+    { filename: errorsFile, code: nl(ARE, AD, RNF, SI) },
     // Throwing a ported error class is allowed.
-    {
-      filename: baseFile,
-      code: `import { RecordNotFound } from "./errors.js";\nthrow new RecordNotFound("nope");\n`,
-    },
+    { filename: baseFile, code: `throw new RecordNotFound("nope");\n` },
     // Excluded file: bare throw is skipped.
     { filename: excludedFile, code: `throw new Error("bare");\n` },
   ],
   invalid: [
     // Missing class: errors.ts omits RecordNotFound.
-    {
-      filename: errorsFile,
-      code: [
-        `export class ActiveRecordError extends Error {}`,
-        `export class AdapterError extends ActiveRecordError {}`,
-        `export class StatementInvalid extends AdapterError {}`,
-        ``,
-      ].join("\n"),
-      errors: [{ messageId: "missingClass" }],
-    },
+    { filename: errorsFile, code: nl(ARE, AD, SI), errors: [{ messageId: "missingClass" }] },
     // Wrong parent: StatementInvalid should extend AdapterError.
     {
       filename: errorsFile,
-      code: [
-        `export class ActiveRecordError extends Error {}`,
-        `export class AdapterError extends ActiveRecordError {}`,
-        `export class RecordNotFound extends ActiveRecordError {}`,
-        `export class StatementInvalid extends ActiveRecordError {}`,
-        ``,
-      ].join("\n"),
+      code: nl(ARE, AD, RNF, "export class StatementInvalid extends ActiveRecordError {}"),
       errors: [{ messageId: "wrongParent" }],
     },
-    // Bare `throw new Error` in Rails-mirroring source.
+    // Bare `throw new Error` and `throw new globalThis.Error` are both flagged.
     {
       filename: baseFile,
       code: `throw new Error("boom");\n`,
       errors: [{ messageId: "bareThrow" }],
     },
-    // Other global error constructors are flagged too.
     {
       filename: baseFile,
-      code: `throw new TypeError("boom");\n`,
+      code: `throw new globalThis.Error("boom");\n`,
       errors: [{ messageId: "bareThrow" }],
+    },
+    // Root class with no `extends` is not an Error subtype — flagged.
+    {
+      filename: errorsFile,
+      code: nl("export class ActiveRecordError {}", AD, RNF, SI),
+      errors: [{ messageId: "rootExtends" }],
     },
   ],
 });

@@ -13,6 +13,7 @@
   "packages/activemodel/src/validations/format.ts",
   "packages/activemodel/src/validations/length.ts",
   "packages/activemodel/src/validations/numericality.ts",
+  "packages/activemodel/src/validations/with.ts",
   "packages/activemodel/src/validator.ts",
   "packages/activerecord/src/adapters/postgresql/pg-range.ts",
   "packages/activerecord/src/aggregations.ts",

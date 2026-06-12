@@ -17,6 +17,9 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
+// All three packages are scanned (per the story) for a complete error
+// inventory; the rule currently enforces only the activerecord/activemodel
+// subset, so the activesupport entries await a future scope widening.
 const PACKAGES = ["activerecord", "activemodel", "activesupport"] as const;
 type Pkg = (typeof PACKAGES)[number];
 
@@ -111,9 +114,8 @@ async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
   for (const d of decls) if (d.fromErrorsFile) known.add(d.name);
 
   // Recognised when the parent is known AND the reference is unambiguous: a
-  // bare name (resolves within the package) or a qualified built-in base
-  // (`< ::RangeError`). A qualified non-root parent like `ActiveJob::Base` is
-  // an external class sharing a leaf name with ours, so it does not propagate.
+  // bare name, or a qualified built-in base (`< ::RangeError`). A qualified
+  // non-root parent like `ActiveJob::Base` is external and must not propagate.
   const recognises = (d: Decl): boolean =>
     known.has(d.parent) && (!d.qualifiedParent || ROOT_BASES.has(d.parent));
 
