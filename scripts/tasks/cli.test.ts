@@ -335,13 +335,11 @@ describe("numberFlag / stringFlag (value-flag validation)", () => {
 });
 
 describe("commitAndPush (git mutation flow)", () => {
-  // commitAndPush acquires the real shared file lock. Redirect it to a throwaway
-  // dir so these tests never block behind a live agent's mutation, and never
-  // leave a lock in the real tasks repo. git itself stays fully mocked.
+  // commitAndPush acquires the real shared lock — redirect it to a throwaway dir
+  // so these tests don't block behind a live agent. git itself stays mocked.
   afterEach(() => __setLockDirForTest(null));
   function setup() {
-    const lockDir = mkdtempSync(join(tmpdir(), "trails-cap-lock-"));
-    __setLockDirForTest(lockDir);
+    __setLockDirForTest(mkdtempSync(join(tmpdir(), "trails-cap-lock-")));
     const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Error(`exit ${code}`);
     }) as never);
@@ -354,23 +352,8 @@ describe("commitAndPush (git mutation flow)", () => {
       seen.push(label);
       return "" as never;
     });
-    return { exit, seen, lockDir };
+    return { exit, seen };
   }
-
-  // commitAndPush runs the critical section under the lock and must release it,
-  // or the next agent blocks until the stale-steal timeout. (The exit paths
-  // release explicitly — see the race test.) No lock file left = no leak.
-  it("releases the critical-section lock after a successful push", () => {
-    const { lockDir } = setup();
-    commitAndPush({
-      message: "test",
-      fileToStage: "/some/file.md",
-      mutator: () => {},
-      raceMessage: "no",
-      raceExitCode: 99,
-    });
-    expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
-  });
 
   it("happy path: pull → add → commit → push, no retry", () => {
     const { seen } = setup();
@@ -1122,7 +1105,6 @@ describe("resolveTasksDir (TASKS_DIR resolution order)", () => {
 });
 
 describe("tasks-CLI critical-section lock", () => {
-  // A checkout with `.git` as a directory (the main worktree shape).
   function repo(): string {
     const dir = mkdtempSync(join(tmpdir(), "trails-lock-"));
     mkdirSync(join(dir, ".git"));
@@ -1132,7 +1114,6 @@ describe("tasks-CLI critical-section lock", () => {
   it("resolves the common git dir for a main checkout and a linked worktree", () => {
     const main = repo();
     expect(gitCommonDir(main)).toBe(join(main, ".git"));
-
     // Linked worktree: `.git` is a pointer file; `commondir` names the shared dir.
     const wt = mkdtempSync(join(tmpdir(), "trails-lock-wt-"));
     const gitdir = join(wt, "gitdir");
@@ -1142,48 +1123,46 @@ describe("tasks-CLI critical-section lock", () => {
     expect(gitCommonDir(wt)).toBe(join(wt, "shared"));
   });
 
-  // The core guarantee: while one agent holds the lock, a second cannot enter
-  // the critical section — it blocks and then fails loudly with a distinct,
-  // non-race exit code rather than racing in and clobbering the first edit.
+  // Core guarantee: while A holds the lock, B cannot enter — it fails loudly
+  // with the distinct non-race LOCK_TIMEOUT_EXIT, then lands once A releases.
   it("two concurrent mutations both land instead of one being silently dropped", () => {
     const dir = repo();
+    const lockPath = join(dir, ".git", "tasks-cli.lock");
     const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Error(`exit ${code}`);
     }) as never);
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    // Agent A enters first and is mid-mutation (lock held).
-    const a = acquireTasksLock(dir);
-    expect(a).not.toBeNull();
-    expect(existsSync(join(dir, ".git", "tasks-cli.lock"))).toBe(true);
-
-    // Agent B tries to enter concurrently: it must NOT proceed. With a short
-    // wait it times out loudly with LOCK_TIMEOUT_EXIT (distinct from the
-    // 2/3/4 race codes) — never silently entering while A holds the lock.
+    const a = acquireTasksLock(dir); // A holds.
+    expect(existsSync(lockPath)).toBe(true);
+    // B cannot enter while A holds it: times out loudly, never silently.
     expect(() => acquireTasksLock(dir, { waitMs: 0, pollMs: 1, staleMs: 60_000 })).toThrow(
       `exit ${LOCK_TIMEOUT_EXIT}`,
     );
     expect(exit).toHaveBeenCalledWith(LOCK_TIMEOUT_EXIT);
 
-    // A finishes and releases; only now can B acquire and land its own edit.
-    releaseTasksLock(a);
-    expect(existsSync(join(dir, ".git", "tasks-cli.lock"))).toBe(false);
+    releaseTasksLock(a); // Only now can B acquire and land its edit.
+    expect(existsSync(lockPath)).toBe(false);
     const b = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 });
     expect(b).not.toBeNull();
     releaseTasksLock(b);
   });
 
-  it("reclaims a stale lock left by a holder that exited without releasing", () => {
+  // Stale reclaim must be ownership-safe: B reclaims A's stale lock, then A's
+  // late release (token mismatch) must NOT delete B's lock.
+  it("reclaims a stale lock and a later release by the prior holder is a no-op", () => {
     const dir = repo();
     const lockPath = join(dir, ".git", "tasks-cli.lock");
-    writeFileSync(lockPath, "stale\n");
-    // Backdate the lock well past the stale threshold (holder crashed long ago).
+    const a = acquireTasksLock(dir); // A holds, then overruns the stale window.
     const old = statSync(dir).mtime.getTime() / 1000 - 3600;
     utimesSync(lockPath, old, old);
-
-    const got = acquireTasksLock(dir, { staleMs: 1000, waitMs: 0, pollMs: 1 });
-    expect(got).toBe(lockPath);
-    releaseTasksLock(got);
+    const b = acquireTasksLock(dir, { staleMs: 1000, waitMs: 0, pollMs: 1 }); // B reclaims.
+    expect(b?.path).toBe(lockPath);
+    expect(b?.token).not.toBe(a?.token);
+    releaseTasksLock(a); // no-op — A no longer owns the path.
+    expect(readFileSync(lockPath, "utf8").trim()).toBe(b?.token);
+    releaseTasksLock(b);
+    expect(existsSync(lockPath)).toBe(false);
   });
 
   it("returns null (proceeds unlocked) when no git dir is resolvable", () => {

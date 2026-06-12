@@ -22,6 +22,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -370,47 +371,40 @@ export function removeFrontmatterKey(file: string, key: string): void {
 
 // ──────────────────── critical-section lock ────────────────────
 //
-// Every `pnpm tasks` mutation runs pull→commit→push against a checkout that
-// shares ONE git object store with every other agent's (canonical tree + each
-// per-worktree `tasks/` symlink are worktrees of the same clone). Unserialized,
-// concurrent mutations race on the push: a loser rebases, retries, loses again,
-// then `reset --hard` discards its edit — a claim/done silently vanishes
-// (observed 2026-06-08). An exclusive advisory file lock in the shared common
-// git dir funnels them through one at a time; a mutation that can't get in
-// within the timeout fails loudly with LOCK_TIMEOUT_EXIT (distinct from every
-// race code 2/3/4/99 — "lock held/stuck", not "lost a race").
+// Every `pnpm tasks` mutation runs pull→commit→push against a checkout sharing
+// ONE git object store with every other agent's (canonical tree + per-worktree
+// `tasks/` symlinks are worktrees of the same clone). Unserialized, concurrent
+// mutations race on the push: a loser rebases, retries, loses again, then
+// `reset --hard` discards its edit — a claim/done silently vanishes (observed
+// 2026-06-08). An exclusive advisory file lock in the shared common git dir
+// funnels them through one at a time; a mutation that can't get in within the
+// timeout fails loudly with LOCK_TIMEOUT_EXIT (distinct from race codes 2/3/4/99
+// — "lock held/stuck", not "lost a race").
 export const LOCK_TIMEOUT_EXIT = 75;
-// Steal a lock older than this (holder crashed, or exited a process.exit path
-// without releasing). A synchronous CLI can't refresh the mtime mid-section
-// (it's blocked in a git call), so this sits well above any real
-// pull→commit→push — else a waiter could reclaim a live holder's lock and
-// re-enter concurrently, the race we prevent.
+// Steal a lock older than this (holder crashed / exited without releasing). A
+// synchronous CLI can't refresh the mtime mid-section (blocked in a git call),
+// so it sits well above any real pull→commit→push — else a waiter could reclaim
+// a live holder's lock and re-enter concurrently, the race we prevent.
 const LOCK_STALE_MS = 120_000;
-// Exceeds LOCK_STALE_MS so a waiter reclaims a dead lock before giving up;
-// timing out only happens under sustained contention from live agents.
+// Exceeds LOCK_STALE_MS so a waiter reclaims a dead lock before giving up.
 const LOCK_WAIT_MS = 180_000;
 const LOCK_POLL_MS = 100;
 
-// Test seam: when set, the lock file is placed here instead of the checkout's
-// real common git dir, so the commitAndPush unit tests never contend on the
-// shared production lock (which would block them behind a live agent's
-// mutation). Production never sets this.
+// Test seam: redirect the lock file off the real shared lock. Production never sets it.
 let lockDirForTest: string | null = null;
 export function __setLockDirForTest(dir: string | null): void {
   lockDirForTest = dir;
 }
 
-// Synchronous sleep with no node timer and no busy-spin: block this thread on
-// an Atomics wait against a throwaway shared buffer. The CLI is short-lived and
-// single-purpose, so parking the event loop here is fine.
+// Synchronous sleep with no node timer: park this thread on an Atomics wait
+// against a throwaway shared buffer. The CLI is short-lived, so this is fine.
 function sleepMs(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-// Resolve the shared common git dir for a checkout WITHOUT shelling out to git
-// (so commitAndPush's git-call sequence is unaffected). `.git` is a directory
-// in the main checkout, or a `gitdir: <path>` pointer file in a linked
-// worktree whose `commondir` names the shared dir every worktree shares.
+// Resolve the shared common git dir for a checkout WITHOUT shelling out to git.
+// `.git` is a directory in the main checkout, or a `gitdir:` pointer file in a
+// linked worktree whose `commondir` names the shared dir every worktree shares.
 export function gitCommonDir(dir: string): string {
   const dotgit = join(dir, ".git");
   if (statSync(dotgit).isDirectory()) return dotgit;
@@ -427,15 +421,28 @@ export function gitCommonDir(dir: string): string {
   }
 }
 
-// Acquire the exclusive tasks-CLI lock for `cwd`. Returns the lock-file path
-// for releaseTasksLock, or null when no shared git dir is resolvable (proceed
+// Each acquisition stamps the lock with a unique owner token so reclaim and
+// release act on identity, not just a path. pid distinguishes processes; the
+// counter, acquisitions within one (the unit tests).
+let lockSeq = 0;
+function newLockToken(): string {
+  return `${process.pid}.${++lockSeq}.${Date.now()}`;
+}
+
+export interface LockHandle {
+  path: string;
+  token: string;
+}
+
+// Acquire the exclusive tasks-CLI lock for `cwd`. Returns an owner handle for
+// releaseTasksLock, or null when no shared git dir is resolvable (proceed
 // unlocked — nothing to serialize). Creation is atomic via the `wx` flag: one
 // agent wins each round, the rest poll, steal a stale lock, or time out loudly
 // (never proceeding silently while another holds it).
 export function acquireTasksLock(
   cwd: string | undefined,
   opts: { waitMs?: number; staleMs?: number; pollMs?: number } = {},
-): string | null {
+): LockHandle | null {
   const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
   const staleMs = opts.staleMs ?? LOCK_STALE_MS;
   const pollMs = opts.pollMs ?? LOCK_POLL_MS;
@@ -445,19 +452,36 @@ export function acquireTasksLock(
   } catch {
     return null; // no resolvable git dir — nothing to lock against
   }
+  const token = newLockToken();
   for (let waited = 0; ; waited += pollMs) {
     try {
-      writeFileSync(lockPath, `${today()} ${cwd ?? TASKS_DIR}\n`, { flag: "wx" });
-      return lockPath;
+      writeFileSync(lockPath, `${token}\n`, { flag: "wx" });
+      return { path: lockPath, token };
     } catch (e) {
       if ((e as { code?: string }).code !== "EEXIST") return null; // dir gone — best effort
+      let st;
       try {
-        if (Date.now() - statSync(lockPath).mtimeMs > staleMs) {
-          unlinkSync(lockPath); // holder died without releasing — reclaim
-          continue;
-        }
+        st = statSync(lockPath);
       } catch {
-        continue; // lock vanished between create and stat — retry create
+        continue; // vanished between create and stat — retry create
+      }
+      if (Date.now() - st.mtimeMs > staleMs) {
+        // Reclaim a dead holder's lock via an atomic rename so exactly ONE
+        // waiter wins the steal (the loser's source path is already gone and it
+        // retries `wx`). Unlinking by path would let two waiters both clear and
+        // re-enter concurrently.
+        const stolen = `${lockPath}.stale.${token}`;
+        try {
+          renameSync(lockPath, stolen);
+        } catch {
+          continue; // another waiter already moved/cleared it — retry create
+        }
+        try {
+          unlinkSync(stolen);
+        } catch {
+          /* best-effort cleanup */
+        }
+        continue; // path clear; `wx` retry still guards a fresh racer
       }
       if (waited >= waitMs) {
         console.error(
@@ -472,14 +496,15 @@ export function acquireTasksLock(
   }
 }
 
-// Release a lock acquired by acquireTasksLock. Idempotent: a no-op for the
-// null (unlocked) case and tolerant of a lock already stolen as stale.
-export function releaseTasksLock(lockPath: string | null): void {
-  if (!lockPath) return;
+// Release a lock from acquireTasksLock. Idempotent and ownership-safe: removes
+// the lock ONLY while it still carries our token (so a reclaimed-from-us lock,
+// now owned by another holder, is left intact).
+export function releaseTasksLock(lock: LockHandle | null): void {
+  if (!lock) return;
   try {
-    unlinkSync(lockPath);
+    if (readFileSync(lock.path, "utf8").trim() === lock.token) unlinkSync(lock.path);
   } catch {
-    /* already removed (e.g. reclaimed as stale by another agent) */
+    /* already removed / unreadable — nothing of ours to release */
   }
 }
 
@@ -575,10 +600,9 @@ export function commitAndPush(opts: {
     }
   }
   // Serialize the whole pull→commit→push section against every other agent's
-  // checkout (they share one git object store). Held until we return or exit.
-  // process.exit below skips the `finally`, so release explicitly before each
-  // exit too; releaseTasksLock is idempotent, and the stale-steal backstops the
-  // crash case where neither runs.
+  // checkout. process.exit skips the `finally`, so the exit paths release
+  // explicitly too (releaseTasksLock is idempotent; stale-steal backstops a
+  // crash where neither runs).
   const lock = acquireTasksLock(cwd);
   try {
     // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
