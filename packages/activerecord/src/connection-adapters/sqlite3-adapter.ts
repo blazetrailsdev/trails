@@ -1047,37 +1047,37 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       columnName = undefined;
       opts = columnOrOptions ?? {};
     }
-    const indexName = await this._indexNameForRemove(tableName, columnName, opts);
+    const columnSpec = columnName ?? opts.column;
+    const cols = columnSpec == null ? [] : Array.isArray(columnSpec) ? columnSpec : [columnSpec];
+
+    let indexName: string;
+    if (opts.name != null && cols.length > 0) {
+      // Name + column both given: validate they describe the same index
+      // (Rails `index_name_for_remove` raises ArgumentError on mismatch). Only
+      // this path needs introspection; the others keep the legacy compute.
+      indexName = await this._indexNameForRemove(tableName, cols, opts.name);
+    } else if (opts.name != null) {
+      indexName = opts.name;
+    } else if (cols.length > 0) {
+      indexName = `index_${tableName}_on_${cols.join("_and_")}`;
+    } else {
+      throw new ArgumentError("No index name or column specified");
+    }
     await this.executeMutation(`DROP INDEX IF EXISTS ${quoteColumnName(indexName)}`);
   }
 
-  // Rails: `index_name_for_remove` — resolve the concrete index name from a
-  // name and/or column spec, raising ArgumentError on no-match / multi-match.
+  // Rails: `index_name_for_remove` (the name + column branch) — confirm the
+  // named index actually covers the given columns, raising ArgumentError on a
+  // no-match / multi-match.
   private async _indexNameForRemove(
     tableName: string,
-    columnName: string | string[] | undefined,
-    options: { name?: string; column?: string | string[] },
+    columnNames: string[],
+    name: string,
   ): Promise<string> {
-    if (columnName == null && options.name != null && options.column == null) {
-      return options.name;
-    }
-    const cols = columnName ?? options.column;
-    const columnNames = cols == null ? [] : Array.isArray(cols) ? cols : [cols];
     const indexNameFor = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
-    const checks: Array<(i: { name: string; columns: string[] }) => boolean> = [];
-    if (options.name != null) {
-      const name = options.name;
-      checks.push((i) => i.name === name);
-    }
-    if (columnNames.length > 0) {
-      const target = indexNameFor(columnNames);
-      checks.push((i) => indexNameFor(i.columns) === target);
-    }
-    if (checks.length === 0) {
-      throw new ArgumentError("No index name or column specified");
-    }
+    const target = indexNameFor(columnNames);
     const all = (await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>;
-    const matching = all.filter((i) => checks.every((check) => check(i)));
+    const matching = all.filter((i) => i.name === name && indexNameFor(i.columns) === target);
     if (matching.length > 1) {
       throw new ArgumentError(
         `Multiple indexes found on ${tableName} columns ${columnNames}. ` +

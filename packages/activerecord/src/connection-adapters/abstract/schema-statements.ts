@@ -298,20 +298,30 @@ export class SchemaStatements {
       opts = columnOrOptions;
     }
     // An array column spec is routed through `options.column` so the legacy
-    // string-typed `index_name_for_remove(column_name)` parameter is preserved.
-    if (Array.isArray(columnName)) {
-      opts = { ...opts, column: columnName };
-      columnName = undefined;
-    }
+    // conventional-name computation below sees the same shape it always has.
+    const columnSpec = columnName ?? opts.column;
+    const cols = columnSpec == null ? [] : Array.isArray(columnSpec) ? columnSpec : [columnSpec];
 
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    // Preserve the legacy message for the bare no-spec call; otherwise resolve
-    // the concrete name (and validate name/column matches) via the canonical
-    // index_name_for_remove port below.
-    if (columnName == null && opts.name == null && opts.column == null) {
+
+    let indexName: string;
+    if (opts.name != null && cols.length > 0) {
+      // Both a name and a column are given: validate they describe the same
+      // index (Rails `index_name_for_remove` raises ArgumentError on a mismatch
+      // or an ambiguous spec). Only this path needs index introspection — the
+      // name-only / column-only paths keep the legacy conventional-name compute.
+      // An array column is threaded through `options.column` since the canonical
+      // helper takes a string-typed positional `column_name`.
+      const positional = typeof columnName === "string" ? columnName : null;
+      const validateOpts = positional == null ? { ...opts, column: cols } : opts;
+      indexName = await this.indexNameForRemove(tableName, positional, validateOpts);
+    } else if (opts.name != null) {
+      indexName = opts.name;
+    } else if (cols.length > 0) {
+      indexName = `index_${tableName}_on_${cols.join("_and_")}`;
+    } else {
       throw new ArgumentError("Must specify either name or column for remove_index");
     }
-    const indexName = await this.indexNameForRemove(tableName, columnName ?? null, opts);
 
     if (this.adapterName === "mysql") {
       await this.adapter.executeMutation(
