@@ -248,14 +248,10 @@ export function serializableAddIncludes(
   const includes = normalizeIncludes(includeOpt);
   for (const [assocName, assocOpts] of Object.entries(includes)) {
     const records = sendAssociation(record, assocName);
-    // Rails: `if records = send(association)` skips on nil. A loaded singular
-    // with no row (`null`) maps to Ruby's nil skip.
-    //
-    // Divergence: where the record has no accessor for the name, JS yields
-    // `undefined` (skipped here) whereas Ruby's `send` raises NoMethodError.
-    // Matching the raise would require an `in`/respond_to? probe and is a
-    // separate error-semantics change; this preserves the pre-RFC skip that
-    // existing tests assert.
+    // Rails: `if records = send(association)` skips on nil — a defined-but-nil
+    // accessor (an `attr_accessor` left unset, or a loaded singular with no
+    // row) is falsy and skipped. `sendAssociation` already raised for a name
+    // the record does not respond to, mirroring `send`'s NoMethodError.
     if (records !== null && records !== undefined) {
       callback(assocName, records, assocOpts);
     }
@@ -270,9 +266,17 @@ export function serializableAddIncludes(
  * the generated association reader. A function-valued member is invoked,
  * mirroring Ruby's `send(:friends)` calling the accessor method.
  *
+ * A name the record does not respond to raises, mirroring Ruby `send`'s
+ * `NoMethodError` (`serialization.rb:191` calls `send` unconditionally). A
+ * defined accessor that returns nil/undefined does NOT raise — the caller
+ * treats it as Rails' falsy `if records = send(...)` skip.
+ *
  * @internal Rails-private helper.
  */
 function sendAssociation(record: SerializationRecord, name: string): unknown {
+  if (!(name in record)) {
+    throw new Error(`undefined method '${name}' for an instance of ${record.constructor.name}`);
+  }
   const reader = record[name];
   return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
 }

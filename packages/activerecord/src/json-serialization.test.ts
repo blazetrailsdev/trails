@@ -156,7 +156,8 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       deep_j4s: { val: "string" },
       post_j5s: { title: "string", author: "string" },
       comment_j5s: { body: "string", post_id: "integer" },
-      post_j6s: { title: "string" },
+      post_j6s: { title: "string", author_id: "integer" },
+      author_j6s: { name: "string" },
       author_j7s: { name: "string", age: "integer" },
       author_j8s: { name: "string", age: "integer" },
       author_j9s: { name: "string" },
@@ -304,15 +305,30 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
   });
 
   it("should not call methods on associations that dont respond", async () => {
+    // Rails defines `favorite_quote` on the author (not on Post), then
+    // `to_json(include: :posts, methods: :favorite_quote)`. The method is
+    // applied to the root author and NOT propagated to the included posts,
+    // which don't respond to it.
     class PostJ6 extends Base {
       static {
         this.attribute("title", "string");
+        this.attribute("author_id", "integer");
       }
     }
-    const post = await PostJ6.create({ title: "Hello" });
-    const json = post.asJson({ include: "comments" });
-    expect(json.comments).toBeUndefined();
-    expect(json.title).toBe("Hello");
+    class AuthorJ6 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("posts", { className: "PostJ6", foreignKey: "author_id" });
+      }
+    }
+    registerModel(PostJ6);
+    const author = await AuthorJ6.create({ name: "David" });
+    await PostJ6.create({ title: "Welcome", author_id: author.id });
+    await collection(author, "posts").load();
+    (author as any).favoriteQuote = () => "Constraints are liberating";
+    const json = author.asJson({ include: "posts", methods: ["favoriteQuote"] });
+    expect(json.favoriteQuote).toBe("Constraints are liberating");
+    expect((json.posts as any[])[0].favoriteQuote).toBeUndefined();
   });
 
   it("should allow only option for list of authors", async () => {

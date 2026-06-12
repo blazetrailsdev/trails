@@ -28,26 +28,37 @@ describe("SerializationTest", () => {
   });
 
   it("include option with empty association", () => {
+    // Rails: `@user.friends = []` then `serializable_hash(include: :friends)`
+    // yields `friends: []` — the accessor exists and returns an empty array.
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
     const p = new Person({ name: "Alice" });
+    setAssociationAccessors(p, { posts: [] });
     const hash = p.serializableHash({ include: "posts" });
-    // No association loaded, so posts won't appear
     expect(hash["name"]).toBe("Alice");
+    expect(hash["posts"]).toEqual([]);
   });
 
   it("include option with ary", () => {
+    // Rails wraps the association in a `FriendList` that responds to `to_ary`
+    // (a non-array Enumerable). serialization maps over it element-wise.
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
+    const friend = { _attributes: new Map([["name", "Joe"]]) };
+    const friendList: Iterable<unknown> = {
+      [Symbol.iterator]: () => [friend][Symbol.iterator](),
+    };
     const p = new Person({ name: "Alice" });
-    const hash = p.serializableHash({ include: ["posts", "comments"] });
+    setAssociationAccessors(p, { friends: friendList });
+    const hash = p.serializableHash({ include: "friends" });
     expect(hash["name"]).toBe("Alice");
+    expect((hash["friends"] as Array<{ name: string }>)[0].name).toBe("Joe");
   });
 
   it("only include", () => {
