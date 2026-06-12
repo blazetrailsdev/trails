@@ -177,6 +177,11 @@ describe("connectAdapter", () => {
     expect(adapter.constructor.name).toBe("BetterSQLite3Adapter");
   });
 
+  it("creates NodeSQLiteAdapter for node-sqlite", async () => {
+    adapter = await connectAdapter({ adapter: "node-sqlite", database: ":memory:" });
+    expect(adapter.constructor.name).toBe("NodeSQLiteAdapter");
+  });
+
   it("throws for unknown adapter", async () => {
     await expect(connectAdapter({ adapter: "oracle" })).rejects.toThrow(/Unknown database adapter/);
   });
