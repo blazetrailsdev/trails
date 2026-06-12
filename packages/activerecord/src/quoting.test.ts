@@ -139,6 +139,9 @@ describe("QuotingTest", () => {
     expect(quotedDate(zdt.toInstant())).toBe("2026-04-07 15:30:00");
   });
   it("quoted time local", () => {
+    // Mirrors Rails' with_timezone_config(:local); quotedTime takes only naive
+    // types (PlainTime/PlainDateTime), so the local setting is intentionally a
+    // no-op here — kept to parallel the Rails test's structure.
     setDefaultTimezone("local");
     const t = Temporal.PlainTime.from("15:30:45");
     expect(quotedTime(t)).toBe("15:30:45");
