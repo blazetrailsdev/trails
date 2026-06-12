@@ -3136,7 +3136,23 @@ export class Relation<T extends Base> {
     if (this._limitValue !== null) manager.take(this._limitValue);
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
 
-    const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
+    // Thread from()/CTE through the manager just like a normal read (Rails'
+    // pluck builds on the relation arel, honoring from_clause / with). FROM
+    // goes on the manager so its source — and any subquery binds — flow through
+    // the single collector in document order; CTE bodies are prepended as SQL
+    // (their binds inline via _compileArelNode), matching _toSqlWithoutSetOp.
+    const fromNode = this._buildFromNode();
+    if (fromNode !== undefined && fromNode !== null) manager.from(fromNode as any);
+
+    const [compiledSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
+    let pluckSql = compiledSql;
+    if (this._ctes.length > 0) {
+      pluckSql = `${_qm.buildCteSql(
+        this._ctes,
+        (n) => this._compileArelNode(n),
+        (name) => this._modelClass.connection.quoteTableName(name),
+      )} ${pluckSql}`;
+    }
     const result = await this._modelClass.connection.selectAll(
       pluckSql,
       `${this._modelClass.name} Pluck`,
