@@ -221,19 +221,30 @@ function _addAssocJoin(
  * that normalized name decides the `_<count>` suffix, which is itself applied to
  * a `truncate`d (`length - 2`) base (alias_tracker.rb:67-72, 86-88). Without
  * this, long names diverge from Rails and can exceed adapter alias limits.
+ *
+ * The count is seeded from every existing join's *emitted* name — its alias if
+ * aliased, else its real table name — mirroring `AliasTracker.initial_count_for`
+ * (alias_tracker.rb:28-43), which scans the join list for table names AND
+ * aliases before `aliased_table_for` increments. This prevents minting an alias
+ * that collides with a real table already joined under the candidate's name.
  */
 function _selfJoinAlias(
   assocName: string,
   ownerTable: string,
-  clauses: ReadonlyArray<{ as?: string }>,
+  clauses: ReadonlyArray<{ table: string; as?: string }>,
   aliasLength: number,
 ): string {
   const candidate = `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`;
   const aliasedName = candidate.slice(0, aliasLength).replace(/\./g, "_");
   const truncated = aliasedName.slice(0, aliasLength - 2);
-  const used = clauses.filter(
-    (j) => j.as === aliasedName || (j.as != null && j.as.startsWith(`${truncated}_`)),
-  ).length;
+  // The first request emits `aliasedName`; later ones emit `<truncated>_<n>`.
+  // Count both forms (and a real table already named `aliasedName`) so the
+  // running count matches Rails' `aliases[aliased_name]` increments.
+  const suffixed = new RegExp(`^${truncated.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_\\d+$`);
+  const used = clauses.filter((j) => {
+    const emitted = j.as ?? j.table;
+    return emitted === aliasedName || suffixed.test(emitted);
+  }).length;
   const count = used + 1;
   return count > 1 ? `${truncated}_${count}` : aliasedName;
 }
