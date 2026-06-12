@@ -60,13 +60,10 @@ describe("buildAdapterArg", () => {
       ).toEqual(["mutated.db"]);
     });
 
-    it("uses the sqlite (filename, options) shape for node-sqlite and expo-sqlite", () => {
+    it("uses the sqlite (filename, options) shape for node-sqlite", () => {
       expect(
         buildAdapterArg("node-sqlite", { adapter: "node-sqlite", database: "x.db", strict: true }),
       ).toEqual(["x.db", { strict: true }]);
-      expect(buildAdapterArg("expo-sqlite", { adapter: "expo-sqlite", database: "y.db" })).toEqual([
-        "y.db",
-      ]);
     });
   });
 
@@ -143,9 +140,8 @@ describe("normalizeAdapterName", () => {
     expect(normalizeAdapterName("custom")).toBe("custom");
   });
 
-  it("normalizes the node-sqlite and expo-sqlite adapters to the sqlite arg shape", () => {
+  it("normalizes the node-sqlite adapter to the sqlite arg shape", () => {
     expect(normalizeAdapterName("node-sqlite")).toBe("sqlite");
-    expect(normalizeAdapterName("expo-sqlite")).toBe("sqlite");
   });
 });
 

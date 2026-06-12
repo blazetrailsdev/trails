@@ -12,7 +12,6 @@ import { FRESH_TSCONFIG, mergeTsconfig, TsconfigMergeResult } from "./tsconfig-m
 const SQLITE_ADAPTER: Record<string, string> = {
   "better-sqlite3": "sqlite3",
   "node-sqlite": "node-sqlite",
-  "expo-sqlite": "expo-sqlite",
 };
 
 function configDatabase(adapter: string): string {
