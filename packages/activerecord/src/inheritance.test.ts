@@ -1386,15 +1386,25 @@ describe("InheritanceTest", () => {
   });
 
   it.skip("scope inherited properly", async () => {
-    // BLOCKED: fixture — STI subclass with default_scope; no STI routing gap (audit-STI: STI dispatch works)
-    // ROOT-CAUSE: test/models fixtures — Rails' SpecialComment / VerySpecialComment hierarchy with `default_scope` on a subclass is not declared in the trails test-models registry
-    // SCOPE: ~10–20 LOC fixture-models setup in inheritance.test.ts; affects 2 default-scope inheritance tests
+    // FOLLOW-UP (f9g2-inheritance-of-first-firm-scope): Rails' `of_first_firm`
+    // scope is `joins(account: :firm).where("companies.id": 1)` — it needs the
+    // companies↔accounts has_one/belongs_to association graph (Account
+    // belongs_to :firm class_name "Company"; Company has_one :account
+    // foreign_key "firm_id") plus an `accounts` fixture table. That
+    // association-fixture setup is its own contained chunk; tracked separately
+    // to keep this PR within the size ceiling.
   });
 
   it.skip("inheritance with default scope", async () => {
-    // BLOCKED: fixture — STI subclass with default_scope; no STI routing gap (audit-STI: STI dispatch works)
-    // ROOT-CAUSE: test/models fixtures — Rails' SpecialComment / VerySpecialComment hierarchy with `default_scope` on a subclass is not declared in the trails test-models registry
-    // SCOPE: ~10–20 LOC fixture-models setup in inheritance.test.ts; affects 2 default-scope inheritance tests
+    // FOLLOW-UP (f9g2-inheritance-enum-sti-default-scope): Rails matches
+    // `SelectedMembership.count(:all) == 1` (inheritance_test.rb:500-501) where
+    // `Membership.enum :type` (membership.rb:3-4) backs an *integer* STI column
+    // (schema.rb:783-787). STI must filter `WHERE type = <enum int for
+    // SelectedMembership>`. The canonical trails Membership model declares the
+    // enum but does NOT wire STI dispatch on the enum-backed column, so
+    // `SelectedMembership.count()` returns all rows (6), not 1. Enum-backed STI
+    // inheritance-column dispatch is the real gap; tracked separately rather
+    // than masked with a non-enum string `type` fixture.
   });
 
   it("company descends from active record", async () => {
