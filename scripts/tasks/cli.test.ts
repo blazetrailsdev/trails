@@ -1,12 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  statSync,
-  utimesSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -1123,8 +1115,7 @@ describe("tasks-CLI critical-section lock", () => {
     expect(gitCommonDir(wt)).toBe(join(wt, "shared"));
   });
 
-  // Core guarantee: while A holds the lock, B cannot enter — it fails loudly
-  // with the distinct non-race LOCK_TIMEOUT_EXIT, then lands once A releases.
+  // Core guarantee: while A holds the lock B can't enter (fails loud), then lands.
   it("two concurrent mutations both land instead of one being silently dropped", () => {
     const dir = repo();
     const lockPath = join(dir, ".git", "tasks-cli.lock");
@@ -1133,14 +1124,14 @@ describe("tasks-CLI critical-section lock", () => {
     }) as never);
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const a = acquireTasksLock(dir); // A holds.
+    const a = acquireTasksLock(dir); // A holds (a live pid).
     expect(existsSync(lockPath)).toBe(true);
-    // B cannot enter while A holds it: times out loudly, never silently.
-    expect(() => acquireTasksLock(dir, { waitMs: 0, pollMs: 1, staleMs: 60_000 })).toThrow(
+    // B can't enter while A is alive (a live holder is never reclaimed): it
+    // times out loudly rather than silently entering.
+    expect(() => acquireTasksLock(dir, { waitMs: 0, pollMs: 1 })).toThrow(
       `exit ${LOCK_TIMEOUT_EXIT}`,
     );
     expect(exit).toHaveBeenCalledWith(LOCK_TIMEOUT_EXIT);
-
     releaseTasksLock(a); // Only now can B acquire and land its edit.
     expect(existsSync(lockPath)).toBe(false);
     const b = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 });
@@ -1148,18 +1139,17 @@ describe("tasks-CLI critical-section lock", () => {
     releaseTasksLock(b);
   });
 
-  // Stale reclaim must be ownership-safe: B reclaims A's stale lock, then A's
-  // late release (token mismatch) must NOT delete B's lock.
-  it("reclaims a stale lock and a later release by the prior holder is a no-op", () => {
+  // Ownership-safe: B reclaims a DEAD holder's lock; the prior holder's late
+  // release (token mismatch) must NOT delete B's lock.
+  it("reclaims a dead holder's lock and a later release by the prior holder is a no-op", () => {
     const dir = repo();
     const lockPath = join(dir, ".git", "tasks-cli.lock");
-    const a = acquireTasksLock(dir); // A holds, then overruns the stale window.
-    const old = statSync(dir).mtime.getTime() / 1000 - 3600;
-    utimesSync(lockPath, old, old);
-    const b = acquireTasksLock(dir, { staleMs: 1000, waitMs: 0, pollMs: 1 }); // B reclaims.
+    const deadToken = "2147483646.0.0"; // pid far above any live process → ESRCH
+    writeFileSync(lockPath, `${deadToken}\n`);
+    const b = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 }); // B reclaims it.
     expect(b?.path).toBe(lockPath);
-    expect(b?.token).not.toBe(a?.token);
-    releaseTasksLock(a); // no-op — A no longer owns the path.
+    expect(b?.token).not.toBe(deadToken);
+    releaseTasksLock({ path: lockPath, token: deadToken }); // no-op — not the owner.
     expect(readFileSync(lockPath, "utf8").trim()).toBe(b?.token);
     releaseTasksLock(b);
     expect(existsSync(lockPath)).toBe(false);

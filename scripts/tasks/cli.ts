@@ -19,6 +19,7 @@
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
+  linkSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -373,20 +374,12 @@ export function removeFrontmatterKey(file: string, key: string): void {
 //
 // Every `pnpm tasks` mutation runs pull→commit→push against a checkout sharing
 // ONE git object store with every other agent's (canonical tree + per-worktree
-// `tasks/` symlinks are worktrees of the same clone). Unserialized, concurrent
-// mutations race on the push: a loser rebases, retries, loses again, then
-// `reset --hard` discards its edit — a claim/done silently vanishes (observed
-// 2026-06-08). An exclusive advisory file lock in the shared common git dir
-// funnels them through one at a time; a mutation that can't get in within the
-// timeout fails loudly with LOCK_TIMEOUT_EXIT (distinct from race codes 2/3/4/99
-// — "lock held/stuck", not "lost a race").
+// `tasks/` symlinks are worktrees of the same clone). Unserialized, a push loser
+// rebases, retries, loses again, then `reset --hard` discards its edit — a
+// claim/done silently vanishes (observed 2026-06-08). An advisory file lock in
+// the shared common git dir serializes them; a mutation that can't get in by the
+// timeout fails loudly with LOCK_TIMEOUT_EXIT (distinct from race codes 2/3/4/99).
 export const LOCK_TIMEOUT_EXIT = 75;
-// Steal a lock older than this (holder crashed / exited without releasing). A
-// synchronous CLI can't refresh the mtime mid-section (blocked in a git call),
-// so it sits well above any real pull→commit→push — else a waiter could reclaim
-// a live holder's lock and re-enter concurrently, the race we prevent.
-const LOCK_STALE_MS = 120_000;
-// Exceeds LOCK_STALE_MS so a waiter reclaims a dead lock before giving up.
 const LOCK_WAIT_MS = 180_000;
 const LOCK_POLL_MS = 100;
 
@@ -396,15 +389,15 @@ export function __setLockDirForTest(dir: string | null): void {
   lockDirForTest = dir;
 }
 
-// Synchronous sleep with no node timer: park this thread on an Atomics wait
-// against a throwaway shared buffer. The CLI is short-lived, so this is fine.
+// Synchronous sleep with no node timer: park on an Atomics wait against a
+// throwaway shared buffer. The CLI is short-lived, so this is fine.
 function sleepMs(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-// Resolve the shared common git dir for a checkout WITHOUT shelling out to git.
-// `.git` is a directory in the main checkout, or a `gitdir:` pointer file in a
-// linked worktree whose `commondir` names the shared dir every worktree shares.
+// Resolve the shared common git dir WITHOUT shelling out to git: `.git` is a
+// directory in the main checkout, or a `gitdir:` pointer file in a worktree
+// whose `commondir` names the shared dir.
 export function gitCommonDir(dir: string): string {
   const dotgit = join(dir, ".git");
   if (statSync(dotgit).isDirectory()) return dotgit;
@@ -421,12 +414,26 @@ export function gitCommonDir(dir: string): string {
   }
 }
 
-// Each acquisition stamps the lock with a unique owner token so reclaim and
-// release act on identity, not just a path. pid distinguishes processes; the
-// counter, acquisitions within one (the unit tests).
+// Stamp `pid.seq.now`: pid drives liveness-based staleness, seq distinguishes
+// acquisitions within one process (unit tests), now disambiguates a reused pid.
 let lockSeq = 0;
 function newLockToken(): string {
   return `${process.pid}.${++lockSeq}.${Date.now()}`;
+}
+
+// A held lock is reclaimable ONLY when its owner process is gone. Agents share
+// one working tree → one host, so PID-liveness is authoritative — and liveness
+// (not elapsed time) makes release safe: a live holder's lock is never stolen,
+// so nobody interposes between its read-token and unlink. Unparseable: not stolen.
+function lockReclaimable(content: string): boolean {
+  const pid = Number(content.split(".")[0]);
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return false; // signal 0 succeeded — holder is alive
+  } catch (e) {
+    return (e as { code?: string }).code === "ESRCH"; // ESRCH = gone; EPERM = alive (other uid)
+  }
 }
 
 export interface LockHandle {
@@ -434,17 +441,15 @@ export interface LockHandle {
   token: string;
 }
 
-// Acquire the exclusive tasks-CLI lock for `cwd`. Returns an owner handle for
-// releaseTasksLock, or null when no shared git dir is resolvable (proceed
-// unlocked — nothing to serialize). Creation is atomic via the `wx` flag: one
-// agent wins each round, the rest poll, steal a stale lock, or time out loudly
-// (never proceeding silently while another holds it).
+// Acquire the exclusive tasks-CLI lock for `cwd`. Returns an owner handle, or
+// null when no shared git dir is resolvable (proceed unlocked — nothing to
+// serialize). Creation is atomic via `wx`: one agent wins each round, the rest
+// poll, reclaim a dead holder's lock, or time out loudly.
 export function acquireTasksLock(
   cwd: string | undefined,
-  opts: { waitMs?: number; staleMs?: number; pollMs?: number } = {},
+  opts: { waitMs?: number; pollMs?: number } = {},
 ): LockHandle | null {
   const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
-  const staleMs = opts.staleMs ?? LOCK_STALE_MS;
   const pollMs = opts.pollMs ?? LOCK_POLL_MS;
   let lockPath: string;
   try {
@@ -459,29 +464,42 @@ export function acquireTasksLock(
       return { path: lockPath, token };
     } catch (e) {
       if ((e as { code?: string }).code !== "EEXIST") return null; // dir gone — best effort
-      let st;
+      let observed = "";
       try {
-        st = statSync(lockPath);
+        observed = readFileSync(lockPath, "utf8").trim();
       } catch {
-        continue; // vanished between create and stat — retry create
+        continue; // vanished between create and read — retry create
       }
-      if (Date.now() - st.mtimeMs > staleMs) {
-        // Reclaim a dead holder's lock via an atomic rename so exactly ONE
-        // waiter wins the steal (the loser's source path is already gone and it
-        // retries `wx`). Unlinking by path would let two waiters both clear and
-        // re-enter concurrently.
-        const stolen = `${lockPath}.stale.${token}`;
+      if (lockReclaimable(observed)) {
+        // Atomically grab the path (one waiter wins; losers get ENOENT, retry
+        // `wx`), but DISCARD it only if it still carries the exact dead token —
+        // else a fresh lock raced in, so restore it via EXCL link (never
+        // clobbering a newer holder) and back off. A refreshed lock is never deleted.
+        const stolen = `${lockPath}.dead.${token}`;
         try {
           renameSync(lockPath, stolen);
         } catch {
-          continue; // another waiter already moved/cleared it — retry create
+          continue; // another waiter moved it first — retry create
+        }
+        let grabbed = "";
+        try {
+          grabbed = readFileSync(stolen, "utf8").trim();
+        } catch {
+          /* unreadable — treat as not-the-dead-one and restore below */
+        }
+        if (grabbed !== observed) {
+          try {
+            linkSync(stolen, lockPath);
+          } catch {
+            /* path already retaken by a newer holder — leave it intact */
+          }
         }
         try {
           unlinkSync(stolen);
         } catch {
           /* best-effort cleanup */
         }
-        continue; // path clear; `wx` retry still guards a fresh racer
+        continue; // retry create
       }
       if (waited >= waitMs) {
         console.error(
@@ -497,8 +515,9 @@ export function acquireTasksLock(
 }
 
 // Release a lock from acquireTasksLock. Idempotent and ownership-safe: removes
-// the lock ONLY while it still carries our token (so a reclaimed-from-us lock,
-// now owned by another holder, is left intact).
+// it ONLY while it carries our token. Safe read-then-unlink: we're alive while
+// releasing and lockReclaimable never steals a live holder's lock, so no waiter
+// can recreate the path between the two calls.
 export function releaseTasksLock(lock: LockHandle | null): void {
   if (!lock) return;
   try {
