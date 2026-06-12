@@ -1107,9 +1107,18 @@ export class Table {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     await this._schema.addIndex(this._tableName, columns, options);
   }
-  async removeIndex(options: { column?: string | string[]; name?: string } = {}): Promise<void> {
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.removeIndex(this._tableName, options);
+  // Rails: `Table#remove_index(column_name = nil, **options)` forwards to
+  // `@base.remove_index(table_name, column_name, **options)`.
+  async removeIndex(
+    columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
+    options: { column?: string | string[]; name?: string } = {},
+  ): Promise<void> {
+    const optionHash =
+      typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)
+        ? options
+        : columnOrOptions;
+    this.raiseOnIfExistOptions(optionHash as Record<string, unknown>);
+    await this._schema.removeIndex(this._tableName, columnOrOptions, options);
   }
   async references(name: string, options: AddReferenceOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
