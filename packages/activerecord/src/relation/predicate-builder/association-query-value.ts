@@ -99,7 +99,11 @@ export class AssociationQueryValue {
       const pk = this.primaryKey();
       let relation = value as any;
       if (!Array.isArray(pk) && this.isSelectClause(relation)) {
-        relation = relation.select(pk);
+        // Select the table-qualified primary key so the subquery's projection
+        // stays unambiguous once its arel carries joins (build_arel
+        // convergence) — matching RelationHandler's `arel_table[primary_key]`.
+        const arelTable = relation._modelClass?.arelTable;
+        relation = relation.select(arelTable ? arelTable.get(pk) : pk);
       }
       if (this.isPolymorphicClause(relation)) {
         relation = relation.where({ [this.primaryType()!]: this.polymorphicName() });

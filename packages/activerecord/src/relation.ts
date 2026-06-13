@@ -10,7 +10,12 @@ import {
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
-import { ConnectionNotEstablished, RecordNotSaved, RecordNotUnique } from "./errors.js";
+import {
+  ConnectionNotEstablished,
+  NotImplementedError,
+  RecordNotSaved,
+  RecordNotUnique,
+} from "./errors.js";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 import { disallowRawSqlBang } from "./sanitization.js";
@@ -3905,19 +3910,130 @@ export class Relation<T extends Base> {
     return _qm.buildProjections.call(this as any) as any[];
   }
 
+  /**
+   * Return the complete query AST as a SelectManager — projections, joins,
+   * wheres, order, distinct, limit/offset, group, having, lock, hints, from,
+   * CTEs, and annotate() comments. Mirrors Rails `build_arel`
+   * (active_record/relation/query_methods.rb#build_arel, ~L1700-1760): the
+   * single manager Rails then compiles, so anything consuming `relation.arel()`
+   * as a subquery (`where(id: subrel.arel)`, `from(relation)`) carries the full
+   * query rather than a projection-only fragment. This is also the manager
+   * `_toSql` compiles, so the legacy string-assembly path and the Arel-manager
+   * path can no longer drift.
+   */
   toArel(): SelectManager {
-    const table = this._modelClass.arelTable;
-    const projections = this._buildProjections(table);
-    const manager = table.project(...(projections as any));
-    this._applyWheresToManager(manager, table);
-    this._applyOrderToManager(manager, table);
-    if (this._isDistinct) manager.distinct();
-    if (this._limitValue !== null) manager.take(this._limitValue);
-    if (this._offsetValue !== null) manager.skip(this._offsetValue);
-    for (const col of this._groupColumns) {
-      manager.group(groupColumnToArel(col, table));
+    return this._buildArel();
+  }
+
+  /**
+   * Mirror Rails `apply_join_dependency` for subquery embedding: convert the
+   * eager_load/includes associations into LEFT OUTER joins and clear the eager
+   * values, so `arel()` carries the join (with a normal projection) instead of
+   * dropping it. A no-op when the relation is not eager-loading.
+   *
+   * Rails `RelationHandler#call` does `value = value.apply_join_dependency`
+   * before selecting the primary key and reading `value.arel`
+   * (predicate_builder/relation_handler.rb:7); `apply_join_dependency` builds a
+   * JoinDependency over `eager_load_values | includes_values` and returns
+   * `except(:includes, :eager_load, :preload).joins!(join_dependency)`
+   * (finder_methods.rb:457). trails models the same outcome with
+   * `leftOuterJoins` (rendered as OUTER joins by `_applyJoinsToManager`) over
+   * the cleared eager specs.
+   * @internal
+   */
+  applyJoinDependencyForArel(): Relation<T> {
+    if (!this._eagerLoadingForSql()) return this;
+    const eagerSpecs = [
+      ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
+    ];
+
+    // Rails `apply_join_dependency`, for a limit/offset over non-limitable
+    // (collection) reflections, replaces the relation with
+    // `distinct_relation_for_primary_key` (finder_methods.rb:463): it EXECUTES a
+    // query (`select_rows`, schema_statements.rb:1434) to materialize the
+    // limited DISTINCT primary keys (honoring `columns_for_distinct(...,
+    // order_values)`), rewrites the relation as `WHERE pk IN (ids)`, and clears
+    // limit_value/offset_value. This avoids `IN (SELECT … LIMIT n)`, which
+    // limits joined rows rather than parents and is unportable (MySQL rejects
+    // it). A synchronous predicate builder cannot execute that query, and any
+    // pure-SQL approximation (DISTINCT+LIMIT subquery) diverges from Rails'
+    // materialized-ID shape and ordered-distinct handling — so rather than
+    // claim parity we reject this combination explicitly. Tracked by the
+    // `relation-handler-distinct-pk-materialization` continuation story.
+    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
+    if (hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) {
+      // @nie disposition=TODO
+      throw new NotImplementedError(
+        "Using an eager-loaded relation with a limit/offset over a collection " +
+          "association as a subquery value is not supported: Rails resolves this by " +
+          "executing a query to materialize the limited primary keys " +
+          "(distinct_relation_for_primary_key), which the synchronous predicate " +
+          "builder cannot do. Materialize the ids first, e.g. " +
+          "where(id: await rel.pluck(primaryKey)).",
+      );
     }
+
+    const rel = this._clone();
+    rel._eagerLoadAssociations = [];
+    rel._includesAssociations = [];
+    return rel.leftOuterJoins(eagerSpecs) as Relation<T>;
+  }
+
+  /**
+   * Mirror Rails `using_limitable_reflections?` (finder_methods.rb:487):
+   * `reflections.none?(&:collection?)`. A non-string (nested-hash) or
+   * unresolvable spec is treated conservatively as non-limitable.
+   */
+  private _eagerReflectionsAreLimitable(specs: AssociationSpec[]): boolean {
+    return specs.every((spec) => {
+      if (typeof spec !== "string") return false;
+      const refl = (this._modelClass as any)._reflectOnAssociation?.(spec);
+      return refl ? !refl.isCollection() : false;
+    });
+  }
+
+  /**
+   * Shared full-manager builder for `toArel`/`arel()` and the non-eager
+   * `_toSql`. Mirrors Rails `build_arel` (query_methods.rb#build_arel): the
+   * base select manager (projections, joins, wheres, order, distinct,
+   * limit/offset, group, having, lock, hints, from) with CTEs (`WITH`) and the
+   * de-duplicated annotate() comments folded into the AST so their binds thread
+   * through the single collector in document order.
+   *
+   * Deliberately uses `_buildSelectManager`, NOT the eager-load JoinDependency
+   * manager: Rails `arel`/`build_arel` projects the model's normal columns even
+   * when eager loading (the `t0_r0…` alias projection is added only by
+   * `apply_join_dependency` on the loading path — `relation.rb#to_sql`/
+   * `exec_queries`, mirrored here by `_buildEagerSql`). Routing `arel()` through
+   * the alias manager would make `relation.select(pk).arel()` (subquery use)
+   * project JoinDependency alias columns instead of the single requested
+   * column.
+   */
+  private _buildArel(): SelectManager {
+    const manager = this._buildSelectManager();
+    this._applyCtesAndAnnotationsToManager(manager);
     return manager;
+  }
+
+  /**
+   * Fold this relation's CTEs (`WITH`/`WITH RECURSIVE`) and annotate() comments
+   * into a SelectManager's AST. Shared by `_buildArel` and the set-operation
+   * operand builder so both encode the same prefix. Mirrors Rails `build_arel`
+   * attaching `@values[:with]` and the de-duplicated annotates onto the manager.
+   */
+  private _applyCtesAndAnnotationsToManager(manager: SelectManager): void {
+    if (this._ctes.length > 0) {
+      const cteNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression));
+      if (this._ctes.some((c) => c.recursive)) manager.withRecursive(...cteNodes);
+      else manager.with(...cteNodes);
+    }
+    if (this._annotations.length > 0) {
+      // Rails dedupes annotations before attaching them to the Arel manager
+      // (query_methods.rb#build_arel: `annotates.uniq if annotates.size > 1`).
+      const annotates =
+        this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
+      manager.comment(...annotates);
+    }
   }
 
   /**
@@ -4015,18 +4131,7 @@ export class Relation<T extends Base> {
    */
   private _buildSetOperationOperandManager(): SelectManager {
     const manager = this._buildSelectManager();
-    if (this._ctes.length > 0) {
-      const cteNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression));
-      if (this._ctes.some((c) => c.recursive)) manager.withRecursive(...cteNodes);
-      else manager.with(...cteNodes);
-    }
-    if (this._annotations.length > 0) {
-      // Rails dedupes annotations before attaching them to the Arel manager
-      // (query_methods.rb#build_arel: `annotates.uniq if annotates.size > 1`).
-      const annotates =
-        this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
-      manager.comment(...annotates);
-    }
+    this._applyCtesAndAnnotationsToManager(manager);
     return manager;
   }
 
@@ -4126,18 +4231,17 @@ export class Relation<T extends Base> {
   }
 
   // Mirrors: ActiveRecord::Relation#to_sql when eager_loading? — builds the
-  // JoinDependency SQL synchronously for toSql()/parity runner use.
+  // JoinDependency (alias-projecting) SQL synchronously for toSql()/parity
+  // runner use. Rails routes this through apply_join_dependency, whose inner
+  // `relation.to_sql` re-enters build_arel — so CTEs (`WITH`) and annotate()
+  // comments belong here too; fold them into the manager AST via the same
+  // helper `_buildArel` uses, keeping the two paths in sync.
   // Returns null if no eager associations could be joined (fall back to plain SQL).
   private _buildEagerSql(): string | null {
     const manager = this._buildEagerOperandManager();
     if (manager === null) return null;
-
-    let sql = this._compileSelectSql(manager);
-    if (this._annotations.length > 0) {
-      const comments = this._annotationComments();
-      sql = `${sql} ${comments}`;
-    }
-    return sql;
+    this._applyCtesAndAnnotationsToManager(manager);
+    return this._compileSelectSql(manager);
   }
 
   /**
@@ -4218,39 +4322,13 @@ export class Relation<T extends Base> {
       // fall through to plain SQL so toSql() always returns something useful.
     }
 
-    const manager = this._buildSelectManager();
-
-    let sql = this._compileSelectSql(manager);
-
-    // Append SQL comments from annotate()
-    if (this._annotations.length > 0) {
-      const comments = this._annotationComments();
-      sql = `${sql} ${comments}`;
-    }
-
-    // Prepend CTE clauses. The bodies are arel expression nodes
-    // (build_with_expression_from_value) compiled through the dialect visitor —
-    // UNION ALL operand parens are stripped on SQLite, kept on PG/MySQL. Relation
-    // bodies thread their bind values through the visitor; since the `WITH`
-    // clause renders before the main SELECT, those binds precede the main
-    // query's, and any `$N` placeholders in the already-compiled main SQL are
-    // shifted up by the CTE bind count (PG numbers globally).
-    if (this._ctes.length > 0) {
-      const { sql: cteSql, binds: cteBinds } = _qm.buildCteSql(
-        this._ctes,
-        (n) => this._compileArelNodeWithBinds(n),
-        (name) => this._modelClass.connection.quoteTableName(name),
-      );
-      if (cteBinds.length > 0) {
-        const shifted = sql.replace(/\$(\d+)/g, (_m, n) => `$${parseInt(n, 10) + cteBinds.length}`);
-        sql = `${cteSql} ${shifted}`;
-        this._lastSelectBinds = [...cteBinds, ...this._lastSelectBinds];
-      } else {
-        sql = `${cteSql} ${sql}`;
-      }
-    }
-
-    return sql;
+    // Compile the converged `build_arel` manager directly. CTEs (`WITH`) and
+    // annotate() comments are folded into the manager AST by `_buildArel`, so a
+    // single collector numbers every bind in document order (CTE binds precede
+    // the main query's; PG `$N` placeholders fall out correctly by
+    // construction) — replacing the former post-compile string splice and its
+    // manual `$N` renumbering.
+    return this._compileSelectSql(this._buildArel());
   }
 
   private _combineNodes(nodes: Nodes.Node[]): Nodes.Node | null {

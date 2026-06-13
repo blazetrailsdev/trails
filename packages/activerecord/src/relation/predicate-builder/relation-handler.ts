@@ -12,13 +12,23 @@ import { Nodes } from "@blazetrails/arel";
  */
 export class RelationHandler {
   call(attribute: Nodes.Attribute, value: any): Nodes.Node {
-    const relation = this.ensureSingleColumnSelect(attribute, value);
+    const relation = this.ensureSingleColumnSelect(attribute, this.applyJoinDependency(value));
     return attribute.in(relation.toArel());
   }
 
   callNegated(attribute: Nodes.Attribute, value: any): Nodes.Node {
-    const relation = this.ensureSingleColumnSelect(attribute, value);
+    const relation = this.ensureSingleColumnSelect(attribute, this.applyJoinDependency(value));
     return attribute.notIn(relation.toArel());
+  }
+
+  // Mirrors Rails `if value.eager_loading? value = value.send(:apply_join_dependency) end`
+  // (predicate_builder/relation_handler.rb:7): normalize an eager-loading
+  // subquery so its eager_load/includes become regular (OUTER) joins before the
+  // PK select + `value.arel`, rather than being dropped.
+  private applyJoinDependency(value: any): any {
+    return typeof value?.applyJoinDependencyForArel === "function"
+      ? value.applyJoinDependencyForArel()
+      : value;
   }
 
   private ensureSingleColumnSelect(attribute: Nodes.Attribute, value: any): any {
@@ -30,7 +40,11 @@ export class RelationHandler {
       if (Array.isArray(pk)) {
         throw new Error(`Cannot map composite primary key ${pk.join(", ")} to ${attribute.name}`);
       }
-      relation = relation.select(pk);
+      // Select the table-qualified primary key, mirroring Rails
+      // `value.select(value.arel_table[value.primary_key])`. Now that the
+      // subquery's arel carries joins (build_arel convergence), a bare `id`
+      // projection is ambiguous when the relation joins another table.
+      relation = relation.select(model.arelTable.get(pk));
     } else if (relation.selectValues.length === 1) {
       const selectValue = relation.selectValues[0];
       if (typeof selectValue === "string") {
