@@ -40,7 +40,7 @@ import {
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
 } from "./callbacks.js";
-import { serializableHash, SerializeOptions, coerceForJson } from "./serialization.js";
+import { serializableHash, SerializeOptions, asJsonThenable } from "./serialization.js";
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ConditionalOptions, ConditionFn, ValidatableRecord } from "./validator.js";
 import { evaluateCondition } from "./validator.js";
@@ -1957,16 +1957,13 @@ export class Model {
   }
 
   asJson(options?: SerializeOptions): Record<string, unknown> {
-    const hash = coerceForJson(this.serializableHash(options)) as Record<string, unknown>;
     const ctor = this.constructor as typeof Model;
-    if (ctor.includeRootInJson) {
-      const root =
-        typeof ctor.includeRootInJson === "string"
-          ? ctor.includeRootInJson
-          : ctor.modelName.element;
-      return { [root]: hash };
-    }
-    return hash;
+    return asJsonThenable(
+      () => this.serializableHash(options),
+      ctor.includeRootInJson,
+      () => ctor.modelName.element,
+      options ?? {},
+    );
   }
 
   toJson(options?: SerializeOptions): string {
