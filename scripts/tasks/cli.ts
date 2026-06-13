@@ -1452,6 +1452,68 @@ export function newStory(
   console.log(`created ${rfcSlug}/stories/${storySlug}.md`);
 }
 
+// ──────────────────── finalize RFC ────────────────────
+
+// Assign a placeholder RFC (`0000-<slug>`, or legacy `draft-<slug>`) its next
+// sequential number: rename the dir, rewrite every `0000-<slug>` reference and
+// the README H1, strip the template's pre-merge comment, and rebuild the index
+// — then commit + push via the standard loop. The rename/rewrite/strip logic is
+// NOT duplicated here: it lives in the tasks repo's scripts/finalize-rfc.mjs,
+// which we invoke as a subprocess (the same way reindex shells out to
+// build-index.mjs). That script does no git of its own, so commitAndPush owns
+// the staging — `git add -A` captures the dir rename (delete + add) plus the
+// regenerated index. `--dry-run` forwards to the script, which prints the
+// 0000-→NNNN- mapping and touched files without changing anything.
+export function finalize(slug: string, dryRun: boolean, tasksDir = TASKS_DIR): void {
+  if (!existsSync(join(tasksDir, ".git"))) {
+    console.error(
+      `error: ${tasksDir} is not a git repo. Clone blazetrailsdev/tasks there, or set $TASKS_DIR to an existing checkout.`,
+    );
+    process.exit(1);
+  }
+  const prefix = slug.startsWith("0000-") ? "0000-" : slug.startsWith("draft-") ? "draft-" : null;
+  if (!prefix || slug.length === prefix.length) {
+    console.error(
+      `error: "${slug}" is not a placeholder RFC — expected a "0000-<slug>" (or legacy "draft-<slug>") dir`,
+    );
+    process.exit(1);
+  }
+  const dir = join(tasksDir, "rfcs", slug);
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+    console.error(`error: no such placeholder RFC dir: rfcs/${slug}`);
+    process.exit(1);
+  }
+  if (dryRun) {
+    execFileSync(process.execPath, ["scripts/finalize-rfc.mjs", slug, "--dry-run"], {
+      cwd: tasksDir,
+      stdio: "inherit",
+    });
+    return;
+  }
+  commitAndPush({
+    message: `finalize: ${slug}`,
+    fileToStage: "-A",
+    raceMessage: `lost finalize race on ${slug} — pull manually and retry`,
+    raceExitCode: 4,
+    cwd: tasksDir,
+    pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
+    mutator: () => {
+      // Re-check after the pull: a concurrent finalize may have already numbered
+      // and renamed this dir away, in which case there is nothing left to do.
+      if (!existsSync(dir)) {
+        console.error(`error: rfcs/${slug} no longer exists (finalized by a concurrent agent?)`);
+        process.exit(4);
+      }
+      // Rename + rewrite + strip + rebuild index in place (no git of its own).
+      execFileSync(process.execPath, ["scripts/finalize-rfc.mjs", slug], {
+        cwd: tasksDir,
+        stdio: "inherit",
+      });
+    },
+  });
+  console.log(`finalized ${slug}`);
+}
+
 // ──────────────────── done merge-state guard ────────────────────
 
 // Guards `done` against marking an OPEN PR as done. Exported for unit tests.
@@ -1582,7 +1644,7 @@ export function stringFlag(
 // Known boolean flags. Everything else with a non-`--` following token
 // is treated as `--key value`. Boolean flags never consume the next
 // token, removing the `--json <id>` ambiguity.
-const BOOLEAN_FLAGS = new Set(["json", "clear", "force"]);
+const BOOLEAN_FLAGS = new Set(["json", "clear", "force", "dry-run"]);
 
 export function parseFlags(
   args: string[],
@@ -1737,6 +1799,12 @@ function main(): void {
       });
       break;
     }
+    case "finalize": {
+      const slug = pos[0];
+      if (!slug) usage();
+      finalize(slug, flags["dry-run"] === true);
+      break;
+    }
     case "reindex":
     case "build":
       reindex();
@@ -1816,6 +1884,7 @@ function usage(): never {
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
   status-set <id> <status>                     (draft ↔ ready, blocked → ready; validates the transition)
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
+  finalize <0000-slug> [--dry-run]             (assign the next RFC number: rename dir, rewrite refs, rebuild index)
   reindex | build                              (rebuild the index in place)
   fmt [<path> ...]                             (prettier --write authored stories; default: rfcs/)
 
