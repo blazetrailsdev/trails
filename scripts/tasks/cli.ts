@@ -969,18 +969,19 @@ function setPriority(id: string, priority: number | null): void {
   console.log(priority === null ? `cleared priority on ${id}` : `set ${id} priority ${priority}`);
 }
 
-// Legal story-status transitions reachable via `status-set`. The work-tracking
-// statuses (claimed/in-progress/done/blocked) own dedicated verbs that also
-// stamp pr/assignee/blocked-by, so this command only moves a story between the
-// pre-work queue states — primarily draft → ready, plus the reverse so a story
-// filed-then-deferred can drop back out of the ready queue without hand-editing.
+// Legal story-status transitions reachable via `status-set`. The forward
+// work-tracking moves (claimed/in-progress/done) own dedicated verbs that stamp
+// pr/assignee, so this command covers the queue-shaping edits the lifecycle
+// otherwise leaves as hand edits: draft ↔ ready (file then defer), and
+// blocked → ready (the documented unblock path — README's
+// "blocked (→ ready once unblocked)" — which has no dedicated verb).
 const STATUS_TRANSITIONS: Record<StoryStatus, readonly StoryStatus[]> = {
   draft: ["ready"],
   ready: ["draft"],
   claimed: [],
   "in-progress": [],
   done: [],
-  blocked: [],
+  blocked: ["ready"],
 };
 
 // Work-tracking statuses own dedicated verbs that also stamp pr/assignee/
@@ -993,21 +994,24 @@ const STATUS_VERB_HINT: Partial<Record<StoryStatus, string>> = {
   blocked: "block <id> --reason <text>",
 };
 
-// Reads the `status:` scalar from a story file's frontmatter. Same fenced-block
+// Reads the `status:` scalar from a story file's frontmatter as a RAW string
+// (not yet validated against STORY_STATUSES — a hand-typo'd value parses fine
+// here and is rejected downstream by statusTransitionError). Same fenced-block
 // parse as claimState so a same-named line in the Markdown body never matches.
-export function statusOf(fileText: string): StoryStatus | null {
-  const v = frontmatterBlock(fileText).match(/^status:\s*"?([^"\n]*)"?\s*$/m)?.[1];
-  return (v as StoryStatus | undefined) ?? null;
+export function statusOf(fileText: string): string | null {
+  return frontmatterBlock(fileText).match(/^status:\s*"?([^"\n]*)"?\s*$/m)?.[1] ?? null;
 }
 
 // Pure transition check, unit-testable without a git repo. Returns null when the
-// move is legal, otherwise a human-readable rejection reason.
-export function statusTransitionError(
-  from: StoryStatus | null,
-  target: StoryStatus,
-): string | null {
+// move is legal, otherwise a human-readable rejection reason. `from` is the raw
+// parsed scalar, so an unrecognized current status is caught here rather than
+// dereferencing STATUS_TRANSITIONS with an out-of-set key.
+export function statusTransitionError(from: string | null, target: StoryStatus): string | null {
   if (from === null) return `cannot read current status`;
-  const allowed = STATUS_TRANSITIONS[from];
+  if (!STORY_STATUSES.includes(from as StoryStatus)) {
+    return `unrecognized current status "${from}" — fix the frontmatter by hand`;
+  }
+  const allowed = STATUS_TRANSITIONS[from as StoryStatus];
   if (from === target || allowed.includes(target)) return null;
   // Illegal move — give the most actionable message. A work-tracking target has
   // a dedicated verb; otherwise report the legal set (or that there is none).
@@ -1056,6 +1060,9 @@ function setStatus(id: string, target: StoryStatus): void {
       process.exit(2);
     }
     editFrontmatter(file, { status: target });
+    // Unblocking clears the block reason the `block` verb stamped, so a
+    // re-readied story doesn't carry a stale `blocked-by` into the queue.
+    if (fresh === "blocked" && target === "ready") removeFrontmatterKey(file, "blocked-by");
   });
   console.log(`set ${id} status ${target}`);
 }
@@ -1648,7 +1655,7 @@ function usage(): never {
   block <id> --reason "<text>"
   refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
-  status-set <id> <status>                     (draft → ready and back; validates the transition)
+  status-set <id> <status>                     (draft ↔ ready, blocked → ready; validates the transition)
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
   reindex | build                              (rebuild the index in place)
   fmt [<path> ...]                             (prettier --write authored stories; default: rfcs/)

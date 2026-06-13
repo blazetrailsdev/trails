@@ -297,6 +297,14 @@ describe("statusTransitionError", () => {
     expect(statusTransitionError("draft", "draft")).toBeNull();
   });
 
+  it("allows blocked → ready (the documented unblock path has no dedicated verb)", () => {
+    expect(statusTransitionError("blocked", "ready")).toBeNull();
+  });
+
+  it("rejects an unrecognized current status instead of throwing", () => {
+    expect(statusTransitionError("typo", "ready")).toMatch(/unrecognized current status "typo"/);
+  });
+
   it("rejects draft → done and points at the dedicated verb", () => {
     const err = statusTransitionError("draft", "done");
     expect(err).toMatch(/won't set status done/);
