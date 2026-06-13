@@ -79,6 +79,8 @@ const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
   poly_children: { name: "string", employable_id: "integer", employable_type: "string" },
   cb_owners: { name: "string" },
   cb_pets: { species: "string", cb_owner_id: "integer" },
+  eyes: {},
+  iris: { eye_id: "integer", color: "string" },
   poly_as_parents: { name: "string" },
   poly_as_children: { name: "string", employable_id: "integer", employable_type: "string" },
   dual_valid_ships: { name: "string", pirate_id: "integer" },
@@ -1359,16 +1361,58 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(log).toContain("child_after_save");
     expect(child.isNewRecord()).toBe(false);
   });
-  it.skip("callbacks on child when parent autosaves child twice", () => {
-    // BLOCKED on story `savepoint-materialize-reentrancy` (RFC 0016).
-    // The Rails fixture (Eye has_one :iris / Iris belongs_to :eye, no
-    // foreign_key) infers the inverse, so the mutual hasOne-autosave /
-    // belongsTo-autosave pair forms a save cycle. The autosave logic
-    // terminates, but the re-entrant savepoint materialization double-starts
-    // the transaction instrumenter (InstrumentationAlreadyStartedError, PG).
-    // Un-skipping with a non-Rails association shape (explicit foreignKey to
-    // suppress the inverse) was rejected in review; left skipped until the
-    // materialize re-entrancy is fixed.
+  // Mirrors Rails' Eye (has_one :iris) / Iris (belongs_to :eye) fixtures with
+  // no explicit foreign_key, so the inverse is inferred and the mutual
+  // hasOne-autosave / belongsTo-autosave pair forms a save cycle.
+  function makeEyeIris() {
+    class Eye extends Base {
+      static _tableName = "eyes";
+    }
+    class Iris extends Base {
+      static _tableName = "iris";
+      static {
+        this.attribute("eye_id", "integer");
+        this.attribute("color", "string");
+        this.beforeValidation(function (rec: any) {
+          rec.beforeValidationCount = (rec.beforeValidationCount ?? 0) + 1;
+        });
+        this.beforeCreate(function (rec: any) {
+          rec.beforeCreateCount = (rec.beforeCreateCount ?? 0) + 1;
+        });
+        this.beforeSave(function (rec: any) {
+          rec.beforeSaveCount = (rec.beforeSaveCount ?? 0) + 1;
+        });
+        this.afterValidation(function (rec: any) {
+          rec.afterValidationCount = (rec.afterValidationCount ?? 0) + 1;
+        });
+        this.afterCreate(function (rec: any) {
+          rec.afterCreateCount = (rec.afterCreateCount ?? 0) + 1;
+        });
+        this.afterSave(function (rec: any) {
+          rec.afterSaveCount = (rec.afterSaveCount ?? 0) + 1;
+        });
+      }
+    }
+    registerModel("Eye", Eye);
+    registerModel("Iris", Iris);
+    Associations.hasOne.call(Eye, "iris", { autosave: true, className: "Iris" });
+    Associations.belongsTo.call(Iris, "eye", { autosave: true, className: "Eye" });
+    return { Eye, Iris };
+  }
+  it("callbacks on child when parent autosaves child twice", async () => {
+    const { Eye, Iris } = makeEyeIris();
+    const eye = new Eye();
+    cacheAssoc(eye, "iris", new Iris());
+    await eye.save();
+    const iris2 = new Iris();
+    cacheAssoc(eye, "iris", iris2);
+    await eye.save();
+    expect((iris2 as any).beforeValidationCount).toBe(1);
+    expect((iris2 as any).beforeCreateCount).toBe(1);
+    expect((iris2 as any).beforeSaveCount).toBe(1);
+    expect((iris2 as any).afterValidationCount).toBe(1);
+    expect((iris2 as any).afterCreateCount).toBe(1);
+    expect((iris2 as any).afterSaveCount).toBe(1);
   });
   it("callbacks on child when parent autosaves polymorphic child with inverse of", async () => {
     const log: string[] = [];
@@ -1453,16 +1497,20 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(log).toContain("owner_after_save");
     expect(owner.isNewRecord()).toBe(false);
   });
-  it.skip("callbacks on child when child autosaves parent twice", () => {
-    // BLOCKED on story `savepoint-materialize-reentrancy` (RFC 0016).
-    // The Rails fixture (Eye has_one :iris / Iris belongs_to :eye, no
-    // foreign_key) infers the inverse, so the mutual hasOne-autosave /
-    // belongsTo-autosave pair forms a save cycle. The autosave logic
-    // terminates, but the re-entrant savepoint materialization double-starts
-    // the transaction instrumenter (InstrumentationAlreadyStartedError, PG).
-    // Un-skipping with a non-Rails association shape (explicit foreignKey to
-    // suppress the inverse) was rejected in review; left skipped until the
-    // materialize re-entrancy is fixed.
+  it("callbacks on child when child autosaves parent twice", async () => {
+    const { Eye, Iris } = makeEyeIris();
+    const iris = new Iris();
+    cacheAssoc(iris, "eye", new Eye());
+    await iris.save();
+    const eye2 = new Eye();
+    cacheAssoc(iris, "eye", eye2);
+    await iris.save();
+    expect((iris as any).beforeValidationCount).toBe(2);
+    expect((iris as any).beforeCreateCount).toBe(1);
+    expect((iris as any).beforeSaveCount).toBe(2);
+    expect((iris as any).afterValidationCount).toBe(2);
+    expect((iris as any).afterCreateCount).toBe(1);
+    expect((iris as any).afterSaveCount).toBe(2);
   });
   it("callbacks on child when polymorphic child with inverse of autosaves parent", async () => {
     const log: string[] = [];
