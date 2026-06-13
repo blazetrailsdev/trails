@@ -12,7 +12,14 @@ import { createHash } from "node:crypto";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 import { cpus } from "node:os";
-import type { ApiManifest, PackageInfo, ClassInfo, MethodInfo, ParamInfo } from "./types.js";
+import type {
+  ApiManifest,
+  PackageInfo,
+  ClassInfo,
+  MethodInfo,
+  ParamInfo,
+  LiteralValue,
+} from "./types.js";
 import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
@@ -22,7 +29,7 @@ import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } 
 // (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus a
 // SCHEMA_VERSION constant we can bump when the extractor's output
 // shape changes. Set `API_COMPARE_FORCE=1` to skip the cache entirely.
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
 
 interface CacheEntry {
@@ -268,7 +275,7 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
  * programs without needing a real package directory + tsconfig.
  */
 export function extractFromProgram(program: ts.Program, srcDir: string): PackageInfo {
-  const info: PackageInfo = { classes: {}, modules: {}, fileFunctions: {} };
+  const info: PackageInfo = { classes: {}, modules: {}, fileFunctions: {}, fileConstants: {} };
   const pendingReExports: PendingReExport[] = [];
   const checker = program.getTypeChecker();
 
@@ -571,6 +578,9 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
     if (fileFunctions.length > 0) {
       info.fileFunctions[relPath] = fileFunctions;
     }
+
+    const fileConstants = extractFileConstants(sourceFile);
+    if (Object.keys(fileConstants).length > 0) info.fileConstants![relPath] = fileConstants;
 
     // If a file has exported functions but no class/interface/namespace,
     // also create a module entry from the file name for backward compat.
@@ -1457,6 +1467,49 @@ function extractNamespace(
   };
 }
 
+/** Classify a TS initializer/RHS as a literal (mirrors Ruby `literal_value`);
+ *  undefined for non-literals, `[]`/`{}` only when empty. */
+export function tsLiteralValue(init: ts.Expression): LiteralValue | undefined {
+  if (ts.isStringLiteralLike(init)) return { kind: "string", value: init.text };
+  if (ts.isNumericLiteral(init)) {
+    const t = init.getText();
+    return { kind: t.includes(".") ? "float" : "int", value: t };
+  }
+  if (init.kind === ts.SyntaxKind.TrueKeyword) return { kind: "bool", value: true };
+  if (init.kind === ts.SyntaxKind.FalseKeyword) return { kind: "bool", value: false };
+  if (init.kind === ts.SyntaxKind.NullKeyword) return { kind: "nil" };
+  if (ts.isIdentifier(init) && init.text === "undefined") return { kind: "nil" };
+  if (ts.isArrayLiteralExpression(init) && init.elements.length === 0) return { kind: "array" };
+  if (ts.isObjectLiteralExpression(init) && init.properties.length === 0) return { kind: "hash" };
+  return undefined; // non-literal (incl. negative numbers — skipped symmetrically with Ruby)
+}
+
+/** Literal constants for one file: exported `const NAME` and public `static
+ *  readonly NAME` literals (excl. `let`/`var` + private members). Mirrors Ruby. */
+export function extractFileConstants(sourceFile: ts.SourceFile): Record<string, LiteralValue> {
+  const out: Record<string, LiteralValue> = {};
+  const recordDecl = (nameNode: ts.PropertyName | ts.BindingName, init?: ts.Expression): void => {
+    if (!init || !ts.isIdentifier(nameNode)) return;
+    const lit = tsLiteralValue(init);
+    if (lit) out[nameNode.text] = lit;
+  };
+  ts.forEachChild(sourceFile, (node) => {
+    if (ts.isVariableStatement(node) && isExported(node)) {
+      if (!(node.declarationList.flags & ts.NodeFlags.Const)) return; // `let`/`var` aren't constants
+      for (const decl of node.declarationList.declarations) recordDecl(decl.name, decl.initializer);
+    } else if (ts.isClassDeclaration(node)) {
+      for (const member of node.members) {
+        if (!ts.isPropertyDeclaration(member) || !member.name) continue;
+        if (!hasModifier(member, ts.SyntaxKind.StaticKeyword)) continue;
+        if (!hasModifier(member, ts.SyntaxKind.ReadonlyKeyword)) continue;
+        if (memberVisibility(member) !== "public") continue; // skip internal constants
+        recordDecl(member.name, member.initializer);
+      }
+    }
+  });
+  return out;
+}
+
 function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): ParamInfo[] {
   return params.map((p) => {
     const name = p.name.getText();
@@ -1469,6 +1522,7 @@ function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): Param
     const result: ParamInfo = { name, kind };
     if (p.initializer) {
       result.default = "...";
+      result.literal = tsLiteralValue(p.initializer) ?? { kind: "expr" };
     }
     if (p.type) {
       result.type = p.type.getText();
