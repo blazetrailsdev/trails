@@ -1193,6 +1193,6 @@ describeIfPg("DirtyTest", () => {
 
   it.skip("partial insert off with changed composite identity primary key attribute", () => {
     // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
+    // Needs reimplementation against the pool (no bypass).
   });
 });

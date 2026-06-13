@@ -69,7 +69,7 @@ export interface AdapterSuiteHandle<A extends TransactionalFixturesAdapter> {
  * Designed for `adapters/**\/*.test.ts` files that currently rebuild the
  * adapter (and re-run DDL) per test via `beforeEach`. Hoisting to a single
  * `beforeAll` is the prerequisite for transactional fixtures to deliver the
- * Phase-6 wall-clock improvement (`docs/activerecord-100-plan.md` B6.5).
+ * Phase-6 wall-clock improvement (B6.5).
  *
  * @example
  *   const suite = setupAdapterSuite({
