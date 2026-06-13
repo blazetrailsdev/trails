@@ -441,6 +441,19 @@ function assignableNestedAttributes(attributes: Record<string, unknown>): Record
   return out;
 }
 
+/**
+ * The slice of the singular (`belongsTo`/`hasOne`) runtime association used by
+ * the one-to-one nested-attributes writer. `target` is the in-memory record (or
+ * null); `build` / `initializeAttributes` mirror Rails' `build_#{name}` and
+ * `Association#initialize_attributes`.
+ * @internal
+ */
+interface OneToOneAssociation {
+  target: Base | null;
+  build(attrs: Record<string, unknown>): Base | null;
+  initializeAttributes(record: Base): void;
+}
+
 /** @internal */
 function hasNestedId(attributes: Record<string, unknown>): boolean {
   const id = (attributes as any).id;
@@ -470,31 +483,64 @@ export function assignNestedAttributesForOneToOneAssociation(
       `Hash expected for \`${associationName}\` attributes, got ${typeof attributes}`,
     );
   }
+
+  const ctor = record.constructor as typeof Base;
+  const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
+  const options = configs.find((c) => c.associationName === associationName)?.options ?? {};
+  const updateOnly = options.updateOnly ?? false;
+  const hasId = hasNestedId(attributes);
+
+  // Rails: `existing_record = send(association_name)`. A synchronous writer can
+  // only observe an already-built / loaded in-memory target — trails performs
+  // no synchronous DB read — so a DB-backed existing record is reached via the
+  // async post-save flush (`processNestedAttributes`) instead.
+  const assoc = record.association(associationName) as unknown as OneToOneAssociation;
+  const existing = assoc.target ?? null;
+
+  // Rails nested_attributes.rb:436 — update (or mark for destruction) the
+  // existing record in place when `update_only` is set, or when a matching
+  // `id` was supplied and the in-memory target carries that id.
+  if (
+    (updateOnly || hasId) &&
+    existing &&
+    (updateOnly || String(existing.id) === String((attributes as any).id))
+  ) {
+    if (!callRejectIf(record, associationName, attributes)) {
+      assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
+    }
+    return;
+  }
+
+  // An `id`/`update_only` update whose target is not in memory: defer it to the
+  // async post-save flush (trails-specific — Rails loads `existing_record`
+  // synchronously here and assigns in place).
+  if (hasId || updateOnly) {
+    storePendingNestedAttributes(record, associationName, [attributes]);
+    return;
+  }
+
+  // Rails nested_attributes.rb:443 — build a new record (no matching id).
   if (!isRejectNewRecord(record, associationName, attributes)) {
-    // Records with a matching `id` are existing-record updates: the loader is
-    // async (no synchronous DB read in this writer), so defer them to the
-    // post-save flush in `processNestedAttributes`.
-    if (hasNestedId(attributes)) {
-      storePendingNestedAttributes(record, associationName, [attributes]);
-      return;
-    }
-    // Rails defers the polymorphic-target check to build time: when no `id` is
-    // present a new record must be built, but a polymorphic belongs_to has no
-    // `build_#{association_name}` method, so the writer raises.
-    if (isPolymorphicBelongsTo(record, associationName)) {
-      throw new Error(
-        `Cannot build association \`${associationName}'. ` +
-          `Are you trying to build a polymorphic one-to-one association?`,
-      );
-    }
-    // Rails-style immediate in-memory build: `build_#{association_name}` runs
-    // at assign time, so the association is readable right after assignment
-    // (`part.ship.name`). Autosave persists the built record on save.
-    (
-      record.association(associationName) as unknown as {
-        build(attrs: Record<string, unknown>): Base | null;
+    const assignable = assignableNestedAttributes(attributes);
+    if (existing && existing.isNewRecord()) {
+      // Rails reuses an already-built unsaved target (e.g. after `buildShip`)
+      // rather than replacing it: assign into it, then re-anchor FK/scope/
+      // inverse via `initialize_attributes`.
+      existing.assignAttributes(assignable);
+      assoc.initializeAttributes(existing);
+    } else {
+      // Rails defers the polymorphic-target check to build time: a polymorphic
+      // belongs_to has no `build_#{association_name}` method, so the writer
+      // raises. Immediate in-memory build otherwise (`part.ship.name` is
+      // readable right after assignment); autosave persists it on save.
+      if (isPolymorphicBelongsTo(record, associationName)) {
+        throw new Error(
+          `Cannot build association \`${associationName}'. ` +
+            `Are you trying to build a polymorphic one-to-one association?`,
+        );
       }
-    ).build(assignableNestedAttributes(attributes));
+      assoc.build(assignable);
+    }
   }
 }
 
