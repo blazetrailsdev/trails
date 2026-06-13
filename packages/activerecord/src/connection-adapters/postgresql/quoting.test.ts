@@ -214,6 +214,10 @@ describe("PostgreSQL quoting", () => {
     expect(() => quote(new Date())).toThrow(/Temporal/);
   });
 
+  it("quoted_date suffixes BC for proleptic years <= 0", () => {
+    expect(quotedDate(Temporal.PlainDate.from("-000043-03-15"))).toBe("0044-03-15 BC");
+  });
+
   it("quote dispatches Date/Time through this.quoted_date (BC suffix)", () => {
     // Rails' PG#quote calls super, whose Date branch is `'#{quoted_date(value)}'`
     // — dispatching through PG's BC-aware quoted_date. Threading `this` reaches it.
