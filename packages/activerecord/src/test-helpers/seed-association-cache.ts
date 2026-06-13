@@ -13,11 +13,17 @@ import type { Base } from "../base.js";
  */
 export function seedAssociationCache(record: Base, name: string, target: unknown): void {
   // A declared association has a real holder — set its target so the genuine
-  // reader / strict-loading logic runs off it.
+  // reader / strict-loading logic runs off it. Mark `_explicitTarget` so the
+  // inner-loader short-circuit treats it as an explicit set (matching the old
+  // `_cachedAssociations.set` poke this replaces).
   try {
-    (record as unknown as { association(n: string): { setTarget(t: unknown): void } })
-      .association(name)
-      .setTarget(target);
+    const assoc = (
+      record as unknown as {
+        association(n: string): { setTarget(t: unknown): void; _explicitTarget: boolean };
+      }
+    ).association(name);
+    assoc.setTarget(target);
+    assoc._explicitTarget = true;
     return;
   } catch {
     // Undeclared name (FakeTopic/FakeReply fixtures): fall through to a minimal
@@ -27,6 +33,7 @@ export function seedAssociationCache(record: Base, name: string, target: unknown
     name,
     {
       target,
+      _explicitTarget: true,
       isLoaded: () => true,
       setTarget(this: { target: unknown }, t: unknown) {
         this.target = t;

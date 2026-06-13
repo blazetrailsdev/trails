@@ -326,20 +326,27 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
   const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
   if (macro === "belongsTo" || macro === "hasOne") {
-    record.association(assocName).setTarget(target);
+    const assoc = record.association(assocName);
+    assoc.setTarget(target);
+    // Flag as an explicit assignment so the inner loaders' short-circuit
+    // (`_loadedSingularTarget`) distinguishes it from a memoized query load.
+    (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
     return;
   }
   // Undeclared inverse name (an inverse reached via automatic-inverse wiring
   // whose reflection isn't a declared singular association): cache the value on
-  // a minimal loaded holder keyed by the name, mirroring Rails'
-  // `@association_cache[name]` for ad-hoc inverses. Surfaced through
-  // `Base#_associationCache`.
-  const existing = record._associationInstances.get(assocName);
+  // a minimal loaded holder keyed by the name for ad-hoc inverses. Surfaced
+  // through `Base#_associationCache`.
+  const existing = record._associationInstances.get(assocName) as
+    | { setTarget(t: unknown): void; _explicitTarget?: boolean }
+    | undefined;
   if (existing) {
     existing.setTarget(target);
+    existing._explicitTarget = true;
   } else {
     record._associationInstances.set(assocName, {
       target,
+      _explicitTarget: true,
       isLoaded: () => true,
       setTarget(this: { target: unknown }, t: unknown) {
         this.target = t;
@@ -369,9 +376,12 @@ export function _loadedSingularTarget(
   assocName: string,
 ): { value: Base | null } | null {
   const instance = record._associationInstances.get(assocName) as
-    | { isLoaded(): boolean; target?: Base | null }
+    | { isLoaded(): boolean; _explicitTarget?: boolean; target?: Base | null }
     | undefined;
-  if (instance?.isLoaded()) {
+  // Only an *explicit* set/seed short-circuits — a prior query load on the
+  // holder must re-query (matches the old `_cachedAssociations` write-shadow,
+  // which never recorded query loads).
+  if (instance?.isLoaded() && instance._explicitTarget) {
     return { value: (instance.target ?? null) as Base | null };
   }
   if (record._preloadedAssociations?.has(assocName)) {

@@ -2353,15 +2353,24 @@ export class Base extends Model {
   _associationInstances: Map<string, AssociationInstance> = new Map();
 
   /**
-   * Return the cached association *object* for `name`, mirroring Rails'
-   * `@association_cache[name]` (associations.rb:82) — callers read `.target`.
-   * A has_many collection lives on its `CollectionProxy` (the canonical target
-   * store, incl. in-memory inverse-seeded records on a not-yet-loaded proxy); a
-   * singular target lives on its loaded `SingularAssociation` holder. The
-   * `HasManyAssociation` mirror in `_associationInstances` is a secondary copy
-   * rewritten on every load, so it is skipped — only singular holders and
-   * ad-hoc seeds (no `isCollection`) surface from there. Tolerates unknown
-   * names the way `@association_cache` does — returns `undefined`.
+   * Return the *loaded* cached association object for `name` — callers read
+   * `.target` off it. This is the RFC-0022 b4 transitional accessor across the
+   * three still-split per-record maps (`_collectionProxies`,
+   * `_associationInstances`, `_preloadedAssociations`); it is NOT yet Rails'
+   * unified `@association_cache` surface. The literal `association_instance_get`
+   * analog (the built wrapper regardless of loaded state) is
+   * `_associationInstances.get(name)`; folding the three maps into one slot so
+   * this can return the wrapper whenever built is the explicit job of the
+   * follow-up `b5-converge-association-cache` story (RFC open questions 1–3).
+   *
+   * Until that convergence, the gate matters: a has_many's canonical target
+   * lives on its `CollectionProxy` (incl. in-memory inverse-seeded records on a
+   * not-yet-loaded proxy) while the `HasManyAssociation` mirror in
+   * `_associationInstances` is a stale secondary copy, so returning an
+   * unloaded/empty wrapper here would surface the wrong store's `.target`.
+   * Hence: a loaded-or-seeded proxy for collections; a loaded singular holder
+   * (or ad-hoc seed, which exposes no `isCollection`) otherwise; `undefined`
+   * for a miss or an unknown name.
    *
    * @internal
    */
