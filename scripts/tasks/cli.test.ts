@@ -27,6 +27,7 @@ import {
   claimState,
   commitAndPush,
   editFrontmatter,
+  formatFiles,
   gitCommonDir,
   Index,
   LOCK_TIMEOUT_EXIT,
@@ -1277,6 +1278,71 @@ describe("newStory cluster validation", () => {
     const msg = (console.error as ReturnType<typeof vi.spyOn>).mock.calls[0]?.[0] as string;
     expect(msg).toMatch(/scaffold/);
     expect(msg).toMatch(/conversion/);
+  });
+});
+
+describe("newStory --status / --body-file (one-call authoring)", () => {
+  function makeRepo(): string {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", "0005-gaps", "stories"), { recursive: true });
+    return dir;
+  }
+
+  it("writes a complete story (status + body) in one call", () => {
+    // git is mocked; the mutator still runs and writes the real file, so we can
+    // assert the on-disk content a single `new` call produces.
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
+    const dir = makeRepo();
+    const bodyFile = join(dir, "body.md");
+    writeFileSync(bodyFile, "## Context\n\nReal context.\n\n## Acceptance criteria\n\n- [ ] x\n");
+    newStory("0005-gaps", "my-story", { title: "My Story", status: "ready", bodyFile }, dir);
+    const out = readFileSync(join(dir, "rfcs", "0005-gaps", "stories", "my-story.md"), "utf8");
+    expect(out).toContain(`title: "My Story"`);
+    expect(out).toContain(`status: ready`);
+    expect(out).toContain("Real context.");
+    expect(out).toContain("- [ ] x");
+  });
+
+  it("exits 1 when --body-file is missing or unreadable", () => {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const dir = makeRepo();
+    expect(() =>
+      newStory("0005-gaps", "my-story", { bodyFile: join(dir, "nope.md") }, dir),
+    ).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/--body-file.*not found/));
+  });
+});
+
+describe("formatFiles", () => {
+  it("is a no-op for an empty file list (never spawns prettier)", () => {
+    formatFiles([], TASKS_DIR);
+    expect(execFileSyncMock).not.toHaveBeenCalled();
+  });
+
+  it("skips silently when the prettier binary is absent (fresh clone)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-noprettier-"));
+    formatFiles([join(dir, "x.md")], dir);
+    expect(execFileSyncMock).not.toHaveBeenCalled();
+  });
+
+  it("runs prettier --write against the tasks repo when the binary exists", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-prettier-"));
+    mkdirSync(join(dir, "node_modules", ".bin"), { recursive: true });
+    writeFileSync(join(dir, "node_modules", ".bin", "prettier"), "#!/bin/sh\n");
+    formatFiles(["rfcs/0001/stories/x.md"], dir);
+    expect(execFileSyncMock).toHaveBeenCalledWith(
+      join(dir, "node_modules", ".bin", "prettier"),
+      ["--write", "rfcs/0001/stories/x.md"],
+      expect.objectContaining({ cwd: dir }),
+    );
   });
 });
 
