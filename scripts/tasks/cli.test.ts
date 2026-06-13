@@ -22,6 +22,7 @@ import {
   bestBundle,
   __setLockDirForTest,
   acquireTasksLock,
+  buildRfcContent,
   buildStoryContent,
   checkPrNotOpen,
   claimState,
@@ -37,6 +38,7 @@ import {
   LOCK_TIMEOUT_EXIT,
   releaseTasksLock,
   listFiltered,
+  newRfc,
   newStory,
   nextBundle,
   numberFlag,
@@ -1522,6 +1524,135 @@ describe("newStory --status / --body-file (one-call authoring)", () => {
       newStory("0005-gaps", "my-story", { bodyFile: join(dir, "nope.md") }, dir),
     ).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/--body-file.*not found/));
+  });
+});
+
+describe("buildRfcContent", () => {
+  it("generates a placeholder RFC with defaults", () => {
+    const content = buildRfcContent("my-rfc", { date: "2026-06-13" });
+    expect(content).toContain(`rfc: "0000-my-rfc"`);
+    expect(content).toContain(`title: "my-rfc"`);
+    expect(content).toContain(`status: draft`);
+    expect(content).toContain(`created: 2026-06-13`);
+    expect(content).toContain(`updated: 2026-06-13`);
+    expect(content).toContain(`owner: "@your-handle"`);
+    expect(content).toContain(`packages: []`);
+    expect(content).toContain(`clusters: []`);
+    // Number-free H1 — cli-finalize-rfc assigns the number at merge.
+    expect(content).toContain(`# RFC — my-rfc`);
+    expect(content).not.toMatch(/^# RFC \d/m);
+    // related-rfcs is omitted entirely when no --related is given.
+    expect(content).not.toContain("related-rfcs");
+  });
+
+  it("applies title, owner, packages, and clusters", () => {
+    const content = buildRfcContent("my-rfc", {
+      title: "My prose title",
+      owner: "@deanmarano",
+      packages: ["arel", "activerecord"],
+      clusters: ["scaffold", "tooling"],
+      date: "2026-06-13",
+    });
+    expect(content).toContain(`title: "My prose title"`);
+    expect(content).toContain(`owner: "@deanmarano"`);
+    expect(content).toContain(`packages:\n  - "arel"\n  - "activerecord"`);
+    expect(content).toContain(`clusters:\n  - "scaffold"\n  - "tooling"`);
+    expect(content).toContain(`# RFC — My prose title`);
+  });
+
+  it("renders related-rfcs only when --related is non-empty", () => {
+    const content = buildRfcContent("my-rfc", {
+      related: ["0001-task-system", "0007-foo"],
+      date: "2026-06-13",
+    });
+    expect(content).toContain(`related-rfcs:\n  - "0001-task-system"\n  - "0007-foo"`);
+  });
+
+  it("substitutes a caller-supplied body for the placeholder prose", () => {
+    const content = buildRfcContent("x", {
+      body: "# RFC — Hand authored\n\n## Summary\n\nReal summary.\n",
+      date: "2026-06-13",
+    });
+    expect(content).toContain("Real summary.");
+    expect(content).not.toContain("No stories registered yet.");
+    expect(content.endsWith("Real summary.\n")).toBe(true);
+    expect(content).toContain("---\n\n# RFC — Hand authored");
+  });
+
+  // The mutator runs formatFiles (prettier) but NOT markdownlint, so the default
+  // placeholder body must pass markdownlint on its own or the tasks pre-commit
+  // hook rejects the new-rfc commit. Guard the default body against regressions.
+  it.skipIf(!existsSync(ML_BIN))("default placeholder body passes markdownlint-cli2", async () => {
+    const { spawnSync } =
+      await vi.importActual<typeof import("node:child_process")>("node:child_process");
+    const content = buildRfcContent("my-rfc", { title: "My RFC", date: "2026-06-13" });
+    const file = join(mkdtempSync(join(tmpdir(), "cli-rfc-")), "README.md");
+    writeFileSync(file, content);
+    const ml = spawnSync(ML_BIN, [file], { cwd: TASKS_DIR, encoding: "utf8" });
+    expect(ml.status, `markdownlint-cli2 failed:\n${ml.stdout}${ml.stderr}`).toBe(0);
+  });
+});
+
+describe("newRfc", () => {
+  function setupExit() {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  }
+
+  it("exits 1 when the slug is not a lowercase slug", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    expect(() => newRfc("../../outside", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/slug.*lowercase slug/));
+  });
+
+  it("exits 1 when a packages entry is not a slug", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    expect(() => newRfc("my-rfc", { packages: ["type: bad"] }, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/packages.*lowercase slug/));
+  });
+
+  it("exits 1 when tasksDir is not a git repo", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    expect(() => newRfc("my-rfc", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/not a git repo/));
+  });
+
+  it("exits 1 when the RFC directory already exists", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", "0000-my-rfc"), { recursive: true });
+    expect(() => newRfc("my-rfc", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/already exists/));
+  });
+
+  it("exits 1 when --body-file is missing or unreadable", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    expect(() => newRfc("my-rfc", { bodyFile: join(dir, "nope.md") }, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/--body-file.*not found/));
+  });
+
+  it("writes a placeholder README under 0000-<slug> and commits", () => {
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    newRfc("my-rfc", { title: "My RFC", owner: "@deanmarano" }, dir);
+    const out = readFileSync(join(dir, "rfcs", "0000-my-rfc", "README.md"), "utf8");
+    expect(out).toContain(`rfc: "0000-my-rfc"`);
+    expect(out).toContain(`title: "My RFC"`);
+    expect(out).toContain(`owner: "@deanmarano"`);
+    expect(out).toContain(`# RFC — My RFC`);
   });
 });
 
