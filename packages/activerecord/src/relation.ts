@@ -2881,12 +2881,17 @@ export class Relation<T extends Base> {
    * (`_checkEagerLoadable`) agree on exactly when a JoinDependency is built.
    * @internal
    */
-  private _eagerLoadBypassesJoinDependency(): boolean {
+  // `ignoreSetOp` is set when building a set-operation *operand* manager: the
+  // operand relation carries `_setOperation` (union/etc. clones the left side
+  // and stamps the op onto it), but Rails applies the join dependency to each
+  // operand's own `build_arel` regardless, so the compound carries the eager
+  // JOIN. The CTE/from/composite-pk bypasses still apply per operand.
+  private _eagerLoadBypassesJoinDependency(ignoreSetOp = false): boolean {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
     return (
       Array.isArray(basePk) ||
       this._ctes.length > 0 ||
-      !!this._setOperation ||
+      (!ignoreSetOp && !!this._setOperation) ||
       !this._fromClause.isEmpty()
     );
   }
@@ -3992,7 +3997,7 @@ export class Relation<T extends Base> {
    * of being spliced into the compiled SQL string per side.
    */
   private _buildSetOperationOperandManager(): SelectManager {
-    const manager = this._buildEagerOperandManager() ?? this._buildSelectManager();
+    const manager = this._buildEagerOperandManager(true) ?? this._buildSelectManager();
     if (this._ctes.length > 0) {
       const cteNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression));
       if (this._ctes.some((c) => c.recursive)) manager.withRecursive(...cteNodes);
@@ -4124,8 +4129,8 @@ export class Relation<T extends Base> {
    * Shared by _buildEagerSql (string path) and the set-operation operand
    * builder, which composes it into the compound's single collector.
    */
-  private _buildEagerOperandManager(): SelectManager | null {
-    if (this._eagerLoadBypassesJoinDependency()) return null;
+  private _buildEagerOperandManager(asOperand = false): SelectManager | null {
+    if (this._eagerLoadBypassesJoinDependency(asOperand)) return null;
 
     const allEager = [
       ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),

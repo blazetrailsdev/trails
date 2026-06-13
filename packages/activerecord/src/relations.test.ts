@@ -738,6 +738,60 @@ describe("RelationTest", () => {
       // own closing paren — the TableAlias set-op path, not a BoundSqlLiteral.
       expect(sql).toMatch(/\) subq/);
     });
+
+    it("composes a CTE operand into a single WITH compound statement", () => {
+      const sql = Post.with({ tech_posts: Post.where({ category: "tech" }) })
+        .from("tech_posts AS posts")
+        .where({ author: "alice" })
+        .union(Post.where({ author: "carol" }))
+        .toSql();
+      // The operand's CTE folds onto the composed manager (manager.with), so the
+      // whole compound carries one leading WITH — not a per-side string prefix.
+      expect(sql).toMatch(/^WITH /);
+      expect(sql.match(/\bWITH\b/g)).toHaveLength(1);
+      expect(sql).toContain("UNION");
+    });
+
+    it("carries an annotate operand comment into the compound statement", () => {
+      const sql = Post.where({ author: "alice" })
+        .annotate("pick alice")
+        .union(Post.where({ author: "bob" }))
+        .toSql();
+      expect(sql).toContain("/* pick alice */");
+      expect(sql).toContain("UNION");
+    });
+
+    it("composes an eager-load operand join dependency", async () => {
+      const { Associations, registerModel } = await import("./associations.js");
+      class SetOpAuthor extends Base {
+        static {
+          this._tableName = "setop_authors";
+          this.attribute("name", "string");
+        }
+      }
+      registerModel("SetOpAuthor", SetOpAuthor);
+      class SetOpPost extends Base {
+        static {
+          this._tableName = "setop_posts";
+          this.attribute("title", "string");
+          this.attribute("setop_author_id", "integer");
+        }
+      }
+      Associations.belongsTo.call(SetOpPost, "setopAuthor", {
+        className: "SetOpAuthor",
+        foreignKey: "setop_author_id",
+      });
+      // Eager load on the *left* operand: union() clones the left relation and
+      // stamps the set operation onto it, so the operand build must still apply
+      // the join dependency (Rails build_arel per operand) rather than bypass it.
+      const sql = SetOpPost.where({ title: "x" })
+        .includes("setopAuthor")
+        .references("setop_authors")
+        .union(SetOpPost.where({ title: "y" }))
+        .toSql();
+      expect(sql).toContain("LEFT OUTER JOIN");
+      expect(sql).toContain("UNION");
+    });
   });
 
   // ── joins (SQL generation) ──
@@ -2616,6 +2670,42 @@ describe("RelationTest", () => {
     const old = User.where({ age: 30 });
     const result = await young.union(old).toArray();
     expect(result).toHaveLength(2);
+  });
+
+  it("union with a CTE operand returns correct records", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    await User.create({ name: "Alice", age: 20 });
+    await User.create({ name: "Bob", age: 30 });
+    await User.create({ name: "Charlie", age: 25 });
+
+    const rel = User.with({ youngsters: User.where({ age: 20 }) })
+      .from("youngsters AS users")
+      .union(User.where({ age: 30 }));
+    const names = (await rel.toArray()).map((u: any) => u.name).sort();
+    expect(names).toEqual(["Alice", "Bob"]);
+  });
+
+  it("union with an annotate operand returns correct records", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    await User.create({ name: "Alice", age: 20 });
+    await User.create({ name: "Bob", age: 30 });
+    await User.create({ name: "Charlie", age: 25 });
+
+    const rel = User.where({ age: 20 })
+      .annotate("youngest")
+      .union(User.where({ age: 30 }));
+    const names = (await rel.toArray()).map((u: any) => u.name).sort();
+    expect(names).toEqual(["Alice", "Bob"]);
   });
 
   it("unionAll includes duplicates", async () => {
