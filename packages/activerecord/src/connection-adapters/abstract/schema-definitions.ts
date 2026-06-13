@@ -374,7 +374,10 @@ export class IndexDefinition {
     } = {},
   ): boolean {
     // Mirrors Rails: `columns = options[:column] if columns.blank?`
-    if (columns === undefined) columns = options.column;
+    // Ruby `blank?` is true for nil, "" and [].
+    const isBlank =
+      columns == null || (Array.isArray(columns) ? columns.length === 0 : columns === "");
+    if (isBlank) columns = options.column;
     if (options.name && this.name !== options.name) return false;
     if (options.unique !== undefined && this.unique !== options.unique) return false;
     if (options.valid !== undefined && this.valid !== options.valid) return false;

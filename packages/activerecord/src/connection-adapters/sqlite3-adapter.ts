@@ -1853,13 +1853,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    if (
-      options.ifNotExists === true &&
-      (await (
-        this as unknown as { foreignKeyExists(f: string, t: string): Promise<boolean> }
-      ).foreignKeyExists(fromTable, toTable))
-    ) {
-      return;
+    if (options.ifNotExists === true) {
+      const fkAware = this as unknown as {
+        foreignKeys(t: string): Promise<{ column: string }[]>;
+        foreignKeyExists(f: string, t: string): Promise<boolean>;
+      };
+      const exists =
+        options.column != null
+          ? (await fkAware.foreignKeys(fromTable)).some((fk) => fk.column === options.column)
+          : await fkAware.foreignKeyExists(fromTable, toTable);
+      if (exists) return;
     }
     await this.alterTable(
       fromTable,

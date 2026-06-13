@@ -37,6 +37,13 @@ describe("IndexDefinition#defined_for?", () => {
     expect(idx.isDefinedFor(undefined, { column: "a" })).toBe(true);
     expect(idx.isDefinedFor(undefined, { column: "b" })).toBe(false);
   });
+
+  it('treats blank positional columns ([] and "") as absent, like Ruby blank?', () => {
+    const idx = new IndexDefinition("t", "i", false, ["a"]);
+    expect(idx.isDefinedFor([], { column: "a" })).toBe(true);
+    expect(idx.isDefinedFor("", { column: "a" })).toBe(true);
+    expect(idx.isDefinedFor([], { column: "b" })).toBe(false);
+  });
 });
 
 describe("ReferenceDefinition helpers", () => {

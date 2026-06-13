@@ -113,4 +113,22 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     });
     expect((await adapter.foreignKeys("articles")).length).toBe(1);
   });
+
+  it("addForeignKey with ifNotExists creates a second FK to the same table on a different column", async () => {
+    // Rails slices :column into the existence check, so a same-target FK on a
+    // different column is NOT short-circuited.
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.createTable("authors", (t) => t.string("name"));
+    await adapter.createTable("articles", (t) => {
+      t.bigint("author_id");
+      t.bigint("editor_id");
+    });
+    await adapter.addForeignKey("articles", "authors", { column: "author_id" });
+    await adapter.addForeignKey("articles", "authors", {
+      column: "editor_id",
+      ifNotExists: true,
+    });
+    const cols = (await adapter.foreignKeys("articles")).map((fk) => fk.column).sort();
+    expect(cols).toEqual(["author_id", "editor_id"]);
+  });
 });

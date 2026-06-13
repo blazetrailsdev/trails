@@ -4186,8 +4186,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
-    if (options.ifNotExists === true && (await this.foreignKeyExists(fromTable, toTable))) {
-      return;
+    if (options.ifNotExists === true) {
+      const exists =
+        options.column != null
+          ? (await this.foreignKeys(fromTable)).some((fk) => fk.column === options.column)
+          : await this.foreignKeyExists(fromTable, toTable);
+      if (exists) return;
     }
     this.assertValidDeferrable(options.deferrable);
     const { schema: fromSchema, table: fromTbl } = this.parseSchemaQualifiedName(fromTable);
