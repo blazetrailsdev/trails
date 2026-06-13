@@ -128,6 +128,17 @@ describe("WithTest", () => {
     ).toEqual(POSTS_WITH_COMMENTS.length);
   });
 
+  // Regression: the CTE body and the outer WHERE both carry a bound parameter,
+  // so prependCtes must thread the CTE-body bind ahead of the body binds and
+  // renumber the body's PG `$N` placeholders past it (instead of inlining).
+  it("count after with call with bound conditions", async () => {
+    const relation = Post.with({ typed_posts: Post.where({ type: "Post" }) })
+      .from("typed_posts AS posts")
+      .where({ type: "Post" });
+
+    expect(await relation.count()).toEqual(await Post.where({ type: "Post" }).count());
+  });
+
   it("with when called from active record scope", async () => {
     expect(toIds(await (Post as any).withTagsCte().order("id").pluck("id"))).toEqual(
       POSTS_WITH_TAGS,
