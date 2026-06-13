@@ -10,15 +10,42 @@ export interface SerializationRecord {
 }
 
 /**
- * Serialize a model's attributes to a plain object.
+ * A serialized hash that is also awaitable: sync reads fail loud on an unloaded
+ * `include`, `await` lazy-loads it (Rails' `to_ary`) and resolves a plain object.
+ * Public serializers type their return as the subset `Record<string, unknown>`.
+ */
+export type SerializableHash = Record<string, unknown> & PromiseLike<Record<string, unknown>>;
+
+/**
+ * Serialize a model's attributes to a (possibly awaitable) hash.
  *
  * Mirrors: ActiveModel::Serialization#serializable_hash
  * (serialization.rb:111-138)
+ *
+ * Rails serializes an `include`d collection via `records.to_ary.map`, where
+ * `CollectionProxy#to_ary` lazily loads it. Trails serialization is synchronous
+ * and must issue no DB load (RFC 0022 b2). An include-bearing call therefore
+ * returns a thenable: sync access fails loud on an unloaded include, `await`
+ * lazy-loads it first. A call with no `:include` returns a plain hash like Rails
+ * (no awaitable contract), so promise assimilation can't trigger a spurious load.
  */
 export function serializableHash(
   record: SerializationRecord,
   options: SerializeOptions = {},
 ): Record<string, unknown> {
+  // `__sync` is the internal re-entry that builds the body synchronously.
+  if (hasIncludes(options) && !(options as { __sync?: boolean }).__sync) {
+    const sync = { ...options, __sync: true } as SerializeOptions;
+    return thenableHash(
+      () => serializableHash(record, sync),
+      async () => {
+        // Await: lazy-load every unloaded include (Rails' `to_ary`), then the
+        // sync build finds them all loaded.
+        await preloadIncludes(record, options);
+        return serializableHash(record, sync);
+      },
+    );
+  }
   // Prefer an instance-level override (Rails' subclass-override
   // semantics) over the standalone helper. The JSON mixin host's
   // protected delegator just forwards to the standalone
@@ -70,17 +97,30 @@ export function serializableHash(
         );
       }
       const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
+      // This callback only runs in the `__sync` build, so nested includes build
+      // sync too rather than returning their own thenables.
+      const nested = { ...opts, __sync: true } as SerializeOptions;
       safeSet(
         result,
         assocName,
-        items.map((r) => serializableHash(r as SerializationRecord, opts)),
+        items.map((r) => serializableHash(r as SerializationRecord, nested)),
       );
     } else if (
       records &&
       typeof records === "object" &&
       (records as unknown as SerializationRecord)._attributes
     ) {
-      safeSet(result, assocName, serializableHash(records as unknown as SerializationRecord, opts));
+      safeSet(
+        result,
+        assocName,
+        serializableHash(
+          records as unknown as SerializationRecord,
+          {
+            ...opts,
+            __sync: true,
+          } as SerializeOptions,
+        ),
+      );
     } else {
       safeSet(result, assocName, records);
     }
@@ -258,6 +298,141 @@ export function serializableAddIncludes(
       callback(assocName, records, assocOpts);
     }
   }
+}
+
+/** Whether `options` carries at least one `:include` entry to (maybe) load. */
+function hasIncludes(options: SerializeOptions): boolean {
+  const include = options.include;
+  if (include == null || (include as unknown) === false) return false;
+  return Object.keys(normalizeIncludes(include)).length > 0;
+}
+
+/**
+ * Recursively lazy-load every `include`d association (and nested includes) via
+ * `resolveIncludeAsync`, so the subsequent sync pass finds them all loaded.
+ */
+async function preloadIncludes(
+  record: SerializationRecord,
+  options: SerializeOptions,
+): Promise<void> {
+  const includeOpt = options.include;
+  if (includeOpt == null || (includeOpt as unknown) === false) return;
+  for (const [name, opts] of Object.entries(normalizeIncludes(includeOpt))) {
+    const records = await resolveIncludeAsync(record, name);
+    const children = isSerializableCollection(records)
+      ? Array.isArray(records)
+        ? records
+        : Array.from(records as Iterable<unknown>)
+      : // Any resolved singular object (AR record or `_attributes`-less PORO)
+        // may itself carry nested includes to preload.
+        records != null && typeof records === "object"
+        ? [records]
+        : [];
+    for (const child of children) {
+      await preloadIncludes(child as SerializationRecord, opts);
+    }
+  }
+}
+
+/**
+ * Resolve an `include`d association for the async path, lazy-loading when the
+ * reader reports an unloaded target. Collections expose `loaded` + `load()`
+ * (Rails' `CollectionProxy`); an unloaded singular reader returns `null`
+ * indistinguishably from a genuine nil, so we consult the `association(name)`
+ * holder (when present) for `loaded` + `loadTarget()`. No include-bag.
+ */
+async function resolveIncludeAsync(record: SerializationRecord, name: string): Promise<unknown> {
+  const raw = sendAssociation(record, name);
+  if (isSerializableCollection(raw)) {
+    const coll = raw as { loaded?: unknown; load?: () => unknown };
+    if (coll.loaded === false && typeof coll.load === "function") {
+      await coll.load();
+    }
+    return raw;
+  }
+  if (raw !== null && raw !== undefined) return raw;
+
+  // `raw` is nil: an unloaded singular reader is indistinguishable from a
+  // genuine nil, so ask the association holder whether it can still load.
+  const associationFn = (record as { association?: (n: string) => unknown }).association;
+  if (typeof associationFn === "function") {
+    let holder: { loaded?: unknown; loadTarget?: () => unknown } | undefined;
+    try {
+      holder = associationFn.call(record, name) as typeof holder;
+    } catch {
+      return raw;
+    }
+    if (holder && holder.loaded === false && typeof holder.loadTarget === "function") {
+      return await holder.loadTarget();
+    }
+  }
+  return raw;
+}
+
+/**
+ * Build the awaitable hash returned by `as_json` (json.rb:96-108):
+ * `serializable_hash(options).as_json`, then root-wrap (Rails' truthiness —
+ * false/nil skip, `true` uses the model element name). Plain when there is
+ * nothing to load; thenable only for include-bearing calls.
+ */
+export function asJsonThenable(
+  serialize: () => Record<string, unknown>,
+  root: boolean | string | null | undefined,
+  element: () => string,
+  options: SerializeOptions,
+): Record<string, unknown> {
+  const finalize = (raw: unknown): Record<string, unknown> => {
+    const hash = coerceForJson(raw) as Record<string, unknown>;
+    if (root === false || root == null) return hash;
+    return { [root === true ? element() : (root as string)]: hash };
+  };
+  if (!hasIncludes(options)) return finalize(serialize());
+  return thenableHash(
+    () => finalize(serialize()),
+    async () => finalize(await serialize()),
+  );
+}
+
+/**
+ * Wrap a hash so it is usable both synchronously and via `await`. The sync
+ * builder runs lazily on first access (memoized), so construction is
+ * side-effect-free and the eager build cannot throw before `.then()` reaches
+ * the async path — `await` touches only `then`, never the sync build.
+ */
+export function thenableHash(
+  sync: () => Record<string, unknown>,
+  async: () => Promise<Record<string, unknown>>,
+): SerializableHash {
+  let memo: Record<string, unknown> | undefined;
+  const built = () => (memo ??= sync());
+  const proxy = new Proxy({} as Record<string, unknown>, {
+    get(_t, key) {
+      if (key === "then")
+        return (onF?: ((v: unknown) => unknown) | null, onR?: ((e: unknown) => unknown) | null) =>
+          async().then(onF, onR);
+      if (key === "catch") return (onR?: ((e: unknown) => unknown) | null) => async().catch(onR);
+      if (key === "finally") return (onF?: (() => void) | null) => async().finally(onF);
+      return built()[key as string];
+    },
+    has(_t, key) {
+      if (key === "then" || key === "catch" || key === "finally") return false;
+      return key in built();
+    },
+    ownKeys() {
+      return Reflect.ownKeys(built());
+    },
+    getOwnPropertyDescriptor(_t, key) {
+      const obj = built();
+      if (!Object.prototype.hasOwnProperty.call(obj, key)) return undefined;
+      const desc = Object.getOwnPropertyDescriptor(obj, key)!;
+      desc.configurable = true;
+      return desc;
+    },
+    getPrototypeOf() {
+      return Object.prototype;
+    },
+  });
+  return proxy as SerializableHash;
 }
 
 /**

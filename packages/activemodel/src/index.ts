@@ -75,7 +75,7 @@ export {
 } from "./callbacks.js";
 export type { CallbackConditions, TransactionalCallbackConditions } from "./callbacks.js";
 export { serializableHash } from "./serialization.js";
-export type { SerializeOptions } from "./serialization.js";
+export type { SerializeOptions, SerializableHash } from "./serialization.js";
 // Aliased to avoid clobbering the global `JSON` namespace; consumers
 // can import as `JSONSerializer` or alias on import.
 export { JSON as JSONSerializer } from "./serializers/json.js";
