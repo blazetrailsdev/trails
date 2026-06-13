@@ -617,6 +617,7 @@ export function resetColumnInformation(this: SchemaHost): void {
       "_attributesBuilder",
       "_schemaLoaded",
       "_cachedDefaultAttributes",
+      "_virtualAttributesReconciled",
     ]) {
       if (Object.prototype.hasOwnProperty.call(this, key)) Reflect.deleteProperty(this, key);
     }
@@ -641,6 +642,7 @@ export function resetColumnInformation(this: SchemaHost): void {
   this._columns = undefined;
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
+  this._virtualAttributesReconciled = false;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   // Mirrors Rails reset_column_information's
@@ -1040,8 +1042,12 @@ async function realColumnNames(host: SchemaHost): Promise<Set<string> | null> {
  * real column. Reconcile against the table's actual columns here so the existing
  * `virtual` flag — already honored by `columnNames`/`columnsHash`/
  * `attributesForCreate` — excludes them. Schema-sourced defs and real columns
- * are left untouched (types included — this only sets the flag). Idempotent and
- * one-shot once the real columns are known.
+ * are left untouched (types included — this only sets the flag). The decision is
+ * purely positional — a user attribute is virtual iff it has no DB column — so
+ * it reclassifies in BOTH directions: an attribute that gains a real column on a
+ * later reflection (e.g. after `resetColumnInformation`) is unflagged. The
+ * one-shot guard is cleared whenever the schema caches or attribute set change
+ * (`resetColumnInformation`, `defineAttribute`), so a reset/re-declare re-runs.
  *
  * @internal
  */
@@ -1053,9 +1059,9 @@ export async function reconcileVirtualAttributes(this: SchemaHost): Promise<void
   for (const [name, def] of host._attributeDefinitions) {
     const userDeclared =
       (def.source ?? (def.userProvided === false ? "schema" : "user")) === "user";
-    if (userDeclared && !def.virtual && !real.has(name)) {
-      def.virtual = true;
-    }
+    if (!userDeclared) continue;
+    const isVirtual = !real.has(name);
+    if (!!def.virtual !== isVirtual) def.virtual = isVirtual;
   }
   host._virtualAttributesReconciled = true;
 }
