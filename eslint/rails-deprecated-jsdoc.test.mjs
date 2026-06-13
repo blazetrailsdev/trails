@@ -51,6 +51,11 @@ tester.run("rails-deprecated-jsdoc", rule, {
       filename: connFile,
       code: `/**\n * Doc.\n * @deprecated\n */\nexport function connection() {}\n`,
     },
+    // Interface method (TSMethodSignature) already tagged.
+    {
+      filename: connFile,
+      code: `interface Adapters {\n  /** @deprecated */\n  connection(): unknown;\n}\n`,
+    },
   ],
   invalid: [
     // Missing tag, no JSDoc — insert a fresh block.
@@ -89,6 +94,15 @@ tester.run("rails-deprecated-jsdoc", rule, {
       code: `/** File header. */\n\nexport function connection() {}\n`,
       errors: [{ messageId: "missingDeprecated" }],
       output: `/** File header. */\n\n/** @deprecated */\nexport function connection() {}\n`,
+    },
+    // Interface method (TSMethodSignature) with no JSDoc — this is the
+    // branch that tags `unsignedFloat`/`unsignedDecimal` on the
+    // `ColumnMethods` interface in mysql/schema-definitions.ts.
+    {
+      filename: connFile,
+      code: `interface Adapters {\n  connection(): unknown;\n}\n`,
+      errors: [{ messageId: "missingDeprecated" }],
+      output: `interface Adapters {\n  /** @deprecated */\n  connection(): unknown;\n}\n`,
     },
   ],
 });
