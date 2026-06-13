@@ -917,6 +917,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return sqliteBuildTruncateStatement.call(this, tableName);
   }
 
+  /** Rails: `execute(build_truncate_statement(table_name), name)`. SQLite's
+   *  `execute` is a read-only `.all()` cursor, so the `DELETE FROM` statement
+   *  must run through `executeMutation` (the write primitive, which also dirties
+   *  the query cache). PG/MySQL keep the abstract `execute` path. */
+  override async truncate(tableName: string, name?: string | null): Promise<unknown> {
+    return this.executeMutation(this.buildTruncateStatement(tableName), [], name ?? "SQL");
+  }
+
   supportsInsertOnConflict(): boolean {
     return this.databaseVersion.gte("3.24.0");
   }

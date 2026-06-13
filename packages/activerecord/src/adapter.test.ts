@@ -666,6 +666,25 @@ describe("AdapterTestWithoutTransaction", () => {
     usesTransaction: withoutTransaction,
   });
 
+  beforeAll(async () => {
+    // Rails' schema.rb declares `movies` with `primary_key: "movieid"`, making
+    // movieid a serial column. The canonical-schema `defineSchema` path creates
+    // a custom-named integer PK without a sequence on PostgreSQL, so a
+    // sequence-less `movieid` rejects the `reset empty table with custom pk`
+    // insert. Recreate it with an auto-increment PK (PG-only; the test is
+    // PG-gated). Mirrors the keyboards recreation in primary-keys.test.ts.
+    if (adapterType !== "postgres") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const conn = Base.connection as any;
+    await conn.dropTable("movies", { ifExists: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await conn.createTable("movies", { primaryKey: "movieid" }, (t: any) => {
+      t.string("name");
+    });
+    Movie.resetColumnInformation();
+    await Movie.loadSchema();
+  });
+
   it("truncate", async () => {
     const conn = Base.connection as AbstractAdapter;
     expect(await Post.count()).toBeGreaterThan(0);
