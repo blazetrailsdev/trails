@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Aes256Gcm as Cipher } from "./aes256-gcm.js";
 import { MessageSerializer } from "../message-serializer.js";
+import { Message } from "../message.js";
+import { EncryptedContentIntegrity } from "../errors.js";
 import * as crypto from "crypto";
 import { inspect } from "util";
 
@@ -99,6 +101,37 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     const m1 = cipher.encrypt("hello");
     const m2 = cipher.encrypt("world");
     expect(m1.headers.get("iv")).not.toEqual(m2.headers.get("iv"));
+  });
+
+  it("raises EncryptedContentIntegrity for a truncated auth tag even when the base64 fallback would yield 16 bytes", () => {
+    // Mirrors Rails: auth_tag.bytes.length != 16 always raises EncryptedContentIntegrity.
+    // The message is in MRI single-base64 format (raw 12-byte IV), so the auth tag is
+    // read under that interpretation. Here `at` is set to a base64 ASCII string that
+    // decodes to 16 bytes — but under the format actually used (latin1) it is 24 bytes,
+    // a wrong-length tag. It must NOT be rescued by the legacy double-base64 fallback.
+    const key = generateKey();
+    const fresh = new Cipher(key).encrypt("hello world");
+    const iv = fresh.headers.get("iv") as Buffer;
+    const realTag = fresh.headers.get("at") as Buffer;
+
+    const forged = new Message(fresh.payload);
+    forged.addHeaders({ iv, at: realTag.toString("base64") });
+    expect(() => new Cipher(key).decrypt(forged)).toThrow(EncryptedContentIntegrity);
+  });
+
+  it("still decrypts legacy double-base64 ciphertexts", () => {
+    // The old trails wire format base64-encoded iv/at/payload a second time. Build such
+    // an envelope from a fresh message and confirm it round-trips through decrypt().
+    const key = generateKey();
+    const fresh = new Cipher(key).encrypt("hello world");
+    const iv = fresh.headers.get("iv") as Buffer;
+    const at = fresh.headers.get("at") as Buffer;
+    const payload = fresh.payload as Buffer;
+
+    const legacy = new Message(payload.toString("base64"));
+    legacy.addHeaders({ iv: iv.toString("base64"), at: at.toString("base64") });
+
+    expect(new Cipher(key).decrypt(legacy).toString("utf-8")).toBe("hello world");
   });
 
   it("inspect_does not show secrets", () => {
