@@ -78,11 +78,9 @@ export class Aes256Gcm {
     }
     const authTag = Buffer.from(cipher.getAuthTag());
 
-    // Store raw bytes as Buffers, exactly like MRI keeps binary Strings on the
-    // Message. The MessageSerializer then does a single base64 hop, producing an
-    // envelope byte-identical to Rails. (The old trails format base64-encoded
-    // here too, so the serializer double-encoded — see decrypt() for the
-    // back-compat path.)
+    // Store raw bytes as Buffers, like MRI keeps binary Strings on the Message;
+    // the serializer then does a single base64 hop, byte-identical to Rails. (The
+    // old trails format base64-encoded here too — see decrypt() for back-compat.)
     const message = new Message(encrypted);
     message.addHeaders({ iv, at: authTag });
     return message;

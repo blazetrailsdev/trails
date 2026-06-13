@@ -27,8 +27,8 @@ export class Message {
 
   /** @internal */
   private validatePayloadType(payload: unknown): void {
-    // Rails payloads are binary Strings; in TS we carry raw cipher bytes as a
-    // Buffer and text payloads as a string. Both are allowed; anything else isn't.
+    // Rails payloads are binary Strings; in TS, raw cipher bytes are a Buffer and
+    // text payloads a string. Both allowed; anything else isn't.
     if (
       payload !== undefined &&
       payload !== null &&
