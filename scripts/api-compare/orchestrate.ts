@@ -84,12 +84,6 @@ async function railsCacheKey(): Promise<string | null> {
 }
 
 /**
- * Run the Ruby extractor, but first consult the cross-worktree shared cache.
- * A hit writes `output/rails-api.json` directly (the fresh mtime keeps the Ruby
- * extractor's own mtime gate satisfied) and skips the subprocess; a miss runs
- * Ruby and publishes the result for sibling worktrees.
- */
-/**
  * True when `output/rails-api.json` is already newer than all three inputs the
  * Ruby extractor's mtime gate watches — i.e. this same worktree is warm and
  * Ruby would no-op. We check it before touching the shared cache so the common
@@ -105,6 +99,12 @@ async function railsOutputFresh(railsOut: string): Promise<boolean> {
   }
 }
 
+/**
+ * Run the Ruby extractor, but first consult the cross-worktree shared cache.
+ * A hit writes `output/rails-api.json` directly (the fresh mtime keeps the Ruby
+ * extractor's own mtime gate satisfied) and skips the subprocess; a miss runs
+ * Ruby and publishes the result for sibling worktrees.
+ */
 async function runRubyExtractShared(): Promise<void> {
   const railsOut = join(OUTPUT_DIR, "rails-api.json");
   // Warm same-worktree path: local output already current → Ruby would no-op,
