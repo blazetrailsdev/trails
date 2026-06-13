@@ -58,7 +58,7 @@ describeIfMysql("AdapterTest", () => {
     await adapter.execute(`CREATE DATABASE ${ARUNIT_DATABASE}`);
     await adapter.execute(`CREATE DATABASE ${ARUNIT2_DATABASE}`);
     await adapter.execute(
-      `CREATE TABLE ${ARUNIT_DATABASE}.pirates (id INT AUTO_INCREMENT PRIMARY KEY, catchphrase VARCHAR(255), parrot_id INT, non_validated_parrot_id INT)`,
+      `CREATE TABLE ${ARUNIT_DATABASE}.pirates (id INT AUTO_INCREMENT PRIMARY KEY, catchphrase VARCHAR(255), parrot_id INT, non_validated_parrot_id INT, created_on DATETIME, updated_on DATETIME)`,
     );
     await adapter.execute(
       `CREATE TABLE ${ARUNIT2_DATABASE}.courses (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, college_id INT)`,
