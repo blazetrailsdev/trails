@@ -12,6 +12,7 @@ import { KeyProvider } from "./key-provider.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Configurable } from "./configurable.js";
 import { DecryptionError } from "./errors.js";
+import { headerString } from "./encoding-helpers.js";
 import type { Message } from "./message.js";
 
 export class EnvelopeEncryptionKeyProvider {
@@ -53,9 +54,7 @@ export class EnvelopeEncryptionKeyProvider {
 
   /** @internal */
   private decryptDataKey(encryptedMessage: Message): string | null {
-    const encryptedDataKey = encryptedMessage.headers.get("encrypted_data_key") as
-      | string
-      | undefined;
+    const encryptedDataKey = headerString(encryptedMessage.headers.get("encrypted_data_key"));
     if (!encryptedDataKey) return null;
     try {
       return new Encryptor({ compress: false }).decrypt(encryptedDataKey, {

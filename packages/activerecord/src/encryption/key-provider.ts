@@ -5,6 +5,7 @@
  */
 
 import { Key } from "./key.js";
+import { headerString } from "./encoding-helpers.js";
 import type { Message } from "./message.js";
 
 export class KeyProvider {
@@ -20,7 +21,7 @@ export class KeyProvider {
   }
 
   decryptionKeys(message: Message): Key[] {
-    const keyRef = message.headers.get("k") as string | undefined;
+    const keyRef = headerString(message.headers.get("k"));
     if (keyRef) {
       const grouped = this.keysGroupedById();
       const found = grouped.get(keyRef);

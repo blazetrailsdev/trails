@@ -10,8 +10,10 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     message.addHeader("iv", "test-iv");
     const serialized = serializer.dump(message);
     const loaded = serializer.load(serialized);
-    expect(loaded.payload).toBe("hello");
-    expect(loaded.headers.get("iv")).toBe("test-iv");
+    // load returns decoded raw bytes (Buffers), mirroring Rails' ASCII-8BIT
+    // strings; the consumer interprets them.
+    expect(loaded.payload.toString()).toBe("hello");
+    expect((loaded.headers.get("iv") as Buffer).toString()).toBe("test-iv");
   });
 
   it("serializes messages with nested messages in their headers", () => {
@@ -24,10 +26,10 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
 
     const serialized = serializer.dump(outer);
     const loaded = serializer.load(serialized);
-    expect(loaded.payload).toBe("outer-payload");
+    expect(loaded.payload.toString()).toBe("outer-payload");
     const nested = loaded.headers.get("nested") as Message;
     expect(nested).toBeInstanceOf(Message);
-    expect(nested.payload).toBe("inner-payload");
+    expect(nested.payload.toString()).toBe("inner-payload");
   });
 
   it("won't load classes from JSON", () => {
@@ -38,7 +40,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
       __proto__: { admin: true },
     });
     const loaded = serializer.load(malicious);
-    expect(loaded.payload).toBe("test");
+    expect(loaded.payload.toString()).toBe("test");
   });
 
   it("detects random JSON data and raises a decryption error", () => {
@@ -74,9 +76,13 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     const serializer = new MessageSerializer();
     const message = new Message("payload");
     message.addHeader("tag", "café 😀");
-    const parsed = JSON.parse(serializer.dump(message)) as { h: { tag: string } };
+    const dumped = serializer.dump(message);
+    const parsed = JSON.parse(dumped) as { h: { tag: string } };
     expect(parsed.h.tag).toBe(Buffer.from("café 😀", "utf-8").toString("base64"));
-    expect(Buffer.from(parsed.h.tag, "base64").toString("utf-8")).toBe("café 😀");
+    // load returns the decoded bytes; the consumer recovers the text losslessly
+    // (no mojibake, no truncation of code points > 0xFF).
+    const loaded = serializer.load(dumped);
+    expect((loaded.headers.get("tag") as Buffer).toString("utf-8")).toBe("café 😀");
   });
 
   it("encodes raw Buffer header values with a single base64 hop", () => {

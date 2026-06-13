@@ -17,9 +17,20 @@ function isBytes(value: unknown): value is string | Buffer {
   return typeof value === "string" || Buffer.isBuffer(value);
 }
 
-/** Coerce a raw-bytes value to a Buffer; strings are decoded with the given format. */
+/**
+ * Coerce a raw-bytes header/payload value to a Buffer under one interpretation.
+ *
+ * - `latin1` is the MRI single-base64 format: the value already IS the raw bytes
+ *   (a Buffer from `load`, or a latin1 byte-string from the MessagePack path).
+ * - `base64` is the legacy double-base64 fallback: the single decode left the
+ *   value holding a base64 string, so decode it once more. A Buffer at this point
+ *   holds those base64 ASCII bytes, so read them back as text first.
+ */
 function toBytes(value: string | Buffer, enc: "latin1" | "base64"): Buffer {
-  return Buffer.isBuffer(value) ? value : Buffer.from(value, enc);
+  if (Buffer.isBuffer(value)) {
+    return enc === "latin1" ? value : Buffer.from(value.toString("latin1"), "base64");
+  }
+  return Buffer.from(value, enc);
 }
 
 export class Aes256Gcm {
@@ -98,13 +109,13 @@ export class Aes256Gcm {
     if (!isBytes(iv) || !isBytes(authTag)) throw new EncryptedContentIntegrity();
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
 
-    // A freshly-encrypted message carries Buffers; a deserialized one carries
-    // latin1 byte-strings (MRI single-base64 format). Legacy trails ciphertexts
-    // were double-base64, so after the serializer's single decode their string
-    // iv/at/payload are still base64 strings — try interpreting them once more so
-    // rows written before this change keep decrypting. Buffers are unambiguous, so
-    // we never retry them. We never throw mid-loop on a failed interpretation —
-    // only after every candidate fails.
+    // A freshly-encrypted message carries Buffers; a deserialized one carries raw
+    // bytes (a Buffer from JSON load, or a latin1 byte-string from MessagePack) —
+    // the MRI single-base64 format, handled by the `latin1` interpretation. Legacy
+    // trails ciphertexts were double-base64, so the single decode left their
+    // iv/at/payload holding a base64 string; the `base64` interpretation decodes
+    // them once more so rows written before this change keep decrypting. We never
+    // throw mid-loop on a failed interpretation — only after every candidate fails.
     let sawValidAuthTag = false;
     for (const enc of ["latin1", "base64"] as const) {
       // Mirrors Rails: OpenSSL bindings don't raise on truncated auth tags, so we
@@ -132,7 +143,6 @@ export class Aes256Gcm {
           // Wrong format or wrong key — try the next interpretation.
         }
       }
-      if (Buffer.isBuffer(authTag)) break; // raw bytes are unambiguous
     }
     // No interpretation yielded a 16-byte auth tag → genuine integrity failure.
     if (!sawValidAuthTag) throw new EncryptedContentIntegrity();
