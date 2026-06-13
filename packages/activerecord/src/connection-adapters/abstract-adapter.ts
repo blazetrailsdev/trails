@@ -54,9 +54,7 @@ import {
   typeCast as abstractTypeCast,
   quoteString as abstractQuoteString,
   quoteIdentifier as abstractQuoteIdentifier,
-  quoteTableName as abstractQuoteTableName,
   quoteColumnName as abstractQuoteColumnName,
-  quoteTableNameForAssignment as abstractQuoteTableNameForAssignment,
   isSqlLiteral,
   quotedTrue as abstractQuotedTrue,
   quotedFalse as abstractQuotedFalse,
@@ -614,7 +612,10 @@ export class AbstractAdapter implements Quoting {
   }
 
   quoteTableName(name: string): string {
-    return abstractQuoteTableName(name);
+    // Rails: abstract quote_table_name delegates to quote_column_name via
+    // dynamic dispatch (abstract/quoting.rb:66-67), so an adapter that
+    // overrides only quoteColumnName still gets correct table-name quoting.
+    return this.quoteColumnName(name);
   }
 
   quoteColumnName(name: string): string {
@@ -622,7 +623,9 @@ export class AbstractAdapter implements Quoting {
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {
-    return abstractQuoteTableNameForAssignment(table, attr);
+    // Rails dispatches through quote_table_name on self (abstract/quoting.rb:157),
+    // which MySQL's table.column override relies on.
+    return this.quoteTableName(`${table}.${attr}`);
   }
 
   quoteDefaultExpression(value: unknown, _column?: unknown): string {

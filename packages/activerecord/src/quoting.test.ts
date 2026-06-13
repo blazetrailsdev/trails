@@ -25,6 +25,7 @@ import {
   formatPlainTimeForSql,
 } from "./connection-adapters/abstract/sql-datetime.js";
 import { setDefaultTimezone } from "./type/internal/timezone.js";
+import { NotImplementedError } from "./errors.js";
 
 afterEach(() => {
   setDefaultTimezone("utc");
@@ -105,16 +106,21 @@ describe("QuotingTest", () => {
   });
 
   it("quote column name", () => {
-    expect(quoteColumnName("name")).toBe('"name"');
+    // Rails: the abstract Quoting module raises NotImplementedError — every
+    // adapter must define its own quote_column_name (quoting.rb L61).
+    expect(() => quoteColumnName("foo")).toThrow(NotImplementedError);
   });
 
   it("quote table name", () => {
-    expect(quoteTableName("users")).toBe('"users"');
+    // Rails: abstract quote_table_name delegates to quote_column_name, which
+    // raises NotImplementedError (quoting.rb L66).
+    expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
   });
 
   it("quote table name for assignment", () => {
-    const result = quoteTableNameForAssignment("users", "name");
-    expect(result).toBe('"users"."name"');
+    // Abstract quote_table_name_for_assignment delegates to quote_table_name,
+    // which raises at the abstract layer; adapters override with real behavior.
+    expect(() => quoteTableNameForAssignment("users", "name")).toThrow(NotImplementedError);
   });
 
   it("quote duration", () => {
@@ -125,12 +131,11 @@ describe("QuotingTest", () => {
     expect(() => quote(minutes(30))).toThrow(/Duration/);
   });
   it("quote table name calls quote column name", () => {
-    // Rails dispatches quote_table_name through quote_column_name per identifier
-    // part. trails has no module-level method dispatch to monkey-patch, so the
-    // ported assertion checks that both routes share the same identifier-quoting
-    // logic — including the "" escape of an embedded quote, not just a bare name.
-    expect(quoteTableName("foo")).toBe(quoteColumnName("foo"));
-    expect(quoteTableName('a"b')).toBe(quoteColumnName('a"b'));
+    // Rails overrides quote_column_name and asserts quote_table_name routes
+    // through it. trails has no module-level dispatch to monkey-patch, so the
+    // ported assertion verifies the delegation by its observable effect: the
+    // abstract quote_table_name surfaces quote_column_name's NotImplementedError.
+    expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
   });
   it("quoted timestamp local", () => {
     setDefaultTimezone("local");

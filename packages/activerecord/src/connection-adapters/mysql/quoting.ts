@@ -46,11 +46,14 @@ export function unquotedFalse(): number {
   return 0;
 }
 
+/**
+ * Mirrors: MySQL::Quoting#quote_table_name —
+ * `"`#{name.gsub('`', '``').gsub('.', '`.`')}`"`. The whole name is wrapped in
+ * backticks with `.` rewritten as `` `.` `` so `foo.bar` → `` `foo`.`bar` ``
+ * (no `*` special-casing, unlike quoteColumnName).
+ */
 export function quoteTableName(name: string): string {
-  return name
-    .split(".")
-    .map((part) => quoteColumnName(part))
-    .join(".");
+  return `\`${name.replace(/`/g, "``").replace(/\./g, "`.`")}\``;
 }
 
 export function quoteColumnName(name: string): string {

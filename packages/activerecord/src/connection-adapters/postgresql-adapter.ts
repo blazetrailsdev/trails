@@ -2729,6 +2729,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return rows[0].oid != null;
   }
 
+  quoteColumnName(name: string): string {
+    return pgQuoteColumnName(name);
+  }
+
   quoteTableName(name: string): string {
     return pgQuoteTableName(name);
   }
