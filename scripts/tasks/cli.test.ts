@@ -41,6 +41,7 @@ import {
   removeFrontmatterKey,
   setFrontmatterList,
   resolveTasksDir,
+  statusEdits,
   statusOf,
   statusTransitionError,
   STORY_STATUSES,
@@ -281,6 +282,26 @@ describe("statusOf", () => {
 
   it("returns null when there is no status line", () => {
     expect(statusOf(`---\npriority: 30\n---\n`)).toBeNull();
+  });
+
+  it("resolves YAML comment/quote semantics rather than the raw line", () => {
+    expect(statusOf(`---\nstatus: ready # filed then readied\n---\n`)).toBe("ready");
+  });
+});
+
+describe("statusEdits", () => {
+  it("sets only the status for a draft → ready flip", () => {
+    expect(statusEdits("draft", "ready")).toEqual({ status: "ready" });
+  });
+
+  it("clears blocked-by, claim, assignee, and pr when unblocking to ready", () => {
+    expect(statusEdits("blocked", "ready")).toEqual({
+      status: "ready",
+      "blocked-by": "null",
+      claim: "null",
+      assignee: "null",
+      pr: "null",
+    });
   });
 });
 

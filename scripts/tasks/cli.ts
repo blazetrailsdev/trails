@@ -994,12 +994,15 @@ const STATUS_VERB_HINT: Partial<Record<StoryStatus, string>> = {
   blocked: "block <id> --reason <text>",
 };
 
-// Reads the `status:` scalar from a story file's frontmatter as a RAW string
-// (not yet validated against STORY_STATUSES — a hand-typo'd value parses fine
-// here and is rejected downstream by statusTransitionError). Same fenced-block
-// parse as claimState so a same-named line in the Markdown body never matches.
+// Reads the `status:` scalar from a story file's frontmatter, parsed with the
+// same YAML semantics the tasks repo uses (lib.mjs `yaml.load`) so comments and
+// quoting (`status: ready # note`) resolve correctly rather than tripping the
+// raw-regex. Returns the RAW value (not yet validated against STORY_STATUSES — a
+// hand-typo'd status is rejected downstream by statusTransitionError). Reads
+// only the fenced block, so a `status:` line in the Markdown body never matches.
 export function statusOf(fileText: string): string | null {
-  return frontmatterBlock(fileText).match(/^status:\s*"?([^"\n]*)"?\s*$/m)?.[1] ?? null;
+  const fm = (parseYaml(frontmatterBlock(fileText)) ?? {}) as Record<string, unknown>;
+  return typeof fm.status === "string" ? fm.status : null;
 }
 
 // Pure transition check, unit-testable without a git repo. Returns null when the
@@ -1021,6 +1024,20 @@ export function statusTransitionError(from: string | null, target: StoryStatus):
   return allowed.length
     ? `illegal transition ${from} → ${target} (allowed from ${from}: ${allowed.join(", ")})`
     : `illegal transition ${from} → ${target} (${from} has no transitions; use the dedicated verb)`;
+}
+
+// Frontmatter edits for a status transition. Unblocking back to ready returns
+// the story to the ready queue for re-claim, so reset it to the unclaimed shape:
+// clear the `blocked-by` the `block` verb stamped AND the claim/assignee/pr it
+// carried in. A blocked story keeps its claim (block doesn't clear it), and
+// claimState reads any non-null `claim` on a ready story as already taken —
+// leaving them set would make the readied story unclaimable.
+export function statusEdits(from: string | null, target: StoryStatus): Record<string, string> {
+  const edits: Record<string, string> = { status: target };
+  if (from === "blocked" && target === "ready") {
+    Object.assign(edits, { "blocked-by": "null", claim: "null", assignee: "null", pr: "null" });
+  }
+  return edits;
 }
 
 // Flip a story's status between pre-work queue states (draft ↔ ready). Rebuilds
@@ -1059,10 +1076,7 @@ function setStatus(id: string, target: StoryStatus): void {
       console.error(`error: ${error} for ${id}`);
       process.exit(2);
     }
-    editFrontmatter(file, { status: target });
-    // Unblocking clears the block reason the `block` verb stamped, so a
-    // re-readied story doesn't carry a stale `blocked-by` into the queue.
-    if (fresh === "blocked" && target === "ready") removeFrontmatterKey(file, "blocked-by");
+    editFrontmatter(file, statusEdits(fresh, target));
   });
   console.log(`set ${id} status ${target}`);
 }
