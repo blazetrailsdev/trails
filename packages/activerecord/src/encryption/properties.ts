@@ -79,6 +79,9 @@ export class Properties {
 
   validateValueType(value: unknown): void {
     if (value === null) return;
+    // Raw cipher header bytes (iv, at) are carried as Buffers — the TS analogue
+    // of Rails' binary Strings. The serializer base64-encodes them in one hop.
+    if (Buffer.isBuffer(value)) return;
     if (typeof value === "object" && value !== null && "payload" in value && "headers" in value)
       return;
     const t = typeof value;

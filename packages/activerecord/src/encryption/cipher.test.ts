@@ -19,7 +19,7 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
   it("by default, encrypts uses random initialization vectors for each encryption operation", () => {
     const cipher = new Cipher();
     const key = generateKey();
-    expect(cipher.encrypt("clean text", { key }).payload).not.toBe(
+    expect(cipher.encrypt("clean text", { key }).payload).not.toEqual(
       cipher.encrypt("clean text", { key }).payload,
     );
   });
@@ -27,7 +27,7 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
   it("deterministic encryption with :deterministic param", () => {
     const cipher = new Cipher();
     const key = generateKey();
-    expect(cipher.encrypt("clean text", { key, deterministic: true }).payload).toBe(
+    expect(cipher.encrypt("clean text", { key, deterministic: true }).payload).toEqual(
       cipher.encrypt("clean text", { key, deterministic: true }).payload,
     );
   });
@@ -48,7 +48,7 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
   it("generates different ciphertexts on different invocations with the same key (not deterministic)", () => {
     const cipher = new Cipher();
     const key = generateKey();
-    expect(cipher.encrypt("clean text", { key }).payload).not.toBe(
+    expect(cipher.encrypt("clean text", { key }).payload).not.toEqual(
       cipher.encrypt("clean text", { key }).payload,
     );
   });

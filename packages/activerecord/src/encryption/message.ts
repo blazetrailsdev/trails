@@ -8,10 +8,10 @@ import { Properties } from "./properties.js";
 import { ForbiddenClass } from "./errors.js";
 
 export class Message {
-  payload: string;
+  payload: string | Buffer;
   headers: Properties;
 
-  constructor(payload?: string | null) {
+  constructor(payload?: string | Buffer | null) {
     this.validatePayloadType(payload);
     this.payload = payload ?? "";
     this.headers = new Properties();
@@ -27,7 +27,14 @@ export class Message {
 
   /** @internal */
   private validatePayloadType(payload: unknown): void {
-    if (payload !== undefined && payload !== null && typeof payload !== "string") {
+    // Rails payloads are binary Strings; in TS we carry raw cipher bytes as a
+    // Buffer and text payloads as a string. Both are allowed; anything else isn't.
+    if (
+      payload !== undefined &&
+      payload !== null &&
+      typeof payload !== "string" &&
+      !Buffer.isBuffer(payload)
+    ) {
       throw new ForbiddenClass(`Payloads must be either nil or strings, not ${typeof payload}`);
     }
   }

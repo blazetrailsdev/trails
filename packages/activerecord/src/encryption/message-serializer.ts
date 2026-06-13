@@ -122,12 +122,16 @@ export class MessageSerializer implements MessageSerializerLike {
 
   /** @internal */
   private encodeIfNeeded(value: unknown): unknown {
+    // Mirrors Rails: Base64.strict_encode64(value) — a single base64 hop over the
+    // value's bytes. Raw cipher bytes arrive as a Buffer (iv, at, payload) and are
+    // encoded directly; genuine text headers arrive as a string and are encoded as
+    // their UTF-8 bytes, exactly like Rails encodes a String's bytes. (Booleans and
+    // numbers pass through untouched.)
+    if (Buffer.isBuffer(value)) {
+      return value.toString("base64");
+    }
     if (typeof value === "string") {
-      // Mirrors Rails: Base64.strict_encode64(value) — a single base64 hop over
-      // the raw bytes. Cipher header values (iv, at) and the payload are raw
-      // bytes carried as latin1 strings (one JS char per byte), so we decode the
-      // string as latin1 rather than utf-8 to avoid mangling bytes >= 0x80.
-      return Buffer.from(value, "latin1").toString("base64");
+      return Buffer.from(value, "utf-8").toString("base64");
     }
     return value;
   }

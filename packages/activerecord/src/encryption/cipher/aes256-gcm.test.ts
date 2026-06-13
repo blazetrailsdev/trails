@@ -39,7 +39,7 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     const cipher = new Cipher(key);
     const m1 = cipher.encrypt("hello");
     const m2 = cipher.encrypt("hello");
-    expect(m1.headers.get("iv")).not.toBe(m2.headers.get("iv"));
+    expect(m1.headers.get("iv")).not.toEqual(m2.headers.get("iv"));
   });
 
   it("in deterministic mode, it generates the same ciphertext for the same inputs", () => {
@@ -47,8 +47,8 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     const cipher = new Cipher(key, { deterministic: true });
     const m1 = cipher.encrypt("hello");
     const m2 = cipher.encrypt("hello");
-    expect(m1.payload).toBe(m2.payload);
-    expect(m1.headers.get("iv")).toBe(m2.headers.get("iv"));
+    expect(m1.payload).toEqual(m2.payload);
+    expect(m1.headers.get("iv")).toEqual(m2.headers.get("iv"));
   });
 
   it("deterministic IV matches Rails HMAC-SHA256 derivation (fixed vector)", () => {
@@ -67,9 +67,9 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
 
     const cipher = new Cipher(key, { deterministic: true });
     const message = cipher.encrypt("hello world");
-    // Header values are now raw bytes carried as latin1 strings (MRI format),
-    // so compare against the raw digest rather than its base64 encoding.
-    expect(Buffer.from(message.headers.get("iv") as string, "latin1")).toEqual(expectedIv);
+    // Header values are now raw bytes (Buffers, the MRI representation), so
+    // compare against the raw digest rather than its base64 encoding.
+    expect(message.headers.get("iv")).toEqual(expectedIv);
   });
 
   it("serialized envelope is byte-identical to MRI (single base64 hop)", () => {
@@ -98,7 +98,7 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     const cipher = new Cipher(key);
     const m1 = cipher.encrypt("hello");
     const m2 = cipher.encrypt("world");
-    expect(m1.headers.get("iv")).not.toBe(m2.headers.get("iv"));
+    expect(m1.headers.get("iv")).not.toEqual(m2.headers.get("iv"));
   });
 
   it("inspect_does not show secrets", () => {

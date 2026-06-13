@@ -66,6 +66,30 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     expect(() => serializer.dump("not a message" as any)).toThrow(ForbiddenClass);
   });
 
+  it("encodes non-ASCII string headers as UTF-8 bytes, matching Rails", () => {
+    // Rails base64-encodes the String's own bytes (Base64.strict_encode64), which
+    // for a UTF-8 string are its UTF-8 bytes. Header text values must therefore be
+    // UTF-8-encoded — never latin1, which would diverge from Rails for bytes in
+    // 0x80..0xFF and silently truncate code points > 0xFF (e.g. emoji).
+    const serializer = new MessageSerializer();
+    const message = new Message("payload");
+    message.addHeader("tag", "café 😀");
+    const parsed = JSON.parse(serializer.dump(message)) as { h: { tag: string } };
+    expect(parsed.h.tag).toBe(Buffer.from("café 😀", "utf-8").toString("base64"));
+    expect(Buffer.from(parsed.h.tag, "base64").toString("utf-8")).toBe("café 😀");
+  });
+
+  it("encodes raw Buffer header values with a single base64 hop", () => {
+    // Cipher header bytes (iv, at) arrive as Buffers and must be base64-encoded
+    // exactly once — base64(raw bytes), the MRI wire format — not re-encoded.
+    const serializer = new MessageSerializer();
+    const message = new Message("payload");
+    const ivBytes = Buffer.from([0x00, 0x80, 0xff, 0x10, 0x20]);
+    message.addHeader("iv", ivBytes);
+    const parsed = JSON.parse(serializer.dump(message)) as { h: { iv: string } };
+    expect(parsed.h.iv).toBe(ivBytes.toString("base64"));
+  });
+
   it("binary? returns false", () => {
     expect(new MessageSerializer().isBinary()).toBe(false);
   });
