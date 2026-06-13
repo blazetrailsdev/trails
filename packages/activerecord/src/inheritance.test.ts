@@ -21,6 +21,10 @@ const TEST_SCHEMA: Schema = {
     name: "string",
     type: "string",
   },
+  accounts: {
+    firm_id: "integer",
+    credit_limit: "integer",
+  },
   vegetables: {
     name: "string",
     type: "string",
@@ -1385,14 +1389,48 @@ describe("InheritanceTest", () => {
     expect(p.name).toBe("NoSTI");
   });
 
-  it.skip("scope inherited properly", async () => {
-    // FOLLOW-UP (f9g2-inheritance-of-first-firm-scope): Rails' `of_first_firm`
-    // scope is `joins(account: :firm).where("companies.id": 1)` — it needs the
-    // companies↔accounts has_one/belongs_to association graph (Account
-    // belongs_to :firm class_name "Company"; Company has_one :account
-    // foreign_key "firm_id") plus an `accounts` fixture table. That
-    // association-fixture setup is its own contained chunk; tracked separately
-    // to keep this PR within the size ceiling.
+  it("scope inherited properly", async () => {
+    // Rails' `of_first_firm` is `joins(account: :firm).where("companies.id": 1)`
+    // (companies.rb). Account `belongs_to :firm, class_name: "Company"`;
+    // Company `has_one :account, foreign_key: "firm_id"`. The scope is defined
+    // on Company and must be inherited by the Client subclass.
+    class OffCompany extends Base {
+      static {
+        this._tableName = "companies";
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.inheritanceColumn = "type";
+        this.hasOne("account", {
+          className: "OffAccount",
+          foreignKey: "firm_id",
+        });
+        this.scope("ofFirstFirm", (rel: any) =>
+          rel.joins({ account: "firm" }).where({ "companies.id": 1 }),
+        );
+      }
+    }
+    class OffFirm extends OffCompany {}
+    class OffClient extends OffCompany {}
+    class OffAccount extends Base {
+      static {
+        this._tableName = "accounts";
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.belongsTo("firm", {
+          className: "OffCompany",
+          foreignKey: "firm_id",
+        });
+      }
+    }
+    registerModel("OffCompany", OffCompany);
+    registerModel("OffFirm", OffFirm);
+    registerModel("OffClient", OffClient);
+    registerModel("OffAccount", OffAccount);
+
+    // assert_nothing_raised: the scope builds and runs on both the base class
+    // and the inheriting subclass.
+    await expect((OffCompany as any).ofFirstFirm().toArray()).resolves.toBeDefined();
+    await expect((OffClient as any).ofFirstFirm().toArray()).resolves.toBeDefined();
   });
 
   it.skip("inheritance with default scope", async () => {
