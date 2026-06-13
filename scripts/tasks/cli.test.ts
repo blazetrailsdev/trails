@@ -44,6 +44,9 @@ import {
   removeFrontmatterKey,
   setFrontmatterList,
   resolveTasksDir,
+  statusEdits,
+  statusOf,
+  statusTransitionError,
   STORY_STATUSES,
   stringFlag,
   StoryEntry,
@@ -299,6 +302,92 @@ describe("claimState (idempotent re-claim discriminator)", () => {
       `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "alice"\n---\n` +
       `assignee: "dean"\n`;
     expect(claimState(fm, "dean")).toBe("taken");
+  });
+});
+
+describe("statusOf", () => {
+  it("reads the status scalar from frontmatter", () => {
+    expect(statusOf(`---\nstatus: draft\npriority: 30\n---\nbody\n`)).toBe("draft");
+  });
+
+  it("reads a quoted status value", () => {
+    expect(statusOf(`---\nstatus: "ready"\n---\n`)).toBe("ready");
+  });
+
+  it("ignores a `status:` line in the Markdown body", () => {
+    expect(statusOf(`---\nstatus: draft\n---\nleave the status: ready field alone\n`)).toBe(
+      "draft",
+    );
+  });
+
+  it("returns null when there is no status line", () => {
+    expect(statusOf(`---\npriority: 30\n---\n`)).toBeNull();
+  });
+
+  it("resolves YAML comment/quote semantics rather than the raw line", () => {
+    expect(statusOf(`---\nstatus: ready # filed then readied\n---\n`)).toBe("ready");
+  });
+
+  it("returns null on malformed frontmatter instead of throwing", () => {
+    expect(statusOf(`---\nstatus: "unterminated\n  bad: : :\n---\n`)).toBeNull();
+  });
+});
+
+describe("statusEdits", () => {
+  it("sets only the status for a draft → ready flip", () => {
+    expect(statusEdits("draft", "ready")).toEqual({ status: "ready" });
+  });
+
+  it("clears blocked-by, claim, assignee, and pr when unblocking to ready", () => {
+    expect(statusEdits("blocked", "ready")).toEqual({
+      status: "ready",
+      "blocked-by": "null",
+      claim: "null",
+      assignee: "null",
+      pr: "null",
+    });
+  });
+});
+
+describe("statusTransitionError", () => {
+  it("allows draft → ready", () => {
+    expect(statusTransitionError("draft", "ready")).toBeNull();
+  });
+
+  it("allows ready → draft", () => {
+    expect(statusTransitionError("ready", "draft")).toBeNull();
+  });
+
+  it("treats a same-status move as a legal no-op", () => {
+    expect(statusTransitionError("draft", "draft")).toBeNull();
+  });
+
+  it("allows blocked → ready (the documented unblock path has no dedicated verb)", () => {
+    expect(statusTransitionError("blocked", "ready")).toBeNull();
+  });
+
+  it("rejects an unrecognized current status instead of throwing", () => {
+    expect(statusTransitionError("typo", "ready")).toMatch(/unrecognized current status "typo"/);
+  });
+
+  it("rejects draft → done and points at the dedicated verb", () => {
+    const err = statusTransitionError("draft", "done");
+    expect(err).toMatch(/won't set status done/);
+    expect(err).toMatch(/done <id> --pr <N>/);
+  });
+
+  it("points draft → claimed at the claim verb", () => {
+    expect(statusTransitionError("draft", "claimed")).toMatch(/pnpm tasks claim <id>/);
+  });
+
+  it("rejects moves out of work-tracking statuses and points at the dedicated verb", () => {
+    expect(statusTransitionError("done", "ready")).toMatch(
+      /has no transitions; use the dedicated verb/,
+    );
+  });
+
+  it("rejects when the current status cannot be read", () => {
+    expect(statusTransitionError(null, "ready")).toMatch(/cannot read current status/);
   });
 });
 

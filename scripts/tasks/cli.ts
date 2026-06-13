@@ -969,6 +969,126 @@ function setPriority(id: string, priority: number | null): void {
   console.log(priority === null ? `cleared priority on ${id}` : `set ${id} priority ${priority}`);
 }
 
+// Legal story-status transitions reachable via `status-set`. The forward
+// work-tracking moves (claimed/in-progress/done) own dedicated verbs that stamp
+// pr/assignee, so this command covers the queue-shaping edits the lifecycle
+// otherwise leaves as hand edits: draft ↔ ready (file then defer), and
+// blocked → ready (the documented unblock path — README's
+// "blocked (→ ready once unblocked)" — which has no dedicated verb).
+const STATUS_TRANSITIONS: Record<StoryStatus, readonly StoryStatus[]> = {
+  draft: ["ready"],
+  ready: ["draft"],
+  claimed: [],
+  "in-progress": [],
+  done: [],
+  blocked: ["ready"],
+};
+
+// Work-tracking statuses own dedicated verbs that also stamp pr/assignee/
+// blocked-by. status-set deliberately won't reach them; the rejection points
+// the operator at the right verb instead of leaving them guessing.
+const STATUS_VERB_HINT: Partial<Record<StoryStatus, string>> = {
+  claimed: "claim <id>",
+  "in-progress": "in-progress <id> --pr <N>",
+  done: "done <id> --pr <N>",
+  blocked: "block <id> --reason <text>",
+};
+
+// Reads the `status:` scalar from a story file's frontmatter, parsed with the
+// same YAML semantics the tasks repo uses (lib.mjs `yaml.load`) so comments and
+// quoting (`status: ready # note`) resolve correctly rather than tripping the
+// raw-regex. Returns the RAW value (not yet validated against STORY_STATUSES — a
+// hand-typo'd status is rejected downstream by statusTransitionError). Reads
+// only the fenced block, so a `status:` line in the Markdown body never matches.
+export function statusOf(fileText: string): string | null {
+  let fm: Record<string, unknown>;
+  try {
+    fm = (parseYaml(frontmatterBlock(fileText)) ?? {}) as Record<string, unknown>;
+  } catch {
+    // Malformed frontmatter — mirror the tasks parser, which records a parse
+    // failure rather than throwing (lib.mjs). Returning null surfaces the
+    // "cannot read current status" CLI error instead of a YAML stack trace.
+    return null;
+  }
+  return typeof fm.status === "string" ? fm.status : null;
+}
+
+// Pure transition check, unit-testable without a git repo. Returns null when the
+// move is legal, otherwise a human-readable rejection reason. `from` is the raw
+// parsed scalar, so an unrecognized current status is caught here rather than
+// dereferencing STATUS_TRANSITIONS with an out-of-set key.
+export function statusTransitionError(from: string | null, target: StoryStatus): string | null {
+  if (from === null) return `cannot read current status`;
+  if (!STORY_STATUSES.includes(from as StoryStatus)) {
+    return `unrecognized current status "${from}" — fix the frontmatter by hand`;
+  }
+  const allowed = STATUS_TRANSITIONS[from as StoryStatus];
+  if (from === target || allowed.includes(target)) return null;
+  // Illegal move — give the most actionable message. A work-tracking target has
+  // a dedicated verb; otherwise report the legal set (or that there is none).
+  if (STATUS_VERB_HINT[target]) {
+    return `won't set status ${target} — use \`pnpm tasks ${STATUS_VERB_HINT[target]}\` instead`;
+  }
+  return allowed.length
+    ? `illegal transition ${from} → ${target} (allowed from ${from}: ${allowed.join(", ")})`
+    : `illegal transition ${from} → ${target} (${from} has no transitions; use the dedicated verb)`;
+}
+
+// Frontmatter edits for a status transition. Unblocking back to ready returns
+// the story to the ready queue for re-claim, so reset it to the unclaimed shape:
+// clear the `blocked-by` the `block` verb stamped AND the claim/assignee/pr it
+// carried in. A blocked story keeps its claim (block doesn't clear it), and
+// claimState reads any non-null `claim` on a ready story as already taken —
+// leaving them set would make the readied story unclaimable.
+export function statusEdits(from: string | null, target: StoryStatus): Record<string, string> {
+  const edits: Record<string, string> = { status: target };
+  if (from === "blocked" && target === "ready") {
+    Object.assign(edits, { "blocked-by": "null", claim: "null", assignee: "null", pr: "null" });
+  }
+  return edits;
+}
+
+// Flip a story's status between pre-work queue states (draft ↔ ready). Rebuilds
+// + commits the index like the other mutating verbs. No-ops short-circuit before
+// the commit (an empty `git commit` would fail); the transition is validated
+// *inside* the mutator — i.e. against the post-`git pull` state — so a story
+// claimed out from under us by a concurrent agent is never clobbered.
+function setStatus(id: string, target: StoryStatus): void {
+  const file = storyFilePath(loadIndex(), id);
+  const from = statusOf(readFileSync(file, "utf8"));
+  if (from === target) {
+    // loadIndex() may have rebuilt the generated index files in the canonical
+    // checkout; this early return skips commitAndPush's restore, so clean up.
+    restoreGeneratedFiles(TASKS_DIR);
+    console.log(`${id} already ${target}`);
+    return;
+  }
+  // Fail fast on an obviously-illegal move before touching git, with the same
+  // message the post-pull recheck would print.
+  const preError = statusTransitionError(from, target);
+  if (preError !== null) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: ${preError} for ${id}`);
+    process.exit(2);
+  }
+  flip(id, `status ${target}: ${id}`, RETRY_MSG(id), 4, (file) => {
+    const fresh = statusOf(readFileSync(file, "utf8"));
+    if (fresh === target) {
+      // Concurrent agent already landed this exact move; the pull brought it
+      // back. Re-applying would leave nothing to commit, so bail cleanly.
+      console.log(`${id} already ${target}`);
+      process.exit(0);
+    }
+    const error = statusTransitionError(fresh, target);
+    if (error !== null) {
+      console.error(`error: ${error} for ${id}`);
+      process.exit(2);
+    }
+    editFrontmatter(file, statusEdits(fresh, target));
+  });
+  console.log(`set ${id} status ${target}`);
+}
+
 // Single exit point for a refine agent: commit whatever it edited in the
 // story file in place, push with the same rebase-retry as the other
 // mutations, and print a machine-readable summary the orchestration layer
@@ -1573,6 +1693,13 @@ function main(): void {
       }
       break;
     }
+    case "status-set": {
+      const id = pos[0];
+      const target = pos[1];
+      if (!id || !target || !STORY_STATUSES.includes(target as StoryStatus)) usage();
+      setStatus(id, target as StoryStatus);
+      break;
+    }
     default:
       usage();
   }
@@ -1593,6 +1720,7 @@ function usage(): never {
   block <id> --reason "<text>"
   refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
+  status-set <id> <status>                     (draft ↔ ready, blocked → ready; validates the transition)
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
   reindex | build                              (rebuild the index in place)
   fmt [<path> ...]                             (prettier --write authored stories; default: rfcs/)
