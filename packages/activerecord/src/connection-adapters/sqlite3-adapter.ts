@@ -52,7 +52,10 @@ import {
 } from "@blazetrails/activemodel";
 import { getFs, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
-import { returningColumnValues as sqliteReturningColumnValues } from "./sqlite3/database-statements.js";
+import {
+  returningColumnValues as sqliteReturningColumnValues,
+  buildTruncateStatement as sqliteBuildTruncateStatement,
+} from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
 import {
@@ -904,6 +907,22 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   override returningColumnValues(result: Result): unknown[] | undefined {
     return sqliteReturningColumnValues(result);
+  }
+
+  /** SQLite has no TRUNCATE; emit `DELETE FROM`.
+   *  Mirrors: SQLite3::DatabaseStatements#build_truncate_statement
+   * @internal
+   */
+  override buildTruncateStatement(tableName: string): string {
+    return sqliteBuildTruncateStatement.call(this, tableName);
+  }
+
+  /** Rails: `execute(build_truncate_statement(table_name), name)`. SQLite's
+   *  `execute` is a read-only `.all()` cursor, so the `DELETE FROM` statement
+   *  must run through `executeMutation` (the write primitive, which also dirties
+   *  the query cache). PG/MySQL keep the abstract `execute` path. */
+  override async truncate(tableName: string, name?: string | null): Promise<unknown> {
+    return this.executeMutation(this.buildTruncateStatement(tableName), [], name ?? "SQL");
   }
 
   supportsInsertOnConflict(): boolean {

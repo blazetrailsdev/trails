@@ -28,7 +28,9 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Post } from "./test-helpers/models/post.js";
-import { Author } from "./test-helpers/models/author.js";
+import { Author, AuthorAddress } from "./test-helpers/models/author.js";
+import { Movie } from "./test-helpers/models/movie.js";
+import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Event } from "./test-helpers/models/event.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 
@@ -642,35 +644,144 @@ describe("AdapterForeignKeyTest", () => {
 });
 
 describe("AdapterTestWithoutTransaction", () => {
-  it.skip("create with query cache", () => {
-    // BLOCKED: query-cache
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts: enableQueryCache!/create cache-invalidation interplay
-    // SCOPE: ~20 LOC + posts fixture; affects ~3 tests
+  registerModel("Author", Author);
+  registerModel("Post", Post);
+  registerModel("AuthorAddress", AuthorAddress);
+  registerModel("Movie", Movie);
+  registerModel("Subscriber", Subscriber);
+
+  // Rails: `self.use_transactional_tests = false`. truncate commits (and on
+  // MySQL implicitly commits as DDL), so these run un-wrapped; useFixtures
+  // re-seeds each table in its beforeEach, standing in for `reset_fixtures`.
+  const withoutTransaction = [
+    "create with query cache",
+    "truncate",
+    "truncate with query cache",
+    "truncate tables",
+    "truncate tables with query cache",
+    "reset empty table with custom pk",
+    "reset table with non integer pk",
+  ];
+  const { posts } = useHandlerFixtures(
+    ["posts", "authors", "authorAddresses", "movies", "subscribers"],
+    {
+      schema: canonicalSchema,
+      usesTransaction: withoutTransaction,
+    },
+  );
+
+  beforeAll(async () => {
+    // Rails' schema.rb declares `movies` with `primary_key: "movieid"`, making
+    // movieid a serial column. The canonical-schema `defineSchema` path creates
+    // a custom-named integer PK without a sequence on PostgreSQL, so a
+    // sequence-less `movieid` rejects the `reset empty table with custom pk`
+    // insert. Recreate it with an auto-increment PK (PG-only; the test is
+    // PG-gated). Mirrors the keyboards recreation in primary-keys.test.ts.
+    if (adapterType !== "postgres") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const conn = Base.connection as any;
+    await conn.dropTable("movies", { ifExists: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await conn.createTable("movies", { primaryKey: "movieid" }, (t: any) => {
+      t.string("name");
+    });
+    Movie.resetColumnInformation();
+    await Movie.loadSchema();
   });
-  it.skip("truncate", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs posts fixture for adapter#truncate("posts") integration
-    // SCOPE: ~15 LOC port; affects ~1 test
+
+  it("create with query cache", async () => {
+    const conn = Base.connection as AbstractAdapter;
+    conn.enableQueryCacheBang();
+    try {
+      // posts fixtures are loaded (e.g. "welcome"), so the count is fixture-backed.
+      expect(posts("welcome").id).toBeGreaterThan(0);
+      const count = (await Post.count()) as number;
+
+      await conn.create("INSERT INTO posts(title, body) VALUES ('', '')");
+
+      expect(await Post.count()).toBe(count + 1);
+    } finally {
+      conn.disableQueryCacheBang();
+    }
   });
-  it.skip("truncate with query cache", () => {
-    // BLOCKED: query-cache
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts: truncate must invalidate query cache after enableQueryCache!
-    // SCOPE: ~15 LOC + posts fixture; affects ~3 tests
+
+  it("truncate", async () => {
+    const conn = Base.connection as AbstractAdapter;
+    expect(await Post.count()).toBeGreaterThan(0);
+
+    await conn.truncate("posts");
+
+    expect(await Post.count()).toBe(0);
   });
-  it.skip("truncate tables with query cache", () => {
-    // BLOCKED: query-cache
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts: truncateTables must invalidate query cache across multiple tables
-    // SCOPE: ~15 LOC + posts/authors/author_addresses fixtures; affects ~3 tests
+
+  it("truncate with query cache", async () => {
+    const conn = Base.connection as AbstractAdapter;
+    conn.enableQueryCacheBang();
+    try {
+      expect(await Post.count()).toBeGreaterThan(0);
+
+      await conn.truncate("posts");
+
+      expect(await Post.count()).toBe(0);
+    } finally {
+      conn.disableQueryCacheBang();
+    }
   });
-  it.skip("reset empty table with custom pk", () => {
-    // BLOCKED: adapter-pg
-    // ROOT-CAUSE: connection-adapters/postgresql-adapter.ts#resetPkSequence!: PG-only; needs Movie fixture
-    // SCOPE: ~15 LOC port + Movie fixture; affects ~2 tests
+
+  it("truncate tables", async () => {
+    const conn = Base.connection as AbstractAdapter;
+    expect(await Post.count()).toBeGreaterThan(0);
+    expect(await Author.count()).toBeGreaterThan(0);
+    expect(await AuthorAddress.count()).toBeGreaterThan(0);
+
+    await conn.truncateTables("author_addresses", "authors", "posts");
+
+    expect(await Post.count()).toBe(0);
+    expect(await Author.count()).toBe(0);
+    expect(await AuthorAddress.count()).toBe(0);
   });
-  it.skip("reset table with non integer pk", () => {
-    // BLOCKED: adapter-pg
-    // ROOT-CAUSE: connection-adapters/postgresql-adapter.ts#resetPkSequence!: PG-only; needs Subscriber (nick PK) fixture
-    // SCOPE: ~15 LOC port + Subscriber fixture; affects ~2 tests
+
+  it("truncate tables with query cache", async () => {
+    const conn = Base.connection as AbstractAdapter;
+    conn.enableQueryCacheBang();
+    try {
+      expect(await Post.count()).toBeGreaterThan(0);
+      expect(await Author.count()).toBeGreaterThan(0);
+      expect(await AuthorAddress.count()).toBeGreaterThan(0);
+
+      await conn.truncateTables("author_addresses", "authors", "posts");
+
+      expect(await Post.count()).toBe(0);
+      expect(await Author.count()).toBe(0);
+      expect(await AuthorAddress.count()).toBe(0);
+    } finally {
+      conn.disableQueryCacheBang();
+    }
+  });
+
+  // Rails gates these on `respond_to?(:reset_pk_sequence!)` — PostgreSQL only.
+  it.skipIf(adapterType !== "postgres")("reset empty table with custom pk", async () => {
+    const conn = Base.connection as DatabaseAdapter & {
+      resetPkSequenceBang(table: string): Promise<void>;
+    };
+    await Movie.deleteAll();
+    await conn.resetPkSequenceBang("movies");
+    const movie = await Movie.create({ name: "fight club" });
+    expect(movie.id).toBe(1);
+  });
+
+  it.skipIf(adapterType !== "postgres")("reset table with non integer pk", async () => {
+    const conn = Base.connection as DatabaseAdapter & {
+      resetPkSequenceBang(table: string): Promise<void>;
+    };
+    await Subscriber.deleteAll();
+    await conn.resetPkSequenceBang("subscribers");
+    const sub = new Subscriber({ name: "robert drake" });
+    sub.id = "bob drake";
+    // Rails: assert_nothing_raised { sub.save! }
+    await sub.saveBang();
+    const found = (await Subscriber.find("bob drake")) as Subscriber;
+    expect(found.id).toBe("bob drake");
   });
 });
 
