@@ -537,6 +537,10 @@ describe("StrictLoadingTest", () => {
       slcpd_books: { title: "string", author_id: "integer" },
       slcpf_devs: { name: "string" },
       slcpf_logs: { message: "string", slcpf_dev_id: "integer" },
+      slnw_books: { title: "string", sl_nw_author_id: "integer" },
+      slhotc_firms: { name: "string" },
+      slhotc_devs: { name: "string", slhotc_firm_id: "integer" },
+      slhotc_members: { name: "string", slhotc_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1603,15 +1607,60 @@ describe("StrictLoadingTest", () => {
     await proxy.concat(book);
     expect(author.isStrictLoading()).toBe(true);
   });
-  it.skip("strict loading with new record on build is ignored", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading with new record on build is ignored", async () => {
+    class SlnbAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlnbBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("sl_nb_author_id", "integer");
+      }
+    }
+    registerModel("SlnbAuthor", SlnbAuthor);
+    registerModel("SlnbBook", SlnbBook);
+    Associations.hasMany.call(SlnbAuthor, "slNbBooks", {
+      className: "SlnbBook",
+      foreignKey: "sl_nb_author_id",
+    });
+    // Rails uses `Developer.new(id: Developer.first.id)` — a new record
+    // carrying a pre-assigned PK (strict_loading_test.rb:244).
+    const author = new SlnbAuthor({ id: 1, name: "Test" });
+    author.strictLoadingBang();
+    const proxy = association(author, "slNbBooks");
+    expect(() => proxy.build({ title: "Built Book" })).not.toThrow();
+    expect(author.isStrictLoading()).toBe(true);
   });
-  it.skip("strict loading with new record on writer is ignored", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading with new record on writer is ignored", async () => {
+    class SlnwAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlnwBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("sl_nw_author_id", "integer");
+      }
+    }
+    registerModel("SlnwAuthor", SlnwAuthor);
+    registerModel("SlnwBook", SlnwBook);
+    Associations.hasMany.call(SlnwAuthor, "slNwBooks", {
+      className: "SlnwBook",
+      foreignKey: "sl_nw_author_id",
+    });
+    // Rails uses `Developer.new(id: Developer.first.id)` — a new record
+    // carrying a pre-assigned PK (strict_loading_test.rb:253). With the PK
+    // present, `foreign_key_present?` is true so the writer's clear path runs
+    // its nullify SQL (no `null_scope?` short-circuit) over an empty child set.
+    const author = new SlnwAuthor({ id: 1, name: "Test" });
+    author.strictLoadingBang();
+    const proxy = association(author, "slNwBooks");
+    const book = new SlnwBook({ title: "Written Book" });
+    await proxy.replace([book]);
+    expect(author.isStrictLoading()).toBe(true);
   });
   it("strict loading has one reload", async () => {
     class SlhorDev extends Base {
@@ -1779,10 +1828,57 @@ describe("StrictLoadingTest", () => {
       loadHasOne(loaded!, "slthcShip", { className: "SlthcShip", foreignKey: "slthc_dev_id" }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
-  it.skip("strict loading with has one through does not prevent creation of association", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading with has one through does not prevent creation of association", async () => {
+    // Mirrors Rails' Computer (`belongs_to :developer; has_one :firm, through:
+    // :developer`) + Developer (`belongs_to :firm`): the through reflection is
+    // a belongs_to, so assigning the target on a new owner builds the join
+    // record in memory and `save` persists the whole graph.
+    class SlhotcFirm extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlhotcDev extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("slhotc_firm_id", "integer");
+      }
+    }
+    class SlhotcMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("slhotc_dev_id", "integer");
+      }
+    }
+    registerModel("SlhotcFirm", SlhotcFirm);
+    registerModel("SlhotcDev", SlhotcDev);
+    registerModel("SlhotcMember", SlhotcMember);
+    Associations.belongsTo.call(SlhotcMember, "slhotcDev", {
+      className: "SlhotcDev",
+      foreignKey: "slhotc_dev_id",
+    });
+    Associations.hasOne.call(SlhotcMember, "slhotcFirm", {
+      className: "SlhotcFirm",
+      through: "slhotcDev",
+      source: "slhotcFirm",
+    });
+    Associations.belongsTo.call(SlhotcDev, "slhotcFirm", {
+      className: "SlhotcFirm",
+      foreignKey: "slhotc_firm_id",
+    });
+
+    // Rails wires new strict-loading records through a has_one :through and
+    // asserts `save!` does not raise (strict_loading_test.rb:330). Creating the
+    // through association on a new strict-loading owner must not trip the
+    // strict-loading violation check.
+    const member = new SlhotcMember({ name: "New Member" });
+    member.strictLoadingBang();
+    expect(member.isStrictLoading()).toBe(true);
+    const firm = new SlhotcFirm({ name: "SuperFirm" });
+    (member.association("slhotcFirm") as any).writer(firm);
+
+    await expect(member.save()).resolves.toBe(true);
+    expect(member.isNewRecord()).toBe(false);
   });
   it("preload audit logs are strict loading because parent is strict loading", async () => {
     class SlpplDev extends Base {
@@ -2355,11 +2451,58 @@ describe("StrictLoadingTest", () => {
 });
 
 describe("StrictLoadingFixturesTest", () => {
-  it.skip("strict loading violations are ignored on fixtures", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
-    /* fixture-dependent */
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      slf_zines: { title: "string" },
+      slf_interests: { topic: "string", slf_zine_id: "integer" },
+    });
+  });
+
+  it("strict loading violations are ignored on fixtures", async () => {
+    class SlfInterest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("slf_zine_id", "integer");
+      }
+    }
+    class SlfZine extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    registerModel("SlfInterest", SlfInterest);
+    registerModel("SlfZine", SlfZine);
+    Associations.hasMany.call(SlfZine, "slfInterests", {
+      className: "SlfInterest",
+      foreignKey: "slf_zine_id",
+    });
+
+    const created = await SlfZine.create({ title: "Going Out" });
+    await SlfInterest.create({ topic: "Hiking", slf_zine_id: created.id });
+    // The fixture record is instantiated before the default flips, capturing
+    // `strict_loading_by_default == false` — loading through the normal DB
+    // path while the default is off models that.
+    const zine = (await SlfZine.find(created.id))!;
+    try {
+      SlfZine.strictLoadingByDefault = true;
+      expect(zine.isStrictLoading()).toBe(false);
+
+      // Mirrors Rails: the fixture-loaded record does NOT raise when loading an
+      // association (strict_loading_test.rb:756)...
+      await expect(association(zine, "slfInterests").toArray()).resolves.toHaveLength(1);
+
+      // ...but a record freshly fetched under `strict_loading_by_default` IS
+      // strict and DOES raise (strict_loading_test.rb:760).
+      const fresh = (await SlfZine.find(created.id))!;
+      expect(fresh.isStrictLoading()).toBe(true);
+      await expect(association(fresh, "slfInterests").toArray()).rejects.toThrow(
+        StrictLoadingViolationError,
+      );
+    } finally {
+      SlfZine.strictLoadingByDefault = false;
+    }
   });
 });
 
