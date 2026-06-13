@@ -1,5 +1,9 @@
 import type { Base } from "./base.js";
-import { modelRegistry, _cacheSingularTarget } from "./associations.js";
+import {
+  modelRegistry,
+  _cacheSingularTarget,
+  association as collectionProxyFor,
+} from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
@@ -422,6 +426,39 @@ export function isPolymorphicBelongsTo(record: Base, associationName: string): b
   return assocDef?.type === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
 }
 
+/**
+ * Plain-object copy of `attributes` with the nested-attribute control keys
+ * (`id`, `_destroy`) removed — the assignable set passed to a built/updated
+ * child. Iterates own enumerable entries so strong-params wrappers
+ * (`ProtectedParams`) work transparently.
+ * @internal
+ */
+function assignableNestedAttributes(attributes: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(attributes)) {
+    if (!UNASSIGNABLE_KEYS.has(k)) out[k] = v;
+  }
+  return out;
+}
+
+/** @internal */
+function hasNestedId(attributes: Record<string, unknown>): boolean {
+  const id = (attributes as any).id;
+  return id !== undefined && id !== null && id !== "";
+}
+
+/** @internal */
+function storePendingNestedAttributes(
+  record: Base,
+  associationName: string,
+  attrs: Record<string, unknown>[],
+): void {
+  if (!(record as any)._pendingNestedAttributes) {
+    (record as any)._pendingNestedAttributes = new Map();
+  }
+  (record as any)._pendingNestedAttributes.set(associationName, attrs);
+}
+
 /** @internal */
 export function assignNestedAttributesForOneToOneAssociation(
   record: Base,
@@ -434,24 +471,30 @@ export function assignNestedAttributesForOneToOneAssociation(
     );
   }
   if (!isRejectNewRecord(record, associationName, attributes)) {
+    // Records with a matching `id` are existing-record updates: the loader is
+    // async (no synchronous DB read in this writer), so defer them to the
+    // post-save flush in `processNestedAttributes`.
+    if (hasNestedId(attributes)) {
+      storePendingNestedAttributes(record, associationName, [attributes]);
+      return;
+    }
     // Rails defers the polymorphic-target check to build time: when no `id` is
     // present a new record must be built, but a polymorphic belongs_to has no
-    // `build_#{association_name}` method, so the writer raises. Updates (with a
-    // matching `id`) are unaffected.
-    const id = (attributes as any).id;
-    if (
-      (id === undefined || id === null || id === "") &&
-      isPolymorphicBelongsTo(record, associationName)
-    ) {
+    // `build_#{association_name}` method, so the writer raises.
+    if (isPolymorphicBelongsTo(record, associationName)) {
       throw new Error(
         `Cannot build association \`${associationName}'. ` +
           `Are you trying to build a polymorphic one-to-one association?`,
       );
     }
-    if (!(record as any)._pendingNestedAttributes) {
-      (record as any)._pendingNestedAttributes = new Map();
-    }
-    (record as any)._pendingNestedAttributes.set(associationName, [attributes]);
+    // Rails-style immediate in-memory build: `build_#{association_name}` runs
+    // at assign time, so the association is readable right after assignment
+    // (`part.ship.name`). Autosave persists the built record on save.
+    (
+      record.association(associationName) as unknown as {
+        build(attrs: Record<string, unknown>): Base | null;
+      }
+    ).build(assignableNestedAttributes(attributes));
   }
 }
 
@@ -517,10 +560,22 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  if (!(record as any)._pendingNestedAttributes) {
-    (record as any)._pendingNestedAttributes = new Map();
+  // Rails-style immediate in-memory build: new records (no `id`) are built on
+  // the association at assign time so the collection is readable right after
+  // assignment (`part.trinkets[0].name`); autosave persists them on save.
+  // Records with an `id` are existing-record updates/destroys whose loader is
+  // async, so they stay in the pending map for the post-save flush.
+  const deferred: Record<string, unknown>[] = [];
+  for (const a of attrs) {
+    if (hasNestedId(a)) {
+      deferred.push(a);
+    } else if (!isRejectNewRecord(record, associationName, a)) {
+      collectionProxyFor(record, associationName).build(assignableNestedAttributes(a));
+    }
   }
-  (record as any)._pendingNestedAttributes.set(associationName, attrs);
+  if (deferred.length > 0) {
+    storePendingNestedAttributes(record, associationName, deferred);
+  }
 }
 
 /**

@@ -19,9 +19,19 @@ import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import "./index.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Company } from "./test-helpers/models/company.js";
+import { ShipPart } from "./test-helpers/models/ship-part.js";
+import { Ship } from "./test-helpers/models/ship.js";
+import { Treasure } from "./test-helpers/models/treasure.js";
+import { registerModel } from "./associations.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { ProtectedParams } from "./test-helpers/protected-params.js";
+
+// ShipPart's nested associations resolve `Ship` / `Treasure` from the model
+// registry at build time; ship.ts and treasure.ts don't self-register.
+registerModel(ShipPart);
+registerModel(Ship);
+registerModel(Treasure);
 
 describe("ForbiddenAttributesProtectionTest", () => {
   useHandlerFixtures(["people", "companies"], { schema: canonicalSchema });
@@ -123,19 +133,27 @@ describe("ForbiddenAttributesProtectionTest", () => {
     expect(remaining).toHaveLength(0);
   });
 
-  it.skip("strong params style objects work with singular associations", () => {
-    // BLOCKED: nested-attributes — Rails builds nested association records in
-    // memory at assign time (`part.ship.name` is readable right after `new`).
-    // ROOT-CAUSE: trails' accepts_nested_attributes_for defers building to save
-    // (_pendingNestedAttributes in nested-attributes.ts) and writes via the DB
-    // on persist, so the in-memory association stays empty. SCOPE: Rails-style
-    // immediate nested build (Phase G), separate PR.
+  it("strong params style objects work with singular associations", () => {
+    const params = new ProtectedParams({
+      name: "Stern",
+      shipAttributes: new ProtectedParams({ name: "The Black Rock" }).permit(),
+    }).permit();
+    const part = new ShipPart(params);
+
+    expect(part.readAttribute("name")).toBe("Stern");
+    expect((part as any).ship.readAttribute("name")).toBe("The Black Rock");
   });
 
-  it.skip("strong params style objects work with collection associations", () => {
-    // BLOCKED: nested-attributes — same as the singular case: collection nested
-    // attributes (`part.trinkets[0].name`) must be built in memory at assign
-    // time. trails defers to save (nested-attributes.ts). SCOPE: Rails-style
-    // immediate nested build (Phase G), separate PR.
+  it("strong params style objects work with collection associations", () => {
+    const params = new ProtectedParams({
+      trinketsAttributes: new ProtectedParams({
+        "0": new ProtectedParams({ name: "Necklace" }).permit(),
+        "1": new ProtectedParams({ name: "Spoon" }).permit(),
+      }).permit(),
+    }).permit();
+    const part = new ShipPart(params);
+
+    expect((part as any).trinkets[0].readAttribute("name")).toBe("Necklace");
+    expect((part as any).trinkets[1].readAttribute("name")).toBe("Spoon");
   });
 });
