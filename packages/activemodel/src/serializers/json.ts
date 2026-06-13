@@ -3,7 +3,7 @@ import {
   attributeNamesForSerialization,
   serializableAttributes,
   serializableAddIncludes,
-  coerceForJson,
+  asJsonThenable,
   type SerializeOptions,
   type SerializationRecord,
 } from "../serialization.js";
@@ -69,22 +69,18 @@ export class JSON {
    */
   asJson(options?: SerializeOptions & { root?: boolean | string }): Record<string, unknown> {
     const ctor = this.constructor as typeof JSON;
+    // A `:root` option overrides `include_root_in_json` (json.rb:101-107);
+    // asJsonThenable applies Rails' truthiness + recursive JSON coercion.
     const rootOpt =
       options && Object.prototype.hasOwnProperty.call(options, "root")
         ? options.root
         : ctor.includeRootInJson;
-    // Rails calls `serializable_hash(options).as_json` — recursive
-    // JSON-coerce on the resulting hash. Mirror that with coerceForJson
-    // so JSON-unsafe values (bigint, undefined, cyclic refs, etc.)
-    // surface predictably, matching Model.asJson (model.ts:1708).
-    const hash = coerceForJson(this.serializableHash(options)) as Record<string, unknown>;
-    // Rails uses Ruby truthiness — only false/nil skip the wrap. JS
-    // falsiness would also skip an empty-string root key, which Rails
-    // would happily emit as `{ "" => hash }`. Match Rails semantics
-    // explicitly (json.rb:101-107).
-    if (rootOpt === false || rootOpt == null) return hash;
-    const rootKey = rootOpt === true ? ctor.modelName.element : (rootOpt as string);
-    return { [rootKey]: hash };
+    return asJsonThenable(
+      () => this.serializableHash(options),
+      rootOpt,
+      () => ctor.modelName.element,
+      options ?? {},
+    );
   }
 
   /**

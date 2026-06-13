@@ -167,6 +167,12 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       post_j11s: { title: "string" },
       post_j12s: { title: "string" },
       comment_j12s: { body: "string", post_id: "integer" },
+      post_a0s: { title: "string" },
+      post_a2s: { title: "string" },
+      comment_a2s: { body: "string", post_id: "integer" },
+      post_a4s: { title: "string" },
+      comment_a4s: { body: "string", post_id: "integer" },
+      reply_a4s: { text: "string", comment_id: "integer" },
     });
   });
   it("includes uses association name", async () => {
@@ -442,7 +448,89 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     registerModel(CommentJ12);
     const post = await PostJ12.create({ title: "Hello" });
     await CommentJ12.create({ body: "Hi", post_id: post.id });
-    // No load() — `post.comments` is unloaded.
-    expect(() => post.asJson({ include: "comments" })).toThrow(/not loaded/);
+    // No load() — `post.comments` is unloaded. The thenable defers the throw to
+    // synchronous access (so `await` can still reach the async path).
+    expect(() => post.asJson({ include: "comments" }).comments).toThrow(/not loaded/);
+    expect(() => JSON.stringify(post.asJson({ include: "comments" }))).toThrow(/not loaded/);
+    // Fail-loud is all-or-nothing: reading any key (not just the include) throws.
+    expect(() => post.asJson({ include: "comments" }).title).toThrow(/not loaded/);
+  });
+
+  it("without an include the hash is plain (no awaitable contract)", async () => {
+    class PostA0 extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const post = await PostA0.create({ title: "Hello" });
+    // No `:include` → Rails-plain Hash with no `then` for assimilation to catch.
+    expect((post.asJson() as { then?: unknown }).then).toBeUndefined();
+    expect((post.serializableHash() as { then?: unknown }).then).toBeUndefined();
+  });
+
+  // Awaiting runs the async path: lazy-load unloaded includes (Rails' `to_ary`).
+  it("awaiting loads an unloaded belongs_to and serializes the row", async () => {
+    class PostA2 extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class CommentA2 extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.belongsTo("post", { className: "PostA2", foreignKey: "post_id" });
+      }
+    }
+    registerModel(PostA2);
+    const post = await PostA2.create({ title: "Hello" });
+    const comment = await CommentA2.create({ body: "Great", post_id: post.id });
+    // Reload so the belongs_to target is unloaded, then `await` lazy-loads it.
+    const fresh = await CommentA2.findBy({ id: comment.id });
+    const json = await fresh!.asJson({ include: "post" });
+    expect((json.post as any).title).toBe("Hello");
+    // root + include on the async path exercises the `element()` thunk.
+    (CommentA2 as any).includeRootInJson = true;
+    try {
+      const rooted = await fresh!.asJson({ include: "post" });
+      const rootKey = Object.keys(rooted)[0];
+      expect(Object.keys(rooted).length).toBe(1);
+      expect((rooted[rootKey] as any).post.title).toBe("Hello");
+    } finally {
+      (CommentA2 as any).includeRootInJson = false;
+    }
+  });
+
+  it("awaiting loads unloaded has_many and nested includes", async () => {
+    class ReplyA4 extends Base {
+      static {
+        this.attribute("text", "string");
+        this.attribute("comment_id", "integer");
+      }
+    }
+    class CommentA4 extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+        this.hasMany("replies", { className: "ReplyA4", foreignKey: "comment_id" });
+      }
+    }
+    class PostA4 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.hasMany("comments", { className: "CommentA4", foreignKey: "post_id" });
+      }
+    }
+    registerModel(CommentA4);
+    registerModel(ReplyA4);
+    const post = await PostA4.create({ title: "Hello" });
+    const c = await CommentA4.create({ body: "Great", post_id: post.id });
+    await ReplyA4.create({ text: "Indeed", comment_id: c.id });
+    const json = await post.asJson({ include: { comments: { include: "replies" } } });
+    const comments = json.comments as any[];
+    expect(comments[0].body).toBe("Great");
+    expect(comments[0].replies[0].text).toBe("Indeed");
+    // The awaited value is a plain object — JSON.stringify works normally.
+    expect(JSON.parse(JSON.stringify(json)).comments[0].replies[0].text).toBe("Indeed");
   });
 });
