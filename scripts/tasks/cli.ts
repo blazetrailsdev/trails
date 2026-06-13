@@ -1324,6 +1324,12 @@ function showStory(index: Index, id: string): void {
     process.exit(1);
   }
   const file = join(TASKS_DIR, entry.file_path);
+  if (!existsSync(file)) {
+    // Index is ahead of disk (e.g. a deleted story still in a stale index).
+    // Surface it cleanly rather than letting readFileSync throw a raw ENOENT.
+    console.error(`error: story "${id}" is indexed at ${entry.file_path} but the file is missing`);
+    process.exit(1);
+  }
   console.log(renderStoryView(entry.file_path, readFileSync(file, "utf8")));
 }
 
