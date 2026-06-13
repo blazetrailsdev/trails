@@ -48,6 +48,14 @@ describe("quotedTime", () => {
     const v = Temporal.PlainDateTime.from("2099-12-31T09:00:00");
     expect(quotedTime(v)).toBe("09:00:00");
   });
+
+  it("dispatches through this.quotedDate (mirrors Rails quoted_time → self.quoted_date)", () => {
+    // Override quotedDate to prove the self-dispatch chain is live; the prefix
+    // is then stripped by quotedTime's date-removal regex.
+    const host = { quotedDate: () => "2000-01-01 11:22:33" };
+    const v = Temporal.PlainTime.from("11:22:33");
+    expect(quotedTime.call(host, v)).toBe("11:22:33");
+  });
 });
 
 describe("quote dispatches through quoted_date/quoted_time", () => {
