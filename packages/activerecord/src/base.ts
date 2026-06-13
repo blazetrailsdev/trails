@@ -1668,7 +1668,7 @@ export class Base extends Model {
     return rel;
   }
 
-  private static _buildDefaultRelation(): any {
+  private static _buildDefaultRelation(allQueries?: boolean | null): any {
     if (!_RelationCtor) {
       throw new Error("Relation not loaded. Import relation.ts first.");
     }
@@ -1676,7 +1676,7 @@ export class Base extends Model {
       const r = new _RelationCtor!(this);
       return _wrapWithScopeProxy ? _wrapWithScopeProxy(r) : r;
     };
-    const rel = DefaultScoping.buildDefaultScope(this, buildBase) ?? buildBase();
+    const rel = DefaultScoping.buildDefaultScope(this, buildBase, allQueries) ?? buildBase();
     return this._applyStiTypeCondition(rel);
   }
 
@@ -1824,12 +1824,15 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.all
    */
-  static all<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
+  static all<T extends typeof Base>(
+    this: T,
+    options?: { allQueries?: boolean | null },
+  ): Relation<InstanceType<T>> {
     const scope = this.currentScope;
     if (scope) {
       return scope._clone();
     }
-    return this._buildDefaultRelation();
+    return this._buildDefaultRelation(options?.allQueries);
   }
 
   /**

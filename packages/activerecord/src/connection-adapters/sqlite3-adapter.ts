@@ -1097,9 +1097,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return new this(config.database ?? ":memory:", { readonly: config.readonly });
   }
 
-  static override dbconsole(config?: { database?: string }): void {
-    const db = config?.database ?? ":memory:";
-    console.log(`sqlite3 ${db}`);
+  // Mirrors Rails' SQLite3Adapter.dbconsole: `-#{mode}` / `-header` flags
+  // precede the database path. The PTY exec itself is unported (Ruby-only).
+  static override dbconsole(
+    config?: { database?: string },
+    options: { mode?: string; header?: boolean } = {},
+  ): string[] {
+    const args: string[] = [];
+    if (options.mode) args.push(`-${options.mode}`);
+    if (options.header) args.push("-header");
+    args.push(config?.database ?? ":memory:");
+    return args;
   }
 
   // --- Schema operations ---

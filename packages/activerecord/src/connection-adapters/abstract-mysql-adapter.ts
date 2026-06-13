@@ -1217,11 +1217,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (config.port) args.push(`--port=${config.port}`);
     if (config.socket) args.push(`--socket=${config.socket}`);
     if (config.username) args.push(`--user=${config.username}`);
-    if (config.password && !options.include_password) args.push("-p");
-    else if (config.password) args.push(`--password=${config.password}`);
     if (config.sslCa) args.push(`--ssl-ca=${config.sslCa}`);
     if (config.sslCert) args.push(`--ssl-cert=${config.sslCert}`);
     if (config.sslKey) args.push(`--ssl-key=${config.sslKey}`);
+    // Rails: --password=… only with include_password; otherwise -p prompts.
+    if (config.password && options.includePassword) {
+      args.push(`--password=${config.password}`);
+    } else if (config.password && String(config.password) !== "") {
+      args.push("-p");
+    }
     if (config.database) args.push(config.database as string);
     return args;
   }
