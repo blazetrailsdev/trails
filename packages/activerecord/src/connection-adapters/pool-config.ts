@@ -257,6 +257,9 @@ export interface TrailsAdapterOptions {
   preparedStatements?: boolean;
   // Mirrors: database.yml `insert_returning` — set false to disable RETURNING
   insertReturning?: boolean;
+  // Mirrors: database.yml `advisory_locks` — set false to disable advisory
+  // locking (read by `advisoryLocksEnabled?`). Defaults to true.
+  advisoryLocks?: boolean | string;
 }
 
 /**

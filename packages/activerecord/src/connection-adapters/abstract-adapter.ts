@@ -510,6 +510,11 @@ export class AbstractAdapter implements Quoting {
   // the default-false here matches Rails' fresh-adapter state.
   protected _rawConnectionDirty = false;
   protected _config: Record<string, unknown> = {};
+  // Mirrors Rails @advisory_locks_enabled (abstract_adapter.rb:163), derived
+  // from `config.fetch(:advisory_locks, true)` at construction. Concrete
+  // adapters with config (PG/MySQL) set this from their adapter options; the
+  // default `true` matches Rails' fetch fallback.
+  protected _advisoryLocksEnabled = true;
   _transactionManager: TransactionManager = new TransactionManager(this as any);
 
   _queryCache: Store | null = null;
@@ -1591,8 +1596,12 @@ export class AbstractAdapter implements Quoting {
 
   // --- Advisory locks ---
 
+  // Mirrors AbstractAdapter#advisory_locks_enabled? (abstract_adapter.rb:603).
+  // `supportsAdvisoryLocks()` is false on SQLite, so this returns false there
+  // (Rails' `respond_to?`/`supports_advisory_locks?` gate); PG/MySQL combine
+  // that capability with the `:advisory_locks` config flag.
   isAdvisoryLocksEnabled(): boolean {
-    return false;
+    return this.supportsAdvisoryLocks() && this._advisoryLocksEnabled;
   }
 
   async getAdvisoryLock(_lockId: number | bigint | string): Promise<boolean> {

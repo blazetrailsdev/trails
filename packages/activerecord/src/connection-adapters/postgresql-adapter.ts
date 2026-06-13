@@ -426,12 +426,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       statementLimit,
       preparedStatements,
       insertReturning,
+      advisoryLocks,
       minMessages,
       variables,
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
     if (statementLimit !== undefined) this.statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
+    if (advisoryLocks !== undefined) {
+      this._advisoryLocksEnabled =
+        PostgreSQLAdapter.typeCastConfigToBoolean(advisoryLocks) !== false;
+    }
     if (insertReturning !== undefined) this._useInsertReturning = insertReturning;
     if (minMessages !== undefined && typeof minMessages !== "string") {
       throw new TypeError(`minMessages must be a string, got ${typeof minMessages}`);
