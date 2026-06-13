@@ -252,6 +252,9 @@ describe("AppGenerator", () => {
     await gen.run();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
     expect(dbConfig).toContain('adapter: "expo-sqlite"');
+    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
+    expect(pkg.dependencies["expo-sqlite"]).toBeDefined();
+    expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
   });
 
   it("skips docker files when --skip-docker", async () => {

@@ -68,4 +68,42 @@ describe("SQLite adapter driver binding", () => {
     expect(adapter.active).toBe(true);
     adapter.disconnectBang();
   });
+
+  it("forwards driver-specific open config (timeout, driverOptions) to open()", async () => {
+    let seen: Record<string, unknown> | undefined;
+    const driver: SqliteDriver = {
+      name: "cfg-stub",
+      capabilities: asyncOnlyDriver.capabilities,
+      async open(config) {
+        seen = config as unknown as Record<string, unknown>;
+        return betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
+      },
+    };
+    const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", {
+      driver,
+      timeout: 1234,
+      driverOptions: { foo: "bar" },
+    } as never);
+    expect(seen?.timeout).toBe(1234);
+    expect(seen?.driverOptions).toEqual({ foo: "bar" });
+    adapter.disconnectBang();
+  });
+
+  it("stays pending after a failed async open so verifyBang can retry", async () => {
+    let attempts = 0;
+    const driver: SqliteDriver = {
+      name: "flaky-stub",
+      capabilities: asyncOnlyDriver.capabilities,
+      async open(config) {
+        if (++attempts === 1) throw new Error("boom");
+        return betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
+      },
+    };
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver });
+    await expect(adapter.completeAsyncConnect()).rejects.toThrow();
+    expect(adapter.active).toBe(false);
+    await adapter.completeAsyncConnect();
+    expect(adapter.active).toBe(true);
+    adapter.disconnectBang();
+  });
 });

@@ -2,6 +2,7 @@ import type {
   SqliteBinds,
   SqliteConnection,
   SqliteDriver,
+  SqliteOpenConfig,
   SqliteStatement,
 } from "../sqlite-adapter.js";
 import { Visitors } from "@blazetrails/arel";
@@ -2393,11 +2394,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         this._asyncConnectPending = true;
         return;
       }
-      const syncConn = factory.openSync({
-        database: this._filename,
-        readOnly: this._readonly,
-        strict: this._strict,
-      });
+      const syncConn = factory.openSync(this.openConfig());
       // Pre-warm version cache while the connection is a known-sync handle so
       // getDatabaseVersion() never needs to touch this.driver directly. (#1269)
       const vRow = syncConn.prepare("SELECT sqlite_version() AS v").get() as any;
@@ -2411,15 +2408,29 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
   }
 
+  /**
+   * Build the driver open-config from adapter config. Mirrors Rails'
+   * `@connection_parameters = @config.merge(...)`: preserves driver-specific
+   * keys (timeout, noMutex, driverOptions) so e.g. expo's `openDatabaseAsync`
+   * options reach the driver. Shared by `connect`/`connectAsync`. @internal
+   */
+  private openConfig(): SqliteOpenConfig {
+    const cfg = this._config as SQLite3AdapterOptions & Partial<SqliteOpenConfig>;
+    return {
+      database: this._filename,
+      readOnly: this._readonly,
+      strict: this._strict,
+      timeout: cfg.timeout,
+      noMutex: cfg.noMutex,
+      driverOptions: cfg.driverOptions,
+    };
+  }
+
   /** Async counterpart to `connect()` for async-only drivers. @internal */
   private async connectAsync(): Promise<void> {
     try {
       const factory = this.resolveDriverFactory();
-      const conn = await factory.open({
-        database: this._filename,
-        readOnly: this._readonly,
-        strict: this._strict,
-      });
+      const conn = await factory.open(this.openConfig());
       const vStmt = await conn.prepare("SELECT sqlite_version() AS v");
       const vRow = (await vStmt.get()) as any;
       this._databaseVersion = new Version(vRow?.v ?? "0.0.0");
@@ -2438,7 +2449,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;
-    this._asyncConnectPending = false;
     await this.connectAsync();
     // Async configureConnection(): await each PRAGMA. Keep this set in sync with it.
     super.configureConnection();
@@ -2486,6 +2496,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+    // Clear only after a successful open+configure: a failed attempt leaves the
+    // adapter pending so the next verifyBang() retries rather than no-opping.
+    this._asyncConnectPending = false;
   }
 
   /**

@@ -91,11 +91,15 @@ export class AppGenerator extends AppBase {
 
   private createRootFiles(name: string): void {
     const dep = this.database.pkgDependency;
-    // For sqlite3, omit the driver dep when using node-sqlite (built-in).
-    // Other databases always include it.
+    // For sqlite3 the driver dep depends on the chosen driver: node-sqlite is
+    // built into Node (no dep), expo-sqlite needs its own package, and
+    // better-sqlite3 (the default) uses the database's pkgDependency. Other
+    // databases always include their pkgDependency.
     const dbDep =
       this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
-        ? {}
+        ? this.sqliteDriver === "expo-sqlite"
+          ? { "expo-sqlite": "^15.0.0" }
+          : {}
         : { [dep.name]: dep.version };
     this.createFile(
       "package.json",
