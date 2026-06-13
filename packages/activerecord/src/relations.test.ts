@@ -761,7 +761,7 @@ describe("RelationTest", () => {
       expect(sql).toContain("UNION");
     });
 
-    it("composes an eager-load operand join dependency", async () => {
+    it("keeps an eager-load operand arity-compatible (no join-dependency aliases)", async () => {
       const { Associations, registerModel } = await import("./associations.js");
       class SetOpAuthor extends Base {
         static {
@@ -781,15 +781,19 @@ describe("RelationTest", () => {
         className: "SetOpAuthor",
         foreignKey: "setop_author_id",
       });
-      // Eager load on the *left* operand: union() clones the left relation and
-      // stamps the set operation onto it, so the operand build must still apply
-      // the join dependency (Rails build_arel per operand) rather than bypass it.
+      // An eager-load operand must NOT compile through its JoinDependency manager
+      // inside a set operation: the wide `t0_r*` alias list + LEFT OUTER JOINs
+      // would make the operand arity-incompatible with the other UNION side (and
+      // couldn't be JD-instantiated, since the compound reads rows as plain
+      // models). The operand keeps plain projections; the eager association loads
+      // via preload on the execution path.
       const sql = SetOpPost.where({ title: "x" })
         .includes("setopAuthor")
         .references("setop_authors")
         .union(SetOpPost.where({ title: "y" }))
         .toSql();
-      expect(sql).toContain("LEFT OUTER JOIN");
+      expect(sql).not.toContain("LEFT OUTER JOIN");
+      expect(sql).not.toMatch(/t0_r0/);
       expect(sql).toContain("UNION");
     });
   });
@@ -2706,6 +2710,45 @@ describe("RelationTest", () => {
       .union(User.where({ age: 30 }));
     const names = (await rel.toArray()).map((u: any) => u.name).sort();
     expect(names).toEqual(["Alice", "Bob"]);
+  });
+
+  it("union with an eager-load operand returns records with the association preloaded", async () => {
+    const { Associations, registerModel } = await import("./associations.js");
+    await defineSchema({
+      eager_setop_authors: { name: "string" },
+      eager_setop_posts: { title: "string", eager_setop_author_id: "integer" },
+    });
+    class EagerSetopAuthor extends Base {
+      static {
+        this._tableName = "eager_setop_authors";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("EagerSetopAuthor", EagerSetopAuthor);
+    class EagerSetopPost extends Base {
+      static {
+        this._tableName = "eager_setop_posts";
+        this.attribute("title", "string");
+        this.attribute("eager_setop_author_id", "integer");
+      }
+    }
+    Associations.belongsTo.call(EagerSetopPost, "author", {
+      className: "EagerSetopAuthor",
+      foreignKey: "eager_setop_author_id",
+    });
+    const author = await EagerSetopAuthor.create({ name: "alice" });
+    await EagerSetopPost.create({ title: "x", eager_setop_author_id: (author as any).id });
+    await EagerSetopPost.create({ title: "y", eager_setop_author_id: (author as any).id });
+
+    // Eager load on the left operand: the compound stays arity-compatible and the
+    // association is still loaded (via the eager-bypass preload path).
+    const rel = EagerSetopPost.where({ title: "x" })
+      .includes("author")
+      .references("eager_setop_authors")
+      .union(EagerSetopPost.where({ title: "y" }));
+    const rows = (await rel.toArray()) as any[];
+    expect(rows.map((p) => p.title).sort()).toEqual(["x", "y"]);
+    expect(rows.every((p) => p.author?.name === "alice")).toBe(true);
   });
 
   it("unionAll includes duplicates", async () => {
