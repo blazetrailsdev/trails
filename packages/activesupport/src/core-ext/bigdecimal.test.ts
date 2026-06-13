@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { BigDecimal } from "./big-decimal/conversions.js";
 
 describe("BigDecimalTest", () => {
   it("to s", () => {
-    // JS numbers to string
-    expect((1.5).toString()).toBe("1.5");
-    expect((0.1 + 0.2).toFixed(1)).toBe("0.3");
-    // eslint-disable-next-line no-loss-of-precision
-    expect((123456789.123456789).toPrecision(15)).toContain("123456789");
+    const bd = new BigDecimal("0.01");
+    expect(bd.toString()).toBe("0.01");
+    expect(bd.toString("+F")).toBe("+0.01");
+    expect(bd.toString("+1F")).toBe("+0.0 1");
   });
 });
