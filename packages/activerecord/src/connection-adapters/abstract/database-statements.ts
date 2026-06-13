@@ -1553,6 +1553,20 @@ export const DatabaseStatements = {
     return insertedId();
   },
 
+  // Rails: `alias create insert`.
+  create(
+    this: any,
+    arel: unknown,
+    name?: string | null,
+    pk?: string | null,
+    idValue?: unknown,
+    sequenceName?: string | null,
+    binds: unknown[] = [],
+    opts?: { returning?: string[] | null },
+  ): Promise<unknown> {
+    return this.insert(arel, name, pk, idValue, sequenceName, binds, opts);
+  },
+
   async update(
     this: any,
     arel: unknown,

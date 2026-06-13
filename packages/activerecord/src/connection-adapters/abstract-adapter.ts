@@ -397,6 +397,16 @@ export interface AbstractAdapter {
     binds?: unknown[],
     opts?: { returning?: string[] | null },
   ): Promise<unknown>;
+  /** Rails: `alias create insert`. */
+  create(
+    arel: unknown,
+    name?: string | null,
+    pk?: string | null,
+    idValue?: unknown,
+    sequenceName?: string | null,
+    binds?: unknown[],
+    opts?: { returning?: string[] | null },
+  ): Promise<unknown>;
   update(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
   delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
   truncate(tableName: string, name?: string | null): Promise<unknown>;

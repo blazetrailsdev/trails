@@ -654,6 +654,7 @@ describe("AdapterTestWithoutTransaction", () => {
   // MySQL implicitly commits as DDL), so these run un-wrapped; useFixtures
   // re-seeds each table in its beforeEach, standing in for `reset_fixtures`.
   const withoutTransaction = [
+    "create with query cache",
     "truncate",
     "truncate with query cache",
     "truncate tables",
@@ -661,10 +662,13 @@ describe("AdapterTestWithoutTransaction", () => {
     "reset empty table with custom pk",
     "reset table with non integer pk",
   ];
-  useHandlerFixtures(["posts", "authors", "authorAddresses", "movies", "subscribers"], {
-    schema: canonicalSchema,
-    usesTransaction: withoutTransaction,
-  });
+  const { posts } = useHandlerFixtures(
+    ["posts", "authors", "authorAddresses", "movies", "subscribers"],
+    {
+      schema: canonicalSchema,
+      usesTransaction: withoutTransaction,
+    },
+  );
 
   beforeAll(async () => {
     // Rails' schema.rb declares `movies` with `primary_key: "movieid"`, making
@@ -683,6 +687,22 @@ describe("AdapterTestWithoutTransaction", () => {
     });
     Movie.resetColumnInformation();
     await Movie.loadSchema();
+  });
+
+  it("create with query cache", async () => {
+    const conn = Base.connection as AbstractAdapter;
+    conn.enableQueryCacheBang();
+    try {
+      // posts fixtures are loaded (e.g. "welcome"), so the count is fixture-backed.
+      expect(posts("welcome").id).toBeGreaterThan(0);
+      const count = (await Post.count()) as number;
+
+      await conn.create("INSERT INTO posts(title, body) VALUES ('', '')");
+
+      expect(await Post.count()).toBe(count + 1);
+    } finally {
+      conn.disableQueryCacheBang();
+    }
   });
 
   it("truncate", async () => {
