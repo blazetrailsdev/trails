@@ -553,11 +553,12 @@ export function _enum(
       },
     );
 
-    // Bang setter: user.active! → user.activeBang() (in-memory only)
+    // Bang setter: user.active! → user.activeBang() persists via update!.
+    // Mirrors Rails: klass.define_method("#{value_method_name}!") { update!(name => value) }
+    // The block's value is update!'s return (true), so the bang returns it too.
     Object.defineProperty(this.prototype, `${methodBase}Bang`, {
       value: function (this: Base) {
-        this.writeAttribute(attrName, value);
-        return this;
+        return (this as unknown as EnumInstanceHost).updateBang({ [attrName]: value });
       },
       writable: true,
       configurable: true,
