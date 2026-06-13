@@ -599,17 +599,52 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book2 = makeEncryptedBookWithSerializedSecondBinary(await freshAdapter());
     await assertEncryptedAttribute(await Book2.create({ logo: jsonBytes }), "logo", jsonBytes);
   });
-  it.skip("deterministic ciphertexts remain constant", () => {
-    // BLOCKED: encryption — message-serializer format divergence — not a key-derivation gap.
-    // MRI Rails' MessageSerializer stores cipher headers (iv, at) as
-    // Base64.strict_encode64(raw_bytes) — single base64 of raw bytes.
-    // Our MessageSerializer stores them as base64(utf8(base64_string)) —
-    // double-base64 — because Aes256Gcm.encrypt adds headers as already-
-    // base64-encoded strings and encodeIfNeeded re-encodes them.
-    // Key derivation parity IS confirmed (SHA1, 65536 iters, same salt/password
-    // correctly produce the right AES key), but the serialized ciphertext format
-    // differs. Fixing requires changing Aes256Gcm to store raw bytes in headers
-    // and would be a breaking change for existing stored ciphertexts.
+  it("deterministic ciphertexts remain constant", async () => {
+    // We need to make sure these don't change or existing apps will stop working.
+    // This envelope was produced by real Rails 8.0.2 (MRI) under the ActiveRecord
+    // encryption test keys (primary_key "test master key", deterministic_key
+    // "test deterministic key", key_derivation_salt "testing key derivation
+    // salt"). MRI stores cipher headers (iv, at) as a SINGLE Base64 hop over the
+    // raw bytes; our serializer/cipher now match that byte-for-byte, so this
+    // Rails-written ciphertext decrypts here — proving cross-decryptability.
+    const ciphertext =
+      '{"p":"DIohhw==","h":{"iv":"wEPaDcJP3VNIxaiz","at":"X7+2xvvcu1k1if6Dy28Esw=="}}';
+    const adapter = await freshAdapter();
+    configureEncryption({
+      primaryKey: "test master key",
+      deterministicKey: "test deterministic key",
+      keyDerivationSalt: "testing key derivation salt",
+    });
+    const Book = makeEncryptedBook(adapter);
+    // Store the raw MRI ciphertext as-is (Rails' UnencryptedBook.create), then
+    // read it back through the encrypted model (EncryptedBook.find).
+    const book = await withoutEncryption(() => Book.create({ name: ciphertext }));
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+  });
+
+  it("legacy double-base64 ciphertexts still decrypt", async () => {
+    // Pre-change trails envelopes base64-encoded the cipher's already-base64
+    // header values and payload a second time. Decryption must still accept them
+    // so rows written before the MRI wire-format fix keep working. The legacy
+    // envelope is the MRI single-base64 fixture with each value base64-encoded
+    // once more.
+    const mri = { p: "DIohhw==", iv: "wEPaDcJP3VNIxaiz", at: "X7+2xvvcu1k1if6Dy28Esw==" };
+    const reEncode = (s: string) => Buffer.from(s, "latin1").toString("base64");
+    const legacy = JSON.stringify({
+      p: reEncode(mri.p),
+      h: { iv: reEncode(mri.iv), at: reEncode(mri.at) },
+    });
+    const adapter = await freshAdapter();
+    configureEncryption({
+      primaryKey: "test master key",
+      deterministicKey: "test deterministic key",
+      keyDerivationSalt: "testing key derivation salt",
+    });
+    const Book = makeEncryptedBook(adapter);
+    const book = await withoutEncryption(() => Book.create({ name: legacy }));
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
   });
 
   it("can compress data with custom compressor", async () => {
