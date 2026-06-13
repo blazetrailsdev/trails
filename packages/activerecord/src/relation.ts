@@ -2391,6 +2391,19 @@ export class Relation<T extends Base> {
       ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
       ...this._preloadAssociations,
     ];
+    // Set-op operands all instantiate as this model class, and the compound
+    // bypasses the eager JOIN (operands stay arity-compatible), so the *other*
+    // operand's includes/eager/preload specs load as preloads against the full
+    // result set rather than being silently dropped. (`this` is the left/loaded
+    // relation; its own specs are handled above + in the eager branch.)
+    if (this._setOperation) {
+      const other = this._setOperation.other;
+      preloadAssocs.push(
+        ...other._eagerLoadAssociations,
+        ...other._includesAssociations,
+        ...other._preloadAssociations,
+      );
+    }
     if (preloadAssocs.length > 0 && this._records.length > 0) {
       await this._preloadAssociationsForRecords(this._records, preloadAssocs);
       if (token !== this._loadToken) return [];
@@ -3985,14 +3998,23 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Build the SelectManager for this relation as a set-operation operand. Uses
-   * the eager-load join-dependency manager when eager loading applies, else the
-   * base manager, then folds CTEs (`WITH`) and annotate() comments into the
-   * operand AST so they thread through the compound's single collector instead
-   * of being spliced into the compiled SQL string per side.
+   * Build the SelectManager for this relation as a set-operation operand: the
+   * base select projections, then folds CTEs (`WITH`) and annotate() comments
+   * into the operand AST so they thread through the compound's single collector
+   * instead of being spliced into the compiled SQL string per side.
+   *
+   * An eager-load operand is deliberately NOT compiled through its
+   * JoinDependency manager here: that emits the wide `t0_r*` aliased column list
+   * + LEFT OUTER JOINs, which (a) make the operand arity-incompatible with the
+   * other side of the UNION (DBs reject differing column counts) and (b) cannot
+   * be JoinDependency-instantiated, since the compound executes through the
+   * `_eagerLoadBypassesJoinDependency` branch and reads rows as plain models.
+   * So each operand keeps the plain projection (arity stays compatible) and the
+   * eager associations load via that bypass branch's `_preloadAssociationsForRecords`
+   * — Rails has no `Relation#union`, so there is no JD-through-union path to mirror.
    */
   private _buildSetOperationOperandManager(): SelectManager {
-    const manager = this._buildEagerOperandManager() ?? this._buildSelectManager();
+    const manager = this._buildSelectManager();
     if (this._ctes.length > 0) {
       const cteNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression));
       if (this._ctes.some((c) => c.recursive)) manager.withRecursive(...cteNodes);
