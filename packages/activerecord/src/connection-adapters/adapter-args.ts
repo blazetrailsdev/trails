@@ -36,6 +36,7 @@ export function normalizeAdapterName(name: string): string {
     case "sqlite":
     case "sqlite3":
     case "node-sqlite":
+    case "expo-sqlite":
       return "sqlite";
     default:
       return name;

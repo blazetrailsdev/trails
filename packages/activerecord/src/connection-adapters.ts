@@ -110,17 +110,18 @@ const sqlite3Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/better-sqlite3-adapter.js")).BetterSQLite3Adapter as any;
 const nodeSqliteLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/node-sqlite-adapter.js")).NodeSQLiteAdapter as any;
+const expoSqliteLoader: AdapterLoader = async () =>
+  (await import("./connection-adapters/expo-sqlite-adapter.js")).ExpoSQLiteAdapter as any;
 const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
 register("sqlite3", sqlite3Loader);
 register("node-sqlite", nodeSqliteLoader);
-// `expo-sqlite` is intentionally NOT registered as an openable adapter yet:
-// its driver only implements async `open()`, and the adapter's constructor
-// uses the sync `openSync()` path, so construction would always throw. The
-// `ExpoSQLiteAdapter` class ships ready for when the async constructor path
-// lands; register it here at that point.
+// `expo-sqlite`'s driver only implements async `open()`. It's now openable via
+// the async construction path (`AbstractSQLite3Adapter.openAsync()` / the pool's
+// async checkout, which awaits `completeAsyncConnect()` in `verifyBang`).
+register("expo-sqlite", expoSqliteLoader);
 register("mysql2", mysql2Loader);
 register("postgresql", postgresqlLoader);
 

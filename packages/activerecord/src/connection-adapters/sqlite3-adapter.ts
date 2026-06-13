@@ -2,6 +2,7 @@ import type {
   SqliteBinds,
   SqliteConnection,
   SqliteDriver,
+  SqliteOpenConfig,
   SqliteStatement,
 } from "../sqlite-adapter.js";
 import { Visitors } from "@blazetrails/arel";
@@ -199,6 +200,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   private driver!: SqliteConnection;
+  /**
+   * True after construction when the bound driver is async-only and the
+   * connection has not yet been established. Cleared by `completeAsyncConnect`.
+   */
+  private _asyncConnectPending = false;
+  /** In-flight async-open promise, deduping concurrent completeAsyncConnect() calls. */
+  private _connectingPromise: Promise<void> | null = null;
   override get active(): boolean {
     return this.driver?.isOpen() ?? false;
   }
@@ -272,7 +280,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // the native driver opens a file handle that would otherwise leak.
     if (options.statementLimit !== undefined) this.statementLimit = options.statementLimit;
     this.connect();
-    this.configureConnection();
+    // Async-only drivers (e.g. expo-sqlite) can't open in a sync constructor;
+    // connect() flags them for the async path instead. See completeAsyncConnect.
+    if (!this._asyncConnectPending) this.configureConnection();
     this._nativeTypeMap = AbstractSQLite3Adapter._buildTypeMap();
   }
 
@@ -964,11 +974,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // --- Connection lifecycle ---
 
   override isConnected(): boolean {
-    return this.driver.isOpen();
+    return this.driver?.isOpen() ?? false;
   }
 
   isActive(): boolean {
-    return this.driver.isOpen();
+    return this.driver?.isOpen() ?? false;
   }
 
   override clearCacheBang(): void {
@@ -978,7 +988,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   override disconnectBang(): void {
     super.disconnectBang();
-    if (this.driver.isOpen()) {
+    // driver is undefined when an async-only connection was never completed
+    // (constructed-but-pending); optional-chain like the `active` getter so a
+    // pre-verifyBang cleanup/error path doesn't throw.
+    if (this.driver?.isOpen()) {
       // driver.close() returns void | Promise<void>; for inProcessSync drivers
       // (better-sqlite3) this is sync. Async-driver teardown needs pool-infra
       // changes — tracked in #1269.
@@ -996,17 +1009,24 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * @internal
    */
-  override reconnect(): void {
+  override async reconnect(): Promise<void> {
     if (this.active) {
       // Mirrors `@raw_connection.rollback rescue nil` — a ROLLBACK with no
       // active transaction raises, which we swallow like Rails does.
       try {
-        this.driver.exec("ROLLBACK");
+        await this.driver.exec("ROLLBACK");
       } catch {
         // no active transaction
       }
     } else {
       this.connect();
+      // connect() defers async-only drivers (leaving the handle undefined); open
+      // it here so the base reconnectBang lifecycle has a live driver before it
+      // runs configure_connection. Sync drivers opened eagerly above no-op here.
+      if (this._asyncConnectPending) {
+        this._asyncConnectPending = false;
+        await this.connectAsync();
+      }
     }
     this._inTransaction = false;
   }
@@ -2349,46 +2369,44 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return undefined;
   }
 
+  /** Resolve the bound SqliteDriver. Shared by `connect`/`connectAsync`. @internal */
+  private resolveDriverFactory(): SqliteDriver {
+    const driverOpt = (this._config as SQLite3AdapterOptions).driver;
+    if (driverOpt != null) {
+      if (
+        typeof (driverOpt as SqliteDriver).name !== "string" ||
+        typeof (driverOpt as SqliteDriver).open !== "function"
+      ) {
+        throw new TypeError(
+          "config.driver must be a SqliteDriver " +
+            "(object with `name: string` and `open(config)` function).",
+        );
+      }
+      return driverOpt;
+    }
+    // No driver configured: concrete subclasses (e.g. BetterSQLite3Adapter)
+    // bind their bundled driver via defaultSqliteDriver(). The abstract base
+    // returns undefined and cannot be opened directly.
+    const def = this.defaultSqliteDriver();
+    if (!def) {
+      throw new Error(
+        "No SQLite driver configured. Use a concrete adapter subclass " +
+          "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
+      );
+    }
+    return def;
+  }
+
   /** @internal */
   private connect(): void {
     try {
-      const driverOpt = (this._config as SQLite3AdapterOptions).driver;
-      let factory: SqliteDriver;
-      if (driverOpt != null) {
-        if (
-          typeof (driverOpt as SqliteDriver).name !== "string" ||
-          typeof (driverOpt as SqliteDriver).open !== "function"
-        ) {
-          throw new TypeError(
-            "config.driver must be a SqliteDriver " +
-              "(object with `name: string` and `open(config)` function).",
-          );
-        }
-        factory = driverOpt;
-      } else {
-        // No driver configured: concrete subclasses (e.g. BetterSQLite3Adapter)
-        // bind their bundled driver via defaultSqliteDriver(). The abstract base
-        // returns undefined and cannot be opened directly.
-        const def = this.defaultSqliteDriver();
-        if (!def) {
-          throw new Error(
-            "No SQLite driver configured. Use a concrete adapter subclass " +
-              "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
-          );
-        }
-        factory = def;
-      }
+      const factory = this.resolveDriverFactory();
       if (!factory.openSync) {
-        throw new Error(
-          `SQLite driver "${factory.name}" does not support sync open(). ` +
-            "Async drivers require an async constructor path (not yet implemented).",
-        );
+        // Async-only driver: defer to completeAsyncConnect() / openAsync().
+        this._asyncConnectPending = true;
+        return;
       }
-      const syncConn = factory.openSync({
-        database: this._filename,
-        readOnly: this._readonly,
-        strict: this._strict,
-      });
+      const syncConn = factory.openSync(this.openConfig());
       // Pre-warm version cache while the connection is a known-sync handle so
       // getDatabaseVersion() never needs to touch this.driver directly. (#1269)
       const vRow = syncConn.prepare("SELECT sqlite_version() AS v").get() as any;
@@ -2402,13 +2420,104 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
   }
 
+  /**
+   * Build the driver open-config from adapter config. Mirrors Rails'
+   * `@connection_parameters = @config.merge(...)`: preserves driver-specific
+   * keys (timeout, noMutex, driverOptions) so e.g. expo's `openDatabaseAsync`
+   * options reach the driver. Shared by `connect`/`connectAsync`. @internal
+   */
+  private openConfig(): SqliteOpenConfig {
+    const cfg = this._config as SQLite3AdapterOptions & Partial<SqliteOpenConfig>;
+    return {
+      database: this._filename,
+      readOnly: this._readonly,
+      strict: this._strict,
+      timeout: cfg.timeout,
+      noMutex: cfg.noMutex,
+      driverOptions: cfg.driverOptions,
+    };
+  }
+
+  /** Async counterpart to `connect()` for async-only drivers. @internal */
+  private async connectAsync(): Promise<void> {
+    try {
+      const factory = this.resolveDriverFactory();
+      const conn = await factory.open(this.openConfig());
+      const vStmt = await conn.prepare("SELECT sqlite_version() AS v");
+      const vRow = (await vStmt.get()) as any;
+      this._databaseVersion = new Version(vRow?.v ?? "0.0.0");
+      this.driver = conn;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new DatabaseConnectionError(`Unable to open database '${this._filename}': ${msg}`, {
+        cause: e,
+      });
+    }
+  }
+
+  /**
+   * Complete a deferred async connection. No-op when already connected
+   * synchronously. Invoked by `openAsync()` and `verifyBang()`. @internal
+   */
+  async completeAsyncConnect(): Promise<void> {
+    if (!this._asyncConnectPending) return;
+    // Dedupe concurrent callers (e.g. racing pool checkouts) onto one open so we
+    // don't open the database twice and leak the first handle.
+    if (!this._connectingPromise) {
+      this._connectingPromise = this._doAsyncConnect().finally(() => {
+        this._connectingPromise = null;
+      });
+    }
+    return this._connectingPromise;
+  }
+
   /** @internal */
-  override configureConnection(): void {
-    // Mirrors Rails: AbstractAdapter#configure_connection → check_version.
-    super.configureConnection();
+  private async _doAsyncConnect(): Promise<void> {
+    await this.connectAsync();
+    // configureConnection() returns a Promise for async-only drivers; await it
+    // so every PRAGMA is applied before the connection is handed out.
+    await this.configureConnection();
+    // Clear only after a successful open+configure: a failed attempt leaves the
+    // adapter pending so the next verifyBang() retries rather than no-opping.
+    this._asyncConnectPending = false;
+  }
+
+  /**
+   * Async construction entry point — works for both sync drivers (returns an
+   * already-connected adapter) and async-only drivers (awaits the deferred
+   * connection).
+   */
+  static async openAsync(
+    this: new (filename?: string, options?: SQLite3AdapterOptions) => AbstractSQLite3Adapter,
+    filename: string | ":memory:" = ":memory:",
+    options: SQLite3AdapterOptions = {},
+  ): Promise<AbstractSQLite3Adapter> {
+    const adapter = new this(filename, options);
+    await adapter.completeAsyncConnect();
+    return adapter;
+  }
+
+  /** @internal */
+  override async verifyBang(): Promise<void> {
+    await this.completeAsyncConnect();
+    await super.verifyBang();
+  }
+
+  /** True when the bound driver has no `openSync()` (e.g. expo-sqlite). @internal */
+  private driverIsAsync(): boolean {
+    return !this.resolveDriverFactory().openSync;
+  }
+
+  /**
+   * Build the ordered `[sql, label]` PRAGMA list applied on every connection.
+   * Shared by the sync and async `configureConnection()` paths so they can't
+   * drift. @internal
+   */
+  private configurePragmas(): [string, string][] {
+    const stmts: [string, string][] = [];
     if (!this._readonly) {
-      // Apply Rails DEFAULT_PRAGMAS best-effort: an unsupported PRAGMA on a
-      // non-standard SQLite build should warn, not abort construction.
+      // Rails DEFAULT_PRAGMAS, best-effort: an unsupported PRAGMA on a
+      // non-standard SQLite build should warn, not abort.
       const defaults: [string, string][] = [
         ["foreign_keys", "ON"],
         ["journal_mode", "WAL"],
@@ -2417,38 +2526,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         ["journal_size_limit", "67108864"],
         ["cache_size", "2000"],
       ];
-      for (const [pragma, value] of defaults) {
-        try {
-          this.driver.pragma(`${pragma} = ${value}`);
-        } catch (e) {
-          console.warn(
-            `SQLite default pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
-          );
-        }
-      }
+      for (const [p, v] of defaults) stmts.push([`${p} = ${v}`, `SQLite default pragma '${p}'`]);
     }
-    // Best-effort: set DQS for drivers that support it (e.g. node:sqlite with a
-    // build that exposes SQLITE_DBCONFIG_DQS_*). better-sqlite3 compiles SQLite
-    // with SQLITE_DQS=0 and silently ignores these pragmas (returns []); other
-    // drivers may throw on unrecognised pragmas, so we guard with try/catch.
+    // DQS for drivers that support it (e.g. node:sqlite). better-sqlite3 builds
+    // with SQLITE_DQS=0 and silently ignores it; others may throw — guarded below.
     const dqsValue = this._strict ? "OFF" : "ON";
-    for (const dqsPragma of ["dqs_ddl", "dqs_dml"]) {
-      try {
-        this.driver.pragma(`${dqsPragma} = ${dqsValue}`);
-      } catch (e) {
-        console.warn(
-          `SQLite DQS pragma '${dqsPragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-    }
+    stmts.push(
+      [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
+      [`dqs_dml = ${dqsValue}`, "SQLite DQS pragma 'dqs_dml'"],
+    );
     const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
     if (pragmas) {
-      // Validate pragma name is a safe SQLite identifier before interpolating.
-      const SAFE_PRAGMA_NAME = /^\w+$/;
-      // Restrict values to identifier-like strings (enum pragmas) or scalars.
-      const SAFE_PRAGMA_VALUE = /^\w+$/;
+      // Validate pragma name/value as safe SQLite identifiers before interpolating.
+      const SAFE = /^\w+$/;
       for (const [pragma, value] of Object.entries(pragmas)) {
-        if (!SAFE_PRAGMA_NAME.test(pragma)) {
+        if (!SAFE.test(pragma)) {
           console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
           continue;
         }
@@ -2459,20 +2551,47 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
               : "0"
             : typeof value === "number"
               ? String(value)
-              : SAFE_PRAGMA_VALUE.test(value)
+              : SAFE.test(value)
                 ? value
                 : null;
         if (scalar === null) {
           console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
           continue;
         }
-        try {
-          this.driver.pragma(`${pragma} = ${scalar}`);
-        } catch (e) {
-          console.warn(
-            `SQLite pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
-          );
+        stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
+      }
+    }
+    return stmts;
+  }
+
+  /**
+   * Mirrors Rails: AbstractAdapter#configure_connection → check_version. Sync
+   * for in-process drivers; for async-only drivers (no `openSync()`) returns a
+   * Promise that awaits each PRAGMA — the base `attemptConfigureConnection()`
+   * awaits it, so both the initial-open and reconnect paths apply pragmas.
+   * @internal
+   */
+  override configureConnection(): void | Promise<void> {
+    super.configureConnection();
+    const stmts = this.configurePragmas();
+    const warn = (label: string, e: unknown) =>
+      console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
+    if (this.driverIsAsync()) {
+      return (async () => {
+        for (const [sql, label] of stmts) {
+          try {
+            await this.driver.pragma(sql);
+          } catch (e) {
+            warn(label, e);
+          }
         }
+      })();
+    }
+    for (const [sql, label] of stmts) {
+      try {
+        this.driver.pragma(sql);
+      } catch (e) {
+        warn(label, e);
       }
     }
   }
