@@ -1861,7 +1861,7 @@ export class SchemaStatements {
     columnName: string | null | undefined,
     options: { name?: string; column?: string | string[] },
   ): Promise<string> {
-    if (columnName == null && options.name && Object.keys(options).length === 1) {
+    if (this.canRemoveIndexByName(columnName, options) && options.name) {
       return options.name;
     }
 
@@ -1885,10 +1885,7 @@ export class SchemaStatements {
       checks.push((i) => i.name === n);
     }
 
-    if (
-      columnNames.length > 0 &&
-      !(options.name && this.isExpressionColumnName(columnNames as unknown as string))
-    ) {
+    if (columnNames.length > 0) {
       checks.push(
         (i) =>
           this.indexName(tableName, { column: i.columns }) ===
