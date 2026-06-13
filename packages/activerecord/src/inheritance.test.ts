@@ -2137,7 +2137,7 @@ describe("set_base_class / setBaseClass", () => {
 // own describe so it can load the canonical `memberships` fixtures; the six rows
 // span every Membership subclass, and `SelectedMembership.count` must filter
 // `WHERE type = 3` (the enum integer for SelectedMembership).
-describe("InheritanceTest enum-backed default scope", () => {
+describe("InheritanceTest", () => {
   useHandlerFixtures(["memberships"], { schema: canonicalSchema });
 
   it("inheritance with default scope", async () => {
