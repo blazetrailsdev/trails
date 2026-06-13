@@ -815,6 +815,48 @@ jobs:
           fi
           echo "No forbidden Claude attribution found in PR body."
 
+  docs-activerecord-freeze:
+    name: Docs ActiveRecord Freeze
+    # RFC 0011 Phase 4 guardrail. AR work tracking moved to the tasks repo;
+    # `docs/activerecord/` is frozen so the two-source-of-truth split can't
+    # self-heal. Fail any PR that adds or modifies a file under that path,
+    # with a single allowlisted exception. Independent of the `changes` gate
+    # (it inspects the diff directly) and PR-only: push/schedule have no PR
+    # base to diff against, and the skip is allowlisted in the `ci` job below.
+    # Only `docs/activerecord/` is policed — other docs/ trees stay live
+    # until their own cutover.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Forbid new or modified docs/activerecord trackers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # The one tracker that stays under docs/activerecord/.
+          ALLOWLIST='docs/activerecord/parity-verification.md'
+          # Triple-dot: diff against the merge-base, not the base tip, so
+          # unrelated commits merged to main since this branch diverged don't
+          # show up. --diff-filter=ACMR ignores deletions (removing a tracker
+          # is allowed). Path-scope to docs/activerecord/ so nothing else is
+          # policed.
+          changed=$(git diff --name-only --diff-filter=ACMR \
+            "$BASE_SHA"..."$HEAD_SHA" -- docs/activerecord/ || true)
+          offending=$(printf '%s\n' "$changed" \
+            | grep -E '^docs/activerecord/' \
+            | grep -vxF "$ALLOWLIST" || true)
+          if [ -n "$offending" ]; then
+            echo "::error::AR work tracking lives in the tasks repo — add a story, not a doc. Offending files:"
+            printf '%s\n' "$offending"
+            exit 1
+          fi
+          echo "No new or modified docs/activerecord trackers."
+
   rails-comparison:
     name: Rails API/Test Comparison
     needs: changes
@@ -1152,6 +1194,7 @@ jobs:
       - maria-tests
       - website
       - pr-attribution
+      - docs-activerecord-freeze
       - rails-comparison
       - schema-parity-rails
       - schema-parity-trails
@@ -1211,6 +1254,11 @@ jobs:
                 pr-attribution)
                   # Only runs on deanmarano-authored PRs; skip is always
                   # legitimate (non-PR events, or any other author).
+                  continue
+                  ;;
+                docs-activerecord-freeze)
+                  # Only runs on pull_request events; skip on push/schedule
+                  # is always legitimate (no PR base to diff against).
                   continue
                   ;;
                 mysql-tests)
