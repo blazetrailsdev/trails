@@ -2644,19 +2644,17 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
 
 /**
  * Per-instance association-cache reset hook. Rails initializes
- * `@association_cache = {}` here; our equivalents (`_associationInstances`
- * and `_collectionProxies`) are pre-allocated by the `Base` class fields,
- * so this only needs to clear them when called on an existing record
- * (e.g. from `initialize_dup`).
+ * `@association_cache = {}` here; our equivalents are pre-allocated by the
+ * `Base` class fields, so this only needs to clear them when called on an
+ * existing record (e.g. from `initialize_dup`). Routes through the single
+ * `Base#_resetAssociationCaches` lifecycle seam (RFC-0022 b5).
  *
  * Mirrors: ActiveRecord::Associations#init_internals
  *
  * @internal
  */
 function initInternals(record: Base): void {
-  record._associationInstances.clear();
-  record._collectionProxies.clear();
-  record._preloadedAssociations.clear();
+  record._resetAssociationCaches();
 }
 
 /**
