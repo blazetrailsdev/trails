@@ -3941,10 +3941,39 @@ export class Relation<T extends Base> {
     const eagerSpecs = [
       ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
     ];
+
+    // Rails `apply_join_dependency` runs `distinct_relation_for_primary_key`
+    // when eager loading with a limit/offset over non-limitable (collection)
+    // reflections (finder_methods.rb:463) — it EXECUTES a query
+    // (`select_rows`) to materialize the limited primary keys, because
+    // `IN (SELECT … LIMIT n)` over a row-multiplying join cuts joined rows
+    // (not parents) and is unportable (MySQL rejects it). A synchronous
+    // predicate builder cannot execute that query, so for this unportable case
+    // we leave the eager associations unconverted: no row-multiplying join is
+    // emitted, the LIMIT applies to distinct parent rows, and the subquery
+    // stays cross-adapter safe — the same parent set Rails materializes.
+    // Faithful `distinct_relation_for_primary_key` is a separate concern.
+    // (schema_statements.rb:1429)
+    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
+    if (hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) return this;
+
     const rel = this._clone();
     rel._eagerLoadAssociations = [];
     rel._includesAssociations = [];
     return rel.leftOuterJoins(eagerSpecs) as Relation<T>;
+  }
+
+  /**
+   * Mirror Rails `using_limitable_reflections?` (finder_methods.rb:487):
+   * `reflections.none?(&:collection?)`. A non-string (nested-hash) or
+   * unresolvable spec is treated conservatively as non-limitable.
+   */
+  private _eagerReflectionsAreLimitable(specs: AssociationSpec[]): boolean {
+    return specs.every((spec) => {
+      if (typeof spec !== "string") return false;
+      const refl = (this._modelClass as any)._reflectOnAssociation?.(spec);
+      return refl ? !refl.isCollection() : false;
+    });
   }
 
   /**

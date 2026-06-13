@@ -1612,7 +1612,9 @@ describe("Relation#arel build_arel convergence", () => {
       gadgets: { widget_id: "integer", label: "string" },
     });
     registerModel("Widget", Widget);
+    registerModel("Gadget", Gadget);
     Associations.belongsTo.call(Gadget, "widget", { className: "Widget" });
+    Associations.hasMany.call(Widget, "gadgets", { className: "Gadget", foreignKey: "widget_id" });
   });
 
   class Widget extends Base {
@@ -1694,5 +1696,16 @@ describe("Relation#arel build_arel convergence", () => {
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toMatch(/IN \(SELECT ["`]gadgets["`]\.["`]id["`]/);
     expect(sql).not.toMatch(/t\d+_r\d+/);
+  });
+
+  // Rails apply_join_dependency materializes distinct primary keys (a query)
+  // when eager loading with a limit over a collection reflection, since
+  // `IN (SELECT … LIMIT n)` over a row-multiplying join is wrong/unportable. A
+  // synchronous predicate builder can't run that query, so we omit the join and
+  // keep the LIMIT applied to distinct parents — cross-adapter safe.
+  it("where with eager-loading limited collection relation subquery keeps the limit on distinct parents", () => {
+    const sql = Gadget.where({ widget_id: Widget.eagerLoad("gadgets").limit(5) }).toSql();
+    expect(sql).not.toContain("JOIN");
+    expect(sql).toMatch(/IN \(SELECT ["`]widgets["`]\.["`]id["`] FROM ["`]widgets["`] LIMIT 5\)/);
   });
 });
