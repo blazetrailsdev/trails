@@ -1226,7 +1226,9 @@ function edit(idOrSlug: string): void {
     // Clean up explicitly: process.exit() below skips any `finally`.
     rmSync(tmpRoot, { recursive: true, force: true });
     const msg = ((e as { message?: string }).message ?? String(e)).trim();
-    console.error(`error: editor (${argv.join(" ")}) failed — aborting without commit: ${msg}`);
+    console.error(
+      `error: editor (${argv.join(" ")}) or temp-file read failed — aborting without commit: ${msg}`,
+    );
     process.exit(1);
   }
   rmSync(tmpRoot, { recursive: true, force: true });
