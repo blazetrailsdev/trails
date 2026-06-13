@@ -1481,6 +1481,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (typeCol) record._writeAttribute(typeCol, ctor.name);
       return record.save();
     };
+    // Rails' `concat_records` only runs `insert_record` when the owner is
+    // persisted (`unless owner.new_record?`); for a new-record owner the
+    // children are added to the in-memory target and saved later via autosave
+    // when the owner is saved. Skipping the save also avoids inserting child
+    // rows with a null owner FK.
+    const ownerNew = this._record.isNewRecord();
     for (const record of records) {
       // Route through replace_on_target (via _addToTarget) so set_inverse_instance
       // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
@@ -1489,7 +1495,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // place rather than appended twice.
       // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`
       // so a `distinct` association scope dedups in place on append rather than appending twice.
-      await this._addToTarget(record, { replace: this.distinctValue }, () => insertRecord(record));
+      await this._addToTarget(
+        record,
+        { replace: this.distinctValue },
+        ownerNew ? undefined : () => insertRecord(record),
+      );
     }
   }
 
@@ -2060,6 +2070,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // before touching join rows.
     this._ensureThroughWritable();
     return this._withoutStrictLoading(async () => {
+      // A new-record owner has no persisted children to delete or nullify —
+      // Rails' `delete_records(load_target, ...)` runs against an empty
+      // `load_target` (find_target is gated on `!owner.new_record?`), so no
+      // SQL fires. Reset the in-memory target without touching the DB.
+      if (this._record.isNewRecord()) {
+        this._target = [];
+        this._targetLoaded = true;
+        this._invalidateAssociationIds();
+        return;
+      }
       // Rails' `clear` routes through `delete_all`, which removes the rows in
       // bulk and does NOT run `before_remove`/`after_remove` callbacks (those
       // live in `remove_records`, not the delete path) — unlike per-record
