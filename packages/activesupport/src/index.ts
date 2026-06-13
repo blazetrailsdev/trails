@@ -250,6 +250,8 @@ export {
 
 export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
+export { BigDecimal } from "./core-ext/bigdecimal.js";
+
 export {
   delegate,
   mattrAccessor,
