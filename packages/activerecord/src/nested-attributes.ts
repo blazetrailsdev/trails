@@ -1,5 +1,9 @@
 import type { Base } from "./base.js";
-import { modelRegistry, _cacheSingularTarget } from "./associations.js";
+import {
+  modelRegistry,
+  _cacheSingularTarget,
+  association as collectionProxyFor,
+} from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
@@ -422,6 +426,52 @@ export function isPolymorphicBelongsTo(record: Base, associationName: string): b
   return assocDef?.type === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
 }
 
+/**
+ * Plain-object copy of `attributes` with the nested-attribute control keys
+ * (`id`, `_destroy`) removed — the assignable set passed to a built/updated
+ * child. Iterates own enumerable entries so strong-params wrappers
+ * (`ProtectedParams`) work transparently.
+ * @internal
+ */
+function assignableNestedAttributes(attributes: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(attributes)) {
+    if (!UNASSIGNABLE_KEYS.has(k)) out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * The slice of the singular (`belongsTo`/`hasOne`) runtime association used by
+ * the one-to-one nested-attributes writer. `target` is the in-memory record (or
+ * null); `build` / `initializeAttributes` mirror Rails' `build_#{name}` and
+ * `Association#initialize_attributes`.
+ * @internal
+ */
+interface OneToOneAssociation {
+  target: Base | null;
+  build(attrs: Record<string, unknown>): Base | null;
+  initializeAttributes(record: Base): void;
+}
+
+/** @internal */
+function hasNestedId(attributes: Record<string, unknown>): boolean {
+  const id = (attributes as any).id;
+  return id !== undefined && id !== null && id !== "";
+}
+
+/** @internal */
+function storePendingNestedAttributes(
+  record: Base,
+  associationName: string,
+  attrs: Record<string, unknown>[],
+): void {
+  if (!(record as any)._pendingNestedAttributes) {
+    (record as any)._pendingNestedAttributes = new Map();
+  }
+  (record as any)._pendingNestedAttributes.set(associationName, attrs);
+}
+
 /** @internal */
 export function assignNestedAttributesForOneToOneAssociation(
   record: Base,
@@ -433,25 +483,64 @@ export function assignNestedAttributesForOneToOneAssociation(
       `Hash expected for \`${associationName}\` attributes, got ${typeof attributes}`,
     );
   }
+
+  const ctor = record.constructor as typeof Base;
+  const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
+  const options = configs.find((c) => c.associationName === associationName)?.options ?? {};
+  const updateOnly = options.updateOnly ?? false;
+  const hasId = hasNestedId(attributes);
+
+  // Rails: `existing_record = send(association_name)`. A synchronous writer can
+  // only observe an already-built / loaded in-memory target — trails performs
+  // no synchronous DB read — so a DB-backed existing record is reached via the
+  // async post-save flush (`processNestedAttributes`) instead.
+  const assoc = record.association(associationName) as unknown as OneToOneAssociation;
+  const existing = assoc.target ?? null;
+
+  // Rails nested_attributes.rb:436 — update (or mark for destruction) the
+  // existing record in place when `update_only` is set, or when a matching
+  // `id` was supplied and the in-memory target carries that id.
+  if (
+    (updateOnly || hasId) &&
+    existing &&
+    (updateOnly || String(existing.id) === String((attributes as any).id))
+  ) {
+    if (!callRejectIf(record, associationName, attributes)) {
+      assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
+    }
+    return;
+  }
+
+  // An `id`/`update_only` update whose target is not in memory: defer it to the
+  // async post-save flush (trails-specific — Rails loads `existing_record`
+  // synchronously here and assigns in place).
+  if (hasId || updateOnly) {
+    storePendingNestedAttributes(record, associationName, [attributes]);
+    return;
+  }
+
+  // Rails nested_attributes.rb:443 — build a new record (no matching id).
   if (!isRejectNewRecord(record, associationName, attributes)) {
-    // Rails defers the polymorphic-target check to build time: when no `id` is
-    // present a new record must be built, but a polymorphic belongs_to has no
-    // `build_#{association_name}` method, so the writer raises. Updates (with a
-    // matching `id`) are unaffected.
-    const id = (attributes as any).id;
-    if (
-      (id === undefined || id === null || id === "") &&
-      isPolymorphicBelongsTo(record, associationName)
-    ) {
-      throw new Error(
-        `Cannot build association \`${associationName}'. ` +
-          `Are you trying to build a polymorphic one-to-one association?`,
-      );
+    const assignable = assignableNestedAttributes(attributes);
+    if (existing && existing.isNewRecord()) {
+      // Rails reuses an already-built unsaved target (e.g. after `buildShip`)
+      // rather than replacing it: assign into it, then re-anchor FK/scope/
+      // inverse via `initialize_attributes`.
+      existing.assignAttributes(assignable);
+      assoc.initializeAttributes(existing);
+    } else {
+      // Rails defers the polymorphic-target check to build time: a polymorphic
+      // belongs_to has no `build_#{association_name}` method, so the writer
+      // raises. Immediate in-memory build otherwise (`part.ship.name` is
+      // readable right after assignment); autosave persists it on save.
+      if (isPolymorphicBelongsTo(record, associationName)) {
+        throw new Error(
+          `Cannot build association \`${associationName}'. ` +
+            `Are you trying to build a polymorphic one-to-one association?`,
+        );
+      }
+      assoc.build(assignable);
     }
-    if (!(record as any)._pendingNestedAttributes) {
-      (record as any)._pendingNestedAttributes = new Map();
-    }
-    (record as any)._pendingNestedAttributes.set(associationName, [attributes]);
   }
 }
 
@@ -517,10 +606,22 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  if (!(record as any)._pendingNestedAttributes) {
-    (record as any)._pendingNestedAttributes = new Map();
+  // Rails-style immediate in-memory build: new records (no `id`) are built on
+  // the association at assign time so the collection is readable right after
+  // assignment (`part.trinkets[0].name`); autosave persists them on save.
+  // Records with an `id` are existing-record updates/destroys whose loader is
+  // async, so they stay in the pending map for the post-save flush.
+  const deferred: Record<string, unknown>[] = [];
+  for (const a of attrs) {
+    if (hasNestedId(a)) {
+      deferred.push(a);
+    } else if (!isRejectNewRecord(record, associationName, a)) {
+      collectionProxyFor(record, associationName).build(assignableNestedAttributes(a));
+    }
   }
-  (record as any)._pendingNestedAttributes.set(associationName, attrs);
+  if (deferred.length > 0) {
+    storePendingNestedAttributes(record, associationName, deferred);
+  }
 }
 
 /**

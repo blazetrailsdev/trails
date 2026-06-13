@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/ship_part.rb
 import { Base } from "../../base.js";
+import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class ShipPart extends Base {
   static {
@@ -9,3 +10,6 @@ export class ShipPart extends Base {
     this.validates("name", { presence: true });
   }
 }
+
+acceptsNestedAttributesFor(ShipPart, "trinkets", { allowDestroy: true });
+acceptsNestedAttributesFor(ShipPart, "ship");

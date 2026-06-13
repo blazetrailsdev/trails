@@ -2582,6 +2582,16 @@ export class Base extends Model {
       // dirty state.
       (this as any)._dirty.snapshot((this as any)._attributes);
     }
+    // Dispatch nested-attribute writers (`<assoc>Attributes=`) that the Model
+    // constructor wrote as plain attribute values rather than through their
+    // generated setter, so `new Model({commentsAttributes: [...]})` builds the
+    // associated records in memory — mirroring Rails' `assign_attributes` →
+    // `public_send(setter)` path. No-op for models without nested attributes.
+    _Persistence._reapplyNestedAttrSetters(
+      this.constructor as typeof Base,
+      this,
+      attrs as Record<string, unknown>,
+    );
   }
 
   // --- Persistence instance predicates (wired via include() after class body) ---
