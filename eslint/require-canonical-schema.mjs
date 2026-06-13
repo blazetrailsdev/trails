@@ -42,7 +42,7 @@
  * `eslint/require-canonical-schema-exclude.json` (repo-relative paths) — a
  * ratchet baseline mirroring expected-fixtures / test-fixture-parity. New files
  * are enforced; the list shrinks as porters migrate tests onto the canonical
- * schema (see docs/activerecord/defineschema-to-fixtures-migration.md).
+ * schema.
  */
 
 import fs from "fs";
