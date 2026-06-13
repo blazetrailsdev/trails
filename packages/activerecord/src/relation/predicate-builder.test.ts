@@ -261,7 +261,7 @@ describe("PredicateBuilderTest", () => {
       expect((binds[0] as any).valueBeforeTypeCast).toBeInstanceOf(Substitute);
     });
 
-    it("compile renders QueryAttribute as a ? bind placeholder (Rails parity)", () => {
+    it("compile inlines QueryAttribute values for display SQL", () => {
       const table = new Table("users");
       const builder = new PredicateBuilder(table);
       const node = builder.build(table.get("name"), "alice");
