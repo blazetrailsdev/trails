@@ -79,7 +79,6 @@ export async function create(
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
   const record = new this(mergedAttrs);
-  _reapplyNestedAttrSetters(this, record, mergedAttrs);
   if (block) block(record);
   await record.save();
   return record;
@@ -104,7 +103,6 @@ export async function createBang(
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
   const record = new this(mergedAttrs);
-  _reapplyNestedAttrSetters(this, record, mergedAttrs);
   if (block) block(record);
   await record.saveBang();
   return record;
@@ -799,7 +797,7 @@ function findPrototypeSetter(instance: object, key: string): ((v: unknown) => vo
  * queues nested attributes for processing on save — mirrors Rails'
  * `new Model(attributes)` → `assign_attributes` → `public_send(setter)` path.
  */
-function _reapplyNestedAttrSetters(
+export function _reapplyNestedAttrSetters(
   ctor: PersistenceHost,
   record: any,
   attrs: Record<string, unknown>,
