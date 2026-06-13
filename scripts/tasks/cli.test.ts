@@ -41,6 +41,8 @@ import {
   removeFrontmatterKey,
   setFrontmatterList,
   resolveTasksDir,
+  statusOf,
+  statusTransitionError,
   STORY_STATUSES,
   stringFlag,
   StoryEntry,
@@ -259,6 +261,56 @@ describe("claimState (idempotent re-claim discriminator)", () => {
       `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "alice"\n---\n` +
       `assignee: "dean"\n`;
     expect(claimState(fm, "dean")).toBe("taken");
+  });
+});
+
+describe("statusOf", () => {
+  it("reads the status scalar from frontmatter", () => {
+    expect(statusOf(`---\nstatus: draft\npriority: 30\n---\nbody\n`)).toBe("draft");
+  });
+
+  it("reads a quoted status value", () => {
+    expect(statusOf(`---\nstatus: "ready"\n---\n`)).toBe("ready");
+  });
+
+  it("ignores a `status:` line in the Markdown body", () => {
+    expect(statusOf(`---\nstatus: draft\n---\nleave the status: ready field alone\n`)).toBe(
+      "draft",
+    );
+  });
+
+  it("returns null when there is no status line", () => {
+    expect(statusOf(`---\npriority: 30\n---\n`)).toBeNull();
+  });
+});
+
+describe("statusTransitionError", () => {
+  it("allows draft → ready", () => {
+    expect(statusTransitionError("draft", "ready")).toBeNull();
+  });
+
+  it("allows ready → draft", () => {
+    expect(statusTransitionError("ready", "draft")).toBeNull();
+  });
+
+  it("treats a same-status move as a legal no-op", () => {
+    expect(statusTransitionError("draft", "draft")).toBeNull();
+  });
+
+  it("rejects draft → done with the allowed set", () => {
+    const err = statusTransitionError("draft", "done");
+    expect(err).toMatch(/illegal transition draft → done/);
+    expect(err).toMatch(/allowed from draft: ready/);
+  });
+
+  it("rejects moves out of work-tracking statuses and points at the dedicated verb", () => {
+    expect(statusTransitionError("done", "ready")).toMatch(
+      /has no transitions; use the dedicated verb/,
+    );
+  });
+
+  it("rejects when the current status cannot be read", () => {
+    expect(statusTransitionError(null, "ready")).toMatch(/cannot read current status/);
   });
 });
 

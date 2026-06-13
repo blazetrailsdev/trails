@@ -969,6 +969,69 @@ function setPriority(id: string, priority: number | null): void {
   console.log(priority === null ? `cleared priority on ${id}` : `set ${id} priority ${priority}`);
 }
 
+// Legal story-status transitions reachable via `status-set`. The work-tracking
+// statuses (claimed/in-progress/done/blocked) own dedicated verbs that also
+// stamp pr/assignee/blocked-by, so this command only moves a story between the
+// pre-work queue states — primarily draft → ready, plus the reverse so a story
+// filed-then-deferred can drop back out of the ready queue without hand-editing.
+const STATUS_TRANSITIONS: Record<StoryStatus, readonly StoryStatus[]> = {
+  draft: ["ready"],
+  ready: ["draft"],
+  claimed: [],
+  "in-progress": [],
+  done: [],
+  blocked: [],
+};
+
+// Reads the `status:` scalar from a story file's frontmatter. Same fenced-block
+// parse as claimState so a same-named line in the Markdown body never matches.
+export function statusOf(fileText: string): StoryStatus | null {
+  const v = frontmatterBlock(fileText).match(/^status:\s*"?([^"\n]*)"?\s*$/m)?.[1];
+  return (v as StoryStatus | undefined) ?? null;
+}
+
+// Pure transition check, unit-testable without a git repo. Returns null when the
+// move is legal, otherwise a human-readable rejection reason.
+export function statusTransitionError(
+  from: StoryStatus | null,
+  target: StoryStatus,
+): string | null {
+  if (from === null) return `cannot read current status`;
+  if (from === target) return null;
+  const allowed = STATUS_TRANSITIONS[from];
+  if (!allowed.includes(target)) {
+    return allowed.length
+      ? `illegal transition ${from} → ${target} (allowed from ${from}: ${allowed.join(", ")})`
+      : `illegal transition ${from} → ${target} (${from} has no transitions; use the dedicated verb)`;
+  }
+  return null;
+}
+
+// Flip a story's status between pre-work queue states (draft ↔ ready). Validates
+// the transition up front and rebuilds + commits the index like the other
+// mutating verbs. Illegal moves and no-ops exit without pushing.
+function setStatus(id: string, target: StoryStatus): void {
+  const file = storyFilePath(loadIndex(), id);
+  const from = statusOf(readFileSync(file, "utf8"));
+  if (from === target) {
+    // loadIndex() may have rebuilt the generated index files in the canonical
+    // checkout; this early return skips commitAndPush's restore, so clean up.
+    restoreGeneratedFiles(TASKS_DIR);
+    console.log(`${id} already ${target}`);
+    return;
+  }
+  const error = statusTransitionError(from, target);
+  if (error !== null) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: ${error} for ${id}`);
+    process.exit(2);
+  }
+  flip(id, `status ${target}: ${id}`, RETRY_MSG(id), 4, (file) =>
+    editFrontmatter(file, { status: target }),
+  );
+  console.log(`set ${id} status ${target}`);
+}
+
 // Single exit point for a refine agent: commit whatever it edited in the
 // story file in place, push with the same rebase-retry as the other
 // mutations, and print a machine-readable summary the orchestration layer
@@ -1531,6 +1594,13 @@ function main(): void {
       }
       break;
     }
+    case "status-set": {
+      const id = pos[0];
+      const target = pos[1];
+      if (!id || !target || !STORY_STATUSES.includes(target as StoryStatus)) usage();
+      setStatus(id, target as StoryStatus);
+      break;
+    }
     default:
       usage();
   }
@@ -1550,6 +1620,7 @@ function usage(): never {
   block <id> --reason "<text>"
   refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
+  status-set <id> <status>                     (draft → ready and back; validates the transition)
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
   reindex | build                              (rebuild the index in place)
   fmt [<path> ...]                             (prettier --write authored stories; default: rfcs/)
