@@ -35,9 +35,11 @@ import { Event } from "./test-helpers/models/event.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 
 // Rails renders the placeholder via `Arel::Nodes::BindParam.new(nil).to_sql`,
-// which collects a "?" marker; our default Node#toSql inlines the value, so the
-// placeholder is written literally here. Drives the same insert/update/select/
-// delete bind round-trip as Rails' AdapterTest casted/non-casted bind probes.
+// which collects a "?" marker. trails' `Node#toSql` instead inlines bind
+// values (a deliberate display-SQL deviation — see the BindParam class doc),
+// so the round-trip SQL here uses literal `?` markers rather than
+// `bindParam.toSql()`. Drives the same insert/update/select/delete bind
+// round-trip as Rails' AdapterTest casted/non-casted bind probes.
 async function roundTripBinds(conn: AbstractSQLite3Adapter, binds: unknown[]): Promise<void> {
   const id = await conn.insert("INSERT INTO events(id) VALUES (?)", null, null, null, null, binds);
   expect(id).toBe(1);
