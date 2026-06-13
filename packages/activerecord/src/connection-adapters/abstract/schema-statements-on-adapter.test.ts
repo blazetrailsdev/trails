@@ -82,4 +82,38 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       stub.removeForeignKey("products", { name: "fk_products_user_id" }),
     ).resolves.toBeUndefined();
   });
+
+  it("validColumnDefinitionOptions includes ifExists (Rails OPTION_NAMES)", () => {
+    const stub = new StubAdapter();
+    const opts = (stub as any).validColumnDefinitionOptions() as string[];
+    expect(opts).toContain("ifExists");
+    expect(opts).toContain("ifNotExists");
+  });
+
+  it("addForeignKey with ifNotExists skips creation when a matching FK exists", async () => {
+    let executed = 0;
+    class FkStub extends StubAdapter {
+      override executeMutation(_sql: string) {
+        executed++;
+        return Promise.resolve(0);
+      }
+      override foreignKeys(_table: string) {
+        return Promise.resolve([{ toTable: "authors", column: "author_id" }] as any);
+      }
+    }
+    const stub = new FkStub();
+    await stub.addForeignKey("articles", "authors", { column: "author_id", ifNotExists: true });
+    expect(executed).toBe(0);
+  });
+
+  it("addForeignKey with ifNotExists creates the FK when none exists", async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.createTable("authors", (t) => t.string("name"));
+    await adapter.createTable("articles", (t) => t.bigint("author_id"));
+    await adapter.addForeignKey("articles", "authors", {
+      column: "author_id",
+      ifNotExists: true,
+    });
+    expect(await (adapter as any).foreignKeyExists("articles", { column: "author_id" })).toBe(true);
+  });
 });

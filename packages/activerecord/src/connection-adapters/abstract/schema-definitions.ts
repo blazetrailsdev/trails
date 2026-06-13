@@ -88,6 +88,7 @@ export interface AddForeignKeyOptions {
   onUpdate?: ReferentialAction;
   deferrable?: "immediate" | "deferred" | false;
   validate?: boolean;
+  ifNotExists?: boolean;
 }
 
 /** Options accepted by the `foreignKey` field of `ReferenceDefinition`. */
@@ -801,7 +802,6 @@ export class TableDefinition {
       "primaryKey",
       "ifExists",
       "ifNotExists",
-      "array",
     ];
   }
 

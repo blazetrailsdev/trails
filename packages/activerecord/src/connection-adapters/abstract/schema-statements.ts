@@ -592,6 +592,15 @@ export class SchemaStatements {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
+    // Mirrors Rails' add_foreign_key:
+    //   return if options[:if_not_exists] == true &&
+    //     foreign_key_exists?(from_table, to_table, **options.slice(:column))
+    if (options.ifNotExists === true) {
+      const exists = options.column
+        ? await this.foreignKeyExists(fromTable, { column: options.column })
+        : await this.foreignKeyExists(fromTable, toTable);
+      if (exists) return;
+    }
     // Delegate to adapter-specific FK implementation when the adapter
     // overrides both addForeignKey and checkConstraints (signals full FK
     // support, e.g. SQLite's table-rebuild path). The double-gate prevents
@@ -1757,6 +1766,7 @@ export class SchemaStatements {
       "collation",
       "comment",
       "primaryKey",
+      "ifExists",
       "ifNotExists",
     ];
   }
