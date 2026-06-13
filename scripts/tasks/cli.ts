@@ -1133,7 +1133,9 @@ function rfcFilePath(index: Index, slug: string): string {
   return join(TASKS_DIR, entry.file_path);
 }
 
-function parseCsv(raw: string): string[] {
+// Splits a comma-separated list into trimmed, non-empty ids. An empty (or
+// all-whitespace) input yields `[]`, which clears the corresponding array.
+export function parseCsv(raw: string): string[] {
   return raw
     .split(",")
     .map((s) => s.trim())
@@ -1268,6 +1270,102 @@ function rfc(
     },
   });
   console.log(`rfc ${slug}: ${changes.join(", ")}`);
+}
+
+// Walks the story-dep graph from `id` with that node's deps overridden to
+// `newDeps`, returning the cycle path if one results or null otherwise. Mirrors
+// validate.mjs's WHITE/GRAY/BLACK DFS (the canonical cycle check) but reads the
+// edited node's edges from `newDeps` so it runs against the *post-edit* graph
+// before anything is committed. The pre-edit graph is acyclic (validate.mjs
+// enforces it), so any new cycle must pass through `id` — visiting from `id`
+// alone is sufficient. When validate-as-library lands this should import its
+// shared check rather than restating the traversal.
+export function depCyclePath(index: Index, id: string, newDeps: string[]): string[] | null {
+  const known = new Set(index.stories.map((s) => s.id));
+  const depsOf = (sid: string): string[] =>
+    sid === id ? newDeps : (index.stories.find((s) => s.id === sid)?.deps ?? []);
+  const WHITE = 0,
+    GRAY = 1,
+    BLACK = 2;
+  const color = new Map<string, number>();
+  let cycle: string[] | null = null;
+  const visit = (sid: string, stack: string[]): void => {
+    if (color.get(sid) === GRAY) {
+      cycle = [...stack, sid];
+      return;
+    }
+    if (color.get(sid) === BLACK) return;
+    color.set(sid, GRAY);
+    for (const dep of depsOf(sid)) {
+      if (cycle) break;
+      if (known.has(dep)) visit(dep, [...stack, sid]);
+    }
+    color.set(sid, BLACK);
+  };
+  visit(id, []);
+  return cycle;
+}
+
+// Validates a proposed deps/deps-rfc array against the index: every reference
+// must resolve (a story for `deps`, an RFC for `deps-rfc`), and a `deps` edit
+// must not introduce a cycle. Returns the first error message, or null when the
+// edit is safe to commit. Pure so the reference + cycle rules are unit-testable
+// without git.
+export function setDepsError(
+  index: Index,
+  id: string,
+  kind: "deps" | "deps-rfc",
+  items: string[],
+): string | null {
+  if (kind === "deps") {
+    const known = new Set(index.stories.map((s) => s.id));
+    for (const d of items) if (!known.has(d)) return `dep "${d}" does not exist`;
+    const cycle = depCyclePath(index, id, items);
+    if (cycle) return `dep cycle detected: ${cycle.join(" → ")}`;
+  } else {
+    const known = new Set(index.rfcs.map((r) => r.id));
+    for (const d of items) if (!known.has(d)) return `deps-rfc "${d}" does not exist`;
+  }
+  return null;
+}
+
+// Replaces a story's `deps` or `deps-rfc` array via the array-safe block setter,
+// after enforcing the same reference + cycle checks the validator applies. A
+// rejected edit fails before any commit; an empty csv clears the array to `[]`.
+function setDeps(id: string, kind: "deps" | "deps-rfc", csv: string): void {
+  inGitTasks();
+  const index = loadIndex();
+  const entry = index.stories.find((s) => s.id === id);
+  if (!entry) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: story "${id}" not found in index`);
+    process.exit(1);
+  }
+  const items = parseCsv(csv);
+
+  // Short-circuit a no-op. Re-running with the unchanged array would leave
+  // nothing to commit and `git commit` would error "nothing to commit"; compare
+  // against the indexed value and report cleanly instead (mirrors setPriority).
+  const current = kind === "deps" ? entry.deps : entry.deps_rfc;
+  if (current.length === items.length && current.every((d, i) => d === items[i])) {
+    // loadIndex() may have rebuilt — and dirtied — the generated index files in
+    // the canonical checkout; this early return skips commitAndPush's restore,
+    // so clean up here to avoid leaving the tasks checkout dirty.
+    restoreGeneratedFiles(TASKS_DIR);
+    console.log(`${id} ${kind} already [${items.join(", ")}]`);
+    return;
+  }
+
+  const error = setDepsError(index, id, kind, items);
+  if (error !== null) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: ${error}`);
+    process.exit(1);
+  }
+
+  const cmd = kind === "deps" ? "set-deps" : "set-deps-rfc";
+  flip(id, `${cmd}: ${id}`, RETRY_MSG(id), 4, (file) => setFrontmatterList(file, kind, items));
+  console.log(`set ${id} ${kind} = [${items.join(", ")}]`);
 }
 
 // Single exit point for a refine agent: commit whatever it edited in the
@@ -2226,6 +2324,16 @@ function main(): void {
       });
       break;
     }
+    case "set-deps":
+    case "set-deps-rfc": {
+      const id = pos[0];
+      // `pos[1] === ""` (an explicit empty csv) clears the array; only a
+      // missing csv positional is a usage error.
+      const csv = pos[1];
+      if (!id || csv === undefined) usage();
+      setDeps(id, cmd === "set-deps" ? "deps" : "deps-rfc", csv);
+      break;
+    }
     default:
       usage();
   }
@@ -2249,6 +2357,8 @@ function usage(): never {
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
   status-set <id> <status>                     (draft ↔ ready, blocked → ready; validates the transition)
   rfc <slug> [--status <s>] [--supersede <other-slug>] [--relate <csv>] [--clusters <csv>] [--packages <csv>]
+  set-deps <id> <csv>                          (replace deps; checks references + cycles; empty csv clears)
+  set-deps-rfc <id> <csv>                      (replace deps-rfc; checks references; empty csv clears)
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
   finalize <0000-slug> [--dry-run]             (assign the next RFC number: rename dir, rewrite refs, rebuild index)
   new-rfc <slug> [--title "text"] [--owner @handle] [--packages <csv>] [--clusters <csv>] [--related <csv>] [--body-file <path>]
