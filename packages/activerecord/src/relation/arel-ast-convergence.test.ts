@@ -26,9 +26,13 @@
  * Not Rails-mirrored test names — RFC 0022 is a TS-internal refactor with no
  * new Ruby counterpart, so the names describe the invariant.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { createSidecarTestAdapter, adapterType } from "../test-adapter.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Post as CanonicalPost } from "../test-helpers/models/post.js";
 
 class Post extends Base {
   static _tableName = "posts";
@@ -112,6 +116,30 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
       const q = openQuote;
       expect(sql).toMatch(new RegExp(`FROM \\(SELECT .* FROM ${q}posts${q} WHERE .*\\) posts`));
       expect(sql).toContain(`SELECT ${q}posts${q}.*`);
+    });
+
+    // pluck spawns its own relation and executes `relation.arel` via
+    // select_all (calculations.rb), a path distinct from the toSql() read
+    // path above. build_arel must apply `arel.from(build_from)` there too, so
+    // the derived-table subquery actually scopes the rows. Executes against
+    // the active adapter (each CI lane runs its own backend).
+    describe("executing through Relation#pluck", () => {
+      useHandlerFixtures(["posts"], { schema: canonicalSchema });
+      beforeAll(async () => {
+        await defineSchema({ posts: canonicalSchema.posts }, { dropExisting: true });
+      });
+
+      it("scopes plucked rows to the from(subquery)", async () => {
+        const sub = CanonicalPost.where("id <= 2");
+        const ids = await (
+          CanonicalPost.from(sub, "posts") as unknown as {
+            order(c: string): { pluck(c: string): Promise<unknown[]> };
+          }
+        )
+          .order("id")
+          .pluck("id");
+        expect(ids.map(Number)).toEqual([1, 2]);
+      });
     });
   });
 });
