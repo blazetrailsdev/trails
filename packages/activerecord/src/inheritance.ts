@@ -631,21 +631,35 @@ export function subclassFromAttributes(
   const inheritCol = getInheritanceColumn(modelClass);
   if (!inheritCol) return null;
 
-  // Try the column as-given, plus snake_case and camelCase variants so attrs
-  // from form params or JS-style camelCase callers both resolve. Use ?? to
-  // preserve falsy-but-present values like 0 (Rails: 0.present? is true).
+  const cast = castStiValueFromAttrs(modelClass, attrsHash, inheritCol);
+  if (!cast.found) return null;
+  return findStiClass(modelClass, cast.value as string);
+}
+
+/**
+ * Read the inheritance-column value out of a plain attrs hash and cast it
+ * through the column's type. Tries the column as-given plus its snake_case and
+ * camelCase variants so attrs from form params or JS-style camelCase callers
+ * both resolve, using `??` to preserve falsy-but-present values like 0 (Rails:
+ * `0.present?` is true). Returns `{ found: false }` when the column is
+ * absent/blank — the caller decides whether that means "no dispatch" — so a
+ * present-but-uncastable value still surfaces (as `value: null`) to the
+ * resolver rather than being silently swallowed. Shared by
+ * {@link subclassFromAttributes} and {@link subclassFromAttributesForNew}.
+ *
+ * @internal
+ */
+function castStiValueFromAttrs(
+  modelClass: typeof Base,
+  attrsHash: Record<string, unknown>,
+  inheritCol: string,
+): { found: false } | { found: true; value: unknown } {
   const camelCol = camelize(inheritCol, false);
   const snakeCol = underscore(inheritCol);
   const subclassValue =
     attrsHash[inheritCol] ?? attrsHash[snakeCol] ?? attrsHash[camelCol] ?? undefined;
-
-  if (isPresent(subclassValue)) {
-    // Rails: cast the value through the inheritance column's type
-    const castValue = castInheritanceColumnValue(modelClass, inheritCol, subclassValue);
-    return findStiClass(modelClass, castValue as string);
-  }
-
-  return null;
+  if (!isPresent(subclassValue)) return { found: false };
+  return { found: true, value: castInheritanceColumnValue(modelClass, inheritCol, subclassValue) };
 }
 
 /**
@@ -667,15 +681,29 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
 }
 
 /**
- * Resolve the subclass to construct for `new modelClass(attrs)` from the
- * inheritance column in `attrs`.
+ * Resolve the subclass to construct for `new modelClass(attrs)`.
  *
- * Mirrors the dispatch in ActiveRecord::Inheritance::ClassMethods#new, but
- * resolves through {@link findStiClassInHierarchy} (registry-safe) and defaults
- * the inheritance column to `"type"` when STI was not explicitly enabled —
- * mirroring Rails' default of `inheritance_column == "type"` for every model.
- * Returns null (no dispatch) when the column is absent/blank or names no
+ * Mirrors the dispatch in ActiveRecord::Inheritance::ClassMethods#new, which
+ * tries three attribute sources in order — the explicit `attrs`, the
+ * `current_scope`'s create attributes, then (for a base class) the table's
+ * `column_defaults` — stopping at the first that names a subclass. We resolve
+ * each through {@link findStiClassInHierarchy} (registry-safe) instead of
+ * Rails' constant-lookup `find_sti_class`, and default the inheritance column
+ * to `"type"` when STI was not explicitly enabled (Rails' `inheritance_column`
+ * default for every model). Returns null (no dispatch) when no source names a
  * subclass in this class's subtree.
+ *
+ * Two intentional deviations from Rails:
+ *  - Rails gates the whole dispatch on `_has_attribute?(inheritance_column)` so
+ *    non-STI models skip it. trails reflects DB columns lazily and apart from
+ *    `_attributeDefinitions`, so that column-metadata check isn't reliably
+ *    available at construction. The STI-subtree fast-path below is the
+ *    equivalent guard, and {@link findStiClassInHierarchy} only ever resolves a
+ *    real descendant — so a stray `type` key on a non-STI model can't dispatch.
+ *  - For a value present but naming no in-hierarchy subclass, Rails'
+ *    `find_sti_class` raises SubclassNotFound; the registry-safe resolver
+ *    returns null (build the receiver as-is) instead, since the global lookup
+ *    that would raise is exactly the ambiguous path we avoid.
  *
  * @internal Used by Base's constructor to dispatch `new` to a subclass.
  */
@@ -683,26 +711,32 @@ export function subclassFromAttributesForNew(
   modelClass: typeof Base,
   attrs: Record<string, unknown> | null | undefined,
 ): typeof Base | null {
-  if (!attrs || typeof attrs !== "object") return null;
+  // Fast path: a class with neither an STI subtree nor an explicit inheritance
+  // column can never dispatch (findStiClassInHierarchy would only ever match
+  // the receiver itself), so skip the source probing — including the
+  // non-memoized columnDefaults build — entirely on the hot path.
+  const inheritCol = getInheritanceColumn(modelClass);
+  if (descendants(modelClass).length === 0 && !inheritCol) return null;
 
-  const inheritCol = getInheritanceColumn(modelClass) ?? "type";
-  // Rails guards #new with `_has_attribute?(inheritance_column)` so non-STI
-  // models skip dispatch entirely. trails reflects DB columns lazily and apart
-  // from `_attributeDefinitions`, so that column-metadata check isn't reliably
-  // available at construction. findStiClassInHierarchy below is the equivalent
-  // guard: it only ever resolves a real descendant of this class, so a model
-  // with no STI subtree (or a stray `type` key) resolves to null and no
-  // dispatch happens — matching the observable behavior of Rails' gate.
-  const camelCol = camelize(inheritCol, false);
-  const snakeCol = underscore(inheritCol);
-  const subclassValue =
-    (attrs as Record<string, unknown>)[inheritCol] ??
-    (attrs as Record<string, unknown>)[snakeCol] ??
-    (attrs as Record<string, unknown>)[camelCol] ??
-    undefined;
+  const col = inheritCol ?? "type";
+  const resolve = (source: unknown): typeof Base | null => {
+    if (!source || typeof source !== "object") return null;
+    const cast = castStiValueFromAttrs(modelClass, source as Record<string, unknown>, col);
+    if (!cast.found) return null;
+    return findStiClassInHierarchy(modelClass, cast.value as string);
+  };
 
-  if (!isPresent(subclassValue)) return null;
-
-  const castValue = castInheritanceColumnValue(modelClass, inheritCol, subclassValue);
-  return findStiClassInHierarchy(modelClass, castValue as string);
+  // Rails Inheritance::ClassMethods#new tries each source in turn, stopping at
+  // the first that resolves a subclass.
+  let subclass = resolve(attrs);
+  if (!subclass) {
+    const scopeAttrs = (
+      modelClass.currentScope as { scopeForCreate?(): unknown } | null
+    )?.scopeForCreate?.();
+    subclass = resolve(scopeAttrs);
+  }
+  if (!subclass && isBaseClass(modelClass)) {
+    subclass = resolve(modelClass.columnDefaults);
+  }
+  return subclass;
 }
