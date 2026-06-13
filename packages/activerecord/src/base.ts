@@ -1487,8 +1487,9 @@ export class Base extends Model {
   // Rails normalises these via AttributeMutationTracker#type_cast (which calls
   // type.cast on the attribute's EnumType); we mirror it here for both live
   // changes (attributeChanged) and persisted changes (savedChangeToAttribute).
-  // Handles both the `_enum` macro (integer-stored, mapping in `_enums`) and
-  // `defineEnum` (string-stored, normalised via EnumType).
+  // Handles both the `_enum` macro (label-stored via the registered EnumType,
+  // mapping in `_enums`) and `defineEnum` (integer-stored, mapping in the
+  // EnumType registry).
   override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     if (options) {
       const ctor = this.constructor as typeof Base;

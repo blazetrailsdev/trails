@@ -342,7 +342,10 @@ export class EnumType extends ValueType<string> {
 
   assertValidValue(value: unknown): void {
     if (!this._raiseOnInvalidValues) return;
-    if (value === null || value === undefined || value === "") return;
+    // Rails: `unless value.blank? || ...` — a blank value (nil or a
+    // whitespace-only string) is always allowed and casts to nil.
+    if (value === null || value === undefined) return;
+    if (typeof value === "string" && isBlank(value)) return;
     if (typeof value === "string" && this._mapping.has(value)) return;
     if ((typeof value === "number" || typeof value === "string") && this._reverseMapping.has(value))
       return;
