@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { minutes } from "@blazetrails/activesupport";
+import { minutes, BigDecimal } from "@blazetrails/activesupport";
 import {
   quote,
   quoteString,
@@ -162,11 +162,12 @@ describe("QuotingTest", () => {
     expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
   it("quote bigdecimal", () => {
-    // Rails: BigDecimal((1 << 100).to_s) quotes bare via to_s("F"); the trails
-    // representation of an exact arbitrary-precision integer is a bigint, which
-    // quotes to the bare decimal digits (Rails emits a trailing ".0" that the
-    // integral bigint has no place for).
-    expect(quote(1n << 100n)).toBe("1267650600228229401496703205376");
+    // Rails: BigDecimal((1 << 100).to_s) quotes bare via to_s("F"). trails'
+    // BigDecimal preserves the arbitrary-precision integer and renders the
+    // fixed form with a trailing ".0", matching Rails exactly.
+    const bigdec = new BigDecimal((1n << 100n).toString());
+    expect(quote(bigdec)).toBe(bigdec.toString("F"));
+    expect(quote(bigdec)).toBe("1267650600228229401496703205376.0");
   });
   it("dates and times", () => {
     // Rails monkey-patches quoted_date to verify quote() dispatches through it.

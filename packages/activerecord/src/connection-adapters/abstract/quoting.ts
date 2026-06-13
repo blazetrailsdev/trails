@@ -9,6 +9,7 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { NotImplementedError } from "../../errors.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
@@ -63,6 +64,9 @@ export function quoteTableName(name: string): string {
 export function quote(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
+  // BigDecimals need to be put in a non-normalized (fixed, ".0"-bearing) form
+  // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
+  if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
   if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
@@ -98,6 +102,8 @@ export function typeCast(value: unknown): unknown {
   if (value === true) return unquotedTrue();
   if (value === false) return unquotedFalse();
   if (value === null || value === undefined) return value;
+  // Rails: `when BigDecimal then value.to_s("F")` — bound as a fixed-form string.
+  if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
