@@ -10,6 +10,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import { NotImplementedError } from "../../errors.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import {
   formatInstantForSql,
@@ -19,33 +20,39 @@ import {
 } from "./sql-datetime.js";
 
 /**
- * Quote a SQL identifier (table name, column name, index name).
+ * ANSI double-quote identifier quoter (`""`-escaped). Not a Rails-layer
+ * method — Rails' abstract `Quoting` has no `quote_identifier`. This is the
+ * SQL-92 fallback used only by {@link ABSTRACT_SCHEMA_QUOTER} when DDL is
+ * rendered without a live adapter; every real adapter quotes through its own
+ * dialect-specific helper.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_column_name
+ * @internal
  */
 export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
 /**
- * Quote a table name. Handles schema-qualified names (schema.table).
+ * Quotes the column name. Must be implemented by subclasses — the abstract
+ * layer raises, mirroring Rails where every adapter defines its own.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_table_name
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting::ClassMethods#quote_column_name
+ * (activerecord/.../abstract/quoting.rb L61 — `raise NotImplementedError`)
  */
-export function quoteTableName(name: string): string {
-  return name
-    .split(".")
-    .map((part) => quoteIdentifier(part))
-    .join(".");
+export function quoteColumnName(_columnName: string): string {
+  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
+  throw new NotImplementedError();
 }
 
 /**
- * Quote a column name.
+ * Quotes the table name. Defaults to column-name quoting with no dot-split;
+ * schema-qualified handling is adapter-specific (PG/MySQL/SQLite each override).
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_column_name
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting::ClassMethods#quote_table_name
+ * (activerecord/.../abstract/quoting.rb L66 — `quote_column_name(table_name)`)
  */
-export function quoteColumnName(columnName: string): string {
-  return quoteIdentifier(columnName);
+export function quoteTableName(name: string): string {
+  return quoteColumnName(name);
 }
 
 /**
@@ -194,7 +201,14 @@ export function quoteDefaultExpression(value: unknown, _column?: unknown): strin
  */
 export const ABSTRACT_SCHEMA_QUOTER: SchemaQuoter = {
   quoteIdentifier,
-  quoteTableName,
+  // The adapter-free fallback renders schema-qualified names ANSI-style by
+  // quoting each dot-separated part. The public `quoteTableName` mirrors Rails
+  // (delegates to the throwing `quoteColumnName`), so it can't back this crutch.
+  quoteTableName: (name) =>
+    name
+      .split(".")
+      .map((part) => quoteIdentifier(part))
+      .join("."),
   quoteDefaultExpression,
 };
 

@@ -8,7 +8,6 @@ import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import {
   quote as abstractQuote,
   quoteIdentifier as abstractQuoteIdentifier,
-  quoteTableNameForAssignment as abstractQuoteTableNameForAssignment,
   quoteString as abstractQuoteString,
   castBoundValue as abstractCastBoundValue,
   columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
@@ -36,7 +35,10 @@ export type Quoter = Pick<
 const ABSTRACT_QUOTER: Quoter = {
   quote: (v) => abstractQuote(v),
   quoteIdentifier: (n) => abstractQuoteIdentifier(n),
-  quoteTableNameForAssignment: (t, a) => abstractQuoteTableNameForAssignment(t, a),
+  // ANSI fallback: the abstract `quoteTableNameForAssignment` delegates to the
+  // throwing `quoteColumnName`, so render `"table"."attr"` directly here.
+  quoteTableNameForAssignment: (t, a) =>
+    `${abstractQuoteIdentifier(t)}.${abstractQuoteIdentifier(a)}`,
   quoteString: (s) => abstractQuoteString(s),
   castBoundValue: (v) => abstractCastBoundValue(v),
 };

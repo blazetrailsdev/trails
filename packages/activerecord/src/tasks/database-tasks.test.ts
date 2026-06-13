@@ -24,7 +24,7 @@ import {
   initializeDatabase,
 } from "./database-tasks.js";
 import { quoteTableName as mysqlQuoteTableName } from "../connection-adapters/mysql/quoting.js";
-import { quoteTableName as abstractQuoteTableName } from "../connection-adapters/abstract/quoting.js";
+import { quoteTableName as sqliteQuoteTableName } from "../connection-adapters/sqlite3/quoting.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { NoDatabaseError } from "../errors.js";
@@ -1996,7 +1996,7 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
     return {
       adapterName,
       quoteTableName: (name: string) =>
-        isMySQL ? mysqlQuoteTableName(name) : abstractQuoteTableName(name),
+        isMySQL ? mysqlQuoteTableName(name) : sqliteQuoteTableName(name),
       // SchemaMigration's read path compiles its SelectManager via
       // adapter.toSql; a real adapter compiles through its visitor. The stub
       // only needs to yield a SELECT string the execute() matcher recognizes.
