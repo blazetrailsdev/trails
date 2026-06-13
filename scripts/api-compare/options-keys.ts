@@ -9,10 +9,28 @@
 
 import { snakeToCamel } from "./conventions.js";
 
+/** Known Ruby-option-symbol → TS-property renames the camelization can't derive.
+ *  Keyed by the raw Ruby symbol. Keep this minimal and evidence-backed — each
+ *  entry suppresses a confirmed false `missingInTs`, not a guess. */
+const OPTION_KEY_RENAMES: Record<string, string> = {
+  // `constructor` is reserved as a JS object-property name, so the port spells
+  // Ruby's `:constructor` option as `constructorFn` (see aggregations.ts).
+  constructor: "constructorFn",
+};
+
 /** Normalize a raw Ruby option symbol to its TS spelling (`inverse_of` →
- *  `inverseOf`) via the same rename pipeline method names flow through. */
+ *  `inverseOf`) via the same rename pipeline method names flow through, then
+ *  apply any known non-derivable rename. */
 export function normalizeRubyKey(sym: string): string {
-  return snakeToCamel(sym);
+  return OPTION_KEY_RENAMES[sym] ?? snakeToCamel(sym);
+}
+
+/** Leading-underscore keys are implementation-internal on both sides (TS
+ *  `_skipValidateOptions`, `_usesLegacyIndexName`; Ruby `:_foo`), not part of
+ *  the public option contract — exclude them from the diff so they never
+ *  surface as findings. */
+function isPublicKey(key: string): boolean {
+  return !key.startsWith("_");
 }
 
 export interface OptionKeyDiff {
@@ -25,8 +43,8 @@ export interface OptionKeyDiff {
 /** Diff a Ruby option-symbol set against a resolved TS key set, after
  *  normalizing the Ruby symbols to TS naming. Both result lists are sorted. */
 export function diffOptionKeys(rubyKeys: string[], tsKeys: string[]): OptionKeyDiff {
-  const ruby = new Set(rubyKeys.map(normalizeRubyKey));
-  const ts = new Set(tsKeys);
+  const ruby = new Set(rubyKeys.map(normalizeRubyKey).filter(isPublicKey));
+  const ts = new Set(tsKeys.filter(isPublicKey));
   return {
     missingInTs: [...ruby].filter((k) => !ts.has(k)).sort(),
     extraInTs: [...ts].filter((k) => !ruby.has(k)).sort(),

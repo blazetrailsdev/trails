@@ -6,6 +6,10 @@ describe("normalizeRubyKey", () => {
     expect(normalizeRubyKey("inverse_of")).toBe("inverseOf");
     expect(normalizeRubyKey("through")).toBe("through");
   });
+
+  it("applies known non-derivable renames (:constructor → constructorFn)", () => {
+    expect(normalizeRubyKey("constructor")).toBe("constructorFn");
+  });
 });
 
 describe("diffOptionKeys", () => {
@@ -19,6 +23,19 @@ describe("diffOptionKeys", () => {
     const diff = diffOptionKeys(["through"], ["through", "validate"]);
     expect(diff.missingInTs).toEqual([]);
     expect(diff.extraInTs).toEqual(["validate"]);
+  });
+
+  it("suppresses a known rename (:constructor) instead of flagging it missing", () => {
+    expect(diffOptionKeys(["constructor", "mapping"], ["constructorFn", "mapping"])).toEqual({
+      missingInTs: [],
+      extraInTs: [],
+    });
+  });
+
+  it("ignores leading-underscore internal keys on both sides", () => {
+    const diff = diffOptionKeys(["_uses_legacy_index_name", "name"], ["_skipValidateOptions"]);
+    expect(diff.missingInTs).toEqual(["name"]);
+    expect(diff.extraInTs).toEqual([]);
   });
 
   it("normalizes both sides so equal keys don't surface, and sorts", () => {
