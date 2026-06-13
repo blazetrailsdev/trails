@@ -1489,7 +1489,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // place rather than appended twice.
       // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`
       // so a `distinct` association scope dedups in place on append rather than appending twice.
-      await this._addToTarget(record, { replace: this.distinctValue }, () => insertRecord(record));
+      //
+      // Rails' `concat_records` runs `insert_record` inside the per-record
+      // `add_to_target` block, guarded by `unless owner.new_record?`
+      // (collection_association.rb:444). For a new-record owner the child is
+      // added to the in-memory target and saved later via autosave; skipping
+      // the insert also avoids writing a child row with a null owner FK. The
+      // check is evaluated per record at save time (after `before_add` fires),
+      // so a callback that persists the owner mid-loop flips the remaining
+      // records onto the insert path — matching Rails' control flow.
+      await this._addToTarget(record, { replace: this.distinctValue }, () =>
+        this._record.isNewRecord() ? Promise.resolve(true) : insertRecord(record),
+      );
     }
   }
 
@@ -2060,6 +2071,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // before touching join rows.
     this._ensureThroughWritable();
     return this._withoutStrictLoading(async () => {
+      // A new-record owner whose scope is a `null_scope?` has no persisted
+      // children to delete or nullify, so Rails' `scope.none!`
+      // (collection_association.rb:300-305) makes the delete/nullify a no-op.
+      // `null_scope?` is `owner.new_record? && !foreign_key_present?`, so a new
+      // owner WITH the owner PK present (e.g. a client-assigned UUID) still
+      // queries — only the genuinely keyless new owner short-circuits. Reset
+      // the in-memory target without touching the DB in that case.
+      if (this._record.isNewRecord() && !this._foreignKeyPresent()) {
+        this._target = [];
+        this._targetLoaded = true;
+        this._invalidateAssociationIds();
+        return;
+      }
       // Rails' `clear` routes through `delete_all`, which removes the rows in
       // bulk and does NOT run `before_remove`/`after_remove` callbacks (those
       // live in `remove_records`, not the delete path) — unlike per-record
