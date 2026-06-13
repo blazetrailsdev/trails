@@ -377,7 +377,13 @@ export function instantiateSti(baseClass: typeof Base, row: Record<string, unkno
   const column = getInheritanceColumn(baseClass);
   if (!column) return directInstantiate(baseClass, row);
 
-  const typeName = row[column] as string | null | undefined;
+  // Cast the raw column value through its attribute type before resolving the
+  // subclass — mirrors Rails' discriminate_class_for_record, which does
+  // `find_sti_class(...cast(record[inheritance_column]))`. This is what makes
+  // an enum-backed STI column work: the integer stored in the column (e.g. 3)
+  // casts to its class-name label ("SelectedMembership"), not a bare number.
+  if (!isPresent(row[column])) return directInstantiate(baseClass, row);
+  const typeName = castInheritanceColumnValue(baseClass, column, row[column]) as string | null;
   if (!typeName || !typeName.trim()) return directInstantiate(baseClass, row);
 
   const subclass = findStiClass(baseClass, typeName);

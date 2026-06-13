@@ -10,6 +10,9 @@ import { quoteTableName } from "./test-helpers/quote-regex.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { SelectedMembership } from "./test-helpers/models/membership.js";
 
 const TEST_SCHEMA: Schema = {
   vehicles: {
@@ -1395,18 +1398,6 @@ describe("InheritanceTest", () => {
     // to keep this PR within the size ceiling.
   });
 
-  it.skip("inheritance with default scope", async () => {
-    // FOLLOW-UP (f9g2-inheritance-enum-sti-default-scope): Rails matches
-    // `SelectedMembership.count(:all) == 1` (inheritance_test.rb:500-501) where
-    // `Membership.enum :type` (membership.rb:3-4) backs an *integer* STI column
-    // (schema.rb:783-787). STI must filter `WHERE type = <enum int for
-    // SelectedMembership>`. The canonical trails Membership model declares the
-    // enum but does NOT wire STI dispatch on the enum-backed column, so
-    // `SelectedMembership.count()` returns all rows (6), not 1. Enum-backed STI
-    // inheritance-column dispatch is the real gap; tracked separately rather
-    // than masked with a non-enum string `type` fixture.
-  });
-
   it("company descends from active record", async () => {
     const { Company } = makeCompanyHierarchy();
     expect(Company.prototype).toBeInstanceOf(Base);
@@ -2138,5 +2129,18 @@ describe("set_base_class / setBaseClass", () => {
     expect((Animal2 as any)._computedBaseClass).toBe(Animal2);
     // Dog2's superclass is Animal2 (concrete, not abstract) → Dog2 inherits Animal2
     expect((Dog2 as any)._computedBaseClass).toBe(Animal2);
+  });
+});
+
+// Enum-backed STI: `Membership.enum :type` backs an *integer* `type` column that
+// also drives STI dispatch (membership.rb:3-4, schema.rb:783-787). Runs in its
+// own describe so it can load the canonical `memberships` fixtures; the six rows
+// span every Membership subclass, and `SelectedMembership.count` must filter
+// `WHERE type = 3` (the enum integer for SelectedMembership).
+describe("InheritanceTest enum-backed default scope", () => {
+  useHandlerFixtures(["memberships"], { schema: canonicalSchema });
+
+  it("inheritance with default scope", async () => {
+    expect(await SelectedMembership.count()).toBe(1);
   });
 });
