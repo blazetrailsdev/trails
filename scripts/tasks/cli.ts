@@ -1045,6 +1045,34 @@ function refine(id: string, pr: number | null, dir: string): void {
   console.log(JSON.stringify({ id, outcome, pushed: true, pr }));
 }
 
+// ──────────────────── formatter + reindex ────────────────────
+
+// Run `prettier --write` on `files` using the tasks repo's own prettier binary
+// (node_modules/.bin/prettier), so we add no runtime dep of our own. Best-effort:
+// when prettier is absent (a fresh clone without the sibling tasks deps), skip
+// silently — the pre-commit hook still gates formatting on commit. Relative
+// paths resolve against tasksDir (prettier's cwd).
+export function formatFiles(files: string[], tasksDir = TASKS_DIR): void {
+  if (files.length === 0) return;
+  const bin = join(tasksDir, "node_modules", ".bin", "prettier");
+  if (!existsSync(bin)) return;
+  execFileSync(bin, ["--write", ...files], { cwd: tasksDir, stdio: "inherit" });
+}
+
+// Rebuild index.json/index.md/search.json without a no-op mutation. The index
+// otherwise only refreshes as a side effect of a committed mutation (via the
+// tasks pre-commit hook) or lazily in loadIndex() when stale; after a manual
+// story edit the only standalone refresh was to abuse `priority <id> N --clear`.
+// This runs the same build script loadIndex() falls back to, in place.
+function reindex(): void {
+  inGitTasks();
+  execFileSync(process.execPath, ["scripts/build-index.mjs"], {
+    cwd: TASKS_DIR,
+    stdio: "inherit",
+  });
+  console.log("rebuilt index");
+}
+
 // ──────────────────── new story ────────────────────
 
 // Returns the cluster names declared in an RFC's README.md frontmatter, parsed
@@ -1079,10 +1107,12 @@ export function buildStoryContent(
   storySlug: string,
   opts: {
     title?: string;
+    status?: StoryStatus;
     cluster?: string | null;
     estLoc?: number | null;
     deps?: string[];
     priority?: number | null;
+    body?: string;
     date: string;
   },
 ): string {
@@ -1091,9 +1121,16 @@ export function buildStoryContent(
   const title = opts.title ?? storySlug;
   const deps = opts.deps ?? [];
   const depsYaml = deps.length === 0 ? "[]" : `[${deps.map((d) => qs(d)).join(", ")}]`;
+  // A caller-supplied body (`--body-file`) replaces the empty skeleton, trimmed
+  // to a single leading blank line and one trailing newline so the file is
+  // prettier-clean regardless of how the source file was whitespaced.
+  const body =
+    opts.body != null
+      ? `\n${opts.body.replace(/^\n+/, "").replace(/\n+$/, "")}\n`
+      : "\n## Context\n\n## Acceptance criteria\n";
   return `---
 title: ${qs(title)}
-status: draft
+status: ${opts.status ?? "draft"}
 updated: ${opts.date}
 rfc: ${qs(rfcSlug)}
 cluster: ${opts.cluster != null ? opts.cluster : "null"}
@@ -1106,11 +1143,7 @@ claim: null
 assignee: null
 blocked-by: null
 ---
-
-## Context
-
-## Acceptance criteria
-`;
+${body}`;
 }
 
 export function newStory(
@@ -1118,10 +1151,12 @@ export function newStory(
   storySlug: string,
   opts: {
     title?: string;
+    status?: StoryStatus;
     cluster?: string;
     estLoc?: number | null;
     deps?: string[];
     priority?: number | null;
+    bodyFile?: string;
   },
   tasksDir = TASKS_DIR,
 ): void {
@@ -1165,6 +1200,17 @@ export function newStory(
       process.exit(1);
     }
   }
+  // Read the optional --body-file up front (before the commit loop) so a missing
+  // path fails loudly rather than silently producing an empty-skeleton story.
+  let body: string | undefined;
+  if (opts.bodyFile != null) {
+    try {
+      body = readFileSync(opts.bodyFile, "utf8");
+    } catch {
+      console.error(`error: --body-file ${opts.bodyFile} not found or unreadable`);
+      process.exit(1);
+    }
+  }
   const storiesDir = join(rfcDir, "stories");
   const storyFile = join(storiesDir, `${storySlug}.md`);
   if (existsSync(storyFile)) {
@@ -1182,7 +1228,14 @@ export function newStory(
         process.exit(4);
       }
       mkdirSync(storiesDir, { recursive: true });
-      writeFileSync(storyFile, buildStoryContent(rfcSlug, storySlug, { ...opts, date: today() }));
+      writeFileSync(
+        storyFile,
+        buildStoryContent(rfcSlug, storySlug, { ...opts, body, date: today() }),
+      );
+      // Hand-authored bodies often violate prettier's wrapping rules, which the
+      // tasks pre-commit hook rejects; format the file in place so the commit is
+      // clean. Staged after this runs (fileToStage), so the formatted bytes land.
+      formatFiles([storyFile], tasksDir);
     },
     raceMessage: `failed to create ${storySlug} after retry — pull manually and retry`,
     raceExitCode: 4,
@@ -1338,6 +1391,7 @@ function main(): void {
     "est-loc",
     "deps",
     "priority",
+    "body-file",
   ];
   for (const k of valueFlags) if (flags[k] === true) usage();
 
@@ -1415,9 +1469,12 @@ function main(): void {
       if (estLocRaw !== undefined && (!/^\d+$/.test(estLocRaw) || Number(estLocRaw) <= 0)) usage();
       const priorityRaw = stringFlag(flags, "priority");
       if (priorityRaw !== undefined && !/^\d+$/.test(priorityRaw)) usage();
+      const statusRaw = stringFlag(flags, "status");
+      if (statusRaw !== undefined && !STORY_STATUSES.includes(statusRaw as StoryStatus)) usage();
       const depsRaw = stringFlag(flags, "deps");
       newStory(rfcSlug, storySlug, {
         title: stringFlag(flags, "title"),
+        status: statusRaw as StoryStatus | undefined,
         cluster: stringFlag(flags, "cluster"),
         estLoc: estLocRaw !== undefined ? Number(estLocRaw) : null,
         deps: depsRaw
@@ -1427,7 +1484,20 @@ function main(): void {
               .filter(Boolean)
           : [],
         priority: priorityRaw !== undefined ? Number(priorityRaw) : null,
+        bodyFile: stringFlag(flags, "body-file"),
       });
+      break;
+    }
+    case "reindex":
+    case "build":
+      reindex();
+      break;
+    case "fmt": {
+      // Format the given paths (relative to TASKS_DIR), or all RFC markdown when
+      // none are named. Leaves hand-authored stories prettier-clean for commit.
+      inGitTasks();
+      formatFiles(pos.length > 0 ? pos : ["rfcs"]);
+      console.log("formatted");
       break;
     }
     case "block": {
@@ -1480,7 +1550,9 @@ function usage(): never {
   block <id> --reason "<text>"
   refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
-  new <rfc-slug> <story-slug> [--title "text"] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>]
+  new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
+  reindex | build                              (rebuild the index in place)
+  fmt [<path> ...]                             (prettier --write authored stories; default: rfcs/)
 
 Set $TASKS_DIR to override the default ~/github/blazetrailsdev/tasks.
 ($RFCS_DIR is honored as a transition fallback after the rfcs → tasks rename.)`);
