@@ -34,6 +34,7 @@ import {
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
 
 const TEST_SCHEMA: Schema = {
   firms: { name: "string" },
@@ -750,7 +751,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = await Firm.create({ name: "InvClear" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
     // Set inverse on account
-    ((account as any)._cachedAssociations ??= new Map()).set("firm", firm);
+    seedAssociationCache(account as any, "firm", firm);
     // Clear has_one by setting to null
     await setHasOne(firm, "account", null, { className: "Account", foreignKey: "firm_id" });
     const loaded = await loadHasOne(firm, "account", {

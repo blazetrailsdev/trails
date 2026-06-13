@@ -383,7 +383,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(instance._associationIds).toBeNull();
   });
 
-  // RFC 0006 S1 — proxy-backed read API + deprecated _cachedAssociations shim.
+  // RFC 0006 S1 — proxy-backed read API + the `_associationCache` accessor.
   it("readTargets() returns the loaded target array (single source of truth)", async () => {
     const blog = await blogWithPosts();
     const proxy = association<ApPost>(blog, "apPosts") as any;
@@ -408,18 +408,16 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect((proxy.targetsByPrimaryKey() as Map<string, ApPost>).size).toBe(3);
   });
 
-  it("_cachedAssociationTarget() delegates to the proxy read accessor for loaded collections", async () => {
+  it("_associationCache() returns the proxy whose target is the read accessor for loaded collections", async () => {
     const blog = await blogWithPosts();
     const proxy = association<ApPost>(blog, "apPosts") as any;
-    expect((blog as any)._cachedAssociationTarget("apPosts")).toBe(proxy.readTargets());
+    expect((blog as any)._associationCache("apPosts").target).toBe(proxy.readTargets());
   });
 
-  it("_cachedAssociationTarget() falls back to _cachedAssociations when no proxy is loaded", async () => {
+  it("_associationCache() returns undefined when no proxy is loaded or seeded", async () => {
     const blog = new ApBlog({ name: "Dev" });
     await blog.save();
-    const sentinel: ApPost[] = [];
-    (blog as any)._cachedAssociations = new Map([["apPosts", sentinel]]);
-    expect((blog as any)._cachedAssociationTarget("apPosts")).toBe(sentinel);
+    expect((blog as any)._associationCache("apPosts")).toBeUndefined();
   });
 });
 

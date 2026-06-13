@@ -8,6 +8,7 @@ import { Associations } from "../associations.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -153,7 +154,7 @@ describe("AssociationValidationTest", () => {
     registerModel("TopicMD_destruction", TopicMD);
     const reply = new FakeReply();
     const t = new TopicMD({ title: "test" });
-    (t as any)._cachedAssociations = new Map([["replies", [reply]]]);
+    seedAssociationCache(t as any, "replies", [reply]);
     expect(t.isValid()).toBe(false);
     reply._destroyed = true;
     t.errors.clear();
@@ -192,7 +193,7 @@ describe("AssociationValidationTest", () => {
     }
     registerModel("ReplyMsg", ReplyMsg);
     const r = new ReplyMsg({ title: "A reply" });
-    (r as any)._cachedAssociations = new Map([["topic", new FakeTopic()]]);
+    seedAssociationCache(r as any, "topic", new FakeTopic());
     expect(r.isValid()).toBe(false);
     expect(r.errors.fullMessagesFor("topic")).toContain(
       "Topic This string contains 'single' and \"double\" quotes",
@@ -213,7 +214,7 @@ describe("AssociationValidationTest", () => {
     }
     registerModel("ReplyCtx", ReplyCtx);
     const r = new ReplyCtx({ title: "A reply" });
-    (r as any)._cachedAssociations = new Map([["topic", new FakeTopic()]]);
+    seedAssociationCache(r as any, "topic", new FakeTopic());
     expect(r.isValid()).toBe(true);
     expect(r.isValid("custom")).toBe(false);
     expect(r.errors.fullMessagesFor("topic")).toEqual(["Topic is invalid"]);
@@ -250,7 +251,7 @@ describe("AssociationValidationTest", () => {
 
     const r = await ReplyCreate.create({ title: "A reply", content: "with content!" });
     // NOTE: Does not pass along :create context from reply to Topic validation.
-    (r as any)._cachedAssociations = new Map([["topic", t]]);
+    seedAssociationCache(r as any, "topic", t);
 
     expect(t.isValid()).toBe(true);
     expect(r.isValid()).toBe(true);

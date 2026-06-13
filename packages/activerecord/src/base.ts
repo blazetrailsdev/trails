@@ -2351,34 +2351,39 @@ export class Base extends Model {
   _preloadedAssociations: Map<string, unknown> = new Map();
   _collectionProxies: Map<string, unknown> = new Map();
   _associationInstances: Map<string, AssociationInstance> = new Map();
-  /** @internal */
-  _cachedAssociations?: Map<string, Base | Base[] | null>;
 
   /**
-   * @internal
-   * @deprecated RFC 0006 (collection-store unification). Reads of has_many
-   * targets should go through the `CollectionProxy` read accessor
-   * (`proxy.readTargets()`), which is the single source of truth. This shim
-   * exists so the legacy `_cachedAssociations` reads can be migrated one
-   * caller at a time: when a loaded collection proxy exists for `name`, it
-   * returns the proxy's canonical target array; otherwise it falls back to the
-   * legacy `_cachedAssociations` map (still used by singular associations and
-   * the direct test pokes). Removed once S4 deletes `_cachedAssociations`.
+   * Return the cached association *object* for `name`, mirroring Rails'
+   * `@association_cache[name]` (associations.rb:82) — callers read `.target`.
+   * A has_many collection lives on its `CollectionProxy` (the canonical target
+   * store, incl. in-memory inverse-seeded records on a not-yet-loaded proxy); a
+   * singular target lives on its loaded `SingularAssociation` holder. The
+   * `HasManyAssociation` mirror in `_associationInstances` is a secondary copy
+   * rewritten on every load, so it is skipped — only singular holders and
+   * ad-hoc seeds (no `isCollection`) surface from there. Tolerates unknown
+   * names the way `@association_cache` does — returns `undefined`.
    *
-   * Named `_cachedAssociationTarget` (not `_associationCache`) deliberately:
-   * Rails' `@association_cache[name]` (associations.rb:82) returns the
-   * association *object* (e.g. `HasManyAssociation`), whereas this returns the
-   * cached *target value*, so reusing that name would mislead anyone
-   * cross-referencing the Rails source.
+   * @internal
    */
-  _cachedAssociationTarget(name: string): Base | Base[] | null | undefined {
+  _associationCache(name: string): { target?: Base | Base[] | null } | undefined {
     const proxy = this._collectionProxies.get(name) as
-      | { loaded?: boolean; readTargets?: () => Base[] }
+      | { loaded?: boolean; target?: Base[] }
       | undefined;
-    if (proxy?.loaded && typeof proxy.readTargets === "function") {
-      return proxy.readTargets();
+    if (
+      proxy &&
+      (proxy.loaded === true || (Array.isArray(proxy.target) && proxy.target.length > 0))
+    ) {
+      return proxy;
     }
-    return this._cachedAssociations?.get(name);
+    const instance = this._associationInstances.get(name) as
+      | (AssociationInstance & {
+          isLoaded?(): boolean;
+          isCollection?(): boolean;
+          target?: Base | Base[] | null;
+        })
+      | undefined;
+    if (instance?.isLoaded?.() && instance.isCollection?.() !== true) return instance;
+    return undefined;
   }
 
   constructor(attrs: Record<string, unknown> = {}) {

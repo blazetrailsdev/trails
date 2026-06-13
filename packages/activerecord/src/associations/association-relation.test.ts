@@ -190,7 +190,6 @@ describe("AssociationRelation", () => {
 
     const scope = proxy.where({}) as unknown as AssociationRelation<ArInvPost>;
     const [post] = await scope.toArray();
-    const cache = (post as any)._cachedAssociations as Map<string, unknown> | undefined;
-    expect(cache?.get("arInvBlog")).toBe(blog);
+    expect((post as any)._associationCache("arInvBlog")?.target).toBe(blog);
   });
 });

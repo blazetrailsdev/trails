@@ -5,6 +5,7 @@ import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -63,8 +64,7 @@ describe("I18nValidationTest", () => {
     registerModel("I18nAssociatedTopic", Topic);
     const replies = [new FakeReply()];
     const topic = new Topic({ title: "topic" });
-    (topic as unknown as { _cachedAssociations: Map<string, unknown> })._cachedAssociations =
-      new Map([["replies", replies]]);
+    seedAssociationCache(topic, "replies", replies);
 
     const spy = vi.spyOn(ActiveModelError, "generateMessage");
     topic.isValid();
@@ -92,8 +92,7 @@ describe("I18nValidationTest", () => {
     }
     registerModel("I18nCustomKeyTopic", Topic);
     const topic = new Topic({ title: "topic" });
-    (topic as unknown as { _cachedAssociations: Map<string, unknown> })._cachedAssociations =
-      new Map([["replies", [new FakeReply()]]]);
+    seedAssociationCache(topic, "replies", [new FakeReply()]);
 
     topic.isValid();
     expect([...new Set(topic.errors.get("replies"))]).toEqual(["custom message"]);
@@ -112,8 +111,7 @@ describe("I18nValidationTest", () => {
     }
     registerModel("I18nGlobalKeyTopic", Topic);
     const topic = new Topic({ title: "topic" });
-    (topic as unknown as { _cachedAssociations: Map<string, unknown> })._cachedAssociations =
-      new Map([["replies", [new FakeReply()]]]);
+    seedAssociationCache(topic, "replies", [new FakeReply()]);
 
     topic.isValid();
     expect(topic.errors.get("replies")).toEqual(["global message"]);
