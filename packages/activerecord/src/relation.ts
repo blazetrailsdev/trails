@@ -3240,7 +3240,19 @@ export class Relation<T extends Base> {
     }
 
     const table = this._modelClass.arelTable;
+    // Rails columns_hash.key? — qualify a bare known column to the base table.
+    const knownColumns = new Set(this._modelClass.attributeNames());
+    const isKnownColumn = (name: string): boolean => knownColumns.has(name);
     const projections = columns.map((c) => {
+      if (c instanceof Nodes.SqlLiteral) {
+        // Rails' Arel::Nodes::SqlLiteral subclasses String, so arel_columns routes
+        // it through arel_column: a bare known-column literal is qualified to the
+        // base table (e.g. "id" → "posts"."id"), which keeps pluck unambiguous once
+        // apply_join_dependency adds a LEFT OUTER JOIN. Complex or unknown literals
+        // (functions, dotted names, non-columns) pass through verbatim.
+        const v = c.value.trim();
+        return /^\w+$/.test(v) && isKnownColumn(v) ? table.get(v) : c;
+      }
       if (typeof c !== "string") return c;
       // Table-qualified ("table.col"), quoted ('"table"."col"'), function expressions,
       // or comma-separated lists must pass through as raw SQL.
