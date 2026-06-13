@@ -1481,12 +1481,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (typeCol) record._writeAttribute(typeCol, ctor.name);
       return record.save();
     };
-    // Rails' `concat_records` only runs `insert_record` when the owner is
-    // persisted (`unless owner.new_record?`); for a new-record owner the
-    // children are added to the in-memory target and saved later via autosave
-    // when the owner is saved. Skipping the save also avoids inserting child
-    // rows with a null owner FK.
-    const ownerNew = this._record.isNewRecord();
     for (const record of records) {
       // Route through replace_on_target (via _addToTarget) so set_inverse_instance
       // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
@@ -1495,10 +1489,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // place rather than appended twice.
       // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`
       // so a `distinct` association scope dedups in place on append rather than appending twice.
-      await this._addToTarget(
-        record,
-        { replace: this.distinctValue },
-        ownerNew ? undefined : () => insertRecord(record),
+      //
+      // Rails' `concat_records` runs `insert_record` inside the per-record
+      // `add_to_target` block, guarded by `unless owner.new_record?`
+      // (collection_association.rb:444). For a new-record owner the child is
+      // added to the in-memory target and saved later via autosave; skipping
+      // the insert also avoids writing a child row with a null owner FK. The
+      // check is evaluated per record at save time (after `before_add` fires),
+      // so a callback that persists the owner mid-loop flips the remaining
+      // records onto the insert path — matching Rails' control flow.
+      await this._addToTarget(record, { replace: this.distinctValue }, () =>
+        this._record.isNewRecord() ? Promise.resolve(true) : insertRecord(record),
       );
     }
   }
@@ -2070,11 +2071,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // before touching join rows.
     this._ensureThroughWritable();
     return this._withoutStrictLoading(async () => {
-      // A new-record owner has no persisted children to delete or nullify —
-      // Rails' `delete_records(load_target, ...)` runs against an empty
-      // `load_target` (find_target is gated on `!owner.new_record?`), so no
-      // SQL fires. Reset the in-memory target without touching the DB.
-      if (this._record.isNewRecord()) {
+      // A new-record owner whose scope is a `null_scope?` has no persisted
+      // children to delete or nullify, so Rails' `scope.none!`
+      // (collection_association.rb:300-305) makes the delete/nullify a no-op.
+      // `null_scope?` is `owner.new_record? && !foreign_key_present?`, so a new
+      // owner WITH the owner PK present (e.g. a client-assigned UUID) still
+      // queries — only the genuinely keyless new owner short-circuits. Reset
+      // the in-memory target without touching the DB in that case.
+      if (this._record.isNewRecord() && !this._foreignKeyPresent()) {
         this._target = [];
         this._targetLoaded = true;
         this._invalidateAssociationIds();
