@@ -1740,7 +1740,8 @@ export function columnReferences(orderArgs: unknown[]): string[] {
       const t = extractTableNameFrom(term);
       if (t) refs.push(t);
     } else if (arg instanceof Nodes.Attribute) {
-      refs.push((arg as any).relation.name);
+      const rn = (arg as any).relation.name;
+      refs.push(rn instanceof Nodes.SqlLiteral ? rn.value : rn);
     } else if (arg instanceof Nodes.Ordering) {
       const expr = (arg as any).expr;
       if (expr instanceof Nodes.Attribute) {
