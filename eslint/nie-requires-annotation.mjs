@@ -3,8 +3,8 @@
  *
  * Every `throw new NotImplementedError(...)` must carry an `@nie` annotation
  * comment on the immediately preceding line, specifying the disposition under
- * the `NotImplementedError` elimination initiative
- * (docs/activerecord-100-clusters.md).
+ * the `NotImplementedError` elimination initiative (tracked as stories in
+ * the tasks repo; see `pnpm tasks`).
  *
  * Allowed dispositions:
  *   port-real | keep-as-strategy-hook | remove-from-class |
@@ -63,7 +63,7 @@ const rule = {
     schema: [],
     messages: {
       missing:
-        "`throw new NotImplementedError` requires a preceding `// @nie disposition=…` annotation. See docs/activerecord-100-clusters.md.",
+        "`throw new NotImplementedError` requires a preceding `// @nie disposition=…` annotation. See `pnpm tasks` (NotImplementedError elimination stories).",
       invalid:
         "Invalid `@nie disposition=` value `{{value}}`. Allowed: port-real, keep-as-strategy-hook, remove-from-class, empty-default, delete-stub, TODO.",
     },
