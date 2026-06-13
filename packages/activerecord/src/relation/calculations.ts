@@ -234,26 +234,35 @@ function wrapBigintAgg(innerSql: string, grouped = false): string {
   return `SELECT CAST("val" AS TEXT) AS "val" FROM (${innerSql}) AS "_bigint_agg"`;
 }
 
-function prependCtes(rel: CalculationRelation, sql: string): string {
-  if (rel._ctes.length === 0) return sql;
+/**
+ * Prefix the `WITH` clause onto an aggregate's compiled SQL, collecting the
+ * CTE-body binds through the visitor and prepending them to the main query's
+ * binds — exactly as the SELECT path does — rather than inlining them. The
+ * `WITH` clause renders first, so its binds lead; for PG `$N` placeholders the
+ * main body is renumbered up by the CTE bind count (SQLite/MySQL `?` are
+ * positional, so document order suffices and the shift is a no-op).
+ */
+function prependCtes(
+  rel: CalculationRelation,
+  body: string,
+  binds: unknown[],
+): [string, unknown[]] {
+  if (rel._ctes.length === 0) return [body, binds];
   const connection = rel._modelClass.connection;
-  // The aggregate call sites thread `fromBinds`/`managerBinds` positionally and
-  // do not carry a slot for CTE-prefix binds, so inline any Relation-body binds
-  // back into the CTE SQL (matching the pre-AST `value.toSql()` behavior) and
-  // report zero binds to buildCteSql. The SELECT path (relation.ts) collects
-  // them through the visitor instead.
   const compile = (node: Nodes.Node): [string, unknown[]] => {
     if (!connection.visitor?.compileWithBinds) return [connection.toSql(node), []];
-    const [body, binds] = connection.visitor.compileWithBinds(node) as [string, unknown[]];
-    if (binds.length === 0) return [body, []];
-    let i = 0;
-    const inlined = body.replace(/\?|\$\d+/g, (m) => {
-      const v = binds[i++];
-      return v === undefined ? m : connection.quote(typeCastCalcBind(v));
-    });
-    return [inlined, []];
+    return connection.visitor.compileWithBinds(node) as [string, unknown[]];
   };
-  return `${buildCteSql(rel._ctes, compile, (name) => connection.quoteTableName(name)).sql} ${sql}`;
+  const { sql: cteSql, binds: cteRawBinds } = buildCteSql(rel._ctes, compile, (name) =>
+    connection.quoteTableName(name),
+  );
+  const cteBinds = cteRawBinds.map(typeCastCalcBind);
+  const offset = cteBinds.length;
+  // PG `$N` placeholders in the body restart at `$1`; shift them past the
+  // CTE binds that now lead the bind array (mirrors buildCteSql's own shift).
+  const shifted =
+    offset > 0 ? body.replace(/\$(\d+)/g, (_m, n) => `$${parseInt(n, 10) + offset}`) : body;
+  return [`${cteSql} ${shifted}`, [...cteBinds, ...binds]];
 }
 
 function typeCastCalcBind(b: unknown): unknown {
@@ -313,14 +322,14 @@ async function singleAggregate(
 
   const colType = resolveColType(rel, column);
   const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
-  const withCtes = prependCtes(rel, rawSql);
+  const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(withCtes) : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
   const result = await rel._modelClass.connection.selectAll(
     sql,
     `${rel._modelClass.name} ${opName}`,
-    managerBinds,
+    ctedBinds,
   );
   const rows = result.toArray() as Record<string, unknown>[];
   const val = rows[0]?.val;
@@ -353,7 +362,7 @@ async function groupedAggregate(
 
   const colType = resolveColType(rel, column);
   const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
-  const withCtes = prependCtes(rel, rawSql);
+  const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel)
       ? wrapBigintAgg(withCtes, true)
@@ -362,7 +371,7 @@ async function groupedAggregate(
   const queryResult = await rel._modelClass.connection.selectAll(
     sql,
     `${rel._modelClass.name} ${opName}`,
-    managerBinds,
+    ctedBinds,
   );
   const rows = queryResult.toArray() as Record<string, unknown>[];
 
@@ -505,10 +514,14 @@ export async function performCount(
           this._applyJoinsToManager(countManager);
           countManager.where(table.get(pk).in(new Nodes.SqlLiteral(innerSql)));
           const [countSql, countOwnBinds] = compileManagerWithBinds(this, countManager);
+          const [withCtes, ctedBinds] = prependCtes(this, countSql, [
+            ...allIdBinds,
+            ...countOwnBinds,
+          ]);
           const limitedResult = await this._modelClass.connection.selectAll(
-            prependCtes(this, countSql),
+            withCtes,
             `${this._modelClass.name} Count`,
-            [...allIdBinds, ...countOwnBinds],
+            ctedBinds,
           );
           const limitedRows = limitedResult.toArray() as Record<string, unknown>[];
           return Number(limitedRows[0]?.count ?? 0);
@@ -531,10 +544,11 @@ export async function performCount(
         this._applyWheresToManager(manager, table);
         applyFromToManager(this, manager);
         const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+        const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
         const result = await this._modelClass.connection.selectAll(
-          prependCtes(this, rawSql),
+          withCtes,
           `${this._modelClass.name} Count`,
-          managerBinds,
+          ctedBinds,
         );
         const rows = result.toArray() as Record<string, unknown>[];
         return Number(rows[0]?.count ?? 0);
@@ -601,10 +615,11 @@ export async function performCount(
     // SelectManager — keeping the hint at the front of the emitted query.
     if (this._optimizerHints.length > 0) outerManager.optimizerHints(...this._optimizerHints);
     const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
+    const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
     const result = await this._modelClass.connection.selectAll(
-      prependCtes(this, outerSql),
+      withCtes,
       `${this._modelClass.name} Count`,
-      [...allInnerBinds, ...outerBinds],
+      ctedBinds,
     );
     const rows = result.toArray() as Record<string, unknown>[];
     return Number(rows[0]?.count ?? 0);
@@ -620,10 +635,11 @@ export async function performCount(
     this._applyWheresToManager(manager, table);
     applyFromToManager(this, manager);
     const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+    const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
     const result = await this._modelClass.connection.selectAll(
-      prependCtes(this, rawSql),
+      withCtes,
       `${this._modelClass.name} Count`,
-      managerBinds,
+      ctedBinds,
     );
     const rows = result.toArray() as Record<string, unknown>[];
     return Number(rows[0]?.count ?? 0);
@@ -644,10 +660,11 @@ export async function performCount(
       const outerManager = table.project(countAll.as("count"));
       outerManager.from(new Nodes.SqlLiteral(`(${innerSqlWithFrom}) AS subquery`));
       const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
+      const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
       const result = await this._modelClass.connection.selectAll(
-        prependCtes(this, outerSql),
+        withCtes,
         `${this._modelClass.name} Count`,
-        [...allInnerBinds, ...outerBinds],
+        ctedBinds,
       );
       const rows = result.toArray() as Record<string, unknown>[];
       return Number(rows[0]?.count ?? 0);
@@ -658,10 +675,11 @@ export async function performCount(
     this._applyWheresToManager(manager, table);
     applyFromToManager(this, manager);
     const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+    const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
     const result = await this._modelClass.connection.selectAll(
-      prependCtes(this, rawSql),
+      withCtes,
       `${this._modelClass.name} Count`,
-      managerBinds,
+      ctedBinds,
     );
     const rows = result.toArray() as Record<string, unknown>[];
     return Number(rows[0]?.count ?? 0);
@@ -673,10 +691,11 @@ export async function performCount(
   this._applyWheresToManager(manager, table);
   applyFromToManager(this, manager);
   const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+  const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
   const result = await this._modelClass.connection.selectAll(
-    prependCtes(this, rawSql),
+    withCtes,
     `${this._modelClass.name} Count`,
-    managerBinds,
+    ctedBinds,
   );
   const rows = result.toArray() as Record<string, unknown>[];
   return Number(rows[0]?.count ?? 0);
