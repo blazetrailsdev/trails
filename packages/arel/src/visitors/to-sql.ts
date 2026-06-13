@@ -799,14 +799,16 @@ export class ToSql extends Visitor {
     // and `AbstractAdapter#quote_table_name` returns SqlLiterals
     // unchanged — so subquery aliases render bare. We approximate the
     // same outcome at the visitor layer by checking whether the
-    // relation is a Grouping (the shape `SelectManager#as` produces);
-    // plain `Table#alias("foo")` keeps `"foo"`. Caveat: callers that
+    // relation self-wraps in parens — a Grouping (the shape
+    // `SelectManager#as` produces) or a set-operation node (a
+    // `from(a.union(b), "alias")` derived table); plain
+    // `Table#alias("foo")` keeps `"foo"`. Caveat: callers that
     // construct a TableAlias on a Table with a SqlLiteral name
     // wouldn't get the bare form here — Rails would. The runtime
     // signature of `TableAlias.name` is `string`, so that path isn't
     // currently reachable, but it's a Rails-fidelity divergence to
     // revisit if the type widens.
-    if (node.relation instanceof Nodes.Grouping) {
+    if (cteRelationSelfWraps(node.relation)) {
       collector.append(` ${node.name}`);
     } else {
       collector.append(` ${this.quoteTableName(node.name)}`);

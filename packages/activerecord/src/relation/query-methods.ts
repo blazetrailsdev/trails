@@ -2148,6 +2148,19 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   const opts = fromClause?.value;
   let name = fromClause?.name;
   if (opts && typeof (opts as any).toArel === "function") {
+    // A set-operation relation (union/intersect/except) has no projection-only
+    // SelectManager — its SQL is a compound node. Build that node directly and
+    // wrap it as a derived table: the TableAlias visitor renders a set-op
+    // relation bare (its own parens, bare alias) and its binds parameterize
+    // through the outer collector, so no string inlining / `$N`→`?` rewrite.
+    if ((opts as any)._setOperation) {
+      name ??= "subquery";
+      const alias = String(name);
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
+        throw argumentError(`Invalid subquery alias "${alias}": must be a safe SQL identifier`);
+      }
+      return new Nodes.TableAlias((opts as any)._buildSetOperationNode(), alias);
+    }
     // When the from-value is a Relation that needs eager loading, derive the
     // from clause via applyJoinDependency on a clone first (mirrors Rails
     // build_from). Clone avoids mutating the caller's relation in-place since
