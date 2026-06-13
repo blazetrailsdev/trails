@@ -88,6 +88,7 @@ export interface AddForeignKeyOptions {
   onUpdate?: ReferentialAction;
   deferrable?: "immediate" | "deferred" | false;
   validate?: boolean;
+  ifNotExists?: boolean;
 }
 
 /** Options accepted by the `foreignKey` field of `ReferenceDefinition`. */
@@ -247,6 +248,19 @@ export interface ColumnOptions {
   ifNotExists?: boolean;
   autoIncrement?: boolean;
   unsigned?: boolean;
+  // Virtual/generated-column options (Rails: `t.virtual ..., as:, stored:`),
+  // read by MySQL/PostgreSQL/SQLite `add_column_options!`.
+  as?: string;
+  stored?: boolean;
+}
+
+/**
+ * Options passed to `add_column_options!` — a column's options merged with a
+ * `column` back-reference to the owning ColumnDefinition (Rails:
+ * `column_options` returns `options.merge(column: o)`).
+ */
+export interface AddColumnOptions extends ColumnOptions {
+  column?: ColumnDefinition;
 }
 
 export interface AddIndexOptions {
@@ -351,6 +365,7 @@ export class IndexDefinition {
   isDefinedFor(
     columns?: string | string[],
     options: {
+      column?: string | string[];
       name?: string;
       unique?: boolean;
       valid?: boolean;
@@ -358,6 +373,11 @@ export class IndexDefinition {
       nullsNotDistinct?: boolean;
     } = {},
   ): boolean {
+    // Mirrors Rails: `columns = options[:column] if columns.blank?`
+    // Ruby `blank?` is true for nil, "" and [].
+    const isBlank =
+      columns == null || (Array.isArray(columns) ? columns.length === 0 : columns === "");
+    if (isBlank) columns = options.column;
     if (options.name && this.name !== options.name) return false;
     if (options.unique !== undefined && this.unique !== options.unique) return false;
     if (options.valid !== undefined && this.valid !== options.valid) return false;
@@ -801,7 +821,6 @@ export class TableDefinition {
       "primaryKey",
       "ifExists",
       "ifNotExists",
-      "array",
     ];
   }
 

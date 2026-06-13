@@ -4183,9 +4183,23 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       onUpdate?: ReferentialAction;
       deferrable?: "immediate" | "deferred";
       validate?: boolean;
+      ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
+    // Rails: assert_valid_deferrable runs before `super` (the abstract
+    // add_foreign_key, where the if_not_exists short-circuit lives).
     this.assertValidDeferrable(options.deferrable);
+    if (options.ifNotExists === true) {
+      const fks = await this.foreignKeys(fromTable);
+      if (
+        fks.some(
+          (fk) =>
+            fk.toTable === toTable && (options.column == null || fk.column === options.column),
+        )
+      ) {
+        return;
+      }
+    }
     const { schema: fromSchema, table: fromTbl } = this.parseSchemaQualifiedName(fromTable);
     const { schema: toSchema, table: toTbl } = this.parseSchemaQualifiedName(toTable);
 
