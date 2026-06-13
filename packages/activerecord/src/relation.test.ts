@@ -1597,3 +1597,115 @@ describe("RelationTest", () => {
     }
   });
 });
+
+// Mirrors: ActiveRecord::Relation#arel returning the full build_arel manager
+// (active_record/relation/query_methods.rb#build_arel). Asserts that the AST
+// from `relation.arel()` carries joins/HAVING/GROUP/FROM/LOCK/CTEs and compiles
+// to exactly the same SQL as `relation.toSql()` — i.e. the legacy string-assembly
+// path and the Arel-manager path can no longer drift.
+describe("Relation#arel build_arel convergence", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      widgets: { name: "string", category: "string", price: "integer" },
+      gadgets: { widget_id: "integer", label: "string" },
+    });
+    registerModel("Widget", Widget);
+    registerModel("Gadget", Gadget);
+    Associations.belongsTo.call(Gadget, "widget", { className: "Widget" });
+    Associations.hasMany.call(Widget, "gadgets", { className: "Gadget", foreignKey: "widget_id" });
+  });
+
+  class Widget extends Base {
+    static _tableName = "widgets";
+    static {
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.attribute("category", "string");
+      this.attribute("price", "integer");
+    }
+  }
+
+  class Gadget extends Base {
+    static _tableName = "gadgets";
+    static {
+      this.attribute("id", "integer");
+      this.attribute("widget_id", "integer");
+      this.attribute("label", "string");
+    }
+  }
+
+  // `connection.toSql(rel.arel())` and `rel.toSql()` both compile through the
+  // adapter visitor with binds inlined, so they yield identical SQL when arel
+  // encodes the whole query (joins/HAVING/FROM/LOCK/CTEs).
+  const arelSql = (rel: any) => Widget.connection.toSql(rel.arel().ast);
+  const placeholderSql = (rel: any) => rel.toSql();
+
+  it("arel carries joins, group, and having", () => {
+    const rel = Widget.joins(
+      `INNER JOIN "widgets" AS "w2" ON "w2"."category" = "widgets"."category"`,
+    )
+      .group("category")
+      .having("COUNT(*) > 1");
+    const sql = arelSql(rel);
+    expect(sql).toContain('INNER JOIN "widgets" AS "w2"');
+    expect(sql).toContain("GROUP BY");
+    expect(sql).toContain("HAVING");
+    expect(sql).toBe(placeholderSql(rel));
+  });
+
+  it("arel carries a from-subquery", () => {
+    const rel = Widget.from(Widget.where({ category: "fruit" }), "widgets");
+    const sql = arelSql(rel);
+    expect(sql).toContain("FROM (SELECT");
+    expect(sql).toBe(placeholderSql(rel));
+  });
+
+  it("arel carries a CTE", () => {
+    const rel = Widget.with({ cheap: Widget.where({ category: "fruit" }) }).where("1 = 1");
+    const sql = arelSql(rel);
+    expect(sql).toContain("WITH");
+    // Quote-char varies by adapter ("cheap" on sqlite/PG, `cheap` on MySQL).
+    expect(sql).toMatch(/["`]cheap["`]/);
+    expect(sql).toBe(placeholderSql(rel));
+  });
+
+  it("arel carries lock", () => {
+    const rel = Widget.all().lock("FOR UPDATE");
+    expect(arelSql(rel)).toBe(placeholderSql(rel));
+  });
+
+  // Rails `arel`/`build_arel` projects the model's normal columns even when
+  // eager loading — the `t0_r0…` alias projection belongs only to
+  // apply_join_dependency on the loading path. So an eager relation used as a
+  // subquery with an explicit single-column select projects that one column,
+  // not JoinDependency aliases (regression guard for build_arel convergence).
+  it("arel of an eager relation projects normal columns, not join-dependency aliases", () => {
+    const rel = Gadget.eagerLoad("widget").select(Gadget.arelTable.get("id"));
+    const sql = Gadget.connection.toSql(rel.arel().ast);
+    expect(sql).not.toMatch(/t\d+_r\d+/);
+    expect(sql).toMatch(/SELECT\s+["`]gadgets["`]\.["`]id["`]/);
+  });
+
+  // Mirrors Rails RelationHandler applying apply_join_dependency before the
+  // subquery: an eager-loading relation used as a `where(id: …)` value has its
+  // eager_load converted to a LEFT OUTER JOIN (not dropped), projecting only PK.
+  it("where with eager-loading relation subquery converts eager-load to a join", () => {
+    const sql = Widget.where({ id: Gadget.eagerLoad("widget") }).toSql();
+    expect(sql).toContain("LEFT OUTER JOIN");
+    expect(sql).toMatch(/IN \(SELECT ["`]gadgets["`]\.["`]id["`]/);
+    expect(sql).not.toMatch(/t\d+_r\d+/);
+  });
+
+  // Rails apply_join_dependency materializes distinct primary keys (executing a
+  // query) when eager loading with a limit over a collection reflection. A
+  // synchronous predicate builder can't run that query, and a pure-SQL
+  // approximation diverges from Rails' materialized-ID shape — so the
+  // combination is rejected explicitly rather than emitting non-parity SQL.
+  it("where with eager-loading limited collection relation subquery is rejected", () => {
+    expect(() => Gadget.where({ widget_id: Widget.eagerLoad("gadgets").limit(5) }).toSql()).toThrow(
+      /not supported/,
+    );
+  });
+});

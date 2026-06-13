@@ -83,7 +83,12 @@ export class PolymorphicArrayValue {
     if (value === null || value === undefined) return null;
     if (typeof value === "object" && value !== null) {
       if ("_modelClass" in value && "toArel" in value) {
-        return (value as any).select(this.primaryKey(value));
+        // Select the table-qualified primary key so the subquery's projection
+        // stays unambiguous once its arel carries joins (build_arel
+        // convergence) — matching RelationHandler's `arel_table[primary_key]`.
+        const pk = this.primaryKey(value);
+        const arelTable = (value as any)._modelClass?.arelTable;
+        return (value as any).select(arelTable && !Array.isArray(pk) ? arelTable.get(pk) : pk);
       }
       const pk = this.primaryKey(value);
       if (pk in (value as object)) return (value as any)[pk];
