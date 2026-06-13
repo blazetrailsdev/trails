@@ -795,18 +795,14 @@ export class ToSql extends Visitor {
 
   private visitArelNodesTableAlias(node: Nodes.TableAlias, collector: SQLString): SQLString {
     this.visit(node.relation, collector);
-    // Rails: `SelectManager#as` wraps the alias name in a SqlLiteral,
-    // and `AbstractAdapter#quote_table_name` returns SqlLiterals
-    // unchanged — so subquery aliases render bare. We approximate the
-    // same outcome at the visitor layer by checking whether the
-    // relation is a Grouping (the shape `SelectManager#as` produces);
-    // plain `Table#alias("foo")` keeps `"foo"`. Caveat: callers that
-    // construct a TableAlias on a Table with a SqlLiteral name
-    // wouldn't get the bare form here — Rails would. The runtime
-    // signature of `TableAlias.name` is `string`, so that path isn't
-    // currently reachable, but it's a Rails-fidelity divergence to
-    // revisit if the type widens.
-    if (node.relation instanceof Nodes.Grouping) {
+    // Mirrors Rails `visit_Arel_Nodes_TableAlias`: `quote_table_name(o.name)`
+    // renders a `SqlLiteral` name bare and quotes a plain string. The bare-alias
+    // cases come from the *value*, not the relation shape: `SelectManager#as`
+    // and the set-op `from()` path both name the alias with a `SqlLiteral`
+    // (`quoteTableName` returns its `value` unchanged), while `Table#alias("foo")`
+    // keeps `"foo"`. The legacy `SelectManager#as` plain-string subquery alias
+    // (relation is a Grouping) is still emitted bare for back-compat.
+    if (node.relation instanceof Nodes.Grouping && !(node.name instanceof Nodes.SqlLiteral)) {
       collector.append(` ${node.name}`);
     } else {
       collector.append(` ${this.quoteTableName(node.name)}`);

@@ -728,6 +728,16 @@ describe("RelationTest", () => {
         .toSql();
       expect(sql).toContain("EXCEPT");
     });
+
+    it("from with a set-operation subquery renders a derived table with a bare alias", () => {
+      const sql = Post.all()
+        .from(Post.where({ author: "alice" }).union(Post.where({ author: "bob" })), "subq")
+        .toSql();
+      expect(sql).toContain("UNION");
+      // Derived-table alias is rendered bare (no quoting) after the compound's
+      // own closing paren — the TableAlias set-op path, not a BoundSqlLiteral.
+      expect(sql).toMatch(/\) subq/);
+    });
   });
 
   // ── joins (SQL generation) ──
@@ -2665,6 +2675,23 @@ describe("RelationTest", () => {
       .union(User.where({ name: "B" }))
       .toSql();
     expect(sql).toContain("UNION");
+  });
+
+  it("from with a union subquery parameterizes binds through the collector", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    await User.create({ name: "Alice", age: 20 });
+    await User.create({ name: "Bob", age: 30 });
+    await User.create({ name: "Charlie", age: 25 });
+
+    const young = User.where({ age: 20 });
+    const old = User.where({ age: 30 });
+    const result = await User.all().from(young.union(old), "users").toArray();
+    expect(result.map((u) => u.name).sort()).toEqual(["Alice", "Bob"]);
   });
 
   it("union threads binds from both operands through one collector", async () => {

@@ -252,16 +252,6 @@ function _selfJoinAlias(
   return { alias: count > 1 ? `${truncated}_${count}` : aliasedName, base: aliasedName };
 }
 
-/**
- * Return the alias bare if it is a valid SQL identifier (letters/digits/underscore,
- * starting with a letter or underscore), otherwise double-quote and escape it.
- * Mirrors Rails: aliases come from Symbol/string caller code — Rails assumes they
- * are safe identifiers. We add a guard so malformed aliases don't produce invalid SQL.
- */
-function _safeAlias(alias: string): string {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(alias) ? alias : `"${alias.replace(/"/g, '""')}"`;
-}
-
 function validateExplainOptions(options: ExplainOption[]): void {
   let seenHash = false;
   for (let i = 0; i < options.length; i++) {
@@ -3967,9 +3957,7 @@ export class Relation<T extends Base> {
    * operands; PG/MySQL parenthesize) lives in the arel visitors, not here.
    */
   private _toSqlSetOperation(): string {
-    const leftManager = this._buildSetOperationOperandManager();
-    const rightManager = this._setOperation!.other._buildSetOperationOperandManager();
-    const node = leftManager[this._setOperation!.type](rightManager);
+    const node = this._buildSetOperationNode();
     const v = this._arelVisitor();
     const [raw, binds, retryable] = v.compileWithBinds(node);
     this._lastSelectRetryable = retryable;
@@ -3980,6 +3968,20 @@ export class Relation<T extends Base> {
     // visitor added (operand-level parens for ORDER/LIMIT/OFFSET sides use no
     // inner space and are preserved).
     return raw.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
+  }
+
+  /**
+   * Compose this relation's set operation as an Arel
+   * Union/UnionAll/Intersect/Except node from each side's operand SelectManager.
+   * Shared by the standalone `_toSqlSetOperation` path and `from()` derived-table
+   * embedding, so a `from(a.union(b), "alias")` threads through the same live AST
+   * (binds parameterized by the outer collector) rather than inlined SQL.
+   * @internal
+   */
+  _buildSetOperationNode(): Nodes.Node {
+    const leftManager = this._buildSetOperationOperandManager();
+    const rightManager = this._setOperation!.other._buildSetOperationOperandManager();
+    return leftManager[this._setOperation!.type](rightManager) as unknown as Nodes.Node;
   }
 
   /**
@@ -4301,25 +4303,13 @@ export class Relation<T extends Base> {
    * of these thread through the single outer collector (binds in document order,
    * FROM before WHERE) with identifier quoting left to the visitor.
    *
-   * Set-operation subqueries are the one case with no AST representation in
-   * trails (`_toSql` string-concatenates the operands), so they fall back to the
-   * full compiled SQL wrapped as a `BoundSqlLiteral`, binds inlined at the FROM
-   * position. Parameterizing those awaits a union-AST convergence — out of scope
-   * for this story.
+   * Set-operation subqueries are no exception: `buildFrom` wraps the compound
+   * Union/UnionAll/Intersect/Except node as a derived-table `TableAlias`, so they
+   * parameterize through the same collector with no `BoundSqlLiteral`/`$N`→`?`
+   * fallback.
    */
   private _buildFromNode(): Nodes.Node | string | undefined {
     if (this._fromClause.isEmpty()) return undefined;
-    const raw = this._fromClause.value;
-    if (raw instanceof Relation && raw._setOperation) {
-      const subSql = raw._toSql();
-      const name = this._fromClause.name ?? "subquery";
-      // PG renders $N placeholders; BoundSqlLiteral expects positional `?`.
-      const placeholders = subSql.replace(/\$\d+/g, "?");
-      return new Nodes.BoundSqlLiteral(
-        `(${placeholders}) ${_safeAlias(name)}`,
-        raw._lastSelectBinds.slice(),
-      );
-    }
     return this.buildFrom() as Nodes.Node | string | undefined;
   }
 
