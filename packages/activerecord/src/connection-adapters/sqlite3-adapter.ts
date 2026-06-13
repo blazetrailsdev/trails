@@ -1154,10 +1154,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
         : [];
     // Rails: `return if options[:if_exists] && !index_exists?(...)`.
-    if (opts.ifExists && !indexExistsForRemoveFrom(all, tableName, columnName, opts)) {
+    const genName = (t: string, c: string | string[]) => this.generateIndexName(t, c);
+    if (opts.ifExists && !indexExistsForRemoveFrom(genName, all, tableName, columnName, opts)) {
       return;
     }
-    const indexName = indexNameForRemoveFrom(all, tableName, columnName, opts);
+    const indexName = indexNameForRemoveFrom(genName, all, tableName, columnName, opts);
     await this.executeMutation(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 

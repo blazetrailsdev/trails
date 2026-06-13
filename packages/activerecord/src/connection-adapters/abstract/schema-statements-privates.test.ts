@@ -62,27 +62,30 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.indexNameOptions("email")).toEqual({ column: "email" });
   });
 
-  it("indexNameForRemove matches a positional expression by its raw name", async () => {
-    // Rails sets `options[:name] = column_name` verbatim, so the match is against
-    // the raw expression string — not `index_<table>_on_<words>`.
+  it("indexNameForRemove resolves a positional expression via generate_index_name", async () => {
+    // Rails: `options[:name] = index_name(table, column_name)` — the expression
+    // is scanned for \w+ words, joined with "_", and passed through
+    // generate_index_name, yielding `index_users_on_lower_email`.
     const ss = makeStatements({
       indexes: vi
         .fn()
-        .mockResolvedValue([{ name: "lower(email)", columns: ["email"], unique: false }]),
+        .mockResolvedValue([
+          { name: "index_users_on_lower_email", columns: ["email"], unique: false },
+        ]),
     });
-    expect(await ss.indexNameForRemove("users", "lower(email)", {})).toBe("lower(email)");
+    expect(await ss.indexNameForRemove("users", "lower(email)", {})).toBe(
+      "index_users_on_lower_email",
+    );
   });
 
-  it("indexNameForRemove does not apply generate_index_name length/hash fallback to an expression", async () => {
-    // A long expression is used verbatim as the name; it is never hashed, so a
-    // hash-shortened index name does not match.
-    const expr = `lower(${"a".repeat(80)})`;
+  it("indexNameForRemove applies the generate_index_name length/hash fallback to a long expression", async () => {
+    const longExpr = `lower(${"a".repeat(80)})`;
+    const expected = makeStatements().generateIndexName("users", `lower_${"a".repeat(80)}`);
+    expect(expected).toMatch(/_[0-9a-f]{10}$/); // fallback fired
     const ss = makeStatements({
-      indexes: vi
-        .fn()
-        .mockResolvedValue([{ name: "index_users_on_short", columns: ["x"], unique: false }]),
+      indexes: vi.fn().mockResolvedValue([{ name: expected, columns: ["x"], unique: false }]),
     });
-    await expect(ss.indexNameForRemove("users", expr, {})).rejects.toThrow(/No indexes found/);
+    expect(await ss.indexNameForRemove("users", longExpr, {})).toBe(expected);
   });
 
   it("stripTableNamePrefixAndSuffix strips prefix/suffix", () => {

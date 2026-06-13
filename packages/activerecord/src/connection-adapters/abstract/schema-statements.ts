@@ -50,18 +50,22 @@ function isExpressionColumnName(columnName: string | string[] | undefined): colu
   return typeof columnName === "string" && /\W/.test(columnName);
 }
 
+type GenerateIndexName = (tableName: string, column: string | string[]) => string;
+
 // Normalize a remove-index spec into the effective name + column list, applying
 // Rails' expression branch: an expression positional column with no `name`
-// matches by name only, using the raw expression string verbatim as the index
-// name (`options[:name] = column_name`) — it is NOT routed through
-// `index_name` / `generate_index_name`, so the length/hash fallback never fires.
+// matches by name only. Rails sets `options[:name] = index_name(table, column)`,
+// where a String column routes through `index_name_options` (scan \w+, join "_")
+// and `generate_index_name`, so the index-name length/hash fallback applies.
 function removeIndexSpec(
+  generateIndexName: GenerateIndexName,
   tableName: string,
   columnName: string | string[] | undefined,
   options: RemoveIndexOptions,
 ): { name?: string; columnNames: string[] } {
   if (options.name == null && isExpressionColumnName(columnName)) {
-    return { name: columnName, columnNames: [] };
+    const joined = (columnName.match(/\w+/g) ?? []).join("_");
+    return { name: generateIndexName(tableName, joined), columnNames: [] };
   }
   const raw = columnName ?? options.column;
   const columnNames = raw == null || raw === "" ? [] : Array.isArray(raw) ? raw : [raw];
@@ -77,6 +81,7 @@ function removeIndexSpec(
  * @internal
  */
 export function indexNameForRemoveFrom(
+  generateIndexName: GenerateIndexName,
   allIndexes: ReadonlyArray<IndexInfo>,
   tableName: string,
   columnName: string | string[] | undefined,
@@ -87,7 +92,7 @@ export function indexNameForRemoveFrom(
     return options.name;
   }
   const conventional = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
-  const { name, columnNames } = removeIndexSpec(tableName, columnName, options);
+  const { name, columnNames } = removeIndexSpec(generateIndexName, tableName, columnName, options);
   const checks: Array<(i: IndexInfo) => boolean> = [];
   if (name != null) {
     checks.push((i) => i.name === name);
@@ -120,12 +125,13 @@ export function indexNameForRemoveFrom(
  * @internal
  */
 export function indexExistsForRemoveFrom(
+  generateIndexName: GenerateIndexName,
   allIndexes: ReadonlyArray<IndexInfo>,
   tableName: string,
   columnName: string | string[] | undefined,
   options: RemoveIndexOptions,
 ): boolean {
-  const { name, columnNames } = removeIndexSpec(tableName, columnName, options);
+  const { name, columnNames } = removeIndexSpec(generateIndexName, tableName, columnName, options);
   return allIndexes.some((i) => {
     if (name != null && i.name !== name) return false;
     if (columnNames.length > 0) {
@@ -1869,10 +1875,11 @@ export class SchemaStatements {
     let columnNames: string[];
 
     if (!options.name && this.isExpressionColumnName(columnName ?? "")) {
-      // Rails: `options[:name] = column_name` — the raw expression string is used
-      // verbatim as the name, never routed through generate_index_name, so the
-      // index-name length/hash fallback does not apply on the remove path.
-      options = { ...options, name: columnName! };
+      // Rails: `options[:name] = index_name(table_name, column_name)` — a String
+      // column is scanned for \w+ words, joined with "_", and passed through
+      // generate_index_name, so the index-name length/hash fallback applies.
+      const joined = (columnName!.match(/\w+/g) ?? []).join("_");
+      options = { ...options, name: this.generateIndexName(tableName, joined) };
       columnNames = [];
     } else {
       const rawColumn = columnName ?? options.column;
@@ -1885,7 +1892,14 @@ export class SchemaStatements {
       checks.push((i) => i.name === n);
     }
 
-    if (columnNames.length > 0) {
+    // Rails: `if column_names.present? && !(options.key?(:name) &&
+    // expression_column_name?(column_names))` — an expression passed via the
+    // `column:` option (kept as a raw string by indexColumnNames) is matched by
+    // name only, so the column check is skipped.
+    if (
+      columnNames.length > 0 &&
+      !(options.name && this.isExpressionColumnName(columnNames as unknown as string))
+    ) {
       checks.push(
         (i) =>
           this.indexName(tableName, { column: i.columns }) ===
