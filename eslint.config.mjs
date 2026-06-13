@@ -253,7 +253,7 @@ export default defineConfig(
 
   // ── nie-requires-annotation: every `throw new NotImplementedError` must
   // carry a `// @nie disposition=…` comment. Tracks the elimination
-  // initiative (docs/activerecord-100-clusters.md).
+  // initiative (tracked as stories in the tasks repo; see `pnpm tasks`).
   {
     files: [
       "packages/activerecord/src/**/*.ts",
