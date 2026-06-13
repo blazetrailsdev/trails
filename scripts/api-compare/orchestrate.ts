@@ -32,7 +32,7 @@
  * fast-path). `API_COMPARE_REFRESH=1` re-clones sources via fetch --refresh.
  */
 import { execFile } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -66,18 +66,19 @@ async function runRubyExtract(): Promise<void> {
 
 const OUTPUT_DIR = join(DIR, "output");
 
-/**
- * Content key for the Ruby manifest: the same three inputs the extractor's own
- * mtime gate watches — the lockfile (re-fetch), sources.ts (registry edits),
- * and the extractor script (output-shape changes) — but hashed by CONTENT so
- * the key matches across worktrees. Returns null if any input is missing.
- */
+// The three inputs the Ruby extractor's mtime gate watches: the lockfile
+// (re-fetch), sources.ts (registry edits), and the extractor script
+// (output-shape changes). The shared cache keys on their CONTENT instead, so a
+// key computed in one worktree matches another's.
+const RAILS_INPUTS = [
+  join(ROOT, "vendor/sources.lock.json"),
+  join(ROOT, "vendor/sources.ts"),
+  join(DIR, "extract-ruby-api.rb"),
+];
+
+/** Content key for the Ruby manifest, or null if any input is missing. */
 async function railsCacheKey(): Promise<string | null> {
-  const inputs = await Promise.all([
-    fileHash(join(ROOT, "vendor/sources.lock.json")),
-    fileHash(join(ROOT, "vendor/sources.ts")),
-    fileHash(join(DIR, "extract-ruby-api.rb")),
-  ]);
+  const inputs = await Promise.all(RAILS_INPUTS.map(fileHash));
   if (inputs.some((h) => h === null)) return null;
   return hashParts(inputs as string[]);
 }
@@ -88,8 +89,28 @@ async function railsCacheKey(): Promise<string | null> {
  * extractor's own mtime gate satisfied) and skips the subprocess; a miss runs
  * Ruby and publishes the result for sibling worktrees.
  */
+/**
+ * True when `output/rails-api.json` is already newer than all three inputs the
+ * Ruby extractor's mtime gate watches — i.e. this same worktree is warm and
+ * Ruby would no-op. We check it before touching the shared cache so the common
+ * warm path stays a few stats, not a multi-MB read+rewrite that bumps mtime.
+ */
+async function railsOutputFresh(railsOut: string): Promise<boolean> {
+  try {
+    const outMtime = (await stat(railsOut)).mtimeMs;
+    const inMtimes = await Promise.all(RAILS_INPUTS.map((p) => stat(p).then((s) => s.mtimeMs)));
+    return inMtimes.every((m) => outMtime >= m);
+  } catch {
+    return false;
+  }
+}
+
 async function runRubyExtractShared(): Promise<void> {
   const railsOut = join(OUTPUT_DIR, "rails-api.json");
+  // Warm same-worktree path: local output already current → Ruby would no-op,
+  // so skip the shared cache entirely (no redundant read/rewrite of the file).
+  if (!force && (await railsOutputFresh(railsOut))) return;
+
   const sharedDir = force ? null : await sharedCacheDir(ROOT);
   const key = sharedDir ? await railsCacheKey() : null;
 
