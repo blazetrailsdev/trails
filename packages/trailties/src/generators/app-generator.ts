@@ -13,13 +13,14 @@ const DB_ALIAS: Record<string, DatabaseName> = {
 
 export type AppDatabase = "sqlite" | "postgres" | "mysql" | DatabaseName;
 export type PackageManager = "pnpm" | "npm" | "yarn";
-// `expo-sqlite` is intentionally omitted: its async-only driver can't drive the
-// sync adapter constructor path yet, so a scaffolded expo app wouldn't boot.
-// Re-add it once the async constructor path lands (see connection-adapters.ts).
-export type SqliteDriver = "better-sqlite3" | "node-sqlite";
+export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
 
 export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn"];
-export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = ["better-sqlite3", "node-sqlite"];
+export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = [
+  "better-sqlite3",
+  "node-sqlite",
+  "expo-sqlite",
+];
 
 export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "appPath"> {
   appPath?: string;

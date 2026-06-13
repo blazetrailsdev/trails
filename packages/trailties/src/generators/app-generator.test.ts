@@ -236,10 +236,22 @@ describe("AppGenerator", () => {
           cwd: tmpDir,
           output: (m) => lines.push(m),
           appPath: "my-app",
-          // expo-sqlite is not yet an openable adapter (async-only driver).
-          sqliteDriver: "expo-sqlite" as never,
+          sqliteDriver: "bogus-driver" as never,
         }),
     ).toThrow(/Unknown SQLite driver/);
+  });
+
+  it("scaffolds the expo-sqlite adapter for --sqlite-driver expo-sqlite", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "my-app",
+      database: "sqlite",
+      sqliteDriver: "expo-sqlite",
+    });
+    await gen.run();
+    const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
+    expect(dbConfig).toContain('adapter: "expo-sqlite"');
   });
 
   it("skips docker files when --skip-docker", async () => {

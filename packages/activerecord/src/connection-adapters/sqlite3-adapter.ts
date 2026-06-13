@@ -199,6 +199,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   private driver!: SqliteConnection;
+  /**
+   * True after construction when the bound driver is async-only and the
+   * connection has not yet been established. Cleared by `completeAsyncConnect`.
+   */
+  private _asyncConnectPending = false;
   override get active(): boolean {
     return this.driver?.isOpen() ?? false;
   }
@@ -272,7 +277,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // the native driver opens a file handle that would otherwise leak.
     if (options.statementLimit !== undefined) this.statementLimit = options.statementLimit;
     this.connect();
-    this.configureConnection();
+    // Async-only drivers (e.g. expo-sqlite) can't open in a sync constructor;
+    // connect() flags them for the async path instead. See completeAsyncConnect.
+    if (!this._asyncConnectPending) this.configureConnection();
     this._nativeTypeMap = AbstractSQLite3Adapter._buildTypeMap();
   }
 
@@ -2349,40 +2356,42 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return undefined;
   }
 
+  /** Resolve the bound SqliteDriver. Shared by `connect`/`connectAsync`. @internal */
+  private resolveDriverFactory(): SqliteDriver {
+    const driverOpt = (this._config as SQLite3AdapterOptions).driver;
+    if (driverOpt != null) {
+      if (
+        typeof (driverOpt as SqliteDriver).name !== "string" ||
+        typeof (driverOpt as SqliteDriver).open !== "function"
+      ) {
+        throw new TypeError(
+          "config.driver must be a SqliteDriver " +
+            "(object with `name: string` and `open(config)` function).",
+        );
+      }
+      return driverOpt;
+    }
+    // No driver configured: concrete subclasses (e.g. BetterSQLite3Adapter)
+    // bind their bundled driver via defaultSqliteDriver(). The abstract base
+    // returns undefined and cannot be opened directly.
+    const def = this.defaultSqliteDriver();
+    if (!def) {
+      throw new Error(
+        "No SQLite driver configured. Use a concrete adapter subclass " +
+          "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
+      );
+    }
+    return def;
+  }
+
   /** @internal */
   private connect(): void {
     try {
-      const driverOpt = (this._config as SQLite3AdapterOptions).driver;
-      let factory: SqliteDriver;
-      if (driverOpt != null) {
-        if (
-          typeof (driverOpt as SqliteDriver).name !== "string" ||
-          typeof (driverOpt as SqliteDriver).open !== "function"
-        ) {
-          throw new TypeError(
-            "config.driver must be a SqliteDriver " +
-              "(object with `name: string` and `open(config)` function).",
-          );
-        }
-        factory = driverOpt;
-      } else {
-        // No driver configured: concrete subclasses (e.g. BetterSQLite3Adapter)
-        // bind their bundled driver via defaultSqliteDriver(). The abstract base
-        // returns undefined and cannot be opened directly.
-        const def = this.defaultSqliteDriver();
-        if (!def) {
-          throw new Error(
-            "No SQLite driver configured. Use a concrete adapter subclass " +
-              "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
-          );
-        }
-        factory = def;
-      }
+      const factory = this.resolveDriverFactory();
       if (!factory.openSync) {
-        throw new Error(
-          `SQLite driver "${factory.name}" does not support sync open(). ` +
-            "Async drivers require an async constructor path (not yet implemented).",
-        );
+        // Async-only driver: defer to completeAsyncConnect() / openAsync().
+        this._asyncConnectPending = true;
+        return;
       }
       const syncConn = factory.openSync({
         database: this._filename,
@@ -2400,6 +2409,104 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         cause: e,
       });
     }
+  }
+
+  /** Async counterpart to `connect()` for async-only drivers. @internal */
+  private async connectAsync(): Promise<void> {
+    try {
+      const factory = this.resolveDriverFactory();
+      const conn = await factory.open({
+        database: this._filename,
+        readOnly: this._readonly,
+        strict: this._strict,
+      });
+      const vStmt = await conn.prepare("SELECT sqlite_version() AS v");
+      const vRow = (await vStmt.get()) as any;
+      this._databaseVersion = new Version(vRow?.v ?? "0.0.0");
+      this.driver = conn;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new DatabaseConnectionError(`Unable to open database '${this._filename}': ${msg}`, {
+        cause: e,
+      });
+    }
+  }
+
+  /**
+   * Complete a deferred async connection. No-op when already connected
+   * synchronously. Invoked by `openAsync()` and `verifyBang()`. @internal
+   */
+  async completeAsyncConnect(): Promise<void> {
+    if (!this._asyncConnectPending) return;
+    this._asyncConnectPending = false;
+    await this.connectAsync();
+    // Async configureConnection(): await each PRAGMA. Keep this set in sync with it.
+    super.configureConnection();
+    const defaults: [string, string][] = this._readonly
+      ? []
+      : [
+          ["foreign_keys", "ON"],
+          ["journal_mode", "WAL"],
+          ["synchronous", "NORMAL"],
+          ["mmap_size", "134217728"],
+          ["journal_size_limit", "67108864"],
+          ["cache_size", "2000"],
+        ];
+    const dqsValue = this._strict ? "OFF" : "ON";
+    const stmts: [string, string][] = [
+      ...defaults.map(([p, v]): [string, string] => [
+        `${p} = ${v}`,
+        `SQLite default pragma '${p}'`,
+      ]),
+      [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
+      [`dqs_dml = ${dqsValue}`, "SQLite DQS pragma 'dqs_dml'"],
+    ];
+    const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
+    if (pragmas) {
+      for (const [pragma, value] of Object.entries(pragmas)) {
+        if (!/^\w+$/.test(pragma)) continue;
+        const scalar =
+          typeof value === "boolean"
+            ? value
+              ? "1"
+              : "0"
+            : typeof value === "number"
+              ? String(value)
+              : /^\w+$/.test(value)
+                ? value
+                : null;
+        if (scalar === null) continue;
+        stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
+      }
+    }
+    for (const [sql, label] of stmts) {
+      try {
+        await this.driver.pragma(sql);
+      } catch (e) {
+        console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+
+  /**
+   * Async construction entry point — works for both sync drivers (returns an
+   * already-connected adapter) and async-only drivers (awaits the deferred
+   * connection).
+   */
+  static async openAsync(
+    this: new (filename?: string, options?: SQLite3AdapterOptions) => AbstractSQLite3Adapter,
+    filename: string | ":memory:" = ":memory:",
+    options: SQLite3AdapterOptions = {},
+  ): Promise<AbstractSQLite3Adapter> {
+    const adapter = new this(filename, options);
+    await adapter.completeAsyncConnect();
+    return adapter;
+  }
+
+  /** @internal */
+  override async verifyBang(): Promise<void> {
+    await this.completeAsyncConnect();
+    await super.verifyBang();
   }
 
   /** @internal */

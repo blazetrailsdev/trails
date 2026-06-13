@@ -70,9 +70,9 @@ export interface SqliteConnection {
 
 /**
  * Synchronous narrowing of `SqliteStatement` for `inProcessSync` drivers. The
- * adapter binds to this until PR 3 lifts every call site to `await`. Until
- * then, async drivers can't be wired through `openSync()` — they'd return
- * Promises that the sync path silently casts as concrete values.
+ * sync constructor path binds to this via `openSync()`; async drivers can't be
+ * wired here (they'd return Promises the sync path casts as concrete values)
+ * and instead use the async `open()` path (`AbstractSQLite3Adapter.openAsync()`).
  */
 export interface SyncSqliteStatement {
   run(binds?: SqliteBinds): RunResult;
@@ -133,12 +133,14 @@ export interface SqliteDriver {
   readonly capabilities: SqliteDriverCapabilities;
   open(config: SqliteOpenConfig): Promise<SqliteConnection>;
   /**
-   * Sync open for `inProcessSync` drivers. The async-aware adapter (PR 3)
-   * lifts everything onto `open()`; this hook bridges the existing sync
-   * `connect()` path until that lands. Returns the narrowed
-   * `SyncSqliteConnection` so the adapter can call statement methods without
-   * `await` and have the type system reject async drivers wired here.
-   * @internal
+   * Sync open for `inProcessSync` drivers. Retained — NOT superseded by the
+   * async path: `AbstractSQLite3Adapter`'s constructor is synchronous, so
+   * in-process drivers (better-sqlite3, node:sqlite) connect eagerly here,
+   * keeping `new Adapter()` usable without `await`. Async-only drivers
+   * (expo-sqlite, WASM/network) omit this hook and are opened via
+   * `AbstractSQLite3Adapter.openAsync()`, which awaits `open()`. Returns the
+   * narrowed `SyncSqliteConnection` so the type system rejects async drivers
+   * wired here. @internal
    */
   openSync?(config: SqliteOpenConfig): SyncSqliteConnection;
   /**
