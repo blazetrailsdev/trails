@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Aes256Gcm as Cipher } from "./aes256-gcm.js";
+import { MessageSerializer } from "../message-serializer.js";
 import * as crypto from "crypto";
 import { inspect } from "util";
 
@@ -69,6 +70,27 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     // Header values are now raw bytes carried as latin1 strings (MRI format),
     // so compare against the raw digest rather than its base64 encoding.
     expect(Buffer.from(message.headers.get("iv") as string, "latin1")).toEqual(expectedIv);
+  });
+
+  it("serialized envelope is byte-identical to MRI (single base64 hop)", () => {
+    // Pins the wire format against any regression back to the double-base64
+    // divergence. The expected envelope was produced by real Rails 8.0.2 (MRI):
+    //
+    //   require "active_record/encryption/cipher/aes256_gcm"
+    //   require "active_record/encryption/message_serializer"
+    //   raw_key = Base64.strict_decode64("dGVzdC1kZXRlcm1pbmlzdGljLWtleS0zMmJ5dGVzISE=")
+    //   cipher = ActiveRecord::Encryption::Cipher::Aes256Gcm.new(raw_key, deterministic: true)
+    //   serializer = ActiveRecord::Encryption::MessageSerializer.new
+    //   serializer.dump(cipher.encrypt("Hello from Rails 8.0.2"))
+    //   # => {"p":"aiDvn3GJU0oNJl8gVJvDI8B7acYIBA==","h":{"iv":"wePblsDr4KpYOpQK","at":"91La92jfskP8kAvEw77Q7Q=="}}
+    //
+    // Deterministic mode makes the IV (and thus the whole envelope) reproducible,
+    // so trails must emit exactly the same bytes for the same key + plaintext.
+    const key = "dGVzdC1kZXRlcm1pbmlzdGljLWtleS0zMmJ5dGVzISE="; // 32 bytes base64
+    const message = new Cipher(key, { deterministic: true }).encrypt("Hello from Rails 8.0.2");
+    expect(new MessageSerializer().dump(message)).toBe(
+      '{"p":"aiDvn3GJU0oNJl8gVJvDI8B7acYIBA==","h":{"iv":"wePblsDr4KpYOpQK","at":"91La92jfskP8kAvEw77Q7Q=="}}',
+    );
   });
 
   it("it generates different ivs for different ciphertexts", () => {
