@@ -2333,9 +2333,11 @@ export async function updateCounterCaches(
   for (const assoc of associations) {
     if (assoc.type !== "belongsTo" || !assoc.options.counterCache) continue;
 
-    const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
-    const fkValue = record._readAttribute(foreignKey as string);
-    if (fkValue === null || fkValue === undefined) continue;
+    const rawForeignKey =
+      assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(assoc.name)}_id`;
+    const fkCols = Array.isArray(rawForeignKey) ? rawForeignKey : [rawForeignKey];
+    const fkValues = fkCols.map((col) => record._readAttribute(col));
+    if (fkValues.some((v) => v === null || v === undefined)) continue;
 
     // For polymorphic, resolve model from _type column
     let className: string;
@@ -2365,16 +2367,24 @@ export async function updateCounterCaches(
     // Guard against a stale cached owner: mirrors Rails' Association#target which
     // returns nil when stale_target? (FK changed after wiring). Check the cached
     // owner's PK still matches the record's current FK before using it.
-    const targetPk = targetModel.primaryKey as string;
+    const rawTargetPk = assoc.options.primaryKey ?? targetModel.primaryKey ?? "id";
+    const pkCols = Array.isArray(rawTargetPk) ? rawTargetPk : [rawTargetPk];
+    if (pkCols.length !== fkValues.length) continue;
+    const conditions: Record<string, unknown> = {};
+    pkCols.forEach((pk, i) => {
+      conditions[pk] = fkValues[i];
+    });
     const loadedOwner = record.association(assoc.name).target as Base | Base[] | null | undefined;
-    const cachedPkValue =
-      loadedOwner != null && !Array.isArray(loadedOwner)
-        ? (loadedOwner as any)._readAttribute?.(targetPk)
-        : undefined;
-    const parent: Base | null =
-      cachedPkValue != null && String(cachedPkValue) === String(fkValue)
-        ? (loadedOwner as Base)
-        : await targetModel.findBy({ [targetPk]: fkValue });
+    const cachedMatches =
+      loadedOwner != null &&
+      !Array.isArray(loadedOwner) &&
+      pkCols.every((pk, i) => {
+        const v = (loadedOwner as any)._readAttribute?.(pk);
+        return v != null && String(v) === String(fkValues[i]);
+      });
+    const parent: Base | null = cachedMatches
+      ? (loadedOwner as Base)
+      : await targetModel.findBy(conditions);
     if (!parent) continue;
 
     // Forward the belongs_to(touch:) option so updated_at (and any named
