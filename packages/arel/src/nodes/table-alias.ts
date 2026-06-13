@@ -1,6 +1,7 @@
 import { Node, NodeVisitor } from "./node.js";
 import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
+import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
 
 interface TypeCastable {
@@ -12,9 +13,11 @@ interface TypeCastable {
 
 export class TableAlias extends Binary {
   readonly relation: Node;
-  readonly name: string;
+  // Rails: `SelectManager#as` stores the alias as a `Nodes::SqlLiteral` (rendered
+  // bare), while `Table#alias` stores a plain string (quoted). Accept both.
+  readonly name: string | SqlLiteral;
 
-  constructor(relation: Node, name: string) {
+  constructor(relation: Node, name: string | SqlLiteral) {
     super(relation, name);
     this.relation = relation;
     this.name = name;
@@ -22,7 +25,7 @@ export class TableAlias extends Binary {
 
   get tableName(): string {
     const rel = this.relation as TypeCastable;
-    return typeof rel?.name === "string" ? rel.name : this.name;
+    return typeof rel?.name === "string" ? rel.name : this.nameString;
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
@@ -41,7 +44,12 @@ export class TableAlias extends Binary {
   }
 
   toCte(): Cte {
-    return new Cte(this.name, this.relation);
+    return new Cte(this.nameString, this.relation);
+  }
+
+  /** The alias as a bare string, unwrapping a `SqlLiteral` name. */
+  private get nameString(): string {
+    return this.name instanceof SqlLiteral ? this.name.value : this.name;
   }
 
   get(columnName: string): Attribute {

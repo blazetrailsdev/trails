@@ -2088,22 +2088,25 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#column_for_attribute */
   async columnForAttribute(attribute: {
-    relation: { name: string };
+    relation: { name: string | Nodes.SqlLiteral };
     name: string;
   }): Promise<import("./column.js").Column | undefined> {
-    let hash = await (this.schemaCache as any).columnsHash(this.pool, attribute.relation.name);
+    // A `TableAlias` relation may carry a `SqlLiteral` name (set-op / subquery
+    // derived table); unwrap to the bare identifier for the schema-cache lookup.
+    const relationName = isSqlLiteral(attribute.relation.name)
+      ? attribute.relation.name.value
+      : attribute.relation.name;
+    let hash = await (this.schemaCache as any).columnsHash(this.pool, relationName);
     if (!hash && this.pool == null && typeof (this as any).columns === "function") {
       // Bare-adapter path (no pool): the null-pool guard in columnsHash blocks the
       // DB fallback. Fetch directly so callers like caseSensitiveComparison can
       // resolve collations even when the schema cache was cleared by model
       // class creation (resetColumnInformation).
       try {
-        const cols: import("./column.js").Column[] = await (this as any).columns(
-          attribute.relation.name,
-        );
+        const cols: import("./column.js").Column[] = await (this as any).columns(relationName);
         if (cols?.length) {
-          this.schemaCache.setColumns(attribute.relation.name, cols);
-          hash = this.schemaCache.getCachedColumnsHash(attribute.relation.name);
+          this.schemaCache.setColumns(relationName, cols);
+          hash = this.schemaCache.getCachedColumnsHash(relationName);
         }
       } catch {
         // no connection — return undefined below

@@ -76,7 +76,9 @@ export interface TypeCaster {
 }
 
 export interface RelationLike {
-  name: string;
+  // A `SqlLiteral` name (e.g. a `SelectManager#as` / set-op `from()` derived
+  // table) renders bare; `quoteTableName` returns its value unchanged.
+  name: string | SqlLiteral;
   tableAlias?: string | null;
   typeCastForDatabase?: (attrName: string, value: unknown) => unknown;
   typeForAttribute?: (name: string) => unknown;

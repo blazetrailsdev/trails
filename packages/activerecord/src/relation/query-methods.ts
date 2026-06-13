@@ -1743,7 +1743,10 @@ export function columnReferences(orderArgs: unknown[]): string[] {
       refs.push((arg as any).relation.name);
     } else if (arg instanceof Nodes.Ordering) {
       const expr = (arg as any).expr;
-      if (expr instanceof Nodes.Attribute) refs.push(expr.relation.name);
+      if (expr instanceof Nodes.Attribute) {
+        const rn = expr.relation.name;
+        refs.push(rn instanceof Nodes.SqlLiteral ? rn.value : rn);
+      }
     } else if (isPlainObject(arg)) {
       for (const [key, value] of Object.entries(arg)) {
         if (isPlainObject(value)) {
@@ -2150,18 +2153,20 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   if (opts && typeof (opts as any).toArel === "function") {
     name ??= "subquery";
     const alias = String(name);
+    // A set-operation relation (union/intersect/except) has no projection-only
+    // SelectManager — its SQL is a compound node. Mirror Rails `build_from` +
+    // `SelectManager#as`: wrap the compound node as a derived table whose alias
+    // is a `SqlLiteral`, so the visitor renders it bare (Rails' `quote_table_name`
+    // returns SqlLiterals unchanged) and the alias is caller-trusted like Rails —
+    // no identifier gate. Its binds parameterize through the outer collector (no
+    // string inlining / `$N`→`?` rewrite). Operands handle their own eager loading
+    // inside `_buildSetOperationNode`, so the applyJoinDependency clone below is
+    // skipped for this branch.
+    if ((opts as any)._setOperation) {
+      return new Nodes.TableAlias((opts as any)._buildSetOperationNode(), arelSql(alias));
+    }
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
       throw argumentError(`Invalid subquery alias "${alias}": must be a safe SQL identifier`);
-    }
-    // A set-operation relation (union/intersect/except) has no projection-only
-    // SelectManager — its SQL is a compound node. Build that node directly and
-    // wrap it as a derived table: the TableAlias visitor renders a set-op
-    // relation bare (its own parens, bare alias) and its binds parameterize
-    // through the outer collector, so no string inlining / `$N`→`?` rewrite.
-    // Operands handle their own eager loading inside `_buildSetOperationNode`,
-    // so the outer applyJoinDependency clone below is skipped for this branch.
-    if ((opts as any)._setOperation) {
-      return new Nodes.TableAlias((opts as any)._buildSetOperationNode(), alias);
     }
     // When the from-value is a Relation that needs eager loading, derive the
     // from clause via applyJoinDependency on a clone first (mirrors Rails
