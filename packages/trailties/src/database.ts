@@ -431,24 +431,29 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
   switch (adapter) {
     case "sqlite3":
     case "sqlite":
-    case "node-sqlite": {
+    case "node-sqlite":
+    case "expo-sqlite": {
       // Each SQLite adapter name resolves to its own concrete subclass, matching
       // `ConnectionAdapters.resolve(name)`. Each subclass bundles its own client
       // library via defaultSqliteDriver(), so no registry dance is needed. The
       // `sqlite3`/`sqlite` names map to the better-sqlite3-backed default.
       // Literal `import()` specifiers (not a computed path) so bundlers and the
-      // vitest alias map can statically resolve each subclass module. `expo-sqlite`
-      // is intentionally absent: its async-only driver can't drive the sync
-      // constructor path yet (see connection-adapters.ts).
-      type SqliteCtor = new (
-        filename: string,
-        options?: Record<string, unknown>,
-      ) => DatabaseAdapter;
+      // vitest alias map can statically resolve each subclass module. We open
+      // via the static `openAsync()` factory, which works for both sync drivers
+      // (better-sqlite3, node:sqlite) and async-only ones (expo-sqlite).
+      type SqliteCtor = {
+        openAsync(filename: string, options?: Record<string, unknown>): Promise<DatabaseAdapter>;
+      };
       const load = async (): Promise<SqliteCtor> => {
         if (adapter === "node-sqlite") {
           return (
             await import("@blazetrails/activerecord/connection-adapters/node-sqlite-adapter.js")
           ).NodeSQLiteAdapter as unknown as SqliteCtor;
+        }
+        if (adapter === "expo-sqlite") {
+          return (
+            await import("@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js")
+          ).ExpoSQLiteAdapter as unknown as SqliteCtor;
         }
         return (
           await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
@@ -457,7 +462,9 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       const need =
         adapter === "node-sqlite"
           ? "Node 22.5+ with the built-in `node:sqlite` module"
-          : "the `better-sqlite3` package (e.g. `npm add better-sqlite3`)";
+          : adapter === "expo-sqlite"
+            ? "the `expo-sqlite` package (Expo / React Native runtimes)"
+            : "the `better-sqlite3` package (e.g. `npm add better-sqlite3`)";
       let SQLiteAdapter: SqliteCtor;
       try {
         SQLiteAdapter = await load();
@@ -473,7 +480,10 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       void _a;
       void _d;
       void _u;
-      return new SQLiteAdapter(config.database ?? ":memory:", rest as Record<string, unknown>);
+      return SQLiteAdapter.openAsync(
+        config.database ?? ":memory:",
+        rest as Record<string, unknown>,
+      );
     }
     case "postgresql":
     case "postgres": {

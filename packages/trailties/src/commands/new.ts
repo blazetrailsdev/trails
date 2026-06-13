@@ -21,7 +21,7 @@ export function newCommand(): Command {
     .option("--package-manager <pm>", "Package manager to use (pnpm, npm, yarn)", "pnpm")
     .option(
       "--sqlite-driver <driver>",
-      "SQLite driver (better-sqlite3, node-sqlite)",
+      "SQLite driver (better-sqlite3, node-sqlite, expo-sqlite)",
       "better-sqlite3",
     )
     .option("--skip-git", "Skip git init")

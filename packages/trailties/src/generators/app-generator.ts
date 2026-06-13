@@ -13,13 +13,14 @@ const DB_ALIAS: Record<string, DatabaseName> = {
 
 export type AppDatabase = "sqlite" | "postgres" | "mysql" | DatabaseName;
 export type PackageManager = "pnpm" | "npm" | "yarn";
-// `expo-sqlite` is intentionally omitted: its async-only driver can't drive the
-// sync adapter constructor path yet, so a scaffolded expo app wouldn't boot.
-// Re-add it once the async constructor path lands (see connection-adapters.ts).
-export type SqliteDriver = "better-sqlite3" | "node-sqlite";
+export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
 
 export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn"];
-export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = ["better-sqlite3", "node-sqlite"];
+export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = [
+  "better-sqlite3",
+  "node-sqlite",
+  "expo-sqlite",
+];
 
 export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "appPath"> {
   appPath?: string;
@@ -90,11 +91,15 @@ export class AppGenerator extends AppBase {
 
   private createRootFiles(name: string): void {
     const dep = this.database.pkgDependency;
-    // For sqlite3, omit the driver dep when using node-sqlite (built-in).
-    // Other databases always include it.
+    // For sqlite3 the driver dep depends on the chosen driver: node-sqlite is
+    // built into Node (no dep), expo-sqlite needs its own package, and
+    // better-sqlite3 (the default) uses the database's pkgDependency. Other
+    // databases always include their pkgDependency.
     const dbDep =
       this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
-        ? {}
+        ? this.sqliteDriver === "expo-sqlite"
+          ? { "expo-sqlite": "^15.0.0" }
+          : {}
         : { [dep.name]: dep.version };
     this.createFile(
       "package.json",
