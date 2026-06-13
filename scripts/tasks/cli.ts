@@ -1001,7 +1001,15 @@ const STATUS_VERB_HINT: Partial<Record<StoryStatus, string>> = {
 // hand-typo'd status is rejected downstream by statusTransitionError). Reads
 // only the fenced block, so a `status:` line in the Markdown body never matches.
 export function statusOf(fileText: string): string | null {
-  const fm = (parseYaml(frontmatterBlock(fileText)) ?? {}) as Record<string, unknown>;
+  let fm: Record<string, unknown>;
+  try {
+    fm = (parseYaml(frontmatterBlock(fileText)) ?? {}) as Record<string, unknown>;
+  } catch {
+    // Malformed frontmatter — mirror the tasks parser, which records a parse
+    // failure rather than throwing (lib.mjs). Returning null surfaces the
+    // "cannot read current status" CLI error instead of a YAML stack trace.
+    return null;
+  }
   return typeof fm.status === "string" ? fm.status : null;
 }
 

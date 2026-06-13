@@ -287,6 +287,10 @@ describe("statusOf", () => {
   it("resolves YAML comment/quote semantics rather than the raw line", () => {
     expect(statusOf(`---\nstatus: ready # filed then readied\n---\n`)).toBe("ready");
   });
+
+  it("returns null on malformed frontmatter instead of throwing", () => {
+    expect(statusOf(`---\nstatus: "unterminated\n  bad: : :\n---\n`)).toBeNull();
+  });
 });
 
 describe("statusEdits", () => {
