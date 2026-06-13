@@ -563,11 +563,34 @@ export interface LockHandle {
   token: string;
 }
 
+// Locks this process currently holds. We release them on fatal termination
+// signals (below) so a CLI killed mid-mutation — pane/worktree teardown, an
+// interrupted agent, a timed-out `git push` whose pane is then killed — never
+// leaves a stale lock behind. A signal death skips both the `finally` and the
+// explicit `process.exit` releases, so without this the lock leaks every time,
+// and the next agent has to clear a "held by a dead process" lock by hand.
+const activeLocks = new Set<LockHandle>();
+let lockSignalsInstalled = false;
+function installLockSignalHandlers(): void {
+  if (lockSignalsInstalled) return;
+  lockSignalsInstalled = true;
+  // 128 + signal number is the conventional shell exit code for a signal death.
+  const codes: Record<string, number> = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 };
+  for (const sig of Object.keys(codes)) {
+    process.on(sig as NodeJS.Signals, () => {
+      for (const l of activeLocks) releaseTasksLock(l);
+      process.exit(codes[sig]);
+    });
+  }
+}
+
 // Acquire the exclusive tasks-CLI lock for `cwd`. Returns an owner handle, or
 // null when no shared git dir is resolvable (proceed unlocked — nothing to
 // serialize). Creation is atomic via `wx`: one agent wins each round, the rest
-// poll a live holder until it releases, then fail loudly — either on a dead
-// holder (rm the lock) or on the wait timeout. NEVER removes another's lock.
+// poll. A holder whose process is gone (ESRCH) is reclaimed automatically — its
+// lock can never be released, so making a human/agent `rm` it was only busywork
+// (and a racy one: concurrent rm+retry can delete a freshly-taken live lock).
+// Only the wait timeout against a *live* holder still fails loudly.
 export function acquireTasksLock(
   cwd: string | undefined,
   opts: { waitMs?: number; pollMs?: number } = {},
@@ -584,7 +607,17 @@ export function acquireTasksLock(
   for (let waited = 0; ; waited += pollMs) {
     try {
       writeFileSync(lockPath, `${token}\n`, { flag: "wx" });
-      return { path: lockPath, token };
+      // Won the create — but a concurrent reclaimer that read a now-removed dead
+      // holder could `unlinkSync` this fresh lock out from under us. Confirm we
+      // still own the path before returning; if not, contend again. Reclaiming
+      // stops the moment a *live* token is observed, so this converges.
+      if (readFileSync(lockPath, "utf8").trim() === token) {
+        const handle = { path: lockPath, token };
+        activeLocks.add(handle);
+        installLockSignalHandlers();
+        return handle;
+      }
+      continue;
     } catch (e) {
       if ((e as { code?: string }).code !== "EEXIST") return null; // dir gone — best effort
       let observed = "";
@@ -593,14 +626,19 @@ export function acquireTasksLock(
       } catch {
         continue; // vanished between create and read — retry create
       }
-      // Holder crashed: its lock will never be released. Fail fast and loud
-      // (don't silently steal — see the section header), naming it for cleanup.
+      // Holder process is gone: its lock will never be released. Reclaim it by
+      // removing the corpse, then contend for a fresh lock. We re-read the file
+      // immediately before unlinking and only remove it while it still carries
+      // the dead token, so we never delete a lock a live process has re-taken;
+      // the verify-after-create above covers the residual race. Best effort: a
+      // rival reclaimer may have removed it first (ENOENT) — that's fine.
       if (lockHolderDead(observed)) {
-        console.error(
-          `error: tasks-CLI lock at ${lockPath} is held by a dead process (${observed}). ` +
-            `No agent can be holding it; remove it to proceed:\n  rm ${lockPath}`,
-        );
-        process.exit(LOCK_TIMEOUT_EXIT);
+        try {
+          if (readFileSync(lockPath, "utf8").trim() === observed) unlinkSync(lockPath);
+        } catch {
+          /* already removed / replaced — fall through and retry create */
+        }
+        continue;
       }
       if (waited >= waitMs) {
         console.error(
@@ -615,11 +653,13 @@ export function acquireTasksLock(
 }
 
 // Release a lock from acquireTasksLock. Idempotent and ownership-safe: removes
-// it ONLY while it carries our token. The read-then-unlink is race-free because
-// no waiter ever removes/recreates a lock it didn't create (acquire only `wx`s
-// onto a free path), so while we hold the path nobody else touches it.
+// it ONLY while it carries our token, and always drops it from the active set
+// so the signal handlers don't try to re-release a handle we've let go. The
+// read-then-unlink is race-free because no waiter removes/recreates a lock it
+// didn't create (acquire only `wx`s onto a free path, or reclaims a dead one).
 export function releaseTasksLock(lock: LockHandle | null): void {
   if (!lock) return;
+  activeLocks.delete(lock);
   try {
     if (readFileSync(lock.path, "utf8").trim() === lock.token) unlinkSync(lock.path);
   } catch {

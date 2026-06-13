@@ -89,6 +89,10 @@ jobs:
           # Cross-cutting paths force every per-package gate true. Anything
           # here affects all packages: workspace topology, root tooling
           # config, shared scripts, this workflow, composite actions.
+          # NOTE: the blanket `scripts/` here also matches scripts/tasks/, which
+          # is NOT cross-cutting; it is carved back out of the infra sweep below
+          # (see `infra_files`) so a tasks-CLI-only change stays off the Rails
+          # matrix. Keep that exclusion in sync if this pattern changes.
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
           # AR workspace deps: arel/activemodel/activesupport/globalid/
           # did-you-mean (per packages/activerecord/package.json). Also
@@ -234,9 +238,18 @@ jobs:
                   echo "guides_affected=false"       >> "$GITHUB_OUTPUT"
                   echo "website_affected=false"      >> "$GITHUB_OUTPUT"
                 else
+                  # scripts/tasks/ is the tasks-management CLI. Its tests ride
+                  # ONLY on the unit-tests vitest run (UNIT_TESTS_PKGS_RE), never
+                  # on the Rails suites — so it must not count as cross-cutting
+                  # infra. Drop it from the infra sweep here so a tasks-only
+                  # change doesn't trip INFRA_RE's blanket `scripts/` and force
+                  # every package gate true (the whole Rails matrix). Per-package
+                  # gates below still see the full $files list, so a tasks change
+                  # correctly flips unit_tests_affected via UNIT_TESTS_PKGS_RE.
+                  infra_files=$(echo "$files" | grep -vE '^scripts/tasks/' || true)
                   set_gate() {
                     local name="$1" re="$2"
-                    if echo "$files" | grep -qE "$INFRA_RE|$re"; then
+                    if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$files" | grep -qE "$re"; then
                       echo "${name}=true"  >> "$GITHUB_OUTPUT"
                     else
                       echo "${name}=false" >> "$GITHUB_OUTPUT"
