@@ -18,7 +18,7 @@ import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 // import only base.js, which doesn't load relation.ts on its own).
 import "./index.js";
 import { Person } from "./test-helpers/models/person.js";
-import { Company } from "./test-helpers/models/company.js";
+import { Company, Client } from "./test-helpers/models/company.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
@@ -55,14 +55,12 @@ describe("ForbiddenAttributesProtectionTest", () => {
     expect(() => new Company(params)).toThrow(ForbiddenAttributesError);
   });
 
-  it.skip("permitted attributes can be used for sti inheritance column", () => {
-    // BLOCKED: inheritance — STI dispatch at `new` not wired.
-    // ROOT-CAUSE: subclassFromAttributes (inheritance.ts:596) exists but isn't
-    // invoked from the Base constructor, so `new Company({ type: "Client" })`
-    // builds a Company, not a Client. Wiring it into construction is unsafe
-    // today: the global STI registry resolves bare class names ambiguously
-    // across test files (two `Firm`/`Client` classes), causing SubclassNotFound
-    // and mis-dispatch. SCOPE: registry-safe STI-at-new wiring, separate PR.
+  it("permitted attributes can be used for sti inheritance column", () => {
+    const params = new ProtectedParams({ type: "Client" });
+    params.permit();
+    const person = new Company(params);
+
+    expect(person.constructor).toBe(Client);
   });
 
   it("regular hash should still be used for mass assignment", () => {

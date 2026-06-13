@@ -1,6 +1,7 @@
 // vendor/rails/activerecord/test/models/company.rb
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
+import { registerSubclass } from "../../inheritance.js";
 import { Rollback } from "../../errors.js";
 import { Base } from "../../base.js";
 
@@ -414,3 +415,26 @@ export class NewlyContractedCompany extends Company {
 registerModel("Namespaced::Company", NamespacedCompany);
 registerModel("Namespaced::Firm", NamespacedFirm);
 registerModel("Namespaced::Client", NamespacedClient);
+
+// Track the STI subtree so registry-safe subclass resolution (STI dispatch at
+// `new`, `descendants`) can find these classes through Company's own subtree
+// rather than the global, bare-name model registry.
+for (const klass of [
+  SpecialCo,
+  NamespacedCompany,
+  NamespacedFirm,
+  NamespacedClient,
+  Firm,
+  DependentFirm,
+  RestrictedWithExceptionFirm,
+  RestrictedWithErrorFirm,
+  Agency,
+  Client,
+  ExclusivelyDependentFirm,
+  LargeClient,
+  SpecialClient,
+  VerySpecialClient,
+  NewlyContractedCompany,
+]) {
+  registerSubclass(klass);
+}
