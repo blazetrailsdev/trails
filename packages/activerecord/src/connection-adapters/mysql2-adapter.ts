@@ -558,9 +558,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           let result: mysql.RowDataPacket[] | mysql.ResultSetHeader = rawResult as
             | mysql.RowDataPacket[]
             | mysql.ResultSetHeader;
+          // Field descriptors for the result set whose rows we return. Mirrors
+          // the `result.fields` Rails' `cast_result` reads: present whenever a
+          // SELECT projected columns, even when it matched zero rows.
+          let fields = rawFields as mysql.FieldPacket[] | undefined;
           if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
             // Multi-result CALL w/ SELECT: rawFields[0] is a FieldPacket[].
             result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
+            fields = rawFields[0] as mysql.FieldPacket[];
           } else if (
             Array.isArray(rawFields) &&
             rawFields[0] === undefined &&
@@ -580,6 +585,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           }
           payload.row_count = result.length;
           await this._handleWarningsOn(mysqlConn, driverSql);
+          // A zero-row SELECT yields no row hashes for `fromRowHashes` to read
+          // columns from, dropping the column set. Mirror Rails' `cast_result`:
+          // take the columns from the field descriptors so the Result still
+          // reports its columns when the query matched no rows.
+          if (result.length === 0) {
+            const names = (fields ?? []).map((f) => f.name);
+            return names.length === 0 ? Result.empty() : new Result(names, []);
+          }
           return Result.fromRowHashes(result as Record<string, unknown>[]);
         });
       } catch (e: any) {
