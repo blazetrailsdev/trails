@@ -595,15 +595,18 @@ export class SchemaStatements {
     // Mirrors Rails' add_foreign_key short-circuit:
     //   return if options[:if_not_exists] == true &&
     //     foreign_key_exists?(from_table, to_table, **options.slice(:column))
-    // When a column is given, scope the existence check to it (a column carries
-    // at most one FK, so this is equivalent to Rails' to_table+column match);
-    // otherwise fall back to the to_table check.
+    // foreign_key_exists? matches via foreign_keys(from).detect { defined_for? },
+    // scoping on to_table plus column when one is given.
     if (options.ifNotExists === true) {
-      const exists =
-        options.column != null
-          ? (await this.foreignKeys(fromTable)).some((fk) => fk.column === options.column)
-          : await this.foreignKeyExists(fromTable, toTable);
-      if (exists) return;
+      const fks = await this.foreignKeys(fromTable);
+      if (
+        fks.some(
+          (fk) =>
+            fk.toTable === toTable && (options.column == null || fk.column === options.column),
+        )
+      ) {
+        return;
+      }
     }
     // Delegate to adapter-specific FK implementation when the adapter
     // overrides both addForeignKey and checkConstraints (signals full FK
