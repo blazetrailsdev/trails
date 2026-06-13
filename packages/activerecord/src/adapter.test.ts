@@ -580,7 +580,6 @@ describe("AdapterForeignKeyTest", () => {
     if (adapterType === "sqlite") return;
     await Base.connection.execute(dropFkSql()).catch(() => {});
   });
-  // (insert helper below casts to the concrete adapter for `insert`)
   beforeEach(async () => {
     if (adapterType !== "sqlite") await cleanup();
   });
@@ -632,18 +631,13 @@ describe("AdapterForeignKeyTest", () => {
 
   it.skipIf(adapterType === "sqlite")("disable referential integrity", async () => {
     const conn = Base.connection as AbstractAdapter;
-    let raised: unknown;
-    try {
-      await conn.disableReferentialIntegrity(async () => {
-        await insertIntoFkTestHasFk();
-        // delete created record as otherwise disableReferentialIntegrity will
-        // try to enable constraints after the block and fail.
-        await conn.execute("DELETE FROM fk_test_has_fk");
-      });
-    } catch (e) {
-      raised = e;
-    }
-    expect(raised).toBeUndefined();
+    // assert_nothing_raised: a throw inside the block fails the test.
+    await conn.disableReferentialIntegrity(async () => {
+      await insertIntoFkTestHasFk();
+      // delete created record as otherwise disableReferentialIntegrity will
+      // try to enable constraints after the block and fail.
+      await conn.execute("DELETE FROM fk_test_has_fk");
+    });
   });
 });
 
