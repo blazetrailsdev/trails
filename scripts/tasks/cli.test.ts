@@ -1033,6 +1033,33 @@ describe("buildStoryContent", () => {
     });
     expect(content).toContain(`title: "foo \\"bar\\" baz"`);
   });
+
+  it("honors an explicit status", () => {
+    const content = buildStoryContent("0005-gaps", "x", { status: "ready", date: "2026-06-08" });
+    expect(content).toContain(`status: ready`);
+  });
+
+  it("substitutes a caller-supplied body for the empty skeleton", () => {
+    const content = buildStoryContent("0005-gaps", "x", {
+      body: "## Context\n\nReal context.\n\n## Acceptance criteria\n\n- [ ] done\n",
+      date: "2026-06-08",
+    });
+    expect(content).toContain("Real context.");
+    expect(content).toContain("- [ ] done");
+    // Exactly one blank line between the closing fence and the body, one
+    // trailing newline — regardless of the source file's surrounding whitespace.
+    expect(content.endsWith("- [ ] done\n")).toBe(true);
+    expect(content).toContain("---\n\n## Context");
+  });
+
+  it("normalizes leading/trailing whitespace around a supplied body", () => {
+    const content = buildStoryContent("0005-gaps", "x", {
+      body: "\n\n## Context\n\nbody\n\n\n",
+      date: "2026-06-08",
+    });
+    expect(content).toContain("---\n\n## Context\n\nbody\n");
+    expect(content.endsWith("body\n")).toBe(true);
+  });
 });
 
 describe("checkPrNotOpen (done merge-state guard)", () => {
