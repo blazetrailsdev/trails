@@ -27,9 +27,17 @@ describeIfMysql("AdapterTest", () => {
   });
 
   it("charset", async () => {
-    expect(await adapter.charset()).not.toBeNull();
+    // Rails' assert_not_nil; charset() collapses null → "" (the ?? "" fallback),
+    // so the not-nil intent maps to non-empty here.
+    expect(await adapter.charset()).not.toBe("");
     expect(await adapter.charset()).not.toBe("character_set_database");
     expect(await adapter.charset()).toBe(await adapter.showVariable("character_set_database"));
+  });
+
+  it("collation", async () => {
+    expect(await adapter.collation()).not.toBe("");
+    expect(await adapter.collation()).not.toBe("collation_database");
+    expect(await adapter.collation()).toBe(await adapter.showVariable("collation_database"));
   });
 
   it("show nonexistent variable returns nil", async () => {
