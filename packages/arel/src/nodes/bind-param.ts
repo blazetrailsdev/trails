@@ -5,19 +5,14 @@ import { Node, NodeVisitor } from "./node.js";
  *
  * Mirrors: Arel::Nodes::BindParam
  *
- * Deliberate deviation — `toSql()` inlining vs. Rails' `?` placeholder:
- * Rails' `Arel::Nodes::BindParam.new(v).to_sql` emits the bind marker `?`
- * (the default ToSql collector records a placeholder and leaves bind
- * substitution to the connection). trails' `Node#toSql()` instead routes
- * through `ToSql#compile`, which post-processes the collected binds and
- * inlines their quoted values — so `new BindParam(1).toSql()` is `"1"` and
- * `new BindParam(null).toSql()` is `"NULL"`. This is intentional: `toSql()`
- * is our human-readable / parity "display SQL" surface, and the parity
- * tooling re-inlines non-datetime binds anyway (see
- * docs/activerecord/parity-verification.md). The `?`-placeholder form is
- * still available via `ToSql#compileWithBinds`, which returns the SQL with
- * markers and the bind values separately. A *valueless* BindParam
- * (`new BindParam()`) has nothing to inline and renders as `?`.
+ * `toSql()` always emits the bind marker `?`, regardless of the wrapped
+ * value — matching Rails' `visit_Arel_Nodes_BindParam`, which does
+ * `collector.add_bind(o.value, &bind_block)` where `BIND_BLOCK = proc { "?" }`.
+ * So `new BindParam(1).toSql()`, `new BindParam(null).toSql()`, and the
+ * valueless `new BindParam().toSql()` are all `"?"`. The value is recorded
+ * separately, not inlined; `ToSql#compileWithBinds` returns the SQL with `?`
+ * markers alongside the extracted bind values. (Casted/Quoted literals do
+ * inline via `quote` — only BindParam/Attribute collect a placeholder.)
  */
 export class BindParam extends Node {
   readonly value: unknown;

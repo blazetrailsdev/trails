@@ -77,13 +77,21 @@ export class ToSql extends Visitor {
   }
 
   compile(node: Node): string {
-    const [sql, binds] = this.compileWithBinds(node);
+    const sqlCollector = new SQLString();
+    const bindCollector = new Bind();
+    const composite = new Composite(sqlCollector, bindCollector);
+    this.visit(node, composite as unknown as SQLString);
+    const sql = sqlCollector.value;
+    const binds = bindCollector.value;
     if (binds.length === 0) return sql;
     let i = 0;
     return sql.replace(/\?|\$\d+/g, (match) => {
       const raw = binds[i++];
-      // Valueless BindParam (used as a raw placeholder/Substitute slot): preserve.
-      if (raw === undefined) return match;
+      // BindParam collects a placeholder rather than inlining its value —
+      // mirrors Rails `visit_Arel_Nodes_BindParam` (`BIND_BLOCK = proc { "?" }`),
+      // so `Nodes::BindParam.new(v).to_sql` is always `?`. Casted/Quoted/date
+      // values still inline below (Rails inlines those via `quote`).
+      if (raw instanceof Nodes.BindParam || raw === undefined) return match;
       const val = resolveValueForDatabase(raw);
       return this.quote(val);
     });
@@ -1244,7 +1252,11 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesBindParam(node: Nodes.BindParam, collector: SQLString): SQLString {
-    collector.addBind(node.value !== undefined ? node.value : node, this.bindBlock());
+    // Push the node itself (not its value) so `compile` can render `?` while
+    // `compileWithBinds` unwraps to `node.value` for the bind array. Mirrors
+    // Rails' `visit_Arel_Nodes_BindParam`: `collector.add_bind(o.value, &bind_block)`
+    // emits the placeholder and records the value separately.
+    collector.addBind(node, this.bindBlock());
     return collector;
   }
 

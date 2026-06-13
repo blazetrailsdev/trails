@@ -168,12 +168,24 @@ export function toSql(
     node = (node as any).ast;
   }
 
-  // Use compile() (inlines values) for display SQL, matching Rails'
-  // to_sql under unprepared_statement. toSqlAndBinds uses
-  // compileWithBinds for execution (placeholders + bind array).
+  // Display / unprepared-statement SQL: inline the bind values, matching
+  // Rails' `to_sql` under `unprepared_statement` (which compiles with a
+  // SubstituteBinds collector). Raw Arel `Node#toSql`/`ToSql#compile` keeps
+  // `?` for BindParams (Rails parity); this path substitutes them via the
+  // adapter quoter, the same way `Relation#toSql` does. `toSqlAndBinds` uses
+  // `compileWithBinds` for execution (placeholders + bind array).
   const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
   if (visitor && node instanceof Nodes.Node) {
-    return visitor.compile(node);
+    const [sql, inlineBinds] = visitor.compileWithBinds(node);
+    if (inlineBinds.length === 0) return sql;
+    const quote = (this as any).quote?.bind(this) as ((v: unknown) => string) | undefined;
+    let i = 0;
+    return sql.replace(/\?|\$\d+/g, (match) => {
+      const raw = inlineBinds[i++];
+      if (raw === undefined) return match;
+      const val = raw instanceof ModelAttribute ? raw.valueForDatabase : raw;
+      return quote ? quote(val) : String(val);
+    });
   }
   if (node && typeof (node as any).toSql === "function") {
     return (node as any).toSql();

@@ -21,21 +21,19 @@ describe("BindParam", () => {
     expect(a.value).not.toBe(b.value);
   });
 
-  // Deliberate deviation from Rails Arel, where `BindParam#to_sql` emits the
-  // `?` placeholder. trails' `toSql()` is a "display SQL" surface that inlines
-  // bind values via `ToSql#compile`; the placeholder form lives on
-  // `compileWithBinds`. See the BindParam class doc for the rationale. Locked
-  // here so the decision doesn't silently regress.
-  describe("toSql inlines the value (trails display-SQL deviation)", () => {
-    it("inlines a scalar value", () => {
-      expect(new Nodes.BindParam(1).toSql()).toBe("1");
+  // Rails parity: `BindParam#to_sql` always emits the `?` placeholder (the
+  // value is collected, not inlined). Mirrors Rails' visit_Arel_Nodes_BindParam
+  // with `BIND_BLOCK = proc { "?" }`. See the BindParam class doc.
+  describe("toSql emits the ? placeholder", () => {
+    it("renders a scalar value as ?", () => {
+      expect(new Nodes.BindParam(1).toSql()).toBe("?");
     });
 
-    it("inlines a null value as NULL", () => {
-      expect(new Nodes.BindParam(null).toSql()).toBe("NULL");
+    it("renders a null value as ?", () => {
+      expect(new Nodes.BindParam(null).toSql()).toBe("?");
     });
 
-    it("renders a valueless bind param as the ? placeholder", () => {
+    it("renders a valueless bind param as ?", () => {
       expect(new Nodes.BindParam().toSql()).toBe("?");
     });
   });
