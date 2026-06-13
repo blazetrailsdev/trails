@@ -1105,7 +1105,6 @@ interface ReloadRecord {
   _collectionProxies: Map<string, unknown>;
   _preloadedAssociations: Map<string, unknown>;
   _associationInstances: Map<string, unknown>;
-  _cachedAssociations?: Map<string, unknown>;
   id: unknown;
   constructor: {
     name: string;
@@ -1172,16 +1171,14 @@ export async function reload<T extends ReloadRecord>(this: T): Promise<T> {
   }
 
   // RFC 0022 b1+: reset the singular holder / collection proxy. The holder
-  // (`_associationInstances`) is the source of truth, but it still re-syncs its
-  // target from the transitional `_cachedAssociations` mirror until b4 deletes
-  // it — so the mirror is cleared alongside the holder to avoid resurfacing a
-  // stale singular target. Reload no longer *copies* a fresh `_cachedAssociations`
-  // snapshot back: re-preloaded strict-loaded targets come back through
-  // `_preloadedAssociations`, which the rebuilt holders sync from on next access.
+  // (`_associationInstances`) and the collection proxy (`_collectionProxies`)
+  // are the source of truth; clearing them drops any cached/loaded target.
+  // Reload no longer *copies* a fresh snapshot back: re-preloaded strict-loaded
+  // targets come back through `_preloadedAssociations`, which the rebuilt
+  // holders sync from on next access.
   this._collectionProxies.clear();
   this._associationInstances.clear();
   this._preloadedAssociations.clear();
-  this._cachedAssociations?.clear();
   if (freshPreloaded) {
     for (const [name, value] of freshPreloaded) this._preloadedAssociations.set(name, value);
   }
@@ -1375,12 +1372,14 @@ export function strictLoadedAssociations(this: PersistencePrivateHost): string[]
     _strictLoading?: boolean;
     isStrictLoadingNPlusOneOnly?(): boolean;
     _preloadedAssociations?: Map<string, unknown>;
-    _cachedAssociations?: Map<string, unknown>;
+    _associationInstances?: Map<string, { isLoaded?(): boolean }>;
     _collectionProxies?: Map<string, { loaded?: boolean }>;
   };
   if (self._strictLoading && !self.isStrictLoadingNPlusOneOnly?.()) {
     for (const name of self._preloadedAssociations?.keys() ?? []) names.add(name);
-    for (const name of self._cachedAssociations?.keys() ?? []) names.add(name);
+    for (const [name, instance] of self._associationInstances ?? []) {
+      if (instance?.isLoaded?.()) names.add(name);
+    }
     for (const [name, proxy] of self._collectionProxies ?? []) {
       if (proxy?.loaded) names.add(name);
     }

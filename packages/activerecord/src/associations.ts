@@ -283,8 +283,9 @@ function _resolveInverseName(
 }
 
 /**
- * Cache `owner` on `child` under `inverseName`. Centralizes the lazy
- * `_cachedAssociations` init so every load/set path writes the same shape.
+ * Cache `owner` on `child` under `inverseName`. Centralizes inverse caching so
+ * every load/set path routes a singular inverse to its holder and a collection
+ * inverse to its proxy.
  *
  * Mirrors: ActiveRecord::Associations::Association#inversed_from
  *
@@ -296,9 +297,8 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
   // Rails `BelongsToAssociation#invertible_for?` (belongs_to_association.rb:159):
   // when the inverse is a has_many, wiring is gated on `klass.has_many_inversing`.
   // Without the flag, Rails does NOT touch the parent collection. Route the
-  // write through the proxy's `_wireInverseTarget` so the in-memory target,
-  // `@replaced_or_added_targets`, and the legacy `_cachedAssociations` mirror
-  // are all maintained in one place (the proxy). This removes the C2 (#2591)
+  // write through the proxy's `_wireInverseTarget` so the in-memory target and
+  // `@replaced_or_added_targets` are maintained in one place (the proxy). This removes the C2 (#2591)
   // seam that used to reach into `proxy._replacedOrAddedTargets` from here.
   if (inverseRefl?.macro === "hasMany") {
     if (!childCtor.hasManyInversing) return;
@@ -318,38 +318,56 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
  * the association object (`@association_cache[name]`). Only singular inverses
  * get the holder write; a collection inverse name is left to its proxy.
  *
- * RFC 0022 b1: writers and inverse-of seeders route through the holder. A
- * transitional `_cachedAssociations` mirror is kept until b3 migrates the
- * remaining singular readers (counter-cache / validations / autosave /
- * persistence / serialization) and b4 deletes the map.
+ * RFC 0022: writers and inverse-of seeders route through the holder, which is
+ * the single source of truth — surfaced to readers via `Base#_associationCache`.
  *
  * @internal
  */
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
   const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
   if (macro === "belongsTo" || macro === "hasOne") {
-    record.association(assocName).setTarget(target);
+    const assoc = record.association(assocName);
+    assoc.setTarget(target);
+    // Flag as an explicit assignment so the inner loaders' short-circuit
+    // (`_loadedSingularTarget`) distinguishes it from a memoized query load.
+    (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
+    return;
   }
-  record._cachedAssociations = record._cachedAssociations ?? new Map();
-  record._cachedAssociations.set(assocName, target);
+  // Undeclared inverse name (an inverse reached via automatic-inverse wiring
+  // whose reflection isn't a declared singular association): cache the value on
+  // a minimal loaded holder keyed by the name for ad-hoc inverses. Surfaced
+  // through `Base#_associationCache`.
+  const existing = record._associationInstances.get(assocName) as
+    | { setTarget(t: unknown): void; _explicitTarget?: boolean }
+    | undefined;
+  if (existing) {
+    existing.setTarget(target);
+    existing._explicitTarget = true;
+  } else {
+    record._associationInstances.set(assocName, {
+      target,
+      _explicitTarget: true,
+      isLoaded: () => true,
+      setTarget(this: { target: unknown }, t: unknown) {
+        this.target = t;
+      },
+    } as never);
+  }
 }
 
 /**
  * Read the explicitly-set singular target for `assocName` — the short-circuit
  * the inner `loadBelongsTo` / `loadHasOne` loaders consult before querying.
  *
- * RFC 0022 b1: singular writers and inverse-of seeders now store their target
- * on the `SingularAssociation` holder (`record.association(name).target`,
- * Rails' `@target`) as the source of truth, mirroring it into the transitional
- * `_cachedAssociations` map. These inner loaders run *inside* the holder's own
- * `loadTarget` (`doAsyncFindTarget`) and from sibling through-writers, where
- * the holder's `loaded` flag tracks load results — not just explicit sets — so
- * reading it here would memoize a load and defeat the re-query those paths
- * depend on. The loaders therefore read the `_cachedAssociations` mirror (the
- * holder's write-shadow, carrying only explicit sets/seeds) plus the
- * `_preloadedAssociations` fallback. b3 migrates the remaining singular readers
- * onto the holder and b4 deletes the mirror. Returns a one-key box (`{ value }`)
- * on a hit so a loaded-nil target (null) is distinguished from a miss.
+ * RFC 0022: singular writers and inverse-of seeders store their target on the
+ * `SingularAssociation` holder (`record.association(name).target`, Rails'
+ * `@target`) as the source of truth. These inner loaders run *inside* the
+ * holder's own `loadTarget` (`doAsyncFindTarget`) and from sibling
+ * through-writers, where the holder is not yet loaded — so a loaded holder here
+ * carries an explicit set/seed (or a prior explicit load), the short-circuit we
+ * want, plus the `_preloadedAssociations` fallback. Returns a one-key box
+ * (`{ value }`) on a hit so a loaded-nil target (null) is distinguished from a
+ * miss.
  *
  * @internal
  */
@@ -357,8 +375,14 @@ export function _loadedSingularTarget(
   record: Base,
   assocName: string,
 ): { value: Base | null } | null {
-  if (record._cachedAssociations?.has(assocName)) {
-    return { value: record._cachedAssociations.get(assocName) as Base | null };
+  const instance = record._associationInstances.get(assocName) as
+    | { isLoaded(): boolean; _explicitTarget?: boolean; target?: Base | null }
+    | undefined;
+  // Only an *explicit* set/seed short-circuits — a prior query load on the
+  // holder must re-query (matches the old `_cachedAssociations` write-shadow,
+  // which never recorded query loads).
+  if (instance?.isLoaded() && instance._explicitTarget) {
+    return { value: (instance.target ?? null) as Base | null };
   }
   if (record._preloadedAssociations?.has(assocName)) {
     return { value: record._preloadedAssociations.get(assocName) as Base | null };
@@ -1218,8 +1242,18 @@ export async function loadHasMany(
   // override is provided (the scope has been mutated; the cache would return
   // stale/incorrect data for the diverged query).
   if (!queryExecutor) {
-    if (record._cachedAssociations?.has(assocName)) {
-      return record._cachedAssociations.get(assocName) as Base[];
+    // Honor an instance-cache hit (a directly-seeded or inverse-seeded
+    // collection target), but ignore the association's *own* collection proxy:
+    // its in-memory built/pushed records are not a complete collection and must
+    // still be merged with a DB query (this loader runs inside that proxy's
+    // load path, where `proxy.loaded` is false by construction).
+    const cache = record._associationCache(assocName);
+    if (
+      cache &&
+      cache !== record._collectionProxies.get(assocName) &&
+      Array.isArray(cache.target)
+    ) {
+      return cache.target as Base[];
     }
     if (record._preloadedAssociations?.has(assocName)) {
       return record._preloadedAssociations.get(assocName) as Base[];
@@ -2130,8 +2164,8 @@ export async function createThroughAssociation(
   });
 
   if (success) {
-    record._cachedAssociations = record._cachedAssociations ?? new Map();
-    record._cachedAssociations.set(assocName, target);
+    // Cache the created has_one :through target on its singular holder.
+    _cacheSingularTarget(record, assocName, target);
   } else {
     // Transaction rolled back — reset in-memory persisted state and PKs
     for (const rec of [target, through]) {
@@ -2325,9 +2359,8 @@ export async function updateCounterCaches(
     // is already loaded in memory (wired via inverse-of from a collection proxy
     // create/push), update it directly so the caller sees the new count without
     // a reload. Otherwise fall back to a fresh DB fetch.
-    // RFC 0022 b1+: the loaded belongs_to owner lives on the SingularAssociation
-    // holder (`record.association(name).target`); read it there rather than off
-    // the legacy `_cachedAssociations` mirror. The holder's target is a scalar
+    // RFC 0022: the loaded belongs_to owner lives on the SingularAssociation
+    // holder (`record.association(name).target`); read it there. The holder's target is a scalar
     // Base (or null) for belongs_to; the Array guard below is defensive.
     // Guard against a stale cached owner: mirrors Rails' Association#target which
     // returns nil when stale_target? (FK changed after wiring). Check the cached
@@ -2566,9 +2599,11 @@ export async function setHasMany(
     }
   }
 
-  // Cache the collection
-  if (!record._cachedAssociations) record._cachedAssociations = new Map();
-  record._cachedAssociations.set(assocName, targets);
+  // Cache the collection on its proxy (the canonical has_many target store).
+  const proxy = association(record, assocName) as unknown as {
+    _hydrateFromPreload(records: Base[]): void;
+  };
+  proxy._hydrateFromPreload(targets);
 }
 
 export async function touchBelongsToParents(record: Base): Promise<void> {

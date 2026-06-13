@@ -11,6 +11,7 @@ import { Base, registerModel, StrictLoadingViolationError } from "./index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { seedAssociationCache } from "./test-helpers/seed-association-cache.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -175,9 +176,8 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     await post.save();
     post.strictLoadingBang();
     const author = new SrAuthor({ name: "dean" });
-    // Populate the legacy _cachedAssociations mirror (written by
-    // _cacheSingularTarget alongside the holder; b4 deletes this map).
-    (post as any)._cachedAssociations = new Map([["srAuthor", author]]);
+    // Cache the singular target on the holder (as _cacheSingularTarget does).
+    seedAssociationCache(post as any, "srAuthor", author);
     expect(() => (post as any).srAuthor).not.toThrow();
     expect(((post as any).srAuthor as SrAuthor).name).toBe("dean");
   });

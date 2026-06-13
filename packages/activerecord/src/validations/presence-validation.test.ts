@@ -16,6 +16,7 @@ import { Face } from "../test-helpers/models/face.js";
 import { Interest } from "../test-helpers/models/interest.js";
 import { Speedometer } from "../test-helpers/models/speedometer.js";
 import { Dashboard } from "../test-helpers/models/dashboard.js";
+import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
 
 // Rails `class Boy < Human; end` — a plain subclass sharing the humans table.
 class Boy extends Human {
@@ -32,11 +33,9 @@ class Boy extends Human {
 // in-memory setter skips for a brand-new (unsaved, null-PK) owner. Writing the
 // association cache directly — the same idiom autosave-association.test.ts uses
 // via its `cacheAssoc` helper — is the faithful in-memory mirror: presence
-// reads it through read_attribute_for_validation's `_cachedAssociations` lookup.
+// reads it through read_attribute_for_validation's `_associationCache` lookup.
 function setAssoc(record: Base, name: string, value: unknown) {
-  const r = record as unknown as { _cachedAssociations?: Map<string, unknown> };
-  if (!r._cachedAssociations) r._cachedAssociations = new Map();
-  r._cachedAssociations.set(name, value);
+  seedAssociationCache(record, name, value);
 }
 
 describe("PresenceValidationTest", () => {

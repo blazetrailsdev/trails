@@ -2855,7 +2855,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     await Part.create({ name: "Mast", ship_id: ship.id });
     await Part.create({ name: "Stern", ship_id: ship.id });
     // Nothing is cached on ship — part association is NOT loaded (hasOne)
-    expect((ship as any)._cachedAssociations?.has("part")).toBeFalsy();
+    expect((ship as any)._associationCache("part")).toBeFalsy();
     // Counting queries: isValid() should not trigger a load of the part association
     let queryCount = 0;
     const sub = Notifications.subscribe("sql.active_record", () => {
@@ -3092,7 +3092,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     await Part.create({ name: "Mast", ship_id: ship.id });
     await Part.create({ name: "Stern", ship_id: ship.id });
     // Nothing is cached on pirate or ship — parts association is NOT loaded
-    expect((ship as any)._cachedAssociations?.has("parts")).toBeFalsy();
+    expect((ship as any)._associationCache("parts")).toBeFalsy();
     // isValid() should not trigger a load of the parts association
     let queryCount = 0;
     const sub = Notifications.subscribe("sql.active_record", (evt: any) => {

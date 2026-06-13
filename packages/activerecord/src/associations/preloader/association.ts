@@ -263,8 +263,8 @@ export class Association {
       inverseName = (this.reflection as any).options?.inverseOf;
     }
     if (inverseName) {
-      // Route through the shared inverse-wiring helper rather than poking
-      // `_cachedAssociations` directly. For a belongs_to inverse it caches the
+      // Route through the shared inverse-wiring helper rather than poking the
+      // association cache directly. For a belongs_to inverse it caches the
       // owner scalar (unchanged); for a has_many inverse it populates the
       // child's collection proxy target — the single write path for has_many
       // targets. Mirrors Rails' `add_to_target` → `set_inverse_instance`, where
