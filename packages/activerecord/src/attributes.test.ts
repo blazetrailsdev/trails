@@ -138,10 +138,7 @@ describe("CustomPropertiesTest", () => {
     expect(p.readAttribute("nonexistent")).toBeNull();
   });
 
-  // BLOCKED: type — virtual attributes (declared via attribute() with no backing DB
-  // column) are not yet supported — save attempts to INSERT the column.
-  // Rails treats these as not-persisted with the default returned on read.
-  it.skip("model with nonexistent attribute with default value can be saved", async () => {
+  it("model with nonexistent attribute with default value can be saved", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -377,9 +374,7 @@ describe("CustomPropertiesTest", () => {
     expect(p.memo).toBe("");
   });
 
-  // BLOCKED: type — same virtual-attribute gap — INSERT tries to write the
-  // non-existent column. See sibling skipped test above.
-  it.skip("attributes not backed by database columns return the default on models loaded from database", async () => {
+  it("attributes not backed by database columns return the default on models loaded from database", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");

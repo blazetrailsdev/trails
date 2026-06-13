@@ -655,6 +655,69 @@ interface SaveRecord {
  * transaction-returning-status, and delegates the insert/update to
  * `_createOrUpdate` (Rails' Persistence#save super).
  */
+interface WriteReflectHost {
+  tableName: string;
+  connection: {
+    schemaCache?: {
+      getCachedColumnsHash?(table: string): Record<string, unknown> | undefined;
+    };
+    columns?(table: string): Promise<Array<{ name: string }>>;
+  };
+  _attributeDefinitions: Map<
+    string,
+    { source?: string; userProvided?: boolean; virtual?: boolean }
+  >;
+}
+
+/**
+ * Resolve the real column names for a table from the connection — the cached
+ * columns hash when warm, otherwise an explicit reflection. Returns null when
+ * they can't be determined (no connection, no schema, reflection failure).
+ *
+ * @internal
+ */
+async function realColumnNames(ctor: WriteReflectHost): Promise<Set<string> | null> {
+  try {
+    const conn = ctor.connection;
+    const table = ctor.tableName;
+    if (!conn || !table) return null;
+    const cached = conn.schemaCache?.getCachedColumnsHash?.(table);
+    if (cached) return new Set(Object.keys(cached));
+    if (typeof conn.columns === "function") {
+      const cols = await conn.columns(table);
+      if (Array.isArray(cols) && cols.length > 0) {
+        return new Set(cols.map((c) => c.name));
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Flag any user-declared attribute that has no backing DB column as virtual,
+ * so persistence excludes it from the INSERT/UPDATE. `ensureSchemaLoaded`
+ * short-circuits once a model declares its own `attribute()`, which leaves a
+ * virtual attribute (declared with no DB column) looking like a real column;
+ * reconciling against the table's actual columns here drops it from
+ * `column_names`, matching Rails — where virtual attributes are never columns.
+ * Schema-sourced defs and real columns are left untouched.
+ *
+ * @internal
+ */
+async function markVirtualAttributesForWrite(ctor: WriteReflectHost): Promise<void> {
+  const real = await realColumnNames(ctor);
+  if (!real) return;
+  for (const [name, def] of ctor._attributeDefinitions) {
+    const userDeclared =
+      (def.source ?? (def.userProvided === false ? "schema" : "user")) === "user";
+    if (userDeclared && !def.virtual && !real.has(name)) {
+      def.virtual = true;
+    }
+  }
+}
+
 export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
@@ -672,6 +735,12 @@ export async function save<T extends SaveRecord>(
   await (
     this.constructor as unknown as { ensureSchemaLoaded(): Promise<void> }
   ).ensureSchemaLoaded();
+  // Drop virtual attributes (declared via `attribute()` with no backing DB
+  // column) from the upcoming INSERT/UPDATE. `ensureSchemaLoaded` short-circuits
+  // once the model declares its own attribute(), leaving such an attribute
+  // indistinguishable from a real column, so reconcile against the table's
+  // actual columns here.
+  await markVirtualAttributesForWrite(this.constructor as unknown as WriteReflectHost);
   if (!performValidations.call(this, options)) return false;
   const self = this as any;
   if (options?.validate !== false) {
