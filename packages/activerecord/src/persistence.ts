@@ -1105,6 +1105,7 @@ interface ReloadRecord {
   _collectionProxies: Map<string, unknown>;
   _preloadedAssociations: Map<string, unknown>;
   _associationInstances: Map<string, unknown>;
+  _resetAssociationCaches(): void;
   id: unknown;
   constructor: {
     name: string;
@@ -1176,9 +1177,7 @@ export async function reload<T extends ReloadRecord>(this: T): Promise<T> {
   // Reload no longer *copies* a fresh snapshot back: re-preloaded strict-loaded
   // targets come back through `_preloadedAssociations`, which the rebuilt
   // holders sync from on next access.
-  this._collectionProxies.clear();
-  this._associationInstances.clear();
-  this._preloadedAssociations.clear();
+  this._resetAssociationCaches();
   if (freshPreloaded) {
     for (const [name, value] of freshPreloaded) this._preloadedAssociations.set(name, value);
   }
