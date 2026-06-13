@@ -1350,19 +1350,44 @@ describe("tasks-CLI critical-section lock", () => {
     releaseTasksLock(b);
   });
 
-  // A dead holder's lock is NEVER stolen: fail loudly, leave it for cleanup.
-  it("fails loudly on a dead holder's lock and never removes it", () => {
+  // A dead holder's lock is auto-reclaimed: it can never be released, so we
+  // steal it and proceed rather than forcing a manual `rm`.
+  it("auto-reclaims a dead holder's lock and acquires it", () => {
     const dir = repo();
     const lockPath = join(dir, ".git", "tasks-cli.lock");
     writeFileSync(lockPath, "2147483646.0.0\n"); // pid far above any live process → ESRCH
+    const exit = vi.spyOn(process, "exit").mockImplementation(((c?: number) => {
+      throw new Error(`exit ${c}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const h = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 });
+    expect(exit).not.toHaveBeenCalled(); // no loud failure, no manual rm needed
+    expect(h).not.toBeNull();
+    expect(existsSync(lockPath)).toBe(true); // reclaimed — now carries our token
+    expect(readFileSync(lockPath, "utf8").trim()).toBe(h?.token);
+    releaseTasksLock(h);
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  // Reclaiming a dead lock leaves a single live owner: after A reclaims and
+  // holds, a dead-pid lock written "underneath" is not what A returned, and a
+  // second acquirer waits on A rather than stealing A's live lock.
+  it("does not let a reclaim steal a live lock", () => {
+    const dir = repo();
+    const lockPath = join(dir, ".git", "tasks-cli.lock");
+    writeFileSync(lockPath, "2147483646.0.0\n"); // dead holder
     vi.spyOn(process, "exit").mockImplementation(((c?: number) => {
       throw new Error(`exit ${c}`);
     }) as never);
     vi.spyOn(console, "error").mockImplementation(() => {});
+    const a = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 }); // reclaims, now live
+    expect(a).not.toBeNull();
+    // A live holder is never reclaimed — B times out instead of stealing it.
     expect(() => acquireTasksLock(dir, { waitMs: 0, pollMs: 1 })).toThrow(
       `exit ${LOCK_TIMEOUT_EXIT}`,
     );
-    expect(existsSync(lockPath)).toBe(true); // never removed — no unsafe reclaim
+    expect(readFileSync(lockPath, "utf8").trim()).toBe(a?.token); // still A's
+    releaseTasksLock(a);
   });
 
   // Release removes the lock only while it carries our token.
