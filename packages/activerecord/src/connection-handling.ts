@@ -368,6 +368,7 @@ const CONNECTION_DEPRECATION_MSG =
   "Called deprecated `ActiveRecord::Base.connection` method. " +
   "Either use `with_connection` or `lease_connection`.";
 
+/** @deprecated */
 export function connection(this: typeof Base): DatabaseAdapter {
   // Fast path: directly assigned via `Model.adapter = x` (tests + simple setups)
   if ((this as any)._adapter) return (this as any)._adapter;

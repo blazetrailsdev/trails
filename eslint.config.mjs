@@ -9,6 +9,7 @@ import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
 import railsErrorParity from "./eslint/rails-error-parity.mjs";
+import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
@@ -116,6 +117,7 @@ export default defineConfig(
           "no-process-bypass": noProcessBypass,
           "rails-private-jsdoc": railsPrivateJsdoc,
           "rails-error-parity": railsErrorParity,
+          "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "no-native-date": noNativeDate,
           "sqlite-driver-await": sqliteDriverAwait,
           "nie-requires-annotation": nieRequiresAnnotation,
@@ -214,6 +216,23 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-error-parity": "error",
+    },
+  },
+
+  // ── rails-deprecated-jsdoc (deprecation parity) ──
+  // Requires `@deprecated` JSDoc where Rails deprecates the same method.
+  {
+    files: [
+      "packages/arel/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/actionpack/src/**/*.ts",
+      "packages/actionview/src/**/*.ts",
+      "packages/activerecord/src/**/*.ts",
+    ],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/rails-deprecated-jsdoc": "error",
     },
   },
 

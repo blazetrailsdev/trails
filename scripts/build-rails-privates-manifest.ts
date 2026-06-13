@@ -30,6 +30,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
+import { libPathsManifest } from "../vendor/sources.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -50,6 +51,11 @@ const PACKAGE_DIRS: Record<string, string> = {
 
 const RAILS_API_PATH = path.join(ROOT, "scripts/api-compare/output/rails-api.json");
 const OUT = path.join(ROOT, "eslint/rails-private-methods.json");
+
+// The deprecation-parity manifest scans the vendored Ruby source directly and
+// does NOT depend on rails-api.json, so emit it up front — before the early
+// exit below that fires when rails-api.json is missing.
+emitDeprecatedManifest();
 
 if (!fs.existsSync(RAILS_API_PATH)) {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
@@ -216,3 +222,135 @@ fs.writeFileSync(OUT, JSON.stringify(final, null, 2) + "\n");
 const fileCount = Object.keys(final.files).length;
 const fileNames = Object.values(final.files).reduce((n, a) => n + a.length, 0);
 console.log(`Wrote ${OUT} — ${fileCount} files (${fileNames} names)`);
+
+// --- Deprecation-parity pass ---
+//
+// Independently of the private-method projection above, scan the vendored
+// Ruby source for methods Rails marks deprecated and emit a sibling manifest
+// keyed the same way (TS rel path → TS method names). The
+// `rails-deprecated-jsdoc` ESLint rule consumes it to require `@deprecated`
+// JSDoc on the matching TS declarations.
+//
+// Two Rails idioms mark a method deprecated:
+//   - a class-body `deprecate :foo, :bar, deprecator: …` / `deprecate foo: "msg"`
+//     macro naming already-defined methods, and
+//   - a method body emitting `<Const>.deprecator.warn(…)` (e.g.
+//     `ActiveRecord.deprecator.warn`). The `@deprecator.warn` form inside the
+//     Deprecation proxy infrastructure itself is deliberately NOT matched —
+//     it's the warning machinery, not a deprecated public method.
+function indentLen(line: string): number {
+  return line.match(/^[ \t]*/)?.[0].length ?? 0;
+}
+
+// Strip a trailing `# comment` (heredoc/string edge cases are rare in the
+// lines we inspect and tolerated — a false negative just misses a tag).
+function stripComment(line: string): string {
+  const hash = line.indexOf("#");
+  return hash === -1 ? line : line.slice(0, hash);
+}
+
+// Collect symbol / keyword targets from a `deprecate …` argument list,
+// ignoring the `deprecator:` option.
+function collectDeprecateTargets(argText: string, out: Set<string>): void {
+  for (const partRaw of argText.split(",")) {
+    const part = partRaw.trim();
+    const sym = part.match(/^:([a-zA-Z_]\w*[?!=]?)/);
+    if (sym) {
+      out.add(sym[1]);
+      continue;
+    }
+    const kw = part.match(/^([a-zA-Z_]\w*[?!=]?):/);
+    if (kw && kw[1] !== "deprecator") out.add(kw[1]);
+  }
+}
+
+// Nearest preceding `def` whose indentation is shallower than the warn line —
+// method bodies are always indented deeper than their `def`.
+function enclosingMethod(lines: string[], idx: number): string | null {
+  const warnIndent = indentLen(lines[idx]);
+  for (let j = idx - 1; j >= 0; j--) {
+    const dm = lines[j].match(/^([ \t]*)def\s+(?:self\.)?([a-zA-Z_]\w*[?!=]?)/);
+    if (dm && dm[1].length < warnIndent) return dm[2];
+  }
+  return null;
+}
+
+// Decide whether a `deprecator.warn` marks the *enclosing method itself*
+// deprecated, versus merely warning about a deprecated argument or behavior
+// from inside a still-live method. The two read very differently:
+//
+//   method:   "Called deprecated `…connection` method."
+//             "`Benchmark.ms` is deprecated and will be removed …"
+//   behavior: "Mapping a route with multiple paths is deprecated …"
+//             "Passing an instance of … to …#since is deprecated"
+//
+// The grammatical subject of "… is deprecated" is the method name (in
+// backticks) for a method deprecation, and some action/argument otherwise.
+// We bias toward dropping when unsure — a missed tag is harmless (no false
+// lint error), a spurious tag would demand `@deprecated` on live API.
+function warnDeprecatesMethod(messageBlob: string, method: string): boolean {
+  if (/called\s+deprecated[\s\S]*?\bmethod\b/i.test(messageBlob)) return true;
+  // A backticked token ending in the method name, as the subject of
+  // "is/are/will be … deprecated": e.g. `Benchmark.ms` is deprecated.
+  const esc = method.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp("`[^`]*\\b" + esc + "`\\s+(?:is|are|will be)\\b[^`]*?deprecated", "i");
+  return re.test(messageBlob);
+}
+
+function deprecatedMethodsInRuby(src: string): Set<string> {
+  const names = new Set<string>();
+  const lines = src.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const code = stripComment(lines[i]);
+    const dep = code.match(/^\s*deprecate\s+(.+)$/);
+    if (dep) {
+      // `deprecate :foo` macro — unambiguously a method deprecation.
+      collectDeprecateTargets(dep[1], names);
+      continue;
+    }
+    if (/\b[A-Z][\w:]*\.deprecator\.warn\b/.test(code)) {
+      const m = enclosingMethod(lines, i);
+      // Join a small window so heredoc / multi-line message bodies are
+      // visible to the classifier.
+      const blob = lines.slice(i, i + 8).join("\n");
+      if (m && warnDeprecatesMethod(blob, m)) names.add(m);
+    }
+  }
+  return names;
+}
+
+function walkRubyFiles(dir: string, out: string[]): void {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkRubyFiles(full, out);
+    else if (entry.isFile() && entry.name.endsWith(".rb")) out.push(full);
+  }
+}
+
+function emitDeprecatedManifest(): void {
+  const DEPRECATED_OUT = path.join(ROOT, "eslint/rails-deprecated-methods.json");
+  const libPaths = libPathsManifest();
+  const files: Record<string, string[]> = {};
+  for (const [pkg, pkgDir] of Object.entries(PACKAGE_DIRS)) {
+    const libDir = libPaths[pkg];
+    if (!libDir || !fs.existsSync(libDir)) continue;
+    const rubyFiles: string[] = [];
+    walkRubyFiles(libDir, rubyFiles);
+    for (const rubyAbs of rubyFiles) {
+      const rubyNames = deprecatedMethodsInRuby(fs.readFileSync(rubyAbs, "utf8"));
+      if (rubyNames.size === 0) continue;
+      const rubyRel = path.relative(libDir, rubyAbs).split(path.sep).join("/");
+      const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyRel).split(path.sep).join("/"));
+      const tsNames = new Set<string>(files[tsRel] ?? []);
+      for (const ruby of rubyNames) for (const c of rubyMethodToTs(ruby) ?? []) tsNames.add(c);
+      if (tsNames.size > 0) files[tsRel] = [...tsNames].sort();
+    }
+  }
+
+  const sorted: Record<string, string[]> = {};
+  for (const k of Object.keys(files).sort()) sorted[k] = files[k];
+  fs.writeFileSync(DEPRECATED_OUT, JSON.stringify({ files: sorted }, null, 2) + "\n");
+  const fc = Object.keys(sorted).length;
+  const nc = Object.values(sorted).reduce((n, a) => n + a.length, 0);
+  console.log(`Wrote ${DEPRECATED_OUT} — ${fc} files (${nc} names)`);
+}
