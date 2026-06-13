@@ -628,6 +628,13 @@ export class Base extends Model {
   declare static _associations: AssociationDefinition[];
   /** @internal */
   declare static _registryKeys: string[];
+  /**
+   * One-shot guard for virtual-attribute reconciliation (model-schema.ts
+   * reconcileVirtualAttributes). Cleared on `attribute()` and
+   * `resetColumnInformation` so a re-declare/reset re-runs it.
+   * @internal
+   */
+  declare static _virtualAttributesReconciled?: boolean;
 
   /** Mirrors: ActiveRecord.writing_role */
   static writingRole = WRITING_ROLE;
@@ -880,6 +887,10 @@ export class Base extends Model {
       return;
     }
     super.attribute(name, typeName, options);
+    // A newly declared attribute may be virtual (no DB column); force the next
+    // ensureSchemaLoaded to re-run virtual reconciliation (model-schema.ts
+    // reconcileVirtualAttributes) instead of skipping it via the one-shot guard.
+    this._virtualAttributesReconciled = false;
     // Apply hookAttributeType decorators (TZ conversion, locking) to the
     // just-registered type so user-declared datetime attributes are wrapped.
     // Patch _attributeDefinitions immediately (read path) and also push a
@@ -1062,7 +1073,11 @@ export class Base extends Model {
     for (const [name, def] of this._attributeDefinitions) {
       const d = def as { virtual?: boolean; source?: string };
       if (!d.virtual && (d.source === "schema" || !enumNames?.has(name))) {
-        return Promise.resolve();
+        // The model declares its own attributes, but some may be virtual (no
+        // backing DB column). Rails' `column_names` is always DB-sourced, so
+        // reconcile against the real columns and flag those as virtual — keeping
+        // `columnNames()` correct without a full re-reflection. One-shot.
+        return (ModelSchema.reconcileVirtualAttributes as () => Promise<void>).call(this);
       }
     }
     return this.loadSchema();

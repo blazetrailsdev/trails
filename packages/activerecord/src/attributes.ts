@@ -98,6 +98,10 @@ export function defineAttribute(
   });
 
   amResetDefaultAttributes(this);
+  // A newly declared attribute may be virtual (no DB column); force the next
+  // ensureSchemaLoaded to re-run the virtual reconciliation (model-schema.ts
+  // reconcileVirtualAttributes) so it isn't skipped by the one-shot guard.
+  this._virtualAttributesReconciled = false;
   encryptionHooks.applyPendingEncryptions(this);
 
   // Install prototype accessor so the attribute is readable/writable by name,
