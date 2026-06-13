@@ -48,9 +48,7 @@ export class MessageSerializer implements MessageSerializerLike {
       d["h"] as Record<string, unknown> | null | undefined,
       level,
     );
-    // decodeIfNeeded returns a Buffer of raw bytes for a present payload; a
-    // missing/non-string `p` decodes to a non-bytes value, which becomes a null
-    // payload. Message accepts both string and Buffer payloads.
+    // A present payload decodes to a Buffer; anything else becomes a null payload.
     const message = new Message(
       typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
     );
@@ -151,12 +149,10 @@ export class MessageSerializer implements MessageSerializerLike {
         if (normalized !== reencoded) {
           throw new DecryptionError("Invalid base64 encoding");
         }
-        // Mirrors Rails: Base64.strict_decode64 returns the raw decoded bytes
-        // (an ASCII-8BIT String). We return a Buffer so cipher payload/iv/at keep
-        // lossless raw bytes AND text headers (e.g. UTF-8 public tags) stay
-        // recoverable — the consumer decodes them (`.toString("utf-8")`) exactly
-        // as Rails consumers re-interpret the binary string. Decoding everything
-        // to latin1 here would mojibake non-ASCII text.
+        // Mirrors Rails' Base64.strict_decode64 (returns an ASCII-8BIT String):
+        // return the raw decoded bytes as a Buffer, so cipher payload/iv/at keep
+        // lossless bytes AND text headers (e.g. UTF-8 public tags) stay recoverable
+        // via `.toString("utf-8")`. latin1 here would mojibake non-ASCII text.
         return buf;
       } catch (e) {
         if (e instanceof DecryptionError) throw e;

@@ -23,9 +23,8 @@ export function normalizeEncoding(encoding: string): "utf8" | "ascii" | "latin1"
 
 /**
  * Read a message header value as text. After `MessageSerializer.load`, decoded
- * header values are Buffers of raw bytes (mirroring Rails' ASCII-8BIT strings);
- * a freshly-built message may still hold the original string. Text headers (key
- * references, public tags) are UTF-8, so decode Buffers accordingly.
+ * values are raw-byte Buffers (Rails' ASCII-8BIT strings); a fresh message may
+ * still hold the original string. Text headers are UTF-8, so decode accordingly.
  *
  * @internal
  */
