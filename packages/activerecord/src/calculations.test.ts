@@ -7260,7 +7260,7 @@ describe("count with includes join dependency", () => {
 // ==========================================================================
 // pluck + includes join dependency tests (calculations_test.rb)
 // ==========================================================================
-describe("pluck with includes join dependency", () => {
+describe("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 

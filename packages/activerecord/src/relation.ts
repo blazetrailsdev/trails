@@ -3196,6 +3196,15 @@ export class Relation<T extends Base> {
     // includes_values` (finder_methods.rb:457); we model that with leftOuterJoins
     // over the cleared specs, matching applyJoinDependencyForArel. The cleared
     // recursion takes the plain (else) branch, so there is no infinite loop.
+    //
+    // Not modeled: Rails apply_join_dependency, for a limit/offset over a
+    // collection reflection, replaces the relation with
+    // distinct_relation_for_primary_key (finder_methods.rb:463) — it executes a
+    // query to materialize the limited DISTINCT primary keys, which a single
+    // recurse cannot reproduce. The common cases still match (LIMIT 0 and
+    // WHERE-contradiction both yield no rows here too); only the nonempty
+    // limit/offset case diverges, tracked by the skipped
+    // `pluck with includes offset` test.
     const firstColumnName =
       columns.length === 0
         ? null
