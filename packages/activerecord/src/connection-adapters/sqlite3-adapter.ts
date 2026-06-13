@@ -113,6 +113,20 @@ export class SQLiteDateTimeType extends ARDateTimeType {
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
  */
 
+// Unwrap an ActiveModel::Attribute bind (e.g. Relation::QueryAttribute) to its
+// database value before driver type-casting, then apply the SQLite type cast.
+// Mirrors Rails' `type_casted_binds`, which sends `value_for_database` to the
+// driver rather than the Attribute wrapper. Plain pre-cast values (the common
+// case) pass straight through.
+function _driverBind(value: unknown): unknown {
+  // `valueForDatabase` is a getter on Attribute/QueryAttribute, so reading it
+  // yields the unwrapped DB value directly.
+  if (value && typeof value === "object" && "valueForDatabase" in value) {
+    value = (value as { valueForDatabase: unknown }).valueForDatabase;
+  }
+  return sqliteTypeCast(value);
+}
+
 function _isSqliteMissingDbError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const e = error as { code?: unknown; message?: unknown };
@@ -287,7 +301,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // bind values through the visitor rather than inlining them, so the
     // `execute` path now receives non-empty bind arrays where it received
     // empty ones before.
-    const driverBinds = binds.map(sqliteTypeCast) as SqliteBinds;
+    const driverBinds = binds.map(_driverBind) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const stmt = await this._cachedStatement(sql);
@@ -393,7 +407,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
     };
-    const driverBinds = binds.map(sqliteTypeCast) as SqliteBinds;
+    const driverBinds = binds.map(_driverBind) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const stmt = await this._cachedStatement(sql);
@@ -525,7 +539,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<Result> {
     const processed = this.preprocessQuery(sql);
     await this.materializeTransactions();
-    const driverBinds = (binds ?? []).map(sqliteTypeCast) as SqliteBinds;
+    const driverBinds = (binds ?? []).map(_driverBind) as SqliteBinds;
     // Rails' SQLite `perform_query` pools the statement only when `prepare` is
     // true (`@statements[sql] ||= ...`) and otherwise prepares a fresh one. The
     // `exec_query` keyword defaults to `false` (database_statements.rb), so we
@@ -662,7 +676,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     _options: ExplainOption[] = [],
   ): Promise<string> {
     const explainStmt = await this.driver.prepare(`EXPLAIN QUERY PLAN ${sql}`);
-    const driverBinds = binds.map(sqliteTypeCast) as SqliteBinds;
+    const driverBinds = binds.map(_driverBind) as SqliteBinds;
     const rows = (await explainStmt.all(driverBinds)) as Record<string, unknown>[];
     return rows.map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`).join("\n");
   }

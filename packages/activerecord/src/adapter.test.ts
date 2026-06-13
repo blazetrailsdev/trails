@@ -22,6 +22,29 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Author } from "./test-helpers/models/author.js";
+import { Event } from "./test-helpers/models/event.js";
+import { QueryAttribute } from "./relation/query-attribute.js";
+
+// Rails renders the placeholder via `Arel::Nodes::BindParam.new(nil).to_sql`,
+// which collects a "?" marker; our default Node#toSql inlines the value, so the
+// placeholder is written literally here. Drives the same insert/update/select/
+// delete bind round-trip as Rails' AdapterTest casted/non-casted bind probes.
+async function roundTripBinds(conn: AbstractSQLite3Adapter, binds: unknown[]): Promise<void> {
+  const id = await conn.insert("INSERT INTO events(id) VALUES (?)", null, null, null, null, binds);
+  expect(id).toBe(1);
+
+  const updated = await conn.update("UPDATE events SET title = 'foo' WHERE id = ?", null, binds);
+  expect(updated).toBe(1);
+
+  const found = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
+  expect(found.first()).toEqual({ id: 1, title: "foo" });
+
+  const deleted = await conn.delete("DELETE FROM events WHERE id = ?", null, binds);
+  expect(deleted).toBe(1);
+
+  const empty = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
+  expect(empty.first()).toBeUndefined();
+}
 
 // Spin up a fresh in-memory adapter with the given DDL applied, run the body,
 // then close. Mirrors AdapterTest's per-test `@connection` against the schema
@@ -409,15 +432,23 @@ describe("AdapterTest", () => {
       },
     );
   });
-  it.skip("select all insert update delete with casted binds", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs Event model + Arel::Nodes::BindParam round-trip through insert/update/delete/selectAll
-    // SCOPE: ~30 LOC port; affects ~2 tests
+  it("select all insert update delete with casted binds", async () => {
+    await withSchema(
+      ["CREATE TABLE events (id integer PRIMARY KEY, title varchar(5))"],
+      async (conn) => {
+        const binds = [Event.typeForAttribute("id").serialize(1)];
+        await roundTripBinds(conn, binds);
+      },
+    );
   });
-  it.skip("select all insert update delete with binds", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs Event model + Relation::QueryAttribute bind through insert/update/delete/selectAll
-    // SCOPE: ~30 LOC port; affects ~2 tests
+  it("select all insert update delete with binds", async () => {
+    await withSchema(
+      ["CREATE TABLE events (id integer PRIMARY KEY, title varchar(5))"],
+      async (conn) => {
+        const binds = [new QueryAttribute("id", 1, Event.typeForAttribute("id"))];
+        await roundTripBinds(conn, binds);
+      },
+    );
   });
   it("type_to_sql returns a String for unmapped types", () => {
     expect(new SchemaCreation("sqlite").typeToSql("special_db_type" as any)).toBe(
@@ -564,13 +595,16 @@ describe("AdapterConnectionTest", () => {
       expect(rawTransactionOpen(conn)).toBe(false);
     });
   });
-  it.skip("materialized transaction state can be restored after a reconnect", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: reconnectBang restoreTransactions lifecycle is now in place
-    // (see "AbstractAdapter reconnect/verify lifecycle" tests); this Rails test
-    // additionally needs a non-in-memory adapter with raw-connection reopen on
-    // reconnect! (Rails gates the whole suite `unless in_memory_db?`).
-    // SCOPE: adapter raw-reconnect wiring; affects ~2 tests
+  it("materialized transaction state can be restored after a reconnect", async () => {
+    await withConnection(async (conn) => {
+      await conn.transactionManager.beginTransaction();
+      expect(conn.isTransactionOpen()).toBe(true);
+      await conn.materializeTransactions();
+      expect(rawTransactionOpen(conn)).toBe(true);
+      await conn.reconnectBang({ restoreTransactions: true });
+      expect(conn.isTransactionOpen()).toBe(true);
+      expect(rawTransactionOpen(conn)).toBe(true);
+    });
   });
   it("materialized transaction state is reset after a disconnect", async () => {
     await withConnection(async (conn) => {
@@ -594,13 +628,17 @@ describe("AdapterConnectionTest", () => {
       expect(rawTransactionOpen(conn)).toBe(false);
     });
   });
-  it.skip("unmaterialized transaction state can be restored after a reconnect", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: reconnectBang restoreTransactions lifecycle is now in place
-    // (see "AbstractAdapter reconnect/verify lifecycle" tests); this Rails test
-    // additionally needs a non-in-memory adapter with raw-connection reopen on
-    // reconnect! (Rails gates the whole suite `unless in_memory_db?`).
-    // SCOPE: adapter raw-reconnect wiring; affects ~2 tests
+  it("unmaterialized transaction state can be restored after a reconnect", async () => {
+    await withConnection(async (conn) => {
+      await conn.transactionManager.beginTransaction();
+      expect(conn.isTransactionOpen()).toBe(true);
+      expect(rawTransactionOpen(conn)).toBe(false);
+      await conn.reconnectBang({ restoreTransactions: true });
+      expect(conn.isTransactionOpen()).toBe(true);
+      expect(rawTransactionOpen(conn)).toBe(false);
+      await conn.materializeTransactions();
+      expect(rawTransactionOpen(conn)).toBe(true);
+    });
   });
   it("unmaterialized transaction state is reset after a disconnect", async () => {
     await withConnection(async (conn) => {
@@ -819,21 +857,6 @@ describe("AdapterConnectionTest", () => {
       allowRetry: true,
     };
     expect(opts.allowRetry).toBe(true);
-  });
-  it.skip("transaction restores after remote disconnection", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract/transaction.ts: outer transaction must reconnect when raw connection died pre-open
-    // SCOPE: ~20 LOC; affects ~3 tests
-  });
-  it.skip("active transaction is restored after remote disconnection", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract/transaction.ts: materializeTransactions + remote disconnect + verify! within outer transaction
-    // SCOPE: ~25 LOC; affects ~3 tests
-  });
-  it.skip("dirty transaction cannot be restored after remote disconnection", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract/transaction.ts: dirty (post-write) transaction must raise ConnectionFailed and not retry block
-    // SCOPE: ~20 LOC; affects ~3 tests
   });
   it("can reconnect and retry queries under limit when retry deadline is set", async () => {
     let attempts = 0;

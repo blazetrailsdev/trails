@@ -191,6 +191,22 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "adapter_test.rb",
+    className: "AdapterConnectionTest",
+    tests: [
+      "transaction restores after remote disconnection",
+      "active transaction is restored after remote disconnection",
+      "dirty transaction cannot be restored after remote disconnection",
+    ],
+    reason:
+      "These tests call the `remote_disconnect` helper, which only supports " +
+      'PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip("remote_disconnect ' +
+      'unsupported")`, so Rails never runs them on SQLite. A genuine remote ' +
+      "disconnect cannot be simulated against in-memory SQLite (closing the handle " +
+      "discards the database), which is also why the surrounding suite is gated " +
+      "`unless in_memory_db?`. Trails always uses :memory: SQLite.",
+  },
+  {
+    testFile: "adapter_test.rb",
     className: "AdapterThreadSafetyTest",
     tests: ["#active? is synchronized", "#verify! is synchronized"],
     reason:
