@@ -1335,14 +1335,29 @@ export function setDepsError(
 function setDeps(id: string, kind: "deps" | "deps-rfc", csv: string): void {
   inGitTasks();
   const index = loadIndex();
-  storyFilePath(index, id); // exits if `id` is unknown
+  const entry = index.stories.find((s) => s.id === id);
+  if (!entry) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: story "${id}" not found in index`);
+    process.exit(1);
+  }
   const items = parseCsv(csv);
+
+  // Short-circuit a no-op. Re-running with the unchanged array would leave
+  // nothing to commit and `git commit` would error "nothing to commit"; compare
+  // against the indexed value and report cleanly instead (mirrors setPriority).
+  const current = kind === "deps" ? entry.deps : entry.deps_rfc;
+  if (current.length === items.length && current.every((d, i) => d === items[i])) {
+    // loadIndex() may have rebuilt — and dirtied — the generated index files in
+    // the canonical checkout; this early return skips commitAndPush's restore,
+    // so clean up here to avoid leaving the tasks checkout dirty.
+    restoreGeneratedFiles(TASKS_DIR);
+    console.log(`${id} ${kind} already [${items.join(", ")}]`);
+    return;
+  }
 
   const error = setDepsError(index, id, kind, items);
   if (error !== null) {
-    // loadIndex() may have rebuilt — and dirtied — the generated index files in
-    // the canonical checkout; restore them so a rejected edit leaves the tree
-    // clean (mirrors setPriority/setStatus's early-return cleanup).
     restoreGeneratedFiles(TASKS_DIR);
     console.error(`error: ${error}`);
     process.exit(1);
