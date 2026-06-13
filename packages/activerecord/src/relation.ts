@@ -3905,19 +3905,53 @@ export class Relation<T extends Base> {
     return _qm.buildProjections.call(this as any) as any[];
   }
 
+  /**
+   * Return the complete query AST as a SelectManager — projections, joins,
+   * wheres, order, distinct, limit/offset, group, having, lock, hints, from,
+   * CTEs, and annotate() comments. Mirrors Rails `build_arel`
+   * (active_record/relation/query_methods.rb#build_arel, ~L1700-1760): the
+   * single manager Rails then compiles, so anything consuming `relation.arel()`
+   * as a subquery (`where(id: subrel.arel)`, `from(relation)`) carries the full
+   * query rather than a projection-only fragment. This is also the manager
+   * `_toSql` compiles, so the legacy string-assembly path and the Arel-manager
+   * path can no longer drift.
+   */
   toArel(): SelectManager {
-    const table = this._modelClass.arelTable;
-    const projections = this._buildProjections(table);
-    const manager = table.project(...(projections as any));
-    this._applyWheresToManager(manager, table);
-    this._applyOrderToManager(manager, table);
-    if (this._isDistinct) manager.distinct();
-    if (this._limitValue !== null) manager.take(this._limitValue);
-    if (this._offsetValue !== null) manager.skip(this._offsetValue);
-    for (const col of this._groupColumns) {
-      manager.group(groupColumnToArel(col, table));
-    }
+    return this._buildArel();
+  }
+
+  /**
+   * Shared full-manager builder for `toArel`/`arel()` and `_toSql`. Starts from
+   * the eager-load JoinDependency manager when eager loading applies (mirrors
+   * Rails `build_joins` → `apply_join_dependency`), else the base select
+   * manager, then folds CTEs (`WITH`) and annotate() comments into the AST so
+   * their binds thread through the single collector in document order.
+   */
+  private _buildArel(): SelectManager {
+    const manager = this._buildEagerOperandManager() ?? this._buildSelectManager();
+    this._applyCtesAndAnnotationsToManager(manager);
     return manager;
+  }
+
+  /**
+   * Fold this relation's CTEs (`WITH`/`WITH RECURSIVE`) and annotate() comments
+   * into a SelectManager's AST. Shared by `_buildArel` and the set-operation
+   * operand builder so both encode the same prefix. Mirrors Rails `build_arel`
+   * attaching `@values[:with]` and the de-duplicated annotates onto the manager.
+   */
+  private _applyCtesAndAnnotationsToManager(manager: SelectManager): void {
+    if (this._ctes.length > 0) {
+      const cteNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression));
+      if (this._ctes.some((c) => c.recursive)) manager.withRecursive(...cteNodes);
+      else manager.with(...cteNodes);
+    }
+    if (this._annotations.length > 0) {
+      // Rails dedupes annotations before attaching them to the Arel manager
+      // (query_methods.rb#build_arel: `annotates.uniq if annotates.size > 1`).
+      const annotates =
+        this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
+      manager.comment(...annotates);
+    }
   }
 
   /**
@@ -4015,18 +4049,7 @@ export class Relation<T extends Base> {
    */
   private _buildSetOperationOperandManager(): SelectManager {
     const manager = this._buildSelectManager();
-    if (this._ctes.length > 0) {
-      const cteNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression));
-      if (this._ctes.some((c) => c.recursive)) manager.withRecursive(...cteNodes);
-      else manager.with(...cteNodes);
-    }
-    if (this._annotations.length > 0) {
-      // Rails dedupes annotations before attaching them to the Arel manager
-      // (query_methods.rb#build_arel: `annotates.uniq if annotates.size > 1`).
-      const annotates =
-        this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
-      manager.comment(...annotates);
-    }
+    this._applyCtesAndAnnotationsToManager(manager);
     return manager;
   }
 
@@ -4218,39 +4241,13 @@ export class Relation<T extends Base> {
       // fall through to plain SQL so toSql() always returns something useful.
     }
 
-    const manager = this._buildSelectManager();
-
-    let sql = this._compileSelectSql(manager);
-
-    // Append SQL comments from annotate()
-    if (this._annotations.length > 0) {
-      const comments = this._annotationComments();
-      sql = `${sql} ${comments}`;
-    }
-
-    // Prepend CTE clauses. The bodies are arel expression nodes
-    // (build_with_expression_from_value) compiled through the dialect visitor —
-    // UNION ALL operand parens are stripped on SQLite, kept on PG/MySQL. Relation
-    // bodies thread their bind values through the visitor; since the `WITH`
-    // clause renders before the main SELECT, those binds precede the main
-    // query's, and any `$N` placeholders in the already-compiled main SQL are
-    // shifted up by the CTE bind count (PG numbers globally).
-    if (this._ctes.length > 0) {
-      const { sql: cteSql, binds: cteBinds } = _qm.buildCteSql(
-        this._ctes,
-        (n) => this._compileArelNodeWithBinds(n),
-        (name) => this._modelClass.connection.quoteTableName(name),
-      );
-      if (cteBinds.length > 0) {
-        const shifted = sql.replace(/\$(\d+)/g, (_m, n) => `$${parseInt(n, 10) + cteBinds.length}`);
-        sql = `${cteSql} ${shifted}`;
-        this._lastSelectBinds = [...cteBinds, ...this._lastSelectBinds];
-      } else {
-        sql = `${cteSql} ${sql}`;
-      }
-    }
-
-    return sql;
+    // Compile the converged `build_arel` manager directly. CTEs (`WITH`) and
+    // annotate() comments are folded into the manager AST by `_buildArel`, so a
+    // single collector numbers every bind in document order (CTE binds precede
+    // the main query's; PG `$N` placeholders fall out correctly by
+    // construction) — replacing the former post-compile string splice and its
+    // manual `$N` renumbering.
+    return this._compileSelectSql(this._buildArel());
   }
 
   private _combineNodes(nodes: Nodes.Node[]): Nodes.Node | null {

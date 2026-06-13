@@ -1597,3 +1597,67 @@ describe("RelationTest", () => {
     }
   });
 });
+
+// Mirrors: ActiveRecord::Relation#arel returning the full build_arel manager
+// (active_record/relation/query_methods.rb#build_arel). Asserts that the AST
+// from `relation.arel()` carries joins/HAVING/GROUP/FROM/LOCK/CTEs and compiles
+// to exactly the same SQL as `relation.toSql()` — i.e. the legacy string-assembly
+// path and the Arel-manager path can no longer drift.
+describe("Relation#arel build_arel convergence", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      widgets: { name: "string", category: "string", price: "integer" },
+    });
+  });
+
+  class Widget extends Base {
+    static _tableName = "widgets";
+    static {
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.attribute("category", "string");
+      this.attribute("price", "integer");
+    }
+  }
+
+  // `connection.toSql(rel.arel())` and `rel.toSql()` both compile through the
+  // adapter visitor with binds inlined, so they yield identical SQL when arel
+  // encodes the whole query (joins/HAVING/FROM/LOCK/CTEs).
+  const arelSql = (rel: any) => Widget.connection.toSql(rel.arel().ast);
+  const placeholderSql = (rel: any) => rel.toSql();
+
+  it("arel carries joins, group, and having", () => {
+    const rel = Widget.joins(
+      `INNER JOIN "widgets" AS "w2" ON "w2"."category" = "widgets"."category"`,
+    )
+      .group("category")
+      .having("COUNT(*) > 1");
+    const sql = arelSql(rel);
+    expect(sql).toContain('INNER JOIN "widgets" AS "w2"');
+    expect(sql).toContain("GROUP BY");
+    expect(sql).toContain("HAVING");
+    expect(sql).toBe(placeholderSql(rel));
+  });
+
+  it("arel carries a from-subquery", () => {
+    const rel = Widget.from(Widget.where({ category: "fruit" }), "widgets");
+    const sql = arelSql(rel);
+    expect(sql).toContain("FROM (SELECT");
+    expect(sql).toBe(placeholderSql(rel));
+  });
+
+  it("arel carries a CTE", () => {
+    const rel = Widget.with({ cheap: Widget.where({ category: "fruit" }) }).where("1 = 1");
+    const sql = arelSql(rel);
+    expect(sql).toContain("WITH");
+    expect(sql).toContain('"cheap"');
+    expect(sql).toBe(placeholderSql(rel));
+  });
+
+  it("arel carries lock", () => {
+    const rel = Widget.all().lock("FOR UPDATE");
+    expect(arelSql(rel)).toBe(placeholderSql(rel));
+  });
+});

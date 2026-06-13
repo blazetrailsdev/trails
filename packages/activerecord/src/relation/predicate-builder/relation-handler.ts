@@ -30,7 +30,11 @@ export class RelationHandler {
       if (Array.isArray(pk)) {
         throw new Error(`Cannot map composite primary key ${pk.join(", ")} to ${attribute.name}`);
       }
-      relation = relation.select(pk);
+      // Select the table-qualified primary key, mirroring Rails
+      // `value.select(value.arel_table[value.primary_key])`. Now that the
+      // subquery's arel carries joins (build_arel convergence), a bare `id`
+      // projection is ambiguous when the relation joins another table.
+      relation = relation.select(model.arelTable.get(pk));
     } else if (relation.selectValues.length === 1) {
       const selectValue = relation.selectValues[0];
       if (typeof selectValue === "string") {
