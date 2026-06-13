@@ -171,8 +171,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * @internal Canonical read accessor for RFC 0006 (collection-store
    * unification). The loaded target array IS the single source of truth for
-   * has_many membership; the legacy `_cachedAssociations` map is a deprecated
-   * shim (see `Base#_cachedAssociationTarget`) that delegates here. Returns the
+   * has_many membership; `Base#_associationCache` surfaces this proxy so its
+   * `.target` is read through the same store. Returns the
    * in-memory target without triggering a DB load — JS has no blocking IO, so
    * a fresh load means awaiting the proxy / `loadTarget()` first.
    */
@@ -1007,9 +1007,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `associations.ts`, is now internal here. `set_inverse_instance(record)` is
    * deliberately NOT re-invoked: the reciprocal (record → owner) side is
    * established by the caller in `associations.ts`, and re-wiring here would
-   * recurse. The `_cachedAssociations` slot is kept pointed at `_target` as a
-   * transitional mirror for the still-live direct-cache readers (and the S1
-   * `_cachedAssociationTarget` fallback) until S4 deletes the map.
+   * recurse. The seeded record lands in `_target`, which `Base#_associationCache`
+   * surfaces to readers (this proxy is the canonical has_many store).
    * @internal
    */
   _wireInverseTarget(record: T): void {
@@ -1032,7 +1031,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this._target.push(record);
       this._invalidateAssociationIds();
     }
-    (this._record._cachedAssociations ??= new Map()).set(this._assocName, this._target);
   }
 
   // NOTE: If _pushThrough fails after the target is saved, the target record

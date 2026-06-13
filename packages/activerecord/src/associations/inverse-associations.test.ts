@@ -15,6 +15,7 @@ import {
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
 
 // -- Helpers --
 describe("InverseBelongsToTests", () => {
@@ -57,7 +58,7 @@ describe("InverseBelongsToTests", () => {
     const f = await Face.create({ description: "pretty", man_id: m.id });
     const parent = await loadBelongsTo(f, "man", { inverseOf: "face" });
     expect(parent).not.toBeNull();
-    expect((parent as any)._cachedAssociations?.get("face")).toBe(f);
+    expect((parent as any)._associationCache("face")?.target).toBe(f);
   });
 
   it("eager loaded child instance should be shared with parent on find", async () => {
@@ -68,7 +69,7 @@ describe("InverseBelongsToTests", () => {
     expect(faces.length).toBe(1);
     const parent = (faces[0] as any)._preloadedAssociations?.get("man");
     expect(parent).not.toBeNull();
-    expect((parent as any)._cachedAssociations?.get("face")).toBe(faces[0]);
+    expect((parent as any)._associationCache("face")?.target).toBe(faces[0]);
   });
 
   it("child instance should be shared with newly built parent", () => {
@@ -76,9 +77,8 @@ describe("InverseBelongsToTests", () => {
     const f = new Face({ description: "pretty" });
     const m = new Man({ name: "Gordon" });
     // Manually set inverse
-    (f as any)._cachedAssociations = new Map();
-    (f as any)._cachedAssociations.set("man", m);
-    expect((f as any)._cachedAssociations.get("man")).toBe(m);
+    seedAssociationCache(f as any, "man", m);
+    expect((f as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("child instance should be shared with newly created parent", async () => {
@@ -87,7 +87,7 @@ describe("InverseBelongsToTests", () => {
     const f = await Face.create({ description: "pretty", man_id: m.id });
     const parent = await loadBelongsTo(f, "man", { inverseOf: "face" });
     expect(parent).not.toBeNull();
-    expect((parent as any)._cachedAssociations?.get("face")).toBe(f);
+    expect((parent as any)._associationCache("face")?.target).toBe(f);
   });
 
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
@@ -111,7 +111,7 @@ describe("InverseBelongsToTests", () => {
     const b = await Book.create({ title: "Wonderland", author_id: a.id });
     const parent = await loadBelongsTo(b, "author", { inverseOf: "books" });
     expect(parent).not.toBeNull();
-    const cached = (parent as any)._cachedAssociations?.get("books") as Base[];
+    const cached = (parent as any)._associationCache("books")?.target as Base[];
     expect(cached).toEqual([b]);
   });
 
@@ -272,7 +272,7 @@ describe("InverseBelongsToTests", () => {
       inverseOf: "children",
     });
     expect(foundParent).not.toBeNull();
-    const cached = (foundParent as any)._cachedAssociations?.get("children") as Base[];
+    const cached = (foundParent as any)._associationCache("children")?.target as Base[];
     expect(cached).toEqual([child]);
   });
 
@@ -312,7 +312,7 @@ describe("InverseBelongsToTests", () => {
     // Without inversable? guard, the AssociationRelation would alias
     // `createdHuman` onto the found interest. Verify the cache wasn't
     // poisoned by the wrong owner.
-    expect((found as any)._cachedAssociations?.get("human")).not.toBe(createdHuman);
+    expect((found as any)._associationCache("human")?.target).not.toBe(createdHuman);
   });
   it("or does not set inverse when incorrect", async () => {
     class Human extends Base {
@@ -337,7 +337,7 @@ describe("InverseBelongsToTests", () => {
     const list = (await (createdHuman as any).interests.unscope("where").toArray()) as Base[];
     const found = list.find((i) => (i as any).id === (interest as any).id);
     expect(found).toBeDefined();
-    expect((found as any)._cachedAssociations?.get("human")).not.toBe(createdHuman);
+    expect((found as any)._associationCache("human")?.target).not.toBe(createdHuman);
   });
   it("child instance should be shared with replaced via accessor parent", async () => {
     const { Man, Face } = makeModels();
@@ -345,8 +345,8 @@ describe("InverseBelongsToTests", () => {
     const f = await Face.create({ description: "pretty", man_id: m1.id });
     const m2 = await Man.create({ name: "New Guy" });
     setBelongsTo(f, "man", m2, { inverseOf: "face" });
-    expect((f as any)._cachedAssociations.get("man")).toBe(m2);
-    expect((m2 as any)._cachedAssociations?.get("face")).toBe(f);
+    expect((f as any)._associationCache("man")?.target).toBe(m2);
+    expect((m2 as any)._associationCache("face")?.target).toBe(f);
   });
   it("trying to use inverses that dont exist should raise an error", async () => {
     class Human extends Base {
@@ -484,7 +484,7 @@ describe("InverseHasManyTests", () => {
     await Interest.create({ topic: "coins", man_id: m.id });
     const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
     for (const i of interests) {
-      const cachedMan = (i as any)._cachedAssociations?.get("man");
+      const cachedMan = (i as any)._associationCache("man")?.target;
       expect(cachedMan).toBe(m);
     }
   });
@@ -498,7 +498,7 @@ describe("InverseHasManyTests", () => {
     const m = await loadBelongsTo(i, "man", { inverseOf: "interests" });
     // Re-load: cached-hit path also runs _wireInverseAssociation; must dedup.
     await loadBelongsTo(i, "man", { inverseOf: "interests" });
-    const cached = (m as any)._cachedAssociations?.get("interests") as Base[];
+    const cached = (m as any)._associationCache("interests")?.target as Base[];
     expect(cached).toEqual([i]);
   });
 
@@ -518,7 +518,7 @@ describe("InverseHasManyTests", () => {
     const preloaded = (men[0] as any)._preloadedAssociations?.get("interests") ?? [];
     expect(preloaded.length).toBe(2);
     for (const i of preloaded) {
-      const cachedMan = (i as any)._cachedAssociations?.get("man");
+      const cachedMan = (i as any)._associationCache("man")?.target;
       expect(cachedMan).toBe(men[0]);
     }
   });
@@ -547,7 +547,7 @@ describe("InverseHasManyTests", () => {
     const men = await Man.all().includes("interests").toArray();
     const preloaded = (men[0] as any)._preloadedAssociations?.get("interests") ?? [];
     expect(preloaded.length).toBe(1);
-    expect((preloaded[0] as any)._cachedAssociations?.get("man")).toBe(men[0]);
+    expect((preloaded[0] as any)._associationCache("man")?.target).toBe(men[0]);
   });
 
   it("parent instance should be shared with newly block style built child", async () => {
@@ -580,9 +580,9 @@ describe("InverseHasManyTests", () => {
     const m = await Man.create({ name: "Gordon" });
     const proxy = association(m, "interests");
     const interest = await proxy.create({ topic: "music" }, (i) => {
-      expect((i as any)._cachedAssociations?.get("man")).toBe(m);
+      expect((i as any)._associationCache("man")?.target).toBe(m);
     });
-    expect((interest as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((interest as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("parent instance should be shared within build block of new child", () => {
@@ -590,9 +590,9 @@ describe("InverseHasManyTests", () => {
     const m = new Man({ name: "Gordon" });
     const proxy = association(m, "interests");
     const interest = proxy.build({ topic: "music" }, (i) => {
-      expect((i as any)._cachedAssociations?.get("man")).toBe(m);
+      expect((i as any)._associationCache("man")?.target).toBe(m);
     });
-    expect((interest as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((interest as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("parent instance should be shared with poked in child", async () => {
@@ -614,8 +614,8 @@ describe("InverseHasManyTests", () => {
       foreignKey: "man_id",
       className: "Interest",
     });
-    expect((i1 as any)._cachedAssociations?.get("man")).toBe(m);
-    expect((i2 as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((i1 as any)._associationCache("man")?.target).toBe(m);
+    expect((i2 as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("parent instance should be shared with first and last child", async () => {
@@ -626,8 +626,8 @@ describe("InverseHasManyTests", () => {
     const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
     const first = interests[0];
     const last = interests[interests.length - 1];
-    expect((first as any)._cachedAssociations?.get("man")).toBe(m);
-    expect((last as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((first as any)._associationCache("man")?.target).toBe(m);
+    expect((last as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("parent instance should be shared with first n and last n children", async () => {
@@ -639,7 +639,7 @@ describe("InverseHasManyTests", () => {
     const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
     expect(interests.length).toBe(3);
     for (const i of interests) {
-      expect((i as any)._cachedAssociations?.get("man")).toBe(m);
+      expect((i as any)._associationCache("man")?.target).toBe(m);
     }
   });
 
@@ -676,7 +676,7 @@ describe("InverseHasManyTests", () => {
     await Interest.create({ topic: "stamps", man_id: m.id });
     const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
     expect(interests.length).toBe(1);
-    expect((interests[0] as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((interests[0] as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("find on child instances with ids should set inverse instances", async () => {
@@ -687,7 +687,7 @@ describe("InverseHasManyTests", () => {
     const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
     expect(interests.length).toBe(2);
     for (const i of interests) {
-      expect((i as any)._cachedAssociations?.get("man")).toBe(m);
+      expect((i as any)._associationCache("man")?.target).toBe(m);
     }
   });
 
@@ -724,7 +724,7 @@ describe("InverseHasManyTests", () => {
       inverseOf: "cpkMan",
     });
     expect(interests.length).toBe(1);
-    expect((interests[0] as any)._cachedAssociations?.get("cpkMan")).toBe(m);
+    expect((interests[0] as any)._associationCache("cpkMan")?.target).toBe(m);
   });
 
   it("raise record not found error when invalid ids are passed", async () => {
@@ -816,12 +816,12 @@ describe("InverseHasManyTests", () => {
       inverseOf: "parent",
     });
     expect(children.length).toBe(1);
-    expect((children[0] as any)._cachedAssociations?.get("parent")).toBe(parent);
+    expect((children[0] as any)._associationCache("parent")?.target).toBe(parent);
   });
 
   it.skip("changing the association id makes the inversed association target stale", () => {
     // BLOCKED: the staleState/isStale mechanism exists (association.ts:72), but
-    // the functional loadBelongsTo helper returns the _cachedAssociations value
+    // the functional loadBelongsTo helper returns the cached holder target
     // without consulting it, so a post-cache FK change isn't detected. Needs
     // loadBelongsTo to honor staleness (small, but live-helper change).
   });
@@ -865,8 +865,8 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
     await Hobby.create({ name: "fishing", man_id: m.id });
     const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
     const hobbies = await loadHasMany(m, "hobbies", { inverseOf: "man" });
-    expect((interests[0] as any)._cachedAssociations?.get("man")).toBe(m);
-    expect((hobbies[0] as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((interests[0] as any)._associationCache("man")?.target).toBe(m);
+    expect((hobbies[0] as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("that we can create associations that have the same reciprocal name from different models", async () => {
@@ -1186,7 +1186,7 @@ describe("AutomaticInverseFindingTests", () => {
     await Face.create({ description: "handsome", man_id: m.id });
     const face = await loadHasOne(m, "face", {});
     expect(face).not.toBeNull();
-    expect((face as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((face as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("has many and belongs to automatic inverse shares objects on rating", async () => {
@@ -1209,7 +1209,7 @@ describe("AutomaticInverseFindingTests", () => {
     await Rating.create({ score: 5, comment_id: c.id });
     const ratings = await loadHasMany(c, "ratings", {});
     expect(ratings.length).toBe(1);
-    expect((ratings[0] as any)._cachedAssociations?.get("comment")).toBe(c);
+    expect((ratings[0] as any)._associationCache("comment")?.target).toBe(c);
   });
 
   it("has many and belongs to automatic inverse shares objects on comment", async () => {
@@ -1232,7 +1232,7 @@ describe("AutomaticInverseFindingTests", () => {
     await Comment.create({ body: "nice", post_id: p.id });
     const comments = await loadHasMany(p, "comments", {});
     expect(comments.length).toBe(1);
-    expect((comments[0] as any)._cachedAssociations?.get("post")).toBe(p);
+    expect((comments[0] as any)._associationCache("post")?.target).toBe(p);
   });
 
   it("belongs to should find inverse has many automatically", async () => {
@@ -1256,7 +1256,7 @@ describe("AutomaticInverseFindingTests", () => {
     const i = await Interest.create({ topic: "stamps", man_id: m.id });
     const parent = await loadBelongsTo(i, "man", { inverseOf: "interests" });
     expect(parent).not.toBeNull();
-    const cached = (parent as any)._cachedAssociations?.get("interests") as Base[];
+    const cached = (parent as any)._associationCache("interests")?.target as Base[];
     expect(cached).toEqual([i]);
   });
 
@@ -1430,7 +1430,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     });
     expect(parent).not.toBeNull();
     // Inverse is set on the found parent
-    expect((parent as any)._cachedAssociations?.get("tags")).toBeTruthy();
+    expect((parent as any)._associationCache("tags")?.target).toBeTruthy();
   });
 
   it("eager loaded child instance should be shared with parent on find", async () => {
@@ -1457,7 +1457,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     });
     expect(parent).not.toBeNull();
     expect(parent).toBe(preloadedParent);
-    const cached = (parent as any)._cachedAssociations?.get("tags") as Base[];
+    const cached = (parent as any)._associationCache("tags")?.target as Base[];
     expect(cached).toEqual([tags[0]]);
   });
   it("child instance should be shared with replaced via accessor parent", async () => {
@@ -1471,8 +1471,8 @@ describe("InversePolymorphicBelongsToTests", () => {
       inverseOf: "tags",
       foreignKey: "taggable_id",
     });
-    expect((t as any)._cachedAssociations.get("taggable")).toBe(m2);
-    const cached = (m2 as any)._cachedAssociations?.get("tags") as Base[];
+    expect((t as any)._associationCache("taggable")?.target).toBe(m2);
+    const cached = (m2 as any)._associationCache("tags")?.target as Base[];
     expect(cached).toEqual([t]);
   });
   it("inversed instance should not be reloaded after stale state changed", async () => {
@@ -1552,7 +1552,7 @@ describe("InversePolymorphicBelongsToTests", () => {
       polymorphic: true,
     });
     expect(parent).not.toBeNull();
-    expect((parent as any)._cachedAssociations).toBeUndefined();
+    expect((parent as any)._associationCache("tags")).toBeUndefined();
   });
 
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
@@ -1562,7 +1562,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     const tag = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
     const parent = await loadBelongsTo(tag, "taggable", { polymorphic: true, inverseOf: "tags" });
     expect(parent).not.toBeNull();
-    const cached = (parent as any)._cachedAssociations?.get("tags") as Base[];
+    const cached = (parent as any)._associationCache("tags")?.target as Base[];
     expect(cached).toEqual([tag]);
   });
   it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
@@ -1676,7 +1676,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 describe("InverseCachedPathTests", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  // Tests for the _cachedAssociations / _preloadedAssociations fast-paths in loadBelongsTo.
+  // Tests for the association-cache / _preloadedAssociations fast-paths in loadBelongsTo.
   beforeAll(async () => {
     await defineSchema({
       cached_men: { name: "string" },
@@ -1705,9 +1705,8 @@ describe("InverseCachedPathTests", () => {
     const m = await CachedMan.create({ name: "Alice" });
     const f = await CachedFace.create({ cached_man_id: m.id });
 
-    // Pre-populate _cachedAssociations so the fast-path is taken
-    (f as any)._cachedAssociations = new Map();
-    (f as any)._cachedAssociations.set("cachedMan", m);
+    // Pre-populate the association cache so the fast-path is taken
+    seedAssociationCache(f as any, "cachedMan", m);
 
     const parent = await loadBelongsTo(f, "cachedMan", {
       className: "CachedMan",
@@ -1716,7 +1715,7 @@ describe("InverseCachedPathTests", () => {
     // Returns the cached instance
     expect(parent).toBe(m);
     // Inverse was wired on the parent's cache
-    expect((parent as any)._cachedAssociations?.get("cachedFace")).toBe(f);
+    expect((parent as any)._associationCache("cachedFace")?.target).toBe(f);
   });
 
   it("throws on invalid inverseOf even when the cached value is null", async () => {
@@ -1739,8 +1738,7 @@ describe("InverseCachedPathTests", () => {
 
     const f = new NullFace();
     // Pre-populate cache with null (as the preloader does for missing rows)
-    (f as any)._cachedAssociations = new Map();
-    (f as any)._cachedAssociations.set("nullMan", null);
+    seedAssociationCache(f as any, "nullMan", null);
 
     // An invalid inverseOf should throw even though the cached value is null
     await expect(
@@ -1853,7 +1851,7 @@ describe("InverseAssociationTests", () => {
     await Interest.create({ topic: "stamps", man_id: m.id });
     const interests = await loadHasMany(m, "interests", { inverseOf: "man" });
     expect(interests.length).toBe(1);
-    const cachedMan = (interests[0] as any)._cachedAssociations?.get("man");
+    const cachedMan = (interests[0] as any)._associationCache("man")?.target;
     expect(cachedMan).toBe(m);
   });
 });
@@ -1891,7 +1889,7 @@ describe("inverse_of", () => {
 
     const loadedAuthor = await loadBelongsTo(book, "author", { inverseOf: "books" });
     // The loaded author should have a cached inverse pointing to the book
-    expect((loadedAuthor as any)._cachedAssociations?.get("books")).toBe(book);
+    expect((loadedAuthor as any)._associationCache("books")?.target).toBe(book);
   });
 
   it("sets inverse reference on loaded has_many children", async () => {
@@ -1919,7 +1917,7 @@ describe("inverse_of", () => {
     const comments = await loadHasMany(post, "comments", { inverseOf: "post" });
     // Each comment should have the post cached
     for (const c of comments) {
-      expect((c as any)._cachedAssociations?.get("post")).toBe(post);
+      expect((c as any)._associationCache("post")?.target).toBe(post);
     }
   });
 });
@@ -1960,7 +1958,7 @@ describe("InverseHasOneTests", () => {
     await Face.create({ description: "pretty", man_id: m.id });
     const face = await loadHasOne(m, "face", { inverseOf: "man" });
     expect(face).not.toBeNull();
-    expect((face as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((face as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("parent instance should be shared with eager loaded child on find", async () => {
@@ -1971,7 +1969,7 @@ describe("InverseHasOneTests", () => {
     expect(men.length).toBe(1);
     const face = (men[0] as any)._preloadedAssociations?.get("face");
     expect(face).not.toBeNull();
-    expect((face as any)._cachedAssociations?.get("man")).toBe(men[0]);
+    expect((face as any)._associationCache("man")?.target).toBe(men[0]);
   });
 
   it("parent instance should be shared with newly built child", () => {
@@ -1980,9 +1978,8 @@ describe("InverseHasOneTests", () => {
     const f = new Face({ description: "pretty" });
     // Simulate building: set FK and inverse cache
     f.man_id = 1;
-    (f as any)._cachedAssociations = new Map();
-    (f as any)._cachedAssociations.set("man", m);
-    expect((f as any)._cachedAssociations.get("man")).toBe(m);
+    seedAssociationCache(f as any, "man", m);
+    expect((f as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("parent instance should be shared with newly created child", async () => {
@@ -1991,7 +1988,7 @@ describe("InverseHasOneTests", () => {
     const f = await Face.create({ description: "pretty", man_id: m.id });
     const face = await loadHasOne(m, "face", { inverseOf: "man" });
     expect(face).not.toBeNull();
-    expect((face as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((face as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("parent instance should be shared with newly created child via bang method", async () => {
@@ -2001,7 +1998,7 @@ describe("InverseHasOneTests", () => {
     const face = await loadHasOne(m, "face", { inverseOf: "man" });
     expect(face).not.toBeNull();
     expect(face!.description).toBe("pretty");
-    expect((face as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((face as any)._associationCache("man")?.target).toBe(m);
   });
 
   it("parent instance should be shared with replaced via accessor child", async () => {
@@ -2009,8 +2006,8 @@ describe("InverseHasOneTests", () => {
     const m = await Man.create({ name: "Gordon" });
     const f = await Face.create({ description: "pretty" });
     await setHasOne(m, "face", f, { inverseOf: "man", foreignKey: "man_id", className: "Face" });
-    expect((m as any)._cachedAssociations.get("face")).toBe(f);
-    expect((f as any)._cachedAssociations?.get("man")).toBe(m);
+    expect((m as any)._associationCache("face")?.target).toBe(f);
+    expect((f as any)._associationCache("man")?.target).toBe(m);
   });
   it("child instance should be shared with replaced via accessor parent", async () => {
     const { Man, Face } = makeModels();
@@ -2018,8 +2015,8 @@ describe("InverseHasOneTests", () => {
     const f = await Face.create({ description: "pretty", man_id: m.id });
     const m2 = await Man.create({ name: "New" });
     setBelongsTo(f, "man", m2, { inverseOf: "face" });
-    expect((f as any)._cachedAssociations.get("man")).toBe(m2);
-    expect((m2 as any)._cachedAssociations?.get("face")).toBe(f);
+    expect((f as any)._associationCache("man")?.target).toBe(m2);
+    expect((m2 as any)._associationCache("face")?.target).toBe(f);
   });
   it("trying to use inverses that dont exist should raise an error", async () => {
     class Human extends Base {

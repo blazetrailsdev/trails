@@ -2366,34 +2366,48 @@ export class Base extends Model {
   _preloadedAssociations: Map<string, unknown> = new Map();
   _collectionProxies: Map<string, unknown> = new Map();
   _associationInstances: Map<string, AssociationInstance> = new Map();
-  /** @internal */
-  _cachedAssociations?: Map<string, Base | Base[] | null>;
 
   /**
-   * @internal
-   * @deprecated RFC 0006 (collection-store unification). Reads of has_many
-   * targets should go through the `CollectionProxy` read accessor
-   * (`proxy.readTargets()`), which is the single source of truth. This shim
-   * exists so the legacy `_cachedAssociations` reads can be migrated one
-   * caller at a time: when a loaded collection proxy exists for `name`, it
-   * returns the proxy's canonical target array; otherwise it falls back to the
-   * legacy `_cachedAssociations` map (still used by singular associations and
-   * the direct test pokes). Removed once S4 deletes `_cachedAssociations`.
+   * Return the *loaded* cached association object for `name` — callers read
+   * `.target` off it. This is the RFC-0022 b4 transitional accessor across the
+   * three still-split per-record maps (`_collectionProxies`,
+   * `_associationInstances`, `_preloadedAssociations`); it is NOT yet Rails'
+   * unified `@association_cache` surface. The literal `association_instance_get`
+   * analog (the built wrapper regardless of loaded state) is
+   * `_associationInstances.get(name)`; folding the three maps into one slot so
+   * this can return the wrapper whenever built is the explicit job of the
+   * follow-up `b5-converge-association-cache` story (RFC open questions 1–3).
    *
-   * Named `_cachedAssociationTarget` (not `_associationCache`) deliberately:
-   * Rails' `@association_cache[name]` (associations.rb:82) returns the
-   * association *object* (e.g. `HasManyAssociation`), whereas this returns the
-   * cached *target value*, so reusing that name would mislead anyone
-   * cross-referencing the Rails source.
+   * Until that convergence, the gate matters: a has_many's canonical target
+   * lives on its `CollectionProxy` (incl. in-memory inverse-seeded records on a
+   * not-yet-loaded proxy) while the `HasManyAssociation` mirror in
+   * `_associationInstances` is a stale secondary copy, so returning an
+   * unloaded/empty wrapper here would surface the wrong store's `.target`.
+   * Hence: a loaded-or-seeded proxy for collections; a loaded singular holder
+   * (or ad-hoc seed, which exposes no `isCollection`) otherwise; `undefined`
+   * for a miss or an unknown name.
+   *
+   * @internal
    */
-  _cachedAssociationTarget(name: string): Base | Base[] | null | undefined {
+  _associationCache(name: string): { target?: Base | Base[] | null } | undefined {
     const proxy = this._collectionProxies.get(name) as
-      | { loaded?: boolean; readTargets?: () => Base[] }
+      | { loaded?: boolean; target?: Base[] }
       | undefined;
-    if (proxy?.loaded && typeof proxy.readTargets === "function") {
-      return proxy.readTargets();
+    if (
+      proxy &&
+      (proxy.loaded === true || (Array.isArray(proxy.target) && proxy.target.length > 0))
+    ) {
+      return proxy;
     }
-    return this._cachedAssociations?.get(name);
+    const instance = this._associationInstances.get(name) as
+      | (AssociationInstance & {
+          isLoaded?(): boolean;
+          isCollection?(): boolean;
+          target?: Base | Base[] | null;
+        })
+      | undefined;
+    if (instance?.isLoaded?.() && instance.isCollection?.() !== true) return instance;
+    return undefined;
   }
 
   constructor(attrs: Record<string, unknown> = {}) {

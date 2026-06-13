@@ -41,15 +41,17 @@ function buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationIn
 }
 
 function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
-  // Reads the loaded has_many target through the proxy read accessor
-  // (`Base#_cachedAssociationTarget`), which returns the canonical proxy
-  // target array when a loaded collection proxy exists and otherwise falls
-  // back to the legacy `_cachedAssociations` map. A cached "nil association"
+  // Reads the loaded target through the association cache
+  // (`Base#_associationCache`): a loaded collection proxy's canonical target
+  // array or a loaded singular holder's target. A cached "nil association"
   // surfaces as `null` (not `undefined`), so the `!== undefined` guard still
-  // marks the instance loaded — matching `Association#doFindTarget`.
-  const cached = this._cachedAssociationTarget(name);
+  // marks the instance loaded — matching `Association#doFindTarget`. When the
+  // cache *is* this very instance (a loaded singular holder caches itself),
+  // there is nothing to copy.
+  const cached = this._associationCache(name);
+  if (cached === instance) return;
   if (cached !== undefined) {
-    instance.setTarget(cached ?? null);
+    instance.setTarget((cached.target as Base | Base[] | null) ?? null);
     return;
   }
   // Use `has()` so an eagerly-preloaded "nil association" (the preloader

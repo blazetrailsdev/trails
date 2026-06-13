@@ -24,6 +24,16 @@ export class Association {
   readonly disableJoins: boolean;
   loaded: boolean;
   target: Base | Base[] | null;
+  /**
+   * True when `target` was set by an *explicit* assignment / inverse-of seed
+   * (the writer paths routed through `_cacheSingularTarget`), as opposed to a
+   * query load. The inner functional loaders (`loadBelongsTo` / `loadHasOne`)
+   * short-circuit only on explicit sets — a prior query load must NOT memoize,
+   * so they can re-query after a mutation (e.g. a has_one :through deleted via
+   * its writer). This is the holder-resident successor to the old
+   * `_cachedAssociations` write-shadow, which only ever held explicit writes.
+   */
+  _explicitTarget = false;
 
   private _staleState: unknown = undefined;
   /**
@@ -78,6 +88,7 @@ export class Association {
     this.loaded = false;
     this.target = null;
     this._staleState = undefined;
+    this._explicitTarget = false;
   }
 
   resetNegativeCache(): void {
@@ -371,9 +382,9 @@ export class Association {
     const owner = this.owner;
     const name = this.reflection.name;
 
-    const cached = owner._cachedAssociationTarget(name);
+    const cached = owner._associationCache(name);
     if (cached !== undefined) {
-      return cached;
+      return cached.target as Base | Base[] | null;
     }
     if (owner._preloadedAssociations.has(name)) {
       return owner._preloadedAssociations.get(name) as Base | Base[] | null;

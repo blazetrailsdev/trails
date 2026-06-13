@@ -23,6 +23,7 @@ import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { seedAssociationCache } from "./test-helpers/seed-association-cache.js";
 import {
   Associations,
   loadBelongsTo,
@@ -252,7 +253,7 @@ describe("BelongsToAssociations", () => {
     const loaded = await loadBelongsTo(book, "author", { inverseOf: "books" });
     expect(loaded).not.toBeNull();
     // The loaded author should have the book cached under "books"
-    const cached = (loaded as any)._cachedAssociations?.get("books");
+    const cached = (loaded as any)._associationCache("books")?.target;
     expect(cached).toBe(book);
   });
 });
@@ -352,7 +353,7 @@ describe("HasOneAssociations", () => {
 
     const profile = await loadHasOne(firm, "profile", { inverseOf: "firm" });
     expect(profile).not.toBeNull();
-    const cached = (profile as any)._cachedAssociations?.get("firm");
+    const cached = (profile as any)._associationCache("firm")?.target;
     expect(cached).toBe(firm);
   });
 
@@ -471,7 +472,7 @@ describe("HasManyAssociations", () => {
     await Post.create({ title: "P1", author_id: author.id });
     const posts = await loadHasMany(author, "posts", { inverseOf: "author" });
     expect(posts).toHaveLength(1);
-    const cached = (posts[0] as any)._cachedAssociations?.get("author");
+    const cached = (posts[0] as any)._associationCache("author")?.target;
     expect(cached).toBe(author);
   });
 
@@ -1173,7 +1174,7 @@ describe("StrictLoading", () => {
     const author = await Author.create({ name: "Dean" });
     (author as any)._strictLoading = true;
     const sentinel = [{ id: 1 }] as any;
-    (author as any)._cachedAssociations = new Map([["books", sentinel]]);
+    seedAssociationCache(author as any, "books", sentinel);
     const loaded = await loadHasMany(author, "books", {});
     expect(loaded).toBe(sentinel);
   });
@@ -4742,7 +4743,7 @@ describe("inverse_of (Rails-guided)", () => {
 
     const loaded = await loadBelongsTo(book, "author", { inverseOf: "books" });
     expect(loaded).not.toBeNull();
-    expect((loaded as any)._cachedAssociations.get("books")).toBe(book);
+    expect((loaded as any)._associationCache("books")?.target).toBe(book);
   });
 
   // Rails: test "inverse_of on has_many sets child reference"
@@ -4773,7 +4774,7 @@ describe("inverse_of (Rails-guided)", () => {
     const comments = await loadHasMany(post, "comments", { inverseOf: "post" });
     expect(comments.length).toBe(2);
     for (const c of comments) {
-      expect((c as any)._cachedAssociations.get("post")).toBe(post);
+      expect((c as any)._associationCache("post")?.target).toBe(post);
     }
   });
 });
@@ -5314,7 +5315,7 @@ describe("BelongsToAssociationsTest", () => {
     await firm.save();
 
     // Reload by clearing cache and reloading
-    (account as any)._cachedAssociations?.delete("reloadFirm");
+    (account as any)._associationInstances.delete("reloadFirm");
     const second = await loadBelongsTo(account, "reloadFirm", {
       className: "ReloadFirm",
       foreignKey: "firm_id",
@@ -7506,7 +7507,7 @@ describe("AssociationProxyTest", () => {
     const proxy = association(found, "isInterests");
     const subset = await proxy.where("1=1").first();
     expect(subset).not.toBeNull();
-    expect((subset as any)._cachedAssociations?.get("isHuman")).toBe(found);
+    expect((subset as any)._associationCache("isHuman")?.target).toBe(found);
   });
   it("pluck uses loaded target", async () => {
     const { APPost, APComment } = setupProxyModels();

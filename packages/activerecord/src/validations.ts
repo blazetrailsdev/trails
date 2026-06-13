@@ -96,7 +96,7 @@ interface ValidationsHost {
   _newRecord?: boolean;
   errors: { any: boolean };
   isValid(context?: ValidationContextArg): boolean;
-  _cachedAssociations?: { get?(name: string): unknown };
+  _associationCache?(name: string): { target?: unknown } | undefined;
   _preloadedAssociations?: { get?(name: string): unknown };
   _collectionProxies?: { get?(name: string): unknown };
   association?(name: string): { loaded?: boolean; target?: unknown } | undefined;
@@ -196,10 +196,9 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
   ) {
     return proxy.target;
   }
-  // RFC 0022 b1+: a loaded singular target lives on the SingularAssociation
-  // holder; `association(name)` hydrates it from any loaded proxy / preload /
-  // cache mirror, so the loaded target is read through the holder rather than
-  // off `_cachedAssociations` directly.
+  // RFC 0022: a loaded singular target lives on the SingularAssociation
+  // holder; `association(name)` hydrates it from any loaded proxy / preload,
+  // so the loaded target is read through the holder.
   if (typeof this.association === "function") {
     try {
       const assoc = this.association(attribute);
@@ -208,10 +207,10 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
       // Not a declared association — fall through.
     }
   }
-  // Transitional: undeclared in-memory pokes (FakeTopic/FakeReply test seeds)
-  // still write `_cachedAssociations` / `_preloadedAssociations` directly; those
-  // pokes and these fallback reads are removed together in RFC 0022 b4.
-  const cached = this._cachedAssociations?.get?.(attribute);
+  // Undeclared in-memory seeds (FakeTopic/FakeReply test fixtures) live on the
+  // association cache (`_associationCache`, Rails' `@association_cache`), keyed
+  // by the undeclared name and surfaced through `.target`.
+  const cached = this._associationCache?.(attribute)?.target;
   if (cached !== undefined) return cached;
   const preloaded = this._preloadedAssociations?.get?.(attribute);
   if (preloaded !== undefined) return preloaded;

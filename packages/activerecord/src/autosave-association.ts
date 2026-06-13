@@ -33,8 +33,8 @@ function _guardKey(association: unknown): string {
  * here is that `isLoaded()` is true), or `null` when no cached data exists
  * or the association name is unknown. Mirrors Rails'
  * `association_instance_get(name)` read path used throughout autosave —
- * `_cachedAssociations` / `_preloadedAssociations` are the storage backing,
- * but lookups must go through the Association object so that subclass
+ * the holder / collection proxy / `_preloadedAssociations` are the storage
+ * backing, but lookups must go through the Association object so that subclass
  * methods (`isUpdated`, `isStaleTarget`, `setInverseInstance`,
  * `loadedBang`, etc.) are reachable.
  *
@@ -50,12 +50,12 @@ function _guardKey(association: unknown): string {
 function _loadedAssociation(record: any, name: string): any | null {
   // Mirrors Rails' `association_instance_get(name)`. Always routes through
   // `record.association(name)` so `syncAssociationInstance` re-pulls fresh
-  // target data from `_cachedAssociations` / `_preloadedAssociations` (our
-  // map-direct preloader writes in preloader/association.ts, relation.ts —
-  // Rails has no equivalent map shortcut; every preloader write lands in
-  // `@association_cache` via `association_instance_set`). Without the
-  // re-sync, an Association instance constructed before a later map write
-  // would surface stale target data here.
+  // target data from the collection proxy / `_preloadedAssociations` (the
+  // preloader writes in preloader/association.ts, relation.ts — Rails has no
+  // equivalent shortcut; every preloader write lands in `@association_cache`
+  // via `association_instance_set`). Without the re-sync, an Association
+  // instance constructed before a later preload write would surface stale
+  // target data here.
   //
   // Rails' helper never throws (only reads `@association_cache[name]`);
   // ours can if the name is unknown. Only swallow `AssociationNotFoundError`
