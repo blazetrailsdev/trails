@@ -983,6 +983,16 @@ const STATUS_TRANSITIONS: Record<StoryStatus, readonly StoryStatus[]> = {
   blocked: [],
 };
 
+// Work-tracking statuses own dedicated verbs that also stamp pr/assignee/
+// blocked-by. status-set deliberately won't reach them; the rejection points
+// the operator at the right verb instead of leaving them guessing.
+const STATUS_VERB_HINT: Partial<Record<StoryStatus, string>> = {
+  claimed: "claim <id>",
+  "in-progress": "in-progress <id> --pr <N>",
+  done: "done <id> --pr <N>",
+  blocked: "block <id> --reason <text>",
+};
+
 // Reads the `status:` scalar from a story file's frontmatter. Same fenced-block
 // parse as claimState so a same-named line in the Markdown body never matches.
 export function statusOf(fileText: string): StoryStatus | null {
@@ -997,19 +1007,23 @@ export function statusTransitionError(
   target: StoryStatus,
 ): string | null {
   if (from === null) return `cannot read current status`;
-  if (from === target) return null;
   const allowed = STATUS_TRANSITIONS[from];
-  if (!allowed.includes(target)) {
-    return allowed.length
-      ? `illegal transition ${from} → ${target} (allowed from ${from}: ${allowed.join(", ")})`
-      : `illegal transition ${from} → ${target} (${from} has no transitions; use the dedicated verb)`;
+  if (from === target || allowed.includes(target)) return null;
+  // Illegal move — give the most actionable message. A work-tracking target has
+  // a dedicated verb; otherwise report the legal set (or that there is none).
+  if (STATUS_VERB_HINT[target]) {
+    return `won't set status ${target} — use \`pnpm tasks ${STATUS_VERB_HINT[target]}\` instead`;
   }
-  return null;
+  return allowed.length
+    ? `illegal transition ${from} → ${target} (allowed from ${from}: ${allowed.join(", ")})`
+    : `illegal transition ${from} → ${target} (${from} has no transitions; use the dedicated verb)`;
 }
 
-// Flip a story's status between pre-work queue states (draft ↔ ready). Validates
-// the transition up front and rebuilds + commits the index like the other
-// mutating verbs. Illegal moves and no-ops exit without pushing.
+// Flip a story's status between pre-work queue states (draft ↔ ready). Rebuilds
+// + commits the index like the other mutating verbs. No-ops short-circuit before
+// the commit (an empty `git commit` would fail); the transition is validated
+// *inside* the mutator — i.e. against the post-`git pull` state — so a story
+// claimed out from under us by a concurrent agent is never clobbered.
 function setStatus(id: string, target: StoryStatus): void {
   const file = storyFilePath(loadIndex(), id);
   const from = statusOf(readFileSync(file, "utf8"));
@@ -1020,15 +1034,29 @@ function setStatus(id: string, target: StoryStatus): void {
     console.log(`${id} already ${target}`);
     return;
   }
-  const error = statusTransitionError(from, target);
-  if (error !== null) {
+  // Fail fast on an obviously-illegal move before touching git, with the same
+  // message the post-pull recheck would print.
+  const preError = statusTransitionError(from, target);
+  if (preError !== null) {
     restoreGeneratedFiles(TASKS_DIR);
-    console.error(`error: ${error} for ${id}`);
+    console.error(`error: ${preError} for ${id}`);
     process.exit(2);
   }
-  flip(id, `status ${target}: ${id}`, RETRY_MSG(id), 4, (file) =>
-    editFrontmatter(file, { status: target }),
-  );
+  flip(id, `status ${target}: ${id}`, RETRY_MSG(id), 4, (file) => {
+    const fresh = statusOf(readFileSync(file, "utf8"));
+    if (fresh === target) {
+      // Concurrent agent already landed this exact move; the pull brought it
+      // back. Re-applying would leave nothing to commit, so bail cleanly.
+      console.log(`${id} already ${target}`);
+      process.exit(0);
+    }
+    const error = statusTransitionError(fresh, target);
+    if (error !== null) {
+      console.error(`error: ${error} for ${id}`);
+      process.exit(2);
+    }
+    editFrontmatter(file, { status: target });
+  });
   console.log(`set ${id} status ${target}`);
 }
 

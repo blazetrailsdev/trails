@@ -297,10 +297,14 @@ describe("statusTransitionError", () => {
     expect(statusTransitionError("draft", "draft")).toBeNull();
   });
 
-  it("rejects draft → done with the allowed set", () => {
+  it("rejects draft → done and points at the dedicated verb", () => {
     const err = statusTransitionError("draft", "done");
-    expect(err).toMatch(/illegal transition draft → done/);
-    expect(err).toMatch(/allowed from draft: ready/);
+    expect(err).toMatch(/won't set status done/);
+    expect(err).toMatch(/done <id> --pr <N>/);
+  });
+
+  it("points draft → claimed at the claim verb", () => {
+    expect(statusTransitionError("draft", "claimed")).toMatch(/pnpm tasks claim <id>/);
   });
 
   it("rejects moves out of work-tracking statuses and points at the dedicated verb", () => {
