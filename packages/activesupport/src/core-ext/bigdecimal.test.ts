@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BigDecimal } from "./bigdecimal.js";
+import { BigDecimal } from "./big-decimal/conversions.js";
 
 describe("BigDecimalTest", () => {
   it("to s", () => {
