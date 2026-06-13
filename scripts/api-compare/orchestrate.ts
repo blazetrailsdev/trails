@@ -32,7 +32,8 @@
  * fast-path). `API_COMPARE_REFRESH=1` re-clones sources via fetch --refresh.
  */
 import { execFile } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -40,6 +41,7 @@ import { runFetch } from "../../vendor/fetch.js";
 import { libPathsManifest } from "../../vendor/sources.js";
 import { main as extractTsApi } from "./extract-ts-api.js";
 import { main as runCompare } from "./compare.js";
+import { sharedCacheDir, hashParts, fileHash, readShared, writeShared } from "./shared-cache.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -62,6 +64,52 @@ async function runRubyExtract(): Promise<void> {
   if (stderr) process.stderr.write(stderr);
 }
 
+const OUTPUT_DIR = join(DIR, "output");
+
+/**
+ * Content key for the Ruby manifest: the same three inputs the extractor's own
+ * mtime gate watches — the lockfile (re-fetch), sources.ts (registry edits),
+ * and the extractor script (output-shape changes) — but hashed by CONTENT so
+ * the key matches across worktrees. Returns null if any input is missing.
+ */
+async function railsCacheKey(): Promise<string | null> {
+  const inputs = await Promise.all([
+    fileHash(join(ROOT, "vendor/sources.lock.json")),
+    fileHash(join(ROOT, "vendor/sources.ts")),
+    fileHash(join(DIR, "extract-ruby-api.rb")),
+  ]);
+  if (inputs.some((h) => h === null)) return null;
+  return hashParts(inputs as string[]);
+}
+
+/**
+ * Run the Ruby extractor, but first consult the cross-worktree shared cache.
+ * A hit writes `output/rails-api.json` directly (the fresh mtime keeps the Ruby
+ * extractor's own mtime gate satisfied) and skips the subprocess; a miss runs
+ * Ruby and publishes the result for sibling worktrees.
+ */
+async function runRubyExtractShared(): Promise<void> {
+  const railsOut = join(OUTPUT_DIR, "rails-api.json");
+  const sharedDir = force ? null : await sharedCacheDir(ROOT);
+  const key = sharedDir ? await railsCacheKey() : null;
+
+  if (sharedDir && key) {
+    const cached = await readShared(sharedDir, "rails-api", key);
+    if (cached !== null) {
+      await writeFile(railsOut, cached);
+      process.stdout.write("Rails manifest served from shared cross-worktree cache\n");
+      return;
+    }
+  }
+
+  await runRubyExtract();
+
+  if (sharedDir && key) {
+    const produced = await readFile(railsOut, "utf-8").catch(() => null);
+    if (produced !== null) await writeShared(sharedDir, "rails-api", key, produced, basename(ROOT));
+  }
+}
+
 async function main(): Promise<void> {
   // Phase A — fetch. On warm runs use the offline fast-path (trust the
   // lockfile pins, skip per-source `git rev-parse`); FORCE/REFRESH take the
@@ -71,7 +119,7 @@ async function main(): Promise<void> {
 
   // Phase B — ruby (subprocess) and ts (in-process worker threads) in parallel.
   // Both only need fetch's vendored sources, which Phase A just produced.
-  await Promise.all([runRubyExtract(), extractTsApi()]);
+  await Promise.all([runRubyExtractShared(), extractTsApi()]);
 
   // Phase C — compare needs both extracts; the two manifests need only
   // ruby-api.json. All in-process and synchronous. The manifest scripts run

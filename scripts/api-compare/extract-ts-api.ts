@@ -21,6 +21,7 @@ import type {
   LiteralValue,
 } from "./types.js";
 import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
+import { sharedCacheDir, contentFingerprint, readShared, writeShared } from "./shared-cache.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
 // takes ~16s; only a handful of packages typically change between
@@ -144,6 +145,11 @@ export async function main() {
   const force = process.env.API_COMPARE_FORCE === "1";
   // `Set` so the per-package summary loop's membership check is O(1).
   const cacheHits = new Set<string>();
+  // Cross-worktree content-keyed cache layer (null if not a git checkout, or
+  // disabled via FORCE). `tag` discriminates atomic-write tmp files per worktree.
+  const sharedDir = force ? null : await sharedCacheDir(ROOT_DIR);
+  const sharedTag = path.basename(ROOT_DIR);
+  const sharedHits = new Set<string>();
 
   // Pass 1: serve every cache hit synchronously and record the
   // metadata needed to extract the misses below.
@@ -152,6 +158,7 @@ export async function main() {
     srcDir: string;
     fingerprint: string;
     cachePath: string;
+    sharedKey: string | null;
   }
   const pending: PendingExtract[] = [];
 
@@ -182,7 +189,33 @@ export async function main() {
       }
     }
 
-    pending.push({ pkg, srcDir: pkgDir, fingerprint, cachePath });
+    // Local miss. Before queueing an extraction, consult the cross-worktree
+    // shared cache keyed by a content fingerprint (mtime-independent, so it
+    // matches across checkouts). A shared hit is written back to the local
+    // mtime-keyed cache so the next same-worktree run takes the fast path.
+    let sharedKey: string | null = null;
+    if (sharedDir) {
+      const contentKey = `${SCHEMA_VERSION}-${await contentFingerprint(fingerprintInputs, pkgRoot)}`;
+      const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
+      if (body) {
+        try {
+          const cached = JSON.parse(body) as CacheEntry;
+          manifest.packages[pkg] = cached.package;
+          fs.writeFileSync(
+            cachePath,
+            JSON.stringify({ schemaVersion: SCHEMA_VERSION, fingerprint, package: cached.package }),
+          );
+          cacheHits.add(pkg);
+          sharedHits.add(pkg);
+          continue;
+        } catch {
+          // Corrupt shared entry — fall through to re-extract.
+        }
+      }
+      sharedKey = contentKey;
+    }
+
+    pending.push({ pkg, srcDir: pkgDir, fingerprint, cachePath, sharedKey });
   }
 
   // Pass 2: extract cache misses in parallel via worker threads.
@@ -196,6 +229,16 @@ export async function main() {
         package: data,
       };
       fs.writeFileSync(p.cachePath, JSON.stringify(entry));
+      // Publish to the shared cache under the content key so sibling worktrees
+      // reuse this extraction (the shared entry's fingerprint is the content key).
+      if (sharedDir && p.sharedKey) {
+        const shared: CacheEntry = {
+          schemaVersion: SCHEMA_VERSION,
+          fingerprint: p.sharedKey,
+          package: data,
+        };
+        await writeShared(sharedDir, `ts-${p.pkg}`, p.sharedKey, JSON.stringify(shared), sharedTag);
+      }
       return [p.pkg, data] as const;
     });
     const results = await runWithConcurrency(tasks, concurrency);
@@ -213,14 +256,16 @@ export async function main() {
     for (const cls of Object.values(data.classes)) {
       methodCount += cls.instanceMethods.length + cls.classMethods.length;
     }
-    const tag = cacheHits.has(pkg) ? " (cached)" : "";
+    const tag = sharedHits.has(pkg) ? " (shared)" : cacheHits.has(pkg) ? " (cached)" : "";
     console.log(
       `  ${pkg}: ${classCount} classes, ${moduleCount} modules, ${methodCount} methods${tag}`,
     );
   }
   if (cacheHits.size > 0) {
+    const sharedNote =
+      sharedHits.size > 0 ? ` (${sharedHits.size} from the shared cross-worktree cache)` : "";
     console.log(
-      `\n  ${cacheHits.size}/${PACKAGES.length} packages served from cache (set API_COMPARE_FORCE=1 to rebuild).`,
+      `\n  ${cacheHits.size}/${PACKAGES.length} packages served from cache${sharedNote} (set API_COMPARE_FORCE=1 to rebuild).`,
     );
   }
 
