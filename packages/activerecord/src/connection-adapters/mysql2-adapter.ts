@@ -442,6 +442,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const {
       statementLimit,
       preparedStatements,
+      advisoryLocks,
       strict,
       waitTimeout,
       variables,
@@ -450,6 +451,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     } = config as mysql.PoolOptions & MysqlAdapterOptions;
     if (statementLimit !== undefined) this.statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
+    if (advisoryLocks !== undefined) {
+      this._advisoryLocksEnabled = Mysql2Adapter.typeCastConfigToBoolean(advisoryLocks) !== false;
+    }
     this._database =
       (mysqlConfig.database as string | undefined) ??
       (() => {

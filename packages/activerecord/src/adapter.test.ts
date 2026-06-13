@@ -301,21 +301,9 @@ describe("AdapterTest", () => {
       },
     );
   });
-  it.skip("charset", () => {
-    // BLOCKED: adapter-mysql
-    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts#charset: MySQL-only; needs MYSQL_TEST_URL test context
-    // SCOPE: ~10 LOC port; affects ~3 tests
-  });
-  it.skip("show nonexistent variable returns nil", () => {
-    // BLOCKED: adapter-mysql
-    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts#showVariable: MySQL-only; needs MYSQL_TEST_URL test context
-    // SCOPE: ~5 LOC port; affects ~1 test
-  });
-  it.skip("not specifying database name for cross database selects", () => {
-    // BLOCKED: adapter-mysql
-    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts: MySQL-only cross-DB select via establishConnection + configurations.configsFor
-    // SCOPE: ~25 LOC port + ARTest config wiring; affects ~1 test
-  });
+  // charset / show nonexistent variable returns nil / not specifying database
+  // name for cross database selects (MySQL-only) live in
+  // adapters/abstract-mysql-adapter/adapter.test.ts behind describeIfMysql.
   it("disable prepared statements", async () => {
     // Rails establishes a connection with `prepared_statements: true` and
     // asserts `lease_connection.prepared_statements?` flips false once the
@@ -424,11 +412,9 @@ describe("AdapterTest", () => {
       "special_db_type",
     );
   });
-  it.skip("current database", () => {
-    // BLOCKED: adapter-mysql
-    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts#currentDatabase + postgresql-adapter.ts#currentDatabase: needs MySQL/PG test context (Rails respond_to? gate skips on SQLite); test-adapter.ts only exposes PG_TEST_URL/MYSQL_TEST_URL env, no per-config "database" name lookup
-    // SCOPE: ~15 LOC port; affects ~1 test
-  });
+  // current database (MySQL/PG, gated by respond_to?(:current_database)) lives
+  // in the adapters/{abstract-mysql-adapter,postgresql}/adapter.test.ts suites
+  // behind describeIfMysql/describeIfPg.
 });
 
 // Model-backed AdapterTest cases. Same Rails class (AdapterTest) as the
@@ -1078,14 +1064,6 @@ describe("AdapterThreadSafetyTest", () => {
   });
   it.skip("#verify! is synchronized", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
-  });
-});
-
-describe("AdvisoryLocksEnabledTest", () => {
-  it.skip("advisory locks enabled?", () => {
-    // BLOCKED: adapter-pg
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#isAdvisoryLocksEnabled (currently hardcoded false): PG override + establishConnection(advisory_locks:) config plumbing not wired
-    // SCOPE: ~15 LOC port; affects ~1 test
   });
 });
 
