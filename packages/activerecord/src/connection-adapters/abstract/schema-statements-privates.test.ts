@@ -62,6 +62,29 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.indexNameOptions("email")).toEqual({ column: "email" });
   });
 
+  it("indexNameForRemove matches a positional expression by its raw name", async () => {
+    // Rails sets `options[:name] = column_name` verbatim, so the match is against
+    // the raw expression string — not `index_<table>_on_<words>`.
+    const ss = makeStatements({
+      indexes: vi
+        .fn()
+        .mockResolvedValue([{ name: "lower(email)", columns: ["email"], unique: false }]),
+    });
+    expect(await ss.indexNameForRemove("users", "lower(email)", {})).toBe("lower(email)");
+  });
+
+  it("indexNameForRemove does not apply generate_index_name length/hash fallback to an expression", async () => {
+    // A long expression is used verbatim as the name; it is never hashed, so a
+    // hash-shortened index name does not match.
+    const expr = `lower(${"a".repeat(80)})`;
+    const ss = makeStatements({
+      indexes: vi
+        .fn()
+        .mockResolvedValue([{ name: "index_users_on_short", columns: ["x"], unique: false }]),
+    });
+    await expect(ss.indexNameForRemove("users", expr, {})).rejects.toThrow(/No indexes found/);
+  });
+
   it("stripTableNamePrefixAndSuffix strips prefix/suffix", () => {
     const ss = makeStatements({ tableNamePrefix: "app_", tableNameSuffix: "_v2" });
     expect(ss.stripTableNamePrefixAndSuffix("app_users_v2")).toBe("users");

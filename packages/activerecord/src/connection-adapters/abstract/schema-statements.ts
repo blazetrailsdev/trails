@@ -52,16 +52,16 @@ function isExpressionColumnName(columnName: string | string[] | undefined): colu
 
 // Normalize a remove-index spec into the effective name + column list, applying
 // Rails' expression branch: an expression positional column with no `name`
-// resolves to the generated index name (`index_<table>_on_<\w+ joined by _>`)
-// and matches by name only.
+// matches by name only, using the raw expression string verbatim as the index
+// name (`options[:name] = column_name`) — it is NOT routed through
+// `index_name` / `generate_index_name`, so the length/hash fallback never fires.
 function removeIndexSpec(
   tableName: string,
   columnName: string | string[] | undefined,
   options: RemoveIndexOptions,
 ): { name?: string; columnNames: string[] } {
   if (options.name == null && isExpressionColumnName(columnName)) {
-    const expr = (columnName.match(/\w+/g) ?? []).join("_");
-    return { name: `index_${tableName}_on_${expr}`, columnNames: [] };
+    return { name: columnName, columnNames: [] };
   }
   const raw = columnName ?? options.column;
   const columnNames = raw == null || raw === "" ? [] : Array.isArray(raw) ? raw : [raw];
@@ -1869,7 +1869,10 @@ export class SchemaStatements {
     let columnNames: string[];
 
     if (!options.name && this.isExpressionColumnName(columnName ?? "")) {
-      options = { ...options, name: this.indexName(tableName, { column: columnName! }) };
+      // Rails: `options[:name] = column_name` — the raw expression string is used
+      // verbatim as the name, never routed through generate_index_name, so the
+      // index-name length/hash fallback does not apply on the remove path.
+      options = { ...options, name: columnName! };
       columnNames = [];
     } else {
       const rawColumn = columnName ?? options.column;
