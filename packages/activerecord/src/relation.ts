@@ -3942,25 +3942,29 @@ export class Relation<T extends Base> {
       ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
     ];
 
-    // Rails `apply_join_dependency` runs `distinct_relation_for_primary_key`
-    // when eager loading with a limit/offset over non-limitable (collection)
-    // reflections (finder_methods.rb:463) — it EXECUTES a query
-    // (`select_rows`) to materialize the limited primary keys, because
-    // `IN (SELECT … LIMIT n)` over a row-multiplying join cuts joined rows
-    // (not parents) and is unportable (MySQL rejects it). A synchronous
-    // predicate builder cannot execute that query, so for this unportable case
-    // we leave the eager associations unconverted: no row-multiplying join is
-    // emitted, the LIMIT applies to distinct parent rows, and the subquery
-    // stays cross-adapter safe — the same parent set Rails materializes.
-    // Faithful `distinct_relation_for_primary_key` is a separate concern.
-    // (schema_statements.rb:1429)
-    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    if (hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) return this;
-
-    const rel = this._clone();
+    let rel = this._clone();
     rel._eagerLoadAssociations = [];
     rel._includesAssociations = [];
-    return rel.leftOuterJoins(eagerSpecs) as Relation<T>;
+    rel = rel.leftOuterJoins(eagerSpecs) as Relation<T>;
+
+    // Rails `apply_join_dependency`, for a limit/offset over non-limitable
+    // (collection) reflections, replaces the relation with
+    // `distinct_relation_for_primary_key` (finder_methods.rb:463): it keeps the
+    // join dependency (so joined-table wheres/orders stay valid) and EXECUTES a
+    // query (`select_rows`, schema_statements.rb:1439) to materialize the
+    // limited DISTINCT primary keys, because a bare `IN (SELECT … LIMIT n)` over
+    // a row-multiplying join would limit joined rows rather than parents (and
+    // MySQL rejects IN+LIMIT). A synchronous predicate builder cannot execute
+    // that query; the closest portable approximation that preserves the
+    // joined-table constraints is DISTINCT on the parent key under the same
+    // LIMIT — the correct distinct-parent set on sqlite/PG. The
+    // query-materialization path (and MySQL's IN+LIMIT restriction) is tracked
+    // by the `relation-handler-distinct-pk-materialization` story.
+    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
+    if (hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) {
+      rel = rel.distinct() as Relation<T>;
+    }
+    return rel;
   }
 
   /**
