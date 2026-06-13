@@ -13,8 +13,8 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   it("binary? returns false because this implementation uses JSON, not MessagePack binary", () => {
     // isBinary() returns true: mirrors Rails' MessagePackMessageSerializer#binary?,
     // which signals that the serialized form must be stored in a binary column.
-    // The wire format is JSON-based (not real MessagePack), but the binary-column
-    // constraint is the key behavioral contract.
+    // The wire format is now real MessagePack binary (the test name predates that
+    // change; it stays verbatim so test:compare keeps matching the Rails test).
     expect(new MessagePackMessageSerializer().isBinary()).toBe(true);
   });
 
@@ -81,6 +81,15 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   it("dumps bytes identical to real Rails MessagePack", () => {
     const dumped = serializer.dump(fixtureMessage());
     expect([...Buffer.from(dumped, "latin1")]).toEqual(MRI_FIXTURE);
+  });
+
+  it("round-trips values that span the str8/bin16/map16 length-prefix boundaries", () => {
+    const message = new Message(Buffer.from("x".repeat(50))); // bin8
+    message.headers.set("long", "y".repeat(40)); // str8 (> 31 bytes)
+    message.headers.set("big", Buffer.from("z".repeat(300))); // bin16 (> 255 bytes)
+    for (let i = 0; i < 20; i++) message.headers.set(`k${i}`, `v${i}`); // map16 (> 15 entries)
+
+    expect(serializer.load(serializer.dump(message))).toEqual(message);
   });
 
   it("loads a MessagePack ciphertext produced by real Rails", () => {
