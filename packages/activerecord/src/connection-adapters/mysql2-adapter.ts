@@ -725,10 +725,23 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Convert boolean values in binds to integers for MySQL compatibility.
+   * Prepare binds for the mysql2 driver. First unwraps any
+   * `ActiveModel::Attribute` (e.g. `Relation::QueryAttribute`) to its
+   * `valueForDatabase` — mirrors Rails' `type_casted_binds`, which sends
+   * `value_for_database` to the driver rather than the Attribute wrapper, and
+   * matches the SQLite/PG paths. Then converts booleans to integers for MySQL
+   * compatibility. Plain pre-cast values (the common case) pass straight
+   * through.
    */
   private mysqlBinds(binds: unknown[]): unknown[] {
-    return binds.map((v) => (v === true ? 1 : v === false ? 0 : v));
+    return binds.map((v) => {
+      // `valueForDatabase` is a getter on Attribute/QueryAttribute, so reading
+      // it yields the unwrapped DB value directly.
+      if (v && typeof v === "object" && "valueForDatabase" in v) {
+        v = (v as { valueForDatabase: unknown }).valueForDatabase;
+      }
+      return v === true ? 1 : v === false ? 0 : v;
+    });
   }
 
   /**
