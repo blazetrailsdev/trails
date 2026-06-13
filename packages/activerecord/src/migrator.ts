@@ -1,5 +1,6 @@
 import type { DatabaseAdapter } from "./adapter.js";
 import type { Migration } from "./migration.js";
+import { Table, SelectManager, InsertManager, DeleteManager } from "@blazetrails/arel";
 
 interface MigrationEntry {
   version: string;
@@ -20,6 +21,7 @@ interface MigrationStatus {
 export class MigrationRunner {
   private adapter: DatabaseAdapter;
   private migrations: MigrationEntry[];
+  private readonly arelTable = new Table("schema_migrations");
 
   constructor(adapter: DatabaseAdapter, migrations: Migration[]) {
     this.adapter = adapter;
@@ -42,7 +44,9 @@ export class MigrationRunner {
    * Get all applied migration versions.
    */
   private async appliedVersions(): Promise<Set<string>> {
-    const rows = await this.adapter.execute(`SELECT "version" FROM "schema_migrations"`);
+    const sm = new SelectManager(this.arelTable);
+    sm.project(this.arelTable.get("version"));
+    const rows = await this.adapter.execute(this.adapter.toSql(sm));
     return new Set(rows.map((r) => String(r.version)));
   }
 
@@ -59,9 +63,9 @@ export class MigrationRunner {
       if (applied.has(entry.version)) continue;
 
       await entry.migration.run(this.adapter, "up");
-      await this.adapter.executeMutation(
-        `INSERT INTO "schema_migrations" ("version") VALUES ('${entry.version}')`,
-      );
+      const im = new InsertManager(this.arelTable);
+      im.insert([[this.arelTable.get("version"), entry.version]]);
+      await this.adapter.executeMutation(this.adapter.toSql(im));
     }
   }
 
@@ -81,9 +85,10 @@ export class MigrationRunner {
 
     for (const entry of toRollback) {
       await entry.migration.run(this.adapter, "down");
-      await this.adapter.executeMutation(
-        `DELETE FROM "schema_migrations" WHERE "version" = '${entry.version}'`,
-      );
+      const dm = new DeleteManager();
+      dm.from(this.arelTable);
+      dm.where(this.arelTable.get("version").eq(entry.version));
+      await this.adapter.executeMutation(this.adapter.toSql(dm));
     }
   }
 
