@@ -1213,15 +1213,23 @@ function edit(idOrSlug: string): void {
   // applies markdown mode; the whole temp dir is removed in `finally`.
   const tmpRoot = mkdtempSync(join(tmpdir(), "tasks-edit-"));
   const tmpFile = join(tmpRoot, target.slice(target.lastIndexOf("/") + 1));
+  const argv = editorArgv(process.env);
   let edited: string;
   try {
     writeFileSync(tmpFile, original);
-    const argv = editorArgv(process.env);
+    // A missing binary (ENOENT) or a non-zero editor exit (user aborted, e.g.
+    // `:cq` in vim) both throw here. Surface a clean message instead of a raw
+    // Node stack trace, and never commit — the canonical file is untouched.
     execFileSync(argv[0], [...argv.slice(1), tmpFile], { stdio: "inherit" });
     edited = readFileSync(tmpFile, "utf8");
-  } finally {
+  } catch (e) {
+    // Clean up explicitly: process.exit() below skips any `finally`.
     rmSync(tmpRoot, { recursive: true, force: true });
+    const msg = ((e as { message?: string }).message ?? String(e)).trim();
+    console.error(`error: editor (${argv.join(" ")}) failed — aborting without commit: ${msg}`);
+    process.exit(1);
   }
+  rmSync(tmpRoot, { recursive: true, force: true });
 
   if (edited === original) {
     console.log(`edit: ${idOrSlug} no-change`);
