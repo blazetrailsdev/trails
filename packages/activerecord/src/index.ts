@@ -260,6 +260,8 @@ export {
   QueryCanceled,
   RangeError,
   AssociationTypeMismatch,
+  TableNotSpecified,
+  AsynchronousQueryInsideTransactionError,
 } from "./errors.js";
 export {
   ReadonlyAttributeError,

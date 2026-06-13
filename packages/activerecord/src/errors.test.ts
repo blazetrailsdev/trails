@@ -4,9 +4,7 @@
  * Faithful port of Rails' ErrorsTest — one test, no database, no fixtures,
  * no inline `class extends Base`. Enumerates every implemented exported
  * ActiveRecordError subclass and asserts each can be constructed with no
- * arguments. Two Rails classes (TableNotSpecified,
- * AsynchronousQueryInsideTransactionError) are not yet implemented and are
- * therefore absent from the list.
+ * arguments.
  *
  * AmbiguousSourceReflectionForThroughAssociation is excluded (same exclusion
  * as Rails). In Rails the no-arg constructor raises ArgumentError (wrong number
@@ -69,6 +67,8 @@ import {
   UnknownAttributeReference,
   UnknownPrimaryKey,
   MultiparameterAssignmentErrors,
+  TableNotSpecified,
+  AsynchronousQueryInsideTransactionError,
   RecordInvalid,
   ReadonlyAttributeError,
   AssociationNotFoundError,
@@ -135,6 +135,8 @@ describe("ErrorsTest", () => {
       NoDatabaseError,
       DatabaseVersionError,
       RangeError,
+      TableNotSpecified,
+      AsynchronousQueryInsideTransactionError,
       DatabaseAlreadyExists,
       StaleObjectError,
       ConfigurationError,

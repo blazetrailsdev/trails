@@ -40,6 +40,14 @@ export class AdapterNotFound extends ActiveRecordError {
   }
 }
 
+// Raised when a model makes a query but it has not specified an associated table.
+export class TableNotSpecified extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "TableNotSpecified";
+  }
+}
+
 export class AdapterError extends ActiveRecordError {
   protected _connectionPool?: unknown;
 
@@ -547,6 +555,15 @@ export class RangeError extends StatementInvalid {
   ) {
     super(message, options);
     this.name = "RangeError";
+  }
+}
+
+// AsynchronousQueryInsideTransactionError will be raised when attempting
+// to perform an asynchronous query from inside a transaction.
+export class AsynchronousQueryInsideTransactionError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AsynchronousQueryInsideTransactionError";
   }
 }
 
