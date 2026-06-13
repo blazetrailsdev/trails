@@ -3921,14 +3921,24 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Shared full-manager builder for `toArel`/`arel()` and `_toSql`. Starts from
-   * the eager-load JoinDependency manager when eager loading applies (mirrors
-   * Rails `build_joins` → `apply_join_dependency`), else the base select
-   * manager, then folds CTEs (`WITH`) and annotate() comments into the AST so
-   * their binds thread through the single collector in document order.
+   * Shared full-manager builder for `toArel`/`arel()` and the non-eager
+   * `_toSql`. Mirrors Rails `build_arel` (query_methods.rb#build_arel): the
+   * base select manager (projections, joins, wheres, order, distinct,
+   * limit/offset, group, having, lock, hints, from) with CTEs (`WITH`) and the
+   * de-duplicated annotate() comments folded into the AST so their binds thread
+   * through the single collector in document order.
+   *
+   * Deliberately uses `_buildSelectManager`, NOT the eager-load JoinDependency
+   * manager: Rails `arel`/`build_arel` projects the model's normal columns even
+   * when eager loading (the `t0_r0…` alias projection is added only by
+   * `apply_join_dependency` on the loading path — `relation.rb#to_sql`/
+   * `exec_queries`, mirrored here by `_buildEagerSql`). Routing `arel()` through
+   * the alias manager would make `relation.select(pk).arel()` (subquery use)
+   * project JoinDependency alias columns instead of the single requested
+   * column.
    */
   private _buildArel(): SelectManager {
-    const manager = this._buildEagerOperandManager() ?? this._buildSelectManager();
+    const manager = this._buildSelectManager();
     this._applyCtesAndAnnotationsToManager(manager);
     return manager;
   }
@@ -4149,18 +4159,17 @@ export class Relation<T extends Base> {
   }
 
   // Mirrors: ActiveRecord::Relation#to_sql when eager_loading? — builds the
-  // JoinDependency SQL synchronously for toSql()/parity runner use.
+  // JoinDependency (alias-projecting) SQL synchronously for toSql()/parity
+  // runner use. Rails routes this through apply_join_dependency, whose inner
+  // `relation.to_sql` re-enters build_arel — so CTEs (`WITH`) and annotate()
+  // comments belong here too; fold them into the manager AST via the same
+  // helper `_buildArel` uses, keeping the two paths in sync.
   // Returns null if no eager associations could be joined (fall back to plain SQL).
   private _buildEagerSql(): string | null {
     const manager = this._buildEagerOperandManager();
     if (manager === null) return null;
-
-    let sql = this._compileSelectSql(manager);
-    if (this._annotations.length > 0) {
-      const comments = this._annotationComments();
-      sql = `${sql} ${comments}`;
-    }
-    return sql;
+    this._applyCtesAndAnnotationsToManager(manager);
+    return this._compileSelectSql(manager);
   }
 
   /**

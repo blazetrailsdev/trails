@@ -1609,7 +1609,10 @@ describe("Relation#arel build_arel convergence", () => {
   beforeAll(async () => {
     await defineSchema({
       widgets: { name: "string", category: "string", price: "integer" },
+      gadgets: { widget_id: "integer", label: "string" },
     });
+    registerModel("Widget", Widget);
+    Associations.belongsTo.call(Gadget, "widget", { className: "Widget" });
   });
 
   class Widget extends Base {
@@ -1619,6 +1622,15 @@ describe("Relation#arel build_arel convergence", () => {
       this.attribute("name", "string");
       this.attribute("category", "string");
       this.attribute("price", "integer");
+    }
+  }
+
+  class Gadget extends Base {
+    static _tableName = "gadgets";
+    static {
+      this.attribute("id", "integer");
+      this.attribute("widget_id", "integer");
+      this.attribute("label", "string");
     }
   }
 
@@ -1652,12 +1664,25 @@ describe("Relation#arel build_arel convergence", () => {
     const rel = Widget.with({ cheap: Widget.where({ category: "fruit" }) }).where("1 = 1");
     const sql = arelSql(rel);
     expect(sql).toContain("WITH");
-    expect(sql).toContain('"cheap"');
+    // Quote-char varies by adapter ("cheap" on sqlite/PG, `cheap` on MySQL).
+    expect(sql).toMatch(/["`]cheap["`]/);
     expect(sql).toBe(placeholderSql(rel));
   });
 
   it("arel carries lock", () => {
     const rel = Widget.all().lock("FOR UPDATE");
     expect(arelSql(rel)).toBe(placeholderSql(rel));
+  });
+
+  // Rails `arel`/`build_arel` projects the model's normal columns even when
+  // eager loading — the `t0_r0…` alias projection belongs only to
+  // apply_join_dependency on the loading path. So an eager relation used as a
+  // subquery with an explicit single-column select projects that one column,
+  // not JoinDependency aliases (regression guard for build_arel convergence).
+  it("arel of an eager relation projects normal columns, not join-dependency aliases", () => {
+    const rel = Gadget.eagerLoad("widget").select(Gadget.arelTable.get("id"));
+    const sql = Gadget.connection.toSql(rel.arel().ast);
+    expect(sql).not.toMatch(/t\d+_r\d+/);
+    expect(sql).toMatch(/SELECT\s+["`]gadgets["`]\.["`]id["`]/);
   });
 });
