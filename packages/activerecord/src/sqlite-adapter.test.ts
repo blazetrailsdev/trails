@@ -118,12 +118,16 @@ describe("SQLite adapter driver binding", () => {
     expect(() => adapter.disconnectBang()).not.toThrow();
   });
 
-  it("reconnects an async-only driver after the handle drops", async () => {
+  it("reconnects an async-only driver and reapplies pragmas", async () => {
     const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", { driver: asyncOnlyDriver });
     adapter.disconnectBang();
     expect(adapter.active).toBe(false);
-    await adapter.reconnect();
+    // Full lifecycle: reconnectBang() -> reconnect() (opens) -> configureConnection().
+    await adapter.reconnectBang();
     expect(adapter.active).toBe(true);
+    // foreign_keys defaults OFF in SQLite; ON proves configure_connection ran.
+    const rows = await adapter.execute("PRAGMA foreign_keys");
+    expect(rows).toEqual([{ foreign_keys: 1 }]);
     adapter.disconnectBang();
   });
 });

@@ -2474,52 +2474,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   /** @internal */
   private async _doAsyncConnect(): Promise<void> {
     await this.connectAsync();
-    // Async configureConnection(): await each PRAGMA. Keep this set in sync with it.
-    super.configureConnection();
-    const defaults: [string, string][] = this._readonly
-      ? []
-      : [
-          ["foreign_keys", "ON"],
-          ["journal_mode", "WAL"],
-          ["synchronous", "NORMAL"],
-          ["mmap_size", "134217728"],
-          ["journal_size_limit", "67108864"],
-          ["cache_size", "2000"],
-        ];
-    const dqsValue = this._strict ? "OFF" : "ON";
-    const stmts: [string, string][] = [
-      ...defaults.map(([p, v]): [string, string] => [
-        `${p} = ${v}`,
-        `SQLite default pragma '${p}'`,
-      ]),
-      [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
-      [`dqs_dml = ${dqsValue}`, "SQLite DQS pragma 'dqs_dml'"],
-    ];
-    const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
-    if (pragmas) {
-      for (const [pragma, value] of Object.entries(pragmas)) {
-        if (!/^\w+$/.test(pragma)) continue;
-        const scalar =
-          typeof value === "boolean"
-            ? value
-              ? "1"
-              : "0"
-            : typeof value === "number"
-              ? String(value)
-              : /^\w+$/.test(value)
-                ? value
-                : null;
-        if (scalar === null) continue;
-        stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
-      }
-    }
-    for (const [sql, label] of stmts) {
-      try {
-        await this.driver.pragma(sql);
-      } catch (e) {
-        console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }
+    // configureConnection() returns a Promise for async-only drivers; await it
+    // so every PRAGMA is applied before the connection is handed out.
+    await this.configureConnection();
     // Clear only after a successful open+configure: a failed attempt leaves the
     // adapter pending so the next verifyBang() retries rather than no-opping.
     this._asyncConnectPending = false;
@@ -2546,13 +2503,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await super.verifyBang();
   }
 
-  /** @internal */
-  override configureConnection(): void {
-    // Mirrors Rails: AbstractAdapter#configure_connection → check_version.
-    super.configureConnection();
+  /** True when the bound driver has no `openSync()` (e.g. expo-sqlite). @internal */
+  private driverIsAsync(): boolean {
+    return !this.resolveDriverFactory().openSync;
+  }
+
+  /**
+   * Build the ordered `[sql, label]` PRAGMA list applied on every connection.
+   * Shared by the sync and async `configureConnection()` paths so they can't
+   * drift. @internal
+   */
+  private configurePragmas(): [string, string][] {
+    const stmts: [string, string][] = [];
     if (!this._readonly) {
-      // Apply Rails DEFAULT_PRAGMAS best-effort: an unsupported PRAGMA on a
-      // non-standard SQLite build should warn, not abort construction.
+      // Rails DEFAULT_PRAGMAS, best-effort: an unsupported PRAGMA on a
+      // non-standard SQLite build should warn, not abort.
       const defaults: [string, string][] = [
         ["foreign_keys", "ON"],
         ["journal_mode", "WAL"],
@@ -2561,38 +2526,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         ["journal_size_limit", "67108864"],
         ["cache_size", "2000"],
       ];
-      for (const [pragma, value] of defaults) {
-        try {
-          this.driver.pragma(`${pragma} = ${value}`);
-        } catch (e) {
-          console.warn(
-            `SQLite default pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
-          );
-        }
-      }
+      for (const [p, v] of defaults) stmts.push([`${p} = ${v}`, `SQLite default pragma '${p}'`]);
     }
-    // Best-effort: set DQS for drivers that support it (e.g. node:sqlite with a
-    // build that exposes SQLITE_DBCONFIG_DQS_*). better-sqlite3 compiles SQLite
-    // with SQLITE_DQS=0 and silently ignores these pragmas (returns []); other
-    // drivers may throw on unrecognised pragmas, so we guard with try/catch.
+    // DQS for drivers that support it (e.g. node:sqlite). better-sqlite3 builds
+    // with SQLITE_DQS=0 and silently ignores it; others may throw — guarded below.
     const dqsValue = this._strict ? "OFF" : "ON";
-    for (const dqsPragma of ["dqs_ddl", "dqs_dml"]) {
-      try {
-        this.driver.pragma(`${dqsPragma} = ${dqsValue}`);
-      } catch (e) {
-        console.warn(
-          `SQLite DQS pragma '${dqsPragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-    }
+    stmts.push(
+      [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
+      [`dqs_dml = ${dqsValue}`, "SQLite DQS pragma 'dqs_dml'"],
+    );
     const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
     if (pragmas) {
-      // Validate pragma name is a safe SQLite identifier before interpolating.
-      const SAFE_PRAGMA_NAME = /^\w+$/;
-      // Restrict values to identifier-like strings (enum pragmas) or scalars.
-      const SAFE_PRAGMA_VALUE = /^\w+$/;
+      // Validate pragma name/value as safe SQLite identifiers before interpolating.
+      const SAFE = /^\w+$/;
       for (const [pragma, value] of Object.entries(pragmas)) {
-        if (!SAFE_PRAGMA_NAME.test(pragma)) {
+        if (!SAFE.test(pragma)) {
           console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
           continue;
         }
@@ -2603,20 +2551,47 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
               : "0"
             : typeof value === "number"
               ? String(value)
-              : SAFE_PRAGMA_VALUE.test(value)
+              : SAFE.test(value)
                 ? value
                 : null;
         if (scalar === null) {
           console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
           continue;
         }
-        try {
-          this.driver.pragma(`${pragma} = ${scalar}`);
-        } catch (e) {
-          console.warn(
-            `SQLite pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
-          );
+        stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
+      }
+    }
+    return stmts;
+  }
+
+  /**
+   * Mirrors Rails: AbstractAdapter#configure_connection → check_version. Sync
+   * for in-process drivers; for async-only drivers (no `openSync()`) returns a
+   * Promise that awaits each PRAGMA — the base `attemptConfigureConnection()`
+   * awaits it, so both the initial-open and reconnect paths apply pragmas.
+   * @internal
+   */
+  override configureConnection(): void | Promise<void> {
+    super.configureConnection();
+    const stmts = this.configurePragmas();
+    const warn = (label: string, e: unknown) =>
+      console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
+    if (this.driverIsAsync()) {
+      return (async () => {
+        for (const [sql, label] of stmts) {
+          try {
+            await this.driver.pragma(sql);
+          } catch (e) {
+            warn(label, e);
+          }
         }
+      })();
+    }
+    for (const [sql, label] of stmts) {
+      try {
+        this.driver.pragma(sql);
+      } catch (e) {
+        warn(label, e);
       }
     }
   }
