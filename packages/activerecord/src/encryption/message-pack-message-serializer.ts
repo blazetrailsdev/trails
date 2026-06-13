@@ -9,6 +9,15 @@ import { Properties } from "./properties.js";
 import { DecryptionError, ForbiddenClass } from "./errors.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 
+/**
+ * Raw cipher bytes are carried as Buffers on a freshly-encrypted Message. This
+ * JSON-backed serializer round-trips strings, so render Buffers as latin1
+ * byte-strings (one char per byte); the cipher re-reads them as latin1 on load.
+ */
+function bytesToString(value: unknown): unknown {
+  return Buffer.isBuffer(value) ? value.toString("latin1") : value;
+}
+
 export class MessagePackMessageSerializer implements MessageSerializerLike {
   dump(message: Message): string {
     if (!(message instanceof Message)) {
@@ -37,7 +46,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
   /** @internal */
   private messageToHash(message: Message): Record<string, unknown> {
     return Object.assign(Object.create(null) as Record<string, unknown>, {
-      p: message.payload,
+      p: bytesToString(message.payload),
       h: this.headersToHash(message.headers),
     });
   }
@@ -46,7 +55,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
   private headersToHash(headers: Properties): Record<string, unknown> {
     const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const [key, value] of headers.entries()) {
-      result[key] = value instanceof Message ? this.messageToHash(value) : value;
+      result[key] = value instanceof Message ? this.messageToHash(value) : bytesToString(value);
     }
     return result;
   }

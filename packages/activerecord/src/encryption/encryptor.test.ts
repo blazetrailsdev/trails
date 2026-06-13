@@ -150,13 +150,14 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     // Verify the custom metadata was stored in the message headers.
     const serializer = new MessageSerializer();
     const message = serializer.load(encrypted);
-    expect(message.headers.get("model")).toBe("User");
-    expect(message.headers.get("attr")).toBe("email");
+    // load returns decoded bytes (Buffers); text headers are recovered as UTF-8.
+    expect((message.headers.get("model") as Buffer).toString("utf-8")).toBe("User");
+    expect((message.headers.get("attr") as Buffer).toString("utf-8")).toBe("email");
 
     // Verify the key provider received a Message with the custom metadata headers during decryption.
     expect(receivedMessage).not.toBeNull();
-    expect(receivedMessage!.headers.get("model")).toBe("User");
-    expect(receivedMessage!.headers.get("attr")).toBe("email");
+    expect((receivedMessage!.headers.get("model") as Buffer).toString("utf-8")).toBe("User");
+    expect((receivedMessage!.headers.get("attr") as Buffer).toString("utf-8")).toBe("email");
   });
 
   it("compress? returns the compress setting", () => {

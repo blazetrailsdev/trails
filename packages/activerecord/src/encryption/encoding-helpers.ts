@@ -21,6 +21,19 @@ export function normalizeEncoding(encoding: string): "utf8" | "ascii" | "latin1"
   }
 }
 
+/**
+ * Read a message header value as text. After `MessageSerializer.load`, decoded
+ * values are raw-byte Buffers (Rails' ASCII-8BIT strings); a fresh message may
+ * still hold the original string. Text headers are UTF-8, so decode accordingly.
+ *
+ * @internal
+ */
+export function headerString(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (Buffer.isBuffer(value)) return value.toString("utf-8");
+  return typeof value === "string" ? value : String(value);
+}
+
 /** @internal */
 export function replaceUnencodable(value: string, maxCodePoint: number): string {
   const out: string[] = [];
