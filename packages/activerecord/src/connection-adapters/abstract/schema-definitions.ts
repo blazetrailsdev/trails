@@ -248,6 +248,10 @@ export interface ColumnOptions {
   ifNotExists?: boolean;
   autoIncrement?: boolean;
   unsigned?: boolean;
+  // Virtual/generated-column options (Rails: `t.virtual ..., as:, stored:`),
+  // read by MySQL/PostgreSQL/SQLite `add_column_options!`.
+  as?: string;
+  stored?: boolean;
 }
 
 export interface AddIndexOptions {

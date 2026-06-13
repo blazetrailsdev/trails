@@ -90,20 +90,17 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(opts).toContain("ifNotExists");
   });
 
-  it("addForeignKey with ifNotExists skips creation when a matching FK exists", async () => {
-    let executed = 0;
-    class FkStub extends StubAdapter {
-      override executeMutation(_sql: string) {
-        executed++;
-        return Promise.resolve(0);
-      }
-      override foreignKeys(_table: string) {
-        return Promise.resolve([{ toTable: "authors", column: "author_id" }] as any);
-      }
-    }
-    const stub = new FkStub();
-    await stub.addForeignKey("articles", "authors", { column: "author_id", ifNotExists: true });
-    expect(executed).toBe(0);
+  it("addForeignKey with ifNotExists is a no-op when the FK already exists", async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.createTable("authors", (t) => t.string("name"));
+    await adapter.createTable("articles", (t) => t.bigint("author_id"));
+    await adapter.addForeignKey("articles", "authors", { column: "author_id" });
+    const before = (await adapter.foreignKeys("articles")).length;
+    await adapter.addForeignKey("articles", "authors", {
+      column: "author_id",
+      ifNotExists: true,
+    });
+    expect((await adapter.foreignKeys("articles")).length).toBe(before);
   });
 
   it("addForeignKey with ifNotExists creates the FK when none exists", async () => {
@@ -114,6 +111,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       column: "author_id",
       ifNotExists: true,
     });
-    expect(await (adapter as any).foreignKeyExists("articles", { column: "author_id" })).toBe(true);
+    expect((await adapter.foreignKeys("articles")).length).toBe(1);
   });
 });

@@ -592,14 +592,12 @@ export class SchemaStatements {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    // Mirrors Rails' add_foreign_key:
-    //   return if options[:if_not_exists] == true &&
-    //     foreign_key_exists?(from_table, to_table, **options.slice(:column))
-    if (options.ifNotExists === true) {
-      const exists = options.column
-        ? await this.foreignKeyExists(fromTable, { column: options.column })
-        : await this.foreignKeyExists(fromTable, toTable);
-      if (exists) return;
+    // Mirrors Rails' add_foreign_key short-circuit:
+    //   return if options[:if_not_exists] == true && foreign_key_exists?(...)
+    // trails' foreignKeyExists matches on to_table; Rails additionally slices
+    // :column, which trails' FK-existence check does not yet support.
+    if (options.ifNotExists === true && (await this.foreignKeyExists(fromTable, toTable))) {
+      return;
     }
     // Delegate to adapter-specific FK implementation when the adapter
     // overrides both addForeignKey and checkConstraints (signals full FK

@@ -4183,8 +4183,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       onUpdate?: ReferentialAction;
       deferrable?: "immediate" | "deferred";
       validate?: boolean;
+      ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
+    if (options.ifNotExists === true && (await this.foreignKeyExists(fromTable, toTable))) {
+      return;
+    }
     this.assertValidDeferrable(options.deferrable);
     const { schema: fromSchema, table: fromTbl } = this.parseSchemaQualifiedName(fromTable);
     const { schema: toSchema, table: toTbl } = this.parseSchemaQualifiedName(toTable);
