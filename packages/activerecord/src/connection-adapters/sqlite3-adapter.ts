@@ -52,7 +52,10 @@ import {
 } from "@blazetrails/activemodel";
 import { getFs, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
-import { returningColumnValues as sqliteReturningColumnValues } from "./sqlite3/database-statements.js";
+import {
+  returningColumnValues as sqliteReturningColumnValues,
+  buildTruncateStatement as sqliteBuildTruncateStatement,
+} from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
 import {
@@ -904,6 +907,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   override returningColumnValues(result: Result): unknown[] | undefined {
     return sqliteReturningColumnValues(result);
+  }
+
+  /** SQLite has no TRUNCATE; emit `DELETE FROM`.
+   *  Mirrors: SQLite3::DatabaseStatements#build_truncate_statement
+   * @internal
+   */
+  override buildTruncateStatement(tableName: string): string {
+    return sqliteBuildTruncateStatement.call(this, tableName);
   }
 
   supportsInsertOnConflict(): boolean {

@@ -107,6 +107,10 @@ export interface DatabaseStatementsHost {
   disableReferentialIntegrity?(fn: () => Promise<void>): Promise<void>;
   /** @internal */
   executeBatch?(statements: string[], name?: string): Promise<void>;
+  /** @internal */
+  buildTruncateStatement?(tableName: string): string;
+  /** @internal */
+  buildTruncateStatements?(tableNames: string[]): string[];
   beginDbTransaction?(): Promise<void>;
   beginIsolatedDbTransaction?(isolation: string): Promise<void>;
   commitDbTransaction?(): Promise<void>;
@@ -590,9 +594,16 @@ export async function truncate(
   tableName: string,
   name?: string | null,
 ): Promise<unknown> {
-  const sql = `TRUNCATE TABLE ${this.quoteTableName(tableName)}`;
-  // Rails: execute(build_truncate_statement(table_name), name). Trails' execute
-  // signature is (sql, binds, name), so the log label goes in the third slot.
+  const sql = (this.buildTruncateStatement ?? buildTruncateStatement).call(this, tableName);
+  // Rails: execute(build_truncate_statement(table_name), name). On SQLite the
+  // built statement is `DELETE FROM`, which the adapter's read-only `execute`
+  // (a `.all()` cursor) rejects; route through `executeBatch` (the write
+  // primitive) when present, mirroring `truncateTables`.
+  if (this.executeBatch) {
+    return this.executeBatch([sql], name ?? undefined);
+  }
+  // Rails: execute(...). Trails' execute signature is (sql, binds, name), so the
+  // log label goes in the third slot.
   return (this.execute ?? execute).call(this, sql, [], name ?? undefined);
 }
 
@@ -613,7 +624,7 @@ export async function truncateTables(
 
   if (filtered.length === 0) return;
 
-  const statements = filtered.map((t) => `TRUNCATE TABLE ${this.quoteTableName(t)}`);
+  const statements = (this.buildTruncateStatements ?? buildTruncateStatements).call(this, filtered);
 
   const exec = this.execute ?? execute;
   const doTruncate = async () => {
@@ -1902,10 +1913,14 @@ export function buildTruncateStatement(
  * @internal
  */
 export function buildTruncateStatements(
-  this: Pick<Quoting, "quoteTableName">,
+  this: Pick<Quoting, "quoteTableName"> & {
+    buildTruncateStatement?(tableName: string): string;
+  },
   tableNames: string[],
 ): string[] {
-  return tableNames.map((t) => buildTruncateStatement.call(this, t));
+  return tableNames.map((t) =>
+    (this.buildTruncateStatement ?? buildTruncateStatement).call(this, t),
+  );
 }
 
 /**
