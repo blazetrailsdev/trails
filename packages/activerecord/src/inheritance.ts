@@ -377,18 +377,27 @@ export function instantiateSti(baseClass: typeof Base, row: Record<string, unkno
   const column = getInheritanceColumn(baseClass);
   if (!column) return directInstantiate(baseClass, row);
 
-  // Cast the raw column value through its attribute type before resolving the
-  // subclass — mirrors Rails' find_sti_class, which does
-  // `type_for_attribute(inheritance_column).cast(type_name)`. This is what makes
-  // an enum-backed STI column work: the integer stored in the column (e.g. 3)
-  // casts to its class-name label ("SelectedMembership"), not a bare number.
-  // (We cast here rather than delegating to discriminateClassForRecord because
-  // its using_single_table_inheritance? gate requires the inheritance column to
-  // be a *declared* attribute, which custom STI columns like Parrot's
-  // `parrot_sti_class` are not.)
+  // Mirrors Rails' instantiate flow: when the inheritance column is blank the
+  // row is the base class (Rails' using_single_table_inheritance? is false, so
+  // it falls through to `super`); when it is present it must resolve to a
+  // subclass via find_sti_class — which *raises* SubclassNotFound for an
+  // unknown value rather than silently returning the base class.
   if (!isPresent(row[column])) return directInstantiate(baseClass, row);
-  const typeName = castInheritanceColumnValue(baseClass, column, row[column]) as string | null;
-  if (!typeName || !typeName.trim()) return directInstantiate(baseClass, row);
+
+  // Cast the raw value through its attribute type before resolving — mirrors
+  // find_sti_class's `type_for_attribute(inheritance_column).cast(type_name)`.
+  // This is what makes an enum-backed STI column work: the integer stored in
+  // the column (e.g. 3) casts to its class-name label ("SelectedMembership"),
+  // not a bare number. A present-but-unmapped enum value casts to null; Rails
+  // keeps such values (EnumType#cast's `value.presence` fallback) so that
+  // sti_class_for still raises, so we resolve against the raw value in that
+  // case rather than masking it as the base class. (We cast inline rather than
+  // delegating to discriminateClassForRecord because its
+  // using_single_table_inheritance? gate requires the inheritance column to be
+  // a *declared* attribute, which custom STI columns like Parrot's
+  // `parrot_sti_class` are not.)
+  const cast = castInheritanceColumnValue(baseClass, column, row[column]) as string | null;
+  const typeName = cast ?? String(row[column]);
 
   const subclass = findStiClass(baseClass, typeName);
   return directInstantiate(subclass, row);
