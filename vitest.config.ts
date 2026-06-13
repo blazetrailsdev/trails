@@ -237,9 +237,9 @@ export default defineConfig({
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
           // creates ~354 tables in one beforeAll). At ~30ms per CREATE on MySQL
           // that's ~10.7s, just over the 10s vitest default and a frequent CI
-          // flake source. Bump to 30s to absorb DDL load + CI contention. See
-          // docs/activerecord/phase-f-ddl-tracking-removal.md for context on why
-          // beforeAll-side existence checks no longer batch.
+          // flake source. Bump to 30s to absorb DDL load + CI contention.
+          // beforeAll-side existence checks no longer batch (phase-F DDL
+          // tracking removal).
           hookTimeout: 30_000,
           pool: "forks",
           poolOptions: { forks: { maxForks: TEST_FORKS } },

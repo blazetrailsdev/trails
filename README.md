@@ -4,7 +4,7 @@ TypeScript packages that mirror the Ruby on Rails API.
 
 The goal is **100% API compatible with Rails**, with behavior matched **test for test** against the Rails source. If you can read the [Rails API docs](https://api.rubyonrails.org/), you already know how to use this — class names, method signatures, and behavior are designed to match Rails as closely as TypeScript allows, while adding the type safety that Ruby can't.
 
-> **Milestone — May 2026: ActiveRecord public API at 100%.** Every public method, class, and module from `activerecord/lib/active_record/**/*.rb` has a TypeScript counterpart (`api:compare` 4969/4969). Behavior parity (test-for-test) continues — see [`docs/activerecord/activerecord-100-plan.md`](docs/activerecord/activerecord-100-plan.md) for the post-100% Rails-fidelity work.
+> **Milestone — May 2026: ActiveRecord public API at 100%.** Every public method, class, and module from `activerecord/lib/active_record/**/*.rb` has a TypeScript counterpart (`api:compare` 4969/4969). Behavior parity (test-for-test) continues — the post-100% Rails-fidelity work is tracked as stories in the tasks repo (`pnpm tasks ready`).
 
 ## Zero-declare models — `trails-tsc`
 
