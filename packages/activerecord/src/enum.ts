@@ -400,8 +400,9 @@ export class EnumMethods {
       });
       detectEnumConflictBang.call(klass, name, `${valueMethodName}!`);
       Object.defineProperty(klass.prototype, `${valueMethodName}!`, {
-        value: async function (this: EnumInstanceHost) {
-          await this.updateBang({ [name]: value });
+        value: function (this: EnumInstanceHost) {
+          // Returns update!'s result (true), mirroring Rails' bang setter.
+          return this.updateBang({ [name]: value });
         },
         writable: true,
         configurable: true,
