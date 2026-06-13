@@ -20,13 +20,15 @@ import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
@@ -1163,6 +1165,83 @@ function refine(id: string, pr: number | null, dir: string): void {
   console.log(JSON.stringify({ id, outcome, pushed: true, pr }));
 }
 
+// ──────────────────── editor-driven body edit ────────────────────
+
+// Resolves an `edit` argument to a repo-relative `.md` path. The same token
+// addresses either a story (matched by id in the index's stories) or an RFC
+// README (matched by slug in its rfcs) — RFC-body editing is the load-bearing
+// case for RFC 0024's "no hand-editing the tasks repo" goal. Stories are tried
+// first; both id and slug namespaces are flat and distinct in practice. Returns
+// null when neither matches, so the caller prints one error. Pure for tests.
+export function resolveEditTarget(index: Index, idOrSlug: string): string | null {
+  const story = index.stories.find((s) => s.id === idOrSlug);
+  if (story) return story.file_path;
+  const rfc = index.rfcs.find((r) => r.id === idOrSlug);
+  if (rfc) return rfc.file_path;
+  return null;
+}
+
+// The editor command to spawn, as argv: $VISUAL, then $EDITOR, then a `vi`
+// fallback. Split on whitespace so `EDITOR="code --wait"` is honored. Pure and
+// exported so the precedence/fallback is unit-testable without spawning.
+export function editorArgv(env: { VISUAL?: string; EDITOR?: string }): string[] {
+  const spec = env.VISUAL?.trim() || env.EDITOR?.trim() || "vi";
+  return spec.split(/\s+/);
+}
+
+// `tasks edit <id-or-rfc-slug>`: open a story or RFC README in $EDITOR and
+// commit the saved content via the same full-content write path `refine` uses.
+// Copies the target to a temp file so the canonical checkout never goes dirty;
+// short-circuits with no commit when the editor exits unchanged (mirrors
+// refine's no-change case). Frontmatter the user edits is preserved verbatim by
+// the full-content write; only `updated` is bumped afterward.
+function edit(idOrSlug: string): void {
+  inGitTasks();
+  const target = resolveEditTarget(loadIndex(), idOrSlug);
+  if (!target) {
+    console.error(`error: "${idOrSlug}" matched no story id or RFC slug`);
+    process.exit(1);
+  }
+  const file = join(TASKS_DIR, target);
+  if (!existsSync(file)) {
+    console.error(`error: ${file} not found`);
+    process.exit(1);
+  }
+  const original = readFileSync(file, "utf8");
+
+  // Temp copy keeps a `.md` extension (story slug or README.md) so the editor
+  // applies markdown mode; the whole temp dir is removed in `finally`.
+  const tmpRoot = mkdtempSync(join(tmpdir(), "tasks-edit-"));
+  const tmpFile = join(tmpRoot, target.slice(target.lastIndexOf("/") + 1));
+  let edited: string;
+  try {
+    writeFileSync(tmpFile, original);
+    const argv = editorArgv(process.env);
+    execFileSync(argv[0], [...argv.slice(1), tmpFile], { stdio: "inherit" });
+    edited = readFileSync(tmpFile, "utf8");
+  } finally {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+
+  if (edited === original) {
+    console.log(`edit: ${idOrSlug} no-change`);
+    return;
+  }
+
+  commitAndPush({
+    message: `edit: ${idOrSlug}`,
+    fileToStage: file,
+    raceMessage: RETRY_MSG(idOrSlug),
+    raceExitCode: 4,
+    pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
+    mutator: () => {
+      writeFileSync(file, edited);
+      editFrontmatter(file, { updated: today() });
+    },
+  });
+  console.log(`edit: ${idOrSlug} changed`);
+}
+
 // ──────────────────── formatter + reindex ────────────────────
 
 // Run `prettier --write` on `files` using the tasks repo's own prettier binary
@@ -1677,6 +1756,12 @@ function main(): void {
       refine(id, refinePr, stringFlag(flags, "dir") ?? TASKS_DIR);
       break;
     }
+    case "edit": {
+      const id = pos[0];
+      if (!id) usage();
+      edit(id);
+      break;
+    }
     case "priority": {
       const id = pos[0];
       if (!id) usage();
@@ -1717,6 +1802,7 @@ function usage(): never {
   done <id> --pr <N> [--force]
   block <id> --reason "<text>"
   refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
+  edit <id-or-rfc-slug>                        ($EDITOR body edit for a story or RFC README)
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
   status-set <id> <status>                     (draft ↔ ready, blocked → ready; validates the transition)
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]

@@ -41,6 +41,8 @@ import {
   numberFlag,
   parseFlags,
   ready,
+  resolveEditTarget,
+  editorArgv,
   removeFrontmatterKey,
   setFrontmatterList,
   resolveTasksDir,
@@ -123,6 +125,34 @@ describe("ready", () => {
       story({ id: "b", rfc: "0002-r", cluster: "c3" }),
     ]);
     expect(ready(idx, { rfc: "0001-r" }).map((s) => s.id)).toEqual(["a"]);
+  });
+});
+
+describe("resolveEditTarget", () => {
+  it("resolves a story id to its repo-relative file path", () => {
+    const idx = index([story({ id: "a", file_path: "0001-r/stories/a.md" })]);
+    expect(resolveEditTarget(idx, "a")).toBe("0001-r/stories/a.md");
+  });
+
+  it("resolves an RFC slug to its README path", () => {
+    const idx = index([]);
+    expect(resolveEditTarget(idx, "0002-r")).toBe("0002-r/README.md");
+  });
+
+  it("returns null when neither a story id nor an RFC slug matches", () => {
+    expect(resolveEditTarget(index([]), "nope")).toBeNull();
+  });
+});
+
+describe("editorArgv", () => {
+  it("prefers $VISUAL over $EDITOR", () => {
+    expect(editorArgv({ VISUAL: "emacs", EDITOR: "vim" })).toEqual(["emacs"]);
+  });
+
+  it("falls back to $EDITOR then vi, and splits args", () => {
+    expect(editorArgv({ EDITOR: "code --wait" })).toEqual(["code", "--wait"]);
+    expect(editorArgv({})).toEqual(["vi"]);
+    expect(editorArgv({ VISUAL: "  ", EDITOR: "" })).toEqual(["vi"]);
   });
 });
 
