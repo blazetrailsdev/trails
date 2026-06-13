@@ -399,6 +399,13 @@ export function quotedDate(
 /**
  * Format a time value for SQL, stripping the date prefix.
  *
+ * Mirrors Rails' `quoted_time` (abstract/quoting.rb:203), which normalises the
+ * date to 2000-01-01 then returns `quoted_date(value).sub(/\A\d\d\d\d-\d\d-\d\d /, "")`.
+ * We call the module-level {@link quotedDate} rather than `self.quoted_date`:
+ * the date is pinned to year 2000, so an adapter's `quotedDate` override can
+ * never change the output (PostgreSQL's only override appends " BC" for years
+ * ≤ 0). Keeping it module-level avoids threading `this` for no observable gain.
+ *
  * @internal
  */
 export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
@@ -416,7 +423,7 @@ export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): 
           value.nanosecond,
         )
       : value.with({ year: 2000, month: 1, day: 1 });
-  return formatPlainDateTimeForSql(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
+  return quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 
 /** @internal */
