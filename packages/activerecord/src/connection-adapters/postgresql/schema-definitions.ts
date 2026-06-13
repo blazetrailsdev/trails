@@ -230,6 +230,20 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   /** @internal */
+  protected override validColumnDefinitionOptions(): string[] {
+    return [
+      ...super.validColumnDefinitionOptions(),
+      "array",
+      "using",
+      "castAs",
+      "as",
+      "type",
+      "enumType",
+      "stored",
+    ];
+  }
+
+  /** @internal */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
       if (!(type in this.prototype)) {
@@ -491,14 +505,6 @@ export class AlterTable extends AbstractAlterTable {
   addUniqueConstraint(columnName: string | string[], options: UniqueConstraintOptions = {}): void {
     this.uniqueConstraintAdds.push(this._pgTd.newUniqueConstraintDefinition(columnName, options));
   }
-}
-
-/** @internal */
-function validColumnDefinitionOptions(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb:285 cluster=pg-long-tail
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#valid_column_definition_options is not implemented",
-  );
 }
 
 /** @internal */

@@ -842,12 +842,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     tableName: string,
     columnName: string,
     type: string,
-    options: Record<string, unknown> = {},
+    options: ColumnOptions = {},
   ): Promise<ChangeColumnDefinition> {
     const column = await this.columnFor(tableName, columnName);
     const resolvedType = type || column.sqlType || "";
 
-    const opts = { ...options };
+    const opts: Record<string, unknown> = { ...options };
 
     if (!Object.prototype.hasOwnProperty.call(opts, "default")) {
       opts["default"] = column.defaultFunction ? () => column.defaultFunction : column.default;

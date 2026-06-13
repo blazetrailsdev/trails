@@ -392,3 +392,16 @@ describe("Table delegation", () => {
     expect(schema.validateCheckConstraint).toHaveBeenCalledWith("products", "price_check");
   });
 });
+
+describe("TableDefinition#validColumnDefinitionOptions", () => {
+  it("adds the PostgreSQL-specific option keys to the abstract set", () => {
+    const td = new TableDefinition("articles");
+    const opts = (td as any).validColumnDefinitionOptions() as string[];
+    for (const key of ["array", "using", "castAs", "as", "type", "enumType", "stored"]) {
+      expect(opts).toContain(key);
+    }
+    // Abstract OPTION_NAMES carry through via super.
+    expect(opts).toContain("collation");
+    expect(opts).toContain("ifNotExists");
+  });
+});

@@ -82,4 +82,53 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       stub.removeForeignKey("products", { name: "fk_products_user_id" }),
     ).resolves.toBeUndefined();
   });
+
+  it("validColumnDefinitionOptions includes ifExists (Rails OPTION_NAMES)", () => {
+    const stub = new StubAdapter();
+    const opts = (stub as any).validColumnDefinitionOptions() as string[];
+    expect(opts).toContain("ifExists");
+    expect(opts).toContain("ifNotExists");
+  });
+
+  it("addForeignKey with ifNotExists is a no-op when the FK already exists", async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.createTable("authors", (t) => t.string("name"));
+    await adapter.createTable("articles", (t) => t.bigint("author_id"));
+    await adapter.addForeignKey("articles", "authors", { column: "author_id" });
+    const before = (await adapter.foreignKeys("articles")).length;
+    await adapter.addForeignKey("articles", "authors", {
+      column: "author_id",
+      ifNotExists: true,
+    });
+    expect((await adapter.foreignKeys("articles")).length).toBe(before);
+  });
+
+  it("addForeignKey with ifNotExists creates the FK when none exists", async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.createTable("authors", (t) => t.string("name"));
+    await adapter.createTable("articles", (t) => t.bigint("author_id"));
+    await adapter.addForeignKey("articles", "authors", {
+      column: "author_id",
+      ifNotExists: true,
+    });
+    expect((await adapter.foreignKeys("articles")).length).toBe(1);
+  });
+
+  it("addForeignKey with ifNotExists creates a second FK to the same table on a different column", async () => {
+    // Rails slices :column into the existence check, so a same-target FK on a
+    // different column is NOT short-circuited.
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.createTable("authors", (t) => t.string("name"));
+    await adapter.createTable("articles", (t) => {
+      t.bigint("author_id");
+      t.bigint("editor_id");
+    });
+    await adapter.addForeignKey("articles", "authors", { column: "author_id" });
+    await adapter.addForeignKey("articles", "authors", {
+      column: "editor_id",
+      ifNotExists: true,
+    });
+    const cols = (await adapter.foreignKeys("articles")).map((fk) => fk.column).sort();
+    expect(cols).toEqual(["author_id", "editor_id"]);
+  });
 });
