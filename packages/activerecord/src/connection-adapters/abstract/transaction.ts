@@ -301,7 +301,7 @@ export class Transaction {
   private _connection: TransactionConnection;
   private _joinable: boolean;
   readonly isolationLevel: string | null;
-  private _materialized = false;
+  protected _materialized = false;
   private _runCommitCallbacks: boolean;
   private _dirty = false;
   written = false;
@@ -727,7 +727,26 @@ export class SavepointTransaction extends Transaction {
   }
 
   override async materializeBang(): Promise<void> {
-    await this.connection.createSavepoint(this.savepointName);
+    // Flip `_materialized` before the awaited `createSavepoint` so that a
+    // re-entrant `materializeTransactions` pass — triggered by queries the
+    // cascade issues while we await (e.g. a mutual `has_one`/`belongs_to`
+    // autosave pair re-entering the save of the original child) — sees
+    // `isMaterialized()` and skips this transaction, avoiding a second
+    // `materializeBang` and the double `_instrumenter.start()` that PostgreSQL
+    // rejects with InstrumentationAlreadyStartedError. Mirrors Rails
+    // `materialize_transactions`' `return if @materializing_transactions`
+    // guard, which the AsyncContext-owner match fails to fire across the
+    // cross-record cascade.
+    this._materialized = true;
+    try {
+      await this.connection.createSavepoint(this.savepointName);
+    } catch (err) {
+      // createSavepoint never ran super.materializeBang(), so the instrumenter
+      // was never started — roll the early flag back so a later rollback/commit
+      // does not call _instrumenter.finish() on an unstarted instrumenter.
+      this._materialized = false;
+      throw err;
+    }
     await super.materializeBang();
   }
 
