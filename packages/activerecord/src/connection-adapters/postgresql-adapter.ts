@@ -190,7 +190,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (variables) {
       // Rails: PGOPTIONS = variables.filter_map { "-c name=value" unless :default }
       const pgOptions = Object.entries(variables)
-        .filter(([, v]) => v !== ":default" && v !== "default")
+        .filter(([, v]) => v !== ":default")
         .map(([name, v]) => `-c ${name}=${String(v).replace(/[ \\]/g, "\\$&")}`)
         .join(" ");
       if (pgOptions) env.PGOPTIONS = pgOptions;
