@@ -34,6 +34,25 @@ export async function withDbWarningsAction(
 export const MYSQL_TEST_URL =
   process.env.MYSQL_TEST_URL ?? "mysql://root@localhost:3306/rails_js_test";
 
+/** The database component of a MySQL connection URL (`/foo` → `foo`). */
+export function databaseName(url: string): string {
+  return new URL(url).pathname.replace(/^\//, "");
+}
+
+/**
+ * ARTest models the AR suite as two databases — `arunit` (primary) and
+ * `arunit2` — and reads both names from `ARTest.test_configuration_hashes`.
+ * Rails' cross-database-select probe references them by those configured
+ * names rather than inventing throwaway databases. trails provisions a single
+ * MySQL server (`MYSQL_TEST_URL`), so we derive the two database names from
+ * that config by suffixing the primary database. The names are dedicated to
+ * the cross-database probe — kept off the shared primary, whose canonical
+ * tables parallel test workers create and drop — but config-derived, not
+ * invented per call.
+ */
+export const ARUNIT_DATABASE = `${databaseName(MYSQL_TEST_URL)}_arunit`;
+export const ARUNIT2_DATABASE = `${databaseName(MYSQL_TEST_URL)}_arunit2`;
+
 let mysqlAvailable = false;
 let mariaDb = false;
 let mysqlVersionStr = "";

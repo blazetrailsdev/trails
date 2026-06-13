@@ -7,11 +7,14 @@
  * `describeIfMysql`, which is `describe.skip` when MYSQL_TEST_URL is absent.
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
-
-function databaseName(url: string): string {
-  return new URL(url).pathname.replace(/^\//, "");
-}
+import {
+  describeIfMysql,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+  databaseName,
+  ARUNIT_DATABASE,
+  ARUNIT2_DATABASE,
+} from "./test-helper.js";
 
 describeIfMysql("AdapterTest", () => {
   let adapter: Mysql2Adapter;
@@ -45,14 +48,21 @@ describeIfMysql("AdapterTest", () => {
   });
 
   it("not specifying database name for cross database selects", async () => {
-    const db1 = "cross_db_select_1";
-    const db2 = "cross_db_select_2";
-    await adapter.execute(`DROP DATABASE IF EXISTS ${db1}`);
-    await adapter.execute(`DROP DATABASE IF EXISTS ${db2}`);
-    await adapter.execute(`CREATE DATABASE ${db1}`);
-    await adapter.execute(`CREATE DATABASE ${db2}`);
-    await adapter.execute(`CREATE TABLE ${db1}.pirates (id INT PRIMARY KEY)`);
-    await adapter.execute(`CREATE TABLE ${db2}.courses (id INT PRIMARY KEY)`);
+    // Rails reads `arunit`/`arunit2` from `ARTest.test_configuration_hashes`
+    // and selects `arunit.pirates` joined with `arunit2.courses`. We mirror
+    // that two-database layout with the config-derived `ARUNIT_DATABASE` /
+    // `ARUNIT2_DATABASE` names (see test-helper), seeding `pirates` in the
+    // first and `courses` in the second using their canonical columns.
+    await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT_DATABASE}`);
+    await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT2_DATABASE}`);
+    await adapter.execute(`CREATE DATABASE ${ARUNIT_DATABASE}`);
+    await adapter.execute(`CREATE DATABASE ${ARUNIT2_DATABASE}`);
+    await adapter.execute(
+      `CREATE TABLE ${ARUNIT_DATABASE}.pirates (id INT AUTO_INCREMENT PRIMARY KEY, catchphrase VARCHAR(255), parrot_id INT)`,
+    );
+    await adapter.execute(
+      `CREATE TABLE ${ARUNIT2_DATABASE}.courses (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), college_id INT)`,
+    );
 
     // Mirrors Rails establishing a connection with the `:database` key removed:
     // a cross-database select must succeed without a default database set.
@@ -62,12 +72,13 @@ describeIfMysql("AdapterTest", () => {
     try {
       // assert_nothing_raised: the select resolves without throwing.
       await noDbAdapter.execute(
-        `SELECT ${db1}.pirates.*, ${db2}.courses.* FROM ${db1}.pirates, ${db2}.courses`,
+        `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
+          `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
       );
     } finally {
       await noDbAdapter.close();
-      await adapter.execute(`DROP DATABASE IF EXISTS ${db1}`);
-      await adapter.execute(`DROP DATABASE IF EXISTS ${db2}`);
+      await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT_DATABASE}`);
+      await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT2_DATABASE}`);
     }
   });
 });
