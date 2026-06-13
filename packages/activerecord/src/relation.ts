@@ -3921,6 +3921,33 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Mirror Rails `apply_join_dependency` for subquery embedding: convert the
+   * eager_load/includes associations into LEFT OUTER joins and clear the eager
+   * values, so `arel()` carries the join (with a normal projection) instead of
+   * dropping it. A no-op when the relation is not eager-loading.
+   *
+   * Rails `RelationHandler#call` does `value = value.apply_join_dependency`
+   * before selecting the primary key and reading `value.arel`
+   * (predicate_builder/relation_handler.rb:7); `apply_join_dependency` builds a
+   * JoinDependency over `eager_load_values | includes_values` and returns
+   * `except(:includes, :eager_load, :preload).joins!(join_dependency)`
+   * (finder_methods.rb:457). trails models the same outcome with
+   * `leftOuterJoins` (rendered as OUTER joins by `_applyJoinsToManager`) over
+   * the cleared eager specs.
+   * @internal
+   */
+  applyJoinDependencyForArel(): Relation<T> {
+    if (!this._eagerLoadingForSql()) return this;
+    const eagerSpecs = [
+      ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
+    ];
+    const rel = this._clone();
+    rel._eagerLoadAssociations = [];
+    rel._includesAssociations = [];
+    return rel.leftOuterJoins(eagerSpecs) as Relation<T>;
+  }
+
+  /**
    * Shared full-manager builder for `toArel`/`arel()` and the non-eager
    * `_toSql`. Mirrors Rails `build_arel` (query_methods.rb#build_arel): the
    * base select manager (projections, joins, wheres, order, distinct,

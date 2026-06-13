@@ -1685,4 +1685,14 @@ describe("Relation#arel build_arel convergence", () => {
     expect(sql).not.toMatch(/t\d+_r\d+/);
     expect(sql).toMatch(/SELECT\s+["`]gadgets["`]\.["`]id["`]/);
   });
+
+  // Mirrors Rails RelationHandler applying apply_join_dependency before the
+  // subquery: an eager-loading relation used as a `where(id: …)` value has its
+  // eager_load converted to a LEFT OUTER JOIN (not dropped), projecting only PK.
+  it("where with eager-loading relation subquery converts eager-load to a join", () => {
+    const sql = Widget.where({ id: Gadget.eagerLoad("widget") }).toSql();
+    expect(sql).toContain("LEFT OUTER JOIN");
+    expect(sql).toMatch(/IN \(SELECT ["`]gadgets["`]\.["`]id["`]/);
+    expect(sql).not.toMatch(/t\d+_r\d+/);
+  });
 });

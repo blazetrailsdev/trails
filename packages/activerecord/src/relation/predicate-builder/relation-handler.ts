@@ -12,13 +12,23 @@ import { Nodes } from "@blazetrails/arel";
  */
 export class RelationHandler {
   call(attribute: Nodes.Attribute, value: any): Nodes.Node {
-    const relation = this.ensureSingleColumnSelect(attribute, value);
+    const relation = this.ensureSingleColumnSelect(attribute, this.applyJoinDependency(value));
     return attribute.in(relation.toArel());
   }
 
   callNegated(attribute: Nodes.Attribute, value: any): Nodes.Node {
-    const relation = this.ensureSingleColumnSelect(attribute, value);
+    const relation = this.ensureSingleColumnSelect(attribute, this.applyJoinDependency(value));
     return attribute.notIn(relation.toArel());
+  }
+
+  // Mirrors Rails `if value.eager_loading? value = value.send(:apply_join_dependency) end`
+  // (predicate_builder/relation_handler.rb:7): normalize an eager-loading
+  // subquery so its eager_load/includes become regular (OUTER) joins before the
+  // PK select + `value.arel`, rather than being dropped.
+  private applyJoinDependency(value: any): any {
+    return typeof value?.applyJoinDependencyForArel === "function"
+      ? value.applyJoinDependencyForArel()
+      : value;
   }
 
   private ensureSingleColumnSelect(attribute: Nodes.Attribute, value: any): any {
