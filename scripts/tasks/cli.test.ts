@@ -45,6 +45,7 @@ import {
   resolveEditTarget,
   editorArgv,
   removeFrontmatterKey,
+  rfcStatusError,
   setFrontmatterList,
   resolveTasksDir,
   statusEdits,
@@ -419,6 +420,36 @@ describe("statusTransitionError", () => {
 
   it("rejects when the current status cannot be read", () => {
     expect(statusTransitionError(null, "ready")).toMatch(/cannot read current status/);
+  });
+});
+
+describe("rfcStatusError", () => {
+  it("accepts a valid status with no supersede", () => {
+    expect(rfcStatusError("active", undefined)).toBeNull();
+  });
+
+  it("accepts no status at all (array-only edit)", () => {
+    expect(rfcStatusError(undefined, undefined)).toBeNull();
+  });
+
+  it("rejects a status outside the allowed set", () => {
+    expect(rfcStatusError("archived", undefined)).toMatch(/invalid status "archived"/);
+  });
+
+  it("requires --supersede when status is superseded", () => {
+    expect(rfcStatusError("superseded", undefined)).toMatch(/requires --supersede/);
+  });
+
+  it("accepts superseded with a supersede target", () => {
+    expect(rfcStatusError("superseded", "0001-other")).toBeNull();
+  });
+
+  it("treats --supersede with no status as implying superseded", () => {
+    expect(rfcStatusError(undefined, "0001-other")).toBeNull();
+  });
+
+  it("rejects --supersede combined with a non-superseded status", () => {
+    expect(rfcStatusError("active", "0001-other")).toMatch(/--supersede conflicts/);
   });
 });
 

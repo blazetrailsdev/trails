@@ -76,6 +76,13 @@ export const STORY_STATUSES: readonly StoryStatus[] = [
   "done",
   "blocked",
 ];
+export const RFC_STATUSES: readonly RfcStatus[] = [
+  "draft",
+  "active",
+  "closed",
+  "postponed",
+  "superseded",
+];
 
 export interface RfcEntry {
   id: string;
@@ -1089,6 +1096,154 @@ function setStatus(id: string, target: StoryStatus): void {
   console.log(`set ${id} status ${target}`);
 }
 
+// ──────────────────── RFC frontmatter mutations ────────────────────
+
+// Pure validation of the `rfc` command's status/supersede pairing, unit-testable
+// without a git repo. Returns null when the request is coherent, else a
+// human-readable rejection. `--supersede` and `status: superseded` are bound:
+// either one implies the other, and the validator (and finalize-rfc) require a
+// `superseded-by` target whenever status is superseded — so we reject the
+// half-specified forms up front rather than committing an invalid frontmatter.
+export function rfcStatusError(
+  status: string | undefined,
+  supersede: string | undefined,
+): string | null {
+  if (status !== undefined && !RFC_STATUSES.includes(status as RfcStatus)) {
+    return `invalid status "${status}" — expected one of ${RFC_STATUSES.join(", ")}`;
+  }
+  if (status === "superseded" && supersede === undefined) {
+    return `status superseded requires --supersede <other-slug>`;
+  }
+  if (supersede !== undefined && status !== undefined && status !== "superseded") {
+    return `--supersede conflicts with --status ${status} (it implies status superseded)`;
+  }
+  return null;
+}
+
+function rfcFilePath(index: Index, slug: string): string {
+  const entry = index.rfcs.find((r) => r.id === slug);
+  if (!entry) {
+    console.error(`error: RFC "${slug}" not found in index`);
+    process.exit(1);
+  }
+  return join(TASKS_DIR, entry.file_path);
+}
+
+function parseCsv(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// `tasks rfc <slug>` — overloaded RFC frontmatter editor covering the moves
+// previously made by hand: status transitions (with the superseded/superseded-by
+// pairing), and the array fields related-rfcs / clusters / packages. Every
+// requested reference (--supersede / --relate targets) is checked against the
+// index *before* any write, and a clusters change that would orphan one of this
+// RFC's stories is surfaced as a warning early (the validator would reject it at
+// commit time). All edits go through one commitAndPush so `updated` is bumped and
+// the change lands atomically.
+function rfc(
+  slug: string,
+  opts: {
+    status?: string;
+    supersede?: string;
+    relate?: string;
+    clusters?: string;
+    packages?: string;
+  },
+): void {
+  inGitTasks();
+  const index = loadIndex();
+  const file = rfcFilePath(index, slug);
+
+  const statusError = rfcStatusError(opts.status, opts.supersede);
+  if (statusError !== null) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: ${statusError} for ${slug}`);
+    process.exit(2);
+  }
+
+  // --supersede implies status superseded even when --status is omitted.
+  const status = opts.supersede !== undefined ? "superseded" : opts.status;
+
+  const rfcExists = (s: string): boolean => index.rfcs.some((r) => r.id === s);
+  if (opts.supersede !== undefined && !rfcExists(opts.supersede)) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: --supersede target "${opts.supersede}" does not exist`);
+    process.exit(2);
+  }
+  const relate = opts.relate !== undefined ? parseCsv(opts.relate) : undefined;
+  if (relate) {
+    const missing = relate.filter((r) => !rfcExists(r));
+    if (missing.length) {
+      restoreGeneratedFiles(TASKS_DIR);
+      console.error(`error: --relate target(s) do not exist: ${missing.join(", ")}`);
+      process.exit(2);
+    }
+  }
+  const clusters = opts.clusters !== undefined ? parseCsv(opts.clusters) : undefined;
+  const packages = opts.packages !== undefined ? parseCsv(opts.packages) : undefined;
+
+  if (
+    status === undefined &&
+    relate === undefined &&
+    clusters === undefined &&
+    packages === undefined
+  ) {
+    restoreGeneratedFiles(TASKS_DIR);
+    usage();
+  }
+
+  // Warn (don't block) on a clusters change that drops a cluster still referenced
+  // by one of this RFC's stories — the same condition `validate.mjs` rejects at
+  // commit. Surfacing it here gives an actionable message before the pre-commit
+  // hook fails the push with a less obvious error.
+  if (clusters !== undefined) {
+    const orphaned = index.stories
+      .filter((s) => s.rfc === slug && s.cluster !== null && !clusters.includes(s.cluster))
+      .map((s) => `${s.id} (cluster "${s.cluster}")`);
+    if (orphaned.length) {
+      console.warn(
+        `warning: clusters change orphans ${orphaned.length} story/stories whose cluster is no ` +
+          `longer declared: ${orphaned.join(", ")}. The commit will fail validation unless you ` +
+          `reassign them (pnpm tasks ... ) or keep the cluster.`,
+      );
+    }
+  }
+
+  const changes: string[] = [];
+  if (status !== undefined) {
+    changes.push(
+      opts.supersede !== undefined ? `superseded by ${opts.supersede}` : `status ${status}`,
+    );
+  }
+  if (relate !== undefined) changes.push(`relate [${relate.join(", ")}]`);
+  if (clusters !== undefined) changes.push(`clusters [${clusters.join(", ")}]`);
+  if (packages !== undefined) changes.push(`packages [${packages.join(", ")}]`);
+
+  commitAndPush({
+    message: `rfc ${slug}: ${changes.join(", ")}`,
+    fileToStage: file,
+    raceMessage: RETRY_MSG(slug),
+    raceExitCode: 4,
+    pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
+    mutator: () => {
+      if (status !== undefined) {
+        const scalar: Record<string, string> = { status };
+        if (opts.supersede !== undefined) scalar["superseded-by"] = JSON.stringify(opts.supersede);
+        editFrontmatter(file, scalar);
+      }
+      if (relate !== undefined) setFrontmatterList(file, "related-rfcs", relate);
+      if (clusters !== undefined) setFrontmatterList(file, "clusters", clusters);
+      if (packages !== undefined) setFrontmatterList(file, "packages", packages);
+      editFrontmatter(file, { updated: today() });
+    },
+  });
+  console.log(`rfc ${slug}: ${changes.join(", ")}`);
+}
+
 // Single exit point for a refine agent: commit whatever it edited in the
 // story file in place, push with the same rebase-retry as the other
 // mutations, and print a machine-readable summary the orchestration layer
@@ -1696,6 +1851,10 @@ function main(): void {
     "deps",
     "priority",
     "body-file",
+    "supersede",
+    "relate",
+    "clusters",
+    "packages",
   ];
   for (const k of valueFlags) if (flags[k] === true) usage();
 
@@ -1861,6 +2020,18 @@ function main(): void {
       setStatus(id, target as StoryStatus);
       break;
     }
+    case "rfc": {
+      const slug = pos[0];
+      if (!slug) usage();
+      rfc(slug, {
+        status: stringFlag(flags, "status"),
+        supersede: stringFlag(flags, "supersede"),
+        relate: stringFlag(flags, "relate"),
+        clusters: stringFlag(flags, "clusters"),
+        packages: stringFlag(flags, "packages"),
+      });
+      break;
+    }
     default:
       usage();
   }
@@ -1883,6 +2054,7 @@ function usage(): never {
   edit <id-or-rfc-slug>                        ($EDITOR body edit for a story or RFC README)
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
   status-set <id> <status>                     (draft ↔ ready, blocked → ready; validates the transition)
+  rfc <slug> [--status <s>] [--supersede <other-slug>] [--relate <csv>] [--clusters <csv>] [--packages <csv>]
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
   finalize <0000-slug> [--dry-run]             (assign the next RFC number: rename dir, rewrite refs, rebuild index)
   reindex | build                              (rebuild the index in place)
