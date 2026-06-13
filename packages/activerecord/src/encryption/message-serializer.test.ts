@@ -69,10 +69,9 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   });
 
   it("encodes non-ASCII string headers as UTF-8 bytes, matching Rails", () => {
-    // Rails base64-encodes the String's own bytes (Base64.strict_encode64), which
-    // for a UTF-8 string are its UTF-8 bytes. Header text values must therefore be
-    // UTF-8-encoded — never latin1, which would diverge from Rails for bytes in
-    // 0x80..0xFF and silently truncate code points > 0xFF (e.g. emoji).
+    // Rails base64s the String's own bytes (UTF-8 for a UTF-8 string). Header text
+    // must be UTF-8-encoded — latin1 would diverge for 0x80..0xFF and truncate
+    // code points > 0xFF (e.g. emoji).
     const serializer = new MessageSerializer();
     const message = new Message("payload");
     message.addHeader("tag", "café 😀");
@@ -86,8 +85,8 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   });
 
   it("encodes raw Buffer header values with a single base64 hop", () => {
-    // Cipher header bytes (iv, at) arrive as Buffers and must be base64-encoded
-    // exactly once — base64(raw bytes), the MRI wire format — not re-encoded.
+    // Cipher header bytes (iv, at) arrive as Buffers: base64(raw bytes) once — the
+    // MRI wire format — never re-encoded.
     const serializer = new MessageSerializer();
     const message = new Message("payload");
     const ivBytes = Buffer.from([0x00, 0x80, 0xff, 0x10, 0x20]);
