@@ -524,7 +524,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return exception.errno ?? null;
   }
 
-  async disableReferentialIntegrity(): Promise<void> {}
+  async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+    // Rails uses query_value/update here; in trails those route through the
+    // unimplemented internal_exec_query path on MySQL, so go through
+    // selectValue/execute, which dispatch to the adapter's execQuery override.
+    const old = await this.selectValue("SELECT @@FOREIGN_KEY_CHECKS");
+    try {
+      await this.execute("SET FOREIGN_KEY_CHECKS = 0");
+      await fn();
+    } finally {
+      if (this.active) await this.execute(`SET FOREIGN_KEY_CHECKS = ${old}`);
+    }
+  }
 
   async beginDbTransaction(): Promise<void> {}
 

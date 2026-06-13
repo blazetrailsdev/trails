@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -14,11 +14,18 @@ import {
   NotNullViolation,
   RecordNotUnique,
   StatementInvalid,
+  Deadlocked,
+  InvalidForeignKey,
+  RangeError,
+  ValueTooLong,
   registerModel,
 } from "./index.js";
 import { Result } from "./result.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { adapterType } from "./test-adapter.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -385,16 +392,11 @@ describe("AdapterTest", () => {
       },
     );
   });
-  it.skip("value limit violations are translated to specific exception", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs Event model with limited title column for ValueTooLong translation (non-SQLite only)
-    // SCOPE: ~10 LOC port + Event fixture; affects ~1 test
-  });
-  it.skip("numeric value out of ranges are translated to specific exception", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs Book model; exercises RangeError translation on out-of-range bigint (non-SQLite only)
-    // SCOPE: ~10 LOC port; affects ~1 test
-  });
+  // `value limit violations` and `numeric value out of ranges` are translated
+  // only on non-SQLite backends (Rails gates them `unless
+  // current_adapter?(:SQLite3Adapter)`), so they live in the model-backed
+  // `AdapterTest` block below where Base.connection resolves to the
+  // ARCONN-configured adapter.
   it.skip("exceptions from notifications are not translated", () => {
     // BLOCKED: notifications
     // ROOT-CAUSE: activesupport Notifications._notify swallows subscriber errors on the
@@ -457,7 +459,45 @@ describe("AdapterTest", () => {
   registerModel("Author", Author);
   registerModel("Post", Post);
   registerModel("Book", Book);
-  useHandlerFixtures(["posts", "authors", "books"], { schema: canonicalSchema });
+  registerModel("Event", Event);
+  useHandlerFixtures(["posts", "authors", "books"], {
+    schema: canonicalSchema,
+    // These two intentionally raise a DB error mid-INSERT, which aborts an open
+    // PG transaction and would poison transactional-fixtures teardown. Run them
+    // outside the shared transaction; the failed INSERT persists nothing, so no
+    // manual cleanup is needed.
+    usesTransaction: [
+      "value limit violations are translated to specific exception",
+      "numeric value out of ranges are translated to specific exception",
+    ],
+  });
+
+  // The Event-backed `events` table is not among the fixtures wired above, so
+  // ensure it exists (mirrors schema.rb `t.string :title, limit: 5`).
+  beforeAll(async () => {
+    if (adapterType === "sqlite") return;
+    await defineSchema({ events: canonicalSchema.events });
+  });
+
+  it.skipIf(adapterType === "sqlite")(
+    "value limit violations are translated to specific exception",
+    async () => {
+      const error = await Event.create({ title: "abcdefgh" }).catch((e) => e);
+      expect(error).toBeInstanceOf(ValueTooLong);
+      expect(error.cause).toBeTruthy();
+    },
+  );
+
+  it.skipIf(adapterType === "sqlite")(
+    "numeric value out of ranges are translated to specific exception",
+    async () => {
+      const error = (await (Base.connection as AbstractAdapter)
+        .insert("INSERT INTO books(author_id) VALUES (9223372036854775808)")
+        .catch((e) => e)) as { cause?: unknown };
+      expect(error).toBeInstanceOf(RangeError);
+      expect(error.cause).toBeTruthy();
+    },
+  );
 
   it.skip("update prepared statement", () => {
     // BLOCKED: binds-inlining
@@ -505,26 +545,99 @@ describe("AdapterTest", () => {
   });
 });
 
+// Rails declares `fixtures :fk_test_has_pk` and a real `foreign_key` on
+// fk_test_has_fk. defineSchema can't express FK constraints (see test-schema.ts
+// header), so we add it via raw DDL once per worker and tear it down after,
+// then drive the tables directly (Rails sets `use_transactional_tests = false`).
 describe("AdapterForeignKeyTest", () => {
-  it.skip("disable referential integrity", async () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs fk_test_has_pk/has_fk tables for disableReferentialIntegrity block
-    // SCOPE: ~20 LOC port + fk_test fixtures; affects ~4 tests
+  setupHandlerSuite();
+
+  const addFkSql = (): string =>
+    "ALTER TABLE fk_test_has_fk ADD CONSTRAINT fk_name " +
+    "FOREIGN KEY (fk_id) REFERENCES fk_test_has_pk (pk_id)";
+  const dropFkSql = (): string =>
+    adapterType === "mysql"
+      ? "ALTER TABLE fk_test_has_fk DROP FOREIGN KEY fk_name"
+      : "ALTER TABLE fk_test_has_fk DROP CONSTRAINT IF EXISTS fk_name";
+
+  const cleanup = async (): Promise<void> => {
+    await Base.connection.execute("DELETE FROM fk_test_has_fk");
+    await Base.connection.execute("DELETE FROM fk_test_has_pk");
+  };
+
+  beforeAll(async () => {
+    if (adapterType === "sqlite") return;
+    // These tables aren't fixture-backed here; create them (mirrors schema.rb)
+    // then add the FK constraint defineSchema can't express.
+    await defineSchema({
+      fk_test_has_pk: canonicalSchema.fk_test_has_pk,
+      fk_test_has_fk: canonicalSchema.fk_test_has_fk,
+    });
+    await Base.connection.execute(dropFkSql()).catch(() => {});
+    await Base.connection.execute(addFkSql());
   });
-  it.skip("foreign key violations are translated to specific exception with validate false", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs fk_test_has_fk table; InvalidForeignKey translation on save(validate: false)
-    // SCOPE: ~15 LOC port; affects ~4 tests
+  afterAll(async () => {
+    if (adapterType === "sqlite") return;
+    await Base.connection.execute(dropFkSql()).catch(() => {});
   });
-  it.skip("foreign key violations on insert are translated to specific exception", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs fk_test_has_fk table; InvalidForeignKey translation on raw INSERT
-    // SCOPE: ~15 LOC port; affects ~4 tests
+  beforeEach(async () => {
+    if (adapterType !== "sqlite") await cleanup();
   });
-  it.skip("foreign key violations on delete are translated to specific exception", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs fk_test_has_pk table; InvalidForeignKey translation on raw DELETE
-    // SCOPE: ~15 LOC port; affects ~4 tests
+  afterEach(async () => {
+    if (adapterType !== "sqlite") await cleanup();
+  });
+
+  const insertIntoFkTestHasFk = (fkId = 0): Promise<unknown> =>
+    (Base.connection as AbstractAdapter).insert(
+      `INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`,
+    );
+
+  it.skipIf(adapterType === "sqlite")(
+    "foreign key violations are translated to specific exception with validate false",
+    async () => {
+      class KlassHasFk extends Base {
+        static {
+          this.tableName = "fk_test_has_fk";
+        }
+      }
+      const hasFk = new KlassHasFk({ fk_id: 1231231231 });
+      const error = await hasFk.save({ validate: false }).catch((e) => e);
+      expect(error).toBeInstanceOf(InvalidForeignKey);
+      expect(error.cause).toBeTruthy();
+    },
+  );
+
+  it.skipIf(adapterType === "sqlite")(
+    "foreign key violations on insert are translated to specific exception",
+    async () => {
+      const error = (await insertIntoFkTestHasFk().catch((e) => e)) as { cause?: unknown };
+      expect(error).toBeInstanceOf(InvalidForeignKey);
+      expect(error.cause).toBeTruthy();
+    },
+  );
+
+  it.skipIf(adapterType === "sqlite")(
+    "foreign key violations on delete are translated to specific exception",
+    async () => {
+      await Base.connection.execute("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
+      await insertIntoFkTestHasFk(1);
+      const error = await Base.connection
+        .execute("DELETE FROM fk_test_has_pk WHERE pk_id = 1")
+        .catch((e) => e);
+      expect(error).toBeInstanceOf(InvalidForeignKey);
+      expect(error.cause).toBeTruthy();
+    },
+  );
+
+  it.skipIf(adapterType === "sqlite")("disable referential integrity", async () => {
+    const conn = Base.connection as AbstractAdapter;
+    // assert_nothing_raised: a throw inside the block fails the test.
+    await conn.disableReferentialIntegrity(async () => {
+      await insertIntoFkTestHasFk();
+      // delete created record as otherwise disableReferentialIntegrity will
+      // try to enable constraints after the block and fail.
+      await conn.execute("DELETE FROM fk_test_has_fk");
+    });
   });
 });
 
@@ -1090,15 +1203,34 @@ describe("AdapterThreadSafetyTest", () => {
   });
 });
 
+// MySQL-only: invalidateTransaction fires only when
+// isSavepointErrorsInvalidateTransactions() is true (Mysql2Adapter override);
+// the abstract/sqlite/pg default is false, matching Rails
+// savepoint_errors_invalidate_transactions?.
 describe("InvalidateTransactionTest", () => {
-  it.skip("invalidates transaction on rollback error", () => {
-    // BLOCKED: adapter-mysql
-    // ROOT-CAUSE: invalidateTransaction only fires when
-    // isSavepointErrorsInvalidateTransactions() is true (mysql2-adapter.ts);
-    // the abstract/sqlite/pg default is false, matching Rails
-    // savepoint_errors_invalidate_transactions?. A Deadlocked inside
-    // withRawConnection therefore invalidates the current transaction on MySQL
-    // only — needs MYSQL_TEST_URL test context (local-verify until RFC 0012).
-    // SCOPE: ~15 LOC port behind describeIfMysql; affects ~1 test
+  setupHandlerSuite();
+
+  it.skipIf(adapterType !== "mysql")("invalidates transaction on rollback error", async () => {
+    let invalidated = false;
+    const connection = Base.connection as AbstractAdapter;
+
+    await connection.transaction(async () => {
+      try {
+        await connection.withRawConnection(async () => {
+          throw new Deadlocked("made-up deadlock");
+        });
+      } catch (error) {
+        if (!(error instanceof Deadlocked) || error.message !== "made-up deadlock") {
+          throw new Error("Rescuing wrong error", { cause: error });
+        }
+        invalidated = (
+          connection.currentTransaction() as { isInvalidated(): boolean }
+        ).isInvalidated();
+      }
+    });
+
+    // asserting outside of the transaction to make sure we actually reach the
+    // end of the test and perform the assertion
+    expect(invalidated).toBe(true);
   });
 });
