@@ -27,8 +27,11 @@ import {
   checkPrNotOpen,
   claimState,
   commitAndPush,
+  depCyclePath,
   editFrontmatter,
   finalize,
+  parseCsv,
+  setDepsError,
   formatFiles,
   formatRows,
   gitCommonDir,
@@ -632,6 +635,73 @@ Body text.
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => setFrontmatterList(file, "deps", ["x"])).toThrow(/exit 1/);
     expect(errSpy.mock.calls[0]?.[0]).toMatch(/refusing to set nested\/multi-level/);
+  });
+});
+
+describe("parseCsv", () => {
+  it("trims and drops empty segments", () => {
+    expect(parseCsv(" a , b ,, c ")).toEqual(["a", "b", "c"]);
+  });
+
+  it("returns an empty array for an empty or whitespace csv", () => {
+    expect(parseCsv("")).toEqual([]);
+    expect(parseCsv("  ,  ")).toEqual([]);
+  });
+});
+
+describe("depCyclePath", () => {
+  it("returns null when the new deps introduce no cycle", () => {
+    const idx = index([story({ id: "a" }), story({ id: "b" })]);
+    expect(depCyclePath(idx, "a", ["b"])).toBeNull();
+  });
+
+  it("detects a direct self-dependency", () => {
+    const idx = index([story({ id: "a" })]);
+    expect(depCyclePath(idx, "a", ["a"])).toEqual(["a", "a"]);
+  });
+
+  it("detects a cycle through an existing dep edge", () => {
+    // b already depends on a; making a depend on b closes the loop.
+    const idx = index([story({ id: "a" }), story({ id: "b", deps: ["a"] })]);
+    expect(depCyclePath(idx, "a", ["b"])).toEqual(["a", "b", "a"]);
+  });
+
+  it("ignores references to unknown stories", () => {
+    const idx = index([story({ id: "a" })]);
+    expect(depCyclePath(idx, "a", ["nope"])).toBeNull();
+  });
+});
+
+describe("setDepsError", () => {
+  it("accepts existing story references with no cycle", () => {
+    const idx = index([story({ id: "a" }), story({ id: "b" })]);
+    expect(setDepsError(idx, "a", "deps", ["b"])).toBeNull();
+  });
+
+  it("rejects a missing story reference", () => {
+    const idx = index([story({ id: "a" })]);
+    expect(setDepsError(idx, "a", "deps", ["ghost"])).toBe(`dep "ghost" does not exist`);
+  });
+
+  it("rejects a dep that would create a cycle", () => {
+    const idx = index([story({ id: "a" }), story({ id: "b", deps: ["a"] })]);
+    expect(setDepsError(idx, "a", "deps", ["b"])).toMatch(/dep cycle detected/);
+  });
+
+  it("accepts an existing rfc reference for deps-rfc", () => {
+    const idx = index([story({ id: "a" })]);
+    expect(setDepsError(idx, "a", "deps-rfc", ["0002-r"])).toBeNull();
+  });
+
+  it("rejects a missing rfc reference for deps-rfc", () => {
+    const idx = index([story({ id: "a" })]);
+    expect(setDepsError(idx, "a", "deps-rfc", ["9999-x"])).toBe(`deps-rfc "9999-x" does not exist`);
+  });
+
+  it("accepts an empty array (clearing the field)", () => {
+    const idx = index([story({ id: "a" })]);
+    expect(setDepsError(idx, "a", "deps", [])).toBeNull();
+    expect(setDepsError(idx, "a", "deps-rfc", [])).toBeNull();
   });
 });
 
