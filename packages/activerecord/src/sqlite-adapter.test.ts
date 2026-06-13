@@ -6,16 +6,17 @@ import { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js"
 import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
 import type { SqliteConnection, SqliteDriver } from "./sqlite-adapter.js";
 
-// Async-only driver (no `openSync()`) exercising the async construction path
-// the way expo-sqlite / WASM drivers do, backed by better-sqlite3 so it runs
+// Async-only drivers (no `openSync()`) exercising the async construction path
+// the way expo-sqlite / WASM drivers do, backed by better-sqlite3 so they run
 // in any Node test environment.
-const asyncOnlyDriver: SqliteDriver = {
+const openVia = async (config: Parameters<SqliteDriver["open"]>[0]): Promise<SqliteConnection> =>
+  betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
+const asyncDriver = (open: SqliteDriver["open"]): SqliteDriver => ({
   name: "async-stub",
   capabilities: { ...betterSqlite3Driver.capabilities, inProcessSync: false },
-  async open(config): Promise<SqliteConnection> {
-    return betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
-  },
-};
+  open,
+});
+const asyncOnlyDriver = asyncDriver(openVia);
 
 describe("SQLite adapter driver binding", () => {
   it("BetterSQLite3Adapter binds its bundled driver and opens", () => {
@@ -71,14 +72,10 @@ describe("SQLite adapter driver binding", () => {
 
   it("forwards driver-specific open config (timeout, driverOptions) to open()", async () => {
     let seen: Record<string, unknown> | undefined;
-    const driver: SqliteDriver = {
-      name: "cfg-stub",
-      capabilities: asyncOnlyDriver.capabilities,
-      async open(config) {
-        seen = config as unknown as Record<string, unknown>;
-        return betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
-      },
-    };
+    const driver = asyncDriver((config) => {
+      seen = config as unknown as Record<string, unknown>;
+      return openVia(config);
+    });
     const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", {
       driver,
       timeout: 1234,
@@ -91,14 +88,10 @@ describe("SQLite adapter driver binding", () => {
 
   it("stays pending after a failed async open so verifyBang can retry", async () => {
     let attempts = 0;
-    const driver: SqliteDriver = {
-      name: "flaky-stub",
-      capabilities: asyncOnlyDriver.capabilities,
-      async open(config) {
-        if (++attempts === 1) throw new Error("boom");
-        return betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
-      },
-    };
+    const driver = asyncDriver((config) => {
+      if (++attempts === 1) throw new Error("boom");
+      return openVia(config);
+    });
     const adapter = new AbstractSQLite3Adapter(":memory:", { driver });
     await expect(adapter.completeAsyncConnect()).rejects.toThrow();
     expect(adapter.active).toBe(false);
