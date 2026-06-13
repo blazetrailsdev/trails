@@ -44,6 +44,7 @@ import {
 } from "./validations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
 import { ScopeRegistry } from "./scoping.js";
+import { reconcileVirtualAttributes } from "./model-schema.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
@@ -672,6 +673,15 @@ export async function save<T extends SaveRecord>(
   await (
     this.constructor as unknown as { ensureSchemaLoaded(): Promise<void> }
   ).ensureSchemaLoaded();
+  // Reconcile virtual attributes (declared via `attribute()` with no backing DB
+  // column) against the real columns so they're excluded from `column_names`,
+  // and thus from the INSERT/UPDATE. `reflect: true` permits a schema-cache
+  // miss to introspect here on the write path (reads never do — see
+  // reconcileVirtualAttributes).
+  await (reconcileVirtualAttributes as (this: unknown, reflect: boolean) => Promise<void>).call(
+    this.constructor,
+    true,
+  );
   if (!performValidations.call(this, options)) return false;
   const self = this as any;
   if (options?.validate !== false) {

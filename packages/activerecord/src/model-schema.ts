@@ -393,6 +393,7 @@ interface SchemaHost {
   _columns?: any[];
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
+  _virtualAttributesReconciled?: boolean;
   connection: any;
   prototype: Record<string, unknown>;
   superclass?: SchemaHost;
@@ -616,6 +617,7 @@ export function resetColumnInformation(this: SchemaHost): void {
       "_attributesBuilder",
       "_schemaLoaded",
       "_cachedDefaultAttributes",
+      "_virtualAttributesReconciled",
     ]) {
       if (Object.prototype.hasOwnProperty.call(this, key)) Reflect.deleteProperty(this, key);
     }
@@ -640,6 +642,7 @@ export function resetColumnInformation(this: SchemaHost): void {
   this._columns = undefined;
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
+  this._virtualAttributesReconciled = false;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   // Mirrors Rails reset_column_information's
@@ -999,6 +1002,89 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (currentAdapter !== startingAdapter) return;
 
   applyColumnsHash(schemaHost, startingAdapter, hash, this);
+}
+
+/**
+ * Real column names from the already-populated schema cache only — never issues
+ * a query. Returns null when the table's columns aren't cached yet.
+ */
+function cachedColumnNames(host: SchemaHost): Set<string> | null {
+  try {
+    const cached = host.connection?.schemaCache?.getCachedColumnsHash?.(host.tableName) as
+      | Record<string, unknown>
+      | undefined;
+    if (cached) return new Set(Object.keys(cached));
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Real column names, reflecting from the database when the schema cache is cold.
+ * May issue a schema-introspection query, so only the write path uses it (reads
+ * must not introduce queries — see the query-cache contract). Populates the
+ * shared schema cache so subsequent lookups are warm. Returns null when the
+ * columns can't be determined (no connection/schema, or reflection failed).
+ */
+async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null> {
+  const cached = cachedColumnNames(host);
+  if (cached) return cached;
+  try {
+    const conn = host.connection;
+    const table = host.tableName;
+    if (!conn || !table || typeof conn.columns !== "function") return null;
+    const cols = (await conn.columns(table)) as Array<{ name: string }> | undefined;
+    if (Array.isArray(cols) && cols.length > 0) {
+      return new Set(cols.map((c) => c.name));
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Flag any user-declared attribute that has no backing DB column as virtual.
+ *
+ * `column_names` in Rails is always `columns.map(&:name)` — purely DB-sourced —
+ * so a user attribute declared via `attribute()` that isn't a real column never
+ * appears in it (model_schema.rb#column_names; attribute_methods.rb
+ * #attributes_for_create/#attributes_for_update intersect with it). In trails,
+ * `ensureSchemaLoaded` short-circuits once a model declares its own attribute(),
+ * leaving the synthesized columnsHash unable to tell a virtual attribute from a
+ * real column. Reconcile against the table's actual columns here so the existing
+ * `virtual` flag — already honored by `columnNames`/`columnsHash`/
+ * `attributesForCreate` — excludes them. Schema-sourced defs and real columns
+ * are left untouched (types included — this only sets the flag). The decision is
+ * purely positional — a user attribute is virtual iff it has no DB column — so
+ * it reclassifies in BOTH directions: an attribute that gains a real column on a
+ * later reflection (e.g. after `resetColumnInformation`) is unflagged. The
+ * one-shot guard is cleared whenever the schema caches or attribute set change
+ * (`resetColumnInformation`, `attribute()`), so a reset/re-declare re-runs.
+ *
+ * `reflect` controls whether a cold schema cache may trigger an introspection
+ * query: the write path (persistence) passes `true`; the generic read path
+ * (`ensureSchemaLoaded`) passes `false` so a query is never issued on reads —
+ * Rails likewise does not re-introspect on a cached read (the residual cold-read
+ * gap is the documented sync/async limitation). With `reflect: false` and a cold
+ * cache this is a no-op that leaves the guard unset, so a later write reconciles.
+ *
+ * @internal
+ */
+export async function reconcileVirtualAttributes(this: SchemaHost, reflect = false): Promise<void> {
+  const host = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
+  if (host._virtualAttributesReconciled) return;
+  const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
+  if (!real) return;
+  for (const [name, def] of host._attributeDefinitions) {
+    const userDeclared =
+      (def.source ?? (def.userProvided === false ? "schema" : "user")) === "user";
+    if (!userDeclared) continue;
+    const isVirtual = !real.has(name);
+    if (!!def.virtual !== isVirtual) def.virtual = isVirtual;
+  }
+  host._virtualAttributesReconciled = true;
 }
 
 /**

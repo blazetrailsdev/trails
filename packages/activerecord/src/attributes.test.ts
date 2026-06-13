@@ -138,10 +138,7 @@ describe("CustomPropertiesTest", () => {
     expect(p.readAttribute("nonexistent")).toBeNull();
   });
 
-  // BLOCKED: type — virtual attributes (declared via attribute() with no backing DB
-  // column) are not yet supported — save attempts to INSERT the column.
-  // Rails treats these as not-persisted with the default returned on read.
-  it.skip("model with nonexistent attribute with default value can be saved", async () => {
+  it("model with nonexistent attribute with default value can be saved", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -209,18 +206,20 @@ describe("CustomPropertiesTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("body", "string");
+        this.attribute("non_existent_decimal", "decimal");
       }
     }
-    // Overloading body with a default should not change attribute order
-    class CustomPost extends (Post as any) {
-      static {
-        this.attribute("body", "string", { default: "default body" });
-      }
-    }
-    const p = new (CustomPost as any)({ title: "hi" });
-    expect(p.title).toBe("hi");
-    expect(p.body).toBe("default body");
+    // Rails: `attribute_names == column_names + ["non_existent_decimal"]`.
+    // `column_names` is always DB-sourced (`columns.map(&:name)`), so the
+    // virtual `attribute()` declaration with no backing column is excluded from
+    // it while `attribute_names` still includes it. A persistence round-trip
+    // loads the schema (the async analogue of Rails' synchronous schema load).
+    await Post.create({ title: "hi" });
+    const columnNames = (Post as any).columnNames();
+    const attributeNames = (Post as any).attributeNames();
+    expect(columnNames).not.toContain("non_existent_decimal");
+    expect(attributeNames).toContain("non_existent_decimal");
+    expect(new Set(attributeNames)).toEqual(new Set([...columnNames, "non_existent_decimal"]));
   });
   it("caches are cleared", async () => {
     class Post extends Base {
@@ -377,9 +376,7 @@ describe("CustomPropertiesTest", () => {
     expect(p.memo).toBe("");
   });
 
-  // BLOCKED: type — same virtual-attribute gap — INSERT tries to write the
-  // non-existent column. See sibling skipped test above.
-  it.skip("attributes not backed by database columns return the default on models loaded from database", async () => {
+  it("attributes not backed by database columns return the default on models loaded from database", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
