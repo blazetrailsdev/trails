@@ -591,8 +591,6 @@ describe("commitAndPush (git mutation flow)", () => {
       "fetch",
       "rev-list",
       "checkout",
-      "checkout",
-      "checkout",
       "status",
       "pull",
       "add",
@@ -637,8 +635,6 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen).toEqual([
       "fetch",
       "rev-list",
-      "checkout",
-      "checkout",
       "checkout",
       "status",
       "pull",
@@ -704,9 +700,10 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/Authentication failed/);
   });
 
-  // loadIndex() may rewrite the tracked index.md/index.json/search.json in
-  // the working tree; a dirty tree aborts `git pull --rebase`. commitAndPush
-  // must restore each generated file to HEAD, individually, before pulling.
+  // loadIndex() may rewrite the tracked index.md in the working tree; a dirty
+  // tree aborts `git pull --rebase`. commitAndPush must restore each generated
+  // file to HEAD, individually, before pulling. (index.json/search.json are
+  // gitignored, rebuilt-on-demand caches — they can't dirty the tree.)
   it("restores each generated index file individually before the first pull", () => {
     setup();
     const fullArgs: string[][] = [];
@@ -724,22 +721,20 @@ describe("commitAndPush (git mutation flow)", () => {
     });
     // One checkout per file (NOT a single multi-path checkout, which git fails
     // atomically if any path is unknown), each preceding the pull. The HEAD:main
-    // guard's fetch + rev-list run first, so the checkouts start at index 2.
+    // guard's fetch + rev-list run first, so the checkout starts at index 2.
     // `checkout HEAD --` (not bare `checkout --`) so a staged generated-file
     // change is discarded from the index too, not just the worktree.
-    expect(fullArgs.slice(2, 5).map((a) => a.slice(2))).toEqual([
+    expect(fullArgs.slice(2, 3).map((a) => a.slice(2))).toEqual([
       ["checkout", "HEAD", "--", "index.md"],
-      ["checkout", "HEAD", "--", "index.json"],
-      ["checkout", "HEAD", "--", "search.json"],
     ]);
     // The dirty-tree `status` probe sits between the restores and the pull.
-    expect(fullArgs[5]?.[2]).toBe("status");
-    expect(fullArgs[6]?.[2]).toBe("pull");
+    expect(fullArgs[3]?.[2]).toBe("status");
+    expect(fullArgs[4]?.[2]).toBe("pull");
   });
 
-  // Partial restore: one unknown path (e.g. a checkout predating search.json)
-  // must not block restoring the others, nor abort the mutation. This is why
-  // the restore is per-file — `git checkout -- a b c` would fail atomically.
+  // Partial restore: an unknown path (e.g. a checkout predating index.md)
+  // must not block the mutation. This is why the restore is per-file, wrapped
+  // in try/catch — `git checkout -- a b c` would fail atomically.
   it("restores the other files when one generated path is unknown to git", () => {
     const { seen } = setup();
     const restored: string[] = [];
@@ -748,7 +743,7 @@ describe("commitAndPush (git mutation flow)", () => {
       if (label === "symbolic-ref") return "main" as never;
       if (label === "checkout") {
         const path = args[args.length - 1];
-        if (path === "index.json") throw new Error("pathspec 'index.json' did not match");
+        if (path === "index.md") throw new Error("pathspec 'index.md' did not match");
         restored.push(path);
         return "" as never;
       }
@@ -763,8 +758,8 @@ describe("commitAndPush (git mutation flow)", () => {
       raceMessage: "no",
       raceExitCode: 4,
     });
-    // index.md and search.json still restored despite index.json failing...
-    expect(restored).toEqual(["index.md", "search.json"]);
+    // The unknown index.md is swallowed, restoring nothing...
+    expect(restored).toEqual([]);
     // ...and the mutation proceeded normally (after the HEAD:main guard probe).
     expect(mutatorCalls).toBe(1);
     expect(seen).toEqual(["fetch", "rev-list", "status", "pull", "add", "commit", "push"]);
@@ -888,16 +883,7 @@ describe("commitAndPush (git mutation flow)", () => {
     });
     // fetch threw inside the guard's try → guard skipped; mutation proceeds.
     expect(mutatorCalls).toBe(1);
-    expect(seen).toEqual([
-      "checkout",
-      "checkout",
-      "checkout",
-      "status",
-      "pull",
-      "add",
-      "commit",
-      "push",
-    ]);
+    expect(seen).toEqual(["checkout", "status", "pull", "add", "commit", "push"]);
   });
 
   // A hand edit left in a story file (e.g. the user edited frontmatter then ran
@@ -944,8 +930,8 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      // index.json staged (`M  index.json`), search.json unstaged (` M ...`).
-      if (label === "status") return "M  index.json\n M search.json" as never;
+      // index.md changed both staged (`M  ...`) and unstaged (` M ...`).
+      if (label === "status") return "M  index.md\n M index.md" as never;
       return "" as never;
     });
     let mutatorCalls = 0;
@@ -1022,17 +1008,7 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(mutatorCalls).toBe(1);
     // rev-list is consumed by the guard (not pushed to seen); fetch precedes the
     // restore checkouts and the mutation loop runs in full.
-    expect(seen).toEqual([
-      "fetch",
-      "checkout",
-      "checkout",
-      "checkout",
-      "status",
-      "pull",
-      "add",
-      "commit",
-      "push",
-    ]);
+    expect(seen).toEqual(["fetch", "checkout", "status", "pull", "add", "commit", "push"]);
   });
 
   // The refine path passes an explicit `pushRefspec: "HEAD:main"` and a `cwd`
