@@ -99,4 +99,31 @@ describe("SQLite adapter driver binding", () => {
     expect(adapter.active).toBe(true);
     adapter.disconnectBang();
   });
+
+  it("dedupes concurrent completeAsyncConnect() calls onto one open", async () => {
+    let opens = 0;
+    const driver = asyncDriver((config) => {
+      opens++;
+      return openVia(config);
+    });
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver });
+    await Promise.all([adapter.completeAsyncConnect(), adapter.completeAsyncConnect()]);
+    expect(opens).toBe(1);
+    expect(adapter.active).toBe(true);
+    adapter.disconnectBang();
+  });
+
+  it("disconnectBang is safe before an async-only connection completes", () => {
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver: asyncOnlyDriver });
+    expect(() => adapter.disconnectBang()).not.toThrow();
+  });
+
+  it("reconnects an async-only driver after the handle drops", async () => {
+    const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", { driver: asyncOnlyDriver });
+    adapter.disconnectBang();
+    expect(adapter.active).toBe(false);
+    await adapter.reconnect();
+    expect(adapter.active).toBe(true);
+    adapter.disconnectBang();
+  });
 });

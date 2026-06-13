@@ -205,6 +205,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * connection has not yet been established. Cleared by `completeAsyncConnect`.
    */
   private _asyncConnectPending = false;
+  /** In-flight async-open promise, deduping concurrent completeAsyncConnect() calls. */
+  private _connectingPromise: Promise<void> | null = null;
   override get active(): boolean {
     return this.driver?.isOpen() ?? false;
   }
@@ -972,11 +974,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // --- Connection lifecycle ---
 
   override isConnected(): boolean {
-    return this.driver.isOpen();
+    return this.driver?.isOpen() ?? false;
   }
 
   isActive(): boolean {
-    return this.driver.isOpen();
+    return this.driver?.isOpen() ?? false;
   }
 
   override clearCacheBang(): void {
@@ -986,7 +988,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   override disconnectBang(): void {
     super.disconnectBang();
-    if (this.driver.isOpen()) {
+    // driver is undefined when an async-only connection was never completed
+    // (constructed-but-pending); optional-chain like the `active` getter so a
+    // pre-verifyBang cleanup/error path doesn't throw.
+    if (this.driver?.isOpen()) {
       // driver.close() returns void | Promise<void>; for inProcessSync drivers
       // (better-sqlite3) this is sync. Async-driver teardown needs pool-infra
       // changes — tracked in #1269.
@@ -1004,17 +1009,24 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * @internal
    */
-  override reconnect(): void {
+  override async reconnect(): Promise<void> {
     if (this.active) {
       // Mirrors `@raw_connection.rollback rescue nil` — a ROLLBACK with no
       // active transaction raises, which we swallow like Rails does.
       try {
-        this.driver.exec("ROLLBACK");
+        await this.driver.exec("ROLLBACK");
       } catch {
         // no active transaction
       }
     } else {
       this.connect();
+      // connect() defers async-only drivers (leaving the handle undefined); open
+      // it here so the base reconnectBang lifecycle has a live driver before it
+      // runs configure_connection. Sync drivers opened eagerly above no-op here.
+      if (this._asyncConnectPending) {
+        this._asyncConnectPending = false;
+        await this.connectAsync();
+      }
     }
     this._inTransaction = false;
   }
@@ -2449,6 +2461,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;
+    // Dedupe concurrent callers (e.g. racing pool checkouts) onto one open so we
+    // don't open the database twice and leak the first handle.
+    if (!this._connectingPromise) {
+      this._connectingPromise = this._doAsyncConnect().finally(() => {
+        this._connectingPromise = null;
+      });
+    }
+    return this._connectingPromise;
+  }
+
+  /** @internal */
+  private async _doAsyncConnect(): Promise<void> {
     await this.connectAsync();
     // Async configureConnection(): await each PRAGMA. Keep this set in sync with it.
     super.configureConnection();
