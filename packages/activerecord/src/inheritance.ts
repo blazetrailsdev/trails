@@ -647,3 +647,62 @@ export function subclassFromAttributes(
 
   return null;
 }
+
+/**
+ * Registry-safe variant of {@link findStiClass} that resolves a type name only
+ * within `baseClass`'s own subtree (the class itself plus its tracked
+ * descendants), matching by `stiName`. Unlike `findStiClass` it never consults
+ * the global `modelRegistry`, where a bare class name like `"Client"` is
+ * ambiguous across test files that each define their own STI tree. Returns null
+ * when no descendant matches rather than raising — the `new()` dispatch path
+ * (the only caller) treats a non-match as "build the receiver as-is".
+ *
+ * @internal
+ */
+function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): typeof Base | null {
+  for (const klass of [baseClass, ...descendants(baseClass)]) {
+    if (stiName(klass) === typeName) return klass;
+  }
+  return null;
+}
+
+/**
+ * Resolve the subclass to construct for `new modelClass(attrs)` from the
+ * inheritance column in `attrs`.
+ *
+ * Mirrors the dispatch in ActiveRecord::Inheritance::ClassMethods#new, but
+ * resolves through {@link findStiClassInHierarchy} (registry-safe) and defaults
+ * the inheritance column to `"type"` when STI was not explicitly enabled —
+ * mirroring Rails' default of `inheritance_column == "type"` for every model.
+ * Returns null (no dispatch) when the column is absent/blank or names no
+ * subclass in this class's subtree.
+ *
+ * @internal Used by Base's constructor to dispatch `new` to a subclass.
+ */
+export function subclassFromAttributesForNew(
+  modelClass: typeof Base,
+  attrs: Record<string, unknown> | null | undefined,
+): typeof Base | null {
+  if (!attrs || typeof attrs !== "object") return null;
+
+  const inheritCol = getInheritanceColumn(modelClass) ?? "type";
+  // Rails guards #new with `_has_attribute?(inheritance_column)` so non-STI
+  // models skip dispatch entirely. trails reflects DB columns lazily and apart
+  // from `_attributeDefinitions`, so that column-metadata check isn't reliably
+  // available at construction. findStiClassInHierarchy below is the equivalent
+  // guard: it only ever resolves a real descendant of this class, so a model
+  // with no STI subtree (or a stray `type` key) resolves to null and no
+  // dispatch happens — matching the observable behavior of Rails' gate.
+  const camelCol = camelize(inheritCol, false);
+  const snakeCol = underscore(inheritCol);
+  const subclassValue =
+    (attrs as Record<string, unknown>)[inheritCol] ??
+    (attrs as Record<string, unknown>)[snakeCol] ??
+    (attrs as Record<string, unknown>)[camelCol] ??
+    undefined;
+
+  if (!isPresent(subclassValue)) return null;
+
+  const castValue = castInheritanceColumnValue(modelClass, inheritCol, subclassValue);
+  return findStiClassInHierarchy(modelClass, castValue as string);
+}
