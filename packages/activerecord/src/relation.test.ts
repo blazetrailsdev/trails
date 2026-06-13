@@ -1698,15 +1698,14 @@ describe("Relation#arel build_arel convergence", () => {
     expect(sql).not.toMatch(/t\d+_r\d+/);
   });
 
-  // Rails apply_join_dependency materializes distinct primary keys (a query)
-  // when eager loading with a limit over a collection reflection. A synchronous
-  // predicate builder can't run that query, so we keep the join (joined-table
-  // predicates stay valid) and add DISTINCT so the LIMIT bounds distinct
-  // parents rather than row-multiplied join rows.
-  it("where with eager-loading limited collection relation subquery keeps the limit on distinct parents", () => {
-    const sql = Gadget.where({ widget_id: Widget.eagerLoad("gadgets").limit(5) }).toSql();
-    expect(sql).toContain("LEFT OUTER JOIN");
-    expect(sql).toMatch(/SELECT DISTINCT ["`]widgets["`]\.["`]id["`]/);
-    expect(sql).toContain("LIMIT 5");
+  // Rails apply_join_dependency materializes distinct primary keys (executing a
+  // query) when eager loading with a limit over a collection reflection. A
+  // synchronous predicate builder can't run that query, and a pure-SQL
+  // approximation diverges from Rails' materialized-ID shape — so the
+  // combination is rejected explicitly rather than emitting non-parity SQL.
+  it("where with eager-loading limited collection relation subquery is rejected", () => {
+    expect(() => Gadget.where({ widget_id: Widget.eagerLoad("gadgets").limit(5) }).toSql()).toThrow(
+      /not supported/,
+    );
   });
 });

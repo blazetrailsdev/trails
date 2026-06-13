@@ -10,7 +10,12 @@ import {
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
-import { ConnectionNotEstablished, RecordNotSaved, RecordNotUnique } from "./errors.js";
+import {
+  ConnectionNotEstablished,
+  NotImplementedError,
+  RecordNotSaved,
+  RecordNotUnique,
+} from "./errors.js";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 import { disallowRawSqlBang } from "./sanitization.js";
@@ -3942,29 +3947,36 @@ export class Relation<T extends Base> {
       ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
     ];
 
-    let rel = this._clone();
-    rel._eagerLoadAssociations = [];
-    rel._includesAssociations = [];
-    rel = rel.leftOuterJoins(eagerSpecs) as Relation<T>;
-
     // Rails `apply_join_dependency`, for a limit/offset over non-limitable
     // (collection) reflections, replaces the relation with
-    // `distinct_relation_for_primary_key` (finder_methods.rb:463): it keeps the
-    // join dependency (so joined-table wheres/orders stay valid) and EXECUTES a
-    // query (`select_rows`, schema_statements.rb:1439) to materialize the
-    // limited DISTINCT primary keys, because a bare `IN (SELECT … LIMIT n)` over
-    // a row-multiplying join would limit joined rows rather than parents (and
-    // MySQL rejects IN+LIMIT). A synchronous predicate builder cannot execute
-    // that query; the closest portable approximation that preserves the
-    // joined-table constraints is DISTINCT on the parent key under the same
-    // LIMIT — the correct distinct-parent set on sqlite/PG. The
-    // query-materialization path (and MySQL's IN+LIMIT restriction) is tracked
-    // by the `relation-handler-distinct-pk-materialization` story.
+    // `distinct_relation_for_primary_key` (finder_methods.rb:463): it EXECUTES a
+    // query (`select_rows`, schema_statements.rb:1434) to materialize the
+    // limited DISTINCT primary keys (honoring `columns_for_distinct(...,
+    // order_values)`), rewrites the relation as `WHERE pk IN (ids)`, and clears
+    // limit_value/offset_value. This avoids `IN (SELECT … LIMIT n)`, which
+    // limits joined rows rather than parents and is unportable (MySQL rejects
+    // it). A synchronous predicate builder cannot execute that query, and any
+    // pure-SQL approximation (DISTINCT+LIMIT subquery) diverges from Rails'
+    // materialized-ID shape and ordered-distinct handling — so rather than
+    // claim parity we reject this combination explicitly. Tracked by the
+    // `relation-handler-distinct-pk-materialization` continuation story.
     const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
     if (hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) {
-      rel = rel.distinct() as Relation<T>;
+      // @nie disposition=TODO
+      throw new NotImplementedError(
+        "Using an eager-loaded relation with a limit/offset over a collection " +
+          "association as a subquery value is not supported: Rails resolves this by " +
+          "executing a query to materialize the limited primary keys " +
+          "(distinct_relation_for_primary_key), which the synchronous predicate " +
+          "builder cannot do. Materialize the ids first, e.g. " +
+          "where(id: await rel.pluck(primaryKey)).",
+      );
     }
-    return rel;
+
+    const rel = this._clone();
+    rel._eagerLoadAssociations = [];
+    rel._includesAssociations = [];
+    return rel.leftOuterJoins(eagerSpecs) as Relation<T>;
   }
 
   /**
