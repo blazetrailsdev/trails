@@ -3212,15 +3212,15 @@ export class Relation<T extends Base> {
           ? (columns[0] as string)
           : " arel";
     if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], firstColumnName)) {
+      // _hasInclude is true only when _eagerLoadAssociations or
+      // _includesAssociations is non-empty, so the union is always non-empty here.
       const eagerSpecs = [
         ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
       ];
-      if (eagerSpecs.length > 0) {
-        const rel = this._clone();
-        rel._eagerLoadAssociations = [];
-        rel._includesAssociations = [];
-        return (rel.leftOuterJoins(eagerSpecs) as Relation<T>).pluck(...columns);
-      }
+      const rel = this._clone();
+      rel._eagerLoadAssociations = [];
+      rel._includesAssociations = [];
+      return (rel.leftOuterJoins(eagerSpecs) as Relation<T>).pluck(...columns);
     }
 
     // Reflect the schema before casting results so the model's attribute
