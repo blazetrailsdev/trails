@@ -1284,18 +1284,47 @@ export function checkPrNotOpen(pr: number): void {
 
 // ──────────────────── presentation ────────────────────
 
-function fmt(rows: StoryEntry[]): void {
-  if (!rows.length) {
-    console.log("(none)");
-    return;
-  }
-  const cols = ["id", "rfc", "status", "cluster", "est_loc"] as const;
+// One-line legend printed above every story table so the priority column's
+// direction is documented wherever the ordering is shown (`ready`, `list`,
+// `next-bundle`). Ties at the same priority have no defined order.
+export const PRIORITY_LEGEND =
+  "priority: lower N = higher priority; absent = unprioritized; ties have undefined order";
+
+// Pure renderer for the story table — exported so tests can assert column
+// content (e.g. est_loc rendered from a numeric value, priority shown) without
+// capturing stdout. `null` cells render as an em dash.
+export function formatRows(rows: StoryEntry[]): string {
+  if (!rows.length) return "(none)";
+  const cols = ["id", "rfc", "status", "priority", "est_loc", "cluster"] as const;
   const widths = cols.map((c) =>
     Math.max(c.length, ...rows.map((r) => String(r[c] ?? "—").length)),
   );
   const line = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i])).join("  ");
-  console.log(line([...cols]));
-  for (const r of rows) console.log(line(cols.map((c) => String(r[c] ?? "—"))));
+  return [
+    PRIORITY_LEGEND,
+    line([...cols]),
+    ...rows.map((r) => line(cols.map((c) => String(r[c] ?? "—")))),
+  ].join("\n");
+}
+
+function fmt(rows: StoryEntry[]): void {
+  console.log(formatRows(rows));
+}
+
+// Pure renderer for `show <id>`: the resolved file path followed by the story's
+// full text (frontmatter + body). Exported for unit testing without a checkout.
+export function renderStoryView(filePath: string, text: string): string {
+  return `${filePath}\n\n${text.trimEnd()}`;
+}
+
+function showStory(index: Index, id: string): void {
+  const entry = index.stories.find((s) => s.id === id);
+  if (!entry) {
+    console.error(`error: story "${id}" not found in index`);
+    process.exit(1);
+  }
+  const file = join(TASKS_DIR, entry.file_path);
+  console.log(renderStoryView(entry.file_path, readFileSync(file, "utf8")));
 }
 
 function statusCounts(index: Index): void {
@@ -1435,6 +1464,13 @@ function main(): void {
       flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows);
       break;
     }
+    case "show": {
+      const id = pos[0];
+      if (!id) usage();
+      syncFromOrigin();
+      showStory(loadIndex(), id);
+      break;
+    }
     case "status":
       syncFromOrigin();
       statusCounts(loadIndex());
@@ -1542,6 +1578,7 @@ function usage(): never {
   ready [--json] [--rfc <slug>]
   next-bundle [--max-loc N] [--cluster <name>] [--rfc <slug>] [--json]
   list [--rfc <slug>] [--status <v>] [--cluster <n>] [--json]
+  show <id>
   status
 
   claim <id> [--assignee <name>]
