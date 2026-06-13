@@ -206,18 +206,19 @@ describe("CustomPropertiesTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("body", "string");
+        this.attribute("non_existent_decimal", "decimal");
       }
     }
-    // Overloading body with a default should not change attribute order
-    class CustomPost extends (Post as any) {
-      static {
-        this.attribute("body", "string", { default: "default body" });
-      }
-    }
-    const p = new (CustomPost as any)({ title: "hi" });
-    expect(p.title).toBe("hi");
-    expect(p.body).toBe("default body");
+    // Rails: `attribute_names == column_names + ["non_existent_decimal"]`.
+    // `column_names` is always DB-sourced (`columns.map(&:name)`), so the
+    // virtual `attribute()` declaration with no backing column is excluded from
+    // it while `attribute_names` still includes it.
+    await (Post as any).ensureSchemaLoaded();
+    const columnNames = (Post as any).columnNames();
+    const attributeNames = (Post as any).attributeNames();
+    expect(columnNames).not.toContain("non_existent_decimal");
+    expect(attributeNames).toContain("non_existent_decimal");
+    expect(new Set(attributeNames)).toEqual(new Set([...columnNames, "non_existent_decimal"]));
   });
   it("caches are cleared", async () => {
     class Post extends Base {
