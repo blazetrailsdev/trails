@@ -1123,6 +1123,10 @@ export function rfcStatusError(
 function rfcFilePath(index: Index, slug: string): string {
   const entry = index.rfcs.find((r) => r.id === slug);
   if (!entry) {
+    // loadIndex() (run by the rfc() caller before this) may have rebuilt and so
+    // dirtied the generated index files; restore them before this error exit so
+    // the tasks checkout isn't left dirty (matches the priority no-op path).
+    restoreGeneratedFiles(TASKS_DIR);
     console.error(`error: RFC "${slug}" not found in index`);
     process.exit(1);
   }
