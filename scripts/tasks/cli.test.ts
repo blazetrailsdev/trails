@@ -27,6 +27,7 @@ import {
   claimState,
   commitAndPush,
   editFrontmatter,
+  finalize,
   formatFiles,
   formatRows,
   gitCommonDir,
@@ -1275,6 +1276,74 @@ describe("newStory validation paths", () => {
     writeFileSync(join(dir, "rfcs", "0005-gaps", "stories", "existing.md"), "---\ntitle: x\n---\n");
     expect(() => newStory("0005-gaps", "existing", {}, dir)).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/already exists/));
+  });
+});
+
+describe("finalize validation paths", () => {
+  function setupExit() {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  }
+
+  it("exits 1 when tasksDir is not a git repo", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    expect(() => finalize("0000-foo", false, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/not a git repo/));
+  });
+
+  it("exits 1 when the slug is not a placeholder prefix", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    expect(() => finalize("0007-foo", false, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/not a placeholder RFC/));
+  });
+
+  it("exits 1 when the placeholder slug has no body (prefix only)", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    expect(() => finalize("0000-", false, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/not a placeholder RFC/));
+  });
+
+  it("exits 1 when the placeholder RFC dir is absent", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    expect(() => finalize("0000-missing", false, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/no such placeholder RFC dir/),
+    );
+  });
+
+  it("accepts the legacy draft- prefix", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    // draft- is a valid placeholder prefix, so it passes the prefix guard and
+    // fails on the dir-absent guard instead (a different message).
+    expect(() => finalize("draft-legacy", false, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/no such placeholder RFC dir/),
+    );
+  });
+
+  it("--dry-run forwards to finalize-rfc.mjs without committing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", "0000-foo"), { recursive: true });
+    finalize("0000-foo", true, dir);
+    expect(execFileSyncMock).toHaveBeenCalledWith(
+      process.execPath,
+      ["scripts/finalize-rfc.mjs", "0000-foo", "--dry-run"],
+      expect.objectContaining({ cwd: dir }),
+    );
+    // No git invocation — only the dry-run script call.
+    expect(execFileSyncMock).toHaveBeenCalledTimes(1);
   });
 });
 
