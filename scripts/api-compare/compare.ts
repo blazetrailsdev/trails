@@ -628,7 +628,7 @@ export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, C
   return map;
 }
 
-function main() {
+export function main() {
   const args = process.argv.slice(2);
   const pkgIndex = args.indexOf("--package");
   let filterPkg: string | null = null;

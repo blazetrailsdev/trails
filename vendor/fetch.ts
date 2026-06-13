@@ -74,7 +74,7 @@ function destFor(source: UpstreamSource): string {
  */
 async function fetchSource(
   source: UpstreamSource,
-  opts: { refresh: boolean; lockEntry?: LockEntry },
+  opts: { refresh: boolean; offline?: boolean; lockEntry?: LockEntry },
 ): Promise<LockEntry> {
   const dest = destFor(source);
   const lockEntry = opts.lockEntry;
@@ -82,6 +82,18 @@ async function fetchSource(
   if (opts.refresh && existsSync(dest)) {
     console.log(`[${source.name}] --refresh: removing ${dest}`);
     rmSync(dest, { recursive: true, force: true });
+  }
+
+  // Offline fast-path: when the clone exists and the lockfile already pins a
+  // sha for it, trust the pin and skip the `git rev-parse HEAD` subprocess.
+  // The HEAD-vs-lock consistency check below only catches a clone that drifted
+  // out from under us (manual checkout, interrupted --refresh); the common
+  // warm case is steady-state, so we still verify the declared paths exist but
+  // avoid spawning git per source. `--refresh`/FORCE take the full path.
+  if (opts.offline && lockEntry && existsSync(join(dest, ".git"))) {
+    console.log(`[${source.name}] offline: pinned at ${lockEntry.sha.slice(0, 12)}`);
+    verifyPackages(source);
+    return lockEntry;
   }
 
   if (existsSync(join(dest, ".git"))) {
@@ -199,6 +211,47 @@ export function parseArgs(argv: string[]): ParsedArgs {
   return out;
 }
 
+/**
+ * Fetch every (or one) source and reconcile the lockfile. Exported so the
+ * api:compare orchestrator can run the fetch phase in-process instead of
+ * paying a separate `pnpm tsx` cold start (~1.7s) for it.
+ *
+ * `offline` enables the per-source fast-path in fetchSource (skip `git
+ * rev-parse`); the orchestrator passes it on warm runs and drops it for
+ * `--refresh` / `API_COMPARE_FORCE=1`.
+ */
+export async function runFetch(
+  opts: {
+    sourceFilter?: string;
+    refresh?: boolean;
+    offline?: boolean;
+  } = {},
+): Promise<void> {
+  const targets = opts.sourceFilter ? SOURCES.filter((s) => s.name === opts.sourceFilter) : SOURCES;
+  if (opts.sourceFilter && targets.length === 0) {
+    const names = SOURCES.map((s) => s.name);
+    const suggestions = new SpellChecker({ dictionary: names }).correct(opts.sourceFilter);
+    const hint = suggestions.length ? ` Did you mean: ${suggestions.join(", ")}?` : "";
+    throw new Error(`--source: no entry named "${opts.sourceFilter}" in vendor/sources.ts.${hint}`);
+  }
+
+  // Fetch in parallel: cold runs are sum(clone times) sequentially → max(...)
+  // here. Lockfile entries are returned, not written in fetchSource, so there's
+  // no write race. The pre-load is the single read; we merge results below.
+  const lock = loadLockfile();
+  const results = await Promise.all(
+    targets.map((source) =>
+      fetchSource(source, {
+        refresh: opts.refresh ?? false,
+        offline: opts.offline ?? false,
+        lockEntry: lock.sources[source.name],
+      }).then((entry) => ({ name: source.name, entry })),
+    ),
+  );
+  for (const { name, entry } of results) lock.sources[name] = entry;
+  writeLockfile(lock);
+}
+
 async function main(argv: string[]): Promise<void> {
   const args = parseArgs(argv);
 
@@ -215,28 +268,7 @@ async function main(argv: string[]): Promise<void> {
     return;
   }
 
-  const targets = args.sourceFilter ? SOURCES.filter((s) => s.name === args.sourceFilter) : SOURCES;
-  if (args.sourceFilter && targets.length === 0) {
-    const names = SOURCES.map((s) => s.name);
-    const suggestions = new SpellChecker({ dictionary: names }).correct(args.sourceFilter);
-    const hint = suggestions.length ? ` Did you mean: ${suggestions.join(", ")}?` : "";
-    throw new Error(`--source: no entry named "${args.sourceFilter}" in vendor/sources.ts.${hint}`);
-  }
-
-  // Fetch in parallel: cold runs are sum(clone times) sequentially → max(...)
-  // here. Lockfile entries are returned, not written in fetchSource, so there's
-  // no write race. The pre-load is the single read; we merge results below.
-  const lock = loadLockfile();
-  const results = await Promise.all(
-    targets.map((source) =>
-      fetchSource(source, {
-        refresh: args.refresh,
-        lockEntry: lock.sources[source.name],
-      }).then((entry) => ({ name: source.name, entry })),
-    ),
-  );
-  for (const { name, entry } of results) lock.sources[name] = entry;
-  writeLockfile(lock);
+  await runFetch({ sourceFilter: args.sourceFilter, refresh: args.refresh });
 }
 
 // Only run main() when invoked as a script, not when imported by tests.
