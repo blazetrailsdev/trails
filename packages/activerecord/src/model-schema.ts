@@ -393,6 +393,7 @@ interface SchemaHost {
   _columns?: any[];
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
+  _virtualAttributesReconciled?: boolean;
   connection: any;
   prototype: Record<string, unknown>;
   superclass?: SchemaHost;
@@ -999,6 +1000,64 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (currentAdapter !== startingAdapter) return;
 
   applyColumnsHash(schemaHost, startingAdapter, hash, this);
+}
+
+/**
+ * Resolve a table's real column names from the connection — the warm schema
+ * cache when available, otherwise an explicit reflection. Returns null when
+ * they can't be determined (no connection/schema, or reflection failed).
+ */
+async function realColumnNames(host: SchemaHost): Promise<Set<string> | null> {
+  try {
+    const conn = host.connection;
+    const table = host.tableName;
+    if (!conn || !table) return null;
+    const cached = conn.schemaCache?.getCachedColumnsHash?.(table) as
+      | Record<string, unknown>
+      | undefined;
+    if (cached) return new Set(Object.keys(cached));
+    if (typeof conn.columns === "function") {
+      const cols = (await conn.columns(table)) as Array<{ name: string }> | undefined;
+      if (Array.isArray(cols) && cols.length > 0) {
+        return new Set(cols.map((c) => c.name));
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Flag any user-declared attribute that has no backing DB column as virtual.
+ *
+ * `column_names` in Rails is always `columns.map(&:name)` — purely DB-sourced —
+ * so a user attribute declared via `attribute()` that isn't a real column never
+ * appears in it (model_schema.rb#column_names; attribute_methods.rb
+ * #attributes_for_create/#attributes_for_update intersect with it). In trails,
+ * `ensureSchemaLoaded` short-circuits once a model declares its own attribute(),
+ * leaving the synthesized columnsHash unable to tell a virtual attribute from a
+ * real column. Reconcile against the table's actual columns here so the existing
+ * `virtual` flag — already honored by `columnNames`/`columnsHash`/
+ * `attributesForCreate` — excludes them. Schema-sourced defs and real columns
+ * are left untouched (types included — this only sets the flag). Idempotent and
+ * one-shot once the real columns are known.
+ *
+ * @internal
+ */
+export async function reconcileVirtualAttributes(this: SchemaHost): Promise<void> {
+  const host = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
+  if (host._virtualAttributesReconciled) return;
+  const real = await realColumnNames(host);
+  if (!real) return;
+  for (const [name, def] of host._attributeDefinitions) {
+    const userDeclared =
+      (def.source ?? (def.userProvided === false ? "schema" : "user")) === "user";
+    if (userDeclared && !def.virtual && !real.has(name)) {
+      def.virtual = true;
+    }
+  }
+  host._virtualAttributesReconciled = true;
 }
 
 /**

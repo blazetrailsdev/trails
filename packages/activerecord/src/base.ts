@@ -1062,7 +1062,11 @@ export class Base extends Model {
     for (const [name, def] of this._attributeDefinitions) {
       const d = def as { virtual?: boolean; source?: string };
       if (!d.virtual && (d.source === "schema" || !enumNames?.has(name))) {
-        return Promise.resolve();
+        // The model declares its own attributes, but some may be virtual (no
+        // backing DB column). Rails' `column_names` is always DB-sourced, so
+        // reconcile against the real columns and flag those as virtual — keeping
+        // `columnNames()` correct without a full re-reflection. One-shot.
+        return (ModelSchema.reconcileVirtualAttributes as () => Promise<void>).call(this);
       }
     }
     return this.loadSchema();
