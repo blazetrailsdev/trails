@@ -261,11 +261,12 @@ function git(args: string[], opts: { silent?: boolean; cwd?: string } = {}): str
   }).trim();
 }
 
-// Generated artifacts the tasks repo's pre-commit hook rebuilds and
-// re-stages on every commit (scripts/build-index.mjs). `loadIndex()` runs
-// that same build script when it finds the index stale, which rewrites
-// these tracked files in the working tree — see restoreGeneratedFiles.
-const GENERATED_INDEX_FILES = ["index.md", "index.json", "search.json"];
+// The only generated artifact that's tracked in git. `index.json` and
+// `search.json` are also rebuilt by scripts/build-index.mjs but are now
+// gitignored (rebuilt on demand by `loadIndex()`), so they can't dirty the
+// tree and don't need restoring. `index.md` is the human-readable registry
+// that stays tracked, rebuilt and re-staged by the pre-commit hook.
+const GENERATED_INDEX_FILES = ["index.md"];
 
 // `loadIndex()` runs before every mutation reaches commitAndPush, and when it
 // finds the index stale it invokes build-index.mjs, which rewrites the tracked
@@ -274,20 +275,17 @@ const GENERATED_INDEX_FILES = ["index.md", "index.json", "search.json"];
 // then aborts: "cannot pull with rebase: You have unstaged changes". With
 // autoStash on it instead stashes the throwaway copy and can conflict against
 // upstream's own regenerated index on reapply — so neither config is safe.
-// These files are regenerated and re-staged by the tasks repo's pre-commit hook
-// on every commit, so the locally-rebuilt copies are throwaway — restore them
-// to HEAD before pulling, leaving a clean tree regardless of git config.
-// Restore each path independently: `git checkout -- a b c` is atomic — if any
-// single path is unknown to git (e.g. a checkout predating search.json) the
-// whole command fails and restores *nothing*, leaving the others dirty and the
-// pull still aborting. Per-file checkout means a path git doesn't track can't
-// block the rest; a path git doesn't know isn't dirty, so skipping it is fine.
+// `index.md` is regenerated and re-staged by the tasks repo's pre-commit hook
+// on every commit, so the locally-rebuilt copy is throwaway — restore it to
+// HEAD before pulling, leaving a clean tree regardless of git config.
+// Restore each path independently so a path git doesn't track can't block the
+// rest; a path git doesn't know isn't dirty, so skipping it is fine.
 function restoreGeneratedFiles(cwd: string | undefined): void {
   for (const file of GENERATED_INDEX_FILES) {
     try {
       // `checkout HEAD --`, not `checkout --`: the latter only restores the
       // worktree from the index, leaving a *staged* generated-file change (e.g.
-      // `M  index.json`) in place. assertCleanWorktree filters generated paths
+      // `M  index.md`) in place. assertCleanWorktree filters generated paths
       // by name regardless of staged state, so that residue would slip through
       // to `git pull --rebase`, which then aborts on a dirty index. Resetting to
       // HEAD discards both index and worktree state for the path.
