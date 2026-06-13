@@ -9,6 +9,7 @@ import {
   type ForeignKeyDefinition,
   type ReferentialAction,
   type ColumnOptions,
+  type AddColumnOptions,
   type TableDefinition as AbstractTableDefinition,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
@@ -305,7 +306,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+  protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): string {
     const opts = options as Record<string, unknown>;
     if (opts["collation"]) {
       sql += ` COLLATE ${this.adapter.quoteIdentifier(String(opts["collation"]))}`;

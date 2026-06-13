@@ -9,6 +9,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import type {
   ReferentialAction,
   ColumnOptions,
+  AddColumnOptions,
   ColumnType,
   AddColumnDefinition,
 } from "../abstract/schema-definitions.js";
@@ -378,7 +379,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+  protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): string {
     return this.addColumnOptions(sql, options);
   }
 

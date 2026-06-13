@@ -254,6 +254,15 @@ export interface ColumnOptions {
   stored?: boolean;
 }
 
+/**
+ * Options passed to `add_column_options!` — a column's options merged with a
+ * `column` back-reference to the owning ColumnDefinition (Rails:
+ * `column_options` returns `options.merge(column: o)`).
+ */
+export interface AddColumnOptions extends ColumnOptions {
+  column?: ColumnDefinition;
+}
+
 export interface AddIndexOptions {
   unique?: boolean;
   name?: string;
@@ -356,6 +365,7 @@ export class IndexDefinition {
   isDefinedFor(
     columns?: string | string[],
     options: {
+      column?: string | string[];
       name?: string;
       unique?: boolean;
       valid?: boolean;
@@ -363,6 +373,8 @@ export class IndexDefinition {
       nullsNotDistinct?: boolean;
     } = {},
   ): boolean {
+    // Mirrors Rails: `columns = options[:column] if columns.blank?`
+    if (columns === undefined) columns = options.column;
     if (options.name && this.name !== options.name) return false;
     if (options.unique !== undefined && this.unique !== options.unique) return false;
     if (options.valid !== undefined && this.valid !== options.valid) return false;

@@ -30,6 +30,15 @@ describe("IndexDefinition#concise_options", () => {
   });
 });
 
+describe("IndexDefinition#defined_for?", () => {
+  it("falls back to the :column option when positional columns are absent", () => {
+    const idx = new IndexDefinition("t", "i", false, ["a"]);
+    // Mirrors Rails: `columns = options[:column] if columns.blank?`
+    expect(idx.isDefinedFor(undefined, { column: "a" })).toBe(true);
+    expect(idx.isDefinedFor(undefined, { column: "b" })).toBe(false);
+  });
+});
+
 describe("ReferenceDefinition helpers", () => {
   it("addTo adds id column by default", () => {
     const ref = new ReferenceDefinition("user", { index: false });

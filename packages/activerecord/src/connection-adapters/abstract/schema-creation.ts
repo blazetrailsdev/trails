@@ -10,6 +10,7 @@
 import {
   type ColumnType,
   type ColumnOptions,
+  type AddColumnOptions,
   type ReferentialAction,
   ColumnDefinition,
   AddColumnDefinition,
@@ -421,7 +422,7 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+  protected addColumnOptionsBang(sql: string, options: AddColumnOptions): string {
     return this.addColumnOptions(sql, options);
   }
 
