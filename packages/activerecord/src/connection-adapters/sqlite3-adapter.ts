@@ -119,9 +119,10 @@ export class SQLiteDateTimeType extends ARDateTimeType {
 // driver rather than the Attribute wrapper. Plain pre-cast values (the common
 // case) pass straight through.
 function _driverBind(value: unknown): unknown {
+  // `valueForDatabase` is a getter on Attribute/QueryAttribute, so reading it
+  // yields the unwrapped DB value directly.
   if (value && typeof value === "object" && "valueForDatabase" in value) {
-    const vfd = (value as { valueForDatabase: unknown }).valueForDatabase;
-    value = typeof vfd === "function" ? (vfd as () => unknown).call(value) : vfd;
+    value = (value as { valueForDatabase: unknown }).valueForDatabase;
   }
   return sqliteTypeCast(value);
 }
