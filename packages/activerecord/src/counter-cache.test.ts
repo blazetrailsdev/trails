@@ -1776,6 +1776,44 @@ describe("CounterCacheTest", () => {
     await Order.resetCounters(order.id, "books");
     expect(((await Order.find([1, 1])) as any).books_count).toBe(1);
   });
+  it("counter cache is incremented and decremented for cpk model on create and destroy", async () => {
+    class Order extends Base {
+      static {
+        this._tableName = "cpk_orders";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("books_count", "integer", { default: 0 });
+        this.primaryKey = ["shop_id", "id"];
+      }
+    }
+    class Book extends Base {
+      static {
+        this._tableName = "cpk_books";
+        this.attribute("author_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.primaryKey = ["author_id", "id"];
+      }
+    }
+    Associations.hasMany.call(Order, "books", {
+      className: "Book",
+      foreignKey: ["shop_id", "order_id"],
+    });
+    Associations.belongsTo.call(Book, "order", {
+      className: "Order",
+      foreignKey: ["shop_id", "order_id"],
+      primaryKey: ["shop_id", "id"],
+      counterCache: true,
+    });
+    registerModel(Order);
+    registerModel(Book);
+    const order = await Order.create({ shop_id: 1, id: 1 });
+    const book = await Book.create({ author_id: 1, id: 1, shop_id: 1, order_id: 1 });
+    expect(((await Order.find([1, 1])) as any).books_count).toBe(1);
+    await book.destroy();
+    expect(((await Order.find([1, 1])) as any).books_count).toBe(0);
+  });
   it("update counter for decrement", async () => {
     class Topic extends Base {
       static {
