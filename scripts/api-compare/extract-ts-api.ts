@@ -126,7 +126,7 @@ async function runWithConcurrency<T>(tasks: (() => Promise<T>)[], limit: number)
   return results;
 }
 
-async function main() {
+export async function main() {
   const manifest: ApiManifest = {
     source: "typescript",
     generatedAt: new Date().toISOString(),
