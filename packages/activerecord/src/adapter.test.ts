@@ -65,6 +65,13 @@ function rawTransactionOpen(conn: AbstractSQLite3Adapter): boolean {
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
 
+  // The abstract quoteColumnName raises NotImplementedError (mirrors Rails —
+  // every adapter must define its own). These test adapters compile real SQL
+  // through Arel, so provide an ANSI quoter like a concrete adapter would.
+  override quoteColumnName(name: string): string {
+    return `"${name.replace(/"/g, '""')}"`;
+  }
+
   simulateConnect(): void {
     this._connected = true;
     this._connection = this;
