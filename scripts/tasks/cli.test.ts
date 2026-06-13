@@ -46,7 +46,10 @@ import {
   ready,
   resolveEditTarget,
   editorArgv,
+  orphanedStories,
   removeFrontmatterKey,
+  rfcRefError,
+  rfcStatusError,
   setFrontmatterList,
   resolveTasksDir,
   statusEdits,
@@ -421,6 +424,85 @@ describe("statusTransitionError", () => {
 
   it("rejects when the current status cannot be read", () => {
     expect(statusTransitionError(null, "ready")).toMatch(/cannot read current status/);
+  });
+});
+
+describe("rfcStatusError", () => {
+  it("accepts a valid status with no supersede", () => {
+    expect(rfcStatusError("active", undefined)).toBeNull();
+  });
+
+  it("accepts no status at all (array-only edit)", () => {
+    expect(rfcStatusError(undefined, undefined)).toBeNull();
+  });
+
+  it("rejects a status outside the allowed set", () => {
+    expect(rfcStatusError("archived", undefined)).toMatch(/invalid status "archived"/);
+  });
+
+  it("requires --supersede when status is superseded", () => {
+    expect(rfcStatusError("superseded", undefined)).toMatch(/requires --supersede/);
+  });
+
+  it("accepts superseded with a supersede target", () => {
+    expect(rfcStatusError("superseded", "0001-other")).toBeNull();
+  });
+
+  it("treats --supersede with no status as implying superseded", () => {
+    expect(rfcStatusError(undefined, "0001-other")).toBeNull();
+  });
+
+  it("rejects --supersede combined with a non-superseded status", () => {
+    expect(rfcStatusError("active", "0001-other")).toMatch(/--supersede conflicts/);
+  });
+});
+
+describe("rfcRefError", () => {
+  it("accepts existing supersede and relate targets", () => {
+    expect(rfcRefError(index([]), "0001-r", "0002-r", ["0002-r"])).toBeNull();
+  });
+
+  it("accepts no references at all", () => {
+    expect(rfcRefError(index([]), "0001-r", undefined, undefined)).toBeNull();
+  });
+
+  it("rejects a supersede target that does not exist", () => {
+    expect(rfcRefError(index([]), "0001-r", "0099-nope", undefined)).toMatch(
+      /--supersede target "0099-nope" does not exist/,
+    );
+  });
+
+  it("rejects superseding the RFC itself", () => {
+    expect(rfcRefError(index([]), "0001-r", "0001-r", undefined)).toMatch(
+      /cannot be the RFC itself/,
+    );
+  });
+
+  it("reports every missing relate target", () => {
+    expect(rfcRefError(index([]), "0001-r", undefined, ["0002-r", "0099-x", "0098-y"])).toMatch(
+      /--relate target\(s\) do not exist: 0099-x, 0098-y/,
+    );
+  });
+});
+
+describe("orphanedStories", () => {
+  it("returns stories whose cluster is no longer declared", () => {
+    const idx = index([story({ id: "s1", rfc: "0001-r", cluster: "c2" })]);
+    const orphans = orphanedStories(idx, "0001-r", ["c1"]);
+    expect(orphans.map((s) => s.id)).toEqual(["s1"]);
+  });
+
+  it("ignores stories whose cluster is still declared", () => {
+    const idx = index([story({ id: "s1", rfc: "0001-r", cluster: "c1" })]);
+    expect(orphanedStories(idx, "0001-r", ["c1", "c2"])).toEqual([]);
+  });
+
+  it("ignores unclustered stories and stories of other RFCs", () => {
+    const idx = index([
+      story({ id: "s1", rfc: "0001-r", cluster: null }),
+      story({ id: "s2", rfc: "0002-r", cluster: "c3" }),
+    ]);
+    expect(orphanedStories(idx, "0001-r", [])).toEqual([]);
   });
 });
 
