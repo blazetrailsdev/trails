@@ -2657,6 +2657,11 @@ describe("RelationTest", () => {
         age: "integer",
         name: "string",
       },
+      // DDL must run here (outside the per-test transaction): on MySQL/MariaDB a
+      // CREATE TABLE implicitly commits and would destroy the transactional-
+      // fixtures savepoint mid-test.
+      eager_setop_authors: { name: "string" },
+      eager_setop_posts: { title: "string", eager_setop_author_id: "integer" },
     });
   });
   it("union combines two relations", async () => {
@@ -2714,10 +2719,6 @@ describe("RelationTest", () => {
 
   it("union with an eager-load operand returns records with the association preloaded", async () => {
     const { Associations, registerModel } = await import("./associations.js");
-    await defineSchema({
-      eager_setop_authors: { name: "string" },
-      eager_setop_posts: { title: "string", eager_setop_author_id: "integer" },
-    });
     class EagerSetopAuthor extends Base {
       static {
         this._tableName = "eager_setop_authors";
@@ -2742,13 +2743,23 @@ describe("RelationTest", () => {
 
     // Eager load on the left operand: the compound stays arity-compatible and the
     // association is still loaded (via the eager-bypass preload path).
-    const rel = EagerSetopPost.where({ title: "x" })
+    const left = EagerSetopPost.where({ title: "x" })
       .includes("author")
       .references("eager_setop_authors")
       .union(EagerSetopPost.where({ title: "y" }));
-    const rows = (await rel.toArray()) as any[];
-    expect(rows.map((p) => p.title).sort()).toEqual(["x", "y"]);
-    expect(rows.every((p) => p.author?.name === "alice")).toBe(true);
+    const leftRows = (await left.toArray()) as any[];
+    expect(leftRows.map((p) => p.title).sort()).toEqual(["x", "y"]);
+    expect(leftRows.every((p) => p.author?.name === "alice")).toBe(true);
+
+    // Eager load on the *right* operand preloads too — the other operand's
+    // include specs merge into the compound's preload set rather than being
+    // silently dropped.
+    const right = EagerSetopPost.where({ title: "x" }).union(
+      EagerSetopPost.where({ title: "y" }).includes("author"),
+    );
+    const rightRows = (await right.toArray()) as any[];
+    expect(rightRows.map((p) => p.title).sort()).toEqual(["x", "y"]);
+    expect(rightRows.every((p) => p.author?.name === "alice")).toBe(true);
   });
 
   it("unionAll includes duplicates", async () => {

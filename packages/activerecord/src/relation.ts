@@ -2391,6 +2391,19 @@ export class Relation<T extends Base> {
       ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
       ...this._preloadAssociations,
     ];
+    // Set-op operands all instantiate as this model class, and the compound
+    // bypasses the eager JOIN (operands stay arity-compatible), so the *other*
+    // operand's includes/eager/preload specs load as preloads against the full
+    // result set rather than being silently dropped. (`this` is the left/loaded
+    // relation; its own specs are handled above + in the eager branch.)
+    if (this._setOperation) {
+      const other = this._setOperation.other;
+      preloadAssocs.push(
+        ...other._eagerLoadAssociations,
+        ...other._includesAssociations,
+        ...other._preloadAssociations,
+      );
+    }
     if (preloadAssocs.length > 0 && this._records.length > 0) {
       await this._preloadAssociationsForRecords(this._records, preloadAssocs);
       if (token !== this._loadToken) return [];
