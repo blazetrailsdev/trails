@@ -60,10 +60,15 @@ export class Aes256Gcm {
     }
     const authTag = Buffer.from(cipher.getAuthTag());
 
-    const message = new Message(encrypted.toString("base64"));
+    // Store raw bytes as latin1 strings (one JS char per byte), exactly like
+    // MRI keeps binary Strings on the Message. The MessageSerializer then does a
+    // single base64 hop, producing an envelope byte-identical to Rails. (The old
+    // trails format base64-encoded here too, so the serializer double-encoded —
+    // see decrypt() for the back-compat path.)
+    const message = new Message(encrypted.toString("latin1"));
     message.addHeaders({
-      iv: iv.toString("base64"),
-      at: authTag.toString("base64"),
+      iv: iv.toString("latin1"),
+      at: authTag.toString("latin1"),
     });
     return message;
   }
@@ -85,31 +90,44 @@ export class Aes256Gcm {
     // Also guard against non-string header values from malformed deserialized messages.
     if (typeof iv !== "string" || typeof authTag !== "string")
       throw new EncryptedContentIntegrity();
-    // Mirrors Rails: OpenSSL bindings don't raise on truncated auth tags, so we check
-    // the length explicitly to prevent auth-tag forgery.
-    const authTagBuf = Buffer.from(authTag, "base64");
-    if (authTagBuf.length !== AUTH_TAG_LENGTH) throw new EncryptedContentIntegrity();
-
-    const ivBuf = Buffer.from(iv, "base64");
-    const encryptedBuf = Buffer.from(message.payload, "base64");
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
 
-    try {
-      const decipher = getCrypto().createDecipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, ivBuf, {
-        authTagLength: AUTH_TAG_LENGTH,
-      });
-      if (!decipher.setAuthTag) {
-        throw new ConfigError("Crypto adapter does not support GCM auth tags (setAuthTag)");
+    // The serializer now hands back raw bytes as latin1 strings (MRI single-
+    // base64 format). Legacy trails ciphertexts were double-base64, so after the
+    // serializer's single decode their iv/at/payload are still base64 strings.
+    // Try the MRI format first, then fall back to decoding once more, so rows
+    // written before this change keep decrypting. We never throw mid-loop on a
+    // failed interpretation — only after both fail.
+    let sawValidAuthTag = false;
+    for (const enc of ["latin1", "base64"] as const) {
+      // Mirrors Rails: OpenSSL bindings don't raise on truncated auth tags, so we
+      // check the length explicitly to prevent auth-tag forgery.
+      const authTagBuf = Buffer.from(authTag, enc);
+      if (authTagBuf.length !== AUTH_TAG_LENGTH) continue;
+      sawValidAuthTag = true;
+
+      const ivBuf = Buffer.from(iv, enc);
+      const encryptedBuf = Buffer.from(message.payload, enc);
+      try {
+        const decipher = getCrypto().createDecipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, ivBuf, {
+          authTagLength: AUTH_TAG_LENGTH,
+        });
+        if (!decipher.setAuthTag) {
+          throw new ConfigError("Crypto adapter does not support GCM auth tags (setAuthTag)");
+        }
+        decipher.setAuthTag(authTagBuf);
+        return Buffer.concat([
+          Buffer.from(decipher.update(encryptedBuf)),
+          Buffer.from(decipher.final()),
+        ]);
+      } catch (e) {
+        if (e instanceof ConfigError) throw e;
+        // Wrong format or wrong key — try the next interpretation.
       }
-      decipher.setAuthTag(authTagBuf);
-      return Buffer.concat([
-        Buffer.from(decipher.update(encryptedBuf)),
-        Buffer.from(decipher.final()),
-      ]);
-    } catch (e) {
-      if (e instanceof ConfigError || e instanceof EncryptedContentIntegrity) throw e;
-      throw new DecryptionError("The provided key could not decrypt the data");
     }
+    // No interpretation yielded a 16-byte auth tag → genuine integrity failure.
+    if (!sawValidAuthTag) throw new EncryptedContentIntegrity();
+    throw new DecryptionError("The provided key could not decrypt the data");
   }
 
   private _validateKeyLength(key: string): void {

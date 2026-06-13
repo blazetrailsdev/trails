@@ -62,12 +62,13 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
       .createHmac("sha256", keyBuf)
       .update("hello world")
       .digest()
-      .subarray(0, 12)
-      .toString("base64");
+      .subarray(0, 12);
 
     const cipher = new Cipher(key, { deterministic: true });
     const message = cipher.encrypt("hello world");
-    expect(message.headers.get("iv")).toBe(expectedIv);
+    // Header values are now raw bytes carried as latin1 strings (MRI format),
+    // so compare against the raw digest rather than its base64 encoding.
+    expect(Buffer.from(message.headers.get("iv") as string, "latin1")).toEqual(expectedIv);
   });
 
   it("it generates different ivs for different ciphertexts", () => {

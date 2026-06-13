@@ -123,7 +123,11 @@ export class MessageSerializer implements MessageSerializerLike {
   /** @internal */
   private encodeIfNeeded(value: unknown): unknown {
     if (typeof value === "string") {
-      return Buffer.from(value, "utf-8").toString("base64");
+      // Mirrors Rails: Base64.strict_encode64(value) — a single base64 hop over
+      // the raw bytes. Cipher header values (iv, at) and the payload are raw
+      // bytes carried as latin1 strings (one JS char per byte), so we decode the
+      // string as latin1 rather than utf-8 to avoid mangling bytes >= 0x80.
+      return Buffer.from(value, "latin1").toString("base64");
     }
     return value;
   }
@@ -138,7 +142,10 @@ export class MessageSerializer implements MessageSerializerLike {
         if (normalized !== reencoded) {
           throw new DecryptionError("Invalid base64 encoding");
         }
-        return buf.toString("utf-8");
+        // Mirrors Rails: Base64.strict_decode64 returns raw bytes. We surface them
+        // as a latin1 string (one JS char per byte) so cipher/payload bytes round-
+        // trip losslessly; the cipher re-reads them as latin1.
+        return buf.toString("latin1");
       } catch (e) {
         if (e instanceof DecryptionError) throw e;
         throw new DecryptionError("Invalid base64 encoding");
