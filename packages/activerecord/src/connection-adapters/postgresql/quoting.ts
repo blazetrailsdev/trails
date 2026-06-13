@@ -11,6 +11,7 @@ import {
   quotedFalse as abstractQuotedFalse,
   quotedTrue as abstractQuotedTrue,
   typeCast as abstractTypeCast,
+  type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
@@ -126,7 +127,7 @@ export function quotedBinary(value: Buffer | Uint8Array | string): string {
   return `'${escapeBytea(value)}'`;
 }
 
-export function quote(value: unknown): string {
+export function quote(this: QuotingDispatchHost | void, value: unknown): string {
   if (value instanceof XmlData) {
     return `xml ${quoteString(value.toString())}`;
   }
@@ -159,7 +160,9 @@ export function quote(value: unknown): string {
   // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
   if (value instanceof BinaryData) return quotedBinary(value.bytes);
   if (typeof value === "string") return quoteString(value);
-  return abstractQuote(value);
+  // Thread `this` so the inherited date/time dispatch reaches PG's
+  // BC-suffixing `quotedDate` (mirrors Rails' `super` call in PG#quote).
+  return abstractQuote.call(this, value);
 }
 
 export function quoteDefaultExpression(

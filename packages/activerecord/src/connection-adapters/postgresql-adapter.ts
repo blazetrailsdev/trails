@@ -25,6 +25,7 @@ import {
   typeCast as pgTypeCast,
   quoteTableName as pgQuoteTableName,
   quoteColumnName as pgQuoteColumnName,
+  quotedDate as pgQuotedDate,
   quoteString as pgQuoteString,
   quoteTableNameForAssignment as pgQuoteTableNameForAssignment,
   quoteDefaultExpression as pgQuoteDefaultExpression,
@@ -2751,7 +2752,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote
    */
   override quote(value: unknown): string {
-    return pgQuote(value);
+    // `.call(this)` so the inherited date/time dispatch resolves to this
+    // adapter's `quotedDate` (BC-suffixing), mirroring PG#quote's `super`.
+    return pgQuote.call(this, value);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quoted_date.
+   * Appends " BC" for proleptic years ≤ 0; `quote` dispatches through here.
+   */
+  quotedDate(value: Parameters<typeof pgQuotedDate>[0]): string {
+    return pgQuotedDate(value);
   }
 
   override typeCast(value: unknown): unknown {
