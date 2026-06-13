@@ -79,7 +79,12 @@ def extract_params(params_node)
   (optional || []).each do |p|
     if p.is_a?(Array) && p.length >= 2
       name = ident_name(p[0])
-      result << { name: name, kind: "optional", default: "..." } if name
+      if name
+        entry = { name: name, kind: "optional", default: "..." }
+        lit = literal_value(p[1])
+        entry[:literal] = lit if lit
+        result << entry
+      end
     end
   end
 
@@ -106,7 +111,10 @@ def extract_params(params_node)
         if kw[1].nil? || kw[1] == false
           result << { name: name.chomp(":"), kind: "keyword" }
         else
-          result << { name: name.chomp(":"), kind: "keyword", default: "..." }
+          entry = { name: name.chomp(":"), kind: "keyword", default: "..." }
+          lit = literal_value(kw[1])
+          entry[:literal] = lit if lit
+          result << entry
         end
       end
     end
@@ -143,6 +151,51 @@ def ident_name(node)
   nil
 end
 
+# Classify a default-value or constant-RHS node as a literal {kind:, value:};
+# {kind: "expr"} for non-literals (calls, refs, lambdas), nil when no node.
+def literal_value(node)
+  return nil if node.nil?
+  return { kind: "expr" } unless node.is_a?(Array)
+  case node[0]
+  when :@int
+    { kind: "int", value: node[1] }
+  when :@float
+    { kind: "float", value: node[1] }
+  when :string_literal
+    val = string_literal_value(node)
+    val.nil? ? { kind: "expr" } : { kind: "string", value: val }
+  when :symbol_literal
+    inner = node[1]
+    name = inner.is_a?(Array) && inner[0] == :symbol ? ident_name(inner[1]) : nil
+    name ? { kind: "symbol", value: name } : { kind: "expr" }
+  when :var_ref, :var_field
+    kw = node[1]
+    if kw.is_a?(Array) && kw[0] == :@kw && %w[true false nil].include?(kw[1])
+      kw[1] == "nil" ? { kind: "nil" } : { kind: "bool", value: kw[1] == "true" }
+    else
+      { kind: "expr" }
+    end
+  when :array
+    node[1].nil? ? { kind: "array" } : { kind: "expr" }
+  when :hash
+    node[1].nil? ? { kind: "hash" } : { kind: "expr" }
+  else
+    { kind: "expr" } # incl. negative numbers — skipped symmetrically with the TS side
+  end
+end
+
+# Plain (non-interpolated) string literal value, or nil when interpolated.
+def string_literal_value(node)
+  content = node[1]
+  return "" unless content.is_a?(Array) && content[0] == :string_content
+  str = +""
+  content[1..].each do |part|
+    return nil unless part.is_a?(Array) && part[0] == :@tstring_content
+    str << part[1]
+  end
+  str
+end
+
 # ---- Dependency detection patterns ----
 # Each entry maps a dependency name to the constants and identifiers that
 # indicate usage. Adding a new dependency is just adding a new key here.
@@ -164,11 +217,13 @@ DEPENDENCY_PATTERNS = {
 # ---- AST walker ----
 
 class ApiExtractor
-  attr_reader :classes, :modules
+  attr_reader :classes, :modules, :file_constants
 
   def initialize
     @classes = {}
     @modules = {}
+    # rel_path → { CONST_NAME => literal_value } for literal-valued constants.
+    @file_constants = {}
     @namespace_stack = []
     @visibility_stack = [:public]
     # Tracks whether the current module-scope is under a bare `module_function`
@@ -308,6 +363,7 @@ class ApiExtractor
       # block belong to the struct, not to the enclosing module.
       lhs, rhs = node[1], node[2]
       maybe_record_valid_options(lhs, rhs)
+      maybe_record_constant(lhs, rhs)
       # Only enter the struct-class path when:
       #   lhs = [:var_field, [:@const, "Name", ...]]
       #   rhs = [:method_add_block, [:method_add_arg, [:call, Struct, ., :new], ...], block]
@@ -821,6 +877,24 @@ class ApiExtractor
     (@const_symbol_arrays[current_fqn] ||= {})[const[1]] = syms
   end
 
+  # Record a constant with a literal RHS, keyed file → NAME (unwrapping `.freeze`).
+  def maybe_record_constant(lhs, rhs)
+    return unless lhs.is_a?(Array) && lhs[0] == :var_field
+    const = lhs[1]
+    return unless const.is_a?(Array) && const[0] == :@const
+    rhs = unwrap_freeze(rhs)
+    lit = literal_value(rhs)
+    return if lit.nil? || lit[:kind] == "expr"
+    (@file_constants[@current_file] ||= {})[const[1]] = lit
+  end
+
+  def unwrap_freeze(node) # `[...].freeze` → receiver node; otherwise unchanged
+    return node unless node.is_a?(Array) && node[0] == :method_add_arg
+    call = node[1]
+    return node unless call.is_a?(Array) && call[0] == :call
+    ident_name(call[3]) == "freeze" ? call[1] : node
+  end
+
   # Advisory option-key collection (see options-keys.ts): the sorted, deduped
   # symbol keys read off an `options`/`opts`/`**kwargs` param in the body. An
   # UNDER-approximation — dynamic access and keys consumed in callees are missed.
@@ -1144,6 +1218,7 @@ def run
     manifest[:packages][pkg_name] = {
       classes: classes,
       modules: modules,
+      fileConstants: extractor.file_constants,
     }
   end
 

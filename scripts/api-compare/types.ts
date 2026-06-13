@@ -2,10 +2,19 @@
 
 // --- Extracted API manifest ---
 
+/** A recorded literal value — a parameter default or constant RHS. `expr` marks
+ *  a non-literal (call/ref/lambda), recorded so the comparer skips it rather
+ *  than confusing it with "no default". See literals.ts. */
+export interface LiteralValue {
+  kind: "int" | "float" | "string" | "symbol" | "bool" | "nil" | "array" | "hash" | "expr";
+  value?: string | boolean; // int/float token (underscores kept), string/symbol text, or boolean
+}
+
 export interface ParamInfo {
   name: string;
   kind: "required" | "optional" | "rest" | "keyword" | "keyword_rest" | "block";
   default?: string;
+  literal?: LiteralValue; // default value, when present; compared by literals.ts
   /**
    * TS-side declared type text (e.g. `"Base"`), when available — lets a
    * consumer recognize a leading receiver/host param on standalone mixin
@@ -53,6 +62,7 @@ export interface PackageInfo {
   classes: Record<string, ClassInfo>;
   modules: Record<string, ClassInfo>;
   fileFunctions?: Record<string, MethodInfo[]>;
+  fileConstants?: Record<string, Record<string, LiteralValue>>; // file → NAME → literal value
 }
 
 export interface ApiManifest {
