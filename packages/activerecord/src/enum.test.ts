@@ -1304,10 +1304,13 @@ describe("EnumTest", () => {
         this.enum("status", { active: 0, inactive: 1 });
       }
     }
-    const user = new User({ name: "Alice", status: 0 });
-    (user as any).inactiveBang();
-    expect((user as any).isInactive()).toBe(true);
+    const user = (await User.create({ name: "Alice", status: 0 })) as any;
+    expect(await user.inactiveBang()).toBe(true);
+    expect(user.isInactive()).toBe(true);
     expect(user.readAttribute("status")).toBe("inactive");
+    // Bang setter persists via update!, mirroring Rails.
+    const reloaded = (await User.find(user.id)) as any;
+    expect(reloaded.isInactive()).toBe(true);
   });
 
   it("exposes the mapping via static getter", () => {
@@ -1656,7 +1659,7 @@ describe("EnumTest", () => {
       expect((t as any).isMedium()).toBe(false);
     });
 
-    it("generates bang setter methods", () => {
+    it("generates bang setter methods", async () => {
       class Task extends Base {
         static {
           this.attribute("priority", "integer");
@@ -1664,9 +1667,12 @@ describe("EnumTest", () => {
         }
       }
 
-      const t = new Task({});
-      (t as any).highBang();
+      const t = (await Task.create({ priority: 0 })) as any;
+      await t.highBang();
       expect(t.readAttribute("priority")).toBe("high");
+      // Bang setter persists via update!, mirroring Rails.
+      const reloaded = (await Task.find(t.id)) as any;
+      expect(reloaded.readAttribute("priority")).toBe("high");
     });
 
     it("where with enum label serializes to integer", () => {
