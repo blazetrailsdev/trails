@@ -372,17 +372,25 @@ function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Ba
 
 /**
  * Instantiate the correct STI subclass from a database row.
- *
- * Mirrors Rails' `instantiate` (persistence.rb): resolve the concrete class via
- * `discriminate_class_for_record`, then build it. Routing through
- * `discriminateClassForRecord` means the raw inheritance-column value is cast
- * through its attribute type (Rails' `find_sti_class` does
- * `type_for_attribute(inheritance_column).cast(...)`), so an enum-backed STI
- * column resolves the stored integer (e.g. 3) to its class-name label
- * ("SelectedMembership") instead of a bare number.
  */
 export function instantiateSti(baseClass: typeof Base, row: Record<string, unknown>): Base {
-  const subclass = discriminateClassForRecord(baseClass, row);
+  const column = getInheritanceColumn(baseClass);
+  if (!column) return directInstantiate(baseClass, row);
+
+  // Cast the raw column value through its attribute type before resolving the
+  // subclass — mirrors Rails' find_sti_class, which does
+  // `type_for_attribute(inheritance_column).cast(type_name)`. This is what makes
+  // an enum-backed STI column work: the integer stored in the column (e.g. 3)
+  // casts to its class-name label ("SelectedMembership"), not a bare number.
+  // (We cast here rather than delegating to discriminateClassForRecord because
+  // its using_single_table_inheritance? gate requires the inheritance column to
+  // be a *declared* attribute, which custom STI columns like Parrot's
+  // `parrot_sti_class` are not.)
+  if (!isPresent(row[column])) return directInstantiate(baseClass, row);
+  const typeName = castInheritanceColumnValue(baseClass, column, row[column]) as string | null;
+  if (!typeName || !typeName.trim()) return directInstantiate(baseClass, row);
+
+  const subclass = findStiClass(baseClass, typeName);
   return directInstantiate(subclass, row);
 }
 
