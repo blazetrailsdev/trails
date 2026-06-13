@@ -66,6 +66,7 @@ import {
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
   narrowToProjectedColumns,
+  subclassFromAttributesForNew,
 } from "./inheritance.js";
 import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
 import {
@@ -2455,6 +2456,15 @@ export class Base extends Model {
     attrs ??= {};
     if (Object.keys(attrs).length > 0) {
       attrs = sanitizeForMassAssignment(attrs);
+    }
+    // STI dispatch at `new`: when the inheritance column names a subclass in
+    // this class's own subtree, construct that subclass instead (Rails'
+    // Inheritance::ClassMethods#new). Resolution is registry-safe — scoped to
+    // this class's descendants, never the ambiguous global name map — so it
+    // runs after sanitize (the un-permitted params case raises above first).
+    const stiTarget = subclassFromAttributesForNew(new.target as typeof Base, attrs);
+    if (stiTarget && stiTarget !== (new.target as typeof Base)) {
+      return new stiTarget(attrs) as Base;
     }
     // Split out constructor-form association values (e.g. `new Owner({items:
     // [...]})`) so super() never sees them as plain attributes. Dispatched
