@@ -1136,6 +1136,38 @@ function parseCsv(raw: string): string[] {
     .filter(Boolean);
 }
 
+// Pure existence check for the `--supersede` / `--relate` targets, run before any
+// write so a typo'd slug fails the command rather than committing a dangling
+// reference the validator would later reject. Returns null when every reference
+// resolves (or none were given), else the first rejection. A self-supersede is
+// nonsensical (an RFC can't supersede itself) and is caught here too.
+export function rfcRefError(
+  index: Index,
+  slug: string,
+  supersede: string | undefined,
+  relate: string[] | undefined,
+): string | null {
+  const exists = (s: string): boolean => index.rfcs.some((r) => r.id === s);
+  if (supersede !== undefined) {
+    if (supersede === slug) return `--supersede target "${supersede}" cannot be the RFC itself`;
+    if (!exists(supersede)) return `--supersede target "${supersede}" does not exist`;
+  }
+  if (relate) {
+    const missing = relate.filter((r) => !exists(r));
+    if (missing.length) return `--relate target(s) do not exist: ${missing.join(", ")}`;
+  }
+  return null;
+}
+
+// Stories of `slug` whose `cluster` would no longer be declared after a clusters
+// change. The validator (`validate.mjs`) rejects exactly these at commit, so we
+// surface them as an early warning. Pure, so it's unit-testable without git.
+export function orphanedStories(index: Index, slug: string, clusters: string[]): StoryEntry[] {
+  return index.stories.filter(
+    (s) => s.rfc === slug && s.cluster !== null && !clusters.includes(s.cluster),
+  );
+}
+
 // `tasks rfc <slug>` — overloaded RFC frontmatter editor covering the moves
 // previously made by hand: status transitions (with the superseded/superseded-by
 // pairing), and the array fields related-rfcs / clusters / packages. Every
@@ -1168,20 +1200,12 @@ function rfc(
   // --supersede implies status superseded even when --status is omitted.
   const status = opts.supersede !== undefined ? "superseded" : opts.status;
 
-  const rfcExists = (s: string): boolean => index.rfcs.some((r) => r.id === s);
-  if (opts.supersede !== undefined && !rfcExists(opts.supersede)) {
-    restoreGeneratedFiles(TASKS_DIR);
-    console.error(`error: --supersede target "${opts.supersede}" does not exist`);
-    process.exit(2);
-  }
   const relate = opts.relate !== undefined ? parseCsv(opts.relate) : undefined;
-  if (relate) {
-    const missing = relate.filter((r) => !rfcExists(r));
-    if (missing.length) {
-      restoreGeneratedFiles(TASKS_DIR);
-      console.error(`error: --relate target(s) do not exist: ${missing.join(", ")}`);
-      process.exit(2);
-    }
+  const refError = rfcRefError(index, slug, opts.supersede, relate);
+  if (refError !== null) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: ${refError}`);
+    process.exit(2);
   }
   const clusters = opts.clusters !== undefined ? parseCsv(opts.clusters) : undefined;
   const packages = opts.packages !== undefined ? parseCsv(opts.packages) : undefined;
@@ -1201,14 +1225,12 @@ function rfc(
   // commit. Surfacing it here gives an actionable message before the pre-commit
   // hook fails the push with a less obvious error.
   if (clusters !== undefined) {
-    const orphaned = index.stories
-      .filter((s) => s.rfc === slug && s.cluster !== null && !clusters.includes(s.cluster))
-      .map((s) => `${s.id} (cluster "${s.cluster}")`);
+    const orphaned = orphanedStories(index, slug, clusters);
     if (orphaned.length) {
       console.warn(
         `warning: clusters change orphans ${orphaned.length} story/stories whose cluster is no ` +
-          `longer declared: ${orphaned.join(", ")}. The commit will fail validation unless you ` +
-          `reassign them (pnpm tasks ... ) or keep the cluster.`,
+          `longer declared: ${orphaned.map((s) => `${s.id} (cluster "${s.cluster}")`).join(", ")}. ` +
+          `The commit will fail validation unless you reassign them (pnpm tasks ... ) or keep the cluster.`,
       );
     }
   }
