@@ -14,6 +14,7 @@ import * as os from "node:os";
 import {
   resolveRelModule,
   extractClass,
+  extractFileConstants,
   extractFileLocalHelpers,
   extractFromProgram,
   harvestObjectLiteralMethods,
@@ -84,10 +85,22 @@ describe("harvestObjectLiteralMethods", () => {
     ]);
     expect(byName["build"]).toEqual([
       { name: "a", kind: "required", type: "number" },
-      { name: "b", kind: "optional", default: "..." },
+      { name: "b", kind: "optional", default: "...", literal: { kind: "int", value: "1" } },
     ]);
     // Shorthand reference: name captured, params unknown (signature lives elsewhere).
     expect(byName["noop"]).toEqual([]);
+  });
+});
+
+describe("extractFileConstants", () => {
+  it("captures exported const + public static readonly literals, excludes the rest", () => {
+    const src = `export const BATCH = 1000; export let MUTABLE = 1; const PRIVATE = 2;
+      class C { static readonly PUBLIC = "x"; private static readonly SECRET = 3;
+        static readonly DYNAMIC = compute(); }`;
+    expect(extractFileConstants(compile(src).sourceFile)).toEqual({
+      BATCH: { kind: "int", value: "1000" },
+      PUBLIC: { kind: "string", value: "x" },
+    });
   });
 });
 

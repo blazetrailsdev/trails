@@ -49,6 +49,12 @@ import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { ARITY_OVERRIDES, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { matchArityAgainst, renderSig, shouldSkipArity, type ArityRange } from "./arity.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
+import {
+  compareDefaults,
+  compareLiteral,
+  constantNameMatches,
+  displayLiteral,
+} from "./literals.js";
 import { isSourceUnported } from "./unported-files.js";
 
 const DETAIL_PACKAGES = new Set([
@@ -114,6 +120,7 @@ interface PackageResult {
   inheritance: InheritanceResult;
   arity: ArityResult;
   optionKeys: OptionKeyResult;
+  literals: LiteralResult;
 }
 
 // Advisory signature comparison: for a name-matched (ruby, ts) pair whose
@@ -151,6 +158,23 @@ interface OptionKeyResult {
   compared: number;
   mismatched: number;
   mismatches: OptionKeyMismatch[];
+}
+
+// Advisory: a default's or constant's literal value differs for a matched pair.
+interface LiteralMismatch {
+  rubyFile: string;
+  tsFile: string;
+  name: string;
+  rubyValue: string;
+  tsValue: string;
+  kind: "default" | "constant";
+}
+
+interface LiteralResult {
+  compared: number;
+  skipped: number;
+  mismatched: number;
+  mismatches: LiteralMismatch[];
 }
 
 interface InheritanceMismatch {
@@ -718,10 +742,15 @@ export function main() {
     // Per-name resolved options-object keys (null = uncheckable). Pooled
     // GLOBALLY like tsParamsByName so a real options type wins over a binding.
     const tsOptionKeysByName = new Map<string, (string[] | null)[]>();
-    const recordTsParams = (m: MethodInfo) => {
+    // Literal-default candidates scoped per (file, name) — unlike arity's global pool.
+    const tsParamsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
+    const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
+      const byName = tsParamsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
+      byName.set(m.name, [...(byName.get(m.name) ?? []), m.params]);
+      tsParamsByFileName.set(file, byName);
       if (m.optionKeys !== undefined) {
         const ok = tsOptionKeysByName.get(m.name) ?? [];
         ok.push(m.optionKeys);
@@ -736,7 +765,7 @@ export function main() {
         for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
           if (tsShouldInclude(m)) {
             methods.add(m.name);
-            recordTsParams(m);
+            recordTsParams(m, file);
           }
         }
         tsMethodsByFile.set(file, methods);
@@ -752,7 +781,7 @@ export function main() {
           for (const fn of fns) {
             if (tsShouldInclude(fn)) {
               methods.add(fn.name);
-              recordTsParams(fn);
+              recordTsParams(fn, file);
             }
           }
           tsMethodsByFile.set(file, methods);
@@ -1028,6 +1057,9 @@ export function main() {
     const arityMismatches: ArityMismatch[] = [];
     let optionKeysCompared = 0;
     const optionKeyMismatches: OptionKeyMismatch[] = [];
+    let literalsCompared = 0;
+    let literalsSkipped = 0;
+    const literalMismatches: LiteralMismatch[] = [];
     const fileResults: FileResult[] = [];
 
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -1098,11 +1130,26 @@ export function main() {
         });
       };
 
+      // Advisory literal-default check (literals.ts); shares matched pairs with arity.
+      const checkLiterals = (rubyName: string, tsName: string, tsFile: string) => {
+        const rubyParams = rubyParamsByName.get(rubyName);
+        if (!rubyParams) return;
+        const candidates = tsParamsByFileName.get(tsFile)?.get(tsName) ?? [];
+        if (candidates.length === 0) return;
+        const res = compareDefaults(rubyParams, candidates);
+        literalsCompared += res.compared;
+        literalsSkipped += res.skipped;
+        for (const m of res.mismatches) {
+          literalMismatches.push({ rubyFile, tsFile, ...m, kind: "default" });
+        }
+      };
+
       // Advisory arity check for one name-matched pair: flag when the Ruby and
       // TS positional-arg ranges don't overlap (see arity.ts). Also drives the
       // option-key check, which shares the same matched (ruby, ts) pairs.
       const checkArity = (rubyName: string, tsName: string, tsFile: string) => {
         checkOptionKeys(rubyName, tsName, tsFile);
+        checkLiterals(rubyName, tsName, tsFile);
         if (ARITY_OVERRIDES.has(rubyName)) return;
         // Ruby writers (`foo=`) map to a TS setter/assignable property; the name
         // match already confirms it exists and arity isn't meaningful here.
@@ -1235,6 +1282,35 @@ export function main() {
       else if (misplacedActualFile) {
         totalMisplaced++;
         filesExist++;
+      }
+    }
+
+    // Diff each Ruby file's literal constants against same-named TS constants.
+    for (const [rubyFile, rubyConsts] of Object.entries(rubyPkg.fileConstants ?? {})) {
+      if (isSourceUnported(rubyFile, pkg)) continue;
+      const expectedTs = rubyFileToTs(rubyFile, pkg);
+      const tsConsts = tsPkg?.fileConstants?.[expectedTs];
+      if (!tsConsts) continue;
+      const tsEntries = Object.entries(tsConsts);
+      for (const [rubyName, rubyLit] of Object.entries(rubyConsts)) {
+        const tsEntry = tsEntries.find(([tsName]) => constantNameMatches(rubyName, tsName));
+        if (!tsEntry) continue;
+        const verdict = compareLiteral(rubyLit, tsEntry[1]);
+        if (verdict === "skip") {
+          literalsSkipped++;
+          continue;
+        }
+        literalsCompared++;
+        if (verdict === "mismatch") {
+          literalMismatches.push({
+            rubyFile,
+            tsFile: expectedTs,
+            name: rubyName,
+            rubyValue: displayLiteral(rubyLit),
+            tsValue: displayLiteral(tsEntry[1]),
+            kind: "constant",
+          });
+        }
       }
     }
 
@@ -1380,6 +1456,12 @@ export function main() {
         mismatched: optionKeyMismatches.length,
         mismatches: optionKeyMismatches,
       },
+      literals: {
+        compared: literalsCompared,
+        skipped: literalsSkipped,
+        mismatched: literalMismatches.length,
+        mismatches: literalMismatches,
+      },
     });
   }
 
@@ -1439,6 +1521,27 @@ export function main() {
     ),
   );
 
+  // Advisory literal artifact — always written, flat across packages.
+  const literalsPath = path.join(OUTPUT_DIR, `literal-mismatches${modeSuffix}.json`);
+  const literalsFlat = results.flatMap((r) =>
+    r.literals.mismatches.map((m) => ({ package: r.package, ...m })),
+  );
+  fs.writeFileSync(
+    literalsPath,
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        note: "Advisory. Literal defaults + constants, normalized; non-literal/nil-sentinel skipped.",
+        compared: results.reduce((n, r) => n + r.literals.compared, 0),
+        skipped: results.reduce((n, r) => n + r.literals.skipped, 0),
+        mismatched: literalsFlat.length,
+        mismatches: literalsFlat,
+      },
+      null,
+      2,
+    ),
+  );
+
   printReport(
     results,
     showMissing,
@@ -1484,6 +1587,8 @@ function printReport(
   let grandOptKeysCompared = 0;
   let grandOptKeysMismatched = 0;
   let grandOptKeysMissing = 0;
+  let grandLiteralsCompared = 0;
+  let grandLiteralsMismatched = 0;
 
   for (const pkg of results) {
     grandTotal += pkg.totalMethods;
@@ -1497,6 +1602,8 @@ function printReport(
     grandOptKeysCompared += pkg.optionKeys.compared;
     grandOptKeysMismatched += pkg.optionKeys.mismatched;
     grandOptKeysMissing += pkg.optionKeys.mismatches.filter((m) => m.missingInTs.length > 0).length;
+    grandLiteralsCompared += pkg.literals.compared;
+    grandLiteralsMismatched += pkg.literals.mismatched;
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
@@ -1618,6 +1725,12 @@ function printReport(
       `  Option keys (advisory): ${grandOptKeysCompared} pairs compared, ` +
         `${grandOptKeysMissing} with keys missing in TS (likely-real), ` +
         `${grandOptKeysMismatched} differ total — see output/options-key-mismatches.json`,
+    );
+  }
+  if (grandLiteralsCompared > 0) {
+    console.log(
+      `  Literals (advisory): ${grandLiteralsCompared} default/constant values compared, ` +
+        `${grandLiteralsMismatched} differ — see output/literal-mismatches.json`,
     );
   }
   console.log(`${"=".repeat(100)}\n`);
