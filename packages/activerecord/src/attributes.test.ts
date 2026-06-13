@@ -212,8 +212,9 @@ describe("CustomPropertiesTest", () => {
     // Rails: `attribute_names == column_names + ["non_existent_decimal"]`.
     // `column_names` is always DB-sourced (`columns.map(&:name)`), so the
     // virtual `attribute()` declaration with no backing column is excluded from
-    // it while `attribute_names` still includes it.
-    await (Post as any).ensureSchemaLoaded();
+    // it while `attribute_names` still includes it. A persistence round-trip
+    // loads the schema (the async analogue of Rails' synchronous schema load).
+    await Post.create({ title: "hi" });
     const columnNames = (Post as any).columnNames();
     const attributeNames = (Post as any).attributeNames();
     expect(columnNames).not.toContain("non_existent_decimal");

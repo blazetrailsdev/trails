@@ -1005,24 +1005,38 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
 }
 
 /**
- * Resolve a table's real column names from the connection — the warm schema
- * cache when available, otherwise an explicit reflection. Returns null when
- * they can't be determined (no connection/schema, or reflection failed).
+ * Real column names from the already-populated schema cache only — never issues
+ * a query. Returns null when the table's columns aren't cached yet.
  */
-async function realColumnNames(host: SchemaHost): Promise<Set<string> | null> {
+function cachedColumnNames(host: SchemaHost): Set<string> | null {
   try {
-    const conn = host.connection;
-    const table = host.tableName;
-    if (!conn || !table) return null;
-    const cached = conn.schemaCache?.getCachedColumnsHash?.(table) as
+    const cached = host.connection?.schemaCache?.getCachedColumnsHash?.(host.tableName) as
       | Record<string, unknown>
       | undefined;
     if (cached) return new Set(Object.keys(cached));
-    if (typeof conn.columns === "function") {
-      const cols = (await conn.columns(table)) as Array<{ name: string }> | undefined;
-      if (Array.isArray(cols) && cols.length > 0) {
-        return new Set(cols.map((c) => c.name));
-      }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Real column names, reflecting from the database when the schema cache is cold.
+ * May issue a schema-introspection query, so only the write path uses it (reads
+ * must not introduce queries — see the query-cache contract). Populates the
+ * shared schema cache so subsequent lookups are warm. Returns null when the
+ * columns can't be determined (no connection/schema, or reflection failed).
+ */
+async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null> {
+  const cached = cachedColumnNames(host);
+  if (cached) return cached;
+  try {
+    const conn = host.connection;
+    const table = host.tableName;
+    if (!conn || !table || typeof conn.columns !== "function") return null;
+    const cols = (await conn.columns(table)) as Array<{ name: string }> | undefined;
+    if (Array.isArray(cols) && cols.length > 0) {
+      return new Set(cols.map((c) => c.name));
     }
   } catch {
     return null;
@@ -1047,14 +1061,21 @@ async function realColumnNames(host: SchemaHost): Promise<Set<string> | null> {
  * it reclassifies in BOTH directions: an attribute that gains a real column on a
  * later reflection (e.g. after `resetColumnInformation`) is unflagged. The
  * one-shot guard is cleared whenever the schema caches or attribute set change
- * (`resetColumnInformation`, `defineAttribute`), so a reset/re-declare re-runs.
+ * (`resetColumnInformation`, `attribute()`), so a reset/re-declare re-runs.
+ *
+ * `reflect` controls whether a cold schema cache may trigger an introspection
+ * query: the write path (persistence) passes `true`; the generic read path
+ * (`ensureSchemaLoaded`) passes `false` so a query is never issued on reads —
+ * Rails likewise does not re-introspect on a cached read (the residual cold-read
+ * gap is the documented sync/async limitation). With `reflect: false` and a cold
+ * cache this is a no-op that leaves the guard unset, so a later write reconciles.
  *
  * @internal
  */
-export async function reconcileVirtualAttributes(this: SchemaHost): Promise<void> {
+export async function reconcileVirtualAttributes(this: SchemaHost, reflect = false): Promise<void> {
   const host = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
   if (host._virtualAttributesReconciled) return;
-  const real = await realColumnNames(host);
+  const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
   for (const [name, def] of host._attributeDefinitions) {
     const userDeclared =
