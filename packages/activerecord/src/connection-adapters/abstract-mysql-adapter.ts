@@ -524,7 +524,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return exception.errno ?? null;
   }
 
-  async disableReferentialIntegrity(): Promise<void> {}
+  async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+    const old = await this.queryValue("SELECT @@FOREIGN_KEY_CHECKS");
+    try {
+      await this.update("SET FOREIGN_KEY_CHECKS = 0");
+      await fn();
+    } finally {
+      if (this.active) await this.update(`SET FOREIGN_KEY_CHECKS = ${old}`);
+    }
+  }
 
   async beginDbTransaction(): Promise<void> {}
 
