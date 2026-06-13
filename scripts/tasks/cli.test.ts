@@ -28,7 +28,10 @@ import {
   commitAndPush,
   editFrontmatter,
   formatFiles,
+  formatRows,
   gitCommonDir,
+  PRIORITY_LEGEND,
+  renderStoryView,
   Index,
   LOCK_TIMEOUT_EXIT,
   releaseTasksLock,
@@ -181,6 +184,43 @@ describe("listFiltered", () => {
     ]);
     const rows = listFiltered(idx, { rfc: "0001-r", status: "ready", cluster: "c2" });
     expect(rows.map((s) => s.id)).toEqual(["c"]);
+  });
+});
+
+describe("formatRows", () => {
+  it("renders est_loc from a numeric value and shows a priority column", () => {
+    const out = formatRows([story({ id: "a", est_loc: 90, priority: 30 })]);
+    expect(out).toContain("priority");
+    expect(out).toContain("est_loc");
+    const dataLine = out.split("\n").find((l) => l.startsWith("a"))!;
+    expect(dataLine).toContain("90");
+    expect(dataLine).toContain("30");
+  });
+
+  it("renders null priority and null est_loc as an em dash", () => {
+    const out = formatRows([story({ id: "a", est_loc: null, priority: null })]);
+    const dataLine = out.split("\n").find((l) => l.startsWith("a"))!;
+    expect(dataLine).toContain("—");
+  });
+
+  it("documents the priority direction in a legend above the table", () => {
+    const out = formatRows([story({ id: "a" })]);
+    expect(out.split("\n")[0]).toBe(PRIORITY_LEGEND);
+    expect(PRIORITY_LEGEND).toMatch(/lower/i);
+  });
+
+  it("returns (none) for an empty row set", () => {
+    expect(formatRows([])).toBe("(none)");
+  });
+});
+
+describe("renderStoryView", () => {
+  it("prints the file path then the full story text", () => {
+    const text = `---\ntitle: "X"\nstatus: ready\n---\n\n## Context\nbody\n`;
+    const out = renderStoryView("0001-r/stories/x.md", text);
+    expect(out.split("\n")[0]).toBe("0001-r/stories/x.md");
+    expect(out).toContain(`title: "X"`);
+    expect(out).toContain("## Context");
   });
 });
 
