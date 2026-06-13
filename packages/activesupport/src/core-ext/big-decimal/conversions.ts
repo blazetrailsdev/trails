@@ -38,6 +38,10 @@ export class BigDecimal {
    * non-negative values, a leading space prints a space instead; an integer
    * `n` inserts a space every `n` digits counting outward from the decimal
    * point; a trailing `F`/`f` selects fixed notation.
+   *
+   * Only fixed (`"F"`) notation is implemented — Ruby's engineering/scientific
+   * `"E"` form has no caller in trails (quoting and the defaulted `to_s` both
+   * use `"F"`). `"E"`/`"e"` throws rather than silently emitting fixed-point.
    */
   toString(format = "F"): string {
     const { signFlag, group } = parseFormat(format);
@@ -53,8 +57,13 @@ export class BigDecimal {
 }
 
 function parseFormat(format: string): { signFlag: "" | "+" | " "; group: number } {
-  const m = format.match(/^([+ ]?)(\d*)[eEfF]?$/);
+  const m = format.match(/^([+ ]?)(\d*)([eEfF]?)$/);
   if (!m) return { signFlag: "", group: 0 };
+  if (m[3] === "e" || m[3] === "E") {
+    throw new TypeError(
+      `BigDecimal#toString: scientific ("E") notation is not implemented — only fixed ("F")`,
+    );
+  }
   const signFlag = (m[1] as "" | "+" | " ") || "";
   const group = m[2] ? Number(m[2]) : 0;
   return { signFlag, group };
@@ -109,7 +118,14 @@ function parse(
   let intPart = m[1] || "0";
   let fracPart = m[2] ?? "";
   const exp = m[3] ? Number(m[3]) : 0;
-  if (Math.abs(exp) > MAX_EXPONENT_EXPANSION) return null;
+  // Ruby BigDecimal accepts arbitrarily large exponents; this cap is a
+  // TS-specific guard so adversarial input (e.g. "1e10000000") can't drive
+  // the digit-expansion below into multi-gigabyte string allocation.
+  if (Math.abs(exp) > MAX_EXPONENT_EXPANSION) {
+    throw new RangeError(
+      `BigDecimal: exponent magnitude exceeds the ${MAX_EXPONENT_EXPANSION}-digit expansion limit (TS-specific guard against unbounded allocation)`,
+    );
+  }
   if (exp > 0) {
     if (fracPart.length >= exp) {
       intPart += fracPart.slice(0, exp);
