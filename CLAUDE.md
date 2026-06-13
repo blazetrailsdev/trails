@@ -11,6 +11,12 @@ package list, and the `declare` / associations / enums / schema reference, see
 - Do use worktrees for any changes; leave the default worktree for the user.
   Always use `scripts/start-worktree.sh` to start a worktree.
 - Do NOT use subagents unless explicitly requested.
+- **AR work tracking lives in the `tasks` repo, not in docs.** Pick work via
+  `pnpm tasks` (`ready` / `next-bundle` / `claim`) — never by hand-editing an
+  `activerecord` plan doc. `docs/activerecord/` is frozen (RFC 0011 Phase 4);
+  CI's `Docs ActiveRecord Freeze` job fails any PR that adds or modifies a
+  file there (allowlist: `docs/activerecord/parity-verification.md`). Other
+  `docs/` trees are not policed and stay live until their own cutover.
 - Do NOT add "Co-Authored-By" lines to commits or "Generated with Claude
   Code" lines to PR descriptions.
 - After opening a PR, run the `/link` skill with the PR number so webhook
