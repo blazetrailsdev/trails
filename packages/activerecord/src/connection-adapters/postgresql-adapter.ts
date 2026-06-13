@@ -186,6 +186,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (config.sslcert) env.PGSSLCERT = String(config.sslcert);
     if (config.sslkey) env.PGSSLKEY = String(config.sslkey);
     if (config.sslrootcert) env.PGSSLROOTCERT = String(config.sslrootcert);
+    const variables = config.variables as Record<string, unknown> | undefined;
+    if (variables) {
+      // Rails: PGOPTIONS = variables.filter_map { "-c name=value" unless :default }
+      const pgOptions = Object.entries(variables)
+        .filter(([, v]) => v !== ":default" && v !== "default")
+        .map(([name, v]) => `-c ${name}=${String(v).replace(/[ \\]/g, "\\$&")}`)
+        .join(" ");
+      if (pgOptions) env.PGOPTIONS = pgOptions;
+    }
     return env;
   }
 
