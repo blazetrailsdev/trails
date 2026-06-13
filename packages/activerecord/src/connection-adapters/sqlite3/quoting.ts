@@ -43,11 +43,13 @@ export function unquotedFalse(): number {
   return 0;
 }
 
+/**
+ * Mirrors: SQLite3::Quoting#quote_table_name —
+ * `%Q("#{name.gsub('"', '""').gsub(".", "\".\"")}")`. The whole name is wrapped
+ * in double quotes with `.` rewritten as `"."` so `foo.bar` → `"foo"."bar"`.
+ */
 export function quoteTableName(name: string): string {
-  return name
-    .split(".")
-    .map((part) => `"${part.replace(/"/g, '""')}"`)
-    .join(".");
+  return `"${name.replace(/"/g, '""').replace(/\./g, '"."')}"`;
 }
 
 export function quoteColumnName(name: string): string {
