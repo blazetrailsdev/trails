@@ -1514,6 +1514,152 @@ export function finalize(slug: string, dryRun: boolean, tasksDir = TASKS_DIR): v
   console.log(`finalized ${slug}`);
 }
 
+// Pure content generator for a placeholder RFC README — exported so tests can
+// verify the exact file format without a real git repo or TASKS_DIR. New RFCs
+// are always `0000-<slug>`; cli-finalize-rfc assigns the real number at merge,
+// so the H1 here is deliberately number-free.
+export function buildRfcContent(
+  slug: string,
+  opts: {
+    title?: string;
+    owner?: string;
+    packages?: string[];
+    clusters?: string[];
+    related?: string[];
+    body?: string;
+    date: string;
+  },
+): string {
+  // Escape for a YAML double-quoted scalar: backslash first, then double-quote.
+  const qs = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  // YAML array value rendered after a `key:` — empty → ` []` (flow, one space);
+  // non-empty → a block list of quoted scalars (no trailing space after the colon).
+  const yamlList = (items: string[]) =>
+    items.length === 0 ? " []" : `\n${items.map((i) => `  - ${qs(i)}`).join("\n")}`;
+  const rfcId = `0000-${slug}`;
+  const title = opts.title ?? slug;
+  const owner = opts.owner ?? "@your-handle";
+  const related = opts.related ?? [];
+  // `related-rfcs` is optional; omit the key entirely when empty (as the template does).
+  const relatedBlock = related.length === 0 ? "" : `\nrelated-rfcs:${yamlList(related)}`;
+  // A caller-supplied body (`--body-file`) replaces the placeholder prose, trimmed
+  // to one leading blank line and one trailing newline so the file is prettier-clean.
+  const body =
+    opts.body != null
+      ? `\n${opts.body.replace(/^\n+/, "").replace(/\n+$/, "")}\n`
+      : `
+# RFC — ${title}
+
+## Summary
+
+One paragraph. What is this? Why does it matter?
+
+## Motivation
+
+What is the current state? What pain does it cause?
+
+## Design
+
+## Stories
+
+No stories registered yet.
+
+## Changelog
+
+- ${opts.date}: initial RFC
+`;
+  return `---
+rfc: ${qs(rfcId)}
+title: ${qs(title)}
+status: draft
+created: ${opts.date}
+updated: ${opts.date}
+owner: ${qs(owner)}
+packages:${yamlList(opts.packages ?? [])}
+clusters:${yamlList(opts.clusters ?? [])}${relatedBlock}
+---
+${body}`;
+}
+
+export function newRfc(
+  slug: string,
+  opts: {
+    title?: string;
+    owner?: string;
+    packages?: string[];
+    clusters?: string[];
+    related?: string[];
+    bodyFile?: string;
+  },
+  tasksDir = TASKS_DIR,
+): void {
+  const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+  if (!SLUG_RE.test(slug)) {
+    console.error(`error: slug "${slug}" must be a lowercase slug (letters, digits, hyphens)`);
+    process.exit(1);
+  }
+  for (const [label, list] of [
+    ["packages", opts.packages],
+    ["clusters", opts.clusters],
+    ["related", opts.related],
+  ] as const) {
+    for (const item of list ?? []) {
+      if (!SLUG_RE.test(item)) {
+        console.error(
+          `error: ${label} entry "${item}" must be a lowercase slug (letters, digits, hyphens)`,
+        );
+        process.exit(1);
+      }
+    }
+  }
+  if (!existsSync(join(tasksDir, ".git"))) {
+    console.error(
+      `error: ${tasksDir} is not a git repo. Clone blazetrailsdev/tasks there, or set $TASKS_DIR to an existing checkout.`,
+    );
+    process.exit(1);
+  }
+  const rfcId = `0000-${slug}`;
+  const rfcDir = join(tasksDir, "rfcs", rfcId);
+  if (existsSync(rfcDir)) {
+    console.error(`error: RFC "${rfcId}" already exists at ${rfcDir}`);
+    process.exit(1);
+  }
+  // Read the optional --body-file up front (before the commit loop) so a missing
+  // path fails loudly rather than silently producing the placeholder body.
+  let body: string | undefined;
+  if (opts.bodyFile != null) {
+    try {
+      body = readFileSync(opts.bodyFile, "utf8");
+    } catch {
+      console.error(`error: --body-file ${opts.bodyFile} not found or unreadable`);
+      process.exit(1);
+    }
+  }
+  const readmeFile = join(rfcDir, "README.md");
+  commitAndPush({
+    message: `new-rfc: ${rfcId}`,
+    fileToStage: readmeFile,
+    mutator: () => {
+      // Re-check after pull: another agent may have pushed the same RFC since
+      // the pre-pull existsSync above, and we must not clobber their README.
+      if (existsSync(rfcDir)) {
+        console.error(`error: RFC "${rfcId}" already exists (created by concurrent agent)`);
+        process.exit(4);
+      }
+      mkdirSync(rfcDir, { recursive: true });
+      writeFileSync(readmeFile, buildRfcContent(slug, { ...opts, body, date: today() }));
+      // Hand-authored bodies often violate prettier's wrapping rules, which the
+      // tasks pre-commit hook rejects; format in place so the commit is clean.
+      formatFiles([readmeFile], tasksDir);
+    },
+    raceMessage: `failed to create ${rfcId} after retry — pull manually and retry`,
+    raceExitCode: 4,
+    cwd: tasksDir,
+    pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
+  });
+  console.log(`created rfcs/${rfcId}/README.md`);
+}
+
 // ──────────────────── done merge-state guard ────────────────────
 
 // Guards `done` against marking an OPEN PR as done. Exported for unit tests.
@@ -1805,6 +1951,28 @@ function main(): void {
       finalize(slug, flags["dry-run"] === true);
       break;
     }
+    case "new-rfc": {
+      const slug = pos[0];
+      if (!slug) usage();
+      const csv = (name: string): string[] | undefined => {
+        const raw = stringFlag(flags, name);
+        return raw
+          ? raw
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : undefined;
+      };
+      newRfc(slug, {
+        title: stringFlag(flags, "title"),
+        owner: stringFlag(flags, "owner"),
+        packages: csv("packages"),
+        clusters: csv("clusters"),
+        related: csv("related"),
+        bodyFile: stringFlag(flags, "body-file"),
+      });
+      break;
+    }
     case "reindex":
     case "build":
       reindex();
@@ -1885,6 +2053,7 @@ function usage(): never {
   status-set <id> <status>                     (draft ↔ ready, blocked → ready; validates the transition)
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
   finalize <0000-slug> [--dry-run]             (assign the next RFC number: rename dir, rewrite refs, rebuild index)
+  new-rfc <slug> [--title "text"] [--owner @handle] [--packages <csv>] [--clusters <csv>] [--related <csv>] [--body-file <path>]
   reindex | build                              (rebuild the index in place)
   fmt [<path> ...]                             (prettier --write authored stories; default: rfcs/)
 
