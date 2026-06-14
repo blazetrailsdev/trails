@@ -1851,8 +1851,26 @@ describe("BasicsTest", () => {
     class Account extends Base {}
     expect(Account.tableName).toBe("accounts");
   });
-  it.skip("utc as time zone", () => {
-    // BLOCKED: fixture — with_env_tz: reads Topic.find(1).bonus_time after assigning "5:42:00AM" string; requires process-level TZ env var and Topic fixture data
+  it("utc as time zone", async () => {
+    await withTimezoneConfig({ default: "utc" }, async () => {
+      class Topic extends Base {
+        static {
+          this.tableName = "topics_tz";
+          this.attribute("bonus_time", "time");
+        }
+      }
+      const created = await Topic.create({});
+      const topic = await Topic.find(created.id);
+      topic.assignAttributes({ bonus_time: "5:42:00AM" });
+      const bonusTime = topic.readAttribute("bonus_time") as {
+        hour: number;
+        minute: number;
+        second: number;
+      };
+      expect(bonusTime.hour).toBe(5);
+      expect(bonusTime.minute).toBe(42);
+      expect(bonusTime.second).toBe(0);
+    });
   });
   it("utc as time zone and new", async () => {
     await withTimezoneConfig({ default: "utc" }, () => {
@@ -2123,8 +2141,30 @@ describe("BasicsTest", () => {
     const reloaded = await Weird.find(w.id);
     expect(reloaded.readAttribute("a$b")).toBe("value");
   });
-  it.skip("attributes on dummy time", () => {
-    // BLOCKED: fixture — with_env_tz: assigns "5:42:00AM" string to Topic.find(1).bonus_time; needs Topic fixture and process-level TZ change; then assert_equal using find_by, requiring DB
+  it("attributes on dummy time", async () => {
+    await withTimezoneConfig({ default: "local" }, async () => {
+      class Topic extends Base {
+        static {
+          this.tableName = "dummy_topics";
+          this.attribute("bonus_time", "time");
+        }
+      }
+      const created = await Topic.create({});
+      const topic = await Topic.find(created.id);
+      topic.assignAttributes({ bonus_time: "5:42:00AM" });
+      const bonusTime = topic.readAttribute("bonus_time") as {
+        hour: number;
+        minute: number;
+        second: number;
+      };
+      expect(bonusTime.hour).toBe(5);
+      expect(bonusTime.minute).toBe(42);
+      expect(bonusTime.second).toBe(0);
+
+      await topic.save();
+      const found = await Topic.findBy({ bonus_time: "5:42:00AM" });
+      expect(found?.id).toBe(topic.id);
+    });
   });
   it("attributes on dummy time with invalid time", async () => {
     class DummyTopic extends Base {

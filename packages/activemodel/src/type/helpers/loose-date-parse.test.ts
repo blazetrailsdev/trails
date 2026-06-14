@@ -59,6 +59,14 @@ describe("looseDateParse", () => {
     expect(looseDateParse("3:30 PM")).toMatchObject({ hour: 15, minute: 30 });
   });
 
+  it("5:42:00AM with seconds", () => {
+    expect(looseDateParse("5:42:00AM")).toMatchObject({ hour: 5, minute: 42, second: 0 });
+  });
+
+  it("12:30:45 PM with seconds", () => {
+    expect(looseDateParse("12:30:45 PM")).toMatchObject({ hour: 12, minute: 30, second: 45 });
+  });
+
   it("12 AM → hour 0", () => {
     expect(looseDateParse("12 AM")).toMatchObject({ hour: 0 });
   });
