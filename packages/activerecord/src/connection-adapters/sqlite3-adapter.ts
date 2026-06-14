@@ -342,12 +342,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // A statement prepared outside the pool — Rails' non-`prepare` branch, which
   // prepares a fresh statement per call rather than caching it.
   private async _freshStatement(sql: string): Promise<SqliteStatement> {
+    await this.ensureConnected();
     const stmt = await this.driver.prepare(sql);
     this._maybeEnableReadBigInts(sql, stmt);
     return stmt;
   }
 
   private async _cachedStatement(sql: string): Promise<SqliteStatement> {
+    await this.ensureConnected();
     // When preparedStatements is off, skip the pool and prepare per call —
     // matches Rails' `statement_pool` behavior gated on
     // `prepared_statements`. better-sqlite3 still uses its own statement
@@ -385,6 +387,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#pragma
    */
   async pragma(name: string): Promise<unknown> {
+    await this.ensureConnected();
     return await this.driver.pragma(name);
   }
 
@@ -521,6 +524,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
+    await this.ensureConnected();
     if (materializeTransactions) await this.materializeTransactions();
     const payload: Record<string, unknown> = {
       sql,
@@ -697,6 +701,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     binds: unknown[] = [],
     _options: ExplainOption[] = [],
   ): Promise<string> {
+    await this.ensureConnected();
     const explainStmt = await this.driver.prepare(`EXPLAIN QUERY PLAN ${sql}`);
     const driverBinds = binds.map(_driverBind) as SqliteBinds;
     const rows = (await explainStmt.all(driverBinds)) as Record<string, unknown>[];
@@ -826,6 +831,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Execute raw SQL (for DDL and other non-query statements).
    */
   async exec(sql: string): Promise<void> {
+    await this.ensureConnected();
     await this.driver.exec(sql);
   }
 
@@ -1505,6 +1511,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+    await this.ensureConnected();
     const oldForeignKeys = ((await this.driver.pragma("foreign_keys")) as any[])[0]?.foreign_keys;
     const oldDefer = ((await this.driver.pragma("defer_foreign_keys")) as any[])[0]
       ?.defer_foreign_keys;
@@ -1519,6 +1526,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   override async checkAllForeignKeysValidBang(): Promise<void> {
+    await this.ensureConnected();
     const violations = (await this.driver.pragma("foreign_key_check")) as Array<
       Record<string, unknown>
     >;
@@ -1561,6 +1569,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
              UNION ALL
              SELECT sql FROM sqlite_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`;
     }
+    await this.ensureConnected();
     const stmt = await this.driver.prepare(sql);
     const row = (await stmt.get()) as { sql: string } | undefined;
     return row?.sql ?? null;
@@ -1994,6 +2003,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     overrideCheckConstraints?: CheckConstraintDefinition[],
     extraDefinition?: (def: import("./abstract/schema-definitions.js").TableDefinition) => void,
   ): Promise<void> {
+    await this.ensureConnected();
     const { schema, bare: bareTable } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const qTable = quoteTableName(tableName);
@@ -2475,6 +2485,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       });
     }
     return this._connectingPromise;
+  }
+
+  /**
+   * Ensure a deferred async-only connection is open before the driver is
+   * touched. The synchronous pool checkout path (`ConnectionPool#checkout`)
+   * hands out a freshly-constructed adapter without awaiting
+   * `completeAsyncConnect()` — it can't, checkout is sync. For async-only
+   * drivers (no `openSync()`) the constructor leaves the handle unset and flags
+   * the open as pending, so the first query that reaches the driver must
+   * complete it. No-op once connected and for sync drivers (never pending).
+   * @internal
+   */
+  private async ensureConnected(): Promise<void> {
+    if (this._asyncConnectPending) await this.completeAsyncConnect();
   }
 
   /** @internal */
