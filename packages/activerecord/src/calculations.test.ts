@@ -719,16 +719,6 @@ describe("CalculationsTest", () => {
     expect(sql).toContain("SUM");
   });
 
-  it("should count field in joined table", () => {
-    class Account extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-      }
-    }
-    const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id").toSql();
-    expect(sql).toContain("INNER JOIN");
-  });
-
   it("should count field in joined table with group by", () => {
     class Account extends Base {
       static {
@@ -7568,5 +7558,10 @@ describe("CalculationsTest", () => {
 
     await assertMinimumAndMaximumOnTimeAttributesJoinsWithColumn("topics.written_on");
     await assertMinimumAndMaximumOnTimeAttributesJoinsWithColumn("written_on");
+  });
+
+  it("should count field in joined table", async () => {
+    expect(await CanonicalAccount.joins("firm").count("companies.id")).toBe(5);
+    expect(await CanonicalAccount.joins("firm").distinct().count("companies.id")).toBe(4);
   });
 });
