@@ -133,14 +133,34 @@ interface PrimaryKeyHost {
   primaryKey: string | string[];
   _primaryKey?: string | string[];
   name: string;
+  tableName?: string;
+  connection?: { schemaCache?: { getCachedPrimaryKeys?(table: string): unknown } };
 }
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key
+ *
+ * Honors an explicitly-configured primary key (an own `_primaryKey`, set via
+ * `primary_key=` or generated). Otherwise mirrors Rails' get_primary_key:
+ * consult the schema cache so a key-less data source (e.g. a view) resolves to
+ * `null` rather than the "id" convention. The lookup is query-free — it reads
+ * only what `loadSchema` already warmed — so a cold cache falls back to "id".
+ * The declared non-null return mirrors the host contract used elsewhere; the
+ * `null` it can return matches Rails' dynamically-nil `primary_key` for a view.
  * @internal
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] {
-  return this._primaryKey ?? "id";
+  if (Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+    return this._primaryKey ?? "id";
+  }
+  try {
+    const table = this.tableName;
+    const cached = table ? this.connection?.schemaCache?.getCachedPrimaryKeys?.(table) : undefined;
+    if (cached !== undefined) return cached as string | string[];
+  } catch {
+    // No connection/schema configured — fall through to the convention.
+  }
+  return "id";
 }
 
 /**

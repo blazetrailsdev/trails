@@ -118,9 +118,15 @@ describe("ViewWithPrimaryKeyTest", () => {
     });
   });
 
-  it.skip("does not assume id column as primary key", () => {
-    // BLOCKED: primary-key detection — our default pk is "id"; detecting nil
-    // requires schema-based reset_primary_key (queries PRAGMA table_info for pk=0).
+  it("does not assume id column as primary key", async () => {
+    class Model extends Base {
+      static override _tableName = "ebooks'";
+    }
+    // Rails resolves `primary_key` synchronously via the connection's schema
+    // cache; our sync resolver reads only what's already cached, so warm it
+    // first (the async analogue of Ruby's lazy schema_cache.primary_keys query).
+    await Model.loadSchema();
+    expect(Model.primaryKey).toBeNull();
   });
 
   itIfSupports("views", "does not dump view as table", async () => {
@@ -189,8 +195,8 @@ describe("ViewWithoutPrimaryKeyTest", () => {
     });
   });
 
-  it.skip("does not have a primary key", () => {
-    // BLOCKED: primary-key detection — see ViewWithPrimaryKeyTest note.
+  it("does not have a primary key", () => {
+    expect(Paperback.primaryKey).toBeNull();
   });
 
   it("does not dump view as table", async () => {
