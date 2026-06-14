@@ -15,7 +15,8 @@
  *
  * Scope (also set in eslint.config.mjs; re-checked here so the rule is testable
  * by filename): activerecord src .ts, excluding test files, connection-adapters,
- * adapters, tasks, and schema-*.ts — those legitimately render SQL.
+ * adapters, tasks, schema-*.ts, and the test-infra DDL helpers (test-helpers/
+ * and test-setup-*.ts) — those legitimately render SQL by design.
  *
  * Existing violators are grandfathered via `eslint/no-raw-sql-exclude.json`
  * (repo-relative paths) — a ratchet baseline; the list is the RFC-0022 burndown
@@ -62,6 +63,11 @@ function isExcludedPath(rel) {
   if (/(^|\/)adapters\//.test(rel)) return true;
   if (/(^|\/)tasks\//.test(rel)) return true;
   if (/(^|\/)schema-[^/]*\.ts$/.test(rel)) return true;
+  // Test-infra DDL helpers render SQL by design and will never migrate to
+  // @blazetrails/arel — scope them out rather than baseline them so the
+  // RFC-0022 burndown worklist reflects only real arel migration targets.
+  if (/(^|\/)test-helpers\//.test(rel)) return true;
+  if (/(^|\/)test-setup-[^/]*\.ts$/.test(rel)) return true;
   return false;
 }
 
