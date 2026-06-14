@@ -3450,7 +3450,20 @@ export class Relation<T extends Base> {
       // into a row-value tuple (`relation.rb`: `primary_key.map { |pk| table[pk] }`).
       // Routing both PK shapes through one path keeps the TS port structurally
       // faithful to Rails (no second code path to sync).
-      const arel = this._buildArel();
+      //
+      // Mirrors `relation.rb:1023`: when the relation requires eager loading
+      // (e.g. an `includes` promoted to a join by a `where`/`order` reference),
+      // build the arel from the join-dependency relation
+      // (`apply_join_dependency.arel`) instead of the plain `build_arel`.
+      const arel = this._eagerLoadingForSql()
+        ? this.applyJoinDependencyForArel()._buildArel()
+        : this._buildArel();
+      // Mirrors `relation.rb:1024` (`arel.source.left = table`): force the FROM
+      // target back to the bare table before `compile_delete`. For the common
+      // and join cases `source.left` is already the table, but an explicit
+      // `from(custom)` would otherwise leave the DELETE targeting the custom
+      // FROM node rather than the model table.
+      arel.source.left = table;
       const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
       const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
       const key = Array.isArray(primaryKey)
