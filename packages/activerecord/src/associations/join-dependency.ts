@@ -247,7 +247,6 @@ export class JoinDependency {
     const keyName = referencedAlias ?? targetTable!;
     let effectiveName: string;
     if ((this._aliasTracker.aliases.get(keyName) ?? 0) === 0) {
-      // First visit: claim the real (or referenced) name and bump its count.
       this._aliasTracker.aliases.set(keyName, 1);
       effectiveName = keyName;
     } else {
