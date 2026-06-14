@@ -585,8 +585,12 @@ async function _warmSchemaCache(adapter: DatabaseAdapter, table: string): Promis
   const sc = adapter.schemaCache;
   const pool = adapter.pool ?? null;
   if (!sc || pool === null) return;
-  if (typeof sc.isCached === "function" && sc.isCached(table)) return;
   try {
+    // `SchemaCache.columnsHash` short-circuits on `_columnsHash.has(table)`, so
+    // an already-warm table is a no-op (no query); otherwise it reflects and
+    // populates exactly the `_columnsHash` that `model-schema.ts` columnsHash()
+    // reads. A guard on `isCached()` would check `_columns`, not `_columnsHash`,
+    // and could skip a warm the read path still needs.
     await sc.columnsHash(pool, table);
   } catch {
     // Reflection is best-effort — a missing/locked table simply leaves the
