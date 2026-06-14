@@ -266,7 +266,16 @@ export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean
 }
 
 export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
-  if (this._attributeMethodsGenerated) return false;
+  // Rails' @attribute_methods_generated is a per-class ivar (nil for every
+  // class regardless of superclass). JS properties are inheritable, so only an
+  // *own* truthy flag counts as already-generated — an inherited `true` from a
+  // parent class must not short-circuit a subclass's own generation.
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+    this._attributeMethodsGenerated
+  ) {
+    return false;
+  }
   // Generate getter/setter for each attribute definition that doesn't
   // already have one on the prototype (mirrors Rails' define_attribute_methods).
   // This is the single generation path: the declaration sites

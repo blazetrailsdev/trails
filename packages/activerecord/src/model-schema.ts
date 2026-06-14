@@ -816,12 +816,9 @@ function applyColumnsHash(
       ...(colDefaultFunction != null ? { defaultFunction: colDefaultFunction } : {}),
     });
 
-    if (name === "id") {
-      if (Object.prototype.hasOwnProperty.call(host.prototype, "id")) {
-        delete host.prototype.id;
-      }
-      continue;
-    }
+    // `id` is excluded from dirty-method generation here; its accessor (and any
+    // stale own `id` property) is handled by defineAttributeMethods below.
+    if (name === "id") continue;
     const proto = host.prototype;
     // The main attribute accessor and the *BeforeTypeCast / *ForDatabase
     // accessors are generated through defineAttributeMethods (invalidated +
