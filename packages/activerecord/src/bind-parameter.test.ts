@@ -269,9 +269,7 @@ describe("BindParameterTest", () => {
       [[1, 2, 3]],
     );
     expect(conn.toSql(arelNode)).toBe(sql);
-    // trails' adapter `selectAll` takes a SQL string (Rails' takes arel); render
-    // the inlined SQL through the same connection path before executing.
-    expect((await conn.selectAll(conn.toSql(arelNode))).length).toBe(3);
+    expect((await conn.selectAll(arelNode)).length).toBe(3);
   }
 
   it("bind params to sql with prepared statements", async (ctx) => {

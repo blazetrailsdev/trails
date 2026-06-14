@@ -1,5 +1,9 @@
 import { Notifications } from "@blazetrails/activesupport";
-import { typeCastedBinds, type DatabaseStatementsHost } from "./database-statements.js";
+import {
+  typeCastedBinds,
+  toSqlAndBinds,
+  type DatabaseStatementsHost,
+} from "./database-statements.js";
 import { Result } from "../../result.js";
 import {
   executionContextId,
@@ -402,7 +406,7 @@ export function clearQueryCache(this: QueryCacheHost): void {
 /** The base (uncached) `selectAll` signature the override wraps via `super`. */
 type BaseSelectAll = (
   this: QueryCacheHost,
-  sql: string,
+  arel: string | unknown,
   name?: string | null,
   binds?: unknown[],
   opts?: { allowRetry?: boolean },
@@ -425,11 +429,20 @@ type BaseSelectAll = (
 export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
   return async function cachedSelectAll(
     this: QueryCacheHost,
-    sql: string,
+    arel: string | unknown,
     name?: string | null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean },
   ): Promise<Result> {
+    // Rails' select_all converts an Arel node (or relation) to SQL + binds via
+    // `to_sql_and_binds` before consulting the cache (query_cache.rb:236). A
+    // SQL string passes through unchanged with its binds intact.
+    const [sql, resolvedBinds] = toSqlAndBinds.call(
+      this as DatabaseStatementsHost,
+      arel,
+      binds ?? [],
+    );
+    binds = resolvedBinds;
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
       const cached = lookupSqlCache.call(this, sql, name, binds ?? []);
