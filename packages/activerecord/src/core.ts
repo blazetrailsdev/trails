@@ -5,7 +5,7 @@
  */
 
 import { getApplicationRecordClass } from "./inheritance.js";
-import { RecordNotFound, StrictLoadingViolationError } from "./errors.js";
+import { RecordNotFound, StatementInvalid, StrictLoadingViolationError } from "./errors.js";
 import { actionOnStrictLoadingViolation } from "./ar-config.js";
 import { WRITING_ROLE } from "./roles.js";
 import {
@@ -841,8 +841,16 @@ async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): 
       return (this as any).where(wheres).limit(1);
     }),
   );
-  const records = await statement.execute(values, connection, { allowRetry: true });
-  return records[0] ?? null;
+  try {
+    const records = await statement.execute(values, connection, { allowRetry: true });
+    return records[0] ?? null;
+  } catch (e) {
+    // Rails: rescue TypeError; raise ActiveRecord::StatementInvalid — a bind
+    // value that slips past unsupportedValue but fails type coercion surfaces
+    // as the AR error callers rescue, not a raw TypeError.
+    if (e instanceof TypeError) throw new StatementInvalid(e.message);
+    throw e;
+  }
 }
 
 export function findByBang(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {
