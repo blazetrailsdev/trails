@@ -2008,8 +2008,12 @@ export function isStaleClaim(s: StoryEntry, nowMs: number, thresholdHours: numbe
   return age != null && age > thresholdHours;
 }
 
+// Stale claims, oldest first — the most urgent (longest orphaned) lead the
+// `status` section.
 export function staleClaims(index: Index, nowMs: number, thresholdHours: number): StoryEntry[] {
-  return index.stories.filter((s) => isStaleClaim(s, nowMs, thresholdHours));
+  return index.stories
+    .filter((s) => isStaleClaim(s, nowMs, thresholdHours))
+    .sort((a, b) => (claimAgeHours(b.claim, nowMs) ?? 0) - (claimAgeHours(a.claim, nowMs) ?? 0));
 }
 
 // Renders the `stale claims` section for `tasks status`. Empty string when
@@ -2092,7 +2096,8 @@ function statusCounts(index: Index, thresholdHours: number): void {
   console.log(line(header));
   for (const r of rows) console.log(line(r));
 
-  const stale = formatStaleClaims(staleClaims(index, Date.now(), thresholdHours), Date.now());
+  const now = Date.now();
+  const stale = formatStaleClaims(staleClaims(index, now, thresholdHours), now);
   if (stale) console.log(`\n${stale}`);
 }
 

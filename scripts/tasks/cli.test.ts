@@ -317,6 +317,14 @@ describe("stale claims", () => {
     expect(staleClaims(idx, NOW, 48).map((s) => s.id)).toEqual(["stale"]);
   });
 
+  it("orders stale claims oldest first", () => {
+    const idx = index([
+      story({ id: "newer", status: "claimed", pr: null, claim: hoursAgo(60) }),
+      story({ id: "older", status: "claimed", pr: null, claim: hoursAgo(200) }),
+    ]);
+    expect(staleClaims(idx, NOW, 48).map((s) => s.id)).toEqual(["older", "newer"]);
+  });
+
   it("formatStaleClaims renders id, assignee, and age; empty when none", () => {
     expect(formatStaleClaims([], NOW)).toBe("");
     const out = formatStaleClaims(
