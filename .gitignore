@@ -37,3 +37,6 @@ file:trails_test_*
 
 # Generated fixtures-adoption report (was docs/activerecord/fixtures-adoption-inventory.md; now untracked)
 /fixtures-adoption-inventory.md
+
+# ESLint rule unit-test scratch fixtures (rails-error-parity / rails-arel-tosql)
+eslint/.tmp-*.json
