@@ -1535,11 +1535,21 @@ export async function countHasMany(
   options: AssociationOptions,
 ): Promise<number> {
   if (options.through) {
-    // Temporarily disable strict loading so through-association loading works
+    // COUNT(*) over the JOIN — matching Rails' scope.count(:all) — instead of
+    // materializing rows just to read their length. Temporarily disable strict
+    // loading so the count works on strict-loading models.
     record._strictLoadingBypassCount++;
     try {
-      const records = await loadHasManyThrough(record, assocName, options);
-      return records.length;
+      const rel = buildThroughJoinScope(record, assocName, options);
+      if (!rel) return 0;
+      const result = await rel.count();
+      if (typeof result !== "number") {
+        throw new Error(
+          `countHasMany expected a numeric count but got ${typeof result} — ` +
+            `association "${assocName}" may have a grouped scope`,
+        );
+      }
+      return result;
     } finally {
       record._strictLoadingBypassCount--;
     }
