@@ -796,8 +796,14 @@ export function findBy(this: CoreHost, conditions: Record<string, unknown>): Pro
 /**
  * Rails: Core::ClassMethods#find_by routes a flat-hash lookup through a cached
  * StatementCache, falling back to the relation path for scoped lookups, keys
- * that are not real columns (associations/aliases), or unsupported
- * (nil/Array/Range/Hash/Relation/Base) values.
+ * that are not real columns, or unsupported (nil/Array/Range/Hash/Relation/Base)
+ * values.
+ *
+ * Known gap vs Rails: Rails first resolves attribute_aliases[key] and
+ * dereferences belongs_to association objects to their FK column + PK value
+ * (core.rb#find_by), so an alias or `find_by({author: postInstance})` still
+ * hits the cache there. Here those keys fail the columnNames check and take the
+ * relation path — correct, but a missed cache hit, not yet ported.
  */
 async function findByThroughCache(
   this: CoreHost,

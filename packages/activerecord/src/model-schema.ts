@@ -604,6 +604,11 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
  * attributes survive reload.
  */
 export function resetColumnInformation(this: SchemaHost): void {
+  // Rails reset_column_information calls initialize_find_by_cache right after
+  // reload_schema_from_cache, resetting @find_by_statement_cache. Clearing it
+  // here (lazy reinit on next access) mirrors that; reload_schema_from_cache
+  // itself leaves the cache alone.
+  (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
   // STI subclasses share the base's defs. Redirect the reset to the base
   // so schema-sourced defs and accessors are actually cleared; clear the
   // subclass-local caches too so any forked metadata is dropped.
@@ -1130,9 +1135,12 @@ export function tableName(this: SchemaHost, value?: string): string {
     const changed = this._tableName !== value;
     this._tableName = value;
     if (changed) {
-      // Rails table_name= runs reload_schema_from_cache: drop the memoized
-      // predicate builder (keyed to the old arel table) and the find_by
-      // statement cache so the next query rebuilds against the new table.
+      // Rails table_name= runs `reset_column_information if connected?`, which
+      // resets the predicate builder and (via initialize_find_by_cache) the
+      // find_by statement cache. We have no connection-pool `connected?`
+      // gate, so we clear these two caches eagerly and directly (rather than
+      // routing through the heavier resetColumnInformation/schema reload) so
+      // the next query rebuilds against the new table.
       (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
       (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
     }
@@ -1253,9 +1261,6 @@ function initializeLoadSchemaMonitor(this: SchemaHost): void {
 /** @internal */
 function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   resetColumnInformation.call(this);
-  // Rails reload_schema_from_cache resets @find_by_statement_cache so a
-  // table_name change invalidates statements built against the old table.
-  (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
   if (recursive) {
     const subclasses: SchemaHost[] = (this as any).subclasses ?? [];
     for (const sub of subclasses) {
