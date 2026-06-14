@@ -1855,7 +1855,7 @@ export class Relation<T extends Base> {
       (throughAssocDef.type as string) === "hasManyThrough" ||
       (throughAssocDef.type as string) === "hasOneThrough";
 
-    let throughJoins: Array<{ table: string; on: string }>;
+    let throughJoins: JoinClauseSpec[];
     if (throughIsNested) {
       const resolved = this._resolveAssociationJoin(throughName);
       if (!resolved) return null;
@@ -1894,6 +1894,7 @@ export class Relation<T extends Base> {
               ? throughPredicates[0]
               : new Nodes.And(throughPredicates),
           ),
+          klass: throughModel,
         },
       ];
     }
