@@ -756,26 +756,15 @@ export class SavepointTransaction extends Transaction {
   }
 
   override async materializeBang(): Promise<void> {
-    // Flip `_materialized` before the awaited `createSavepoint` so that a
-    // re-entrant `materializeTransactions` pass — triggered by queries the
-    // cascade issues while we await (e.g. a mutual `has_one`/`belongs_to`
-    // autosave pair re-entering the save of the original child) — sees
-    // `isMaterialized()` and skips this transaction, avoiding a second
-    // `materializeBang` and the double `_instrumenter.start()` that PostgreSQL
-    // rejects with InstrumentationAlreadyStartedError. Mirrors Rails
-    // `materialize_transactions`' `return if @materializing_transactions`
-    // guard, which the AsyncContext-owner match fails to fire across the
-    // cross-record cascade.
-    this._materialized = true;
-    try {
-      await this.connection.createSavepoint(this.savepointName);
-    } catch (err) {
-      // createSavepoint never ran super.materializeBang(), so the instrumenter
-      // was never started — roll the early flag back so a later rollback/commit
-      // does not call _instrumenter.finish() on an unstarted instrumenter.
-      this._materialized = false;
-      throw err;
-    }
+    // A re-entrant `materializeTransactions` pass — triggered by queries the
+    // cascade issues while we await `createSavepoint` (e.g. a mutual
+    // `has_one`/`belongs_to` autosave pair re-entering the save of the
+    // original child) — no longer double-materializes this savepoint: the
+    // `TransactionManager._materializingTransactions` guard no-ops the nested
+    // pass before it touches the stack (mirroring Rails `materialize_transactions`'
+    // `return if @materializing_transactions`). No early `_materialized` flip
+    // is needed here.
+    await this.connection.createSavepoint(this.savepointName);
     await super.materializeBang();
   }
 
@@ -897,12 +886,15 @@ export class TransactionManager {
   private _currentLockOwner: symbol | null = null;
   /** @internal Outermost-call mutex; non-null while a foreign chain holds it. */
   private _lockChain: Promise<void> | null = null;
-  /** @internal AsyncContext carrying the per-materialization owner token. */
-  private _materializingOwner: AsyncContext<symbol> | null = null;
-  /** @internal Cached AsyncContext adapter for the materialize owner. */
-  private _materializingOwnerAdapter: ReturnType<typeof getAsyncContext> | null = null;
-  /** @internal Token identifying the chain currently materializing. */
-  private _currentMaterializingOwner: symbol | null = null;
+  /**
+   * @internal Mirrors Rails' `@materializing_transactions` boolean. Guards
+   * re-entrant `materializeTransactions` passes (queries the materialize loop
+   * issues re-enter the method on the same chain). Safe as a plain instance
+   * flag — not an AsyncContext token — because it is only ever read and written
+   * while holding the per-connection lock ({@link synchronize}); a foreign
+   * chain blocks on the lock and never observes it true.
+   */
+  private _materializingTransactions = false;
 
   static readonly NULL_TRANSACTION = Object.freeze(new NullTransaction());
 
@@ -1021,46 +1013,34 @@ export class TransactionManager {
     });
   }
 
-  /** @internal */
-  private _materializingStorage(): AsyncContext<symbol> {
-    const asyncContext = getAsyncContext();
-    if (!this._materializingOwner || this._materializingOwnerAdapter !== asyncContext) {
-      this._materializingOwner = asyncContext.create<symbol>();
-      this._materializingOwnerAdapter = asyncContext;
-    }
-    return this._materializingOwner;
-  }
-
   async materializeTransactions(): Promise<void> {
-    // Re-entrant call from inside an in-progress materializeBang on the same
-    // chain — skip to avoid infinite recursion (queries issued by
-    // materializeBang itself call back into here).
-    const storage = this._materializingStorage();
-    if (this._currentMaterializingOwner && storage.getStore() === this._currentMaterializingOwner) {
-      return;
-    }
     // Mirrors Rails (`abstract/transaction.rb:577-591`): the pass runs under
-    // the per-connection lock. Foreign chains block here; once they enter,
-    // an earlier holder will have flipped `_hasUnmaterializedTransactions`
+    // the per-connection lock. Foreign chains block on the lock; once they
+    // enter, an earlier holder will have flipped `_hasUnmaterializedTransactions`
     // off and they no-op. `beginTransaction` is wrapped in the same lock
     // (mirroring Rails line 507) so `_hasUnmaterializedTransactions` cannot
     // flip back to true mid-pass — making the unconditional clear at the
     // end of the loop safe by exclusion.
     await this.synchronize(async () => {
+      // `return if @materializing_transactions` (`transaction.rb:578`). A
+      // re-entrant call — a query the materialize loop issues (e.g. a
+      // cross-record autosave cascade) re-enters here on the same chain and
+      // re-acquires the lock reentrantly — no-ops directly. The flag is a
+      // plain boolean rather than an AsyncContext owner token because the lock
+      // already serializes foreign chains out: they never reach this read
+      // while it is true.
+      if (this._materializingTransactions) return;
       if (!this._hasUnmaterializedTransactions) return;
-      const owner = Symbol("tm.materialize");
-      this._currentMaterializingOwner = owner;
+      this._materializingTransactions = true;
       try {
-        await storage.run(owner, async () => {
-          for (const t of this._stack) {
-            if (t instanceof Transaction && !t.isMaterialized()) {
-              await t.materializeBang();
-            }
+        for (const t of this._stack) {
+          if (t instanceof Transaction && !t.isMaterialized()) {
+            await t.materializeBang();
           }
-        });
+        }
         this._hasUnmaterializedTransactions = false;
       } finally {
-        this._currentMaterializingOwner = null;
+        this._materializingTransactions = false;
       }
     });
   }
