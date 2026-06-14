@@ -4,6 +4,15 @@ import { Node, NodeVisitor } from "./node.js";
  * Represents a bind parameter placeholder in a prepared statement.
  *
  * Mirrors: Arel::Nodes::BindParam
+ *
+ * `toSql()` always emits the bind marker `?`, regardless of the wrapped
+ * value — matching Rails' `visit_Arel_Nodes_BindParam`, which does
+ * `collector.add_bind(o.value, &bind_block)` where `BIND_BLOCK = proc { "?" }`.
+ * So `new BindParam(1).toSql()`, `new BindParam(null).toSql()`, and the
+ * valueless `new BindParam().toSql()` are all `"?"`. The value is recorded
+ * separately, not inlined; `ToSql#compileWithBinds` returns the SQL with `?`
+ * markers alongside the extracted bind values. (Casted/Quoted literals do
+ * inline via `quote` — only BindParam/Attribute collect a placeholder.)
  */
 export class BindParam extends Node {
   readonly value: unknown;

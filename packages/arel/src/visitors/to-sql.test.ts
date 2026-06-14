@@ -1096,10 +1096,10 @@ describe("the to_sql visitor", () => {
 
   it("works with BindParams", () => {
     const v = new Visitors.ToSql();
-    // Valueless BindParam: preserved as ? (raw placeholder slot).
+    // Rails: `compile(Nodes::BindParam.new(1))` is `"?"` — the value is
+    // collected as a bind, never inlined. A valueless BindParam is `?` too.
+    expect(v.compile(new Nodes.BindParam(1))).toBe("?");
     expect(v.compile(new Nodes.BindParam())).toBe("?");
-    // BindParam with value: compile() inlines the value for display SQL.
-    expect(v.compile(new Nodes.BindParam(1))).toBe("1");
   });
 
   it("compileWithBinds extracts bind values", () => {

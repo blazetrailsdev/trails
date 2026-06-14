@@ -151,6 +151,27 @@ export class DatabaseStatementsBase {
 // --- Query conversion ---
 
 /**
+ * Compile an Arel node to a SQL string with its bind values inlined via the
+ * host's quoter. Raw Arel `ToSql#compile` now emits `?` for BindParams (Rails
+ * parity); any path that produces a standalone SQL string with no companion
+ * bind array (display SQL, statement-cache fallbacks) must substitute them
+ * here, the same way `Relation#toSql` does, or an unbound `?` leaks into
+ * executable SQL.
+ */
+function compileInlined(visitor: Visitors.ToSql, node: Nodes.Node, host: unknown): string {
+  const [sql, binds] = visitor.compileWithBinds(node);
+  if (binds.length === 0) return sql;
+  const quote = (host as any)?.quote?.bind(host) as ((v: unknown) => string) | undefined;
+  let i = 0;
+  return sql.replace(/\?|\$\d+/g, (match) => {
+    const raw = binds[i++];
+    if (raw === undefined) return match;
+    const val = raw instanceof ModelAttribute ? raw.valueForDatabase : raw;
+    return quote ? quote(val) : String(val);
+  });
+}
+
+/**
  * Converts an arel AST to SQL.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#to_sql
@@ -168,12 +189,15 @@ export function toSql(
     node = (node as any).ast;
   }
 
-  // Use compile() (inlines values) for display SQL, matching Rails'
-  // to_sql under unprepared_statement. toSqlAndBinds uses
-  // compileWithBinds for execution (placeholders + bind array).
+  // Display / unprepared-statement SQL: inline the bind values, matching
+  // Rails' `to_sql` under `unprepared_statement` (which compiles with a
+  // SubstituteBinds collector). Raw Arel `Node#toSql`/`ToSql#compile` keeps
+  // `?` for BindParams (Rails parity); this path substitutes them via the
+  // adapter quoter, the same way `Relation#toSql` does. `toSqlAndBinds` uses
+  // `compileWithBinds` for execution (placeholders + bind array).
   const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
   if (visitor && node instanceof Nodes.Node) {
-    return visitor.compile(node);
+    return compileInlined(visitor, node, this);
   }
   if (node && typeof (node as any).toSql === "function") {
     return (node as any).toSql();
@@ -284,7 +308,8 @@ export function cacheableQuery(
   if (typeof arel === "string") {
     sql = arel;
   } else if (visitor && node instanceof Nodes.Node) {
-    sql = visitor.compile(node);
+    // Returns empty binds below, so inline any BindParams into the SQL string.
+    sql = compileInlined(visitor, node, host);
   } else {
     sql = (node as any).toSql?.() ?? String(node);
   }
