@@ -8,8 +8,6 @@ import { Base, registerModel, StaleObjectError, ReadonlyAttributeError } from ".
 import { Associations, association } from "./associations.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Person } from "./test-helpers/models/person.js";
@@ -511,8 +509,25 @@ describe("OptimisticLockingTest", () => {
 });
 
 describe("OptimisticLockingWithSchemaChangeTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  // Mirrors Rails `fixtures :people, :legacy_things, :references` plus
+  // `self.use_transactional_tests = false` (locking_test.rb:563-568): the
+  // counter tests run DDL (`add_counter_column_to`), and on MySQL `ALTER TABLE`
+  // forces an implicit commit that would end the per-test SAVEPOINT — so those
+  // tests opt out of the transaction wrapper via `usesTransaction`. The fixture
+  // loader still delete+inserts each table per test, resetting `lock_version`
+  // to 0 between cases on every adapter.
+  const counterTests = [
+    "increment counter updates lock version",
+    "decrement counter updates lock version",
+    "update counters updates lock version",
+    "increment counter updates custom lock version",
+    "decrement counter updates custom lock version",
+    "update counters updates custom lock version",
+  ];
+  const { people, legacyThings } = useHandlerFixtures(["people", "legacyThings", "references"], {
+    schema: canonicalSchema,
+    usesTransaction: counterTests,
+  });
   beforeAll(async () => {
     await defineSchema(
       {
@@ -561,12 +576,13 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     }
   }
 
-  // Rails generates these with { lock_version: Person, custom_lock_version: LegacyThing }.
-  beforeAll(async () => {
-    await Person.createBang({ first_name: "lock counter" });
-    await LegacyThing.createBang({ tps_report_number: 1 });
-  });
+  // Touch the fixture accessors so the seeded sets are referenced (Rails
+  // declares `fixtures :people, :legacy_things` for these); `model.first()`
+  // inside counterTest reads the seeded row, mirroring Rails' `model.first`.
+  void people;
+  void legacyThings;
 
+  // Rails generates these with { lock_version: Person, custom_lock_version: LegacyThing }.
   it("increment counter updates lock version", async () => {
     await counterTest(Person, 1, (id) => Person.incrementCounter("test_count", id));
   });
