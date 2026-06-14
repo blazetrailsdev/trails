@@ -646,9 +646,12 @@ export class Response {
     this: T,
     status = 200,
     headers: Record<string, string> = {},
-    body = "",
+    body: string | string[] = [],
   ): InstanceType<T> {
-    return new this(status, headers, body ? [body] : []) as InstanceType<T>;
+    // Rails defaults `body` to `[]` and routes it through `body=`, which munges
+    // a non-enumerable (e.g. a bare string) into a 1-element array.
+    const parts = Array.isArray(body) ? body : [body];
+    return new this(status, headers, parts) as InstanceType<T>;
   }
 }
 
