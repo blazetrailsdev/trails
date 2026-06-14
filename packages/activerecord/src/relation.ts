@@ -3189,6 +3189,40 @@ export class Relation<T extends Base> {
   ): Promise<unknown[]> {
     if (this._isNone) return [];
 
+    // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
+    // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
+    // the eager values) and recurses, so the plucked columns can reference the
+    // joined tables. Rails builds the JoinDependency over `eager_load_values |
+    // includes_values` (finder_methods.rb:457); we model that with leftOuterJoins
+    // over the cleared specs, matching applyJoinDependencyForArel. The cleared
+    // recursion takes the plain (else) branch, so there is no infinite loop.
+    //
+    // Not modeled: Rails apply_join_dependency, for a limit/offset over a
+    // collection reflection, replaces the relation with
+    // distinct_relation_for_primary_key (finder_methods.rb:463) — it executes a
+    // query to materialize the limited DISTINCT primary keys, which a single
+    // recurse cannot reproduce. The common cases still match (LIMIT 0 and
+    // WHERE-contradiction both yield no rows here too); only the nonempty
+    // limit/offset case diverges, tracked by the skipped
+    // `pluck with includes offset` test.
+    const firstColumnName =
+      columns.length === 0
+        ? null
+        : typeof columns[0] === "string"
+          ? (columns[0] as string)
+          : " arel";
+    if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], firstColumnName)) {
+      // _hasInclude is true only when _eagerLoadAssociations or
+      // _includesAssociations is non-empty, so the union is always non-empty here.
+      const eagerSpecs = [
+        ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
+      ];
+      const rel = this._clone();
+      rel._eagerLoadAssociations = [];
+      rel._includesAssociations = [];
+      return (rel.leftOuterJoins(eagerSpecs) as Relation<T>).pluck(...columns);
+    }
+
     // Reflect the schema before casting results so the model's attribute
     // types are available — Rails' type_cast_pluck_values reads
     // model.attribute_types, which runs load_schema first. pluck issues a
@@ -3206,7 +3240,19 @@ export class Relation<T extends Base> {
     }
 
     const table = this._modelClass.arelTable;
+    // Rails columns_hash.key? — qualify a bare known column to the base table.
+    const knownColumns = new Set(this._modelClass.attributeNames());
+    const isKnownColumn = (name: string): boolean => knownColumns.has(name);
     const projections = columns.map((c) => {
+      if (c instanceof Nodes.SqlLiteral) {
+        // Rails' Arel::Nodes::SqlLiteral subclasses String, so arel_columns routes
+        // it through arel_column: a bare known-column literal is qualified to the
+        // base table (e.g. "id" → "posts"."id"), which keeps pluck unambiguous once
+        // apply_join_dependency adds a LEFT OUTER JOIN. Complex or unknown literals
+        // (functions, dotted names, non-columns) pass through verbatim.
+        const v = c.value.trim();
+        return /^\w+$/.test(v) && isKnownColumn(v) ? table.get(v) : c;
+      }
       if (typeof c !== "string") return c;
       // Table-qualified ("table.col"), quoted ('"table"."col"'), function expressions,
       // or comma-separated lists must pass through as raw SQL.
