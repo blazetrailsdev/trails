@@ -1,0 +1,46 @@
+{
+  "generatedAt": "vendored",
+  "packages": {
+    "activerecord": [
+      {
+        "name": "DatabaseStatements",
+        "methods": ["toSql", "toSqlAndBinds"],
+        "rubyFile": "connection_adapters/abstract/database_statements.rb",
+        "tsFile": "connection-adapters/abstract/database-statements.ts"
+      },
+      {
+        "name": "InsertAll",
+        "methods": ["toSql"],
+        "rubyFile": "insert_all.rb",
+        "tsFile": "insert-all.ts"
+      },
+      {
+        "name": "Relation",
+        "methods": ["toSql"],
+        "rubyFile": "relation.rb",
+        "tsFile": "relation.ts"
+      },
+      {
+        "name": "SchemaCreation",
+        "methods": ["toSql"],
+        "rubyFile": "connection_adapters/abstract/schema_creation.rb",
+        "tsFile": "connection-adapters/abstract/schema-creation.ts"
+      }
+    ],
+    "activemodel": [],
+    "arel": [
+      {
+        "name": "Node",
+        "methods": ["toSql"],
+        "rubyFile": "nodes/node.rb",
+        "tsFile": "nodes/node.ts"
+      },
+      {
+        "name": "TreeManager",
+        "methods": ["toSql"],
+        "rubyFile": "tree_manager.rb",
+        "tsFile": "tree-manager.ts"
+      }
+    ]
+  }
+}
