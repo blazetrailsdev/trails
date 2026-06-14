@@ -58,7 +58,9 @@ export async function beginIsolatedDbTransaction(
   isolation: string,
 ): Promise<void> {
   if (isolation !== "read_uncommitted") {
-    throw new Error("SQLite3 only supports the `read_uncommitted` transaction isolation level");
+    throw new TransactionIsolationError(
+      "SQLite3 only supports the `read_uncommitted` transaction isolation level",
+    );
   }
   await adapter.executeMutation("BEGIN DEFERRED TRANSACTION");
 }

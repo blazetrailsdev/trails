@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 import { touchAttributesWithTime } from "./timestamp.js";
@@ -163,7 +164,7 @@ export async function resetCounters(
       }
       if (!assoc) {
         // Mirrors Rails' ArgumentError in CounterCache::ClassMethods#reset_counters.
-        throw new Error(`'${this.name}' has no association called '${counterName}'`);
+        throw new ArgumentError(`'${this.name}' has no association called '${counterName}'`);
       }
       counterColumn = resolveCounterColumn(this, assoc, assoc.name);
     }
