@@ -41,7 +41,14 @@ import { runFetch } from "../../vendor/fetch.js";
 import { libPathsManifest } from "../../vendor/sources.js";
 import { main as extractTsApi } from "./extract-ts-api.js";
 import { main as runCompare } from "./compare.js";
-import { sharedCacheDir, hashParts, fileHash, readShared, writeShared } from "./shared-cache.js";
+import {
+  sharedCacheDir,
+  hashParts,
+  fileHash,
+  readShared,
+  writeShared,
+  pruneSharedCache,
+} from "./shared-cache.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -148,6 +155,20 @@ async function main(): Promise<void> {
   runCompare();
   await import("../build-rails-privates-manifest.js");
   await import("../build-rails-file-structure-manifest.js");
+
+  // Phase D — prune the shared cache. Best-effort housekeeping: content keys
+  // are append-only and CACHE_VERSION bumps orphan whole dirs, so without this
+  // the cross-worktree cache grows without bound. Runs after the work so a
+  // failure here can never affect the comparison result.
+  if (!force) {
+    const pruned = await pruneSharedCache(ROOT);
+    if (pruned.removedEntries || pruned.removedVersionDirs) {
+      process.stdout.write(
+        `Pruned shared cache: ${pruned.removedEntries} stale entr${pruned.removedEntries === 1 ? "y" : "ies"}, ` +
+          `${pruned.removedVersionDirs} superseded version dir${pruned.removedVersionDirs === 1 ? "" : "s"}\n`,
+      );
+    }
+  }
 }
 
 main().catch((err) => {

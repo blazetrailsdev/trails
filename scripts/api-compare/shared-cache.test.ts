@@ -15,6 +15,7 @@ import {
   fileHash,
   readShared,
   writeShared,
+  pruneSharedCache,
   CACHE_VERSION,
 } from "./shared-cache.js";
 
@@ -89,6 +90,82 @@ describe("hashParts / fileHash", () => {
     fs.writeFileSync(path.join(dir, "f"), "hello");
     expect(await fileHash(path.join(dir, "f"))).toMatch(/^[0-9a-f]{40}$/);
     expect(await fileHash(path.join(dir, "nope"))).toBeNull();
+  });
+});
+
+describe("pruneSharedCache", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  function mkRoot(): string {
+    const root = mkTmp();
+    fs.mkdirSync(path.join(root, ".git"));
+    return root;
+  }
+  function cacheParent(root: string): string {
+    return path.join(root, ".git", "api-compare-cache");
+  }
+  function currentDir(root: string): string {
+    return path.join(cacheParent(root), `v${CACHE_VERSION}`);
+  }
+
+  it("no-ops cleanly when there is no cache or no .git", async () => {
+    expect(await pruneSharedCache(mkTmp())).toEqual({
+      removedEntries: 0,
+      removedVersionDirs: 0,
+    });
+    const root = mkRoot();
+    expect(await pruneSharedCache(root)).toEqual({
+      removedEntries: 0,
+      removedVersionDirs: 0,
+    });
+  });
+
+  it("removes entries older than maxAgeMs and keeps fresh ones", async () => {
+    const root = mkRoot();
+    const dir = currentDir(root);
+    fs.mkdirSync(dir, { recursive: true });
+    const now = 100 * DAY;
+    const stale = path.join(dir, "rails-api-old.json");
+    const fresh = path.join(dir, "rails-api-new.json");
+    fs.writeFileSync(stale, "{}");
+    fs.writeFileSync(fresh, "{}");
+    fs.utimesSync(stale, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
+    fs.utimesSync(fresh, new Date(now - 1 * DAY), new Date(now - 1 * DAY));
+
+    const result = await pruneSharedCache(root, { now, maxAgeMs: 14 * DAY });
+    expect(result).toEqual({ removedEntries: 1, removedVersionDirs: 0 });
+    expect(fs.existsSync(stale)).toBe(false);
+    expect(fs.existsSync(fresh)).toBe(true);
+  });
+
+  it("ignores non-.json files and only evicts by mtime", async () => {
+    const root = mkRoot();
+    const dir = currentDir(root);
+    fs.mkdirSync(dir, { recursive: true });
+    const now = 100 * DAY;
+    const other = path.join(dir, "rails-api-old.json.tmp-worktree_a");
+    fs.writeFileSync(other, "partial");
+    fs.utimesSync(other, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
+
+    const result = await pruneSharedCache(root, { now, maxAgeMs: 14 * DAY });
+    expect(result.removedEntries).toBe(0);
+    expect(fs.existsSync(other)).toBe(true);
+  });
+
+  it("removes superseded version dirs but never the current one", async () => {
+    const root = mkRoot();
+    fs.mkdirSync(currentDir(root), { recursive: true });
+    const parent = cacheParent(root);
+    fs.mkdirSync(path.join(parent, `v${CACHE_VERSION + 1}`));
+    fs.mkdirSync(path.join(parent, "v0"));
+    fs.mkdirSync(path.join(parent, "scratch")); // non-version dir, untouched
+
+    const result = await pruneSharedCache(root, { now: 0, maxAgeMs: DAY });
+    expect(result.removedVersionDirs).toBe(2);
+    expect(fs.existsSync(currentDir(root))).toBe(true);
+    expect(fs.existsSync(path.join(parent, "v0"))).toBe(false);
+    expect(fs.existsSync(path.join(parent, `v${CACHE_VERSION + 1}`))).toBe(false);
+    expect(fs.existsSync(path.join(parent, "scratch"))).toBe(true);
   });
 });
 

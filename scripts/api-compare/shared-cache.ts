@@ -20,6 +20,14 @@ import { createHash } from "crypto";
 export const CACHE_VERSION = 1;
 
 /**
+ * Default staleness horizon for cache entries: an entry whose mtime is older
+ * than this is pruned. Content keys are append-only — every source edit mints a
+ * new key and orphans the old entry forever — so without eviction the cache
+ * grows unbounded. 14 days comfortably outlives a normal rebase/CI cadence.
+ */
+export const CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
  * Resolve the shared cache directory from a repo root, or null if it isn't a
  * git checkout. `<root>/.git` is a directory in the main checkout and a
  * `gitdir: <path>` pointer file in a linked worktree; the git COMMON dir
@@ -88,6 +96,80 @@ export async function fileHash(file: string): Promise<string | null> {
 
 function entryPath(dir: string, name: string, key: string): string {
   return path.join(dir, `${name}-${key}.json`);
+}
+
+/** Outcome of a prune pass — counts so callers can log what was reclaimed. */
+export interface PruneResult {
+  /** Stale entry files removed from the current-version dir. */
+  removedEntries: number;
+  /** Superseded `v<N>` sibling directories removed wholesale. */
+  removedVersionDirs: number;
+}
+
+/**
+ * Evict from the shared cache anchored at `rootDir`:
+ *
+ *   1. Entry files in the current `v${CACHE_VERSION}` dir whose mtime is older
+ *      than `maxAgeMs` — these are orphaned content keys (see CACHE_MAX_AGE_MS).
+ *   2. Sibling `v<N>` directories left behind by a bumped CACHE_VERSION; nothing
+ *      reads them again, so they're deleted whole.
+ *
+ * `now` is injected (defaulting to the wall clock) so tests pin the horizon
+ * without touching the entries' real mtimes. Entirely best-effort: a missing or
+ * unreadable cache is a no-op, and per-file/dir failures are swallowed — the
+ * cache is an optimisation and pruning must never break a run.
+ */
+export async function pruneSharedCache(
+  rootDir: string,
+  opts: { now?: number; maxAgeMs?: number } = {},
+): Promise<PruneResult> {
+  const result: PruneResult = { removedEntries: 0, removedVersionDirs: 0 };
+  const currentDir = await sharedCacheDir(rootDir);
+  if (!currentDir) return result;
+  const parent = path.dirname(currentDir);
+  const currentName = path.basename(currentDir);
+  const now = opts.now ?? Date.now();
+  const maxAgeMs = opts.maxAgeMs ?? CACHE_MAX_AGE_MS;
+
+  let siblings: string[];
+  try {
+    siblings = await fs.readdir(parent);
+  } catch {
+    return result;
+  }
+  for (const name of siblings) {
+    if (name === currentName || !/^v\d+$/.test(name)) continue;
+    try {
+      await fs.rm(path.join(parent, name), { recursive: true, force: true });
+      result.removedVersionDirs++;
+    } catch {
+      // best-effort
+    }
+  }
+
+  let entries: string[];
+  try {
+    entries = await fs.readdir(currentDir);
+  } catch {
+    return result;
+  }
+  await Promise.all(
+    entries.map(async (name) => {
+      if (!name.endsWith(".json")) return;
+      const file = path.join(currentDir, name);
+      try {
+        const stat = await fs.stat(file);
+        if (now - stat.mtimeMs > maxAgeMs) {
+          await fs.rm(file, { force: true });
+          result.removedEntries++;
+        }
+      } catch {
+        // best-effort
+      }
+    }),
+  );
+
+  return result;
 }
 
 /** Read a cached entry body, or null on miss / unreadable cache. */
