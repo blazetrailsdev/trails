@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (module)
  */
 
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, type Type } from "@blazetrails/activemodel";
 import { presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
@@ -378,4 +378,166 @@ export function integerToSql(limit: number | null | undefined): string {
         `No integer type has byte size ${limit}. Use a decimal with scale 0 instead.`,
       );
   }
+}
+
+/** @internal Host surface for the information_schema introspection helpers.
+ * `columns` reads MySQL's `information_schema.columns` directly (rather than
+ * SHOW FULL FIELDS), so it dispatches through adapter helpers for name parsing,
+ * querying, cast-type lookup, and engine/version detection. */
+interface IntrospectionHost {
+  schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
+  parseMysqlName(name: string): { schema?: string; table: string };
+  lookupCastType(sqlType: string): Type;
+  getFullVersion(): Promise<string>;
+  isMariadb(): boolean;
+}
+
+/** @internal
+ * Return Column metadata for the named table. Reads from
+ * `information_schema.columns` — matches Rails' column introspection
+ * shape. Populates the fields SchemaCache serializes (name, default,
+ * null, sqlTypeMetadata, primaryKey).
+ */
+export async function columns(this: IntrospectionHost, tableName: string): Promise<Column[]> {
+  const { schema, table } = this.parseMysqlName(tableName);
+  const rows = (await this.schemaQuery(
+    `SELECT column_name AS name,
+            column_default AS default_value,
+            is_nullable AS nullable,
+            data_type AS type,
+            column_type AS full_type,
+            character_maximum_length AS char_len,
+            numeric_precision AS num_precision,
+            numeric_scale AS num_scale,
+            column_key AS col_key,
+            collation_name AS collation,
+            column_comment AS comment,
+            extra AS extra
+       FROM information_schema.columns
+       WHERE table_schema = COALESCE(?, database())
+       AND table_name = ?
+       ORDER BY ordinal_position`,
+    [schema ?? null, table],
+  )) as Array<Record<string, unknown>>;
+
+  // The bare-string "NULL" default below is a MariaDB-only reflection quirk and the
+  // disambiguation is engine-specific (see the coercion comment). Ensure the cached
+  // version/_mariadb flag is populated before the map needs it — but only when a row
+  // actually carries that token, so the common path adds no round-trip.
+  if (rows.some((r) => (r.default_value ?? r.DEFAULT_VALUE) === "NULL")) {
+    await this.getFullVersion();
+  }
+
+  return rows.map((r) => {
+    const name = String((r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
+    const sqlType = String((r.full_type ?? r.FULL_TYPE ?? r.COLUMN_TYPE ?? "") as string);
+    const baseType = String((r.type ?? r.TYPE ?? r.DATA_TYPE ?? "") as string).toLowerCase();
+    const charLen = r.char_len ?? r.CHAR_LEN ?? r.CHARACTER_MAXIMUM_LENGTH;
+    const numPrec = r.num_precision ?? r.NUM_PRECISION ?? r.NUMERIC_PRECISION;
+    const numScale = r.num_scale ?? r.NUM_SCALE ?? r.NUMERIC_SCALE;
+    const charLimitVal = charLen != null ? Number(charLen) : null;
+    // lookupCastType always returns a Type (falls back to ValueType with name "value").
+    // Key the cast lookup on the full COLUMN_TYPE (e.g. "tinyint(1)") so the
+    // emulate_booleans override (/^tinyint\(1\)/i → Boolean) can fire — Rails'
+    // new_column_from_field keys on the full sql_type (mysql/schema_statements.rb:191).
+    const castType = this.lookupCastType(sqlType);
+    // Rails' fetch_type_metadata derives type AND limit from that one
+    // lookup_cast_type(sql_type) (abstract/schema_statements.rb:1717), so an
+    // emulated tinyint(1) gets type :boolean with limit nil — not the integer
+    // limit 1. The lone divergence is MariaDB, which normalizes a declared
+    // FLOAT's COLUMN_TYPE to "double" in information_schema (limit 53), whereas
+    // Rails reads SHOW FULL FIELDS where it stays "float" (limit 24). For that
+    // one type, re-key the limit on DATA_TYPE to keep Rails' 24; every other
+    // registration yields the same fixed limit regardless of which key is used.
+    const limitType = baseType === "float" ? this.lookupCastType(baseType) : castType;
+    const typeMapLimit = charLimitVal == null ? (limitType.limit ?? null) : null;
+    // Map DATA_TYPE ("varchar") to the Rails semantic type ("string") via the type map.
+    // MysqlDateTimeType.name is "datetime" for both "datetime" and "timestamp" DATA_TYPEs.
+    const castName = castType.name;
+    const semanticType = (castName === "value" ? baseType : castName).toLowerCase();
+    // information_schema.numeric_precision is NULL for date/time/datetime/timestamp.
+    // MariaDB/MySQL encode fractional-seconds precision in the column_type string
+    // (e.g. "time(3)", "datetime(6)", "timestamp(0)") — parse it directly. Mirrors
+    // abstract_mysql_adapter.rb#extract_precision: for `(date)?time(stamp)?` types,
+    // a missing `(N)` defaults to 0 (TIME ≡ TIME(0) on MySQL/MariaDB), not null.
+    let precision: number | null = numPrec != null ? Number(numPrec) : null;
+    if (precision == null && /^(?:datetime|timestamp|time)\b/i.test(baseType)) {
+      const m = sqlType.match(/^(?:datetime|timestamp|time)\((\d+)\)/i);
+      precision = m ? Number(m[1]) : 0;
+    }
+    const meta = new SqlTypeMetadata({
+      sqlType,
+      type: semanticType,
+      limit: charLimitVal ?? typeMapLimit,
+      precision,
+      scale: numScale != null ? Number(numScale) : null,
+    });
+    const nullable =
+      String((r.nullable ?? r.NULLABLE ?? r.IS_NULLABLE ?? "YES") as string).toUpperCase() !== "NO";
+    const colKey = String((r.col_key ?? r.COL_KEY ?? r.COLUMN_KEY ?? "") as string);
+    const extraRaw = String((r.extra ?? r.EXTRA ?? "") as string);
+    const extra = extraRaw.toLowerCase();
+    // Mirror newColumnFromField's function-default detection (mysql/schema-statements.ts):
+    // information_schema doesn't surface SHOW CREATE TABLE's bare-keyword default branch, but
+    // the two cases that matter for renameColumnForAlter — datetime+CURRENT_TIMESTAMP and
+    // DEFAULT_GENERATED — are detectable from extra + default_value alone.
+    let def: unknown = r.default_value ?? r.DEFAULT_VALUE ?? null;
+    let defFn: string | null = null;
+    // MariaDB stores column defaults as expressions and reports a nullable column's
+    // implicit `DEFAULT NULL` as the bare string "NULL" in information_schema (MySQL
+    // returns a real SQL NULL there). Coerce it to an actual null so new records get a
+    // nil default instead of the 4-char string. Gated on MariaDB: there a genuine
+    // string default is reported *quoted* ("'NULL'"), so the unquoted token is
+    // unambiguously SQL null — whereas MySQL reports a literal `DEFAULT 'NULL'`
+    // unquoted ("NULL"), and nulling that would drop a real string default. The
+    // SHOW-FULL-FIELDS sibling path (newColumnFromField) reaches the same def=null,
+    // defaultFunction=null result, since the driver yields a real null for that field —
+    // matching Rails' net result for a plain nullable column.
+    if (this.isMariadb() && def === "NULL") def = null;
+    const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
+    if (
+      semanticType === "datetime" &&
+      typeof def === "string" &&
+      /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def)
+    ) {
+      defFn = onUpdateMatch ? `${def} ON UPDATE ${onUpdateMatch[1]}` : def;
+      def = null;
+    } else if (extraRaw.toUpperCase().startsWith("DEFAULT_GENERATED")) {
+      if (typeof def === "string") {
+        const wrapped = def.startsWith("(") ? def : `(${def})`;
+        defFn = onUpdateMatch ? `${wrapped} ON UPDATE ${onUpdateMatch[1]}` : wrapped;
+      }
+      def = null;
+    }
+    const onUpdateForColumn =
+      onUpdateMatch && (defFn == null || !/ ON UPDATE /i.test(defFn)) ? onUpdateMatch[1] : null;
+    return new Column(
+      name,
+      def,
+      {
+        sqlType: meta.sqlType,
+        type: meta.type ?? undefined,
+        limit: meta.limit,
+        precision: meta.precision,
+        scale: meta.scale,
+      },
+      nullable,
+      {
+        collation: (r.collation ?? r.COLLATION ?? null) as string | null,
+        comment: presence((r.comment ?? r.COMMENT) as string | null | undefined) ?? null,
+        defaultFunction: defFn,
+        primaryKey: colKey === "PRI",
+        autoIncrement: extra === "auto_increment",
+        // Literal port of Rails MySQL::Column#unsigned? (`/\bunsigned(?: zerofill)?\z/`).
+        // End-anchored (JS `$` without /m ≡ Ruby `\z`): the modifier only ever trails the
+        // column_type, so anchoring avoids a false match on the literal "unsigned" inside an
+        // enum/set value list, e.g. enum('unsigned','bigint'). No /i flag, as in Rails — MySQL
+        // reports information_schema COLUMN_TYPE lowercased.
+        unsigned: /\bunsigned(?: zerofill)?$/.test(sqlType),
+        virtual: /\b(?:virtual|stored|persistent)\b/i.test(extra),
+        extra: extraRaw,
+        onUpdate: onUpdateForColumn,
+      },
+    );
+  });
 }
