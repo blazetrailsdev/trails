@@ -5913,7 +5913,7 @@ export class Relation<T extends Base> {
     operation: string,
     columnName: string,
     distinct: boolean,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Record<string, unknown> | Map<unknown, unknown>> {
     return _executeGroupedCalculation(this as any, operation, columnName, distinct);
   }
 

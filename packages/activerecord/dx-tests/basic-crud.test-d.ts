@@ -110,8 +110,11 @@ describe("basic CRUD DX — defining and using a model", () => {
   it("User.count / exists / pluck have concrete return types", () => {
     // Rails' count returns either a scalar or a grouped hash, depending on
     // whether the active scope has a GROUP BY — signature widened to match
-    // Relation#count.
-    expectTypeOf(User.count).returns.resolves.toEqualTypeOf<number | Record<string, number>>();
+    // Relation#count. Grouping by a belongs_to association keys the hash by the
+    // loaded records, returned as a Map (JS object keys can't be records).
+    expectTypeOf(User.count).returns.resolves.toEqualTypeOf<
+      number | Record<string, number> | Map<unknown, number>
+    >();
     expectTypeOf(User.exists).returns.resolves.toBeBoolean();
     expectTypeOf(User.pluck).returns.resolves.toEqualTypeOf<unknown[]>();
   });

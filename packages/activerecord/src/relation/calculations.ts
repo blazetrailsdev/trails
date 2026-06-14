@@ -344,11 +344,16 @@ async function groupedAggregate(
   fn: AggFn,
   column: string,
   coerceNumeric: boolean = true,
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown> | Map<unknown, unknown>> {
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
   const groupCol = rel._groupColumns[0];
-  const groupNode = groupColumnToArel(groupCol, table);
+  // Rails: a single group field that reflects to a belongs_to association
+  // groups by the association's foreign key, then maps the result keys back to
+  // the loaded associated records (calculations.rb:execute_grouped_calculation).
+  const association = resolveGroupAssociation(rel, groupCol);
+  const effectiveGroupCol = association ? (association.foreignKey as string) : groupCol;
+  const groupNode = groupColumnToArel(effectiveGroupCol, table);
   const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
   const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
   const manager = table.project(groupKeyAlias, aggNode.as("val"));
@@ -375,23 +380,60 @@ async function groupedAggregate(
   );
   const rows = queryResult.toArray() as Record<string, unknown>[];
 
+  const aggOf = (val: unknown): unknown =>
+    val === undefined || val === null
+      ? fn === "sum"
+        ? castAggValue(null, fn, colType, coerceNumeric)
+        : null
+      : castAggValue(val, fn, colType, coerceNumeric);
+
+  if (association) {
+    // Rails keys the result hash by the associated record objects, looked up by
+    // foreign-key value. JS Map keys compare by reference, so callers locate a
+    // key by its `id` rather than by holding the same instance.
+    const klass = (association.klass as any).baseClass ?? association.klass;
+    const ids = rows.map((row) => row.group_key).filter((v) => v != null);
+    const records: any[] =
+      ids.length > 0 ? await (klass as any).where({ [klass.primaryKey]: ids }).toArray() : [];
+    const byId = new Map(records.map((r) => [String(r.id), r]));
+    const result = new Map<unknown, unknown>();
+    for (const row of rows) {
+      result.set(byId.get(String(row.group_key)) ?? null, aggOf(row.val));
+    }
+    return result;
+  }
+
   const result: Record<string, unknown> = {};
   for (const row of rows) {
     const key = String(row.group_key ?? "null");
-    const val = row.val;
-    if (val === undefined || val === null) {
-      result[key] = fn === "sum" ? castAggValue(null, fn, colType, coerceNumeric) : null;
-    } else {
-      result[key] = castAggValue(val, fn, colType, coerceNumeric);
-    }
+    result[key] = aggOf(row.val);
   }
   return result;
+}
+
+/**
+ * Resolve a single grouped field to its belongs_to reflection, or null. Mirrors
+ * Rails' `model._reflect_on_association(field).belongs_to?` guard — only
+ * belongs_to associations are grouped by foreign key and keyed by record.
+ */
+function resolveGroupAssociation(rel: CalculationRelation, groupCol: string): any {
+  if (rel._groupColumns.length !== 1 || typeof groupCol !== "string") return null;
+  const reflection = (rel._modelClass as any)._reflectOnAssociation?.(groupCol);
+  if (!reflection || !reflection.belongsTo?.()) return null;
+  // Rails (calculations.rb:521) does `group_fields = Array(association.foreign_key)`
+  // and builds a multi-column GROUP BY for a composite-key belongs_to, keyed by
+  // the loaded record. This helper groups by a single column only (it reads
+  // `_groupColumns[0]`), mirroring the CPK grouped-calculation deferral in
+  // performCount. Leave a composite FK unresolved so it surfaces loudly rather
+  // than silently grouping by a truncated key.
+  if (Array.isArray(reflection.foreignKey)) return null;
+  return reflection;
 }
 
 export async function performCount(
   this: CalculationRelation,
   column?: string,
-): Promise<number | Record<string, number>> {
+): Promise<number | Record<string, number> | Map<unknown, number>> {
   if (this._limitValue === 0) return 0;
   if (this._isNone) return this._groupColumns.length > 0 ? {} : 0;
 
@@ -422,7 +464,7 @@ export async function performCount(
         "count",
         column != null && column !== "*" ? column : pk,
         true,
-      ) as Promise<Record<string, number>>;
+      ) as Promise<Record<string, number> | Map<unknown, number>>;
     }
   }
 
@@ -704,14 +746,16 @@ export async function performCount(
 export async function performSum(
   this: CalculationRelation,
   column?: string,
-): Promise<number | bigint | Record<string, number | bigint>> {
+): Promise<number | bigint | Record<string, number | bigint> | Map<unknown, number | bigint>> {
   if (this._isNone) {
     if (this._groupColumns.length > 0) return {};
     return column && resolveColType(this, column) instanceof BigIntegerType ? 0n : 0;
   }
   if (!column) return 0;
   if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "sum", column, true) as Promise<Record<string, number | bigint>>;
+    return groupedAggregate(this, "sum", column, true) as Promise<
+      Record<string, number | bigint> | Map<unknown, number | bigint>
+    >;
   }
   return ((await singleAggregate(this, "sum", column, true)) as number | bigint) ?? 0;
 }
@@ -719,7 +763,7 @@ export async function performSum(
 export async function performAverage(
   this: CalculationRelation,
   column: string,
-): Promise<unknown | null | Record<string, unknown>> {
+): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
   // Returns `unknown` (not just number) because non-numeric column types
   // — interval (Duration), money, time — route through the column type's
   // deserialize and yield a domain object. Rails' AVG return type is
@@ -736,7 +780,7 @@ export async function performAverage(
 export async function performMinimum(
   this: CalculationRelation,
   column: string,
-): Promise<unknown | null | Record<string, unknown>> {
+): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
   if (this._isNone) return this._groupColumns.length > 0 ? {} : null;
   if (this._groupColumns.length > 0) {
     return groupedAggregate(this, "minimum", column, false);
@@ -747,7 +791,7 @@ export async function performMinimum(
 export async function performMaximum(
   this: CalculationRelation,
   column: string,
-): Promise<unknown | null | Record<string, unknown>> {
+): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
   if (this._isNone) return this._groupColumns.length > 0 ? {} : null;
   if (this._groupColumns.length > 0) {
     return groupedAggregate(this, "maximum", column, false);
@@ -767,8 +811,10 @@ export async function performMaximum(
  * rules then reject every subclass override.
  */
 export interface CalculationMethods {
-  count(column?: string): Promise<number | Record<string, number>>;
-  sum(column?: string): Promise<number | bigint | Record<string, number | bigint>>;
+  count(column?: string): Promise<number | Record<string, number> | Map<unknown, number>>;
+  sum(
+    column?: string,
+  ): Promise<number | bigint | Record<string, number | bigint> | Map<unknown, number | bigint>>;
   average(column: string): Promise<unknown | null | Record<string, unknown>>;
   minimum(column: string): Promise<unknown | null | Record<string, unknown>>;
   maximum(column: string): Promise<unknown | null | Record<string, unknown>>;
@@ -899,7 +945,7 @@ export async function executeGroupedCalculation(
   operation: string,
   columnName: string,
   distinct: boolean,
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown> | Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
   // Build a GROUP BY aggregate query via Arel (delegates to the shared groupedAggregate helper).
   const table = rel._modelClass.arelTable as Nodes.Node;
