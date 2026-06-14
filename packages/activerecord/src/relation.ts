@@ -3410,8 +3410,11 @@ export class Relation<T extends Base> {
       typeof primaryKey === "string" &&
       (this._limitValue !== null || this._offsetValue !== null || this._orderClauses.length > 0)
     ) {
-      // Mirrors Rails: a limited/ordered delete_all compiles through the
-      // SELECT manager so the visitor emits `WHERE pk IN (SELECT pk ...)`.
+      // Mirrors Rails `delete_all`: build the SELECT arel and `compile_delete`
+      // with the primary key so the visitor rewrites a limited/ordered delete
+      // into `WHERE pk IN (SELECT pk ... ORDER BY ... LIMIT ...)`. The
+      // unconstrained branch keeps the plain DeleteManager — the visitor would
+      // emit identical SQL there, but this avoids touching the hot path.
       const arel = this._buildArel();
       stmtAst = arel.compileDelete(table.get(primaryKey)).ast;
     } else {
