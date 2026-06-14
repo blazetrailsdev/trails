@@ -636,8 +636,24 @@ export class JoinDependency {
       resolvedTable = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
     }
     r.table = resolvedTable;
-    if (originalTable !== resolvedTable) {
-      this._rebindChildOnPredicates(r, originalTable, resolvedTable);
+    if (originalTable === resolvedTable) return;
+
+    // r's children were built referencing r's old table name; re-point their ON
+    // predicates to the merged (left) table so the emitted SQL is self-consistent.
+    const toTable = new Table(resolvedTable);
+    for (const child of r.children) {
+      const arelJoin = child.arelJoin;
+      if (!arelJoin) continue;
+      const on = arelJoin.right;
+      if (!(on instanceof Nodes.On)) continue;
+      const rebound = rebindTableReferences(on.expr as Nodes.Node, originalTable, toTable);
+      if (rebound !== on.expr) {
+        const JoinClass = arelJoin.constructor as new (
+          left: Nodes.Node,
+          right: Nodes.Node,
+        ) => Nodes.Join;
+        child.arelJoin = new JoinClass(arelJoin.left, new Nodes.On(rebound));
+      }
     }
   }
 
@@ -657,29 +673,6 @@ export class JoinDependency {
       }
     }
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
-  }
-
-  /** @internal */
-  private _rebindChildOnPredicates(
-    parent: JoinPart,
-    fromTableName: string,
-    toTableName: string,
-  ): void {
-    const toTable = new Table(toTableName);
-    for (const child of parent.children) {
-      if (!child.arelJoin) continue;
-      const arelJoin = child.arelJoin;
-      const on = arelJoin.right;
-      if (!(on instanceof Nodes.On)) continue;
-      const rebound = rebindTableReferences(on.expr as Nodes.Node, fromTableName, toTable);
-      if (rebound !== on.expr) {
-        const JoinClass = arelJoin.constructor as new (
-          left: Nodes.Node,
-          right: Nodes.Node,
-        ) => Nodes.Join;
-        child.arelJoin = new JoinClass(arelJoin.left, new Nodes.On(rebound));
-      }
-    }
   }
 
   instantiate(resultSet: Record<string, unknown>[], strictLoadingValue?: boolean): any[] {
