@@ -59,7 +59,10 @@ describe("OptimisticLockingTest", () => {
     // from the canonical schema verbatim, so we never write a reduced shape that
     // could in turn contaminate later suites. Covers the fixture tables plus the
     // bespoke-class tables: `ships` (ReadonlyNameShip) and the
-    // `lock_without_defaults*` pair (Rails: `t.timestamps null: true`).
+    // `lock_without_defaults*` pair (Rails: `t.timestamps null: true`). The
+    // `jobs`/`comments`/`personal_legacy_things` tables back Person's
+    // `dependent:` associations, which `destroy with dirty primary key`
+    // traverses (see the model registrations below).
     await defineSchema(
       {
         people: canonicalSchema.people,
@@ -75,6 +78,9 @@ describe("OptimisticLockingTest", () => {
         wheels: canonicalSchema.wheels,
         bulbs: canonicalSchema.bulbs,
         engines: canonicalSchema.engines,
+        jobs: canonicalSchema.jobs,
+        comments: canonicalSchema.comments,
+        personal_legacy_things: canonicalSchema.personal_legacy_things,
       },
       { dropExisting: true },
     );
@@ -90,21 +96,14 @@ describe("OptimisticLockingTest", () => {
     await Car.loadSchema();
     await Wheel.loadSchema();
     registerModel(Treasure);
-    // Person's `jobs_with_dependent_destroy` (dependent: :destroy) is traversed
-    // by `test_destroy_with_dirty_primary_key`, so its `references`→`jobs` chain
-    // must resolve: register both models and ensure the `jobs` table exists.
+    // Destroying a Person runs its `dependent:` association callbacks
+    // (`jobs_with_dependent_destroy` through `references`, `personal_legacy_things`,
+    // `comments`), so those models must be registered for the reflections to
+    // resolve during `destroy with dirty primary key`.
     registerModel(Reference);
     registerModel(Job);
     registerModel(Comment);
     registerModel(PersonalLegacyThing);
-    await defineSchema(
-      {
-        jobs: canonicalSchema.jobs,
-        comments: canonicalSchema.comments,
-        personal_legacy_things: canonicalSchema.personal_legacy_things,
-      },
-      { dropExisting: true },
-    );
   });
 
   it("quote value passed lock col", async () => {
