@@ -11,6 +11,7 @@
  */
 
 import { Attribute } from "@blazetrails/activemodel";
+import { Nodes } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 
 /**
@@ -219,7 +220,14 @@ export class StatementCache {
       binds = [];
     }
 
-    const bindMap = new BindMap(binds);
+    // The prepared path (compileWithBinds) already unwraps each collected
+    // BindParam to its `.value`; the unprepared PartialQueryCollector path
+    // hands back the raw BindParam nodes. Normalize here so BindMap sees the
+    // bound attributes/Substitutes directly — otherwise a concrete bind (e.g.
+    // the LIMIT added by find/find_by) reaches the adapter's quote() as a raw
+    // BindParam ("can't quote BindParam").
+    const normalizedBinds = binds.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
+    const bindMap = new BindMap(normalizedBinds);
     return new StatementCache(queryBuilder, bindMap, relation.model);
   }
 
@@ -256,6 +264,11 @@ export class StatementCache {
       const name = (value as any).constructor?.name;
       if (name === "Range" || name === "Relation") return true;
       if (value instanceof Map || value instanceof Set) return true;
+      // Plain Hash and ActiveRecord instances are unsupported in Rails; a
+      // nested-hash condition (find_by(author: {...})) must take the
+      // relation path, not the cached statement.
+      if (Object.getPrototypeOf(value) === Object.prototype) return true;
+      if ("_attributes" in (value as object)) return true;
     }
     return false;
   }

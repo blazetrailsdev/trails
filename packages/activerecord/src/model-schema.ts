@@ -604,6 +604,11 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
  * attributes survive reload.
  */
 export function resetColumnInformation(this: SchemaHost): void {
+  // Rails reset_column_information calls initialize_find_by_cache right after
+  // reload_schema_from_cache, resetting @find_by_statement_cache. Clearing it
+  // here (lazy reinit on next access) mirrors that; reload_schema_from_cache
+  // itself leaves the cache alone.
+  (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
   // STI subclasses share the base's defs. Redirect the reset to the base
   // so schema-sourced defs and accessors are actually cleared; clear the
   // subclass-local caches too so any forked metadata is dropped.
@@ -1135,7 +1140,20 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
 }
 
 export function tableName(this: SchemaHost, value?: string): string {
-  if (value !== undefined) this._tableName = value;
+  if (value !== undefined) {
+    const changed = this._tableName !== value;
+    this._tableName = value;
+    if (changed) {
+      // Rails table_name= runs `reset_column_information if connected?`, which
+      // resets the predicate builder and (via initialize_find_by_cache) the
+      // find_by statement cache. We have no connection-pool `connected?`
+      // gate, so we clear these two caches eagerly and directly (rather than
+      // routing through the heavier resetColumnInformation/schema reload) so
+      // the next query rebuilds against the new table.
+      (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
+      (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
+    }
+  }
   return resolveTableName.call(this as any);
 }
 
