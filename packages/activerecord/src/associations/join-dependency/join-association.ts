@@ -24,8 +24,8 @@ export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
   private _table: Table | null = null;
   readonly tables: Table[] = [];
-  private _readonly = false;
-  private _strictLoading = false;
+  private _readonly?: boolean;
+  private _strictLoading?: boolean;
 
   constructor(reflection: AbstractReflection, children?: JoinPart[]) {
     super(reflection.klass, children);
@@ -176,12 +176,34 @@ export class JoinAssociation extends JoinPart {
     return joins;
   }
 
-  isReadonly(): boolean {
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#readonly?
+   *
+   *   @readonly = reflection.scope && reflection.scope_for(base_klass.unscoped).readonly_value
+   *
+   * Memoized like Rails' `@readonly`.
+   */
+  override isReadonly(): boolean {
+    if (this._readonly !== undefined) return this._readonly;
+    const refl = this.reflection as any;
+    if (!refl?.scope || typeof refl.scopeFor !== "function") return (this._readonly = false);
+    try {
+      const baseRel =
+        (this.baseKlass as any)._allForPreload?.() ?? (this.baseKlass as any).unscoped?.();
+      this._readonly = !!(baseRel && refl.scopeFor(baseRel)?._isReadonly);
+    } catch {
+      this._readonly = false;
+    }
     return this._readonly;
   }
 
-  isStrictLoading(): boolean {
-    return this._strictLoading;
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#strict_loading?
+   * Memoized like Rails' `@strict_loading`.
+   */
+  override isStrictLoading(): boolean {
+    if (this._strictLoading !== undefined) return this._strictLoading;
+    return (this._strictLoading = !!(this.reflection as any)?.strictLoading);
   }
 }
 
