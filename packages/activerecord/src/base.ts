@@ -3713,7 +3713,7 @@ extend(Base, CounterCache.ClassMethods);
     ) {
       return LockingOptimistic.updateCounters.call(
         this,
-        superUpdateCounters as any,
+        (cid, ccounters, copts) => superUpdateCounters.call(this, cid, ccounters, copts),
         id,
         counters,
         options,
