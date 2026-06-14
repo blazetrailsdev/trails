@@ -515,6 +515,11 @@ export async function defineSchema(
 
   // Discriminate: if the first arg has an `adapterName` string property it's
   // a DatabaseAdapter; otherwise it's a Schema (plain object with table names).
+  // Only the model-facing implicit form (`defineSchema(schema)` → the live
+  // `Base.connection`) warms the schema cache. The explicit-adapter form is
+  // used by low-level adapter tests that drive raw/sidecar adapters directly
+  // and do not want (or safely support) eager column introspection.
+  let warm = false;
   if (
     adapterOrSchema !== null &&
     typeof adapterOrSchema === "object" &&
@@ -528,9 +533,10 @@ export async function defineSchema(
     adapter = Base.connection;
     schema = adapterOrSchema as Schema;
     resolvedOpts = schemaOrOpts as DefineSchemaOpts | undefined;
+    warm = true;
   }
 
-  return _defineSchemaImpl(adapter, schema, resolvedOpts);
+  return _defineSchemaImpl(adapter, schema, resolvedOpts, warm);
 }
 
 async function _resetAutoIncrement(
@@ -558,10 +564,41 @@ async function _resetAutoIncrement(
   }
 }
 
+/**
+ * Eagerly reflect a freshly-defined table's columns into the adapter's schema
+ * cache, so `schemaCache.isCached(table)` is true before any query runs.
+ *
+ * This is the test/boot analogue of Rails loading `db/schema_cache.yml` after
+ * the schema is defined: a synchronous `Model.columnNames()` / `columnsHash()`
+ * on a connected model can then take the cached, DB-sourced branch instead of
+ * synthesizing columns from `_attributeDefinitions`. The synthesized branch
+ * cannot tell a virtual `attribute()` (no backing column) from a real column on
+ * a cold cache, so warming here is what makes virtual attributes fall out of the
+ * class-level column introspection without a prior `await ensureSchemaLoaded()`.
+ *
+ * Best-effort: a no-op for raw adapters without a pool (mirrors the
+ * `dataSourceExists` guard above) and swallows reflection failures.
+ *
+ * @internal
+ */
+async function _warmSchemaCache(adapter: DatabaseAdapter, table: string): Promise<void> {
+  const sc = adapter.schemaCache;
+  const pool = adapter.pool ?? null;
+  if (!sc || pool === null) return;
+  if (typeof sc.isCached === "function" && sc.isCached(table)) return;
+  try {
+    await sc.columnsHash(pool, table);
+  } catch {
+    // Reflection is best-effort — a missing/locked table simply leaves the
+    // cache cold, falling back to the synthesized columnsHash branch.
+  }
+}
+
 async function _defineSchemaImpl(
   adapter: DatabaseAdapter,
   schema: Schema,
   opts?: DefineSchemaOpts,
+  warm = false,
 ): Promise<void> {
   const ss = adapter.schemaStatements ? adapter.schemaStatements() : new SchemaStatements(adapter);
   const order = resolveReferences(schema);
@@ -599,6 +636,7 @@ async function _defineSchemaImpl(
       if (pk === undefined) {
         await _resetAutoIncrement(adapter, ss, table);
       }
+      if (warm) await _warmSchemaCache(adapter, table);
       continue;
     }
     // D-Z: always drop the specific table before recreating. Together with
@@ -670,5 +708,6 @@ async function _defineSchemaImpl(
       }
     });
     cache.set(table, newSig);
+    if (warm) await _warmSchemaCache(adapter, table);
   }
 }
