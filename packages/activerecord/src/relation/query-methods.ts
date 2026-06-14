@@ -135,7 +135,19 @@ interface QueryMethodsHost {
   _havingClause: WhereClause;
   _isNone: boolean;
   _lockValue: string | null;
-  _joinClauses: Array<{ type: "inner" | "left"; table: string; on: string; quoted?: boolean }>;
+  _joinClauses: Array<{
+    type: "inner" | "left";
+    table: string;
+    on: string;
+    quoted?: boolean;
+    // The target model a `.joins(:assoc)` resolved to. Rails keeps the join
+    // dependency (joins_values feed build_join_dependencies), so
+    // lookup_table_klass_from_join_dependencies can recover the joined model for
+    // any plain `.joins(:assoc)`. We pre-resolve the association to SQL here, so
+    // we retain the klass to drive aggregate/where cast-type resolution without a
+    // global registry scan by table name.
+    klass?: unknown;
+  }>;
   _joinValues: (string | Nodes.Join)[];
   _leftOuterJoinsValues: AssociationSpec[];
   _namedInnerJoins: AssociationSpec[];
@@ -2319,6 +2331,13 @@ export function lookupTableKlassFromJoinDependencies(
   eachJoinDependencies.call(this, undefined, (join: any) => {
     if (tableName === join.tableName) found = join.baseKlass;
   });
+  if (found) return found;
+  // A plain `.joins(:assoc)` is pre-resolved to a SQL clause that retains its
+  // target klass; recover it by table name so cast-type / where lookups don't
+  // fall back to a global registry scan (which mis-resolves shared table names).
+  for (const j of this._joinClauses) {
+    if (j.klass && j.table === tableName) return j.klass;
+  }
   return found;
 }
 
