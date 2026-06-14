@@ -38,6 +38,10 @@
       "types": "./dist/gzip.d.ts",
       "default": "./dist/gzip.js"
     },
+    "./message-pack": {
+      "types": "./dist/message-pack/index.d.ts",
+      "default": "./dist/message-pack/index.js"
+    },
     "./glob": {
       "types": "./dist/glob.d.ts",
       "default": "./dist/glob.js"
