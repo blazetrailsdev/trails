@@ -761,21 +761,22 @@ export async function foreignKeys(
   return results;
 }
 
-/** @internal Host surface for {@link indexes}: name parsing, catalog querying, and
- * the memoized `EXPRESSION`-column capability probe ({@link statisticsHasExpressionColumn}). */
+/** @internal Host surface for {@link indexes}: runs `SHOW KEYS` via the schema
+ * channel and quotes the (optionally schema-qualified) table name. */
 interface IndexesHost {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
-  parseMysqlName(name: string): { schema?: string; table: string };
-  statisticsHasExpressionColumn(): Promise<boolean>;
+  quoteTableName(name: string): string;
 }
 
 /** @internal
- * Return user-defined indexes for the given table. Uses
- * `information_schema.statistics` (cross-schema-capable) and surfaces
- * `using` / `type` fields the way Rails' MySQL `indexes` does via
- * `Index_type`: btree/hash map to `using`, fulltext/spatial map to `type`.
- * Functional-index expressions are surfaced on MySQL 8.0.13+ (detected
- * via statisticsHasExpressionColumn).
+ * Return user-defined indexes for the given table. Mirrors Rails'
+ * MySQL `indexes`: reads `SHOW KEYS FROM <table>`, skips the primary
+ * key, groups multi-column indexes by `Key_name`, maps `Index_type`
+ * (btree/hash → `using`; fulltext/spatial → `type`), and wraps
+ * functional-index `Expression` values in parens (unescaping `\'`).
+ * Returns `[]` when the table doesn't exist, matching Rails' rescue.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#indexes
  */
 export async function indexes(
   this: IndexesHost,
@@ -790,64 +791,60 @@ export async function indexes(
     comment?: string;
   }>
 > {
-  const { schema, table } = this.parseMysqlName(tableName);
-  const hasExpr = await this.statisticsHasExpressionColumn();
-  const exprSelect = hasExpr ? "expression AS expr" : "NULL AS expr";
-  const rows = (await this.schemaQuery(
-    `SELECT index_name AS name,
-            column_name AS col,
-            ${exprSelect},
-            non_unique AS non_unique,
-            index_type AS idx_type,
-            index_comment AS idx_comment
-       FROM information_schema.statistics
-       WHERE table_schema = COALESCE(?, database())
-       AND table_name = ?
-       AND index_name <> 'PRIMARY'
-       ORDER BY index_name, seq_in_index`,
-    [schema ?? null, table],
-  )) as Array<Record<string, unknown>>;
+  let rows: Array<Record<string, unknown>>;
+  try {
+    rows = (await this.schemaQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`)) as Array<
+      Record<string, unknown>
+    >;
+  } catch (e) {
+    // Mirrors Rails' `rescue StatementInvalid` — a missing table yields []
+    // rather than propagating ER_NO_SUCH_TABLE.
+    const message = `${(e as { message?: string })?.message ?? ""} ${
+      (e as { cause?: { message?: string } })?.cause?.message ?? ""
+    }`;
+    if (/Table '.+' doesn't exist/.test(message)) return [];
+    throw e;
+  }
 
   const byIndex = new Map<
     string,
     { columns: string[]; unique: boolean; using?: string; type?: string; comment?: string }
   >();
+  let currentIndex: string | null = null;
   for (const r of rows) {
-    const name = String((r.name ?? r.NAME ?? r.INDEX_NAME) as string);
-    // MySQL 8+ functional indexes store NULL in column_name and the
-    // raw SQL expression in `expression`. Rails wraps those in parens
-    // for its IndexDefinition; we do the same so the entry is
-    // unambiguous and doesn't serialize as the literal string "null"
-    // (what String(null) would produce).
-    const rawCol = r.col ?? r.COL ?? r.COLUMN_NAME;
-    const rawExpr = r.expr ?? r.EXPR ?? r.EXPRESSION;
-    let column: string | null;
-    if (rawCol != null) {
-      column = String(rawCol);
-    } else if (rawExpr != null) {
-      const expr = String(rawExpr);
-      column = expr.startsWith("(") ? expr : `(${expr})`;
-    } else {
-      column = null;
-    }
-    if (column == null) continue;
-    const nonUnique = Number(r.non_unique ?? r.NON_UNIQUE ?? 0);
-    if (!byIndex.has(name)) {
-      const idxType = String(r.idx_type ?? r.IDX_TYPE ?? r.INDEX_TYPE ?? "BTREE").toUpperCase();
+    const keyName = String((r.Key_name ?? r.KEY_NAME) as string);
+    if (currentIndex !== keyName) {
+      if (keyName === "PRIMARY") continue; // skip the primary key
+      currentIndex = keyName;
+
+      const idxType = String((r.Index_type ?? r.INDEX_TYPE ?? "BTREE") as string).toLowerCase();
       let using: string | undefined;
       let type: string | undefined;
-      if (idxType === "FULLTEXT" || idxType === "SPATIAL") {
-        type = idxType.toLowerCase();
-      } else {
-        using = idxType.toLowerCase();
+      if (idxType === "fulltext" || idxType === "spatial") {
+        type = idxType;
+      } else if (idxType === "btree" || idxType === "hash") {
+        using = idxType;
       }
+      const nonUnique = Number(r.Non_unique ?? r.NON_UNIQUE ?? 0);
       // Mirrors Rails' `row["Index_comment"].presence` — blank (incl. whitespace-only) → nil.
-      const rawComment = r.idx_comment ?? r.IDX_COMMENT ?? r.INDEX_COMMENT;
+      const rawComment = r.Index_comment ?? r.INDEX_COMMENT;
       const comment =
         rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
-      byIndex.set(name, { columns: [], unique: nonUnique === 0, using, type, comment });
+      byIndex.set(keyName, { columns: [], unique: nonUnique === 0, using, type, comment });
     }
-    byIndex.get(name)!.columns.push(column);
+
+    const entry = byIndex.get(currentIndex!)!;
+    const rawExpr = r.Expression ?? r.EXPRESSION;
+    if (rawExpr != null) {
+      // MySQL 8+ functional indexes carry the raw SQL in `Expression` (and
+      // NULL in `Column_name`). Unescape `\'` then wrap in parens unless the
+      // expression already is, matching Rails' IndexDefinition shape.
+      let expr = String(rawExpr).replace(/\\'/g, "'");
+      if (!expr.startsWith("(")) expr = `(${expr})`;
+      entry.columns.push(expr);
+    } else {
+      entry.columns.push(String((r.Column_name ?? r.COLUMN_NAME) as string));
+    }
   }
   return Array.from(byIndex.entries()).map(([name, { columns, unique, using, type, comment }]) => ({
     name,
@@ -857,41 +854,4 @@ export async function indexes(
     ...(type !== undefined ? { type } : {}),
     ...(comment !== undefined ? { comment } : {}),
   }));
-}
-
-/** @internal Host surface for {@link statisticsHasExpressionColumn}: the catalog
- * probe plus the mutable memo field it caches into (`undefined` = not yet probed). */
-interface StatisticsExpressionHost {
-  schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
-  _statisticsHasExpression: boolean | undefined;
-}
-
-/** @internal
- * Check whether `information_schema.statistics` exposes an
- * `expression` column. Added in MySQL 8.0.13; absent on earlier
- * MySQL and on MariaDB (through 10.x). Probed once per adapter
- * instance and memoized — the result can't change mid-connection.
- */
-export async function statisticsHasExpressionColumn(
-  this: StatisticsExpressionHost,
-): Promise<boolean> {
-  if (this._statisticsHasExpression !== undefined) {
-    return this._statisticsHasExpression;
-  }
-  try {
-    const rows = (await this.schemaQuery(
-      `SELECT 1 AS one FROM information_schema.columns
-         WHERE table_schema = 'information_schema'
-         AND table_name = 'STATISTICS'
-         AND column_name = 'EXPRESSION'
-         LIMIT 1`,
-    )) as Array<unknown>;
-    this._statisticsHasExpression = rows.length > 0;
-  } catch {
-    // Defensive: if the probe itself fails, assume no — we'll just
-    // miss functional index expressions, which matches pre-8 MySQL
-    // semantics anyway.
-    this._statisticsHasExpression = false;
-  }
-  return this._statisticsHasExpression;
 }
