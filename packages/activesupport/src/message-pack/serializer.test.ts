@@ -12,8 +12,8 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("includes signature in message", () => {
-    expect(MessagePack.signature(dump(""))).toBe(true);
-    expect(MessagePack.signature(Buffer.from("{}"))).toBe(false);
+    expect(MessagePack.isSignature(dump(""))).toBe(true);
+    expect(MessagePack.isSignature(Buffer.from("{}"))).toBe(false);
   });
 
   it("roundtrips base types", () => {
@@ -36,6 +36,14 @@ describe("MessagePackSerializerTest", () => {
   it("dumps Symbol bytes identical to real Rails MessagePack", () => {
     const expected = [204, 128, 199, 11, 0, 115, 111, 109, 101, 95, 115, 121, 109, 98, 111, 108];
     expect([...dump(Symbol.for("some_symbol"))]).toEqual(expected);
+  });
+
+  it("rejects integers above the 32-bit native range until the bigint ext lands", () => {
+    // Rails routes these through the Integer ext type (1); we have no 64-bit /
+    // bigint encoding yet, so refuse rather than silently truncate via `>>>`.
+    expect(() => dump(2 ** 33)).toThrow();
+    expect(() => dump(Number.MAX_SAFE_INTEGER)).toThrow();
+    expect(() => dump(-(2 ** 33))).toThrow();
   });
 
   it("rejects input without the signature", () => {

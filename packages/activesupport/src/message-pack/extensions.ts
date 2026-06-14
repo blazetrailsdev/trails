@@ -101,14 +101,19 @@ export const Extensions = {
 
   writeObject(object: object, packer: Packer): void {
     const klass = classOf(object);
-    if (typeof klass.fromMsgpackExt === "function") {
+    const o = object as { toMsgpackExt?: () => unknown; asJson?: () => unknown };
+    // Rails pairs a class-level `from_msgpack_ext`/`json_create` with an
+    // instance-level `to_msgpack_ext`/`as_json`. Guard the instance half too so
+    // a half-implemented protocol raises UnserializableObjectError rather than a
+    // bare TypeError from the cast.
+    if (typeof klass.fromMsgpackExt === "function" && typeof o.toMsgpackExt === "function") {
       packer.write(LOAD_WITH_MSGPACK_EXT);
       Extensions.writeClass(klass, packer);
-      packer.write((object as { toMsgpackExt: () => unknown }).toMsgpackExt());
-    } else if (typeof klass.jsonCreate === "function") {
+      packer.write(o.toMsgpackExt());
+    } else if (typeof klass.jsonCreate === "function" && typeof o.asJson === "function") {
       packer.write(LOAD_WITH_JSON_CREATE);
       Extensions.writeClass(klass, packer);
-      packer.write((object as { asJson: () => unknown }).asJson());
+      packer.write(o.asJson());
     } else {
       Extensions.raiseUnserializable(object);
     }

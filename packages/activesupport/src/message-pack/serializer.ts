@@ -46,7 +46,7 @@ export class Serializer {
     return unpacker.read();
   }
 
-  signature(dumped: Buffer): boolean {
+  isSignature(dumped: Buffer): boolean {
     return dumped[0] === 0xcc && dumped[1] === 0x80;
   }
 

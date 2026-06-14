@@ -120,6 +120,14 @@ export class Packer {
       for (const b of buf) this.out.push(b);
       return;
     }
+    // pushSized only emits up to a 32-bit field; `>>>` would silently truncate
+    // anything wider. Rails routes oversized integers through the Integer ext
+    // type (1, the bigint extension) before reaching a native uint/int — until
+    // that type is ported, refuse rather than corrupt. (64-bit native + bigint
+    // land in activesupport-messagepack-native-extension-types.)
+    if (n > 0xffffffff || n < -0x80000000) {
+      throw new MessagePackError(`Integer ${n} is out of the supported MessagePack range`);
+    }
     if (n >= 0) {
       if (n < 0x80) this.out.push(n);
       else if (n < 0x100) this.pushSized(0xcc, n, 1);
