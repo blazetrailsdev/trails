@@ -118,6 +118,35 @@ describe("SQLite adapter driver binding", () => {
     expect(() => adapter.disconnectBang()).not.toThrow();
   });
 
+  it("disconnectBang fires async driver.close() and close() drains it", async () => {
+    let closed = false;
+    let resolveClose: () => void;
+    const closeGate = new Promise<void>((resolve) => {
+      resolveClose = resolve;
+    });
+    const driver = asyncDriver(async (config) => {
+      const conn = (await openVia(config)) as SqliteConnection;
+      return new Proxy(conn, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              await closeGate;
+              (target.close as () => void)();
+              closed = true;
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    });
+    const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", { driver });
+    adapter.disconnectBang();
+    expect(closed).toBe(false);
+    resolveClose!();
+    await adapter.close();
+    expect(closed).toBe(true);
+  });
+
   it("reconnects an async-only driver and reapplies pragmas", async () => {
     const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", { driver: asyncOnlyDriver });
     adapter.disconnectBang();

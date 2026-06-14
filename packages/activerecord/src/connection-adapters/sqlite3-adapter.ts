@@ -208,6 +208,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   private _asyncConnectPending = false;
   /** In-flight async-open promise, deduping concurrent completeAsyncConnect() calls. */
   private _connectingPromise: Promise<void> | null = null;
+  /**
+   * In-flight async driver.close() fired by disconnectBang(). Async-only drivers
+   * (expo-sqlite / WASM) return a Promise from close() that disconnectBang()
+   * cannot await (its contract is sync void), so we retain it here and chain
+   * repeated disconnect cycles onto it; close() awaits it so callers can be sure
+   * the handle is fully torn down. Sync drivers (better-sqlite3) leave this null.
+   */
+  private _closingDriver: Promise<void> | null = null;
   override get active(): boolean {
     return this.driver?.isOpen() ?? false;
   }
@@ -788,6 +796,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   async close(): Promise<void> {
     await this.driver.close();
+    // Drain any async teardown fired by an earlier disconnectBang() so callers
+    // (e.g. afterEach) can be sure every handle is fully closed.
+    if (this._closingDriver) {
+      const closing = this._closingDriver;
+      this._closingDriver = null;
+      await closing;
+    }
   }
 
   /**
@@ -994,9 +1009,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // pre-verifyBang cleanup/error path doesn't throw.
     if (this.driver?.isOpen()) {
       // driver.close() returns void | Promise<void>; for inProcessSync drivers
-      // (better-sqlite3) this is sync. Async-driver teardown needs pool-infra
-      // changes — tracked in #1269.
-      this.driver.close();
+      // (better-sqlite3) this is sync. Async-only drivers return a Promise we
+      // can't await here (sync void contract), so retain it for close() to drain
+      // and chain repeated disconnect cycles so no earlier teardown is lost.
+      const closing = this.driver.close();
+      if (closing) {
+        const settled = closing.catch(() => {});
+        this._closingDriver = this._closingDriver
+          ? this._closingDriver.then(() => settled)
+          : settled;
+      }
     }
     // Closing the handle implicitly rolls back any in-flight raw transaction.
     this._inTransaction = false;
