@@ -236,17 +236,29 @@ export class JoinDependency {
     // `order(author: …)`/`references(:author)` aliases the join to that name
     // (`authors AS author`). Only honored when the referenced alias is free.
     // References arrive as a build argument (threaded from join_constraints'
-    // caller) rather than a stored field. A colliding table otherwise gets the
-    // derived `t{index}` alias (mirrors aliased_table_for in make_constraints).
-    const referencedAlias = options?.references?.includes(assocName) ? assocName : undefined;
-    const effectiveName =
-      referencedAlias &&
-      referencedAlias !== targetTable! &&
-      (this._aliasTracker.aliases.get(referencedAlias) ?? 0) === 0
-        ? referencedAlias
-        : (this._aliasTracker.aliases.get(targetTable!) ?? 0) > 0
-          ? tableAlias
-          : targetTable!;
+    // caller) rather than a stored field. This mirrors `aliased_table_for`: the
+    // collision key is the referenced name when present, otherwise the real
+    // table; a colliding table gets the reflection's `alias_candidate`
+    // (`{plural_name}_{parent_table}`, with `_N` on repeat), not `t{index}`.
+    const referencedAlias =
+      options?.references?.includes(assocName) && assocName !== targetTable!
+        ? assocName
+        : undefined;
+    const keyName = referencedAlias ?? targetTable!;
+    let effectiveName: string;
+    if ((this._aliasTracker.aliases.get(keyName) ?? 0) === 0) {
+      // First visit: claim the real (or referenced) name and bump its count.
+      this._aliasTracker.aliases.set(keyName, 1);
+      effectiveName = keyName;
+    } else {
+      // Collision: route through AliasTracker with the Rails alias candidate
+      // (aliasNameFor bumps the candidate's count and suffixes `_N` on repeat).
+      const parentTableName = (modelClass as any).tableName;
+      const candidate = reflection
+        ? reflection.aliasCandidate(parentTableName)
+        : `${targetTable!}_${parentTableName}`;
+      effectiveName = this._aliasTracker.aliasNameFor(candidate);
+    }
 
     const targetArelTable =
       effectiveName === targetTable!
@@ -256,15 +268,6 @@ export class JoinDependency {
 
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
     if (Array.isArray(targetModelPk)) return null;
-
-    // Commit-point: all failure guards passed; register the emitted name so
-    // later joins to the same table collide correctly (mirrors aliased_table_for
-    // bumping the alias count, whether that is the real table or a reference).
-    const registeredName = effectiveName === referencedAlias ? referencedAlias : targetTable!;
-    this._aliasTracker.aliases.set(
-      registeredName,
-      (this._aliasTracker.aliases.get(registeredName) ?? 0) + 1,
-    );
 
     const columns = getModelColumns(targetModel);
 
