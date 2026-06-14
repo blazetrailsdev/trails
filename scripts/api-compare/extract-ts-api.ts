@@ -1526,7 +1526,17 @@ export function tsLiteralValue(init: ts.Expression): LiteralValue | undefined {
   if (ts.isIdentifier(init) && init.text === "undefined") return { kind: "nil" };
   if (ts.isArrayLiteralExpression(init) && init.elements.length === 0) return { kind: "array" };
   if (ts.isObjectLiteralExpression(init) && init.properties.length === 0) return { kind: "hash" };
-  return undefined; // non-literal (incl. negative numbers — skipped symmetrically with Ruby)
+  // A negative literal `-1` is a prefix-unary minus over a numeric literal; fold
+  // the sign back in so it compares against Ruby's `[:unary, :-@, [:@int]]`.
+  if (
+    ts.isPrefixUnaryExpression(init) &&
+    init.operator === ts.SyntaxKind.MinusToken &&
+    ts.isNumericLiteral(init.operand)
+  ) {
+    const t = init.operand.getText();
+    return { kind: t.includes(".") ? "float" : "int", value: `-${t}` };
+  }
+  return undefined; // non-literal
 }
 
 /** Literal constants for one file: exported `const NAME` and public `static

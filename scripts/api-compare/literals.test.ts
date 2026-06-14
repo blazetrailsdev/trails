@@ -13,6 +13,22 @@ describe("compareLiteral", () => {
     );
   });
 
+  it("matches negative numeric defaults across languages (-1 === -1)", () => {
+    expect(compareLiteral({ kind: "int", value: "-1" }, { kind: "int", value: "-1" })).toBe(
+      "match",
+    );
+    // negative float and negative int collapse to the same numeric key
+    expect(compareLiteral({ kind: "float", value: "-1.0" }, { kind: "int", value: "-1" })).toBe(
+      "match",
+    );
+  });
+
+  it("flags a negative value differing from its positive counterpart (-1 !== 1)", () => {
+    expect(compareLiteral({ kind: "int", value: "-1" }, { kind: "int", value: "1" })).toBe(
+      "mismatch",
+    );
+  });
+
   it("matches a Ruby symbol against a TS string of the same value", () => {
     expect(compareLiteral({ kind: "symbol", value: "asc" }, { kind: "string", value: "asc" })).toBe(
       "match",
@@ -58,6 +74,15 @@ describe("compareDefaults", () => {
     const res = compareDefaults(
       [ruby("batch_size", { kind: "int", value: "1000" })],
       [[tsp("batchSize", { kind: "int", value: "1_000" })]],
+    );
+    expect(res.mismatches).toEqual([]);
+    expect(res.compared).toBe(1);
+  });
+
+  it("matches a negative default through the by-name path (-1 === -1)", () => {
+    const res = compareDefaults(
+      [ruby("limit", { kind: "int", value: "-1" })],
+      [[tsp("limit", { kind: "int", value: "-1" })]],
     );
     expect(res.mismatches).toEqual([]);
     expect(res.compared).toBe(1);
