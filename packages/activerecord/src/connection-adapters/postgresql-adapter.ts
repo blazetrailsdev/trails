@@ -2710,46 +2710,29 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // ---------------------------------------------------------------------------
 
   async schemaNames(): Promise<string[]> {
-    const rows = await this.schemaQuery(
-      `SELECT nspname FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname != 'information_schema' ORDER BY nspname`,
-    );
-    return rows.map((r) => r.nspname as string);
+    return this.pgSchemaStatements().schemaNames();
   }
 
   async createSchema(
     name: string,
     options: { force?: boolean; ifNotExists?: boolean } = {},
   ): Promise<void> {
-    if (options.force && options.ifNotExists) {
-      throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
-    }
-    if (options.force) {
-      await this.exec(`DROP SCHEMA IF EXISTS ${this.quoteSchemaName(name)} CASCADE`);
-    }
-    const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
-    await this.exec(`CREATE SCHEMA${ifNotExists} ${this.quoteSchemaName(name)}`);
+    await this.pgSchemaStatements().createSchema(name, options);
   }
 
   async dropSchema(
     name: string,
     options: { ifExists?: boolean; cascade?: boolean } = {},
   ): Promise<void> {
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.cascade ? " CASCADE" : "";
-    await this.exec(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(name)}${cascade}`);
+    await this.pgSchemaStatements().dropSchema(name, options);
   }
 
   async schemaExists(name: string): Promise<boolean> {
-    const rows = await this.schemaQuery(
-      `SELECT COUNT(*) AS count FROM pg_namespace WHERE nspname = $1`,
-      [name],
-    );
-    return Number(rows[0].count) > 0;
+    return this.pgSchemaStatements().schemaExists(name);
   }
 
   async currentSchema(): Promise<string> {
-    const rows = await this.schemaQuery("SELECT current_schema() AS schema");
-    return rows[0].schema as string;
+    return this.pgSchemaStatements().currentSchema();
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
@@ -2972,11 +2955,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async databaseExists(name: string): Promise<boolean> {
-    const rows = await this.schemaQuery(
-      `SELECT COUNT(*) AS count FROM pg_database WHERE datname = $1`,
-      [name],
-    );
-    return Number(rows[0].count) > 0;
+    return this.pgSchemaStatements().databaseExists(name);
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
@@ -4387,24 +4366,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
-    const encoding = options.encoding ?? "utf8";
-    let optionString = ` ENCODING = ${this.quoteLiteral(encoding)}`;
-    if (options.collation) optionString += ` LC_COLLATE = ${this.quoteLiteral(options.collation)}`;
-    if (options.ctype) optionString += ` LC_CTYPE = ${this.quoteLiteral(options.ctype)}`;
-    if (options.owner) optionString += ` OWNER = ${this.quoteIdentifier(options.owner)}`;
-    if (options.template) optionString += ` TEMPLATE = ${this.quoteIdentifier(options.template)}`;
-    if (options.tablespace)
-      optionString += ` TABLESPACE = ${this.quoteIdentifier(options.tablespace)}`;
-    if (options.connectionLimit != null) {
-      const limit = options.connectionLimit;
-      if (!Number.isInteger(limit) || (limit < 0 && limit !== -1)) {
-        throw new Error(
-          `connectionLimit must be -1 (unlimited) or a non-negative integer, got: ${limit}`,
-        );
-      }
-      optionString += ` CONNECTION LIMIT = ${limit}`;
-    }
-    await this.exec(`CREATE DATABASE ${this.quoteIdentifier(name)}${optionString}`);
+    await this.pgSchemaStatements().createDatabase(name, options);
   }
 
   // ---------------------------------------------------------------------------
@@ -4616,10 +4578,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     );
   }
 
-  private quoteSchemaName(name: string): string {
-    return pgQuoteColumnName(name);
-  }
-
   private nativeType(type: string): string {
     const map: Record<string, string> = {
       string: "character varying",
@@ -4715,16 +4673,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async dropDatabase(name: string): Promise<void> {
-    await this.exec(`DROP DATABASE IF EXISTS ${this.quoteIdentifier(name)}`);
+    await this.pgSchemaStatements().dropDatabase(name);
   }
 
   async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
-    await this.dropDatabase(name);
-    await this.createDatabase(name, options);
+    await this.pgSchemaStatements().recreateDatabase(name, options);
   }
 
   override schemaStatements(host?: DatabaseAdapter): SchemaStatements {
     return new PostgreSQLSchemaStatements((host ?? this) as unknown as DatabaseAdapter);
+  }
+
+  private pgSchemaStatements(): PostgreSQLSchemaStatements {
+    return this.schemaStatements() as PostgreSQLSchemaStatements;
   }
 
   async dropTable(
@@ -4740,52 +4701,35 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async currentDatabase(): Promise<string> {
-    const rows = await this.schemaQuery("SELECT current_database() AS name");
-    return rows[0].name as string;
+    return this.pgSchemaStatements().currentDatabase();
   }
 
   async encoding(): Promise<string> {
-    const rows = await this.schemaQuery(
-      "SELECT pg_encoding_to_char(encoding) AS enc FROM pg_database WHERE datname = current_database()",
-    );
-    return rows[0].enc as string;
+    return this.pgSchemaStatements().encoding();
   }
 
   async collation(): Promise<string> {
-    const rows = await this.schemaQuery(
-      "SELECT datcollate AS col FROM pg_database WHERE datname = current_database()",
-    );
-    return rows[0].col as string;
+    return this.pgSchemaStatements().collation();
   }
 
   async ctype(): Promise<string> {
-    const rows = await this.schemaQuery(
-      "SELECT datctype AS ct FROM pg_database WHERE datname = current_database()",
-    );
-    return rows[0].ct as string;
+    return this.pgSchemaStatements().ctype();
   }
 
   async schemaSearchPath(): Promise<string> {
-    const rows = await this.schemaQuery("SHOW search_path");
-    return rows[0].search_path as string;
+    return this.pgSchemaStatements().schemaSearchPath();
   }
 
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
-    if (searchPath == null) return;
-    // Mirrors Rails' schema_search_path= which uses direct interpolation:
-    //   execute("SET search_path TO #{schema_csv}")
-    // This means unquoted $user causes a PG parse error (dollar-quoted string),
-    // matching Rails' behavior. Use '$user' (with single quotes) for the special token.
-    await this.execute(`SET search_path TO ${searchPath}`);
+    await this.pgSchemaStatements().setSchemaSearchPath(searchPath);
   }
 
   async clientMinMessages(): Promise<string> {
-    const rows = await this.schemaQuery("SHOW client_min_messages");
-    return rows[0].client_min_messages as string;
+    return this.pgSchemaStatements().clientMinMessages();
   }
 
   async setClientMinMessages(level: string): Promise<void> {
-    await this.exec(`SET client_min_messages TO ${this.quoteLiteral(level)}`);
+    await this.pgSchemaStatements().setClientMinMessages(level);
   }
 
   async tableComment(tableName: string): Promise<string | null> {
