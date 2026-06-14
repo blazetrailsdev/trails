@@ -37,8 +37,8 @@ beforeAll(async () => {
       columns: { shop_id: "integer", id: "integer", status: "string" },
       primaryKey: ["shop_id", "id"],
     },
-    pets: { name: "string" },
-    toys: { name: "string", pet_id: "integer" },
+    da_pets: { name: "string" },
+    da_toys: { name: "string", pet_id: "integer" },
   });
 });
 
@@ -73,13 +73,13 @@ describe("DeleteAllTest", () => {
 
 class Pet extends Base {
   static {
-    this.tableName = "pets";
+    this.tableName = "da_pets";
     this.attribute("name", "string");
   }
 }
 class Toy extends Base {
   static {
-    this.tableName = "toys";
+    this.tableName = "da_toys";
     this.attribute("name", "string");
     this.attribute("pet_id", "integer");
   }
@@ -158,7 +158,7 @@ describe("DeleteAllTest", () => {
 
   it("delete all with joins and where part is not hash", async () => {
     await makePetWithBone();
-    const whereArgs: [string, string] = ["toys.name = ?", "Bone"];
+    const whereArgs: [string, string] = ["da_toys.name = ?", "Bone"];
     const count = await Pet.joins("toys")
       .where(...whereArgs)
       .count();
