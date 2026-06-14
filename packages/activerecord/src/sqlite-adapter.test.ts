@@ -208,7 +208,10 @@ describe("SQLite adapter driver binding", () => {
       return openVia(config);
     });
     const adapter = new AbstractSQLite3Adapter(":memory:", { driver });
-    await adapter.internalExecute("CREATE TABLE race_t (id INTEGER PRIMARY KEY)", "SCHEMA");
+    // These are the FIRST operations — no prior query has cleared the pending
+    // flag, so all three race into completeAsyncConnect() and must dedupe onto
+    // the single in-flight open rather than each opening their own handle.
+    expect(adapter.active).toBe(false);
     await Promise.all([
       adapter.execute("SELECT 1 AS one"),
       adapter.execQuery("SELECT 2 AS two"),
