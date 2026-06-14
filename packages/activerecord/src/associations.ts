@@ -918,14 +918,27 @@ export async function loadBelongsTo(
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
     if (cached) {
-      const inverseName = _resolveInverseName(
-        record.constructor as typeof Base,
-        assocName,
-        options,
-      );
-      if (inverseName) _wireInverseAssociation(record, cached, inverseName);
+      // Honor staleness (Rails' `stale_target?`): if the owner's FK changed so
+      // it no longer points at the cached target, the cache is stale — fall
+      // through to re-query. The holder reads this as FK==PK rather than its
+      // `isStaleTarget()` snapshot (see BelongsToAssociation#isCachedTargetStale).
+      const holder = record._associationInstances.get(assocName) as
+        | { isCachedTargetStale?: (t: Base) => boolean }
+        | undefined;
+      const stale =
+        typeof holder?.isCachedTargetStale === "function" && holder.isCachedTargetStale(cached);
+      if (!stale) {
+        const inverseName = _resolveInverseName(
+          record.constructor as typeof Base,
+          assocName,
+          options,
+        );
+        if (inverseName) _wireInverseAssociation(record, cached, inverseName);
+        return cached;
+      }
+    } else {
+      return cached;
     }
-    return cached;
   }
 
   // Strict loading check: this is a lazy load
