@@ -104,6 +104,7 @@ export class JoinDependency {
   private _baseModel: typeof Base;
   private _baseAlias: string;
   private _aliasTracker: AliasTracker;
+  private _aliasesCache?: Aliases;
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   private _references: Record<string, string> = Object.create(null) as Record<string, string>;
@@ -513,6 +514,7 @@ export class JoinDependency {
       }
     };
     prune(this._joinRoot);
+    this._aliasesCache = undefined;
     this._aliasTracker.aliases.clear();
     for (const [k, v] of snapshot.tracker) this._aliasTracker.aliases.set(k, v);
   }
@@ -1010,9 +1012,13 @@ export class JoinDependency {
    * JoinDependency#aliases — `join_root.each_with_index` over column names).
    * The base table is keyed by the join root; each joined node supplies its own
    * column names and Arel table. Replaces the index-keyed `_aliases`/`_arelTablesByIndex`.
+   *
+   * Memoized like Rails' `@aliases ||=`; the cache is cleared on any tree
+   * mutation (`_insertTreeNode` / `_rollback`) so it can never go stale.
    * @internal
    */
   private aliases(): Aliases {
+    if (this._aliasesCache) return this._aliasesCache;
     const columnsFor = (
       node: JoinPart,
       columns: string[],
@@ -1030,7 +1036,7 @@ export class JoinDependency {
     for (const node of this.nodes) {
       tables.push(columnsFor(node, node.columns, node.tableIndex));
     }
-    return new Aliases(tables);
+    return (this._aliasesCache = new Aliases(tables));
   }
 
   /**
@@ -1144,6 +1150,7 @@ export class JoinDependency {
       );
     }
     parent.children.push(treePart);
+    this._aliasesCache = undefined;
   }
 
   private _addThroughViaJoinAssociation(
