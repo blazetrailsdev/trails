@@ -194,13 +194,14 @@ export class JoinAssociation extends JoinPart {
    *
    *   @strict_loading = reflection.scope && reflection.scope_for(base_klass.unscoped).strict_loading_value
    *
-   * Memoized like Rails' `@strict_loading`. Scope-driven strict loading (e.g.
-   * `hasMany("posts", () => rel.strictLoading())`) is detected via the scoped
-   * relation, not just the reflection's direct flag.
+   * Memoized like Rails' `@strict_loading`. Covers both the reflection's direct
+   * `strictLoading: true` option and scope-driven strict loading (e.g.
+   * `hasMany("posts", () => rel.strictLoading())`) via the scoped relation.
    */
   override isStrictLoading(): boolean {
     if (this._strictLoading !== undefined) return this._strictLoading;
-    this._strictLoading = !!this._scopeRelation()?._isStrictLoading;
+    this._strictLoading =
+      !!(this.reflection as any)?.strictLoading || !!this._scopeRelation()?._isStrictLoading;
     return this._strictLoading;
   }
 
