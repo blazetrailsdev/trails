@@ -1409,6 +1409,66 @@ interface DatabaseStatementsDefaultsHost {
   ): Promise<Result>;
 }
 
+/**
+ * Shared body for `DatabaseStatements.insert` and its `create` alias.
+ *
+ * Rails' `alias create insert` copies the *original* insert body, so after
+ * `dirties_query_cache` wraps both methods, calling `create` clears the query
+ * cache once (its own wrapper) then runs this unwrapped body directly — it
+ * never re-enters the wrapped `insert`. Assigning this same function to both
+ * `insert` and `create` reproduces that single-clear semantics; dispatching
+ * `create` through `this.insert(...)` would clear the cache a second time.
+ *
+ * @internal
+ */
+async function insertStatement(
+  this: any,
+  arel: unknown,
+  name?: string | null,
+  pk?: string | null,
+  idValue?: unknown,
+  sequenceName?: string | null,
+  binds: unknown[] = [],
+  opts?: { returning?: string[] | null },
+): Promise<unknown> {
+  const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
+  const result = await this.execInsert(
+    sql,
+    name,
+    resolvedBinds,
+    pk,
+    sequenceName,
+    opts?.returning ?? null,
+  );
+  // execInsert may return a Result (PG/adapter with RETURNING support) or a
+  // number/insertId (MySQL/SQLite via executeMutation). Delegate to the
+  // adapter's lastInsertedId when available; fall back to treating the
+  // result directly as the id (matches executeMutation returning insertId).
+  const insertedId = (): unknown => {
+    if (idValue != null) return idValue;
+    if (this.lastInsertedId && result instanceof Result) return this.lastInsertedId(result);
+    if (result instanceof Result) return lastInsertedId(result);
+    return result; // numeric insertId from executeMutation
+  };
+  if (opts?.returning != null) {
+    // Adapters that emit a RETURNING clause surface the values via the result
+    // rows; those that can't (MySQL, SQLite < 3.35) fall back to the generated
+    // id so the single PK/auto-populated column is still filled. Returned as an
+    // array to match Rails' `returning_column_values` shape.
+    if (result instanceof Result) {
+      const rv = (this.returningColumnValues ?? returningColumnValues).call(this, result);
+      // `undefined` first element means no value was extracted (no RETURNING
+      // clause emitted) — fall back to the insert id. A real `null` is a
+      // legitimate RETURNING value and must be preserved, so guard on
+      // `!== undefined`, not `!= null` (Rails has no such guard because its
+      // adapter dispatch never yields the no-value case here).
+      if (rv != null && rv.length > 0 && rv[0] !== undefined) return rv;
+    }
+    return [insertedId()];
+  }
+  return insertedId();
+}
+
 export const DatabaseStatements = {
   resetTransaction,
   async selectAll(
@@ -1530,67 +1590,15 @@ export const DatabaseStatements = {
     return cacheableQuery.call(this as never, klass, arel);
   },
 
-  async insert(
-    this: any,
-    arel: unknown,
-    name?: string | null,
-    pk?: string | null,
-    idValue?: unknown,
-    sequenceName?: string | null,
-    binds: unknown[] = [],
-    opts?: { returning?: string[] | null },
-  ): Promise<unknown> {
-    const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
-    const result = await this.execInsert(
-      sql,
-      name,
-      resolvedBinds,
-      pk,
-      sequenceName,
-      opts?.returning ?? null,
-    );
-    // execInsert may return a Result (PG/adapter with RETURNING support) or a
-    // number/insertId (MySQL/SQLite via executeMutation). Delegate to the
-    // adapter's lastInsertedId when available; fall back to treating the
-    // result directly as the id (matches executeMutation returning insertId).
-    const insertedId = (): unknown => {
-      if (idValue != null) return idValue;
-      if (this.lastInsertedId && result instanceof Result) return this.lastInsertedId(result);
-      if (result instanceof Result) return lastInsertedId(result);
-      return result; // numeric insertId from executeMutation
-    };
-    if (opts?.returning != null) {
-      // Adapters that emit a RETURNING clause surface the values via the result
-      // rows; those that can't (MySQL, SQLite < 3.35) fall back to the generated
-      // id so the single PK/auto-populated column is still filled. Returned as an
-      // array to match Rails' `returning_column_values` shape.
-      if (result instanceof Result) {
-        const rv = (this.returningColumnValues ?? returningColumnValues).call(this, result);
-        // `undefined` first element means no value was extracted (no RETURNING
-        // clause emitted) — fall back to the insert id. A real `null` is a
-        // legitimate RETURNING value and must be preserved, so guard on
-        // `!== undefined`, not `!= null` (Rails has no such guard because its
-        // adapter dispatch never yields the no-value case here).
-        if (rv != null && rv.length > 0 && rv[0] !== undefined) return rv;
-      }
-      return [insertedId()];
-    }
-    return insertedId();
-  },
+  insert: insertStatement,
 
-  // Rails: `alias create insert`.
-  create(
-    this: any,
-    arel: unknown,
-    name?: string | null,
-    pk?: string | null,
-    idValue?: unknown,
-    sequenceName?: string | null,
-    binds: unknown[] = [],
-    opts?: { returning?: string[] | null },
-  ): Promise<unknown> {
-    return this.insert(arel, name, pk, idValue, sequenceName, binds, opts);
-  },
+  // Rails: `alias create insert`. Rails' `alias` copies the *original* insert
+  // body, so after `dirties_query_cache` wraps both, `create` clears the cache
+  // once (its own wrapper) and runs the unwrapped insert body — it never
+  // re-enters the wrapped `insert`. Referencing the same standalone function
+  // here (rather than `this.insert(...)`) reproduces that: a `create` call
+  // dirties the query cache exactly once.
+  create: insertStatement,
 
   async update(
     this: any,
