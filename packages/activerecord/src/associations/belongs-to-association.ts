@@ -442,6 +442,33 @@ export class BelongsToAssociation extends SingularAssociation {
     return true;
   }
 
+  /**
+   * Read of Rails' `stale_target?` for the inner `loadBelongsTo` cached
+   * short-circuit: the cached target is stale only when the owner holds a
+   * *non-null* FK that no longer equals the cached target's primary key. A
+   * null FK can't point at a different record, so the inverse-wired-but-unsaved
+   * holder (`new_man.face = face` before save) is kept — matching Rails, where
+   * `inversed_from` re-snapshots `@stale_state` after `replace_keys`. trails'
+   * shared inverse primitive skips that FK write, so the holder's
+   * `isStaleTarget()` snapshot over-reports; this FK==PK read is the faithful
+   * local substitute (see the `update_counters` note above).
+   */
+  protected isCachedTargetStale(target: Base): boolean {
+    const fks = this.foreignKeyNames();
+    const pks = this.associationPrimaryKeys(target);
+    for (let i = 0; i < fks.length; i++) {
+      const fkValue = (this.owner as any)._readAttribute?.(fks[i]);
+      if (fkValue == null) continue;
+      const pk = pks[i] ?? pks[0];
+      const pkValue =
+        typeof (target as any)._readAttribute === "function"
+          ? (target as any)._readAttribute(pk)
+          : (target as any)[pk];
+      if (pkValue == null || String(pkValue) !== String(fkValue)) return true;
+    }
+    return false;
+  }
+
   protected ownerAttributeChanged(attr: string): boolean {
     if (typeof (this.owner as any).attributeChanged === "function")
       return (this.owner as any).attributeChanged(attr);
