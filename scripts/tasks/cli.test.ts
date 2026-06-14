@@ -1421,6 +1421,11 @@ describe("uncheckedCheckboxes", () => {
   it("returns empty for a body with no checkboxes", () => {
     expect(uncheckedCheckboxes("# Title\n\nProse only, no boxes.\n")).toEqual([]);
   });
+
+  it("recognizes `*` and `+` bullet markers and indented items", () => {
+    const body = "* [ ] star item\n+ [ ] plus item\n  - [ ] indented item\n";
+    expect(uncheckedCheckboxes(body)).toEqual(["star item", "plus item", "indented item"]);
+  });
 });
 
 describe("checkCheckboxesDone (done unchecked-checkbox guard)", () => {

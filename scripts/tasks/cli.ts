@@ -1986,7 +1986,7 @@ export function checkPrNotOpen(pr: number): void {
 export function uncheckedCheckboxes(body: string): string[] {
   const out: string[] = [];
   for (const line of body.split("\n")) {
-    const m = line.match(/^\s*[-*]\s+\[ \](?:\s+(.*\S))?\s*$/);
+    const m = line.match(/^\s*[-*+]\s+\[ \](?:\s+(.*\S))?\s*$/);
     if (m) out.push((m[1] ?? "").trim());
   }
   return out;
