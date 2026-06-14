@@ -35,6 +35,19 @@ function bigIntToMsgpackExt(value: bigint): Buffer {
   return Buffer.from(bytes);
 }
 
+/**
+ * Mirrors Ruby's `load_time_zone` → `ActiveSupport::TimeZone[name]`, which
+ * rescues an invalid identifier to `null` (time_zone.rb:236-241) rather than
+ * raising. `TimeZone.find` throws on an unknown name, so we catch it here.
+ */
+function loadTimeZone(name: string): TimeZone | null {
+  try {
+    return TimeZone.find(name);
+  } catch {
+    return null;
+  }
+}
+
 function bigIntFromMsgpackExt(payload: Buffer): bigint {
   const sign = payload[0];
   let sum = 0n;
@@ -101,7 +114,7 @@ export const Extensions = {
       recursive: false,
       match: (v) => v instanceof TimeZone,
       packer: (v) => Buffer.from((v as TimeZone).name, "utf-8"),
-      unpacker: (payload) => TimeZone.find((payload as Buffer).toString("utf-8")),
+      unpacker: (payload) => loadTimeZone((payload as Buffer).toString("utf-8")),
     });
 
     registry.registerType({
