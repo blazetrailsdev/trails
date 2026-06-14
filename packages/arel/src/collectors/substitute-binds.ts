@@ -1,4 +1,11 @@
+import { BindParam } from "../nodes/bind-param.js";
+
 function extractValue(bind: unknown): unknown {
+  // A raw Arel BindParam carries its bound value on `.value` (the visitor
+  // pushes the node itself so the Bind collector can render `?` while
+  // `compileWithBinds` unwraps it). When inlining, unwrap to the value so it
+  // can be quoted directly — matching Rails' `add_bind(o.value)`.
+  if (bind instanceof BindParam) return extractValue(bind.value);
   if (
     bind &&
     typeof bind === "object" &&
