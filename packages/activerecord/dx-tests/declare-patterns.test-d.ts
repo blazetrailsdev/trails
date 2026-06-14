@@ -148,11 +148,11 @@ class Task extends Base {
 
 // --- Enum typing (defineEnum form): richer surface with async persisting
 // bang setters, plain in-memory setters, and `not*` scopes.
-// Unlike Base.enum, defineEnum does NOT override the attribute accessor —
-// `record.status` still returns the underlying integer. Use `readEnumValue`
-// (exported from `@blazetrails/activerecord`) when you want the string label.
+// Like Base.enum, defineEnum now overrides the attribute accessor and stores
+// the label — `record.status` returns the string label ("draft"), while the
+// database column holds the mapped integer. (`readEnumValue` still works.)
 class Article extends Base {
-  declare status: number; // integer column — defineEnum leaves the accessor alone
+  declare status: string; // label-storing accessor (Rails-faithful)
 
   // Predicates (same as Base.enum)
   declare isDraft: () => boolean;
