@@ -1239,12 +1239,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return names;
   }
 
-  /**
-   * Return Column metadata for the named table. Reads from
-   * `information_schema.columns` — matches Rails' column introspection
-   * shape. Populates the fields SchemaCache serializes (name, default,
-   * null, sqlTypeMetadata, primaryKey).
-   */
+  /** Delegates to {@link mysqlColumns} in `mysql/schema-statements.ts`. */
   async columns(tableName: string): Promise<Column[]> {
     return mysqlColumns.call(this, tableName);
   }
