@@ -38,6 +38,7 @@ import {
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
 } from "./associations/errors.js";
+import { isFinderNeedsTypeCondition, typeCondition } from "./inheritance.js";
 
 type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
@@ -279,6 +280,15 @@ export class AbstractReflection {
       scope = scope.where(table.get(primaryKeys[i]).eq(foreignTable.get(foreignKeys[i])));
     }
 
+    // Rails: `if klass.finder_needs_type_condition?; klass_scope.where!(klass.type_condition(table))`.
+    // The STI predicate lives here (qualified by the join's `table`, which may be
+    // an alias) rather than baked into `klassJoinScope`, so a self-referential
+    // STI join filters on the aliased table instead of the model's base table.
+    const targetKlass = this.klass as any;
+    if (isFinderNeedsTypeCondition(targetKlass)) {
+      scope = scope.where(typeCondition(targetKlass, table));
+    }
+
     return scope;
   }
 
@@ -291,8 +301,13 @@ export class AbstractReflection {
     return [];
   }
 
-  klassJoinScope(_table?: Table, _predicateBuilder?: any): any {
-    return this.buildScope(_table, _predicateBuilder);
+  klassJoinScope(table?: Table, predicateBuilder?: any): any {
+    // Rails: `klass.scope_for_association(build_scope(table, predicate_builder))`.
+    // `build_scope` is a bare relation (no default scope, no STI); the STI
+    // `type_condition` is added by `joinScope`, qualified by the join's table.
+    const klass = this.klass as any;
+    const bare = klass._buildBareRelation?.(table) ?? this.buildScope(table, predicateBuilder);
+    return klass.scopeForAssociation ? klass.scopeForAssociation(bare) : bare;
   }
 
   constraints(): Array<(...args: any[]) => any> {
