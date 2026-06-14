@@ -33,6 +33,14 @@ export class AdapterNotSpecified extends ActiveRecordError {
   }
 }
 
+// Raised when a model makes a query but it has not specified an associated table.
+export class TableNotSpecified extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "TableNotSpecified";
+  }
+}
+
 export class AdapterNotFound extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
@@ -263,6 +271,15 @@ export class TransactionRollbackError extends StatementInvalid {
   ) {
     super(message, options);
     this.name = "TransactionRollbackError";
+  }
+}
+
+// AsynchronousQueryInsideTransactionError will be raised when attempting
+// to perform an asynchronous query from inside a transaction.
+export class AsynchronousQueryInsideTransactionError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AsynchronousQueryInsideTransactionError";
   }
 }
 
