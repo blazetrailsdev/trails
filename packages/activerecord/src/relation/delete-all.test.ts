@@ -37,6 +37,8 @@ beforeAll(async () => {
       columns: { shop_id: "integer", id: "integer", status: "string" },
       primaryKey: ["shop_id", "id"],
     },
+    da_pets: { name: "string" },
+    da_toys: { name: "string", pet_id: "integer" },
   });
 });
 
@@ -68,6 +70,24 @@ describe("DeleteAllTest", () => {
     expect(count).toBe(1);
   });
 });
+
+class Pet extends Base {
+  static {
+    this.tableName = "da_pets";
+    this.attribute("name", "string");
+  }
+}
+class Toy extends Base {
+  static {
+    this.tableName = "da_toys";
+    this.attribute("name", "string");
+    this.attribute("pet_id", "integer");
+  }
+}
+registerModel(Pet);
+registerModel(Toy);
+Associations.hasMany.call(Pet, "toys", { className: "Toy", foreignKey: "pet_id" });
+Associations.belongsTo.call(Toy, "pet", { className: "Pet", foreignKey: "pet_id" });
 
 describe("DeleteAllTest", () => {
   function makeModel() {
@@ -123,36 +143,69 @@ describe("DeleteAllTest", () => {
     );
   });
 
+  async function makePetWithBone() {
+    const pet = await Pet.create({ name: "parrot" });
+    await Toy.create({ name: "Bone", pet_id: pet.id });
+    return pet;
+  }
+
   it("delete all with joins and where part is hash", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "j", author: "bob" });
-    await Post.where({ author: "bob" }).deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
+    await makePetWithBone();
+    const whereArgs = { toys: { name: "Bone" } };
+    const count = await Pet.joins("toys").where(whereArgs).count();
+    expect(await Pet.joins("toys").where(whereArgs).deleteAll()).toBe(count);
   });
 
   it("delete all with joins and where part is not hash", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "nothash", author: "carol" });
-    await Post.where({ author: "carol" }).deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
+    await makePetWithBone();
+    const whereArgs: [string, string] = ["da_toys.name = ?", "Bone"];
+    const count = await Pet.joins("toys")
+      .where(...whereArgs)
+      .count();
+    expect(
+      await Pet.joins("toys")
+        .where(...whereArgs)
+        .deleteAll(),
+    ).toBe(count);
   });
 
   it("delete all with left joins", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "lj", author: "dave" });
-    await Post.where({ author: "dave" }).deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
+    await makePetWithBone();
+    const whereArgs = { toys: { name: "Bone" } };
+    const count = await Pet.leftJoins("toys").where(whereArgs).count();
+    expect(await Pet.leftJoins("toys").where(whereArgs).deleteAll()).toBe(count);
   });
 
   it("delete all with includes", async () => {
+    await makePetWithBone();
+    const whereArgs = { toys: { name: "Bone" } };
+    const count = await Pet.includes("toys").where(whereArgs).count();
+    expect(await Pet.includes("toys").where(whereArgs).deleteAll()).toBe(count);
+  });
+
+  it("delete all with includes and group skips limit materialization guard", async () => {
+    await makePetWithBone();
+    // Mirrors Rails `apply_join_dependency(eager_loading: group_values.empty?)`
+    // (finder_methods.rb:457): a grouped delete passes `eager_loading: false`,
+    // so the limit/offset materialization guard is skipped — `includes + group
+    // + limit` deletes rather than raising NotImplementedError.
+    const rel = Pet.includes("toys")
+      .where({ toys: { name: "Bone" } })
+      .group("da_pets.id")
+      .limit(5);
+    expect(await rel.deleteAll()).toBe(1);
+    expect(await Pet.all().toArray()).toHaveLength(0);
+  });
+
+  it("delete all with from clause still targets the table", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "inc", author: "eve" });
-    await Post.where({ author: "eve" }).deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
+    await Post.create({ title: "fromtest", author: "ivan" });
+    // Mirrors Rails `relation.rb:1024` (`arel.source.left = table`): an explicit
+    // `from(custom)` overrides the FROM source, but `delete_all` forces it back
+    // to the bare table, so the DELETE targets `posts` rather than the aliased
+    // FROM node (which would emit `DELETE FROM posts AS p` and not match).
+    expect(await Post.from("posts AS p").where({ author: "ivan" }).deleteAll()).toBe(1);
+    expect(await Post.all().toArray()).toHaveLength(0);
   });
 
   it("delete all with order and limit deletes subset only", async () => {
