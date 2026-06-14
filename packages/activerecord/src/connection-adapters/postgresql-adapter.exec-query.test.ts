@@ -19,13 +19,16 @@ const UUID_OID = 2950;
 
 function makeAdapter(queryImpl: (...args: unknown[]) => Promise<unknown>): PostgreSQLAdapter {
   const adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
-  // Stub the client acquisition so tests don't touch a real pool.
-  // `fakeClient.release` is a no-op; `getClient()` / `execQuery()` call
-  // it directly once the block resolves.
+  // Preset the persistent connection so withRawConnection yields it directly
+  // (the loop yields `_connection`); mark verified so the verify/reconnect
+  // preamble is skipped, and stub the acquire as a safety net.
   const fakeClient = { query: queryImpl, release: () => {} };
-  vi.spyOn(adapter as unknown as { getClient: () => unknown }, "getClient").mockResolvedValue(
-    fakeClient,
-  );
+  (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
+  adapter.verifiedBang();
+  vi.spyOn(
+    adapter as unknown as { _acquireFreshClient: () => unknown },
+    "_acquireFreshClient",
+  ).mockResolvedValue(fakeClient);
   // In a live PG adapter, loadAdditionalTypes queries pg_type and
   // aliases numeric OIDs → typnames registered in the static map.
   // Pre-register the known base OIDs so execQuery's miss path resolves
@@ -187,9 +190,12 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
       },
       release: () => {},
     };
-    vi.spyOn(adapter as unknown as { getClient: () => unknown }, "getClient").mockResolvedValue(
-      fakeClient,
-    );
+    (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
+    adapter.verifiedBang();
+    vi.spyOn(
+      adapter as unknown as { _acquireFreshClient: () => unknown },
+      "_acquireFreshClient",
+    ).mockResolvedValue(fakeClient);
   });
 
   afterEach(async () => {
@@ -255,9 +261,11 @@ describe("PostgreSQLAdapter#executeMutation", () => {
       release: () => {},
     };
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
-    vi.spyOn(adapter as unknown as { getClient: () => unknown }, "getClient").mockResolvedValue(
-      fakeClient,
-    );
+    (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
+    vi.spyOn(
+      adapter as unknown as { _acquireFreshClient: () => unknown },
+      "_acquireFreshClient",
+    ).mockResolvedValue(fakeClient);
     // Mark verified so withRawConnection's verify/reconnect preamble is
     // skipped — reconnect() would otherwise reset _inTransaction (the mock
     // leaves _rawConnection null, which a live in-transaction adapter never
