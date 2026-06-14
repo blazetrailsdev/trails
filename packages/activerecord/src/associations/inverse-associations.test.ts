@@ -819,11 +819,24 @@ describe("InverseHasManyTests", () => {
     expect((children[0] as any)._associationCache("parent")?.target).toBe(parent);
   });
 
-  it.skip("changing the association id makes the inversed association target stale", () => {
-    // BLOCKED: the staleState/isStale mechanism exists (association.ts:72), but
-    // the functional loadBelongsTo helper returns the cached holder target
-    // without consulting it, so a post-cache FK change isn't detected. Needs
-    // loadBelongsTo to honor staleness (small, but live-helper change).
+  it("changing the association id makes the inversed association target stale", async () => {
+    const { Man, Interest } = makeModels();
+    const man1 = await Man.create({ name: "Gordon" });
+    const man2 = await Man.create({ name: "Bertie" });
+    await Interest.create({ topic: "stamps", man_id: man1.id });
+    const interests = await loadHasMany(man1, "interests", { inverseOf: "man" });
+    const interest = interests[0] as Base;
+
+    // Inverse-of wiring caches man1 on the child's belongs_to holder.
+    expect(await loadBelongsTo(interest, "man", { inverseOf: "interests" })).toBe(man1);
+
+    await (interest as unknown as { updateBang(attrs: object): Promise<unknown> }).updateBang({
+      man_id: man2.id,
+    });
+
+    // The FK change marks the cached target stale, so a re-read loads man2.
+    const reloaded = await loadBelongsTo(interest, "man", { inverseOf: "interests" });
+    expect((reloaded as Base & { id: number }).id).toBe(man2.id);
   });
 });
 
