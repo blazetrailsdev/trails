@@ -24,8 +24,11 @@ import {
   acquireTasksLock,
   buildRfcContent,
   buildStoryContent,
+  checkCheckboxesDone,
   checkPrNotOpen,
   claimState,
+  prLocDelta,
+  uncheckedCheckboxes,
   commitAndPush,
   depCyclePath,
   editFrontmatter,
@@ -1401,6 +1404,99 @@ describe("checkPrNotOpen (done merge-state guard)", () => {
     expect(console.error).toHaveBeenCalledWith(
       expect.stringMatching(/could not read PR #42 state/),
     );
+  });
+});
+
+describe("uncheckedCheckboxes", () => {
+  it("returns the text of each unchecked item", () => {
+    const body = "## Criteria\n\n- [ ] first thing\n- [ ] second thing\n";
+    expect(uncheckedCheckboxes(body)).toEqual(["first thing", "second thing"]);
+  });
+
+  it("ignores checked boxes (case-insensitive) and plain bullets", () => {
+    const body = "- [x] done lower\n- [X] done upper\n- plain bullet\n- [ ] still open\n";
+    expect(uncheckedCheckboxes(body)).toEqual(["still open"]);
+  });
+
+  it("returns empty for a body with no checkboxes", () => {
+    expect(uncheckedCheckboxes("# Title\n\nProse only, no boxes.\n")).toEqual([]);
+  });
+
+  it("recognizes `*` and `+` bullet markers and indented items", () => {
+    const body = "* [ ] star item\n+ [ ] plus item\n  - [ ] indented item\n";
+    expect(uncheckedCheckboxes(body)).toEqual(["star item", "plus item", "indented item"]);
+  });
+
+  it("counts a text-less `- [ ]` box as unchecked with empty text", () => {
+    // A bare checkbox is still an unfinished criterion, so it must block
+    // `done`; the empty string documents that it carries no label.
+    expect(uncheckedCheckboxes("- [ ]\n")).toEqual([""]);
+  });
+});
+
+describe("checkCheckboxesDone (done unchecked-checkbox guard)", () => {
+  function setupExit() {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  }
+
+  it("exits 1 listing the unchecked items when boxes remain", () => {
+    setupExit();
+    expect(() => checkCheckboxesDone("- [ ] a\n- [ ] b\n", false)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/2 unchecked checkbox/));
+    expect(console.error).toHaveBeenCalledWith("  - [ ] a");
+    expect(console.error).toHaveBeenCalledWith("  - [ ] b");
+  });
+
+  it("bypasses with a printed warning under --force", () => {
+    setupExit();
+    expect(() => checkCheckboxesDone("- [ ] a\n", true)).not.toThrow();
+    expect(console.warn).toHaveBeenCalledWith(expect.stringMatching(/--force/));
+  });
+
+  it("passes silently when all boxes are checked", () => {
+    setupExit();
+    expect(() => checkCheckboxesDone("- [x] a\n- [X] b\n", false)).not.toThrow();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("prLocDelta (est-loc vs actual feedback)", () => {
+  it("formats a positive delta when actual exceeds the estimate", () => {
+    execFileSyncMock.mockReturnValueOnce(
+      JSON.stringify({ additions: 200, deletions: 50 }) as never,
+    );
+    expect(prLocDelta(7, 150)).toBe("est-loc 150 vs actual 250 (+100)");
+    expect(execFileSyncMock).toHaveBeenCalledWith(
+      "gh",
+      ["pr", "view", "7", "--json", "additions,deletions"],
+      expect.objectContaining({ encoding: "utf8" }),
+    );
+  });
+
+  it("formats a negative delta when actual is under the estimate", () => {
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ additions: 40, deletions: 10 }) as never);
+    expect(prLocDelta(7, 150)).toBe("est-loc 150 vs actual 50 (-100)");
+  });
+
+  it("returns null (silence) when est-loc is absent", () => {
+    expect(prLocDelta(7, null)).toBeNull();
+    expect(execFileSyncMock).not.toHaveBeenCalled();
+  });
+
+  it("returns null (never throws) when gh fails", () => {
+    execFileSyncMock.mockImplementationOnce(() => {
+      throw new Error("Command failed");
+    });
+    expect(prLocDelta(7, 150)).toBeNull();
+  });
+
+  it("returns null when gh output lacks numeric fields", () => {
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ additions: "x" }) as never);
+    expect(prLocDelta(7, 150)).toBeNull();
   });
 });
 
