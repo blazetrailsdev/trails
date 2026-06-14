@@ -111,6 +111,13 @@ function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
 }
 
 /** @internal */
+function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
+  if (spec === undefined) return false;
+  const type = typeof spec === "string" ? spec : spec.type;
+  return type === "integer" || type === "big_integer";
+}
+
+/** @internal */
 function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
   return isWrappedSchema(table) ? table.columns : (table as Record<string, ColumnSpec>);
 }
@@ -652,15 +659,28 @@ async function _defineSchemaImpl(
     await ss.dropTable(table, { ifExists: true });
     const columns = columnsOf(raw);
     const pk = primaryKeyOf(raw);
-    const createOpts: { id?: boolean; primaryKey?: string[] } = {};
+    // A single-column integer PK declared via `primaryKey: ["col"]` mirrors
+    // Rails' `t.primary_key :col` (movieid/key_number/monkeyID), which makes
+    // the column a serial/identity. Emit it via the string `primaryKey` form
+    // so the adapter generates the auto-increment sequence — the array form
+    // would create a plain integer PK with no sequence, and on PostgreSQL an
+    // INSERT that omits the PK then trips a NOT NULL violation.
+    const serialPkName =
+      Array.isArray(pk) && pk.length === 1 && isIntegerSpec(columns[pk[0]]) ? pk[0] : null;
+    const createOpts: { id?: boolean; primaryKey?: string | string[] } = {};
     if (pk === false) createOpts.id = false;
-    else if (Array.isArray(pk)) {
+    else if (serialPkName !== null) {
+      createOpts.primaryKey = serialPkName;
+    } else if (Array.isArray(pk)) {
       createOpts.primaryKey = pk;
       createOpts.id = false;
     }
-    const compositePkCols = Array.isArray(pk) ? new Set(pk) : null;
+    const compositePkCols = Array.isArray(pk) && serialPkName === null ? new Set(pk) : null;
     await ss.createTable(table, createOpts, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
+        // The serial PK column is emitted by createTable's string-`primaryKey`
+        // path; emitting it again here would duplicate the column.
+        if (colName === serialPkName) continue;
         const primitive: AnyPrimitiveColumnSpec = typeof spec === "string" ? spec : spec.type;
         const isArray = typeof spec === "object" && spec.array === true;
         if (PG_ONLY_TYPES.has(primitive) && adapter.adapterName !== "postgres") {
