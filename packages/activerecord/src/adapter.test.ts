@@ -558,6 +558,35 @@ describe("AdapterTest", () => {
     expect(await conn.selectValue(sql)).toBe("foo");
     expect(await conn.selectValues(sql)).toEqual(["foo"]);
   });
+
+  // QueryAttribute bind round-trip against the ARCONN-configured connection,
+  // scoped to the MySQL driver path (the story's subject). The inline-DDL block
+  // above drives the same Rails probe
+  // (`test_select_all_insert_update_delete_with_binds`) against SQLite; here the
+  // `Relation::QueryAttribute` bind must be unwrapped to `valueForDatabase` by
+  // `mysqlBinds` before reaching the driver (matching Rails' `type_casted_binds`).
+  // On MySQL the explicit-id INSERT yields driver insertId 0, so the round-trip
+  // is asserted via the bound SELECT rather than the insert return value.
+  // PostgreSQL is excluded: its INSERT bind path has a separate latent unwrap
+  // gap (tracked as its own story), out of scope for this MySQL fix.
+  it.skipIf(adapterType !== "mysql")("select all insert update delete with binds", async () => {
+    const conn = Base.connection as AbstractAdapter;
+    const binds = [new QueryAttribute("id", 1, Event.typeForAttribute("id"))];
+
+    await conn.insert("INSERT INTO events(id) VALUES (?)", null, null, null, null, binds);
+
+    const updated = await conn.update("UPDATE events SET title = 'foo' WHERE id = ?", null, binds);
+    expect(updated).toBe(1);
+
+    const found = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
+    expect(found.first()).toEqual({ id: 1, title: "foo" });
+
+    const deleted = await conn.delete("DELETE FROM events WHERE id = ?", null, binds);
+    expect(deleted).toBe(1);
+
+    const empty = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
+    expect(empty.first()).toBeUndefined();
+  });
 });
 
 // Rails declares `fixtures :fk_test_has_pk` and a real `foreign_key` on
