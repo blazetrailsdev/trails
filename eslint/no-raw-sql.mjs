@@ -62,6 +62,11 @@ function isExcludedPath(rel) {
   if (/(^|\/)adapters\//.test(rel)) return true;
   if (/(^|\/)tasks\//.test(rel)) return true;
   if (/(^|\/)schema-[^/]*\.ts$/.test(rel)) return true;
+  // Test-infra DDL helpers render SQL by design and will never migrate to
+  // @blazetrails/arel — scope them out rather than baseline them so the
+  // RFC-0022 burndown worklist reflects only real arel migration targets.
+  if (/(^|\/)test-helpers\//.test(rel)) return true;
+  if (/(^|\/)test-setup-[^/]*\.ts$/.test(rel)) return true;
   return false;
 }
 

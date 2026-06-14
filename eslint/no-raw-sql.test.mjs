@@ -41,6 +41,16 @@ tester.run("no-raw-sql", rule, {
       code: 'connection.execute("SELECT * FROM posts");',
       filename: "packages/activerecord/src/relation.test.ts",
     },
+    // test-helpers/ DDL infra renders SQL by design (never migrating to arel).
+    {
+      code: 'connection.execute("CREATE TABLE posts (id integer)");',
+      filename: "packages/activerecord/src/test-helpers/define-fixtures.ts",
+    },
+    // test-setup-*.ts worker-db bootstrap is likewise scoped out.
+    {
+      code: 'connection.execute("DROP TABLE posts");',
+      filename: "packages/activerecord/src/test-setup-worker-db.ts",
+    },
     // Surgery on a variable that isn't named `sql`.
     { code: 'query.replace(/LIMIT \\d+/, "");', filename: IN },
     // String that doesn't start with a SQL verb.
