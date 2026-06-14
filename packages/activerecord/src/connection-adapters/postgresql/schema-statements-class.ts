@@ -1,7 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaStatements } from "../abstract/schema-statements.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
-import type { CreateDatabaseOptions } from "./schema-statements.js";
+import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 
 /**
  * PG-specific adapter surface used by the schema/database/session statements
@@ -15,6 +15,9 @@ interface PgSchemaAdapter {
   quoteIdentifier(name: string): string;
   quoteLiteral(value: unknown): string;
   parseSchemaQualifiedName(name: string): { schema: string | null; table: string };
+  getDatabaseVersion(): Promise<number>;
+  supportsIndexInclude(): boolean;
+  pgQuotedScope(name: string, type: "BASE TABLE" | null): { schema: string; name: string | null };
 }
 
 export class PostgreSQLSchemaStatements extends SchemaStatements {
@@ -34,6 +37,154 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     }
     const quoted = tableNames.map((n) => this._qt(n)).join(", ");
     await this.adapter.executeMutation(`DROP TABLE${ifExists} ${quoted}${cascade}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Indexes
+  // ---------------------------------------------------------------------------
+
+  async indexes(tableName: string): Promise<PgIndexDefinition[]> {
+    // supportsIndexInclude() reads databaseVersion; ensure it's populated.
+    await this.pg.getDatabaseVersion();
+    const { schema, table } = this.pg.parseSchemaQualifiedName(tableName);
+
+    let tableCondition: string;
+    const binds: unknown[] = [];
+
+    if (schema) {
+      binds.push(table, schema);
+      tableCondition = `t.relname = $1 AND n.nspname = $2`;
+    } else {
+      binds.push(tableName);
+      tableCondition = `t.oid = to_regclass($1)`;
+    }
+
+    // ix.indnkeyatts was added in PG11 (covering indexes); on older servers
+    // INCLUDE columns don't exist, so all indkey columns are key columns.
+    const includeFilter = this.pg.supportsIndexInclude() ? `WHERE k < ix.indnkeyatts` : "";
+
+    const rows = await this.pg.schemaQuery(
+      `SELECT i.relname AS index_name,
+              ix.indisunique AS is_unique,
+              am.amname AS using,
+              ARRAY(
+                SELECT pg_get_indexdef(ix.indexrelid, k + 1, true)
+                FROM generate_subscripts(ix.indkey, 1) AS k
+                ${includeFilter}
+                ORDER BY k
+              ) AS columns,
+              pg_get_indexdef(ix.indexrelid) AS definition,
+              ix.indoption AS options,
+              obj_description(ix.indexrelid, 'pg_class') AS comment,
+              t.relname AS table_name
+       FROM pg_class t
+       JOIN pg_index ix ON t.oid = ix.indrelid
+       JOIN pg_class i ON i.oid = ix.indexrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+       JOIN pg_am am ON am.oid = i.relam
+       WHERE ${tableCondition}
+         AND ix.indisprimary = false
+       ORDER BY i.relname`,
+      binds,
+    );
+
+    return rows.map((row) => {
+      const columns = row.columns as string[];
+      const def = row.definition as string;
+
+      // Extract the expressions, INCLUDE, NULLS NOT DISTINCT, and WHERE clauses.
+      // Mirrors Rails' regex: / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?\z/m
+      const defMatch = def.match(
+        / USING \w+? \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
+      );
+      const expressions = defMatch?.[1] ?? "";
+      const includeStr = defMatch?.[2];
+      const nullsNotDistinctStr = defMatch?.[3];
+      const whereStr = defMatch?.[4];
+
+      const include = includeStr
+        ? includeStr.split(",").map((c) => c.trim().replace(/^"|"$/g, ""))
+        : undefined;
+      const where = whereStr?.trim();
+      const nullsNotDistinct = nullsNotDistinctStr ? true : undefined;
+
+      // Parse opclasses and orders from the expressions string.
+      // Mirrors Rails regex: /(?<column>\w+)"?\s?(?<opclass>\w+_ops(_\w+)?)?\s?(?<desc>DESC)?\s?(?<nulls>NULLS (?:FIRST|LAST))?/
+      const opclassesMap: Record<string, string> = {};
+      const ordersMap: Record<string, string> = {};
+      const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
+      for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
+        if (opclass) opclassesMap[column] = opclass;
+        if (nulls) {
+          ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
+        } else if (desc) {
+          ordersMap[column] = "desc";
+        }
+      }
+
+      // concise_options: collapse to a single scalar when all key columns share the same value.
+      // `columns` is already key-only because the SQL limits to ix.indnkeyatts.
+      let opclasses: Record<string, string> | string | undefined;
+      const opclassVals = Object.values(opclassesMap);
+      if (opclassVals.length > 0) {
+        if (columns.length === opclassVals.length && new Set(opclassVals).size === 1) {
+          opclasses = opclassVals[0];
+        } else {
+          opclasses = opclassesMap;
+        }
+      }
+
+      let orders: Record<string, string> | string | undefined;
+      const orderVals = Object.values(ordersMap);
+      if (orderVals.length > 0) {
+        if (columns.length === orderVals.length && new Set(orderVals).size === 1) {
+          orders = orderVals[0];
+        } else {
+          orders = ordersMap;
+        }
+      }
+
+      return {
+        table: row.table_name as string,
+        name: row.index_name as string,
+        unique: row.is_unique as boolean,
+        columns,
+        using: row.using as string,
+        orders,
+        opclasses,
+        include,
+        where,
+        nullsNotDistinct,
+        // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.
+        comment: (row.comment as string | null)?.trim() ? (row.comment as string) : undefined,
+      };
+    });
+  }
+
+  async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
+    const table = this.pg.pgQuotedScope(tableName, "BASE TABLE");
+    const idxName = this.pg.quoteLiteral(indexName);
+    const rows = await this.pg.schemaQuery(`
+      SELECT COUNT(*) AS cnt
+      FROM pg_class t
+      INNER JOIN pg_index d ON t.oid = d.indrelid
+      INNER JOIN pg_class i ON d.indexrelid = i.oid
+      LEFT JOIN pg_namespace n ON n.oid = t.relnamespace
+      WHERE i.relkind IN ('i', 'I')
+        AND i.relname = ${idxName}
+        AND t.relname = ${table.name}
+        AND n.nspname = ${table.schema}
+    `);
+    return Number(rows[0].cnt) > 0;
+  }
+
+  quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
+    if (typeof columnNames === "string") return this.pg.quoteIdentifier(columnNames);
+    const quoted: Record<string, string> = {};
+    for (const name of columnNames) {
+      quoted[name] = this.pg.quoteIdentifier(name);
+    }
+    return Object.values(quoted).join(", ");
   }
 
   // ---------------------------------------------------------------------------
