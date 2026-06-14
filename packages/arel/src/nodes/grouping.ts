@@ -9,7 +9,9 @@ import { SqlLiteral } from "./sql-literal.js";
  * Mirrors: Arel::Nodes::Grouping (extends Unary)
  */
 export class Grouping extends Unary {
-  constructor(expr: Node) {
+  // `expr` is an array for a composite-key row-value tuple `(pk1, pk2)`
+  // (Rails wraps `o.key` — which may be an array of columns — in a Grouping).
+  constructor(expr: Node | Node[]) {
     super(expr);
   }
 

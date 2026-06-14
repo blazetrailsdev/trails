@@ -3423,22 +3423,25 @@ export class Relation<T extends Base> {
     const table = this._modelClass.arelTable;
     const primaryKey = this._modelClass.primaryKey;
     let stmtAst;
-    if (typeof primaryKey === "string") {
+    if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
       // Mirrors Rails `delete_all`: always run `build_arel` + `compile_delete`
       // with the primary key, having clause, and group columns. For a
       // limited/ordered/grouped delete the visitor rewrites it into
-      // `WHERE pk IN (SELECT pk ... ORDER BY ... LIMIT ...)`; for the
+      // `WHERE (pk...) IN (SELECT pk... ORDER BY ... LIMIT ...)`; for the
       // unconstrained case it emits a plain `DELETE FROM ... WHERE`, identical
-      // to a hand-built DeleteManager. Routing both through one path keeps the
-      // TS port structurally faithful to Rails (no second code path to sync).
+      // to a hand-built DeleteManager. A composite primary key maps each column
+      // into a row-value tuple (`relation.rb`: `primary_key.map { |pk| table[pk] }`).
+      // Routing both PK shapes through one path keeps the TS port structurally
+      // faithful to Rails (no second code path to sync).
       const arel = this._buildArel();
       const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
       const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
-      stmtAst = arel.compileDelete(table.get(primaryKey), havingAst, groupColumns).ast;
+      const key = Array.isArray(primaryKey)
+        ? primaryKey.map((pk) => table.get(pk))
+        : table.get(primaryKey);
+      stmtAst = arel.compileDelete(key, havingAst, groupColumns).ast;
     } else {
-      // Composite primary key — left on the plain DeleteManager path; the
-      // limited/subselect rewrite for CPK is the
-      // `delete-all-composite-pk-limited-subselect` story.
+      // No primary key — fall back to a plain DeleteManager.
       const dm = new DeleteManager().from(table);
       for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
         dm.where(node);
