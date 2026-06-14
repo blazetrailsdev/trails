@@ -68,6 +68,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TYPE IF EXISTS "color" CASCADE`);
     // test_schema is managed by withTestSchema — no DROP here
     PostgresqlEnum.resetColumnInformation();
+    vi.restoreAllMocks();
   });
 
   describe("PostgresqlEnumTest", () => {
@@ -123,11 +124,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("no oid warning", async () => {
       await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      try {
-        await PostgresqlEnum.first();
-      } finally {
-        warn.mockRestore();
-      }
+      await PostgresqlEnum.first();
       expect(warn).not.toHaveBeenCalled();
     });
 
