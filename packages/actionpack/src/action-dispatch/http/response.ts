@@ -648,8 +648,9 @@ export class Response {
     headers: Record<string, string> = {},
     body: string | string[] = [],
   ): InstanceType<T> {
-    // Rails defaults `body` to `[]` and routes it through `body=`, which munges
-    // a non-enumerable (e.g. a bare string) into a 1-element array.
+    // Rails passes body to `new` → `body=` → `munge_body_object` (wraps a
+    // non-enumerable like a bare string into a 1-element array); TS pre-munges
+    // here because the constructor bypasses the setter.
     const parts = Array.isArray(body) ? body : [body];
     return new this(status, headers, parts) as InstanceType<T>;
   }
