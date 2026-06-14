@@ -795,13 +795,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Close the database connection.
    */
   async close(): Promise<void> {
-    await this.driver.close();
-    // Drain any async teardown fired by an earlier disconnectBang() so callers
-    // (e.g. afterEach) can be sure every handle is fully closed.
+    // If disconnectBang() already fired an async driver.close(), drain that
+    // in-flight promise rather than issuing a second close() — a concurrent
+    // double-close could race or throw on drivers that aren't double-close-safe
+    // while the first is still settling. Sync drivers leave _closingDriver null.
     if (this._closingDriver) {
       const closing = this._closingDriver;
       this._closingDriver = null;
       await closing;
+    } else {
+      await this.driver.close();
     }
   }
 
