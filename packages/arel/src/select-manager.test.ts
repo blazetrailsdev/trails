@@ -702,6 +702,16 @@ describe("SelectManagerTest", () => {
       const stmt = mgr.compileDelete();
       expect(stmt.toSql()).toBe('DELETE FROM "users" WHERE "users"."id" = 10');
     });
+
+    it("limited composite-key delete renders a row-value subselect", () => {
+      const mgr = new SelectManager();
+      mgr.from(users).take(1);
+      const stmt = mgr.compileDelete([users.get("id"), users.get("name")]);
+      expect(stmt.toSql()).toBe(
+        'DELETE FROM "users" WHERE ("users"."id", "users"."name") IN ' +
+          '(SELECT "users"."id", "users"."name" FROM "users" LIMIT 1)',
+      );
+    });
   });
 
   describe("where_sql", () => {

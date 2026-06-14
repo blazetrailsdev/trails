@@ -22,7 +22,7 @@ export interface Crud {
     groupValuesColumns?: Node[],
   ): UpdateManager;
   compileDelete(
-    key?: Node | null,
+    key?: Node | Node[] | null,
     havingClause?: Node | null,
     groupValuesColumns?: Node[],
   ): DeleteManager;
