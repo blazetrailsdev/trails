@@ -7,7 +7,6 @@
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
-import { Nodes } from "@blazetrails/arel";
 import { camelize, isPresent, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 
@@ -191,10 +190,59 @@ export function enableSti(modelClass: typeof Base, options: { column?: string } 
 }
 
 /**
- * Get the inheritance column for a model, if STI is enabled.
+ * Get the inheritance column for a model.
+ *
+ * Mirrors Rails, where `inheritance_column` defaults to `"type"` for every
+ * model (`class_attribute :inheritance_column, default: "type"`) regardless of
+ * whether the model actually participates in STI. The column merely names where
+ * STI *would* read/write the type; whether dispatch happens is gated separately
+ * on `_has_attribute?(inheritance_column)` — see {@link classHasAttribute}.
  */
-export function getInheritanceColumn(modelClass: typeof Base): string | null {
-  return (modelClass as any)._inheritanceColumn ?? null;
+export function getInheritanceColumn(modelClass: typeof Base): string {
+  return (modelClass as any)._inheritanceColumn ?? "type";
+}
+
+/**
+ * Class-level column-aware `_has_attribute?`.
+ *
+ * Rails' `_has_attribute?(name)` is `attribute_types.key?(name)`, true for any
+ * reflected DB column as well as any explicitly declared `attribute()`. trails
+ * splits these — declared attributes live in `_attributeDefinitions`, real
+ * columns in the lazily reflected schema — so this checks both. This is the
+ * gate Rails uses to decide whether STI dispatch applies, so that defaulting
+ * `inheritance_column` to `"type"` (above) does not make every model with a
+ * stray `type` key behave as STI: only models that actually have the column
+ * dispatch.
+ *
+ * @internal
+ */
+export function classHasAttribute(modelClass: typeof Base, name: string): boolean {
+  if ((modelClass as any)._attributeDefinitions?.has(name)) return true;
+  if (modelClass.abstractClass) return false;
+  try {
+    return (modelClass.columnNames() as string[]).includes(name);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when STI was explicitly enabled on this class or an ancestor (the
+ * inherited `_inheritanceColumn` sentinel). Distinct from {@link getInheritanceColumn},
+ * which now always resolves to a name (default "type"): the column merely names
+ * where STI *would* read the type; this reports whether the model actually
+ * participates in STI.
+ *
+ * Used to gate the database-row dispatch paths (instantiate, association build),
+ * which resolve through the ambiguous global registry and so must stay scoped to
+ * explicitly-modeled hierarchies. The `new`-from-attributes path resolves within
+ * the class's own subtree and instead gates on the column-aware
+ * {@link classHasAttribute} (Rails' `_has_attribute?`).
+ *
+ * @internal
+ */
+export function stiEnabled(modelClass: object): boolean {
+  return (modelClass as any)._inheritanceColumn != null;
 }
 
 /**
@@ -459,7 +507,7 @@ export function stiClassFor(modelClass: typeof Base, typeName: string): typeof B
   } catch (cause) {
     throw new SubclassNotFound(
       `The single-table inheritance mechanism failed to locate the subclass: '${typeName}'. ` +
-        `This error is raised because the column '${getInheritanceColumn(modelClass) ?? "type"}' is reserved for storing the class in case of inheritance.`,
+        `This error is raised because the column '${getInheritanceColumn(modelClass)}' is reserved for storing the class in case of inheritance.`,
       { cause },
     );
   }
@@ -503,7 +551,6 @@ export function ensureProperType(this: Base): void {
   const klass = this.constructor as typeof Base;
   if (!isFinderNeedsTypeCondition(klass)) return;
   const inheritCol = getInheritanceColumn(klass);
-  if (!inheritCol) return;
   // Only write when the column is a declared attribute — otherwise the value
   // wouldn't persist or serialize correctly. Mirrors usingSingleTableInheritance.
   if (!(klass as any)._attributeDefinitions?.has(inheritCol)) return;
@@ -524,15 +571,13 @@ export function discriminateClassForRecord(
 ): typeof Base {
   if (usingSingleTableInheritance(modelClass, record)) {
     const inheritCol = getInheritanceColumn(modelClass);
-    if (inheritCol) {
-      // Rails: subclass = base_class.type_for_attribute(inheritCol).cast(record[inheritCol])
-      const castValue = castInheritanceColumnValue(modelClass, inheritCol, record[inheritCol]);
-      // A present-but-unmapped enum value casts to null; Rails keeps such values
-      // (EnumType#cast's `value.presence` fallback) so find_sti_class still
-      // raises SubclassNotFound rather than masking it as the base class.
-      const typeName = (castValue as string | null) ?? String(record[inheritCol]);
-      return findStiClass(modelClass, typeName);
-    }
+    // Rails: subclass = base_class.type_for_attribute(inheritCol).cast(record[inheritCol])
+    const castValue = castInheritanceColumnValue(modelClass, inheritCol, record[inheritCol]);
+    // A present-but-unmapped enum value casts to null; Rails keeps such values
+    // (EnumType#cast's `value.presence` fallback) so find_sti_class still
+    // raises SubclassNotFound rather than masking it as the base class.
+    const typeName = (castValue as string | null) ?? String(record[inheritCol]);
+    return findStiClass(modelClass, typeName);
   }
   return modelClass;
 }
@@ -548,8 +593,12 @@ function usingSingleTableInheritance(
   modelClass: typeof Base,
   record: Record<string, unknown>,
 ): boolean {
+  // `inheritance_column` defaults to "type" for every model now, so the column's
+  // presence no longer signals STI. The database-row dispatch path resolves
+  // through the ambiguous global registry, so restrict it to explicitly-modeled
+  // STI hierarchies — a plain model with a reflected `type` column stays itself.
+  if (!stiEnabled(modelClass)) return false;
   const inheritCol = getInheritanceColumn(modelClass);
-  if (!inheritCol) return false;
   // Rails: record[inheritance_column].present? && _has_attribute?(inheritance_column)
   if (!isPresent(record[inheritCol])) return false;
   return stiColumnIsAttribute(modelClass, inheritCol, record);
@@ -579,14 +628,8 @@ function stiColumnIsAttribute(
   inheritCol: string,
   record: Record<string, unknown>,
 ): boolean {
-  if ((modelClass as any)._attributeDefinitions?.has(inheritCol)) return true;
   if (Object.prototype.hasOwnProperty.call(record, inheritCol)) return true;
-  if (modelClass.abstractClass) return false;
-  try {
-    return (modelClass.columnNames() as string[]).includes(inheritCol);
-  } catch {
-    return false;
-  }
+  return classHasAttribute(modelClass, inheritCol);
 }
 
 /**
@@ -597,11 +640,6 @@ function stiColumnIsAttribute(
  */
 export function typeCondition(modelClass: typeof Base, arelTable?: any): any {
   const inheritCol = getInheritanceColumn(modelClass);
-  if (!inheritCol) {
-    // If no inheritance column, return a truthy predicate that matches everything
-    return new Nodes.True();
-  }
-
   const table = arelTable || (modelClass as any).arelTable;
   if (!table) throw new ActiveRecordError("Cannot build type condition without arel table");
 
@@ -645,7 +683,9 @@ export function subclassFromAttributes(
   if (!attrsHash || typeof attrsHash !== "object") return null;
 
   const inheritCol = getInheritanceColumn(modelClass);
-  if (!inheritCol) return null;
+  // Rails gates STI dispatch on `_has_attribute?(inheritance_column)` — only
+  // models that actually carry the column dispatch.
+  if (!classHasAttribute(modelClass, inheritCol)) return null;
 
   const cast = castStiValueFromAttrs(modelClass, attrsHash, inheritCol);
   if (!cast.found) return null;
@@ -704,22 +744,15 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
  * `current_scope`'s create attributes, then (for a base class) the table's
  * `column_defaults` — stopping at the first that names a subclass. We resolve
  * each through {@link findStiClassInHierarchy} (registry-safe) instead of
- * Rails' constant-lookup `find_sti_class`, and default the inheritance column
- * to `"type"` when STI was not explicitly enabled (Rails' `inheritance_column`
- * default for every model). Returns null (no dispatch) when no source names a
- * subclass in this class's subtree.
+ * Rails' constant-lookup `find_sti_class`. `inheritance_column` now always
+ * resolves to a name (default `"type"`), and the dispatch is gated on the
+ * column-aware `_has_attribute?` ({@link classHasAttribute}). Returns null (no
+ * dispatch) when no source names a subclass in this class's subtree.
  *
- * Two intentional deviations from Rails:
- *  - Rails gates the whole dispatch on `_has_attribute?(inheritance_column)` so
- *    non-STI models skip it. trails reflects DB columns lazily and apart from
- *    `_attributeDefinitions`, so that column-metadata check isn't reliably
- *    available at construction. The STI-subtree fast-path below is the
- *    equivalent guard, and {@link findStiClassInHierarchy} only ever resolves a
- *    real descendant — so a stray `type` key on a non-STI model can't dispatch.
- *  - For a value present but naming no in-hierarchy subclass, Rails'
- *    `find_sti_class` raises SubclassNotFound; the registry-safe resolver
- *    returns null (build the receiver as-is) instead, since the global lookup
- *    that would raise is exactly the ambiguous path we avoid.
+ * One intentional deviation from Rails: for a value present but naming no
+ * in-hierarchy subclass, Rails' `find_sti_class` raises SubclassNotFound; the
+ * registry-safe resolver returns null (build the receiver as-is) instead, since
+ * the global lookup that would raise is exactly the ambiguous path we avoid.
  *
  * @internal Used by Base's constructor to dispatch `new` to a subclass.
  */
@@ -727,14 +760,19 @@ export function subclassFromAttributesForNew(
   modelClass: typeof Base,
   attrs: Record<string, unknown> | null | undefined,
 ): typeof Base | null {
-  // Fast path: a class with neither an STI subtree nor an explicit inheritance
-  // column can never dispatch (findStiClassInHierarchy would only ever match
-  // the receiver itself), so skip the source probing — including the
-  // non-memoized columnDefaults build — entirely on the hot path.
-  const inheritCol = getInheritanceColumn(modelClass);
-  if (descendants(modelClass).length === 0 && !inheritCol) return null;
+  // Rails gates the whole `new` dispatch on `_has_attribute?(inheritance_column)`
+  // so a stray `type` key on a non-STI model can never dispatch. `inheritance_column`
+  // defaults to "type"; the column-aware `_has_attribute?` (declared attribute or
+  // reflected DB column) is the primary guard. But trails' schema reflection is
+  // not always warm at construction — a canonical STI base like `Company` declares
+  // no `attribute("type")` and its `type` column only reflects once the schema
+  // loads — so a tracked STI subtree stands in as the trails-reliable signal that
+  // `findStiClassInHierarchy` could resolve. A plain model with neither can never
+  // dispatch (it has no in-subtree match), so short-circuit the source probing —
+  // including the non-memoized columnDefaults build — on the hot path.
+  const col = getInheritanceColumn(modelClass);
+  if (!classHasAttribute(modelClass, col) && descendants(modelClass).length === 0) return null;
 
-  const col = inheritCol ?? "type";
   const resolve = (source: unknown): typeof Base | null => {
     if (!source || typeof source !== "object") return null;
     const cast = castStiValueFromAttrs(modelClass, source as Record<string, unknown>, col);

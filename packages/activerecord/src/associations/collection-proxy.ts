@@ -33,7 +33,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
   HasManyThroughOrderError,
 } from "./errors.js";
-import { getInheritanceColumn, findStiClass } from "../inheritance.js";
+import { getInheritanceColumn, findStiClass, stiEnabled } from "../inheritance.js";
 import {
   hasQueryConstraints as ownerHasQueryConstraints,
   queryConstraintsList as ownerQueryConstraintsList,
@@ -744,7 +744,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // instantiation; the full scope_for_create filter still runs below.
     const sfcForSti = this._scopeForCreateRaw();
     const inheritanceCol = getInheritanceColumn(targetModel);
-    if (inheritanceCol) {
+    if (stiEnabled(targetModel)) {
       const typeName = (buildAttrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as
         | string
         | undefined;
@@ -764,7 +764,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const sfcForSti = this._scopeForCreateRaw();
     const inheritanceCol = getInheritanceColumn(targetModel);
-    if (inheritanceCol) {
+    if (stiEnabled(targetModel)) {
       const typeName = (attrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as string | undefined;
       if (typeName) targetModel = findStiClass(targetModel, typeName);
     }

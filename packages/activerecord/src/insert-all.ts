@@ -5,7 +5,7 @@ import { IndexDefinition } from "./connection-adapters/abstract/schema-definitio
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
-import { stiName } from "./inheritance.js";
+import { stiName, isDescendsFromActiveRecord } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./adapter.js";
 
@@ -307,9 +307,11 @@ export class InsertAll {
 
   /** @internal */
   private resolveSti(): void {
-    // descendsFromActiveRecord? is not yet implemented; use inheritanceColumn as proxy
+    // Rails injects the STI type only for descendants (`!descends_from_active_record?`).
+    // `inheritance_column` now always resolves to a name (default "type"), so gate
+    // on the structural check rather than the column's presence.
+    if (isDescendsFromActiveRecord(this.model)) return;
     const inheritanceCol = this.model.inheritanceColumn;
-    if (!inheritanceCol) return;
     const type = stiName(this.model);
     for (const insert of this.inserts) {
       if (!(inheritanceCol in insert)) {

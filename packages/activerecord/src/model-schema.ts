@@ -1136,9 +1136,10 @@ export function protectedEnvironments(this: SchemaHost, value?: string[]): strin
   return this._protectedEnvironments ?? ["production"];
 }
 
-export function inheritanceColumn(this: SchemaHost, value?: string | null): string | null {
+export function inheritanceColumn(this: SchemaHost, value?: string | null): string {
   if (value !== undefined) this._inheritanceColumn = value ?? undefined;
-  return this._inheritanceColumn ?? null;
+  // Rails defaults `inheritance_column` to "type" for every model.
+  return this._inheritanceColumn ?? "type";
 }
 
 export function sequenceName(this: SchemaHost, value?: string | null): string | null {
