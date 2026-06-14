@@ -80,6 +80,10 @@ const alias = {
     "packages/activesupport/src/digest.ts",
   ),
   "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
+  "@blazetrails/activesupport/message-pack": path.resolve(
+    __dirname,
+    "packages/activesupport/src/message-pack/index.ts",
+  ),
   "@blazetrails/activesupport/yaml": path.resolve(__dirname, "packages/activesupport/src/yaml.ts"),
   "@blazetrails/activesupport/gzip": path.resolve(__dirname, "packages/activesupport/src/gzip.ts"),
   "@blazetrails/activesupport/process-adapter": path.resolve(

@@ -11,23 +11,18 @@
  * so the binary form survives a string-typed serializer interface losslessly.
  */
 
+import { MessagePack, MessagePackError } from "@blazetrails/activesupport/message-pack";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { DecryptionError, ForbiddenClass } from "./errors.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
-import { encode, decode, MessagePackError } from "./message-pack-codec.js";
-
-// Mirrors ActiveSupport::MessagePack::Serializer::SIGNATURE_INT — `dump` writes
-// this value before the object, and `load` rejects input that doesn't open with it.
-const SIGNATURE_INT = 128;
 
 export class MessagePackMessageSerializer implements MessageSerializerLike {
   dump(message: Message): string {
     if (!(message instanceof Message)) {
       throw new ForbiddenClass(`Can only serialize Message instances, got ${typeof message}`);
     }
-    const packed = Buffer.concat([encode(SIGNATURE_INT), encode(this.messageToHash(message))]);
-    return packed.toString("latin1");
+    return MessagePack.dump(this.messageToHash(message)).toString("latin1");
   }
 
   load(serialized: string): Message {
@@ -36,11 +31,10 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
     }
     let data: unknown;
     try {
-      const buf = Buffer.from(serialized, "latin1");
-      const sig = decode(buf, 0);
-      if (sig.value !== SIGNATURE_INT) throw new MessagePackError("Invalid serialization format");
-      data = decode(buf, sig.offset).value;
+      data = MessagePack.load(Buffer.from(serialized, "latin1"));
     } catch (e) {
+      // ActiveSupport::MessagePack raises MessagePackError on a missing/wrong
+      // signature or malformed bytes — both mean an undecodable message.
       if (e instanceof MessagePackError)
         throw new DecryptionError("Failed to load MessagePack message");
       throw e;
