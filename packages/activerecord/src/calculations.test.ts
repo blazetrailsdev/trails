@@ -28,6 +28,12 @@ import { runBeforeCallbacksOnProto, runAfterCallbacksOnProto } from "@blazetrail
 import { setApp, _resetApp } from "@blazetrails/globalid";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Account as CanonicalAccount } from "./test-helpers/models/account.js";
+import { Company, Firm } from "./test-helpers/models/company.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { Reply } from "./test-helpers/models/reply.js";
 
 // ==========================================================================
 // CalculationsTest — targets calculations_test.rb
@@ -1094,20 +1100,6 @@ describe("CalculationsTest", () => {
     const ids = await Account.ids();
     expect(ids.length).toBe(1);
   });
-  it.skip("ids with includes offset", async () => {
-    const { Account } = makeModel();
-    await Account.create({ name: "off1" });
-    await Account.create({ name: "off2" });
-    const ids = await Account.offset(1).ids();
-    expect(ids.length).toBe(1);
-  });
-  it.skip("pluck with includes offset", async () => {
-    const { Account } = makeModel();
-    await Account.create({ name: "po1" });
-    await Account.create({ name: "po2" });
-    const names = await Account.offset(1).pluck("name");
-    expect(names.length).toBe(1);
-  });
   it("pluck with join alias", async () => {
     const { Account } = makeModel();
     await Account.create({ name: "ja" });
@@ -1616,15 +1608,6 @@ describe("CalculationsTest", () => {
     expect(Object.keys(result as object).length).toBeLessThanOrEqual(2);
   });
 
-  it.skip("group by with offset", async () => {
-    const Account = makeAccount();
-    await Account.create({ name: "a", credit_limit: 1 });
-    await Account.create({ name: "b", credit_limit: 2 });
-    await Account.create({ name: "c", credit_limit: 3 });
-    const result = await Account.group("name").offset(1).count();
-    expect(Object.keys(result as object).length).toBeLessThanOrEqual(2);
-  });
-
   it("pluck and distinct", async () => {
     const Account = makeAccount();
     await Account.create({ name: "Alice" });
@@ -1651,20 +1634,6 @@ describe("CalculationsTest", () => {
     const all = await Account.all().toArray();
     const total = all.reduce((sum: number, a: any) => sum + a.credit_limit, 0);
     expect(total).toBe(30);
-  });
-
-  it.skip("should group by summed association", async () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-    // requires association join fixture
-  });
-
-  it.skip("should calculate grouped association with foreign key option", async () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-    // requires fixture-based associations
   });
 
   it("pluck with serialization", async () => {
@@ -7392,5 +7361,66 @@ describe("lookupCastTypeFromJoinDependencies", () => {
       [nodeMissing, nodeGood],
     ] as unknown as JoinDependency[]);
     expect(result).toBe(type);
+  });
+});
+
+// ==========================================================================
+// CalculationsTest — grouped-association + includes/offset tail.
+// These mirror Rails calculations_test.rb cases that group by a belongs_to
+// association (keyed by the loaded records) or paginate an eager-loaded
+// relation. They need the canonical companies/accounts/topics fixtures rather
+// than the inline stub models the rest of this file uses, so they live in their
+// own describe block.
+// ==========================================================================
+describe("CalculationsTest", () => {
+  registerModel("Company", Company);
+  registerModel("Firm", Firm);
+  registerModel("Account", CanonicalAccount);
+  registerModel("Topic", Topic);
+  registerModel("Reply", Reply);
+
+  // Rails: `fixtures :accounts, :companies, :topics`. Companies load first so
+  // accounts' `firm_id` ref() resolves to companies' declared ids, not the
+  // CRC32 fallback (see define-fixtures.ts ref() ordering requirement).
+  const { companies } = useHandlerFixtures(["companies", "accounts", "topics"], {
+    schema: canonicalSchema,
+  });
+
+  // JS Map keys compare by reference, so resolve a grouped-by-association
+  // result by the key record's id rather than by holding the same instance.
+  const byRecord = (result: unknown, record: { id: unknown }): unknown => {
+    for (const [key, value] of result as Map<{ id: unknown } | null, unknown>) {
+      if (key && key.id === record.id) return value;
+    }
+    return undefined;
+  };
+
+  it("should group by summed association", async () => {
+    const c = await CanonicalAccount.group("firm").sum("credit_limit");
+    expect(byRecord(c, companies("first_firm"))).toBe(50);
+    expect(byRecord(c, companies("rails_core"))).toBe(105);
+    expect(byRecord(c, companies("first_client"))).toBe(60);
+  });
+
+  it("should calculate grouped association with foreign key option", async () => {
+    class AccountWithAnotherFirm extends CanonicalAccount {
+      static {
+        this.belongsTo("anotherFirm", { className: "Firm", foreignKey: "firm_id" });
+      }
+    }
+    const c = await AccountWithAnotherFirm.group("anotherFirm").count("*");
+    expect(byRecord(c, companies("first_firm"))).toBe(1);
+    expect(byRecord(c, companies("rails_core"))).toBe(2);
+    expect(byRecord(c, companies("first_client"))).toBe(1);
+  });
+
+  it("ids with includes offset", async () => {
+    expect(await Topic.includes("replies").order("id").offset(4).ids()).toEqual([5]);
+    expect(await Topic.includes("replies").order("id").offset(5).ids()).toEqual([]);
+  });
+
+  it("pluck with includes offset", async () => {
+    expect(await Topic.includes("replies").order("id").offset(4).pluck("id")).toEqual([5]);
+    expect(await Topic.includes("replies").order("id").offset(5).pluck("id")).toEqual([]);
   });
 });

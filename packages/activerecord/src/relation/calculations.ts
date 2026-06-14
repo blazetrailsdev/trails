@@ -344,11 +344,18 @@ async function groupedAggregate(
   fn: AggFn,
   column: string,
   coerceNumeric: boolean = true,
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown> | Map<unknown, unknown>> {
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
   const groupCol = rel._groupColumns[0];
-  const groupNode = groupColumnToArel(groupCol, table);
+  // Rails: a single group field that reflects to a belongs_to association
+  // groups by the association's foreign key, then maps the result keys back to
+  // the loaded associated records (calculations.rb:execute_grouped_calculation).
+  const association = resolveGroupAssociation(rel, groupCol);
+  const effectiveGroupCol = association
+    ? (Array.isArray(association.foreignKey) ? association.foreignKey[0] : association.foreignKey)!
+    : groupCol;
+  const groupNode = groupColumnToArel(effectiveGroupCol, table);
   const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
   const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
   const manager = table.project(groupKeyAlias, aggNode.as("val"));
@@ -375,17 +382,46 @@ async function groupedAggregate(
   );
   const rows = queryResult.toArray() as Record<string, unknown>[];
 
+  const aggOf = (val: unknown): unknown =>
+    val === undefined || val === null
+      ? fn === "sum"
+        ? castAggValue(null, fn, colType, coerceNumeric)
+        : null
+      : castAggValue(val, fn, colType, coerceNumeric);
+
+  if (association) {
+    // Rails keys the result hash by the associated record objects, looked up by
+    // foreign-key value. JS Map keys compare by reference, so callers locate a
+    // key by its `id` rather than by holding the same instance.
+    const klass = (association.klass as any).baseClass ?? association.klass;
+    const ids = rows.map((row) => row.group_key).filter((v) => v != null);
+    const records: any[] =
+      ids.length > 0 ? await (klass as any).where({ [klass.primaryKey]: ids }).toArray() : [];
+    const byId = new Map(records.map((r) => [String(r.id), r]));
+    const result = new Map<unknown, unknown>();
+    for (const row of rows) {
+      result.set(byId.get(String(row.group_key)) ?? null, aggOf(row.val));
+    }
+    return result;
+  }
+
   const result: Record<string, unknown> = {};
   for (const row of rows) {
     const key = String(row.group_key ?? "null");
-    const val = row.val;
-    if (val === undefined || val === null) {
-      result[key] = fn === "sum" ? castAggValue(null, fn, colType, coerceNumeric) : null;
-    } else {
-      result[key] = castAggValue(val, fn, colType, coerceNumeric);
-    }
+    result[key] = aggOf(row.val);
   }
   return result;
+}
+
+/**
+ * Resolve a single grouped field to its belongs_to reflection, or null. Mirrors
+ * Rails' `model._reflect_on_association(field).belongs_to?` guard — only
+ * belongs_to associations are grouped by foreign key and keyed by record.
+ */
+function resolveGroupAssociation(rel: CalculationRelation, groupCol: string): any {
+  if (rel._groupColumns.length !== 1 || typeof groupCol !== "string") return null;
+  const reflection = (rel._modelClass as any)._reflectOnAssociation?.(groupCol);
+  return reflection && reflection.belongsTo?.() ? reflection : null;
 }
 
 export async function performCount(
@@ -899,7 +935,7 @@ export async function executeGroupedCalculation(
   operation: string,
   columnName: string,
   distinct: boolean,
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown> | Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
   // Build a GROUP BY aggregate query via Arel (delegates to the shared groupedAggregate helper).
   const table = rel._modelClass.arelTable as Nodes.Node;
