@@ -21,6 +21,7 @@ import { formatForInspect } from "./attribute-inspection.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode } from "./model-schema.js";
+import { StatementCache } from "./statement-cache.js";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -777,7 +778,35 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
 }
 
 export function findBy(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {
-  return this.all().findBy(conditions);
+  return findByThroughCache.call(this, conditions);
+}
+
+/**
+ * Rails: Core::ClassMethods#find_by routes a flat-hash lookup through a cached
+ * StatementCache keyed by the column names, falling back to the relation path
+ * for scoped lookups or unsupported (nil/Array/Range/Hash/Relation) values.
+ */
+async function findByThroughCache(
+  this: CoreHost,
+  conditions: Record<string, unknown>,
+): Promise<any> {
+  if ((this as any).currentScope) return this.all().findBy(conditions);
+  const keys = Object.keys(conditions);
+  const values = keys.map((k) => conditions[k]);
+  if (keys.length === 0 || values.some((v) => StatementCache.unsupportedValue(v))) {
+    return this.all().findBy(conditions);
+  }
+  await this.ensureSchemaLoaded();
+  const connection = (this as any).connection;
+  const statement = cachedFindByStatement.call(this, connection, keys.join(","), () =>
+    StatementCache.create(connection, (params) => {
+      const wheres: Record<string, unknown> = {};
+      for (const k of keys) wheres[k] = params.bind();
+      return (this as any).where(wheres).limit(1);
+    }),
+  );
+  const records = await statement.execute(values, connection);
+  return records[0] ?? null;
 }
 
 export function findByBang(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {

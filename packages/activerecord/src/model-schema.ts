@@ -1126,7 +1126,17 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
 }
 
 export function tableName(this: SchemaHost, value?: string): string {
-  if (value !== undefined) this._tableName = value;
+  if (value !== undefined) {
+    const changed = this._tableName !== value;
+    this._tableName = value;
+    if (changed) {
+      // Rails table_name= runs reload_schema_from_cache: drop the memoized
+      // predicate builder (keyed to the old arel table) and the find_by
+      // statement cache so the next query rebuilds against the new table.
+      (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
+      (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
+    }
+  }
   return resolveTableName.call(this as any);
 }
 
@@ -1243,6 +1253,9 @@ function initializeLoadSchemaMonitor(this: SchemaHost): void {
 /** @internal */
 function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   resetColumnInformation.call(this);
+  // Rails reload_schema_from_cache resets @find_by_statement_cache so a
+  // table_name change invalidates statements built against the old table.
+  (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
   if (recursive) {
     const subclasses: SchemaHost[] = (this as any).subclasses ?? [];
     for (const sub of subclasses) {

@@ -238,20 +238,107 @@ describe("StatementCacheTest", () => {
     expect(sql).not.toContain("?");
   });
 
-  it.skip("find by does not use statement cache if table name is changed", () => {
-    // BLOCKED: relation — prepared statement cache not implemented
-    // ROOT-CAUSE: statement-cache.ts#StatementCache#execute or prepared statement infrastructure missing
-    // SCOPE: ~50 LOC fix in statement-cache.ts; affects ~3 tests in statement-cache.test.ts
+  it("find by does not use statement cache if table name is changed", async () => {
+    await import("./relation.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+    const { Base } = await import("./base.js");
+
+    const conn = new BetterSQLite3Adapter(":memory:");
+    try {
+      await defineSchema(conn, { liquid: canonicalSchema.liquid, birds: canonicalSchema.birds });
+      await conn.executeMutation('INSERT INTO "liquid" ("name") VALUES (?)', ["salty"]);
+
+      class Liquid extends Base {
+        static {
+          this.tableName = "liquid";
+          this.adapter = conn;
+        }
+      }
+
+      // Warm the statement cache.
+      expect((await Liquid.findBy({ name: "salty" }))!.readAttribute("name")).toBe("salty");
+
+      // Changing the table name should change the query that is not cached.
+      Liquid.tableName = "birds";
+      expect(await Liquid.findBy({ name: "salty" })).toBeNull();
+    } finally {
+      conn.disconnectBang();
+    }
   });
-  it.skip("find does not use statement cache if table name is changed", () => {
-    // BLOCKED: relation — prepared statement cache not implemented
-    // ROOT-CAUSE: statement-cache.ts#StatementCache#execute or prepared statement infrastructure missing
-    // SCOPE: ~50 LOC fix in statement-cache.ts; affects ~3 tests in statement-cache.test.ts
+
+  it("find does not use statement cache if table name is changed", async () => {
+    await import("./relation.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+    const { Base } = await import("./base.js");
+    const { RecordNotFound } = await import("./errors.js");
+
+    const conn = new BetterSQLite3Adapter(":memory:");
+    try {
+      await defineSchema(conn, { liquid: canonicalSchema.liquid, birds: canonicalSchema.birds });
+      await conn.executeMutation('INSERT INTO "liquid" ("name") VALUES (?)', ["salty"]);
+
+      class Liquid extends Base {
+        static {
+          this.tableName = "liquid";
+          this.adapter = conn;
+        }
+      }
+
+      const liquid = (await Liquid.findBy({ name: "salty" }))!;
+      await Liquid.find(liquid.id); // warming the statement cache.
+
+      Liquid.tableName = "birds";
+      await expect(Liquid.find(liquid.id)).rejects.toBeInstanceOf(RecordNotFound);
+    } finally {
+      conn.disconnectBang();
+    }
   });
-  it.skip("find association does not use statement cache if table name is changed", () => {
-    // BLOCKED: relation — prepared statement cache not implemented
-    // ROOT-CAUSE: statement-cache.ts#StatementCache#execute or prepared statement infrastructure missing
-    // SCOPE: ~50 LOC fix in statement-cache.ts; affects ~3 tests in statement-cache.test.ts
+
+  it("find association does not use statement cache if table name is changed", async () => {
+    await import("./relation.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+    const { Base } = await import("./base.js");
+    const { Associations, registerModel } = await import("./associations.js");
+
+    const conn = new BetterSQLite3Adapter(":memory:");
+    try {
+      await defineSchema(conn, {
+        liquid: canonicalSchema.liquid,
+        molecules: canonicalSchema.molecules,
+        birds: canonicalSchema.birds,
+      });
+
+      class Liquid extends Base {
+        static {
+          this.tableName = "liquid";
+          this.adapter = conn;
+        }
+      }
+      class Molecule extends Base {
+        static {
+          this.tableName = "molecules";
+          this.adapter = conn;
+          this.attribute("liquid_id", "integer");
+        }
+      }
+      registerModel("Liquid", Liquid);
+      registerModel("Molecule", Molecule);
+      Associations.belongsTo.call(Molecule, "liquid");
+
+      const salty = await Liquid.create({ name: "salty" });
+      const molecule = await Molecule.create({ name: "dioxane", liquid_id: salty.id });
+
+      const loaded = (await molecule.association("liquid").loadTarget()) as any;
+      expect(loaded.id).toBe(salty.id);
+
+      Liquid.tableName = "birds";
+      expect(await (molecule.association("liquid") as any).forceReloadReader()).toBeNull();
+    } finally {
+      conn.disconnectBang();
+    }
   });
 
   it("StatementCache.create unprepared path uses PartialQuery with Substitute slots", async () => {

@@ -256,6 +256,11 @@ export class StatementCache {
       const name = (value as any).constructor?.name;
       if (name === "Range" || name === "Relation") return true;
       if (value instanceof Map || value instanceof Set) return true;
+      // Plain Hash and ActiveRecord instances are unsupported in Rails; a
+      // nested-hash condition (find_by(author: {...})) must take the
+      // relation path, not the cached statement.
+      if (Object.getPrototypeOf(value) === Object.prototype) return true;
+      if ("_attributes" in (value as object)) return true;
     }
     return false;
   }
