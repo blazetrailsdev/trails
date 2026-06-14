@@ -285,8 +285,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // is MySQL 8.0.13+. Pre-8 MySQL and MariaDB (through at least 10.x)
   // don't expose it, so we detect once and remember. `undefined` =
   // not yet probed, `true`/`false` = result.
-  /** @internal Host field for {@link mysqlStatisticsHasExpressionColumn}'s memo. */
-  _statisticsHasExpression: boolean | undefined;
+  private _statisticsHasExpression: boolean | undefined;
   private _fullVersionString: string | null = null;
   private _database: string | undefined;
 
@@ -1198,12 +1197,32 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       comment?: string;
     }>
   > {
-    return mysqlIndexes.call(this, tableName);
+    // `statisticsHasExpressionColumn` is private, so bind a public host surface
+    // rather than handing `this` straight to the standalone helper.
+    return mysqlIndexes.call(
+      {
+        schemaQuery: this.schemaQuery.bind(this),
+        parseMysqlName: this.parseMysqlName.bind(this),
+        statisticsHasExpressionColumn: this.statisticsHasExpressionColumn.bind(this),
+      },
+      tableName,
+    );
   }
 
-  /** @internal Delegates to {@link mysqlStatisticsHasExpressionColumn} in `mysql/schema-statements.ts`. */
-  async statisticsHasExpressionColumn(): Promise<boolean> {
-    return mysqlStatisticsHasExpressionColumn.call(this);
+  /** Delegates to {@link mysqlStatisticsHasExpressionColumn} in `mysql/schema-statements.ts`. */
+  private async statisticsHasExpressionColumn(): Promise<boolean> {
+    // The helper memoizes into `_statisticsHasExpression`, which is private; expose
+    // it through get/set accessors so the memo persists on this adapter instance.
+    const self = this;
+    return mysqlStatisticsHasExpressionColumn.call({
+      schemaQuery: this.schemaQuery.bind(this),
+      get _statisticsHasExpression(): boolean | undefined {
+        return self._statisticsHasExpression;
+      },
+      set _statisticsHasExpression(v: boolean | undefined) {
+        self._statisticsHasExpression = v;
+      },
+    });
   }
 
   /** Delegates to {@link mysqlParseName} in `mysql/schema-statements.ts`. */
