@@ -25,8 +25,15 @@ function isPlainObject(value: object): boolean {
 /** A type registered with the factory, matched during packing by `match`. */
 export interface RegisteredType {
   type: number;
+  /** Label for the type→class enshrine parity (Ruby registers the actual class). */
+  klass: string;
   match: (value: unknown) => boolean;
   recursive: boolean;
+  /**
+   * Ruby's `oversized_integer_extension: true`. Integers outside the native
+   * 64-bit range route through this ext (type 1) instead of `typeFor` lookup.
+   */
+  oversizedInteger?: boolean;
   /** Non-recursive: return the raw ext payload. Recursive: write parts to `packer`. */
   packer: (value: unknown, packer: Packer) => Buffer | void;
   /** Non-recursive: receive the raw payload Buffer. Recursive: read parts from `unpacker`. */
@@ -46,6 +53,15 @@ export class Factory {
 
   typeById(id: number): RegisteredType | undefined {
     return this.types.find((t) => t.type === id);
+  }
+
+  oversizedIntegerType(): RegisteredType | undefined {
+    return this.types.find((t) => t.oversizedInteger);
+  }
+
+  /** Type id → class label, mirroring Ruby's `registered_types` for parity checks. */
+  registeredTypes(): { type: number; klass: string }[] {
+    return this.types.map((t) => ({ type: t.type, klass: t.klass }));
   }
 
   packer(): Packer {
@@ -72,6 +88,7 @@ export class Packer {
     if (Buffer.isBuffer(value)) return this.writeBin(value);
     if (typeof value === "string") return this.writeStr(value);
     if (typeof value === "number") return this.writeNumber(value);
+    if (typeof value === "bigint") return this.writeBigInt(value);
     if (Array.isArray(value)) return this.writeArray(value);
 
     // Plain hashes map to native msgpack maps; only tagged values (Symbol) and
@@ -120,23 +137,38 @@ export class Packer {
       for (const b of buf) this.out.push(b);
       return;
     }
-    // pushSized only emits up to a 32-bit field; `>>>` would silently truncate
-    // anything wider. Rails routes oversized integers through the Integer ext
-    // type (1, the bigint extension) before reaching a native uint/int — until
-    // that type is ported, refuse rather than corrupt. (64-bit native + bigint
-    // land in activesupport-messagepack-native-extension-types.)
-    if (n > 0xffffffff || n < -0x80000000) {
-      throw new MessagePackError(`Integer ${n} is out of the supported MessagePack range`);
+    this.writeBigInt(BigInt(n));
+  }
+
+  /**
+   * @internal Encodes any integer (JS `number` widened to `bigint`, or a native
+   * `bigint`). Values inside the 64-bit native range use msgpack int tags;
+   * anything wider routes through the oversized-integer ext (type 1), matching
+   * Ruby's `oversized_integer_extension`.
+   */
+  private writeBigInt(n: bigint): void {
+    if (n >= 0n) {
+      if (n < 0x80n) return void this.out.push(Number(n));
+      if (n <= 0xffn) return this.pushSized(0xcc, Number(n), 1);
+      if (n <= 0xffffn) return this.pushSized(0xcd, Number(n), 2);
+      if (n <= 0xffffffffn) return this.pushSized(0xce, Number(n), 4);
+      if (n <= 0xffffffffffffffffn) return this.pushBig(0xcf, n);
+    } else {
+      if (n >= -32n) return void this.out.push(0xe0 | (Number(n) + 32));
+      if (n >= -0x80n) return this.pushSized(0xd0, Number(n) & 0xff, 1);
+      if (n >= -0x8000n) return this.pushSized(0xd1, Number(n) & 0xffff, 2);
+      if (n >= -0x80000000n) return this.pushSized(0xd2, Number(n) >>> 0, 4);
+      if (n >= -0x8000000000000000n) return this.pushBig(0xd3, n & 0xffffffffffffffffn);
     }
-    if (n >= 0) {
-      if (n < 0x80) this.out.push(n);
-      else if (n < 0x100) this.pushSized(0xcc, n, 1);
-      else if (n < 0x10000) this.pushSized(0xcd, n, 2);
-      else this.pushSized(0xce, n, 4);
-    } else if (n >= -32) this.out.push(0xe0 | (n + 32));
-    else if (n >= -0x80) this.pushSized(0xd0, n & 0xff, 1);
-    else if (n >= -0x8000) this.pushSized(0xd1, n & 0xffff, 2);
-    else this.pushSized(0xd2, n >>> 0, 4);
+    const ext = this.factory.oversizedIntegerType();
+    if (!ext) throw new MessagePackError(`Integer ${n} requires the oversized-integer ext type`);
+    this.writeExt(ext, n);
+  }
+
+  /** @internal Pushes a tag followed by an 8-byte big-endian field from a bigint. */
+  private pushBig(tag: number, value: bigint): void {
+    this.out.push(tag);
+    for (let shift = 56n; shift >= 0n; shift -= 8n) this.out.push(Number((value >> shift) & 0xffn));
   }
 
   /** @internal */
@@ -209,6 +241,26 @@ export class Unpacker {
     return u >= 2 ** (bits - 1) ? u - 2 ** bits : u;
   }
 
+  /**
+   * @internal Reads an 8-byte big-endian unsigned int. Returns a `number` when
+   * it fits in the safe-integer range, else a `bigint` (mirroring Ruby Integer).
+   */
+  private readBigUint(): number | bigint {
+    let v = 0n;
+    for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(this.buf[this.pos++]);
+    return v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v) : v;
+  }
+
+  /** @internal Reads an 8-byte big-endian two's-complement signed int. */
+  private readBigInt(): number | bigint {
+    let v = 0n;
+    for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(this.buf[this.pos++]);
+    if (v >= 0x8000000000000000n) v -= 0x10000000000000000n;
+    return v >= BigInt(Number.MIN_SAFE_INTEGER) && v <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(v)
+      : v;
+  }
+
   /** @internal */
   private readBytes(len: number): Buffer {
     if (this.pos + len > this.buf.length)
@@ -256,6 +308,10 @@ export class Unpacker {
         return this.readUint(2);
       case 0xce:
         return this.readUint(4);
+      case 0xcf:
+        return this.readBigUint();
+      case 0xd3:
+        return this.readBigInt();
       case 0xd0:
         return this.readInt(1);
       case 0xd1:
