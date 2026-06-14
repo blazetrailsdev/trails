@@ -150,24 +150,25 @@ export class AssociationCacheFacet<V> implements Map<string, V> {
  * The three folded association-cache facets for one record, backed by one
  * shared {@link AssociationCacheSlot} store; `clear()` resets every facet.
  *
+ * Implemented as a class (not an object literal) so its methods live on the
+ * prototype: two empty caches on distinct records deep-equal under `toEqual`,
+ * which matters because records are compared field-by-field in tests and an
+ * own-property closure here would make otherwise-equal records compare unequal.
+ *
  * @internal
  */
-export interface AssociationCache {
-  readonly store: Map<string, AssociationCacheSlot>;
-  readonly instances: AssociationCacheFacet<unknown>;
-  readonly proxies: AssociationCacheFacet<unknown>;
-  readonly preloaded: AssociationCacheFacet<unknown>;
-  clear(): void;
+export class AssociationCache {
+  readonly store = new Map<string, AssociationCacheSlot>();
+  readonly instances = new AssociationCacheFacet<unknown>(this.store, "instance");
+  readonly proxies = new AssociationCacheFacet<unknown>(this.store, "proxy");
+  readonly preloaded = new AssociationCacheFacet<unknown>(this.store, "preloaded");
+
+  clear(): void {
+    this.store.clear();
+  }
 }
 
 /** @internal */
 export function createAssociationCache(): AssociationCache {
-  const store = new Map<string, AssociationCacheSlot>();
-  return {
-    store,
-    instances: new AssociationCacheFacet(store, "instance"),
-    proxies: new AssociationCacheFacet(store, "proxy"),
-    preloaded: new AssociationCacheFacet(store, "preloaded"),
-    clear: () => store.clear(),
-  };
+  return new AssociationCache();
 }
