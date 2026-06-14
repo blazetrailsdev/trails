@@ -1031,17 +1031,21 @@ export class TransactionManager {
       // while it is true.
       if (this._materializingTransactions) return;
       if (!this._hasUnmaterializedTransactions) return;
-      this._materializingTransactions = true;
       try {
+        this._materializingTransactions = true;
         for (const t of this._stack) {
           if (t instanceof Transaction && !t.isMaterialized()) {
             await t.materializeBang();
           }
         }
-        this._hasUnmaterializedTransactions = false;
       } finally {
         this._materializingTransactions = false;
       }
+      // After the `ensure` clears the flag — mirrors Rails ordering
+      // (`transaction.rb:588`): `@has_unmaterialized_transactions = false`
+      // sits after the begin/ensure, still inside the lock. Skipped on a loop
+      // throw (the flag stays set for a later retry), same as Rails.
+      this._hasUnmaterializedTransactions = false;
     });
   }
 
