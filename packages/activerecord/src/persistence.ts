@@ -1163,10 +1163,20 @@ export async function reload<T extends ReloadRecord>(
   this._dirty.snapshot(this._attributes);
   this._dirty.clearChangesInformation();
 
-  // RFC 0022 b1+: drop the (now-stale) singular holders / collection proxies,
-  // then re-point the freshly re-preloaded strict-loaded associations onto this
-  // record. `_findRecord` preloads `strict_loaded_associations` so re-reading
-  // one after reload doesn't trigger a StrictLoadingViolationError lazy load.
+  // Rails reload replaces `@association_cache` wholesale from the freshly
+  // fetched object, then re-points each adopted association's owner back to
+  // self (persistence.rb):
+  //   @association_cache = fresh_object.instance_variable_get(:@association_cache)
+  //   @association_cache.each_value { |association| association.owner = self }
+  // Our cache is split across three maps (see `Base#_resetAssociationCaches`).
+  // Of those, `_findRecord` only ever populates `_preloadedAssociations` — it
+  // preloads `strict_loaded_associations` so re-reading one after reload won't
+  // trip a StrictLoadingViolationError lazy load — and those entries are raw,
+  // ownerless target records, not owner-bound Association objects. So the
+  // faithful analog is: drop this record's now-stale holders/proxies, then
+  // adopt fresh's preloaded targets. Rails' owner re-point has no analog here
+  // because the adopted store carries no owner to re-point (this record is
+  // already the owner for everything read back through `association()`).
   this._resetAssociationCaches();
   for (const [name, value] of fresh._preloadedAssociations) {
     this._preloadedAssociations.set(name, value);
