@@ -677,8 +677,15 @@ export class JoinDependency {
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
   }
 
+  /**
+   * Constructs AR model instances from a flat result row set, assigning
+   * associations. Entry point for the eager-load instantiation phase.
+   *
+   * Mirrors: ActiveRecord::Associations::JoinDependency#instantiate
+   * (returns `parents.values`).
+   */
   instantiate(resultSet: Record<string, unknown>[], strictLoadingValue?: boolean): any[] {
-    return this.construct(resultSet, strictLoadingValue);
+    return this.instantiateFromRows(resultSet, strictLoadingValue).parents;
   }
 
   applyColumnAliases(relation: any): any {
@@ -746,6 +753,18 @@ export class JoinDependency {
     return predicate;
   }
 
+  /**
+   * Hydrate models from a flat result row set, mirroring Rails'
+   * JoinDependency#instantiate body. `seen` is the identity-keyed
+   * parent → node → id → model map (Rails' `compare_by_identity` hash); a JS
+   * `Map` keys by object identity, matching it. `modelCache` caches each node's
+   * instances by id, with the join-root's entry doubling as the parent dedup
+   * map (`parents = model_cache[join_root]`).
+   *
+   * Returns `{ parents, associations }` rather than Rails' bare `parents.values`:
+   * the `associations` map (parent key → assoc name → children) is a trails
+   * affordance derived from the wired proxies after construction.
+   */
   instantiateFromRows(
     rows: Record<string, unknown>[],
     strictLoadingValue?: boolean,
@@ -753,221 +772,144 @@ export class JoinDependency {
     parents: any[];
     associations: Map<unknown, Map<string, any[]>>;
   } {
-    const basePk = (this._baseModel as any).primaryKey ?? "id";
-    const parentMap = new Map<unknown, any>();
-    const assocMap = new Map<unknown, Map<string, any[]>>();
-    const seenRawPks = new Set<unknown>();
-    const rawToKey = new Map<unknown, unknown>();
-
-    const modelCache = new Map<JoinPart, Map<unknown, any>>();
-    const seenChildren = new WeakMap<object, Map<string, Set<unknown>>>();
-
+    const joinRoot = this._joinRoot;
     const aliases = this.aliases();
+    const basePk = (this._baseModel as any).primaryKey ?? "id";
     const baseColumns = getModelColumns(this._baseModel);
-    const columnNames = new Set(aliases.columns().map((a) => a.alias));
+    const aliasSet = new Set(aliases.columns().map((a) => a.alias));
 
-    const nodeReadonly = new Map<JoinPart, boolean>();
-    const nodeStrictLoading = new Map<JoinPart, boolean>();
-    for (const node of this.nodes) {
-      nodeReadonly.set(node, this._isNodeReadonly(node));
-      nodeStrictLoading.set(node, this._isNodeStrictLoading(node));
-    }
+    const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
+    const modelCache = new Map<JoinPart, Map<unknown, any>>();
+    const parents = new Map<unknown, any>();
+    modelCache.set(joinRoot, parents);
 
     for (const row of rows) {
       const parentAttrs: Record<string, unknown> = Object.create(null);
       for (let i = 0; i < baseColumns.length; i++) {
-        parentAttrs[baseColumns[i]] = row[aliases.columnAlias(this._joinRoot, baseColumns[i])!];
+        parentAttrs[baseColumns[i]] = row[aliases.columnAlias(joinRoot, baseColumns[i])!];
       }
+      // Rails appends Aliases::Column.new(name, name) for non-`t\d+_r\d+` columns
+      // so they land on the parent (and only the parent) record.
       for (const key of Object.keys(row)) {
-        if (!columnNames.has(key)) {
-          parentAttrs[key] = row[key];
+        if (!aliasSet.has(key)) parentAttrs[key] = row[key];
+      }
+
+      const parentKey = this._rowKey(basePk, parentAttrs);
+      let parent = parents.get(parentKey);
+      if (!parent) {
+        parent = (this._baseModel as any)._instantiate(parentAttrs);
+        if (strictLoadingValue && typeof parent.strictLoadingBang === "function") {
+          parent.strictLoadingBang();
         }
+        parents.set(parentKey, parent);
       }
 
-      const rawPk = parentAttrs[basePk];
-      let parentKey: unknown;
-      let parent: any;
-      if (!seenRawPks.has(rawPk)) {
-        seenRawPks.add(rawPk);
-        parent = this.constructModel(parentAttrs, null, strictLoadingValue);
-        parentKey = parent._readAttribute(basePk);
-        rawToKey.set(rawPk, parentKey);
-        parentMap.set(parentKey, parent);
-        assocMap.set(parentKey, new Map());
-      } else {
-        parentKey = rawToKey.get(rawPk)!;
-        parent = parentMap.get(parentKey);
-      }
-
-      this._constructRecursive(
-        this._joinRoot,
-        parent,
-        parentKey,
-        row,
-        aliases,
-        modelCache,
-        seenChildren,
-        assocMap,
-        nodeReadonly,
-        nodeStrictLoading,
-        strictLoadingValue,
-      );
+      this.construct(parent, joinRoot, row, seen, modelCache, strictLoadingValue);
     }
 
-    return { parents: [...parentMap.values()], associations: assocMap };
+    const parentList = [...parents.values()];
+    return { parents: parentList, associations: this._collectAssociations(parentList, basePk) };
   }
 
   /**
    * Recursive tree-walk hydration — mirrors Rails' JoinDependency#construct.
    * @internal
    */
-  private _constructRecursive(
-    treeNode: JoinPart,
+  private construct(
     arParent: any,
-    rootParentKey: unknown,
+    parent: JoinPart,
     row: Record<string, unknown>,
-    aliases: Aliases,
+    seen: Map<any, Map<JoinPart, Map<unknown, any>>>,
     modelCache: Map<JoinPart, Map<unknown, any>>,
-    seenChildren: WeakMap<object, Map<string, Set<unknown>>>,
-    assocMap: Map<unknown, Map<string, any[]>>,
-    nodeReadonly: Map<JoinPart, boolean>,
-    nodeStrictLoading: Map<JoinPart, boolean>,
     strictLoadingValue?: boolean,
   ): void {
     if (arParent == null) return;
-    for (const child of treeNode.children) {
-      if (child.tableIndex < 0) continue;
+    const aliases = this.aliases();
+    for (const node of parent.children) {
+      if (node.tableIndex < 0) continue;
 
-      if (child.isThroughNode) {
-        this._constructRecursive(
-          child,
-          arParent,
-          rootParentKey,
-          row,
-          aliases,
-          modelCache,
-          seenChildren,
-          assocMap,
-          nodeReadonly,
-          nodeStrictLoading,
-          strictLoadingValue,
-        );
+      // trails through-chain intermediates carry no AR record — pass the
+      // current parent straight through to the real target node.
+      if (node.isThroughNode) {
+        this.construct(arParent, node, row, seen, modelCache, strictLoadingValue);
         continue;
       }
 
-      if (
-        child.assocType !== "hasMany" &&
+      const isCollection = node.assocType === "hasMany";
+      if (isCollection) {
+        this._markCollectionLoaded(arParent, node);
+      } else if (
         arParent._associationInstances &&
-        isAssociationCached(arParent, child.immediateAssocName)
+        isAssociationCached(arParent, node.immediateAssocName)
       ) {
-        const model = arParent.association?.(child.immediateAssocName)?.target;
-        this._constructRecursive(
-          child,
-          model,
-          rootParentKey,
-          row,
-          aliases,
-          modelCache,
-          seenChildren,
-          assocMap,
-          nodeReadonly,
-          nodeStrictLoading,
-          strictLoadingValue,
-        );
+        const model = arParent.association?.(node.immediateAssocName)?.target;
+        this.construct(model, node, row, seen, modelCache, strictLoadingValue);
         continue;
       }
 
-      const childAttrs: Record<string, unknown> = {};
-      let hasNonNull = false;
-      for (let i = 0; i < child.columns.length; i++) {
-        const val = row[aliases.columnAlias(child, child.columns[i])!];
-        childAttrs[child.columns[i]] = val;
-        if (val !== null && val !== undefined) hasNonNull = true;
-      }
-
-      if (!hasNonNull) {
-        this._markAssociationLoaded(arParent, child);
+      const pk = (node.baseKlass as any).primaryKey ?? "id";
+      const pkCols: string[] = Array.isArray(pk) ? pk : [pk];
+      const idVals = pkCols.map((c) => row[aliases.columnAlias(node, c)!]);
+      if (idVals.some((v) => v === null || v === undefined)) {
+        this._markAssociationLoaded(arParent, node);
         continue;
       }
+      const id = idVals.length === 1 ? idVals[0] : idVals.join(" ");
 
-      const rawChildPk = childAttrs[(child.baseKlass as any).primaryKey ?? "id"];
-
-      let parentSeen = seenChildren.get(arParent);
+      let parentSeen = seen.get(arParent);
       if (!parentSeen) {
         parentSeen = new Map();
-        seenChildren.set(arParent, parentSeen);
+        seen.set(arParent, parentSeen);
       }
-      let seenPks = parentSeen.get(child.immediateAssocName);
-      if (!seenPks) {
-        seenPks = new Set();
-        parentSeen.set(child.immediateAssocName, seenPks);
+      let nodeSeen = parentSeen.get(node);
+      if (!nodeSeen) {
+        nodeSeen = new Map();
+        parentSeen.set(node, nodeSeen);
       }
-      const alreadySeen = seenPks.has(rawChildPk);
-
-      let nodeCache = modelCache.get(child);
-      if (!nodeCache) {
-        nodeCache = new Map();
-        modelCache.set(child, nodeCache);
-      }
-      let childInstance = nodeCache.get(rawChildPk);
-      if (!childInstance) {
-        childInstance = this.constructModel(childAttrs, child, strictLoadingValue);
-        if (rawChildPk != null) nodeCache.set(rawChildPk, childInstance);
+      let model = nodeSeen.get(id);
+      if (!model) {
+        model = this.constructModel(arParent, node, row, modelCache, id, strictLoadingValue);
+        nodeSeen.set(id, model);
       }
 
-      if (!alreadySeen) {
-        seenPks.add(rawChildPk);
-
-        const isCollection = child.assocType === "hasMany";
-
-        if (!(arParent as any)._preloadedAssociations) {
-          (arParent as any)._preloadedAssociations = new Map();
-        }
-        if (
-          isCollection &&
-          !(arParent as any)._preloadedAssociations.has(child.immediateAssocName)
-        ) {
-          (arParent as any)._preloadedAssociations.set(child.immediateAssocName, []);
-        }
-
-        this._wireAssociationProxy(arParent, child, childInstance);
-
-        if (nodeReadonly.get(child)) {
-          (childInstance as any)._readonly = true;
-        }
-        if (
-          nodeStrictLoading.get(child) &&
-          typeof (childInstance as any).strictLoadingBang === "function"
-        ) {
-          (childInstance as any).strictLoadingBang();
-        }
-
-        if (!isCollection) {
-          (arParent as any)._preloadedAssociations.set(child.immediateAssocName, childInstance);
-        }
-
-        if (treeNode === this._joinRoot) {
-          const rootAssocs = assocMap.get(rootParentKey)!;
-          if (!rootAssocs.has(child.immediateAssocName))
-            rootAssocs.set(child.immediateAssocName, []);
-          rootAssocs.get(child.immediateAssocName)!.push(childInstance);
-        }
-      }
-
-      this._constructRecursive(
-        child,
-        childInstance,
-        rootParentKey,
-        row,
-        aliases,
-        modelCache,
-        seenChildren,
-        assocMap,
-        nodeReadonly,
-        nodeStrictLoading,
-        strictLoadingValue,
-      );
+      this.construct(model, node, row, seen, modelCache, strictLoadingValue);
     }
+  }
+
+  /**
+   * Build the parent-key → assoc-name → children map from the wired proxies.
+   * A trails affordance with no Rails analogue (Rails returns only
+   * `parents.values`); keyed by each parent's read primary key.
+   * @internal
+   */
+  private _collectAssociations(
+    parents: any[],
+    basePk: string | string[],
+  ): Map<unknown, Map<string, any[]>> {
+    const associations = new Map<unknown, Map<string, any[]>>();
+    for (const parent of parents) {
+      const key = Array.isArray(basePk)
+        ? basePk.map((k) => parent._readAttribute(k)).join(" ")
+        : parent._readAttribute(basePk);
+      const assocs = new Map<string, any[]>();
+      for (const child of this._joinRoot.children) {
+        if (child.tableIndex < 0 || child.isThroughNode) continue;
+        const proxy = parent.association?.(child.immediateAssocName);
+        const target = proxy?.target;
+        assocs.set(
+          child.immediateAssocName,
+          Array.isArray(target) ? target : target ? [target] : [],
+        );
+      }
+      associations.set(key, assocs);
+    }
+    return associations;
+  }
+
+  /** @internal Compute a parent dedup key from its (possibly composite) PK. */
+  private _rowKey(pk: string | string[], attrs: Record<string, unknown>): unknown {
+    if (Array.isArray(pk)) return pk.map((k) => attrs[k]).join(" ");
+    return attrs[pk];
   }
 
   /**
@@ -1051,32 +993,55 @@ export class JoinDependency {
   }
 
   /**
-   * Constructs AR model instances from a flat result row set, assigning
-   * associations. Entry point for the eager-load instantiation phase.
-   *
-   * Mirrors: ActiveRecord::Associations::JoinDependency#construct
-   */
-  private construct(resultSet: Record<string, unknown>[], strictLoadingValue?: boolean): any[] {
-    return this.instantiateFromRows(resultSet, strictLoadingValue).parents;
-  }
-
-  /**
-   * Instantiates a single model record from a hash of aliased row attributes.
-   * Deduplication of repeated parent rows is handled by instantiateFromRows
-   * (the `seenRawPks` / `parentMap` logic); this method just constructs the
-   * model object for a given attribute hash.
+   * Build (or fetch from `modelCache`) the child record for `node`, wire it into
+   * `record`'s association, and apply readonly / strict-loading flags.
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency#construct_model
    */
   private constructModel(
-    attrs: Record<string, unknown>,
-    node: JoinPart | null,
+    record: any,
+    node: JoinPart,
+    row: Record<string, unknown>,
+    modelCache: Map<JoinPart, Map<unknown, any>>,
+    id: unknown,
     strictLoadingValue?: boolean,
   ): any {
-    const modelClass = node ? node.baseKlass : this._baseModel;
-    const model = (modelClass as any)._instantiate(attrs);
-    if (strictLoadingValue && typeof model.strictLoadingBang === "function") {
-      model.strictLoadingBang();
+    let nodeCache = modelCache.get(node);
+    if (!nodeCache) {
+      nodeCache = new Map();
+      modelCache.set(node, nodeCache);
+    }
+    let model = nodeCache.get(id);
+    if (!model) {
+      const attrs: Record<string, unknown> = {};
+      const aliases = this.aliases();
+      for (let i = 0; i < node.columns.length; i++) {
+        attrs[node.columns[i]] = row[aliases.columnAlias(node, node.columns[i])!];
+      }
+      model = (node.baseKlass as any)._instantiate(attrs);
+      if (strictLoadingValue && typeof model.strictLoadingBang === "function") {
+        model.strictLoadingBang();
+      }
+      if (id != null) nodeCache.set(id, model);
+    }
+
+    const isCollection = node.assocType === "hasMany";
+    if (!(record as any)._preloadedAssociations) {
+      (record as any)._preloadedAssociations = new Map();
+    }
+    if (isCollection) {
+      if (!(record as any)._preloadedAssociations.has(node.immediateAssocName)) {
+        (record as any)._preloadedAssociations.set(node.immediateAssocName, []);
+      }
+    } else {
+      (record as any)._preloadedAssociations.set(node.immediateAssocName, model);
+    }
+
+    this._wireAssociationProxy(record, node, model);
+
+    if (node.isReadonly()) (model as any)._readonly = true;
+    if (node.isStrictLoading() && typeof (model as any).strictLoadingBang === "function") {
+      (model as any).strictLoadingBang();
     }
     return model;
   }
@@ -1113,6 +1078,30 @@ export class JoinDependency {
 
   /**
    * @internal
+   * Mirrors Rails' `other.loaded!` at the top of `construct` for a collection
+   * node: mark the proxy loaded (seeding an empty target) without clobbering any
+   * children already pushed by a prior row.
+   */
+  private _markCollectionLoaded(parent: any, node: JoinPart): void {
+    if (typeof parent.association !== "function") return;
+    try {
+      const proxy = parent.association(node.immediateAssocName);
+      if (!proxy || proxy.loaded) return;
+      proxy.target = [];
+      proxy.loadedBang?.();
+      if (!(parent as any)._preloadedAssociations) {
+        (parent as any)._preloadedAssociations = new Map();
+      }
+      if (!(parent as any)._preloadedAssociations.has(node.immediateAssocName)) {
+        (parent as any)._preloadedAssociations.set(node.immediateAssocName, []);
+      }
+    } catch (e) {
+      if (!(e instanceof AssociationNotFoundError)) throw e;
+    }
+  }
+
+  /**
+   * @internal
    * Mark an association as loaded (empty) when the join row is all-null.
    */
   private _markAssociationLoaded(parent: any, node: JoinPart): void {
@@ -1125,31 +1114,6 @@ export class JoinDependency {
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }
-  }
-
-  /**
-   * @internal
-   * Mirrors Rails' `JoinAssociation#readonly?` — checks if the reflection's
-   * scope marks the association as readonly.
-   */
-  private _isNodeReadonly(node: JoinPart): boolean {
-    const refl = node.nodeReflection;
-    if (!refl || typeof refl.scopeFor !== "function") return false;
-    try {
-      const baseRel = (node.baseKlass as any)._allForPreload?.();
-      if (!baseRel) return false;
-      const scopeRel = refl.scopeFor(baseRel);
-      return !!scopeRel?._isReadonly;
-    } catch {
-      return false;
-    }
-  }
-
-  /** @internal */
-  private _isNodeStrictLoading(node: JoinPart): boolean {
-    const refl = node.nodeReflection;
-    if (!refl) return false;
-    return !!refl.strictLoading;
   }
 
   private _insertTreeNode(treePart: JoinPart): void {

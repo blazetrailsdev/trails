@@ -46,6 +46,22 @@ export abstract class JoinPart {
     return this.constructor === other.constructor;
   }
 
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#readonly?
+   * Base nodes (JoinBase / no-reflection leaves) are never readonly.
+   */
+  isReadonly(): boolean {
+    return false;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#strict_loading?
+   * Base nodes (JoinBase / no-reflection leaves) never force strict loading.
+   */
+  isStrictLoading(): boolean {
+    return false;
+  }
+
   each(fn: (part: JoinPart) => void): void {
     fn(this);
     for (const child of this.children) {
