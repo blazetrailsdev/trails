@@ -220,9 +220,17 @@ export function initializeDup(this: Base, _other: unknown): void {
  *
  * Mirrors: ActiveRecord::Aggregations#reload
  */
-export async function reload<T extends Base>(this: T): Promise<T> {
+export async function reload<T extends Base>(
+  this: T,
+  options?: { lock?: boolean | string; unscoped?: boolean },
+): Promise<T> {
   clearAggregationCache(this);
-  return (persistenceReload as unknown as (this: T) => Promise<T>).call(this);
+  return (
+    persistenceReload as unknown as (
+      this: T,
+      options?: { lock?: boolean | string; unscoped?: boolean },
+    ) => Promise<T>
+  ).call(this, options);
 }
 
 export const InstanceMethods = {

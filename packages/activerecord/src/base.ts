@@ -3591,7 +3591,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   update(attrs: Record<string, unknown>): Promise<boolean>;
   updateBang(attrs: Record<string, unknown>): Promise<true>;
   delete(): Promise<this>;
-  reload(): Promise<this>;
+  reload(options?: { lock?: boolean | string; unscoped?: boolean }): Promise<this>;
   initializeDup(other: unknown): void;
   /** @internal */
   committedBang(options?: { shouldRunCallbacks?: boolean }): Promise<void>;
