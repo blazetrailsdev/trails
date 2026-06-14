@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, Range, RecordNotFound, SoleRecordExceeded, registerModel } from "./index.js";
+import { Base, Range, RecordNotFound, registerModel, SoleRecordExceeded } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -37,6 +37,9 @@ const TEST_SCHEMA = {
     score: "integer",
     active: "boolean",
   },
+  fel_posts: { title: "string" },
+  fel_comments: { body: "string", fel_post_id: "integer" },
+  fel_ratings: { value: "integer", fel_comment_id: "integer" },
 } as const;
 
 // ==========================================================================
@@ -2327,8 +2330,46 @@ describe("FinderTest", () => {
     }
   });
 
-  it.skip("find with eager loading collection and ordering by collection primary key", async () => {
-    // BLOCKED: associations — finder_test.rb: eager load + ORDER BY association pk
+  it("find with eager loading collection and ordering by collection primary key", async () => {
+    class FelPost extends Base {
+      static {
+        this.tableName = "fel_posts";
+        this.attribute("title", "string");
+      }
+    }
+    class FelComment extends Base {
+      static {
+        this.tableName = "fel_comments";
+        this.attribute("body", "string");
+        this.attribute("fel_post_id", "integer");
+      }
+    }
+    class FelRating extends Base {
+      static {
+        this.tableName = "fel_ratings";
+        this.attribute("value", "integer");
+        this.attribute("fel_comment_id", "integer");
+      }
+    }
+    FelPost.hasMany("comments", { className: "FelComment", foreignKey: "fel_post_id" });
+    FelComment.hasMany("ratings", { className: "FelRating", foreignKey: "fel_comment_id" });
+    registerModel("FelPost", FelPost);
+    registerModel("FelComment", FelComment);
+    registerModel("FelRating", FelRating);
+
+    const p1 = await FelPost.create({ title: "first" });
+    const p2 = await FelPost.create({ title: "second" });
+    const c1 = await FelComment.create({ body: "c1", fel_post_id: p1.id });
+    const c2 = await FelComment.create({ body: "c2", fel_post_id: p2.id });
+    await FelRating.create({ value: 1, fel_comment_id: c1.id });
+    await FelRating.create({ value: 2, fel_comment_id: c2.id });
+
+    const eager = await FelPost.eagerLoad({ comments: "ratings" })
+      .order("fel_posts.id, fel_ratings.id, fel_comments.id")
+      .first();
+    const expected = await FelPost.first();
+    expect(eager).not.toBeNull();
+    expect((eager as any).id).toBe((expected as any).id);
   });
 });
 
