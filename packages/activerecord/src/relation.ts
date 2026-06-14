@@ -3404,12 +3404,31 @@ export class Relation<T extends Base> {
     if (this._isNone) return 0;
 
     const table = this._modelClass.arelTable;
-    const dm = new DeleteManager().from(table);
-    for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
-      dm.where(node);
+    const primaryKey = this._modelClass.primaryKey;
+    let stmtAst;
+    if (
+      typeof primaryKey === "string" &&
+      (this._limitValue !== null || this._offsetValue !== null || this._orderClauses.length > 0)
+    ) {
+      // Mirrors Rails `delete_all`: build the SELECT arel and `compile_delete`
+      // with the primary key, having clause, and group columns so the visitor
+      // rewrites a limited/ordered delete into
+      // `WHERE pk IN (SELECT pk ... ORDER BY ... LIMIT ...)`. The unconstrained
+      // branch keeps the plain DeleteManager — the visitor would emit identical
+      // SQL there, but this avoids touching the hot path.
+      const arel = this._buildArel();
+      const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
+      const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
+      stmtAst = arel.compileDelete(table.get(primaryKey), havingAst, groupColumns).ast;
+    } else {
+      const dm = new DeleteManager().from(table);
+      for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
+        dm.where(node);
+      }
+      stmtAst = dm.ast;
     }
 
-    const [deleteSql, deleteBinds] = this._compileAstWithBinds(dm.ast);
+    const [deleteSql, deleteBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._modelClass.connection.execDelete(
       deleteSql,
       `${this._modelClass.name} Delete All`,
