@@ -108,12 +108,15 @@ export class DecimalType extends NumericValueType {
     if (value === null || value === undefined) return null;
     if (typeof value === "bigint") return value.toString();
     if (typeof value === "number") {
-      // BigDecimal("NaN") has no decimal string form; with decimals
-      // modelled as strings, NaN round-trips as the sentinel "NaN" so
-      // `nan?`-style checks and PG's 'NaN'::numeric serialization work.
-      // Other non-finite values (±Infinity) still cast to null.
+      // BigDecimal("NaN") / BigDecimal("Infinity") have no decimal string
+      // form; with decimals modelled as strings, the non-finite values
+      // round-trip as sentinels so `nan?`/`infinite?`-style checks and PG's
+      // 'NaN'/'Infinity'::numeric serialization work. Rails routes Float
+      // through `value.to_d`, and `Float::INFINITY.to_d` yields
+      // BigDecimal::INFINITY ("Infinity") rather than nil.
       if (Number.isNaN(value)) return "NaN";
-      if (!Number.isFinite(value)) return null;
+      if (value === Infinity) return "Infinity";
+      if (value === -Infinity) return "-Infinity";
       // Rails dispatches Float through `convert_float_to_big_decimal`
       // (decimal.rb:75-81). Route every JS number through the same hook
       // so a configured `precision:` applies the same significant-digit
@@ -127,7 +130,11 @@ export class DecimalType extends NumericValueType {
       // Ruby `"NaN".to_d` yields BigDecimal NaN, and the PG adapter hands
       // numeric NaN back as the string "NaN" on load — both round-trip to
       // the JS NaN sentinel rather than `to_d`'s leading-prefix parse.
+      // Likewise PG returns "Infinity"/"-Infinity" for non-finite numerics,
+      // and `"Infinity".to_d` yields BigDecimal::INFINITY.
       if (trimmed === "NaN") return "NaN";
+      if (trimmed === "Infinity") return "Infinity";
+      if (trimmed === "-Infinity") return "-Infinity";
       // Rails' `String#to_d` parses a leading numeric prefix and
       // silently drops everything after, returning `BigDecimal(0)` if
       // no leading number is present. Tests assert, e.g.,
