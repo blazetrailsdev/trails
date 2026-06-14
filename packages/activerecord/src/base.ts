@@ -95,6 +95,10 @@ import {
 import * as Timestamp from "./timestamp.js";
 import * as TouchLater from "./touch-later.js";
 import { Association as AssociationInstance } from "./associations/association.js";
+import {
+  type AssociationCache as _AssociationCache,
+  createAssociationCache,
+} from "./association-cache.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import * as ConnectionHandling from "./connection-handling.js";
 import * as ModelSchema from "./model-schema.js";
@@ -2395,24 +2399,32 @@ export class Base extends Model {
   _strictLoading = false;
   _strictLoadingMode?: _Core.StrictLoadingMode;
   _strictLoadingBypassCount = 0;
-  _preloadedAssociations: Map<string, unknown> = new Map();
-  _collectionProxies: Map<string, unknown> = new Map();
-  _associationInstances: Map<string, AssociationInstance> = new Map();
+  /**
+   * The single backing slot for this record's association cache — RFC-0022's
+   * fold of the three formerly-separate maps into one store keyed by name (see
+   * `_resetAssociationCaches`). The three public accessors below are
+   * `Map`-compatible facet views onto one field of this shared store, mirroring
+   * Rails' single `@association_cache`.
+   *
+   * @internal
+   */
+  _associationCacheStore: _AssociationCache = createAssociationCache();
+  _preloadedAssociations: Map<string, unknown> = this._associationCacheStore.preloaded;
+  _collectionProxies: Map<string, unknown> = this._associationCacheStore.proxies;
+  _associationInstances: Map<string, AssociationInstance> = this._associationCacheStore
+    .instances as Map<string, AssociationInstance>;
 
   /**
    * Return the *loaded* cached association object for `name` — callers read
-   * `.target` off it. This is the RFC-0022 b4 transitional accessor across the
-   * three still-split per-record maps (`_collectionProxies`,
-   * `_associationInstances`, `_preloadedAssociations`); it is NOT yet Rails'
-   * unified `@association_cache` surface. The literal `association_instance_get`
-   * analog (the built wrapper regardless of loaded state) is
-   * `_associationInstances.get(name)`. RFC-0022 b5 evaluated folding the three
-   * maps into one slot and recorded the decision to keep them physically split
-   * (each encodes a distinct semantic — see `_resetAssociationCaches`); the
-   * lifecycle is unified there, but this gated accessor stays.
+   * `.target` off it. This reads across the three association-cache facets
+   * (`_collectionProxies`, `_associationInstances`, `_preloadedAssociations`),
+   * which since RFC-0022's fold are all views onto one backing slot
+   * (`_associationCacheStore`) rather than separate maps. The literal
+   * `association_instance_get` analog (the built wrapper regardless of loaded
+   * state) is `_associationInstances.get(name)`.
    *
-   * Until that convergence, the gate matters: a has_many's canonical target
-   * lives on its `CollectionProxy` (incl. in-memory inverse-seeded records on a
+   * The gate still matters: a has_many's canonical target lives on its
+   * `CollectionProxy` (incl. in-memory inverse-seeded records on a
    * not-yet-loaded proxy) while the `HasManyAssociation` mirror in
    * `_associationInstances` is a stale secondary copy, so returning an
    * unloaded/empty wrapper here would surface the wrong store's `.target`.
@@ -2448,10 +2460,10 @@ export class Base extends Model {
    * lifecycle seam mirroring Rails resetting `@association_cache = {}` (in
    * `init_internals`, and effectively on `reload`/`destroy`).
    *
-   * RFC-0022 b5 decision: the three maps stay *physically* split because each
-   * encodes a genuinely distinct semantic that the single Rails map does not
-   * have to separate (Ruby's one Association object carries proxy + target +
-   * loaded-nil together):
+   * RFC-0022 fold: the three former maps are now `Map`-compatible facet views
+   * onto one backing slot (`_associationCacheStore`), so a single `clear()`
+   * resets all of them. Each facet still carries a genuinely distinct semantic
+   * that Ruby's single Association object folds together internally:
    *   - `_associationInstances` is the canonical `@association_cache` analog
    *     (name → built `Association` wrapper; what `association_instance_get/set`
    *     and `association()` read/write).
@@ -2459,20 +2471,15 @@ export class Base extends Model {
    *     layer (incl. in-memory inverse-seeded records on a not-yet-loaded proxy),
    *     which has no standalone Ruby analog — Rails' proxy lives *inside* the
    *     Association object.
-   *   - `_preloadedAssociations` is the preloaded-target shadow, the only store
+   *   - `_preloadedAssociations` is the preloaded-target shadow, the only facet
    *     that can express an eagerly-preloaded *nil* association (`set(name, null)`)
-   *     distinctly from "never loaded"; the holders cannot yet represent that
-   *     losslessly, so it remains a named preload seam.
-   * Converging them into one slot is a behavior-risky, multi-file fold beyond
-   * this story's scope; folding the lifecycle (this method) is the measured,
-   * behavior-preserving step. See associations.ts `initInternals`.
+   *     distinctly from "never loaded" (tracked by a per-slot presence flag).
+   * See `association-cache.ts` and associations.ts `initInternals`.
    *
    * @internal
    */
   _resetAssociationCaches(): void {
-    this._associationInstances.clear();
-    this._collectionProxies.clear();
-    this._preloadedAssociations.clear();
+    this._associationCacheStore.clear();
   }
 
   constructor(attrs: Record<string, unknown> = {}) {
