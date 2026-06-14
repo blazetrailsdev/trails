@@ -3,9 +3,10 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
+import { Base, Range, RecordNotFound, SoleRecordExceeded, registerModel } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
@@ -3690,3 +3691,44 @@ describe("FinderTest", () => {
 // ==========================================================================
 // FinderTest — targets finder_test.rb (continued)
 // ==========================================================================
+describe("FinderTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  class Company extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  class Account extends Base {
+    static {
+      this.attribute("firm_id", "integer");
+      this.attribute("credit_limit", "integer");
+      this.belongsTo("firm", { className: "Company", foreignKey: "firm_id" });
+      this.aliasAttribute("available_credit", "credit_limit");
+    }
+  }
+
+  beforeAll(async () => {
+    registerModel("Company", Company);
+    registerModel("Account", Account);
+    await defineSchema({
+      companies: canonicalSchema.companies,
+      accounts: canonicalSchema.accounts,
+    });
+  });
+
+  // Rails: test_find_by_with_alias
+  it("test_find_by_with_alias", async () => {
+    const account = await Account.create({ credit_limit: 5000 });
+    expect((await Account.findBy({ available_credit: 5000 }))!.id).toBe(account.id);
+  });
+
+  // Rails: test "find_by with associations"
+  it("find_by with associations", async () => {
+    const firm = await Company.create({ name: "37signals" });
+    const account = await Account.create({ firm_id: firm.id, credit_limit: 50 });
+    expect((await Account.findBy({ firm: firm }))!.id).toBe(account.id);
+  });
+});
