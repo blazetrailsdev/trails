@@ -647,23 +647,31 @@ describe("OptimisticLockingTest", () => {
 
 describe("OptimisticLockingWithSchemaChangeTest", () => {
   // Mirrors Rails `fixtures :people, :legacy_things, :references` plus
-  // `self.use_transactional_tests = false` (locking_test.rb:563-568): the
-  // counter tests run DDL (`add_counter_column_to`), and on MySQL `ALTER TABLE`
-  // forces an implicit commit that would end the per-test SAVEPOINT — so those
-  // tests opt out of the transaction wrapper via `usesTransaction`. The fixture
-  // loader still delete+inserts each table per test, resetting `lock_version`
-  // to 0 between cases on every adapter.
-  const counterTests = [
+  // `self.use_transactional_tests = false` (locking_test.rb:562-568): the whole
+  // class is non-transactional. The counter tests run DDL
+  // (`add_counter_column_to`), and on MySQL `ALTER TABLE` forces an implicit
+  // commit that would end the per-test SAVEPOINT. The DDL churn also leaves
+  // stale PostgreSQL prepared plans on the connection (the column is dropped in
+  // each test's `ensure`); a later test reusing that plan raises "cached plan
+  // must not change result type". Outside a transaction the PG adapter recovers
+  // by deallocating and retrying, but inside the per-test SAVEPOINT it raises
+  // PreparedStatementCacheExpired — so EVERY test here opts out of the wrapper,
+  // matching Rails' class-level setting. The fixture loader still delete+inserts
+  // each table per test, resetting `lock_version` to 0 between cases.
+  const schemaChangeTests = [
     "increment counter updates lock version",
     "decrement counter updates lock version",
     "update counters updates lock version",
     "increment counter updates custom lock version",
     "decrement counter updates custom lock version",
     "update counters updates custom lock version",
+    "destroy dependents",
+    "destroy existing object with locking column value null in the database",
+    "destroy stale object",
   ];
   const { people, legacyThings } = useHandlerFixtures(["people", "legacyThings", "references"], {
     schema: canonicalSchema,
-    usesTransaction: counterTests,
+    usesTransaction: schemaChangeTests,
   });
   beforeAll(async () => {
     await defineSchema(
