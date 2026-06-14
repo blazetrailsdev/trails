@@ -267,7 +267,10 @@ export interface AbstractAdapter {
     options?: { column?: string | string[]; name?: string; ifExists?: boolean },
   ): Promise<void>;
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
-  indexName(tableName: string, options: { column?: string | string[] }): string;
+  indexName(
+    tableName: string,
+    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+  ): string;
   generateIndexName(tableName: string, column: string | string[]): string;
   indexExists(
     tableName: string,

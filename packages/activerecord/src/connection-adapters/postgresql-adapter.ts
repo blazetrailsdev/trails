@@ -5140,10 +5140,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     );
   }
 
-  indexName(tableName: string, options: { column?: string | string[] }): string {
+  indexName(
+    tableName: string,
+    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+  ): string {
     const normalizedTableName = tableName.replace(/[."]/g, "_");
-    const cols = Array.isArray(options.column) ? options.column : [options.column ?? ""];
-    return `index_${normalizedTableName}_on_${cols.join("_and_")}`;
+    if (options.column != null) {
+      if (options.usesLegacyIndexName) {
+        const cols = Array.isArray(options.column) ? options.column : [options.column];
+        return `index_${normalizedTableName}_on_${cols.join("_and_")}`;
+      }
+      return this.generateIndexName(normalizedTableName, options.column);
+    }
+    if (options.name != null) return options.name;
+    throw new ArgumentError("You must specify the index name");
   }
 
   addIndexOptions(

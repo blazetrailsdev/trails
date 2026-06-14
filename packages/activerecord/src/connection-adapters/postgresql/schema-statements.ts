@@ -188,7 +188,10 @@ export interface SchemaStatements {
     options?: { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean },
   ): Promise<void>;
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
-  indexName(tableName: string, options: { column?: string | string[] }): string;
+  indexName(
+    tableName: string,
+    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+  ): string;
   addForeignKey(
     fromTable: string,
     toTable: string,

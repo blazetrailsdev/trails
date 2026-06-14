@@ -91,15 +91,16 @@ export function indexNameForRemoveFrom(
   if (columnName == null && options.name != null && options.column == null) {
     return options.name;
   }
-  const conventional = (c: string[]): string => `index_${tableName}_on_${c.join("_and_")}`;
   const { name, columnNames } = removeIndexSpec(generateIndexName, tableName, columnName, options);
   const checks: Array<(i: IndexInfo) => boolean> = [];
   if (name != null) {
     checks.push((i) => i.name === name);
   }
   if (columnNames.length > 0) {
-    const target = conventional(columnNames);
-    checks.push((i) => conventional(i.columns) === target);
+    // Rails: `index_name(table, i.columns) == index_name(table, column_names)` —
+    // both sides route through generate_index_name (length/hash fallback).
+    const target = generateIndexName(tableName, columnNames);
+    checks.push((i) => generateIndexName(tableName, i.columns) === target);
   }
   if (checks.length === 0) {
     throw new ArgumentError("No name or columns specified");
@@ -862,9 +863,22 @@ export class SchemaStatements {
     );
   }
 
-  indexName(tableName: string, options: { column?: string | string[] }): string {
-    const cols = Array.isArray(options.column) ? options.column : [options.column ?? ""];
-    return `index_${tableName}_on_${cols.join("_and_")}`;
+  indexName(
+    tableName: string,
+    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+  ): string {
+    // Rails `index_name`: the `column` branch routes through generate_index_name
+    // (length/hash fallback) by default; the bare `_and_` join is only used when
+    // `options[:_uses_legacy_index_name]` is set (Rails migration compatibility).
+    if (options.column != null) {
+      if (options.usesLegacyIndexName) {
+        const cols = Array.isArray(options.column) ? options.column : [options.column];
+        return `index_${tableName}_on_${cols.join("_and_")}`;
+      }
+      return this.generateIndexName(tableName, options.column);
+    }
+    if (options.name != null) return options.name;
+    throw new ArgumentError("You must specify the index name");
   }
 
   async removeColumns(tableName: string, ...columns: string[]): Promise<void>;

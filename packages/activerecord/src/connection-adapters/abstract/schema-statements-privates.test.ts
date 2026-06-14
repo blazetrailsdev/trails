@@ -27,6 +27,36 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(name).toMatch(/_[0-9a-f]{10}$/);
   });
 
+  it("indexName routes a column through generate_index_name by default", () => {
+    const ss = makeStatements();
+    expect(ss.indexName("users", { column: "email" })).toBe("index_users_on_email");
+    expect(ss.indexName("users", { column: ["foo", "bar"] })).toBe("index_users_on_foo_and_bar");
+  });
+
+  it("indexName applies the generate_index_name length/hash fallback by default", () => {
+    const ss = makeStatements();
+    const expected = ss.generateIndexName("users", "a".repeat(60));
+    expect(ss.indexName("users", { column: "a".repeat(60) })).toBe(expected);
+    expect(ss.indexName("users", { column: "a".repeat(60) }).length).toBeLessThanOrEqual(62);
+  });
+
+  it("indexName uses the bare _and_ form when usesLegacyIndexName is set", () => {
+    const ss = makeStatements();
+    expect(ss.indexName("users", { column: "a".repeat(60), usesLegacyIndexName: true })).toBe(
+      `index_users_on_${"a".repeat(60)}`,
+    );
+  });
+
+  it("indexName returns options.name when no column is given", () => {
+    const ss = makeStatements();
+    expect(ss.indexName("users", { name: "custom_idx" })).toBe("custom_idx");
+  });
+
+  it("indexName raises when neither column nor name is given", () => {
+    const ss = makeStatements();
+    expect(() => ss.indexName("users", {})).toThrow("You must specify the index name");
+  });
+
   it("validateChangeColumnNullArgumentBang accepts booleans", () => {
     const ss = makeStatements();
     expect(() => ss.validateChangeColumnNullArgumentBang(true)).not.toThrow();

@@ -1080,7 +1080,10 @@ export abstract class Migration {
     await this.schema.renameIndex(tableName, oldName, newName);
   }
 
-  indexName(tableName: string, options: { column?: string | string[] }): string {
+  indexName(
+    tableName: string,
+    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+  ): string {
     return this.schema.indexName(this._pt(tableName), options);
   }
 
