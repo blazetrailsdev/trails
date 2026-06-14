@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Table } from "@blazetrails/arel";
 import { _correctNames } from "./associations.js";
+import { joinTableName } from "./migration/join-table.js";
 
 import { modelRegistry } from "./associations.js";
 import {
@@ -751,12 +752,9 @@ export class AssociationReflection extends MacroReflection {
     return null;
   }
 
-  get joinTable(): string | null {
-    if (this.macro !== "hasAndBelongsToMany") return null;
+  get joinTable(): string {
     if (this.options.joinTable) return this.options.joinTable as string;
-    const ownerKey = pluralize(underscore(this.activeRecord.name));
-    const assocKey = underscore(this.name);
-    return [ownerKey, assocKey].sort().join("_");
+    return this.deriveJoinTable();
   }
 
   isPolymorphic(): boolean {
@@ -1150,12 +1148,11 @@ export class AssociationReflection extends MacroReflection {
 
   /**
    * @internal
-   * Derives the join table name for hasAndBelongsToMany associations.
+   * Mirrors ActiveRecord::Reflection::AssociationReflection#derive_join_table:
+   * collapses a shared `[._]`-terminated prefix across the two table names.
    */
   protected deriveJoinTable(): string {
-    return [underscore(this.activeRecord.tableName), underscore(this.klass.tableName)]
-      .sort()
-      .join("_");
+    return joinTableName(this.activeRecord.tableName, this.klass.tableName);
   }
 }
 
@@ -1454,7 +1451,7 @@ export class ThroughReflection extends AbstractReflection {
     return through;
   }
 
-  get joinTable(): string | null {
+  get joinTable(): string {
     return this._delegate.joinTable;
   }
 
