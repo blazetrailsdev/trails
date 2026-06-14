@@ -13,7 +13,6 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
-import { modelRegistry } from "../associations.js";
 import {
   arelColumn,
   buildCteSql,
@@ -92,8 +91,8 @@ const SQL_FN_NAMES: Record<AggFn, string> = {
 /**
  * Resolve the cast type for an aggregate target column, mirroring Rails'
  * `type_for` (calculations.rb): the model's own attribute type, then a type
- * discovered through the join dependencies, then — for a `.joins(:assoc)` that
- * pre-resolved to a SQL clause — the joined model recovered by table name.
+ * discovered through the join dependencies (which, for a `.joins(:assoc)`,
+ * include the target klass retained on the pre-resolved SQL join clause).
  */
 function resolveColType(rel: CalculationRelation, column: string): unknown {
   if (column === "*") return null;
@@ -103,37 +102,8 @@ function resolveColType(rel: CalculationRelation, column: string): unknown {
   const bare = dot >= 0 ? column.slice(dot + 1) : column;
   return (
     pluckCastTypeForKnownColumn(rel, bare) ??
-    (lookupCastTypeFromJoinDependencies(rel, bare) as ColumnType | null) ??
-    joinedColumnType(rel, dot >= 0 ? column.slice(0, dot) : null, bare)
+    (lookupCastTypeFromJoinDependencies(rel, bare) as ColumnType | null)
   );
-}
-
-/**
- * Resolve a column's cast type from a joined table when the model itself does
- * not own it. `.joins(:assoc)` pre-resolves the association into a SQL join
- * clause that keeps only the table name (the target class is discarded), so the
- * model is recovered from the registry by table name: a qualified
- * "topics.written_on" looks up "topics" directly, while a bare "written_on"
- * scans the relation's join-clause tables for the one model that owns it.
- */
-function joinedColumnType(
-  rel: CalculationRelation,
-  tableName: string | null,
-  bare: string,
-): ColumnType | null {
-  const tables = tableName
-    ? [tableName]
-    : ((rel as { _joinClauses?: Array<{ table: string }> })._joinClauses ?? []).map((j) => j.table);
-  for (const table of tables) {
-    for (const klass of modelRegistry.values()) {
-      const model = klass as unknown as CalculationRelation["_modelClass"] & {
-        tableName?: string;
-      };
-      if (model.tableName !== table) continue;
-      if (model._attributeDefinitions?.has(bare)) return model.typeForAttribute?.(bare) ?? null;
-    }
-  }
-  return null;
 }
 
 /**
@@ -1103,17 +1073,26 @@ export function lookupCastTypeFromJoinDependencies(
   const deps = joinDependencies ?? joinDependenciesForTypeLookup.call(rel as any);
   for (const jd of deps) {
     for (const node of jd) {
-      const klass = node.baseKlass;
-      if (!klass) continue;
-      const rawTypes: unknown =
-        typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;
-      if (!rawTypes) continue;
-      const type =
-        rawTypes instanceof Map ? rawTypes.get(name) : (rawTypes as Record<string, unknown>)[name];
+      const type = castTypeFromKlass(node.baseKlass, name);
       if (type) return type;
     }
   }
+  // A plain `.joins(:assoc)` is pre-resolved to a SQL clause (not a join
+  // dependency) but retains its target klass; consult it so cast-type
+  // resolution covers the joined column without a global registry scan.
+  for (const j of (rel as { _joinClauses?: Array<{ klass?: unknown }> })._joinClauses ?? []) {
+    const type = castTypeFromKlass(j.klass, name);
+    if (type) return type;
+  }
   return null;
+}
+
+function castTypeFromKlass(klass: any, name: string): unknown {
+  if (!klass) return null;
+  const rawTypes: unknown =
+    typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;
+  if (!rawTypes) return null;
+  return rawTypes instanceof Map ? rawTypes.get(name) : (rawTypes as Record<string, unknown>)[name];
 }
 
 /**

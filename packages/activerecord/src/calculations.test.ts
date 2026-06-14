@@ -7346,6 +7346,36 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     ] as unknown as JoinDependency[]);
     expect(result).toBe(type);
   });
+
+  // A plain `.joins(:assoc)` is pre-resolved to a SQL clause, not a join
+  // dependency, but retains its target klass; the lookup must fall through to
+  // `_joinClauses` so an aggregate over the joined column still resolves its
+  // cast type without a global registry scan.
+  it("returns cast type from a joins(:assoc) clause's retained klass", () => {
+    const dtType = { cast: (v: unknown) => v };
+    const rel = {
+      _joinClauses: [
+        { table: "topics", on: "", klass: { attributeTypes: () => ({ written_on: dtType }) } },
+      ],
+    };
+    const result = lookupCastTypeFromJoinDependencies(rel as any, "written_on", []);
+    expect(result).toBe(dtType);
+  });
+
+  // A has_many :through join emits an intermediate clause (the through model)
+  // plus the final target; the intermediate entry must also carry its klass so
+  // an aggregate over a column on the through table resolves its cast type.
+  it("returns cast type from an intermediate through-join clause's retained klass", () => {
+    const dtType = { cast: (v: unknown) => v };
+    const rel = {
+      _joinClauses: [
+        { table: "taggings", on: "", klass: { attributeTypes: () => ({ created_at: dtType }) } },
+        { table: "tags", on: "", klass: { attributeTypes: () => ({ name: {} }) } },
+      ],
+    };
+    const result = lookupCastTypeFromJoinDependencies(rel as any, "created_at", []);
+    expect(result).toBe(dtType);
+  });
 });
 
 // ==========================================================================
