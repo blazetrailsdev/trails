@@ -58,6 +58,17 @@ export class BigDecimal {
     return `${prefix}${intPart}.${fracPart}`;
   }
 
+  /**
+   * Encode as a JSON string in fixed ("F") form, mirroring ActiveSupport's
+   * `BigDecimal#as_json` (which returns the value, encoded as a string by the
+   * JSON encoder to avoid the float precision loss a bare JSON number would
+   * incur). Without this, `JSON.stringify` would emit the internal
+   * `{sign, intDigits, fracDigits}` shape.
+   */
+  toJSON(): string {
+    return this.toString("F");
+  }
+
   /** Render as `0.<digits>e<exp>` (Ruby's `"E"` form, sans sign prefix). */
   private toScientific(group: number): string {
     const allDigits = this.intDigits + this.fracDigits;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 
 import { Money } from "./money.js";
 
@@ -9,8 +10,8 @@ describe("PostgreSQL::OID::Money", () => {
 
   it("castValue is the public Rails-named hook", () => {
     // cast delegates to castValue; both paths handle locale-formatted
-    // money strings identically.
-    expect(new Money().castValue("$1,234.56")).toBe("1234.56");
-    expect(new Money().cast("$1,234.56")).toBe("1234.56");
+    // money strings identically, returning a BigDecimal (Money < Decimal).
+    expect((new Money().castValue("$1,234.56") as BigDecimal).toString("F")).toBe("1234.56");
+    expect((new Money().cast("$1,234.56") as BigDecimal).toString("F")).toBe("1234.56");
   });
 });

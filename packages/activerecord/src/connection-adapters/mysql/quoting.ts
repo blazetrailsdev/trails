@@ -19,6 +19,7 @@ import {
   formatPlainTimeForSqlMysql as formatPlainTimeForSql,
 } from "../abstract/sql-datetime.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
@@ -181,6 +182,8 @@ export function quote(value: unknown): string {
   // strings; MySQL coerces or rejects at the column-type boundary.
   if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
   if (typeof value === "number" || typeof value === "bigint") return String(value);
+  // Rails: `when BigDecimal then value.to_s("F")` — bare, fixed-form literal.
+  if (value instanceof BigDecimal) return value.toString("F");
   if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
   if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
   if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
@@ -220,6 +223,8 @@ export function typeCast(value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;
+  // Rails type_cast: `when BigDecimal then value.to_s("F")`.
+  if (value instanceof BigDecimal) return value.toString("F");
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);

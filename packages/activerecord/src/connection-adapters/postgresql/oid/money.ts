@@ -6,6 +6,7 @@
  * locale-formatted money strings before delegating to Decimal#cast_value.
  */
 
+import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 
 export class Money extends DecimalType {
@@ -50,7 +51,7 @@ export class Money extends DecimalType {
    * we only fall through to the parent's `castValue` (NOT `cast`) to
    * avoid the virtual-dispatch loop that would re-enter this method.
    */
-  override castValue(value: unknown): string | null {
+  override castValue(value: unknown): BigDecimal | string | null {
     if (value === null || value === undefined) return null;
     if (typeof value !== "string") return super.castValue(value);
 

@@ -10,7 +10,7 @@
 
 import { sql as arelSql, Nodes, Visitors, Table, InsertManager } from "@blazetrails/arel";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, BigDecimal } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TransactionIsolationError, NotImplementedError } from "../../errors.js";
 import {
@@ -1182,6 +1182,10 @@ export function temporalToBindString(
     if (value === DateInfinity) return "infinity";
     if (value === DateNegativeInfinity) return "-infinity";
   }
+  // Cast decimals are BigDecimal values; drivers need a primitive, so send the
+  // fixed ("F") form (Rails' `type_cast`: `when BigDecimal then value.to_s("F")`)
+  // rather than letting the driver JSON-stringify the object.
+  if (value instanceof BigDecimal) return value.toString("F");
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
