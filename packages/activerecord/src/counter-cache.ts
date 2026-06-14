@@ -25,7 +25,9 @@ export async function incrementCounter(
   by: number = 1,
   options?: { touch?: boolean | string | string[] },
 ): Promise<number> {
-  return updateCounters.call(this, id, { [counterName]: by }, options);
+  // Dispatch through `this.updateCounters` (not the local function) so the
+  // Locking::Optimistic override — which bumps the lock version — is honored.
+  return this.updateCounters(id, { [counterName]: by }, options);
 }
 
 /**
@@ -40,7 +42,7 @@ export async function decrementCounter(
   by: number = 1,
   options?: { touch?: boolean | string | string[] },
 ): Promise<number> {
-  return updateCounters.call(this, id, { [counterName]: -by }, options);
+  return this.updateCounters(id, { [counterName]: -by }, options);
 }
 
 /**

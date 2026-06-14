@@ -3699,6 +3699,28 @@ extend(Base, Translation.ClassMethods);
 extend(Base, Sanitization.ClassMethods);
 extend(Base, ReadonlyAttributes.ClassMethods);
 extend(Base, CounterCache.ClassMethods);
+// Mirrors ActiveRecord::Locking::Optimistic::ClassMethods#update_counters, which
+// prepends over CounterCache#update_counters and `super`s into it after merging
+// the locking-column bump. Capture the CounterCache implementation as `super`.
+{
+  const superUpdateCounters = CounterCache.updateCounters;
+  extend(Base, {
+    updateCounters(
+      this: typeof Base,
+      id: unknown,
+      counters: Record<string, number>,
+      options?: { touch?: boolean | string | string[] },
+    ) {
+      return LockingOptimistic.updateCounters.call(
+        this,
+        superUpdateCounters as any,
+        id,
+        counters,
+        options,
+      );
+    },
+  });
+}
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);

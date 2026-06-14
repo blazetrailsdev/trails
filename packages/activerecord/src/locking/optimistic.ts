@@ -106,7 +106,6 @@ const DEFAULT_LOCKING_COLUMN = "lock_version";
 interface LockingHost {
   _lockingColumn: string;
   lockOptimistically?: boolean;
-  updateCounters?(id: unknown, counters: Record<string, number>): Promise<number>;
   _updateRecord?(
     values: Record<string, unknown>,
     constraints: Record<string, unknown>,
@@ -139,27 +138,31 @@ export function resetLockingColumn(this: LockingHost): void {
 
 /**
  * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#update_counters
- * Adds locking_column increment when optimistic locking is enabled.
+ *
+ *   def update_counters(id, counters)
+ *     counters = counters.merge(locking_column => 1) if locking_enabled?
+ *     super
+ *   end
+ *
+ * Merges a `locking_column => 1` bump into the counters and delegates to the
+ * CounterCache implementation (`superFn`), so any counter-cache increment,
+ * decrement, or `update_counters` call also advances the lock version by one.
  */
 export async function updateCounters(
-  this: LockingHost & { all?(): any; primaryKey?: string },
+  this: typeof Base,
+  superFn: (
+    id: unknown,
+    counters: Record<string, number>,
+    options?: { touch?: boolean | string | string[] },
+  ) => Promise<number>,
   id: unknown,
   counters: Record<string, number>,
+  options?: { touch?: boolean | string | string[] },
 ): Promise<number> {
-  if (lockingEnabled(this as any) && this._lockingColumn) {
-    counters = {
-      ...counters,
-      [this._lockingColumn]: (counters[this._lockingColumn] ?? 0) + 1,
-    };
+  if (lockingEnabled(this)) {
+    counters = { ...counters, [lockingColumn(this)]: 1 };
   }
-  // Rails calls super → CounterCache.update_counters → Relation#update_counters
-  const rel = this.all?.();
-  if (!rel?.where) return 0;
-  const scoped = rel.where({ [this.primaryKey ?? "id"]: id });
-  if (typeof scoped.updateCounters === "function") {
-    return scoped.updateCounters(counters);
-  }
-  return 0;
+  return superFn.call(this, id, counters, options);
 }
 
 type InstanceLockingHost = {

@@ -457,10 +457,16 @@ describe("OptimisticLockingTest", () => {
   });
 
   it.skip("counter cache with touch and lock version", () => {
-    // BLOCKED: associations — counter cache with locking not fully integrated
+    // BLOCKED: belongs-to counter cache updates the target through the
+    // relation-level `updateCounters` (with a combined `touch`), which bypasses
+    // the class-level Locking::Optimistic#update_counters override that bumps
+    // lock_version, and the separate belongs-to touch path raises a stale
+    // object. Needs the belongs-to counter-cache+touch+lock integration.
   });
   it.skip("polymorphic destroy with dependencies and lock version", () => {
-    // BLOCKED: associations — polymorphic + locking not supported
+    // BLOCKED: same belongs-to counter-cache+touch+lock integration gap — a
+    // wheel create touches the car via the relation-level counter update and
+    // the separate touch raises StaleObjectError.
   });
   it("removing has and belongs to many associations upon destroy", async () => {
     // RichPerson's async beforeValidation callbacks conflict with the sync
@@ -511,6 +517,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     await defineSchema(
       {
         people: canonicalSchema.people,
+        legacy_things: canonicalSchema.legacy_things,
         personal_legacy_things: canonicalSchema.personal_legacy_things,
         lock_without_defaults: canonicalSchema.lock_without_defaults,
         lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
@@ -519,23 +526,64 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     );
   });
 
-  it.skip("increment counter updates lock version", () => {
-    // BLOCKED: migration — requires DDL column add/remove
+  // Mirrors Rails' private add_counter_column_to / remove_counter_column_from
+  // helpers: add a `test_count` integer column, run reset_column_information so
+  // the model picks it up, then strip it again in the ensure block.
+  async function addCounterColumnTo(model: typeof Base): Promise<void> {
+    await (Base.connection as any).addColumn(model.tableName, "test_count", "integer", {
+      null: false,
+      default: 0,
+    });
+    model.resetColumnInformation();
+  }
+  async function removeCounterColumnFrom(model: typeof Base): Promise<void> {
+    await (Base.connection as any).removeColumn(model.tableName, "test_count");
+    model.resetColumnInformation();
+  }
+
+  // Mirrors Rails' private counter_test(model, expected_count) { |id| ... }.
+  async function counterTest(
+    model: typeof Base,
+    expectedCount: number,
+    op: (id: unknown) => Promise<unknown>,
+  ): Promise<void> {
+    await addCounterColumnTo(model);
+    try {
+      const object = (await (model as any).first())!;
+      expect(object.test_count).toBe(0);
+      expect(object.readAttribute(model.lockingColumn)).toBe(0);
+      await op(object.id);
+      await object.reload();
+      expect(object.test_count).toBe(expectedCount);
+      expect(object.readAttribute(model.lockingColumn)).toBe(1);
+    } finally {
+      await removeCounterColumnFrom(model);
+    }
+  }
+
+  // Rails generates these with { lock_version: Person, custom_lock_version: LegacyThing }.
+  beforeAll(async () => {
+    await Person.createBang({ first_name: "lock counter" });
+    await LegacyThing.createBang({ tps_report_number: 1 });
   });
-  it.skip("decrement counter updates lock version", () => {
-    // BLOCKED: migration — requires DDL column add/remove
+
+  it("increment counter updates lock version", async () => {
+    await counterTest(Person, 1, (id) => Person.incrementCounter("test_count", id));
   });
-  it.skip("update counters updates lock version", () => {
-    // BLOCKED: migration — requires DDL column add/remove
+  it("decrement counter updates lock version", async () => {
+    await counterTest(Person, -1, (id) => Person.decrementCounter("test_count", id));
   });
-  it.skip("increment counter updates custom lock version", () => {
-    // BLOCKED: migration — requires DDL column add/remove
+  it("update counters updates lock version", async () => {
+    await counterTest(Person, 1, (id) => Person.updateCounters(id, { test_count: 1 }));
   });
-  it.skip("decrement counter updates custom lock version", () => {
-    // BLOCKED: migration — requires DDL column add/remove
+  it("increment counter updates custom lock version", async () => {
+    await counterTest(LegacyThing, 1, (id) => LegacyThing.incrementCounter("test_count", id));
   });
-  it.skip("update counters updates custom lock version", () => {
-    // BLOCKED: migration — requires DDL column add/remove
+  it("decrement counter updates custom lock version", async () => {
+    await counterTest(LegacyThing, -1, (id) => LegacyThing.decrementCounter("test_count", id));
+  });
+  it("update counters updates custom lock version", async () => {
+    await counterTest(LegacyThing, 1, (id) => LegacyThing.updateCounters(id, { test_count: 1 }));
   });
 
   it("destroy dependents", async () => {
