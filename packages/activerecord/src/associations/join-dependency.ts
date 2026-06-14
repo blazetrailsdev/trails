@@ -557,19 +557,34 @@ export class JoinDependency {
     return this._joinType;
   }
 
-  // Rails' `join_constraints(joins_to_add, alias_tracker, references)` threads
-  // `references` so make_constraints can alias a join to a referenced table name
-  // (`@references[reflection.name]`). trails resolves all table aliasing eagerly
-  // during tree construction, so `references` is consumed in `addAssociationSpec`
-  // (the build entry) — replacing the old stored `_references` field +
-  // `setReferences` setter — and is accepted here only to keep Rails' arity.
+  // Rails' `join_constraints(joins_to_add, alias_tracker, references)` consumes
+  // `references` lazily inside `make_constraints` during constraint emission, so
+  // a join can be aliased to a referenced table name (`@references[reflection.name]`)
+  // at the moment its ON predicate is built.
+  //
+  // trails currently diverges: it resolves ALL table aliasing eagerly during
+  // tree construction (`addAssociation` / `addAssociationSpec`), so `references`
+  // is fully consumed at the build entry — replacing Rails' lazy lookup and the
+  // old stored `_references` field + `setReferences` setter. By the time
+  // `joinConstraints` runs, every join's alias and ON predicate are already
+  // precomputed; there is no aliasing left for it to perform, so `references`
+  // is `void`-ed here.
+  //
+  // DEVIATION (tracked, pending convergence — not wontfix). Fidelity to Rails is
+  // the goal: this eager model is a temporary divergence, not the intended end
+  // state. The signature convergence already landed (references now arrive as an
+  // argument, #3253); the remaining work is to consume them lazily in
+  // `makeConstraints` and drop the eager aliasing in `addAssociation`, removing
+  // this `void`. Scheduled as RFC 0027 (join-dependency-fidelity) story
+  // `converge-references-lazy-make-constraints`. Surfaced by RFC 0023's
+  // `join-dependency-references-resolved-at-build-not-make-constraints`.
   joinConstraints(
     joinsToAdd: JoinDependency[],
     aliasTracker?: AliasTracker,
     references?: string[],
   ): Nodes.Join[] {
     if (aliasTracker) this._aliasTracker = aliasTracker;
-    void references;
+    void references; // intentionally unused for now — see the deviation note above
     const joins = this.makeJoinConstraints(this._joinRoot, this._joinType);
 
     for (const oj of joinsToAdd) {
