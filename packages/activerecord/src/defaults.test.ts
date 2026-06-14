@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 
@@ -361,8 +362,10 @@ describe("DefaultTest", () => {
     (Order as any).adapter = mockAdapter;
     await loadSchemaFromAdapter.call(Order);
     const val = new Order().amount;
-    // "2.789" cast through DecimalType(scale:2) → "2.79" (rounded to 2 decimal places)
-    expect(val).toBe("2.79");
+    // "2.789" cast through DecimalType(scale:2) → BigDecimal("2.79")
+    // (rounded to 2 decimal places), quoting in fixed "F" form.
+    expect(val).toBeInstanceOf(BigDecimal);
+    expect((val as BigDecimal).toString("F")).toBe("2.79");
   });
 
   it("default value for float", () => {

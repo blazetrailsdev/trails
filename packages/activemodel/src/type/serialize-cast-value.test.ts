@@ -65,13 +65,15 @@ describe("SerializeCastValueTest", () => {
   it("uses #serialize_cast_value when a delegate class prepends SerializeCastValue", () => {
     const type = new Types.DecimalType();
     const cast = type.cast("3.14");
-    expect(type.serialize(cast)).toBe(cast);
+    // Cast decimals are BigDecimal values; serialize re-casts to an equal
+    // BigDecimal (compare by value, not object identity).
+    expect(type.serialize(cast)).toEqual(cast);
   });
 
   it("uses #serialize_cast_value when a delegate class subclass includes SerializeCastValue", () => {
     class CustomDecimal extends Types.DecimalType {}
     const type = new CustomDecimal();
     const cast = type.cast("2.71");
-    expect(type.serialize(cast)).toBe(cast);
+    expect(type.serialize(cast)).toEqual(cast);
   });
 });

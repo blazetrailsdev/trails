@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/domain_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base } from "../../index.js";
@@ -75,7 +76,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       // Rails: assert_equal BigDecimal("34.15"), record.reload.price
       await record.reload();
-      expect(record.price).toBe("34.15");
+      expect((record.price as BigDecimal).toString("F")).toBe("34.15");
     });
   });
 });

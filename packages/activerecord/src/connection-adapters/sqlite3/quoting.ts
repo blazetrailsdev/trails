@@ -15,6 +15,7 @@ import {
   formatPlainTimeForSql,
 } from "../abstract/sql-datetime.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
@@ -69,6 +70,8 @@ export function quote(value: unknown): string {
     return String(value);
   }
   if (typeof value === "bigint") return String(value);
+  // Rails: `when BigDecimal then value.to_s("F")` — bare, fixed-form literal.
+  if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "symbol") {
     if (value.description === undefined) {
       throw new TypeError("can't quote a Symbol without a description");
@@ -136,6 +139,10 @@ export function typeCast(value: unknown): unknown {
   if (typeof value === "boolean") return value ? unquotedTrue() : unquotedFalse();
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "string" || typeof value === "bigint") return value;
+  // Rails SQLite3::Quoting#_type_cast: `when BigDecimal then value.to_f` — a
+  // float, NOT the abstract adapter's `value.to_s("F")` string. (quote() still
+  // emits the fixed-form string via the inherited abstract quoter.)
+  if (value instanceof BigDecimal) return Number(value.toString("F"));
   if (typeof value === "symbol") return value.description ?? null;
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);

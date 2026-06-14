@@ -1,7 +1,8 @@
+import { BigDecimal } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
 
-const NumericValueType = applyNumericMixin(ValueType<string>);
+const NumericValueType = applyNumericMixin(ValueType<BigDecimal | string>);
 
 export class DecimalType extends NumericValueType {
   readonly name: string = "decimal";
@@ -11,20 +12,36 @@ export class DecimalType extends NumericValueType {
   }
 
   typeCastForSchema(value: unknown): string {
+    // Rails: `value.to_s.inspect`. A cast decimal is a BigDecimal whose
+    // default `to_s` is the fixed ("F") form, so dump that string (quoted)
+    // rather than the object's field shape.
+    if (value instanceof BigDecimal) return JSON.stringify(value.toString("F"));
     return JSON.stringify(value) ?? String(value);
   }
 
-  // JS has no BigDecimal, so we represent decimals as strings to avoid
-  // losing precision through IEEE-754 floats. Rails' `cast_value`:
+  // Rails' `cast_value`:
   //   - Numeric  -> BigDecimal(value)
   //   - String   -> value.to_d  (returns BigDecimal(0) on invalid)
   //   - nil      -> nil
-  // We mirror the same shape, returning the string form rather than a
-  // BigDecimal wrapper.
+  // The precision-preserving math runs on digit strings (JS has no native
+  // arbitrary-precision decimal), then the result is wrapped in a
+  // BigDecimal so the value carries its type — decimal binds quote in
+  // fixed ("F") form (`1.5`, `42.0`) rather than as a `'1.5'` string
+  // literal (Rails: `when BigDecimal then value.to_s("F")`).
   /** @internal Rails-private helper. */
-  protected castValue(value: unknown): string | null {
-    const casted = this._castWithoutScale(value);
-    return this.applyScale(casted);
+  protected castValue(value: unknown): BigDecimal | string | null {
+    const casted = this.applyScale(this._castWithoutScale(value));
+    if (casted === null) return null;
+    // BigDecimal has no NaN/±Infinity form; keep those sentinel strings as-is
+    // so PG's 'NaN'/'Infinity'::numeric round-trip (quoted) still works.
+    if (casted === "NaN" || casted === "Infinity" || casted === "-Infinity") return casted;
+    try {
+      return new BigDecimal(casted);
+    } catch {
+      // Adversarial exponents (e.g. "1e10000000") exceed BigDecimal's
+      // expansion cap; leave the raw cast string untouched.
+      return casted;
+    }
   }
 
   /**
@@ -43,12 +60,12 @@ export class DecimalType extends NumericValueType {
    * Trails keeps the same overall cast pipeline but applies `scale:`
    * later via the outer `castValue() → applyScale(...)` step rather
    * than inside this helper, so the inner `apply_scale(value)` call
-   * Rails makes here is intentionally elided. Trails has no
-   * BigDecimal — decimals are strings — so the precision-sensitive
-   * portion translates to "round to `floatPrecision()` significant
-   * digits". When no precision is configured, fall through to
-   * `String(value)` (the same form `_castWithoutScale` would
-   * otherwise emit).
+   * Rails makes here is intentionally elided. This helper runs on the
+   * digit-string stage of the pipeline (before `castValue` wraps the
+   * result in a BigDecimal), so the precision-sensitive portion
+   * translates to "round to `floatPrecision()` significant digits".
+   * When no precision is configured, fall through to `String(value)`
+   * (the same form `_castWithoutScale` would otherwise emit).
    *
    * @internal Rails-private helper.
    */
@@ -104,15 +121,35 @@ export class DecimalType extends NumericValueType {
     return roundHalfUpToScale(value, this.scale);
   }
 
+  /**
+   * Dirty-tracking compares cast values for equality. Cast decimals are
+   * {@link BigDecimal} instances, so a bare `!==` (object identity) would
+   * report every revert as a change. Rails compares with `==` (value
+   * equality); normalize both operands to their fixed-form string before
+   * delegating to the numeric mixin's `isChanged`.
+   */
+  override isChanged(
+    oldValue: unknown,
+    newValue: unknown,
+    newValueBeforeTypeCast?: unknown,
+  ): boolean {
+    const normalize = (v: unknown) => (v instanceof BigDecimal ? v.toString("F") : v);
+    return super.isChanged(normalize(oldValue), normalize(newValue), newValueBeforeTypeCast);
+  }
+
   private _castWithoutScale(value: unknown): string | null {
     if (value === null || value === undefined) return null;
+    // A BigDecimal re-cast (e.g. through serialize) round-trips via its
+    // fixed-form string — Rails treats BigDecimal as ::Numeric and re-wraps
+    // it through `BigDecimal(value, precision)`.
+    if (value instanceof BigDecimal) return value.toString("F");
     if (typeof value === "bigint") return value.toString();
     if (typeof value === "number") {
       // BigDecimal("NaN") / BigDecimal("Infinity") have no decimal string
-      // form; with decimals modelled as strings, the non-finite values
-      // round-trip as sentinels so `nan?`/`infinite?`-style checks and PG's
-      // 'NaN'/'Infinity'::numeric serialization work. Rails routes Float
-      // through `value.to_d`, and `Float::INFINITY.to_d` yields
+      // form, so the non-finite values round-trip as sentinel strings (not
+      // BigDecimals) — `nan?`/`infinite?`-style checks and PG's
+      // 'NaN'/'Infinity'::numeric serialization rely on them. Rails routes
+      // Float through `value.to_d`, and `Float::INFINITY.to_d` yields
       // BigDecimal::INFINITY ("Infinity") rather than nil.
       if (Number.isNaN(value)) return "NaN";
       if (value === Infinity) return "Infinity";
