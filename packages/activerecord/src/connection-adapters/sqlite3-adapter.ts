@@ -17,6 +17,7 @@ import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-defi
 import {
   dataSourceSql as sqliteDataSourceSql,
   extractValueFromDefault as sqliteExtractValueFromDefault,
+  indexes as sqliteIndexes,
 } from "./sqlite3/schema-statements.js";
 import { indexNameForRemoveFrom, indexExistsForRemoveFrom } from "./abstract/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
@@ -1790,47 +1791,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async indexes(tableName: string): Promise<unknown[]> {
-    const { schema, bare } = this._splitTableName(tableName);
-    const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = (await this.execute(
-      `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bare)})`,
-      [],
-      "SCHEMA",
-    )) as Array<{ name: string; unique: number; origin: string }>;
-    // Skip auto-indexes that SQLite generates for PRIMARY KEY / UNIQUE
-    // constraints — Rails' schema cache records user-defined indexes
-    // only, and the auto ones are redundant with the CREATE TABLE sql.
-    const userIndexes = rows.filter((r) => r.origin === "c");
-    const sqliteMaster = schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master";
-    const result: Array<{
-      table: string;
-      name: string;
-      columns: string[];
-      unique: boolean;
-      where?: string;
-    }> = [];
-    for (const idx of userIndexes) {
-      // index_info takes the bare index name; the schema qualifier, if
-      // any, comes before the PRAGMA keyword — same shape as above.
-      const cols = (await this.execute(
-        `PRAGMA ${pragmaPrefix}index_info(${quoteColumnName(idx.name)})`,
-        [],
-        "SCHEMA",
-      )) as Array<{ name: string; seqno: number }>;
-      const idxSqlStmt = await this.driver.prepare(
-        `SELECT sql FROM ${sqliteMaster} WHERE type='index' AND name=${sqliteQuoteStringLiteral(idx.name)}`,
-      );
-      const idxSqlRow = (await idxSqlStmt.get()) as { sql: string } | undefined;
-      const whereMatch = idxSqlRow?.sql ? /\bWHERE\b\s+(.+)$/i.exec(idxSqlRow.sql) : null;
-      result.push({
-        table: bare,
-        name: idx.name,
-        columns: cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name),
-        unique: idx.unique === 1,
-        ...(whereMatch ? { where: whereMatch[1].trim() } : {}),
-      });
-    }
-    return result;
+    return sqliteIndexes(this, tableName);
   }
 
   // --- FK / Check constraint operations (SQLite requires table rebuild) ---
