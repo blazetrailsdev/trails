@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { isBlank, RoundingHelper } from "@blazetrails/activesupport";
+import { isBlank, RoundingHelper, BigDecimal } from "@blazetrails/activesupport";
 import { errorOptions } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 
@@ -58,6 +58,10 @@ export class NumericalityValidator extends EachValidator {
       record.errors.add(attribute, "not_a_number", this.filteredOptions(value));
       return;
     }
+    // A cast/raw decimal is a BigDecimal (Numeric in Rails — Kernel.Float
+    // accepts it). Normalize to its fixed-form string so the string-based
+    // checks below (isNumber, Number(), isInteger) treat it as numeric.
+    if (value instanceof BigDecimal) value = value.toString("F");
     if (this.options.allowBlank && isBlank(value)) return;
 
     if (!this.isNumber(value, precision, scale)) {

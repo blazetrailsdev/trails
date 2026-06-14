@@ -8,7 +8,7 @@ import { Range } from "../../relation.js";
 import { MultiRange, Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
+import { TimeWithZone, TimeZone, setZone, resetZone, BigDecimal } from "@blazetrails/activesupport";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 
@@ -915,14 +915,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("create numrange", async () => {
       // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))
-      // DecimalType.castValue returns string; bounds round-trip as "0.5"/"1".
+      // DecimalType.castValue returns a BigDecimal; bounds round-trip as such.
       const range = new Range("0.5", "1", true);
       const r = await PostgresqlRanges.create({ num_range: range });
       await r.reload();
       const result = r.num_range as Range;
       expect(result).toBeInstanceOf(Range);
-      expect(result.begin).toBe("0.5");
-      expect(result.end).toBe("1");
+      expect((result.begin as BigDecimal).toString("F")).toBe("0.5");
+      expect((result.end as BigDecimal).toString("F")).toBe("1.0");
       expect(result.excludeEnd).toBe(true);
     });
     it("update numrange", async () => {
@@ -931,8 +931,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const range = new Range("0.5", "1", true);
       const r = await PostgresqlRanges.create({ num_range: range });
       await r.reload();
-      expect((r.num_range as Range).begin).toBe("0.5");
-      expect((r.num_range as Range).end).toBe("1");
+      expect(((r.num_range as Range).begin as BigDecimal).toString("F")).toBe("0.5");
+      expect(((r.num_range as Range).end as BigDecimal).toString("F")).toBe("1.0");
       // [0.5,0.5) is empty in numrange → null on reload
       r.num_range = new Range("0.5", "0.5", true);
       await r.saveBang();
