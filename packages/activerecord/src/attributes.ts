@@ -11,7 +11,6 @@
 import {
   Attribute,
   AttributeSet,
-  MissingAttributeError,
   type Type,
   applyPendingAttributeModifications,
   resetDefaultAttributes as amResetDefaultAttributes,
@@ -104,33 +103,18 @@ export function defineAttribute(
   this._virtualAttributesReconciled = false;
   encryptionHooks.applyPendingEncryptions(this);
 
-  // Install prototype accessor so the attribute is readable/writable by name,
-  // matching what applyColumnsHash does for schema-reflected columns.
+  // Route prototype-accessor generation through defineAttributeMethods rather
+  // than installing inline here. Rails generates attribute methods lazily via
+  // `define_attribute_methods`; we mirror that single generation path by
+  // invalidating the generated-methods flag and regenerating, so the accessor
+  // for the just-declared attribute (and the `id`-skip) is handled in one place.
   if (this.prototype) {
-    if (name === "id") {
-      // Let Base.prototype.id (the CPK-aware getter) take precedence.
-      if (Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
-        delete (this.prototype as Record<string, unknown>)["id"];
-      }
-    } else if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
-      Object.defineProperty(this.prototype, name, {
-        get(this: {
-          readAttribute(n: string): unknown;
-          _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
-        }) {
-          if (!this._attributes.getAttribute(name).isInitialized()) {
-            throw new MissingAttributeError(
-              `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-            );
-          }
-          return this.readAttribute(name);
-        },
-        set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
-          this.writeAttribute(name, value);
-        },
-        configurable: true,
-      });
-    }
+    const klass = this as unknown as {
+      _attributeMethodsGenerated?: boolean;
+      defineAttributeMethods?: () => boolean;
+    };
+    klass._attributeMethodsGenerated = false;
+    klass.defineAttributeMethods?.();
   }
 }
 
