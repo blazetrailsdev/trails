@@ -65,6 +65,11 @@ import {
   stringFlag,
   StoryEntry,
   TASKS_DIR,
+  claimAgeHours,
+  isStaleClaim,
+  staleClaims,
+  formatStaleClaims,
+  DEFAULT_STALE_HOURS,
 } from "./cli.ts";
 
 function story(over: Partial<StoryEntry>): StoryEntry {
@@ -256,6 +261,85 @@ describe("formatRows", () => {
 
   it("returns (none) for an empty row set", () => {
     expect(formatRows([])).toBe("(none)");
+  });
+
+  it("marks stale rows with a ! suffix in the status column", () => {
+    const out = formatRows([story({ id: "a", status: "claimed" })], new Set(["a"]));
+    const dataLine = out.split("\n").find((l) => l.startsWith("a"))!;
+    expect(dataLine).toContain("claimed!");
+  });
+});
+
+describe("stale claims", () => {
+  // Fixed clock: 100h after the epoch-ish reference so ages are exact.
+  const NOW = Date.parse("2026-06-13T00:00:00Z");
+  const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
+
+  it("defaults the threshold to 48 hours", () => {
+    expect(DEFAULT_STALE_HOURS).toBe(48);
+  });
+
+  it("computes claim age in hours and returns null for a missing/bad claim", () => {
+    expect(claimAgeHours(hoursAgo(10), NOW)).toBeCloseTo(10);
+    expect(claimAgeHours(null, NOW)).toBeNull();
+    expect(claimAgeHours("not-a-date", NOW)).toBeNull();
+  });
+
+  it("does not flag a fresh claim", () => {
+    const s = story({ status: "claimed", pr: null, claim: hoursAgo(1) });
+    expect(isStaleClaim(s, NOW, 48)).toBe(false);
+  });
+
+  it("flags a claim older than the threshold", () => {
+    const s = story({ status: "claimed", pr: null, claim: hoursAgo(72) });
+    expect(isStaleClaim(s, NOW, 48)).toBe(true);
+  });
+
+  it("does not flag a stale claim that already has a PR", () => {
+    const s = story({ status: "claimed", pr: 123, claim: hoursAgo(72) });
+    expect(isStaleClaim(s, NOW, 48)).toBe(false);
+  });
+
+  it("does not flag in-progress stories", () => {
+    // pr: null so only the status guard can exempt this — isolates that
+    // in-progress is excluded by status, not incidentally by having a PR.
+    const s = story({ status: "in-progress", pr: null, claim: hoursAgo(72) });
+    expect(isStaleClaim(s, NOW, 48)).toBe(false);
+  });
+
+  it("honors a custom threshold", () => {
+    const s = story({ status: "claimed", pr: null, claim: hoursAgo(72) });
+    expect(isStaleClaim(s, NOW, 96)).toBe(false);
+  });
+
+  it("staleClaims selects only the stale, PR-less, claimed stories", () => {
+    const idx = index([
+      story({ id: "fresh", status: "claimed", pr: null, claim: hoursAgo(1) }),
+      story({ id: "stale", status: "claimed", pr: null, claim: hoursAgo(72) }),
+      story({ id: "stalePr", status: "claimed", pr: 9, claim: hoursAgo(72) }),
+      story({ id: "ready", status: "ready", pr: null, claim: null }),
+    ]);
+    expect(staleClaims(idx, NOW, 48).map((s) => s.id)).toEqual(["stale"]);
+  });
+
+  it("orders stale claims oldest first", () => {
+    const idx = index([
+      story({ id: "newer", status: "claimed", pr: null, claim: hoursAgo(60) }),
+      story({ id: "older", status: "claimed", pr: null, claim: hoursAgo(200) }),
+    ]);
+    expect(staleClaims(idx, NOW, 48).map((s) => s.id)).toEqual(["older", "newer"]);
+  });
+
+  it("formatStaleClaims renders id, assignee, and age; empty when none", () => {
+    expect(formatStaleClaims([], NOW)).toBe("");
+    const out = formatStaleClaims(
+      [story({ id: "orphan", status: "claimed", assignee: "bot", claim: hoursAgo(72) })],
+      NOW,
+    );
+    expect(out).toContain("stale claims");
+    expect(out).toContain("orphan");
+    expect(out).toContain("bot");
+    expect(out).toContain("72");
   });
 });
 
