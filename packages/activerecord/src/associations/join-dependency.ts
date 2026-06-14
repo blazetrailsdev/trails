@@ -108,7 +108,6 @@ export class JoinDependency {
   private _arelTablesByIndex: Map<number, Table> = new Map();
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
-  private _treeNodesByPath: Map<string, JoinPart> = new Map();
   private _references: Record<string, string> = Object.create(null) as Record<string, string>;
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
@@ -353,7 +352,7 @@ export class JoinDependency {
     const parts = path.split(".");
     if (parts.length === 1) return this.addAssociation(parts[0]);
 
-    const snapshot = this._snapshotTree();
+    const snapshot = this._capture();
 
     let currentModel = this._baseModel as any;
     let currentAlias = this._baseAlias;
@@ -364,7 +363,7 @@ export class JoinDependency {
       for (const part of parts) {
         const node = this._addOrReuse(part, currentModel, currentAlias, parentPath);
         if (!node) {
-          this._restoreTree(snapshot);
+          this._rollback(snapshot);
           return null;
         }
         lastNode = node;
@@ -379,7 +378,7 @@ export class JoinDependency {
       // addAssociation mutates _nextTableIndex/aliasTracker before the
       // polymorphic check throws; restore so a mid-walk throw leaves the
       // instance unchanged before propagating (e.g. EagerLoadPolymorphicError).
-      this._restoreTree(snapshot);
+      this._rollback(snapshot);
       throw e;
     }
     return lastNode;
@@ -405,17 +404,21 @@ export class JoinDependency {
    * construction from the eager_load values hash).
    */
   addAssociationSpec(spec: AssociationSpec): boolean {
-    const snapshot = this._snapshotTree();
+    // Normalize the spec into a make_tree-style nested hash up front, then
+    // construct the tree from it in one walk (mirrors Rails building the whole
+    // tree once from `make_tree(associations)` rather than incrementally).
+    const tree = eagerSpecToTree(spec);
+    const snapshot = this._capture();
     try {
-      if (!this._walkSpec(spec, this._baseModel, this._baseAlias, "")) {
-        this._restoreTree(snapshot);
+      if (!this._buildSpecTree(tree, this._baseModel, this._baseAlias, "")) {
+        this._rollback(snapshot);
         return false;
       }
     } catch (e) {
       // addAssociation mutates _nextTableIndex/aliasTracker before the
       // polymorphic check throws. Restore so the instance is left unchanged
       // (all-or-nothing) before propagating EagerLoadPolymorphicError.
-      this._restoreTree(snapshot);
+      this._rollback(snapshot);
       throw e;
     }
     return true;
@@ -441,39 +444,30 @@ export class JoinDependency {
     this.build(eagerSpecToTree(spec), this._baseModel);
   }
 
-  /** @internal */
-  private _walkSpec(
-    spec: AssociationSpec | AssociationSpec[],
+  /**
+   * Build the join tree from a normalized make_tree-style hash (dotted strings
+   * already split into nested keys by `eagerSpecToTree`). Each key becomes a
+   * JOIN via `_addOrReuse`; children recurse under the joined node's model and
+   * effective alias. Returns false on the first un-joinable segment so the
+   * caller can roll back and degrade to preloading.
+   * @internal
+   */
+  private _buildSpecTree(
+    hash: Record<PropertyKey, any>,
     model: typeof Base,
     alias: string,
     parentPath: string,
   ): boolean {
-    if (Array.isArray(spec)) {
-      return spec.every((s) => this._walkSpec(s, model, alias, parentPath));
-    }
-    if (typeof spec === "string") {
-      // Dotted strings ("comments.author") are walked segment-by-segment so
-      // each level threads the correct source model/alias.
-      let m = model;
-      let a = alias;
-      let pp = parentPath;
-      for (const part of spec.split(".")) {
-        const node = this._addOrReuse(part, m, a, pp);
-        if (!node) return false;
-        m = node.baseKlass;
-        a = node.effectiveSqlName;
-        pp = pp ? `${pp}.${part}` : part;
-      }
-      return true;
-    }
-    for (const key of Object.keys(spec)) {
-      const node = this._addOrReuse(key, model, alias, parentPath);
+    for (const key of Reflect.ownKeys(hash)) {
+      const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
+      const node = this._addOrReuse(name, model, alias, parentPath);
       if (!node) return false;
-      const child = spec[key];
-      const childPath = parentPath ? `${parentPath}.${key}` : key;
+      const child = hash[key];
+      const childPath = parentPath ? `${parentPath}.${name}` : name;
       if (
         child != null &&
-        !this._walkSpec(child, node.baseKlass, node.effectiveSqlName, childPath)
+        Reflect.ownKeys(child).length > 0 &&
+        !this._buildSpecTree(child, node.baseKlass, node.effectiveSqlName, childPath)
       ) {
         return false;
       }
@@ -492,8 +486,7 @@ export class JoinDependency {
     fromAlias: string,
     parentPath: string,
   ): JoinPart | null {
-    const fullPath = parentPath ? `${parentPath}.${assocName}` : assocName;
-    const existing = this._treeNodesByPath.get(fullPath);
+    const existing = this._findNodeByPath(parentPath ? `${parentPath}.${assocName}` : assocName);
     if (existing) return existing;
     return this.addAssociation(assocName, {
       fromModel,
@@ -502,15 +495,40 @@ export class JoinDependency {
     });
   }
 
-  /** @internal */
-  private _snapshotTree(): {
-    paths: Set<string>;
+  /**
+   * Resolve a tree node by its dotted association path (`comments.author`) by
+   * walking children from the root. Replaces the `_treeNodesByPath` index:
+   * the tree itself is the source of truth. Empty/null path is the root.
+   * @internal
+   */
+  private _findNodeByPath(path: string | null): JoinPart | null {
+    if (!path) return this._joinRoot;
+    let node: JoinPart = this._joinRoot;
+    for (const segment of path.split(".")) {
+      const child = node.children.find((c) => c.immediateAssocName === segment);
+      if (!child) return null;
+      node = child;
+    }
+    return node;
+  }
+
+  /**
+   * Snapshot the alias bookkeeping + current tree nodes so an all-or-nothing
+   * spec build can be rolled back when a later segment proves un-joinable.
+   * @internal
+   */
+  private _capture(): {
+    nodes: Set<JoinPart>;
     aliases: number;
     nextIndex: number;
     tracker: Map<string, number>;
   } {
+    const nodes = new Set<JoinPart>();
+    this._joinRoot.each((p) => {
+      if (p !== this._joinRoot) nodes.add(p);
+    });
     return {
-      paths: new Set(this._treeNodesByPath.keys()),
+      nodes,
       aliases: this._aliases.length,
       nextIndex: this._nextTableIndex,
       tracker: new Map(this._aliasTracker.aliases),
@@ -518,13 +536,23 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _restoreTree(snapshot: {
-    paths: Set<string>;
+  private _rollback(snapshot: {
+    nodes: Set<JoinPart>;
     aliases: number;
     nextIndex: number;
     tracker: Map<string, number>;
   }): void {
-    this._rollbackTree(snapshot.paths);
+    const prune = (parent: JoinPart): void => {
+      for (let i = parent.children.length - 1; i >= 0; i--) {
+        const child = parent.children[i];
+        if (snapshot.nodes.has(child)) {
+          prune(child);
+        } else {
+          parent.children.splice(i, 1);
+        }
+      }
+    };
+    prune(this._joinRoot);
     this._aliases.length = snapshot.aliases;
     this._nextTableIndex = snapshot.nextIndex;
     this._aliasTracker.aliases.clear();
@@ -1140,49 +1168,13 @@ export class JoinDependency {
 
   private _insertTreeNode(treePart: JoinPart): void {
     const parentPath = treePart.parentPath;
-    let parent: JoinPart;
-    if (parentPath) {
-      const found = this._treeNodesByPath.get(parentPath);
-      if (!found) {
-        throw new Error(
-          `JoinDependency tree: parent path "${parentPath}" not found for "${treePart.immediateAssocName}"`,
-        );
-      }
-      parent = found;
-    } else {
-      parent = this._joinRoot;
+    const parent = this._findNodeByPath(parentPath);
+    if (!parent) {
+      throw new Error(
+        `JoinDependency tree: parent path "${parentPath}" not found for "${treePart.immediateAssocName}"`,
+      );
     }
     parent.children.push(treePart);
-    const fullPath = parentPath
-      ? `${parentPath}.${treePart.immediateAssocName}`
-      : treePart.immediateAssocName;
-    this._treeNodesByPath.set(fullPath, treePart);
-  }
-
-  private _rollbackTree(snapshotPaths: Set<string>): void {
-    const toRemove: string[] = [];
-    for (const key of this._treeNodesByPath.keys()) {
-      if (!snapshotPaths.has(key)) toRemove.push(key);
-    }
-    for (const key of toRemove.reverse()) {
-      const part = this._treeNodesByPath.get(key)!;
-      this._treeNodesByPath.delete(key);
-      const lastDot = key.lastIndexOf(".");
-      const parentKey = lastDot === -1 ? null : key.slice(0, lastDot);
-      const parent = parentKey
-        ? (this._treeNodesByPath.get(parentKey) ?? this._joinRoot)
-        : this._joinRoot;
-      const idx = parent.children.indexOf(part);
-      if (idx !== -1) parent.children.splice(idx, 1);
-    }
-  }
-
-  private _resolveTreeParent(parentPath: string): JoinPart {
-    const found = this._treeNodesByPath.get(parentPath);
-    if (!found) {
-      throw new Error(`JoinDependency tree: parent path "${parentPath}" not found`);
-    }
-    return found;
   }
 
   private _addThroughViaJoinAssociation(
@@ -1365,7 +1357,7 @@ export class JoinDependency {
  * Convert an eager-load spec (string, dotted string, array, or nested hash)
  * into the nested-hash tree `JoinDependency#build` consumes. Unlike
  * `JoinDependency.makeTree`, dotted strings ("comments.author") are split into
- * nested levels, matching how `_walkSpec` walks them segment-by-segment.
+ * nested levels, so `_buildSpecTree` joins them segment-by-segment.
  */
 function eagerSpecToTree(
   spec: AssociationSpec | AssociationSpec[],
