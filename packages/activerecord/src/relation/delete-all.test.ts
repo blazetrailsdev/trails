@@ -33,6 +33,10 @@ beforeAll(async () => {
     users: { name: "string", active: "boolean" },
     delete_all_authors: { name: "string" },
     delete_all_posts: { title: "string", author_id: "integer" },
+    cpk_orders: {
+      columns: { shop_id: "integer", id: "integer", status: "string" },
+      primaryKey: ["shop_id", "id"],
+    },
   });
 });
 
@@ -182,6 +186,27 @@ describe("DeleteAllTest", () => {
     await Post.where({ author: "hal" }).deleteAll();
     const remaining = await Post.all().toArray();
     expect(remaining.length).toBe(0);
+  });
+
+  it("delete all composite model with order and limit deletes subset only", async () => {
+    class CpkOrder extends Base {
+      static {
+        this.tableName = "cpk_orders";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "id"];
+      }
+    }
+    await CpkOrder.create({ shop_id: 1, id: 1, status: "pending" });
+    await CpkOrder.create({ shop_id: 1, id: 2, status: "pending" });
+    const limited = CpkOrder.where({ status: "pending" }).order("id").limit(1);
+    expect(await limited.count()).toBe(1);
+    expect(await limited.deleteAll()).toBe(1);
+    const remaining = await CpkOrder.all().toArray();
+    const remainingIds = remaining.map((o) => o.readAttribute("id"));
+    expect(remainingIds).not.toContain(1);
+    expect(remainingIds).toContain(2);
   });
 });
 

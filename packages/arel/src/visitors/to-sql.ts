@@ -707,7 +707,13 @@ export class ToSql extends Visitor {
     collector.append("(");
     let inner = node.expr;
     while (inner instanceof Nodes.Grouping) inner = inner.expr;
-    if (inner instanceof Node) {
+    if (Array.isArray(inner)) {
+      // Composite-key row-value tuple: `(pk1, pk2, ...)`.
+      inner.forEach((item, i) => {
+        if (i > 0) collector.append(", ");
+        this.visit(item, collector);
+      });
+    } else if (inner instanceof Node) {
       this.visit(inner, collector);
     } else if (inner !== null && inner !== undefined) {
       collector.append(String(inner));
@@ -1550,7 +1556,7 @@ export class ToSql extends Visitor {
   }
 
   protected buildSubselect(
-    key: Node,
+    key: Node | Node[],
     o: {
       relation: Node | null;
       wheres: Node[];
@@ -1565,7 +1571,9 @@ export class ToSql extends Visitor {
     const core = stmt.cores[0];
     if (o.relation) core.source = new Nodes.JoinSource(o.relation);
     core.wheres = [...o.wheres];
-    core.projections = [key];
+    // A composite key projects each column (`SELECT pk1, pk2`); Rails relies on
+    // `visit_Array` to comma-join, here we spread for the same SQL.
+    core.projections = Array.isArray(key) ? [...key] : [key];
     core.groups = [...o.groups];
     core.havings = [...o.havings];
     stmt.limit = o.limit;
@@ -1727,8 +1735,12 @@ export class ToSql extends Visitor {
       stmt.limit = null;
       stmt.offset = null;
       stmt.orders = [];
-      const rawKey = Array.isArray(o.key) ? o.key[0] : o.key;
-      const key = this.subselectKey(rawKey);
+      // A composite primary key arrives as an array of column nodes; the
+      // visitor renders it as a row-value tuple `(pk1, pk2) IN (SELECT pk1, pk2
+      // ...)`. Mirrors Rails `prepare_delete_statement`'s `Grouping.new(o.key)`.
+      const key = Array.isArray(o.key)
+        ? o.key.map((k) => this.subselectKey(k))
+        : this.subselectKey(o.key);
       const columns = new Nodes.Grouping(key);
       stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
       if (this.hasJoinSources(o)) {

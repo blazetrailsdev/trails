@@ -581,7 +581,7 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#compile_delete
    */
   compileDelete(
-    key: Node | null = null,
+    key: Node | Node[] | null = null,
     havingClause: Node | null = null,
     groupValuesColumns: Node[] = [],
   ): DeleteManager {
