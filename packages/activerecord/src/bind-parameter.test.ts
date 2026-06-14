@@ -7,12 +7,16 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { IntegerType, StringType } from "@blazetrails/activemodel";
+import { Nodes, Collectors } from "@blazetrails/arel";
 import { LogSubscriber } from "./log-subscriber.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import { Base } from "./index.js";
+import { registerModel } from "./associations.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { Author } from "./test-helpers/models/author.js";
+import { Post } from "./test-helpers/models/post.js";
 
 // Captures `sql.active_record` notification events, mirroring Rails'
 // LogListener subscribed in the test's `setup`.
@@ -132,12 +136,17 @@ describe("BindParameterTest", () => {
     }
   });
 
-  it.skip("bind from join in subquery", () => {
-    // DEFERRED (story f9-bind-params-to-sql-and-join-subquery): needs association-name joins (`joins(:thinking_posts)`) plus
-    // bind threading through `from(subquery)`. trails' `joins(table, on)` is the
-    // manual SQL-fragment form only — a bare association name renders as a raw
-    // table alias (`FROM authors thinkingPosts`), never an INNER JOIN. Wiring
-    // association joins is production work, tracked in the follow-up story.
+  it("bind from join in subquery", async () => {
+    // Rails: `joins(:thinking_posts)` — a bare association name resolved to an
+    // INNER JOIN. trails resolves association joins through the model registry,
+    // so register the canonical Author/Post here (their fixtures load above but
+    // don't auto-register the classes).
+    registerModel(Author);
+    registerModel(Post);
+
+    const subquery = Author.joins("thinkingPosts").where({ name: "David" });
+    const scope = Author.from(subquery, "authors").where({ id: 1 });
+    expect(await scope.count()).toBe(1);
   });
 
   it.skip("binds are logged", () => {
@@ -198,16 +207,65 @@ describe("BindParameterTest", () => {
     );
   });
 
-  it.skip("bind params to sql with prepared statements", () => {
-    // DEFERRED (story f9-bind-params-to-sql-and-join-subquery): Rails builds the expected SQL with `@connection.send(:collector)`
-    // + `visitor.compile(bind_params, collector)` to render adapter-correct
-    // placeholders ($1/?/literal) with shared bind numbering. trails' `compile`
-    // takes a single node with no shared collector state, so the multi-bind
-    // numbering can't be reproduced test-only — tracked in the follow-up story.
+  // Mirrors Rails' `bind_params(ids)` helper (bind_parameter_test.rb:254): build
+  // a list of BindParam nodes and compile them through a single shared collector
+  // (`@connection.send(:collector)` + `visitor.compile(bind_params, collector)`).
+  // Deliberate deviation: trails' `to_sql` always inlines bind values (it mirrors
+  // Rails' *unprepared* `to_sql` even when prepared_statements is on — see
+  // database-statements.ts), so we drive an inlining SubstituteBinds collector
+  // here regardless of mode. That renders the IN-list the same way `to_sql` does
+  // (`1, 2, 3`) so the expected SQL matches on every adapter.
+  function bindParams(conn: any, ids: number[]): string {
+    const collector = new Collectors.SubstituteBinds(conn, new Collectors.SQLString());
+    return conn.visitor.compile(
+      ids.map((i) => new Nodes.BindParam(i)),
+      collector,
+    );
+  }
+
+  async function assertBindParamsToSql(conn: any): Promise<void> {
+    const table = conn.quoteTableName(Author.tableName);
+    const pk = `${table}.${conn.quoteColumnName(Author.primaryKey)}`;
+
+    let sql = `SELECT ${table}.* FROM ${table} WHERE (${pk} IN (${bindParams(conn, [1, 2, 3])}) OR ${pk} IS NULL)`;
+    const authors = Author.where({ id: [1, 2, 3, null] });
+    expect(conn.toSql(authors.arel())).toBe(sql);
+    expect((await authors.toArray()).length).toBe(3);
+
+    // Rails' middle assertion (`where(id: [1, 2, 3, 2**63])` → `IN (1, 2, 3)`)
+    // tests that an over-range integer is excluded from the array condition.
+    // trails' ArrayHandler doesn't yet drop out-of-range values from `IN`
+    // (the integer type's range check isn't applied per-element there) — that is
+    // a distinct gap from this story's bind_params_to_sql collector, tracked
+    // separately as story `array-where-integer-range-exclusion`.
+
+    sql = `SELECT ${table}.* FROM ${table} WHERE ${pk} IN (${bindParams(conn, [1, 2, 3])})`;
+    const arelNode = new Nodes.BoundSqlLiteral(
+      `SELECT ${table}.* FROM ${table} WHERE ${pk} IN (?)`,
+      [[1, 2, 3]],
+    );
+    expect(conn.toSql(arelNode)).toBe(sql);
+    // trails' adapter `selectAll` takes a SQL string (Rails' takes arel); render
+    // the inlined SQL through the same connection path before executing.
+    expect((await conn.selectAll(conn.toSql(arelNode))).length).toBe(3);
+  }
+
+  it("bind params to sql with prepared statements", async (ctx) => {
+    // Rails wraps the whole BindParameterTest in `if prepared_statements`;
+    // MySQL/MariaDB default it off, so mirror that class-level guard here.
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    registerModel(Author);
+    await assertBindParamsToSql(conn);
   });
-  it.skip("bind params to sql with unprepared statements", () => {
-    // DEFERRED (story f9-bind-params-to-sql-and-join-subquery): see
-    // "bind params to sql with prepared statements".
+
+  it("bind params to sql with unprepared statements", async (ctx) => {
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    registerModel(Author);
+    await conn.unpreparedStatement(async () => {
+      await assertBindParamsToSql(conn);
+    });
   });
 
   it("nested unprepared statements", async (ctx) => {
