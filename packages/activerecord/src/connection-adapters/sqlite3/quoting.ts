@@ -139,8 +139,10 @@ export function typeCast(value: unknown): unknown {
   if (typeof value === "boolean") return value ? unquotedTrue() : unquotedFalse();
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "string" || typeof value === "bigint") return value;
-  // Rails type_cast: `when BigDecimal then value.to_s("F")`.
-  if (value instanceof BigDecimal) return value.toString("F");
+  // Rails SQLite3::Quoting#_type_cast: `when BigDecimal then value.to_f` — a
+  // float, NOT the abstract adapter's `value.to_s("F")` string. (quote() still
+  // emits the fixed-form string via the inherited abstract quoter.)
+  if (value instanceof BigDecimal) return Number(value.toString("F"));
   if (typeof value === "symbol") return value.description ?? null;
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
