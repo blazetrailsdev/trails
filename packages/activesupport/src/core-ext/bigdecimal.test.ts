@@ -9,6 +9,13 @@ describe("BigDecimalTest", () => {
     expect(bd.toString("+1F")).toBe("+0.0 1");
   });
 
+  it("encodes as a JSON string in fixed form", () => {
+    // ActiveSupport encodes BigDecimal as a JSON string to avoid float
+    // precision loss; JSON.stringify must not leak the internal digit shape.
+    expect(JSON.stringify(new BigDecimal("1.5"))).toBe('"1.5"');
+    expect(JSON.stringify({ price: new BigDecimal("42") })).toBe('{"price":"42.0"}');
+  });
+
   it("to s with scientific notation", () => {
     expect(new BigDecimal("1234.5678").toString("E")).toBe("0.12345678e4");
     expect(new BigDecimal("1234.5678").toString("e")).toBe("0.12345678e4");
