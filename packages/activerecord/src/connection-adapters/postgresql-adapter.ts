@@ -70,6 +70,7 @@ import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements, JoinTableOptions } from "./abstract/schema-statements.js";
+import { indexNameForRemoveFrom, indexExistsForRemoveFrom } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
@@ -3211,7 +3212,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    return this.pgSchemaStatements().renameIndex(tableName, oldName, newName);
+    const { schema } = this.parseSchemaQualifiedName(tableName);
+    const qualifiedOld = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(oldName)}`
+      : this.quoteIdentifier(oldName);
+    await this.exec(`ALTER INDEX ${qualifiedOld} RENAME TO ${this.quoteIdentifier(newName)}`);
   }
 
   async columns(tableName: string): Promise<Column[]> {
@@ -3940,7 +3945,65 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       comment?: string;
     } = {},
   ): Promise<string> {
-    return this.pgSchemaStatements().addIndex(tableName, columns, options);
+    const cols = Array.isArray(columns) ? columns : [columns];
+    const quotedTable = this.quoteTableName(tableName);
+
+    const indexName =
+      options.name ?? `index_${tableName.replace(/[."]/g, "_")}_on_${cols.join("_and_")}`;
+
+    if (options.algorithm && options.algorithm !== "concurrently") {
+      throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
+    }
+    if (options.algorithm === "concurrently" && this._inTransaction) {
+      throw new Error("CREATE INDEX CONCURRENTLY cannot run inside a transaction");
+    }
+
+    const unique = options.unique ? "UNIQUE " : "";
+    const concurrently = options.algorithm === "concurrently" ? "CONCURRENTLY " : "";
+    const ifNotExists = options.ifNotExists ? "IF NOT EXISTS " : "";
+    const using = options.using ? ` USING ${options.using}` : "";
+
+    const colDefs = cols.map((col) => {
+      const isExpression = col.includes("(") || col.includes(" ");
+      let result = isExpression ? col : this.quoteIdentifier(col);
+      if (options.opclass) {
+        const op = options.opclass[col];
+        if (op) result += ` ${op}`;
+      }
+      if (options.order) {
+        if (typeof options.order === "string") {
+          result += ` ${options.order}`;
+        } else {
+          const o = options.order[col];
+          if (o) result += ` ${o.toUpperCase()}`;
+        }
+      }
+      return result;
+    });
+
+    let sql = `CREATE ${unique}INDEX ${concurrently}${ifNotExists}${this.quoteIdentifier(indexName)} ON ${quotedTable}${using} (${colDefs.join(", ")})`;
+
+    if (options.include) {
+      sql += ` INCLUDE (${options.include.map((c) => this.quoteIdentifier(c)).join(", ")})`;
+    }
+    if (options.nullsNotDistinct) {
+      sql += " NULLS NOT DISTINCT";
+    }
+    if (options.where) {
+      sql += ` WHERE ${options.where}`;
+    }
+
+    await this.exec(sql);
+
+    if (options.comment?.trim()) {
+      const { schema } = this.parseSchemaQualifiedName(tableName);
+      const qualifiedIndex = schema
+        ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(indexName)}`
+        : this.quoteIdentifier(indexName);
+      await this.exec(`COMMENT ON INDEX ${qualifiedIndex} IS ${this.quote(options.comment)}`);
+    }
+
+    return sql;
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#remove_index
@@ -3957,7 +4020,67 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       ifExists?: boolean;
     } = {},
   ): Promise<void> {
-    return this.pgSchemaStatements().removeIndex(tableName, columnOrOptions, options);
+    // Rails: `remove_index(table_name, column_name = nil, **options)` — column
+    // may be positional or in the options hash.
+    let columnName: string | string[] | undefined;
+    let opts: { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean };
+    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
+      columnName = columnOrOptions;
+      opts = options;
+    } else {
+      columnName = undefined;
+      opts = columnOrOptions ?? {};
+    }
+
+    if (opts.algorithm && opts.algorithm !== "concurrently") {
+      throw new Error(`Unknown algorithm: ${opts.algorithm}. Only 'concurrently' is supported.`);
+    }
+    if (opts.algorithm === "concurrently" && this._inTransaction) {
+      throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
+    }
+
+    // Rails strips the schema from the table (PG `index_name` resolves against
+    // the unqualified table) and, when a name is given, splits its schema off:
+    // the bare identifier becomes the name to match, the index is dropped in the
+    // table's schema (or the name's schema when the table is unqualified), and a
+    // conflicting schema pair raises.
+    const { schema: tableSchema, table: bareTable } = this.parseSchemaQualifiedName(tableName);
+    let dropSchema = tableSchema;
+    let resolveOpts = opts;
+    if (opts.name != null) {
+      const { schema: nameSchema, table: nameIdent } = this.parseSchemaQualifiedName(opts.name);
+      resolveOpts = { ...opts, name: nameIdent };
+      if (!tableSchema) dropSchema = nameSchema;
+      if (nameSchema && tableSchema && nameSchema !== tableSchema) {
+        throw new ArgumentError(
+          `Index schema '${nameSchema}' does not match table schema '${tableSchema}'`,
+        );
+      }
+    }
+
+    // A bare `{ name }` resolves without introspection (Rails
+    // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
+    const canRemoveByName =
+      columnName == null && resolveOpts.name != null && resolveOpts.column == null;
+    const all =
+      opts.ifExists || !canRemoveByName
+        ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
+        : [];
+    // Rails: `return if options[:if_exists] && !index_exists?(...)`.
+    const genName = (t: string, c: string | string[]) => this.generateIndexName(t, c);
+    if (
+      opts.ifExists &&
+      !indexExistsForRemoveFrom(genName, all, bareTable, columnName, resolveOpts)
+    ) {
+      return;
+    }
+    const indexName = indexNameForRemoveFrom(genName, all, bareTable, columnName, resolveOpts);
+
+    const concurrently = opts.algorithm === "concurrently" ? " CONCURRENTLY" : "";
+    const qualifiedIndex = dropSchema
+      ? `${this.quoteIdentifier(dropSchema)}.${this.quoteIdentifier(indexName)}`
+      : this.quoteIdentifier(indexName);
+    await this.exec(`DROP INDEX${concurrently} ${qualifiedIndex}`);
   }
 
   async addForeignKey(
@@ -4455,16 +4578,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   override schemaStatements(host?: DatabaseAdapter): SchemaStatements {
-    // PostgreSQLSchemaStatements#addIndex returns Promise<string> (the generated
-    // SQL) rather than the base Promise<void>, so it is not a structural subtype
-    // of SchemaStatements — cast through unknown.
-    return new PostgreSQLSchemaStatements(
-      (host ?? this) as unknown as DatabaseAdapter,
-    ) as unknown as SchemaStatements;
+    return new PostgreSQLSchemaStatements((host ?? this) as unknown as DatabaseAdapter);
   }
 
   private pgSchemaStatements(): PostgreSQLSchemaStatements {
-    return this.schemaStatements() as unknown as PostgreSQLSchemaStatements;
+    return this.schemaStatements() as PostgreSQLSchemaStatements;
   }
 
   async dropTable(

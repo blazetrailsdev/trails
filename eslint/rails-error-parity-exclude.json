@@ -58,7 +58,6 @@
   "packages/activerecord/src/connection-adapters/postgresql/quoting.ts",
   "packages/activerecord/src/connection-adapters/postgresql/schema-creation.ts",
   "packages/activerecord/src/connection-adapters/postgresql/schema-definitions.ts",
-  "packages/activerecord/src/connection-adapters/postgresql/schema-statements-class.ts",
   "packages/activerecord/src/connection-adapters/sqlite3-adapter.ts",
   "packages/activerecord/src/connection-adapters/sqlite3/quoting.ts",
   "packages/activerecord/src/connection-adapters/sqlite3/schema-creation.ts",
