@@ -2,7 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { Association } from "./association.js";
 import { strictLoadingViolationBang } from "../core.js";
-import { RecordNotSaved } from "../errors.js";
+import { RecordInvalid } from "../validations.js";
 
 /**
  * Base class for has_one and belongs_to associations.
@@ -124,10 +124,7 @@ export class SingularAssociation extends Association {
     if (typeof (record as any).save === "function") {
       const saved = await (record as any).save();
       if (!saved && shouldRaise) {
-        throw new RecordNotSaved(
-          `Failed to save the new associated ${this.reflection.name}.`,
-          record,
-        );
+        throw new RecordInvalid(record);
       }
     }
     return record;
