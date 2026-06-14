@@ -2535,10 +2535,11 @@ export class Relation<T extends Base> {
   private _addEagerSpecsToJoinDependency(
     jd: JoinDependency,
     specs: AssociationSpec[],
+    references: string[] = [],
   ): AssociationSpec[] {
     const fallbackAssocs: AssociationSpec[] = [];
     for (const spec of specs) {
-      if (!jd.addAssociationSpec(spec)) fallbackAssocs.push(spec);
+      if (!jd.addAssociationSpec(spec, references)) fallbackAssocs.push(spec);
     }
     return fallbackAssocs;
   }
@@ -2559,9 +2560,11 @@ export class Relation<T extends Base> {
     }
 
     const jd = new JoinDependency(this._modelClass);
-    jd.setReferences(this._aliasableReferences());
-
-    const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerAssociations);
+    const fallbackAssocs = this._addEagerSpecsToJoinDependency(
+      jd,
+      eagerAssociations,
+      this._aliasableReferences(),
+    );
 
     // If no associations could be JOINed, fall back entirely to preload
     if (jd.nodes.length === 0) {
@@ -4326,8 +4329,7 @@ export class Relation<T extends Base> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
 
     const jd = new JoinDependency(this._modelClass);
-    jd.setReferences(this._aliasableReferences());
-    this._addEagerSpecsToJoinDependency(jd, allEager);
+    this._addEagerSpecsToJoinDependency(jd, allEager, this._aliasableReferences());
     if (jd.nodes.length === 0) return null;
 
     return this._buildEagerJoinManager(jd, basePk);
