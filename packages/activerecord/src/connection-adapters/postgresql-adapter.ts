@@ -2163,23 +2163,36 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Mirrors Rails' private `PostgreSQLAdapter#connect`: open `@raw_connection`
+   * and run `configure_connection`. With the single-client design that work
+   * lives in `_acquireFreshClient` (open + `_maybeConfigureConnection`), which
+   * this delegates to. Driven by `connectBang()` (initial use) and
+   * `reconnect()` (post-failure) so both populate `_connection` eagerly.
+   *
+   * @internal
+   */
+  async connect(): Promise<void> {
+    await this._acquireFreshClient();
+  }
+
+  /**
    * Mirrors Rails' `connect!` establishing `@raw_connection`. Eagerly opens
-   * and configures the single pg.Client (via `_acquireFreshClient`) so the
-   * base `withRawConnection` loop yields `this._connection` directly — no lazy
+   * and configures the single pg.Client (via `connect()`) so the base
+   * `withRawConnection` loop yields `this._connection` directly — no lazy
    * per-iteration re-acquire. Called pre-loop by the base when `_connection`
    * is null and the transaction state is restorable.
    *
    * @internal
    */
   override async connectBang(): Promise<void> {
-    await this._acquireFreshClient();
+    await this.connect();
   }
 
   /**
    * Mirrors Rails' private `PostgreSQLAdapter#reconnect`. Fires a
    * non-blocking `client.end()` on the old connection (fire-and-forget),
-   * resets all per-connection state, and leaves the new connection to
-   * be opened lazily on next use.
+   * resets all per-connection state, then eagerly re-opens + reconfigures
+   * the new connection via `connect()`.
    *
    * Like Rails' private `reconnect`, this does NOT reset the transaction
    * manager — that is owned by the inherited `AbstractAdapter#reconnectBang`
@@ -2202,11 +2215,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._closed = false;
     conn?.end().catch(() => {});
     // Rails' private `reconnect` repopulates `@raw_connection` (PQreset). Eagerly
-    // open + configure the new pg.Client so `withRawConnection` yields a live
-    // handle directly, with no lazy second acquire. The inherited
+    // open + configure the new pg.Client via `connect()` so `withRawConnection`
+    // yields a live handle directly, with no lazy second acquire. The inherited
     // `reconnectBang` awaits this (and retries connection errors); the
     // fire-and-forget error-handler callers ignore the result via `.catch`.
-    await this._acquireFreshClient();
+    await this.connect();
   }
 
   /**
