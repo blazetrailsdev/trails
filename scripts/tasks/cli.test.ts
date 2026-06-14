@@ -1426,6 +1426,12 @@ describe("uncheckedCheckboxes", () => {
     const body = "* [ ] star item\n+ [ ] plus item\n  - [ ] indented item\n";
     expect(uncheckedCheckboxes(body)).toEqual(["star item", "plus item", "indented item"]);
   });
+
+  it("counts a text-less `- [ ]` box as unchecked with empty text", () => {
+    // A bare checkbox is still an unfinished criterion, so it must block
+    // `done`; the empty string documents that it carries no label.
+    expect(uncheckedCheckboxes("- [ ]\n")).toEqual([""]);
+  });
 });
 
 describe("checkCheckboxesDone (done unchecked-checkbox guard)", () => {
