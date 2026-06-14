@@ -140,19 +140,21 @@ interface PrimaryKeyHost {
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key
  *
- * Honors an explicitly-configured primary key (an own `_primaryKey`, set via
- * `primary_key=` or generated). Otherwise mirrors Rails' get_primary_key:
- * consult the schema cache so a key-less data source (e.g. a view) resolves to
- * `null` rather than the "id" convention. The lookup is query-free — it reads
- * only what `loadSchema` already warmed — so a cold cache falls back to "id".
- * The declared non-null return mirrors the host contract used elsewhere; the
- * `null` it can return matches Rails' dynamically-nil `primary_key` for a view.
+ * Honors an explicitly-configured primary key — read through the prototype
+ * chain, so an STI subclass inherits the value its base set with `primary_key=`
+ * (Rails copies base_class.primary_key into the subclass; the chain is the
+ * equivalent here). When nothing is configured anywhere up the chain, mirror
+ * Rails' get_primary_key: consult the schema cache so a key-less data source
+ * (e.g. a view) resolves to `null` rather than the "id" convention. The lookup
+ * is query-free — it reads only what `loadSchema` already warmed — so a cold
+ * cache falls back to "id". The declared non-null return mirrors the host
+ * contract used elsewhere; the `null` it can return matches Rails'
+ * dynamically-nil `primary_key` for a view.
  * @internal
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] {
-  if (Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
-    return this._primaryKey ?? "id";
-  }
+  const configured = this._primaryKey;
+  if (configured !== undefined) return configured;
   try {
     const table = this.tableName;
     const cached = table ? this.connection?.schemaCache?.getCachedPrimaryKeys?.(table) : undefined;

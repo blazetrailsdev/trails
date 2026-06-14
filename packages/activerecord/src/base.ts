@@ -623,7 +623,12 @@ export class Base extends Model {
 
   // -- Class-level configuration --
   static _tableName: string | null = null;
-  static _primaryKey: string | string[] = "id";
+  // No default value: an *absent* _primaryKey (anywhere up the prototype chain)
+  // means "not configured", so primary_key resolution can consult the schema
+  // cache (Rails get_primary_key) before falling back to the "id" convention.
+  // An explicit `primary_key=` — including on a parent an STI subclass inherits
+  // from — sets an own value that the chain walk in getPrimaryKeyAttr honors.
+  declare static _primaryKey?: string | string[];
   static readonly _isActiveRecordBase = true;
 
   /** @internal */
