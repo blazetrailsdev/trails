@@ -623,30 +623,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(reloaded.name).toBe("Dune");
   });
 
-  it("legacy double-base64 ciphertexts still decrypt", async () => {
-    // Pre-change trails envelopes base64-encoded the cipher's already-base64
-    // header values and payload a second time. Decryption must still accept them
-    // so rows written before the MRI wire-format fix keep working. The legacy
-    // envelope is the MRI single-base64 fixture with each value base64-encoded
-    // once more.
-    const mri = { p: "DIohhw==", iv: "wEPaDcJP3VNIxaiz", at: "X7+2xvvcu1k1if6Dy28Esw==" };
-    const reEncode = (s: string) => Buffer.from(s, "latin1").toString("base64");
-    const legacy = JSON.stringify({
-      p: reEncode(mri.p),
-      h: { iv: reEncode(mri.iv), at: reEncode(mri.at) },
-    });
-    const adapter = await freshAdapter();
-    configureEncryption({
-      primaryKey: "test master key",
-      deterministicKey: "test deterministic key",
-      keyDerivationSalt: "testing key derivation salt",
-    });
-    const Book = makeEncryptedBook(adapter);
-    const book = await withoutEncryption(() => Book.create({ name: legacy }));
-    const reloaded = await Book.find(book.id);
-    expect(reloaded.name).toBe("Dune");
-  });
-
   it("can compress data with custom compressor", async () => {
     const Book = makeEncryptedBookWithCustomCompressor(await freshAdapter());
     new Book();

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Aes256Gcm as Cipher } from "./aes256-gcm.js";
 import { MessageSerializer } from "../message-serializer.js";
+import { Message } from "../message.js";
+import { DecryptionError, EncryptedContentIntegrity } from "../errors.js";
 import * as crypto from "crypto";
 import { inspect } from "util";
 
@@ -99,6 +101,27 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     const m1 = cipher.encrypt("hello");
     const m2 = cipher.encrypt("world");
     expect(m1.headers.get("iv")).not.toEqual(m2.headers.get("iv"));
+  });
+
+  it("raises EncryptedContentIntegrity for a truncated auth tag", () => {
+    // Mirrors Rails: auth_tag.bytes.length != 16 always raises EncryptedContentIntegrity
+    // (truncated-tag forgery defence), propagating out of the per-key retry loop.
+    const key = generateKey();
+    const fresh = new Cipher(key).encrypt("hello world");
+    const iv = fresh.headers.get("iv") as Buffer;
+    const realTag = fresh.headers.get("at") as Buffer;
+
+    const forged = new Message(fresh.payload);
+    forged.addHeaders({ iv, at: realTag.subarray(0, 10) });
+    expect(() => new Cipher(key).decrypt(forged)).toThrow(EncryptedContentIntegrity);
+  });
+
+  it("raises a retryable Decryption error (not integrity) when a well-formed tag is decrypted with the wrong key", () => {
+    // Symmetric to the truncated-tag case: a 16-byte tag is well-formed, so failure
+    // here is a genuine decryption failure (wrong key), which Cipher#tryToDecryptWithEach
+    // retries against the next key — it must NOT surface as EncryptedContentIntegrity.
+    const message = new Cipher(generateKey()).encrypt("hello world");
+    expect(() => new Cipher(generateKey()).decrypt(message)).toThrow(DecryptionError);
   });
 
   it("inspect_does not show secrets", () => {
