@@ -179,8 +179,18 @@ def literal_value(node)
     node[1].nil? ? { kind: "array" } : { kind: "expr" }
   when :hash
     node[1].nil? ? { kind: "hash" } : { kind: "expr" }
+  when :unary
+    # Ripper splits a negative literal `-1` into `[:unary, :-@, [:@int, "1"]]`.
+    # Fold the negation back into the numeric value; anything else stays expr.
+    op = node[1]
+    inner = node[2]
+    if op == :-@ && inner.is_a?(Array) && [:@int, :@float].include?(inner[0])
+      { kind: inner[0] == :@int ? "int" : "float", value: "-#{inner[1]}" }
+    else
+      { kind: "expr" }
+    end
   else
-    { kind: "expr" } # incl. negative numbers — skipped symmetrically with the TS side
+    { kind: "expr" }
   end
 end
 
