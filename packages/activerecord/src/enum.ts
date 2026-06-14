@@ -171,8 +171,6 @@ export function defineEnum(
       });
       Object.defineProperty(modelClass.prototype, `${friendlyName}Bang`, {
         value: function (this: EnumInstanceHost) {
-          // Mirrors Rails' bang setter: update!(attribute => value), which runs
-          // validations/callbacks, inserts when new, and returns true.
           return this.updateBang({ [attribute]: value });
         },
         writable: true,
@@ -199,9 +197,9 @@ export function defineEnum(
       });
     }
 
-    // Bang setter: record.draftBang() or record.statusDraftBang()
-    // Mirrors Rails' bang setter: update!(attribute => value), which runs
-    // validations/callbacks, inserts when new, and returns true.
+    // Bang setter: record.draftBang() or record.statusDraftBang().
+    // Mirrors Rails' `define_method("#{value}!") { update!(name => value) }` —
+    // runs validations/callbacks, inserts when the record is new, returns true.
     Object.defineProperty(modelClass.prototype, bangName, {
       value: function (this: EnumInstanceHost) {
         return this.updateBang({ [attribute]: value });
@@ -228,8 +226,6 @@ export function defineEnum(
       });
       Object.defineProperty(modelClass.prototype, origBang, {
         value: function (this: EnumInstanceHost) {
-          // Mirrors Rails' bang setter: update!(attribute => value), which runs
-          // validations/callbacks, inserts when new, and returns true.
           return this.updateBang({ [attribute]: value });
         },
         writable: true,
