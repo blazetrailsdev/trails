@@ -7,7 +7,6 @@
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
-import { Nodes } from "@blazetrails/arel";
 import { camelize, isPresent, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 
@@ -552,7 +551,6 @@ export function ensureProperType(this: Base): void {
   const klass = this.constructor as typeof Base;
   if (!isFinderNeedsTypeCondition(klass)) return;
   const inheritCol = getInheritanceColumn(klass);
-  if (!inheritCol) return;
   // Only write when the column is a declared attribute — otherwise the value
   // wouldn't persist or serialize correctly. Mirrors usingSingleTableInheritance.
   if (!(klass as any)._attributeDefinitions?.has(inheritCol)) return;
@@ -642,11 +640,6 @@ function stiColumnIsAttribute(
  */
 export function typeCondition(modelClass: typeof Base, arelTable?: any): any {
   const inheritCol = getInheritanceColumn(modelClass);
-  if (!inheritCol) {
-    // If no inheritance column, return a truthy predicate that matches everything
-    return new Nodes.True();
-  }
-
   const table = arelTable || (modelClass as any).arelTable;
   if (!table) throw new ActiveRecordError("Cannot build type condition without arel table");
 
