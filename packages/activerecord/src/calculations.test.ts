@@ -7485,6 +7485,8 @@ describe("CalculationsTest", () => {
       InstanceType<typeof CpkOrder> | null,
       number
     >;
+    // Keys are the loaded CpkOrder records, looked up by the composite FK.
+    expect([...c.keys()].every((k) => k instanceof CpkOrder)).toBe(true);
     const byShop = (shopId: number): number | undefined => {
       for (const [key, value] of c) if (key && key.shop_id === shopId) return value;
       return undefined;

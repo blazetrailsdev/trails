@@ -484,11 +484,15 @@ async function groupedCompositeAssoc(
 
   const klass = (association.klass as any).baseClass ?? association.klass;
   const pk = (Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]) as string[];
+  // NUL-join so string-valued key components cannot collide across the tuple
+  // boundary (e.g. ["a b","c"] vs ["a","b c"]).
   const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join(" ");
   const tuples = rows
     .map((row) => aliases.map((a) => row[a]))
     .filter((vals) => vals.every((v) => v != null));
   const records: any[] = tuples.length > 0 ? await (klass as any).where(pk, tuples).toArray() : [];
+  // The composite-PK `id` accessor returns an array, so key the lookup map by
+  // the raw per-column attribute values to match the SQL group-key tuple.
   const byKey = new Map(records.map((r) => [keyOf(pk.map((k) => r._readAttribute(k))), r]));
 
   const result = new Map<unknown, unknown>();
