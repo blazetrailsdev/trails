@@ -15,6 +15,7 @@ import {
   fileHash,
   readShared,
   writeShared,
+  pruneSharedCache,
   CACHE_VERSION,
 } from "./shared-cache.js";
 
@@ -92,6 +93,84 @@ describe("hashParts / fileHash", () => {
   });
 });
 
+describe("pruneSharedCache", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  function mkRoot(): string {
+    const root = mkTmp();
+    fs.mkdirSync(path.join(root, ".git"));
+    return root;
+  }
+  function cacheParent(root: string): string {
+    return path.join(root, ".git", "api-compare-cache");
+  }
+  function currentDir(root: string): string {
+    return path.join(cacheParent(root), `v${CACHE_VERSION}`);
+  }
+
+  const EMPTY = { removedEntries: 0, removedFragments: 0, removedVersionDirs: 0 };
+
+  it("no-ops cleanly when there is no cache or no .git", async () => {
+    expect(await pruneSharedCache(mkTmp())).toEqual(EMPTY);
+    const root = mkRoot();
+    expect(await pruneSharedCache(root)).toEqual(EMPTY);
+  });
+
+  it("removes entries older than maxAgeMs and keeps fresh ones", async () => {
+    const root = mkRoot();
+    const dir = currentDir(root);
+    fs.mkdirSync(dir, { recursive: true });
+    const now = 100 * DAY;
+    const stale = path.join(dir, "rails-api-old.json");
+    const fresh = path.join(dir, "rails-api-new.json");
+    fs.writeFileSync(stale, "{}");
+    fs.writeFileSync(fresh, "{}");
+    fs.utimesSync(stale, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
+    fs.utimesSync(fresh, new Date(now - 1 * DAY), new Date(now - 1 * DAY));
+
+    const result = await pruneSharedCache(root, { now, maxAgeMs: 14 * DAY });
+    expect(result).toEqual({ removedEntries: 1, removedFragments: 0, removedVersionDirs: 0 });
+    expect(fs.existsSync(stale)).toBe(false);
+    expect(fs.existsSync(fresh)).toBe(true);
+  });
+
+  it("evicts stale crashed-writer .tmp- fragments but leaves unrelated files", async () => {
+    const root = mkRoot();
+    const dir = currentDir(root);
+    fs.mkdirSync(dir, { recursive: true });
+    const now = 100 * DAY;
+    const staleTmp = path.join(dir, "rails-api-old.json.tmp-worktree_a");
+    const unrelated = path.join(dir, "README");
+    fs.writeFileSync(staleTmp, "partial");
+    fs.writeFileSync(unrelated, "note");
+    fs.utimesSync(staleTmp, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
+    fs.utimesSync(unrelated, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
+
+    const result = await pruneSharedCache(root, { now, maxAgeMs: 14 * DAY });
+    expect(result.removedFragments).toBe(1);
+    expect(result.removedEntries).toBe(0);
+    expect(fs.existsSync(staleTmp)).toBe(false);
+    expect(fs.existsSync(unrelated)).toBe(true);
+  });
+
+  it("removes superseded version dirs but never the current or a newer one", async () => {
+    const root = mkRoot();
+    fs.mkdirSync(currentDir(root), { recursive: true });
+    const parent = cacheParent(root);
+    const newer = path.join(parent, `v${CACHE_VERSION + 1}`);
+    fs.mkdirSync(newer); // a concurrent newer-version run — must NOT be wiped
+    fs.mkdirSync(path.join(parent, "v0"));
+    fs.mkdirSync(path.join(parent, "scratch")); // non-version dir, untouched
+
+    const result = await pruneSharedCache(root, { now: 0, maxAgeMs: DAY });
+    expect(result.removedVersionDirs).toBe(1);
+    expect(fs.existsSync(currentDir(root))).toBe(true);
+    expect(fs.existsSync(path.join(parent, "v0"))).toBe(false);
+    expect(fs.existsSync(newer)).toBe(true);
+    expect(fs.existsSync(path.join(parent, "scratch"))).toBe(true);
+  });
+});
+
 describe("readShared / writeShared", () => {
   it("round-trips an entry, misses cleanly, and leaves no tmp file", async () => {
     const dir = path.join(mkTmp(), "cache");
@@ -99,5 +178,17 @@ describe("readShared / writeShared", () => {
     await writeShared(dir, "ts-arel", "key1", '{"v":1}', "worktree/a");
     expect(await readShared(dir, "ts-arel", "key1")).toBe('{"v":1}');
     expect(fs.readdirSync(dir).filter((f) => f.includes(".tmp-"))).toEqual([]);
+  });
+
+  it("bumps mtime on a hit so prune evicts by last access, not last write", async () => {
+    const dir = path.join(mkTmp(), "cache");
+    await writeShared(dir, "ts-arel", "key1", '{"v":1}', "worktree/a");
+    const file = path.join(dir, "ts-arel-key1.json");
+    fs.utimesSync(file, new Date(0), new Date(0)); // age the entry to the epoch
+    expect((await fs.promises.stat(file)).mtimeMs).toBe(0);
+
+    expect(await readShared(dir, "ts-arel", "key1")).toBe('{"v":1}');
+    // readShared awaits its own touch, so the new mtime is observable immediately.
+    expect((await fs.promises.stat(file)).mtimeMs).toBeGreaterThan(0);
   });
 });
