@@ -79,6 +79,15 @@ describe("compareDefaults", () => {
     expect(res.compared).toBe(1);
   });
 
+  it("matches a negative default through the by-name path (-1 === -1)", () => {
+    const res = compareDefaults(
+      [ruby("limit", { kind: "int", value: "-1" })],
+      [[tsp("limit", { kind: "int", value: "-1" })]],
+    );
+    expect(res.mismatches).toEqual([]);
+    expect(res.compared).toBe(1);
+  });
+
   it("flags a differing default value", () => {
     const res = compareDefaults(
       [ruby("order", { kind: "symbol", value: "asc" })],
