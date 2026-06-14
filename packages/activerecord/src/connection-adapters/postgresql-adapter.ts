@@ -213,17 +213,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return !this._closed && this._pgClientOptions != null;
   }
 
-  // Mirrors libpq's `PGconn#finished?` (the `@raw_connection.finished?` half of
-  // Rails' `connected?`) over node-pg's `pg.Client`. A client is "finished" once
-  // its socket is gone: `end()` was called (`_ending`/`_ended`) or a post-connect
-  // error fired and flipped it un-queryable (`_queryable === false` — set by
-  // pg's `_handleErrorEvent`, e.g. a server-side `pg_terminate_backend`/FATAL or
-  // a dropped socket), or a connection-time error was recorded
-  // (`_connectionError`). Verified against the pinned `pg@8.20` Client internals
-  // (lib/client.js: `_ending`/`_ended`/`_queryable`/`_connectionError`).
-  // Without this, `isConnected()` would report `true` for a dead-but-not-yet-
-  // nulled handle, diverging from Rails `connected?`.
-  // @internal
+  /**
+   * Mirrors libpq's `PGconn#finished?` (the `@raw_connection.finished?` half of
+   * Rails' `connected?`) over node-pg's `pg.Client`. A client is "finished" once
+   * its socket is gone: `end()` was called (`_ending`/`_ended`) or a post-connect
+   * error fired and flipped it un-queryable (`_queryable === false` — set by pg's
+   * `_handleErrorEvent`, e.g. a server-side `pg_terminate_backend`/FATAL or a
+   * dropped socket), or a connection-time error was recorded (`_connectionError`).
+   * Verified against the pinned `pg@8.20` Client internals (lib/client.js:
+   * `_ending`/`_ended`/`_queryable`/`_connectionError`). Without this,
+   * `isConnected()` would report `true` for a dead-but-not-yet-nulled handle,
+   * diverging from Rails `connected?`.
+   * @internal
+   */
   protected override rawConnectionFinished(): boolean {
     const client = this._rawConnection as PgClientLiveness | null;
     if (client === null) return false;

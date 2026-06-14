@@ -918,15 +918,17 @@ export class AbstractAdapter implements Quoting {
     return this._connection !== null && !this.rawConnectionFinished();
   }
 
-  // Mirrors the `@raw_connection.finished?` half of Rails'
-  // `connected?` (`!(@raw_connection.nil? || @raw_connection.finished?)`).
-  // libpq's `PGconn#finished?` reports a connection object whose underlying
-  // socket has been closed (`PQfinish` / `PQstatus == CONNECTION_BAD`) even
-  // before the adapter nulls its handle. Base drivers expose no such cheap
-  // liveness flag, so the default is `false` — leaving `isConnected()` as a
-  // pure `_connection !== null` check for them. PostgreSQL overrides this to
-  // inspect its live `pg.Client`.
-  // @internal
+  /**
+   * Mirrors the `@raw_connection.finished?` half of Rails' `connected?`
+   * (`!(@raw_connection.nil? || @raw_connection.finished?)`). libpq's
+   * `PGconn#finished?` reports a connection object whose underlying socket has
+   * been closed (`PQfinish` / `PQstatus == CONNECTION_BAD`) even before the
+   * adapter nulls its handle. Base drivers expose no such cheap liveness flag,
+   * so the default is `false` — leaving `isConnected()` as a pure
+   * `_connection !== null` check for them. PostgreSQL overrides this to inspect
+   * its live `pg.Client`.
+   * @internal
+   */
   protected rawConnectionFinished(): boolean {
     return false;
   }
