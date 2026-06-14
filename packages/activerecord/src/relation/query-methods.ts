@@ -1648,9 +1648,8 @@ export function buildSubquery(
   if (typeof (relation as any).toArel !== "function") {
     throw new ActiveRecordError("Cannot build subquery: relation does not support toArel()");
   }
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(subqueryAlias)) {
-    throw argumentError(`Invalid subquery alias "${subqueryAlias}": must be a safe SQL identifier`);
-  }
+  // No identifier gate — the alias is caller-trusted and wrapped verbatim in a
+  // `SqlLiteral` by `SelectManager#as`, matching Rails' `build_from`.
   const aliasedSubquery = (relation as any).toArel().as(subqueryAlias);
   const sm = new SelectManager();
   sm.from(aliasedSubquery);
@@ -2171,9 +2170,11 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     if ((opts as any)._setOperation) {
       return new Nodes.TableAlias((opts as any)._buildSetOperationNode(), arelSql(alias));
     }
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
-      throw argumentError(`Invalid subquery alias "${alias}": must be a safe SQL identifier`);
-    }
+    // No identifier gate: Rails' `build_from` stores the caller-provided
+    // `subquery_name` verbatim and wraps it in a `SqlLiteral` via
+    // `SelectManager#as`, so the alias is caller-trusted (same trust model as
+    // the set-op branch above). A regex guard here was stricter than Rails and
+    // left the two `from(Relation)` paths asymmetric.
     // When the from-value is a Relation that needs eager loading, derive the
     // from clause via applyJoinDependency on a clone first (mirrors Rails
     // build_from). Clone avoids mutating the caller's relation in-place since
