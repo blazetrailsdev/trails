@@ -1,5 +1,6 @@
 export { ToSql, type ArelConnection, type ArelQuoter } from "./to-sql.js";
 export { defaultQuoter, mysqlDefaultQuoter } from "./default-quoter.js";
+export { substituteBoundValues } from "./substitute-bound-values.js";
 export {
   splitSchemaQualifiedName,
   quoteSchemaQualifiedName,

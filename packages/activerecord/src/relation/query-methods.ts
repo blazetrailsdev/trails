@@ -860,6 +860,11 @@ export function buildWhereClause(
         const replacement = Array.isArray(value)
           ? value.map((v) => adapter.quote(v)).join(", ")
           : adapter.quote(value);
+        // Named-bind substitution on a user-supplied SQL fragment, not an arel
+        // AST — mirrors Rails `sanitize_sql` → `replace_named_bind_variables`
+        // (sanitization.rb), which likewise `gsub`s `:name` tokens with quoted
+        // values. There is no AST to build here; the fragment is opaque text.
+        // eslint-disable-next-line blazetrails/no-raw-sql
         sql = sql.replace(new RegExp(`(?<!:):${escaped}\\b`, "g"), () => replacement);
       }
     } else if (rest.length > 0) {
