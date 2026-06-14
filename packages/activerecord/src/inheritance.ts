@@ -372,35 +372,14 @@ function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Ba
 
 /**
  * Instantiate the correct STI subclass from a database row.
+ *
+ * Mirrors Rails' single STI dispatch path: `instantiate` →
+ * `discriminate_class_for_record` → `find_sti_class`. The class decision lives
+ * entirely in {@link discriminateClassForRecord}; this wrapper only constructs
+ * the resolved class.
  */
 export function instantiateSti(baseClass: typeof Base, row: Record<string, unknown>): Base {
-  const column = getInheritanceColumn(baseClass);
-  if (!column) return directInstantiate(baseClass, row);
-
-  // Mirrors Rails' instantiate flow: when the inheritance column is blank the
-  // row is the base class (Rails' using_single_table_inheritance? is false, so
-  // it falls through to `super`); when it is present it must resolve to a
-  // subclass via find_sti_class — which *raises* SubclassNotFound for an
-  // unknown value rather than silently returning the base class.
-  if (!isPresent(row[column])) return directInstantiate(baseClass, row);
-
-  // Cast the raw value through its attribute type before resolving — mirrors
-  // find_sti_class's `type_for_attribute(inheritance_column).cast(type_name)`.
-  // This is what makes an enum-backed STI column work: the integer stored in
-  // the column (e.g. 3) casts to its class-name label ("SelectedMembership"),
-  // not a bare number. A present-but-unmapped enum value casts to null; Rails
-  // keeps such values (EnumType#cast's `value.presence` fallback) so that
-  // sti_class_for still raises, so we resolve against the raw value in that
-  // case rather than masking it as the base class. (We cast inline rather than
-  // delegating to discriminateClassForRecord because its
-  // using_single_table_inheritance? gate requires the inheritance column to be
-  // a *declared* attribute, which custom STI columns like Parrot's
-  // `parrot_sti_class` are not.)
-  const cast = castInheritanceColumnValue(baseClass, column, row[column]) as string | null;
-  const typeName = cast ?? String(row[column]);
-
-  const subclass = findStiClass(baseClass, typeName);
-  return directInstantiate(subclass, row);
+  return directInstantiate(discriminateClassForRecord(baseClass, row), row);
 }
 
 // ---------------------------------------------------------------------------
@@ -548,7 +527,11 @@ export function discriminateClassForRecord(
     if (inheritCol) {
       // Rails: subclass = base_class.type_for_attribute(inheritCol).cast(record[inheritCol])
       const castValue = castInheritanceColumnValue(modelClass, inheritCol, record[inheritCol]);
-      return findStiClass(modelClass, castValue as string);
+      // A present-but-unmapped enum value casts to null; Rails keeps such values
+      // (EnumType#cast's `value.presence` fallback) so find_sti_class still
+      // raises SubclassNotFound rather than masking it as the base class.
+      const typeName = (castValue as string | null) ?? String(record[inheritCol]);
+      return findStiClass(modelClass, typeName);
     }
   }
   return modelClass;
@@ -567,10 +550,43 @@ function usingSingleTableInheritance(
 ): boolean {
   const inheritCol = getInheritanceColumn(modelClass);
   if (!inheritCol) return false;
-  // Rails: record[inheritance_column].present? && has_attribute?(inheritance_column)
+  // Rails: record[inheritance_column].present? && _has_attribute?(inheritance_column)
   if (!isPresent(record[inheritCol])) return false;
-  // Check that the inheritance column is a declared attribute on this model
-  return (modelClass as any)._attributeDefinitions?.has(inheritCol) ?? false;
+  return stiColumnIsAttribute(modelClass, inheritCol, record);
+}
+
+/**
+ * Rails' class-level `_has_attribute?(name)` is `attribute_types.key?(name)`,
+ * true for any real DB column as well as any explicitly declared `attribute()`.
+ * trails splits these — declared attributes live in `_attributeDefinitions`,
+ * real columns in the (lazily reflected) schema — and reflection is not always
+ * warm by the time `instantiate` dispatches. A custom STI column like
+ * `Parrot#parrot_sti_class` is a real column but not a declared `attribute()`,
+ * and when the schema cache is cold `columnNames()` falls back to the declared
+ * set and omits it — which silently hydrated those rows as the base class.
+ *
+ * Accept any of three signals that prove the column is a real model attribute:
+ *   1. a declared `attribute()` definition;
+ *   2. the column appearing as a key on the record being instantiated — every
+ *      key in an `instantiate` row is a real DB column by construction, and that
+ *      DB-row path is the only one that reaches STI dispatch;
+ *   3. a reflected schema column, when the cache happens to be warm.
+ *
+ * @internal
+ */
+function stiColumnIsAttribute(
+  modelClass: typeof Base,
+  inheritCol: string,
+  record: Record<string, unknown>,
+): boolean {
+  if ((modelClass as any)._attributeDefinitions?.has(inheritCol)) return true;
+  if (Object.prototype.hasOwnProperty.call(record, inheritCol)) return true;
+  if (modelClass.abstractClass) return false;
+  try {
+    return (modelClass.columnNames() as string[]).includes(inheritCol);
+  } catch {
+    return false;
+  }
 }
 
 /**
