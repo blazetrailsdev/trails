@@ -146,6 +146,7 @@ interface AttributeMethodsHost {
   _aliasAttributesMassGenerated?: boolean;
   _attributeAliases?: Record<string, string>;
   _dangerousAttributeMethods?: Set<string>;
+  _ignoredColumns?: string[];
   prototype: any;
 }
 
@@ -265,13 +266,52 @@ export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean
 }
 
 export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
-  if (this._attributeMethodsGenerated) return false;
+  // Rails' @attribute_methods_generated is a per-class ivar (nil for every
+  // class regardless of superclass). JS properties are inheritable, so only an
+  // *own* truthy flag counts as already-generated — an inherited `true` from a
+  // parent class must not short-circuit a subclass's own generation.
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+    this._attributeMethodsGenerated
+  ) {
+    return false;
+  }
   // Generate getter/setter for each attribute definition that doesn't
-  // already have one on the prototype (mirrors Rails' define_attribute_methods)
+  // already have one on the prototype (mirrors Rails' define_attribute_methods).
+  // This is the single generation path: the declaration sites
+  // (Attributes#defineAttribute, ModelSchema#applyColumnsHash) invalidate
+  // `_attributeMethodsGenerated` and route here rather than installing
+  // accessors inline, mirroring Rails' lazy `define_attribute_methods`.
+  const proto = this.prototype;
+  const ignored = new Set(this._ignoredColumns ?? []);
   for (const name of this._attributeDefinitions.keys()) {
-    if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
-      Object.defineProperty(this.prototype, name, {
-        get(this: AttributeAccessorHost) {
+    // ignored columns keep their (possibly user-declared) definition but expose
+    // no accessor — mirrors applyColumnsHash's strip-accessor-keep-def behavior.
+    if (ignored.has(name)) continue;
+    // `id` is left to Base.prototype.id (the CPK-aware getter), never a plain
+    // attribute accessor — matches the id-skip in the declaration sites.
+    if (name === "id") {
+      if (Object.prototype.hasOwnProperty.call(proto, "id")) {
+        delete (proto as Record<string, unknown>)["id"];
+      }
+      continue;
+    }
+    // Skip when this class (or a parent in the prototype chain) already exposes
+    // a custom accessor, so generation never clobbers an override.
+    const parentProto = Object.getPrototypeOf(proto);
+    const inheritedFromParent = parentProto != null && name in (parentProto as object);
+    if (!Object.prototype.hasOwnProperty.call(proto, name) && !inheritedFromParent) {
+      Object.defineProperty(proto, name, {
+        get(
+          this: AttributeAccessorHost & {
+            _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+          },
+        ) {
+          if (!this._attributes.getAttribute(name).isInitialized()) {
+            throw new MissingAttributeError(
+              `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+            );
+          }
           return this.readAttribute(name);
         },
         set(this: AttributeAccessorHost, value: unknown) {

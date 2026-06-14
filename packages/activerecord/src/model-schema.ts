@@ -5,7 +5,6 @@ import {
   Attribute,
   AttributeSetBuilder,
   AttributeSetCoder,
-  MissingAttributeError,
   typeRegistry,
   defineDirtyAttributeMethods,
   type Type,
@@ -822,53 +821,28 @@ function applyColumnsHash(
       ...(colDefaultFunction != null ? { defaultFunction: colDefaultFunction } : {}),
     });
 
-    if (name === "id") {
-      if (Object.prototype.hasOwnProperty.call(host.prototype, "id")) {
-        delete host.prototype.id;
-      }
-      continue;
-    }
+    // `id` is excluded from dirty-method generation here; its accessor (and any
+    // stale own `id` property) is handled by defineAttributeMethods below.
+    if (name === "id") continue;
     const proto = host.prototype;
-    // Skip if this class or any parent prototype already has a custom accessor —
-    // prevents schema reflection from overwriting an ignore_case (or other)
-    // override that was installed on a parent class.
-    const parentProto = Object.getPrototypeOf(proto);
-    const inheritedFromParent = parentProto != null && name in (parentProto as object);
-    if (!Object.prototype.hasOwnProperty.call(proto, name) && !inheritedFromParent) {
-      Object.defineProperty(proto, name, {
-        get(this: {
-          readAttribute(n: string): unknown;
-          _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
-        }) {
-          if (!this._attributes.getAttribute(name).isInitialized()) {
-            throw new MissingAttributeError(
-              `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-            );
-          }
-          return this.readAttribute(name);
-        },
-        set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
-          this.writeAttribute(name, value);
-        },
-        configurable: true,
-      });
-    }
-    // Per-attribute *BeforeTypeCast accessor — mirrors Rails' attribute_method_suffix
-    // "_before_type_cast" in ActiveRecord::AttributeMethods::BeforeTypeCast.
-    const btcName = `${name}BeforeTypeCast`;
-    if (!Object.prototype.hasOwnProperty.call(proto, btcName)) {
-      Object.defineProperty(proto, btcName, {
-        get(this: { readAttributeBeforeTypeCast(n: string): unknown }) {
-          return this.readAttributeBeforeTypeCast(name);
-        },
-        configurable: true,
-      });
-    }
+    // The main attribute accessor and the *BeforeTypeCast / *ForDatabase
+    // accessors are generated through defineAttributeMethods (invalidated +
+    // regenerated below), not installed inline — mirroring Rails' single
+    // define_attribute_methods generation path.
     // Per-attribute dirty methods (nameChanged, nameWas, nameChange, …).
     // Mirrors the call in activemodel's `attribute()` for user-declared attrs.
     // Guards inside defineDirtyAttributeMethods skip already-defined methods.
     defineDirtyAttributeMethods(proto, name);
   }
+
+  // Regenerate attribute accessors through the single define_attribute_methods
+  // path now that schema reflection has settled the attribute definitions.
+  const methodHost = host as unknown as {
+    _attributeMethodsGenerated?: boolean;
+    defineAttributeMethods?: () => boolean;
+  };
+  methodHost._attributeMethodsGenerated = false;
+  methodHost.defineAttributeMethods?.();
 
   type CacheBag = {
     _attributesBuilder?: unknown;
