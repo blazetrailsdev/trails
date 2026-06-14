@@ -1,16 +1,17 @@
 /**
- * PostgreSQLAdapter#getClient — single persistent connection.
+ * PostgreSQLAdapter connection acquisition — single persistent connection.
  *
  * After the dual-pool collapse the adapter owns one pg.Client for its
- * lifetime. Every getClient() caller — inside or outside a transaction,
- * sequential or under Promise.all — uses the same connection; pg.Client
- * serializes concurrent query() calls on its socket, so a logical TX
- * can no longer fan across multiple sockets (root cause of #2253).
+ * lifetime. Every `_acquireFreshClient()` caller — inside or outside a
+ * transaction, sequential or under Promise.all — uses the same connection;
+ * pg.Client serializes concurrent query() calls on its socket, so a logical
+ * TX can no longer fan across multiple sockets (root cause of #2253).
  *
- * Connection-error recovery is no longer a getClient() concern: callers
- * route through withRawConnection, whose retry loop drives reconnectBang →
- * the PG reconnect() override → lazy getClient() re-acquire. That recovery
- * is asserted by the unskipped Rails mirrors (adapter.test.ts +
+ * Connection-error recovery routes through withRawConnection, whose retry
+ * loop drives reconnectBang → the PG reconnect() override (which eagerly
+ * re-acquires). The base loop yields `_connection` directly — opened eagerly
+ * by connectBang() — with no per-iteration re-acquire. That recovery is
+ * asserted by the unskipped Rails mirrors (adapter.test.ts +
  * adapters/postgresql/postgresql-adapter.test.ts reconnect cluster).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,7 +22,6 @@ interface PrivatePgAdapter {
   _rawConnection: unknown;
   _client: unknown;
   _inFlightReset: Promise<void> | null;
-  getClient: () => Promise<unknown>;
   _acquireFreshClient: () => Promise<unknown>;
   reconnect: () => void;
   resetBang: () => void;
@@ -47,7 +47,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
     adapter._rawConnection = persistentClient;
     vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
 
-    const work = Array.from({ length: 11 }, () => adapter.getClient());
+    const work = Array.from({ length: 11 }, () => adapter._acquireFreshClient());
     const seen = await Promise.all(work);
 
     expect(seen).toHaveLength(11);
@@ -62,11 +62,11 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
 
     // No TX active.
     adapter._client = null;
-    expect(await adapter.getClient()).toBe(persistentClient);
+    expect(await adapter._acquireFreshClient()).toBe(persistentClient);
 
     // TX active — _client points at the same persistent client.
     adapter._client = persistentClient;
-    expect(await adapter.getClient()).toBe(persistentClient);
+    expect(await adapter._acquireFreshClient()).toBe(persistentClient);
   });
 
   it("resetBang barrier: real _acquireFreshClient waits until DISCARD ALL resolves", async () => {
