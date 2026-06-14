@@ -647,12 +647,16 @@ export class Response {
     status = 200,
     headers: Record<string, string> = {},
     body: string | string[] = [],
+    { defaultHeaders }: { defaultHeaders?: Record<string, string> } = {},
   ): InstanceType<T> {
+    // Rails: `merge_default_headers(headers, default_headers)`, where the
+    // `default_headers:` keyword defaults to `self.default_headers`.
+    const merged = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
     // Rails passes body to `new` → `body=` → `munge_body_object` (wraps a
     // non-enumerable like a bare string into a 1-element array); TS pre-munges
     // here because the constructor bypasses the setter.
     const parts = Array.isArray(body) ? body : [body];
-    return new this(status, headers, parts) as InstanceType<T>;
+    return new this(status, merged, parts) as InstanceType<T>;
   }
 }
 

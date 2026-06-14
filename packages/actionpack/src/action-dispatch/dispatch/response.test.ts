@@ -445,13 +445,42 @@ describe("ResponseTest", () => {
     }
   });
 
-  it.skip("read x_frame_options, x_content_type_options, x_xss_protection, x_permitted_cross_domain_policies and referrer_policy", () => {
-    // pending: Response.create() does not merge defaultHeaders into new
-    // instances. Rails merges them in create via merge_default_headers.
+  it("read x_frame_options, x_content_type_options, x_xss_protection, x_permitted_cross_domain_policies and referrer_policy", () => {
+    const original = Response.defaultHeaders;
+    try {
+      Response.defaultHeaders = {
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "0",
+        "X-Permitted-Cross-Domain-Policies": "none",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+      };
+      const resp = Response.create();
+      resp.body = "Hello";
+      resp.toRack();
+      expect(resp.headers["X-Frame-Options"]).toBe("DENY");
+      expect(resp.headers["X-Content-Type-Options"]).toBe("nosniff");
+      expect(resp.headers["X-XSS-Protection"]).toBe("0");
+      expect(resp.headers["X-Permitted-Cross-Domain-Policies"]).toBe("none");
+      expect(resp.headers["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+    } finally {
+      Response.defaultHeaders = original;
+    }
   });
 
-  it.skip("read custom default_header", () => {
-    // pending: same as above — defaultHeaders not applied in create().
+  it("read custom default_header", () => {
+    const original = Response.defaultHeaders;
+    try {
+      Response.defaultHeaders = {
+        "X-XX-XXXX": "Here is my phone number",
+      };
+      const resp = Response.create();
+      resp.body = "Hello";
+      resp.toRack();
+      expect(resp.headers["X-XX-XXXX"]).toBe("Here is my phone number");
+    } finally {
+      Response.defaultHeaders = original;
+    }
   });
 
   it.skip("respond_to? accepts include_private", () => {
