@@ -1022,12 +1022,6 @@ describe("CalculationsTest", () => {
     const names = await Account.pluck("name");
     expect(names).toContain("alias");
   });
-  it("pluck if table included", async () => {
-    const { Account } = makeModel();
-    await Account.create({ name: "incl" });
-    const names = await Account.pluck("name");
-    expect(names.length).toBe(1);
-  });
   it("pluck not auto table name prefix if column joined", async () => {
     const { Account } = makeModel();
     await Account.create({ name: "prefix" });
@@ -1495,13 +1489,6 @@ describe("CalculationsTest", () => {
     expect(count).toBe(1);
   });
 
-  it("pluck with multiple columns and includes", async () => {
-    const { Account } = makeModel();
-    await Account.create({ name: "multi_inc", credits: 10 });
-    const result = await Account.pluck("name", "credits");
-    expect(Array.isArray(result)).toBe(true);
-    expect(Array.isArray(result[0])).toBe(true);
-  });
   it("pluck functions without alias", async () => {
     const { Account } = makeModel();
     await Account.create({ name: "fn_no_alias" });
@@ -2144,16 +2131,6 @@ describe("CalculationsTest", () => {
     }
     const ids = await Account.all().ids();
     expect(ids).toEqual([]);
-  });
-
-  it("pluck with includes limit and empty result", async () => {
-    class Account extends Base {
-      static {
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    const result = await Account.all().pluck("credit_limit");
-    expect(result).toEqual([]);
   });
 
   it("sum uses enumerable version when block is given", async () => {
@@ -7277,6 +7254,81 @@ describe("count with includes join dependency", () => {
     >;
     expect(counts["x"]).toBe(1);
     expect(counts["y"]).toBe(1);
+  });
+});
+
+// ==========================================================================
+// pluck + includes join dependency tests (calculations_test.rb)
+// ==========================================================================
+describe("CalculationsTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  class PjContract extends Base {
+    static _tableName = "pj_contracts";
+    static {
+      this.attribute("pj_company_id", "integer");
+      this.attribute("body", "string");
+    }
+  }
+  class PjCompany extends Base {
+    static _tableName = "pj_companies";
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  beforeAll(async () => {
+    await defineSchema(
+      {
+        pj_companies: { name: "string" },
+        pj_contracts: { pj_company_id: "integer", body: "string" },
+      },
+      { dropExisting: true },
+    );
+    registerModel(PjContract);
+    registerModel(PjCompany);
+    Associations.hasMany.call(PjCompany, "pjContracts", {
+      foreignKey: "pj_company_id",
+      className: "PjContract",
+    });
+  });
+
+  it("pluck if table included", async () => {
+    // Rails: Company.includes(:contracts).where("contracts.id" => ...).pluck(:id).
+    // The where referencing the included table forces apply_join_dependency, so
+    // the LEFT OUTER JOIN is present and pluck can filter on the joined table.
+    const c = await PjCompany.create({ name: "test" });
+    const contract = await PjContract.create({ pj_company_id: c.id, body: "a" });
+    const ids = await PjCompany.includes("pjContracts")
+      .where({ "pj_contracts.id": contract.id })
+      .pluck("id");
+    expect(ids).toEqual([c.id]);
+  });
+
+  it("pluck with multiple columns and includes", async () => {
+    // Rails: Company.order("companies.id").includes(:contracts).pluck(:name, ...).
+    // apply_join_dependency LEFT OUTER JOINs contracts; a company with no
+    // contract still yields a row (qualified contracts column is NULL).
+    const c1 = await PjCompany.create({ name: "37signals" });
+    const c2 = await PjCompany.create({ name: "test" });
+    await PjContract.create({ pj_company_id: c2.id, body: "x" });
+    const rows = await PjCompany.order("pj_companies.id")
+      .includes("pjContracts")
+      .pluck("name", "pj_contracts.body");
+    expect(rows).toEqual([
+      ["37signals", null],
+      ["test", "x"],
+    ]);
+    void c1;
+  });
+
+  it("pluck with includes limit and empty result", async () => {
+    // Rails: Topic.includes(:replies).limit(0).pluck(:id) == [] and
+    // Topic.includes(:replies).limit(1).where("0 = 1").pluck(:id) == [].
+    await PjCompany.create({ name: "test" });
+    expect(await PjCompany.includes("pjContracts").limit(0).pluck("id")).toEqual([]);
+    expect(await PjCompany.includes("pjContracts").limit(1).where("0 = 1").pluck("id")).toEqual([]);
   });
 });
 
