@@ -108,6 +108,11 @@ export class DecimalType extends NumericValueType {
     if (value === null || value === undefined) return null;
     if (typeof value === "bigint") return value.toString();
     if (typeof value === "number") {
+      // BigDecimal("NaN") has no decimal string form; with decimals
+      // modelled as strings, NaN round-trips as the sentinel "NaN" so
+      // `nan?`-style checks and PG's 'NaN'::numeric serialization work.
+      // Other non-finite values (±Infinity) still cast to null.
+      if (Number.isNaN(value)) return "NaN";
       if (!Number.isFinite(value)) return null;
       // Rails dispatches Float through `convert_float_to_big_decimal`
       // (decimal.rb:75-81). Route every JS number through the same hook
@@ -119,6 +124,10 @@ export class DecimalType extends NumericValueType {
     if (typeof value === "string") {
       const trimmed = value.trim();
       if (trimmed === "") return null;
+      // Ruby `"NaN".to_d` yields BigDecimal NaN, and the PG adapter hands
+      // numeric NaN back as the string "NaN" on load — both round-trip to
+      // the JS NaN sentinel rather than `to_d`'s leading-prefix parse.
+      if (trimmed === "NaN") return "NaN";
       // Rails' `String#to_d` parses a leading numeric prefix and
       // silently drops everything after, returning `BigDecimal(0)` if
       // no leading number is present. Tests assert, e.g.,

@@ -7,6 +7,11 @@ import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+import { adapterType } from "./test-adapter.js";
+
+// Rails guards test_numeric_fields_with_nan with current_adapter?(:PostgreSQLAdapter):
+// only PostgreSQL's numeric type stores NaN (SQLite/MySQL reject 'NaN'::numeric).
+const itPg = adapterType === "postgres" ? it : it.skip;
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -92,10 +97,26 @@ describe("NumericDataTest", () => {
     expect(m1!.big_bank_balance).toBe("234000567.95");
   });
 
-  it.skip("numeric fields with nan", () => {
-    // BLOCKED: type — PostgreSQL-only (BigDecimal("NaN")). DecimalType has no NaN
-    // representation: numeric NaN casts to null and the string "NaN" casts to "0".
-    // Faithful port needs a BigDecimal-NaN sentinel + 'NaN'::numeric serialization
-    // (activemodel/type/decimal.ts + PG quoting). Separate from the TZ wiring shipped here.
+  itPg("numeric fields with nan", async () => {
+    // Decimals are modelled as strings, so BigDecimal("NaN") (passed in as
+    // the JS NaN) round-trips as the sentinel "NaN" — the stand-in for
+    // Rails' `nan?` predicate.
+    const m = NumericData.new({
+      bank_balance: NaN,
+      big_bank_balance: NaN,
+      world_population: 2n ** 62n,
+      my_house_population: 3,
+    });
+    expect(m.bank_balance).toBe("NaN");
+    expect(m.big_bank_balance).toBe("NaN");
+    expect(await m.save()).toBe(true);
+
+    const m1 = await NumericData.findBy({
+      bank_balance: NaN,
+      big_bank_balance: NaN,
+    });
+
+    expect(m1!.bank_balance).toBe("NaN");
+    expect(m1!.big_bank_balance).toBe("NaN");
   });
 });
