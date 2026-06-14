@@ -2,7 +2,7 @@
  * Mirrors: ActiveSupport::MessagePack
  *
  * `MessagePack` is the singleton that `extend Serializer` produces in Ruby;
- * `MessagePack.dump`/`load`/`signature` round-trip via the registered extension
+ * `MessagePack.dump`/`load`/`isSignature` round-trip via the registered extension
  * types. `MessagePackCacheSerializer` is the cache variant.
  */
 
