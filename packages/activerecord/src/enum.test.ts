@@ -947,6 +947,13 @@ describe("EnumTest", () => {
     const p = await StringStatusPost.create({ status: "active" });
     expect((p as any).isPersisted()).toBe(true);
   });
+  class Book extends Base {
+    static {
+      this.attribute("id", "integer");
+      this.attribute("status", "integer");
+      this.enum("status", { proposed: 0, written: 1, published: 2 });
+    }
+  }
   it("enum methods are overwritable", () => {
     expect(true).toBe(true);
   });
@@ -972,7 +979,11 @@ describe("EnumTest", () => {
     expect(true).toBe(true);
   });
   it("assign non existing value raises an error", () => {
-    expect(true).toBe(true);
+    const book = new Book();
+    (book as any).status = "published";
+    expect(() => {
+      (book as any).status = "unknown";
+    }).toThrow("'unknown' is not a valid status");
   });
   it("validation with 'validate: true' option", () => {
     expect(true).toBe(true);
@@ -987,13 +998,19 @@ describe("EnumTest", () => {
     expect(true).toBe(true);
   });
   it("assign nil value", () => {
-    expect(true).toBe(true);
+    const book = new Book();
+    (book as any).status = "published";
+    (book as any).status = null;
+    expect((book as any).status).toBeNull();
   });
   it("assign nil value to enum which defines nil value to hash", () => {
     expect(true).toBe(true);
   });
   it("assign empty string value", () => {
-    expect(true).toBe(true);
+    const book = new Book();
+    (book as any).status = "published";
+    (book as any).status = "";
+    expect((book as any).status).toBeNull();
   });
   it("assign false value to a field defined as not boolean", () => {
     expect(true).toBe(true);
@@ -1002,7 +1019,10 @@ describe("EnumTest", () => {
     expect(true).toBe(true);
   });
   it("assign long empty string value", () => {
-    expect(true).toBe(true);
+    const book = new Book();
+    (book as any).status = "published";
+    (book as any).status = "   ";
+    expect((book as any).status).toBeNull();
   });
   it("constant to access the mapping", () => {
     expect(true).toBe(true);
