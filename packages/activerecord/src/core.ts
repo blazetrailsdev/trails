@@ -5,7 +5,7 @@
  */
 
 import { getApplicationRecordClass } from "./inheritance.js";
-import { RecordNotFound, StrictLoadingViolationError } from "./errors.js";
+import { RecordNotFound, StatementInvalid, StrictLoadingViolationError } from "./errors.js";
 import { actionOnStrictLoadingViolation } from "./ar-config.js";
 import { WRITING_ROLE } from "./roles.js";
 import {
@@ -20,7 +20,9 @@ import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import { buildPkWhereNode } from "./model-schema.js";
+import { buildPkWhereNode, columnNames } from "./model-schema.js";
+import { StatementCache } from "./statement-cache.js";
+import { ActiveModelRangeError } from "@blazetrails/activemodel";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -562,7 +564,18 @@ export function cachedFindByStatement(
   key: string,
   block: () => any,
 ): any {
-  if (!this._findByStatementCache) initializeFindByCache.call(this);
+  // Static fields are inherited via the prototype chain, so a subclass that
+  // never initialized its own cache would see the parent's map as truthy and
+  // hit the parent's cached statement (returning Parent instances). Require an
+  // own property — mirroring Rails initializing @find_by_statement_cache per
+  // class in the `inherited` hook. The `|| !value` arm re-inits after a
+  // table_name change clears it to undefined (an own, falsy property).
+  if (
+    !Object.prototype.hasOwnProperty.call(this, "_findByStatementCache") ||
+    !this._findByStatementCache
+  ) {
+    initializeFindByCache.call(this);
+  }
   const prepared = connection?.preparedStatements ?? true;
   const cache = this._findByStatementCache!.get(prepared)!;
   if (!cache.has(key)) {
@@ -659,15 +672,6 @@ function relation(this: CoreHost): any {
   return (this as any).all();
 }
 
-/** @internal */
-function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
-  const conditions: Record<string, unknown> = {};
-  for (let i = 0; i < keys.length; i++) {
-    conditions[keys[i]] = values[i];
-  }
-  return (this as any).findBy(conditions);
-}
-
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // Reflect the schema before casting ids — the cast below reads
   // attribute definitions that lazy reflection populates.
@@ -678,6 +682,35 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       this.name,
       String(this.primaryKey),
       [],
+    );
+  }
+  // Rails Core#find fast-path: a single supported scalar id on a simple
+  // primary key (no scope, no block) goes through the cached StatementCache.
+  // Gated on preparedStatements: the unprepared StatementCache path inlines
+  // bind values into the SQL (PartialQuery) and so drops the bind payload the
+  // relation path logs; Rails buckets the cache by prepared_statements, but our
+  // relation path is result-equivalent unprepared and keeps the instrumentation
+  // (full log-only-bind plumbing through every adapter is deferred work).
+  if (
+    ids.length === 1 &&
+    (this as any).connection?.preparedStatements &&
+    !(this as any).currentScope &&
+    this.primaryKey != null &&
+    !this.compositePrimaryKey &&
+    !Array.isArray(ids[0]) &&
+    !StatementCache.unsupportedValue(ids[0])
+  ) {
+    const pk = this.primaryKey as string;
+    // Rails passes the raw id; type coercion happens inside the StatementCache
+    // bind path (the bound pk attribute carries the column type), so neither
+    // find nor find_by pre-casts here.
+    const record = await cachedFindBy.call(this, [pk], [ids[0]]);
+    if (record) return record;
+    throw new RecordNotFound(
+      `${this.name} with ${this.primaryKey}=${ids[0]} not found`,
+      this.name,
+      pk,
+      ids[0],
     );
   }
   if (ids.length > 1) {
@@ -777,7 +810,78 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
 }
 
 export function findBy(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {
-  return this.all().findBy(conditions);
+  return findByThroughCache.call(this, conditions);
+}
+
+/**
+ * Rails: Core::ClassMethods#find_by routes a flat-hash lookup through a cached
+ * StatementCache, falling back to the relation path for scoped lookups, keys
+ * that are not real columns, or unsupported (nil/Array/Range/Hash/Relation/Base)
+ * values.
+ *
+ * Known gap vs Rails: Rails first resolves attribute_aliases[key] and
+ * dereferences belongs_to association objects to their FK column + PK value
+ * (core.rb#find_by), so an alias or `find_by({author: postInstance})` still
+ * hits the cache there. Here those keys fail the columnNames check and take the
+ * relation path — correct, but a missed cache hit, not yet ported.
+ */
+async function findByThroughCache(
+  this: CoreHost,
+  conditions: Record<string, unknown>,
+): Promise<any> {
+  if ((this as any).currentScope) return this.all().findBy(conditions);
+  const keys = Object.keys(conditions);
+  if (keys.length === 0) return this.all().findBy(conditions);
+  await this.ensureSchemaLoaded();
+  // See find(): only use the statement cache under prepared statements, so the
+  // unprepared (PartialQuery) inlining path doesn't drop the bind payload the
+  // relation path logs.
+  if (!(this as any).connection?.preparedStatements) return this.all().findBy(conditions);
+  const columns = new Set(columnNames.call(this as any));
+  const values: unknown[] = [];
+  for (const k of keys) {
+    const v = conditions[k];
+    if (!columns.has(k) || StatementCache.unsupportedValue(v)) {
+      return this.all().findBy(conditions);
+    }
+    values.push(v);
+  }
+  return cachedFindBy.call(this, keys, values);
+}
+
+/**
+ * Rails: Core::ClassMethods#cached_find_by — build (once) and execute a
+ * StatementCache keyed by the lookup columns, bucketed by the connection's
+ * prepared_statements setting.
+ *
+ * @internal
+ */
+async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
+  const connection = (this as any).connection;
+  // Rails keys the cache on the array itself (structural equality); we
+  // serialize it so ["a","b"] and ["a,b"] don't collide on a "," join.
+  const cacheKey = JSON.stringify(keys);
+  const statement = cachedFindByStatement.call(this, connection, cacheKey, () =>
+    StatementCache.create(connection, (params) => {
+      const wheres: Record<string, unknown> = {};
+      for (const k of keys) wheres[k] = params.bind();
+      return (this as any).where(wheres).limit(1);
+    }),
+  );
+  try {
+    const records = await statement.execute(values, connection, { allowRetry: true });
+    return records[0] ?? null;
+  } catch (e) {
+    // An out-of-range value for the column type returns null, matching the
+    // relation path's findBy (finder-methods.ts). Rails catches ::RangeError
+    // at the bind layer; our typed ActiveModelRangeError is the port of that.
+    if (e instanceof ActiveModelRangeError) return null;
+    // Rails: rescue TypeError; raise ActiveRecord::StatementInvalid — a bind
+    // value that slips past unsupportedValue but fails type coercion surfaces
+    // as the AR error callers rescue, not a raw TypeError.
+    if (e instanceof TypeError) throw new StatementInvalid(e.message);
+    throw e;
+  }
 }
 
 export function findByBang(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {
