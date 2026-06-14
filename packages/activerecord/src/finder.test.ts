@@ -3,14 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import {
-  Associations,
-  Base,
-  Range,
-  RecordNotFound,
-  registerModel,
-  SoleRecordExceeded,
-} from "./index.js";
+import { Base, Range, RecordNotFound, registerModel, SoleRecordExceeded } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -2358,14 +2351,8 @@ describe("FinderTest", () => {
         this.attribute("fel_comment_id", "integer");
       }
     }
-    Associations.hasMany.call(FelPost, "comments", {
-      className: "FelComment",
-      foreignKey: "fel_post_id",
-    });
-    Associations.hasMany.call(FelComment, "ratings", {
-      className: "FelRating",
-      foreignKey: "fel_comment_id",
-    });
+    FelPost.hasMany("comments", { className: "FelComment", foreignKey: "fel_post_id" });
+    FelComment.hasMany("ratings", { className: "FelRating", foreignKey: "fel_comment_id" });
     registerModel("FelPost", FelPost);
     registerModel("FelComment", FelComment);
     registerModel("FelRating", FelRating);
