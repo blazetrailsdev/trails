@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
-import { StringInquirer } from "@blazetrails/activesupport";
+import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -19,6 +19,7 @@ import { Message } from "./test-helpers/models/message.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Post } from "./test-helpers/models/post.js";
+import { Recipient } from "./test-helpers/models/recipient.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -43,6 +44,7 @@ describe("DelegatedTypeTest", () => {
   registerModel("Comment", Comment);
   registerModel("Account", Account);
   registerModel("Post", Post);
+  registerModel("Recipient", Recipient);
 
   beforeAll(async () => {
     // Force-recreate every canonical table this suite touches. The worker's
@@ -192,12 +194,31 @@ describe("DelegatedTypeTest", () => {
     expect((entryWithCommentUuid as any).uuidMessageUuid).toBeNull();
   });
 
-  it.skip("touch account", () => {
-    // BLOCKED: needs multi-hop `belongs_to … touch: true` propagation through a
-    // polymorphic delegated_type owner (Rails chains Recipient → Message → Entry →
-    // Account via `touch: true`) plus `travel`-based timestamp assertions; the
-    // chained-touch path through the polymorphic `entryable` of a delegated_type
-    // parent is unverified (audit-STI). Affects this single touch test.
+  it("touch account", async () => {
+    // Recipient → message (belongs_to touch) → entry (has_one entryable touch)
+    // → account (belongs_to touch): a create on the recipient must walk the
+    // whole chain up to the account.
+    const message = await (entryWithMessage as any).loadBelongsTo("entryable");
+    const account = await (entryWithMessage as any).loadBelongsTo("account");
+    const previousAccountUpdatedAt = account.updated_at;
+    const previousEntryUpdatedAt = (entryWithMessage as any).updated_at;
+    const previousMessageUpdatedAt = message.updated_at;
+
+    travel(5000);
+    try {
+      await Recipient.create({ message, email_address: "test@test.com" });
+    } finally {
+      travelBack();
+    }
+
+    const reloadedEntry = await Entry.find(entryWithMessage.id!);
+    expect((await (reloadedEntry as any).loadBelongsTo("account")).updated_at).not.toEqual(
+      previousAccountUpdatedAt,
+    );
+    expect((reloadedEntry as any).updated_at).not.toEqual(previousEntryUpdatedAt);
+    expect((await (reloadedEntry as any).loadBelongsTo("entryable")).updated_at).not.toEqual(
+      previousMessageUpdatedAt,
+    );
   });
 
   it("builder method", () => {

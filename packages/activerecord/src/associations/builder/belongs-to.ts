@@ -209,26 +209,16 @@ export class BelongsTo extends SingularAssociation {
       }
     }
 
-    // Touch the current parent by looking it up via FK value.
-    const currentFkValues = fkColumns.map((col) =>
-      typeof (record as any)._readAttribute === "function"
-        ? (record as any)._readAttribute(col)
-        : record[col],
-    );
-    if (currentFkValues.every((v) => v != null)) {
-      const association =
-        typeof record.association === "function" ? record.association(name) : null;
-      if (association) {
-        const klass = association.klass;
-        if (klass && typeof klass.findBy === "function") {
-          const pk = BelongsTo.resolvePk(association.reflection, klass);
-          const fkValue = fkColumns.length === 1 ? currentFkValues[0] : currentFkValues;
-          const conditions = BelongsTo.buildFindConditions(pk, fkValue);
-          if (conditions) {
-            const parent = await klass.findBy(conditions);
-            if (parent) await BelongsTo.touchParent(parent, touch);
-          }
-        }
+    // Touch the current parent. Mirrors Rails `record = o.public_send name`:
+    // read through the association so a cached (in-memory) target is touched in
+    // place rather than a freshly-loaded copy — the touch_later defer must land
+    // on the same object the caller holds. Falls back to loading from the DB
+    // when the target isn't already cached.
+    const association = typeof record.association === "function" ? record.association(name) : null;
+    if (association && typeof association.loadTarget === "function") {
+      const parent = await association.loadTarget();
+      if (parent && !Array.isArray(parent) && parent.isPersisted?.()) {
+        await BelongsTo.touchParent(parent, touch);
       }
     }
   }

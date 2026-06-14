@@ -13,6 +13,7 @@ import {
   type AsyncContext,
 } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { beforeCommittedOnAllRecords } from "../../ar-config.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::TransactionState
@@ -473,8 +474,15 @@ export class Transaction {
     if (this._runCommitCallbacks) {
       const recs = this.records;
       if (recs) {
-        const unique = this.uniqueRecords(recs);
-        for (const record of unique) {
+        // Mirrors Rails before_commit_records: when before_committed_on_all_records
+        // is true, before_committed! fires on every distinct in-memory copy
+        // (dedup by object identity); when false (the default), only the first
+        // copy of each logical record runs (dedup by record equality), so a
+        // deferred touch held on a second copy of a parent never flushes.
+        const ite = beforeCommittedOnAllRecords
+          ? this.uniqueRecords(recs)
+          : this.uniqueRecordsByEquality(recs);
+        for (const record of ite) {
           if (typeof (record as any).beforeCommittedBang === "function") {
             await (record as any).beforeCommittedBang();
           }
@@ -575,6 +583,26 @@ export class Transaction {
         seen.add(record);
         result.push(record);
       }
+    }
+    return result;
+  }
+
+  /**
+   * Dedup by record equality (Ruby `Array#uniq`), keeping the first occurrence
+   * of each logical record. Two distinct in-memory copies of the same persisted
+   * row collapse to one; new records compare only to themselves.
+   *
+   * @internal
+   */
+  private uniqueRecordsByEquality(recs: unknown[]): unknown[] {
+    const result: unknown[] = [];
+    for (const record of recs) {
+      const isDup = result.some(
+        (kept) =>
+          kept === record ||
+          (typeof (record as any)?.equals === "function" && (record as any).equals(kept)),
+      );
+      if (!isDup) result.push(record);
     }
     return result;
   }

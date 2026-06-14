@@ -105,23 +105,30 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
  *
  * Mirrors: ActiveRecord::TouchLater#touch
  */
-export async function touch(this: Base, ...names: string[]): Promise<boolean> {
+export async function touch(
+  this: Base,
+  optionsOrName?: { time?: Date | Temporal.Instant | null } | string,
+  ...rest: string[]
+): Promise<boolean> {
   const self = this as any;
   if (self._deferTouchAttrs?.length) {
     const deferredAttrs = self._deferTouchAttrs as string[];
     const deferredTime = self._touchTime as Temporal.Instant | null;
+    const names: string[] = typeof optionsOrName === "string" ? [optionsOrName, ...rest] : rest;
     const merged: string[] = [...new Set([...names, ...deferredAttrs])];
     self._deferTouchAttrs = null;
     self._touchTime = null;
     try {
-      return await timestampTouch.call(this, ...merged);
+      return typeof optionsOrName === "object" && optionsOrName != null
+        ? await timestampTouch.call(this, optionsOrName, ...merged)
+        : await timestampTouch.call(this, ...merged);
     } catch (error) {
       self._deferTouchAttrs = deferredAttrs;
       self._touchTime = deferredTime;
       throw error;
     }
   }
-  return timestampTouch.call(this, ...names);
+  return timestampTouch.call(this, optionsOrName, ...rest);
 }
 
 /**
