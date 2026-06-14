@@ -352,6 +352,9 @@ async function groupedAggregate(
   // groups by the association's foreign key, then maps the result keys back to
   // the loaded associated records (calculations.rb:execute_grouped_calculation).
   const association = resolveGroupAssociation(rel, groupCol);
+  if (association && Array.isArray(association.foreignKey)) {
+    return groupedCompositeAssoc(rel, association, fn, column, coerceNumeric);
+  }
   const effectiveGroupCol = association ? (association.foreignKey as string) : groupCol;
   const groupNode = groupColumnToArel(effectiveGroupCol, table);
   const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
@@ -422,12 +425,79 @@ function resolveGroupAssociation(rel: CalculationRelation, groupCol: string): an
   if (!reflection || !reflection.belongsTo?.()) return null;
   // Rails (calculations.rb:521) does `group_fields = Array(association.foreign_key)`
   // and builds a multi-column GROUP BY for a composite-key belongs_to, keyed by
-  // the loaded record. This helper groups by a single column only (it reads
-  // `_groupColumns[0]`), mirroring the CPK grouped-calculation deferral in
-  // performCount. Leave a composite FK unresolved so it surfaces loudly rather
-  // than silently grouping by a truncated key.
-  if (Array.isArray(reflection.foreignKey)) return null;
+  // the loaded record. A composite FK (string[]) is handled by
+  // `groupedCompositeAssoc`; a single-column FK by the caller's main path.
   return reflection;
+}
+
+/**
+ * Grouped calculation keyed by a composite-key belongs_to association. Mirrors
+ * Rails' `execute_grouped_calculation` (calculations.rb): GROUP BY every foreign
+ * key column, then map each group's key tuple back to the loaded associated
+ * record via the target's composite primary key. JS Map keys compare by
+ * reference, so callers locate a key record by its component values, not by
+ * holding the same instance.
+ */
+async function groupedCompositeAssoc(
+  rel: CalculationRelation,
+  association: any,
+  fn: AggFn,
+  column: string,
+  coerceNumeric: boolean,
+): Promise<Map<unknown, unknown>> {
+  const table = rel._modelClass.arelTable;
+  const fkCols = association.foreignKey as string[];
+  const aliases = fkCols.map((_, i) => `group_key_${i}`);
+  const groupNodes = fkCols.map((c) => groupColumnToArel(c, table));
+  const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
+  const projections = groupNodes.map((n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])));
+  const manager = table.project(...projections, aggNode.as("val"));
+  rel._applyJoinsToManager(manager);
+  rel._applyWheresToManager(manager, table);
+  applyFromToManager(rel, manager);
+  for (const n of groupNodes) manager.group(n);
+
+  if (rel._limitValue !== null) manager.take(rel._limitValue);
+  if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
+
+  const colType = resolveColType(rel, column);
+  const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
+  const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
+  const sql =
+    isBigintColumn(rel, fn, column) && needsBigintCast(rel)
+      ? `SELECT ${aliases.map((a) => `"${a}"`).join(", ")}, CAST("val" AS TEXT) AS "val" FROM (${withCtes}) AS "_bigint_agg"`
+      : withCtes;
+  const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
+  const queryResult = await rel._modelClass.connection.selectAll(
+    sql,
+    `${rel._modelClass.name} ${opName}`,
+    ctedBinds,
+  );
+  const rows = queryResult.toArray() as Record<string, unknown>[];
+
+  const aggOf = (val: unknown): unknown =>
+    val === undefined || val === null
+      ? fn === "sum"
+        ? castAggValue(null, fn, colType, coerceNumeric)
+        : null
+      : castAggValue(val, fn, colType, coerceNumeric);
+
+  const klass = (association.klass as any).baseClass ?? association.klass;
+  const pk = (Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]) as string[];
+  const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join(" ");
+  const tuples = rows
+    .map((row) => aliases.map((a) => row[a]))
+    .filter((vals) => vals.every((v) => v != null));
+  const records: any[] = tuples.length > 0 ? await (klass as any).where(pk, tuples).toArray() : [];
+  const byKey = new Map(records.map((r) => [keyOf(pk.map((k) => r._readAttribute(k))), r]));
+
+  const result = new Map<unknown, unknown>();
+  for (const row of rows) {
+    const vals = aliases.map((a) => row[a]);
+    const record = vals.every((v) => v != null) ? (byKey.get(keyOf(vals)) ?? null) : null;
+    result.set(record, aggOf(row.val));
+  }
+  return result;
 }
 
 export async function performCount(
