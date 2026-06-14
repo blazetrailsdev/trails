@@ -7397,6 +7397,27 @@ describe("CalculationsTest", () => {
     (Base.connection as { clearCacheBang?: () => void }).clearCacheBang?.();
   });
 
+  // The canonical fixtures only create companies/accounts/topics tables; the
+  // composite-key grouped-association test needs the CPK book/order tables.
+  beforeAll(async () => {
+    await defineSchema({
+      cpk_orders: {
+        columns: { shop_id: "integer", id: "integer", status: "string" },
+        primaryKey: ["shop_id", "id"],
+      },
+      cpk_books: {
+        columns: {
+          author_id: "integer",
+          id: "integer",
+          title: "string",
+          shop_id: "integer",
+          order_id: "integer",
+        },
+        primaryKey: ["author_id", "id"],
+      },
+    });
+  });
+
   // JS Map keys compare by reference, so resolve a grouped-by-association
   // result by the key record's id rather than by holding the same instance.
   const byRecord = (result: unknown, record: { id: unknown }): unknown => {
@@ -7423,6 +7444,55 @@ describe("CalculationsTest", () => {
     expect(byRecord(c, companies("first_firm"))).toBe(1);
     expect(byRecord(c, companies("rails_core"))).toBe(2);
     expect(byRecord(c, companies("first_client"))).toBe(1);
+  });
+
+  it("should calculate grouped association with composite foreign key", async () => {
+    class CpkOrder extends Base {
+      static {
+        this.tableName = "cpk_orders";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "id"];
+      }
+    }
+    class CpkBook extends Base {
+      static {
+        this.tableName = "cpk_books";
+        this.attribute("author_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.primaryKey = ["author_id", "id"];
+        this.belongsTo("order", {
+          className: "CpkOrder",
+          foreignKey: ["shop_id", "order_id"],
+          primaryKey: ["shop_id", "id"],
+        });
+      }
+    }
+    registerModel("CpkOrder", CpkOrder);
+    registerModel("CpkBook", CpkBook);
+
+    await CpkOrder.create({ shop_id: 1, id: 10, status: "pending" });
+    await CpkOrder.create({ shop_id: 2, id: 20, status: "shipped" });
+    await CpkBook.create({ author_id: 1, id: 1, shop_id: 1, order_id: 10, title: "a" });
+    await CpkBook.create({ author_id: 2, id: 2, shop_id: 1, order_id: 10, title: "b" });
+    await CpkBook.create({ author_id: 3, id: 3, shop_id: 2, order_id: 20, title: "c" });
+
+    const c = (await CpkBook.group("order").count("*")) as Map<
+      InstanceType<typeof CpkOrder> | null,
+      number
+    >;
+    // Keys are the loaded CpkOrder records, looked up by the composite FK.
+    expect([...c.keys()].every((k) => k instanceof CpkOrder)).toBe(true);
+    const byShop = (shopId: number): number | undefined => {
+      for (const [key, value] of c) if (key && key.shop_id === shopId) return value;
+      return undefined;
+    };
+    expect(byShop(1)).toBe(2);
+    expect(byShop(2)).toBe(1);
   });
 
   it("ids with includes offset", async () => {
