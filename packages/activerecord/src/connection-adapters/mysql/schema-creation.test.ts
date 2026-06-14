@@ -149,10 +149,14 @@ describe("MySQL::SchemaCreation", () => {
 });
 
 describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
+  // Rails has no MySQL::TableDefinition#to_sql; CREATE TABLE SQL is produced by
+  // accepting the TableDefinition into the adapter's SchemaCreation visitor.
+  const toSql = (td: MyTd, host?: unknown) => new SchemaCreation(host as any).accept(td);
+
   it("emits bigint AUTO_INCREMENT PRIMARY KEY for default id column", () => {
     const td = new MyTd("users", {});
     td.string("name");
-    expect(td.toSql()).toBe(
+    expect(toSql(td)).toBe(
       "CREATE TABLE `users` (`id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, `name` varchar(255))",
     );
   });
@@ -160,13 +164,13 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
   it("honors id: false (no primary key column)", () => {
     const td = new MyTd("logs", { id: false });
     td.string("body");
-    expect(td.toSql()).toBe("CREATE TABLE `logs` (`body` varchar(255))");
+    expect(toSql(td)).toBe("CREATE TABLE `logs` (`body` varchar(255))");
   });
 
   it("appends DEFAULT CHARSET and COLLATE from table options", () => {
     const td = new MyTd("posts", { charset: "utf8mb4", collation: "utf8mb4_unicode_ci" });
     td.string("title");
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain("DEFAULT CHARSET=utf8mb4");
     expect(sql).toContain("COLLATE=utf8mb4_unicode_ci");
   });
@@ -174,14 +178,14 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
   it("emits IF NOT EXISTS and TEMPORARY modifiers", () => {
     const td = new MyTd("tmp", { id: false, temporary: true, ifNotExists: true });
     td.integer("n");
-    expect(td.toSql()).toBe("CREATE TEMPORARY TABLE IF NOT EXISTS `tmp` (`n` int)");
+    expect(toSql(td)).toBe("CREATE TEMPORARY TABLE IF NOT EXISTS `tmp` (`n` int)");
   });
 
   it("emits composite PRIMARY KEY clause", () => {
     const td = new MyTd("memberships", { primaryKey: ["user_id", "group_id"] });
     td.bigint("user_id", { null: false });
     td.bigint("group_id", { null: false });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain("PRIMARY KEY (`user_id`, `group_id`)");
   });
 
@@ -189,7 +193,7 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
     const td = new MyTd("users", {});
     td.string("email");
     td.index(["email"], { unique: true, name: "idx_users_email" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain("UNIQUE INDEX `idx_users_email` (`email`)");
   });
 
@@ -197,7 +201,7 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
     const td = new MyTd("posts", {});
     td.bigint("author_id");
     td.foreignKey("authors", { column: "author_id" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain("CONSTRAINT ");
     expect(sql).toContain("FOREIGN KEY (`author_id`) REFERENCES `authors` (`id`)");
   });
@@ -206,19 +210,19 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
     const td = new MyTd("products", {});
     td.integer("price");
     td.checkConstraint("price > 0", { name: "price_positive" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain("CONSTRAINT `price_positive` CHECK (price > 0)");
   });
 
   it("appends MySQL COMMENT on table option", () => {
     const td = new MyTd("notes", { comment: "user-supplied" });
     td.string("body");
-    expect(td.toSql()).toContain("COMMENT 'user-supplied'");
+    expect(toSql(td)).toContain("COMMENT 'user-supplied'");
   });
 
   it("emits AS clause after table options for CTAS", () => {
     const td = new MyTd("snapshot", { id: false, as: "SELECT 1" });
-    expect(td.toSql()).toMatch(/CREATE TABLE `snapshot`.* AS SELECT 1$/);
+    expect(toSql(td)).toMatch(/CREATE TABLE `snapshot`.* AS SELECT 1$/);
   });
 
   it("skips FK emission when host adapter has foreignKeys disabled", () => {
@@ -229,7 +233,7 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
     const td = new MyTd("posts", { adapter: host });
     td.bigint("author_id");
     td.foreignKey("authors", { column: "author_id" });
-    expect(td.toSql()).not.toContain("FOREIGN KEY");
+    expect(toSql(td, host)).not.toContain("FOREIGN KEY");
   });
 
   it("skips CHECK emission when host adapter reports !supportsCheckConstraints", () => {
@@ -237,6 +241,6 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
     const td = new MyTd("products", { adapter: host });
     td.integer("price");
     td.checkConstraint("price > 0", { name: "p_pos" });
-    expect(td.toSql()).not.toContain("CHECK");
+    expect(toSql(td, host)).not.toContain("CHECK");
   });
 });

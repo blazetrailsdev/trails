@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TableDefinition } from "./schema-definitions.js";
+import { SchemaCreation } from "./schema-creation.js";
 
 describe("SQLite3::TableDefinition", () => {
   it("forces type: integer for references", () => {
@@ -32,7 +33,7 @@ describe("SQLite3::TableDefinition", () => {
     const td = new TableDefinition("items", { id: false });
     td.column("x", "integer");
     td.column("expr", "integer", { as: "x + 1", stored: true } as any);
-    const sql = td.toSql();
+    const sql = new SchemaCreation("sqlite", (td as any)._adapter).accept(td);
     expect(sql).toContain("GENERATED ALWAYS AS (x + 1) STORED");
   });
 });

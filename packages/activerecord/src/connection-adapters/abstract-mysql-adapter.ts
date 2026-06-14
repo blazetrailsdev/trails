@@ -222,8 +222,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   createTableDefinition(name: string, options: Record<string, unknown> = {}): MysqlTableDefinition {
     // Strip caller-supplied adapter/adapterName (abstract SchemaStatements#createTable forwards
     // a bare SchemaQuoter shape) and substitute `this` — the full MySQL adapter — so the
-    // TableDefinition's `toSql()` can build a host-aware visitor. Matches the PG sibling
-    // (postgresql-adapter.ts) so the dispatch is symmetric across dialects.
+    // TableDefinition carries a host-aware schema quoter when the SchemaCreation visitor
+    // accepts it. Matches the PG sibling (postgresql-adapter.ts) so the dispatch is symmetric
+    // across dialects.
     const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
     return new MysqlTableDefinition(name, { ...rest, adapter: this });
   }
