@@ -136,7 +136,12 @@ describe("BindParameterTest", () => {
     }
   });
 
-  it("bind from join in subquery", async () => {
+  it("bind from join in subquery", async (ctx) => {
+    // Rails wraps the whole BindParameterTest in `if prepared_statements`
+    // (bind_parameter_test.rb:9), so this case is gated too; mirror that guard.
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+
     // Rails: `joins(:thinking_posts)` — a bare association name resolved to an
     // INNER JOIN. trails resolves association joins through the model registry,
     // so register the canonical Author/Post here (their fixtures load above but
