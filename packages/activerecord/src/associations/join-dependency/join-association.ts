@@ -24,8 +24,8 @@ export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
   private _table: Table | null = null;
   readonly tables: Table[] = [];
-  private _readonly = false;
-  private _strictLoading = false;
+  private _readonly?: boolean;
+  private _strictLoading?: boolean;
 
   constructor(reflection: AbstractReflection, children?: JoinPart[]) {
     super(reflection.klass, children);
@@ -176,12 +176,51 @@ export class JoinAssociation extends JoinPart {
     return joins;
   }
 
-  isReadonly(): boolean {
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#readonly?
+   *
+   *   @readonly = reflection.scope && reflection.scope_for(base_klass.unscoped).readonly_value
+   *
+   * Memoized like Rails' `@readonly`.
+   */
+  override isReadonly(): boolean {
+    if (this._readonly !== undefined) return this._readonly;
+    this._readonly = !!this._scopeRelation()?._isReadonly;
     return this._readonly;
   }
 
-  isStrictLoading(): boolean {
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#strict_loading?
+   *
+   *   @strict_loading = reflection.scope && reflection.scope_for(base_klass.unscoped).strict_loading_value
+   *
+   * Memoized like Rails' `@strict_loading`. Covers both the reflection's direct
+   * `strictLoading: true` option and scope-driven strict loading (e.g.
+   * `hasMany("posts", () => rel.strictLoading())`) via the scoped relation.
+   */
+  override isStrictLoading(): boolean {
+    if (this._strictLoading !== undefined) return this._strictLoading;
+    this._strictLoading =
+      !!(this.reflection as any)?.strictLoading || !!this._scopeRelation()?._isStrictLoading;
     return this._strictLoading;
+  }
+
+  /**
+   * `reflection.scope && reflection.scope_for(base_klass.unscoped)` — the scoped
+   * relation Rails reads `readonly_value` / `strict_loading_value` off of, or
+   * null when the reflection has no scope. Always builds from `unscoped` (per
+   * Rails) so default scopes don't perturb the result.
+   * @internal
+   */
+  private _scopeRelation(): any | null {
+    const refl = this.reflection as any;
+    if (!refl?.scope || typeof refl.scopeFor !== "function") return null;
+    try {
+      const unscoped = (this.baseKlass as any).unscoped?.();
+      return unscoped ? (refl.scopeFor(unscoped) ?? null) : null;
+    } catch {
+      return null;
+    }
   }
 }
 
