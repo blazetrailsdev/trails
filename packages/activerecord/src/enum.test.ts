@@ -696,6 +696,32 @@ describe("EnumTest", () => {
     expect((p as any).isEasyToRead()).toBe(false);
   });
 
+  it("update by declaration", async () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
+
+    // Bang on an unpersisted record inserts it (Rails update!), returning true.
+    const p = new Post({ status: 0 });
+    expect((p as any).isPersisted()).toBe(false);
+    const result = await (p as any).publishedBang();
+    expect(result).toBe(true);
+    expect((p as any).isPersisted()).toBe(true);
+    expect((p as any).isPublished()).toBe(true);
+
+    // Reloading from the database confirms the insert persisted the new value.
+    const reloaded = (await Post.find((p as any).readAttribute("id"))) as any;
+    expect(reloaded.isPublished()).toBe(true);
+
+    // Bang on a persisted record updates and still returns true.
+    const result2 = await (p as any).archivedBang();
+    expect(result2).toBe(true);
+    expect((p as any).isArchived()).toBe(true);
+  });
+
   it("enum on custom attribute with default", async () => {
     class Post extends Base {
       static _tableName = "posts";
