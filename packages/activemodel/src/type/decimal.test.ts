@@ -179,4 +179,23 @@ describe("DecimalType", () => {
     const type = new Types.DecimalType();
     expect(type.isChanged("5", "5", "5")).toBe(false);
   });
+
+  it("casts NaN (BigDecimal NaN sentinel) — number and string forms", () => {
+    // BigDecimal("NaN") has no decimal string form; it round-trips as the
+    // sentinel "NaN" (the JS NaN on assignment, the string "NaN" from PG on
+    // load). ±Infinity has no BigDecimal equivalent here and stays null.
+    const type = new Types.DecimalType();
+    expect(type.cast(NaN)).toBe("NaN");
+    expect(type.cast("NaN")).toBe("NaN");
+    expect(type.cast(Infinity)).toBeNull();
+    expect(type.cast(-Infinity)).toBeNull();
+  });
+
+  it("applyScale leaves the NaN sentinel untouched", () => {
+    // A scaled decimal column (bank_balance is scale: 2) must not mangle the
+    // "NaN" sentinel — roundHalfUpToScale's splitDecimal returns null for it.
+    const type = new Types.DecimalType({ precision: 10, scale: 2 });
+    expect(type.cast(NaN)).toBe("NaN");
+    expect(type.cast("NaN")).toBe("NaN");
+  });
 });
