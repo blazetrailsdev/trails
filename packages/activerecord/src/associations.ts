@@ -77,7 +77,7 @@ import {
   camelize,
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
-import { getInheritanceColumn, findStiClass } from "./inheritance.js";
+import { getInheritanceColumn, findStiClass, stiEnabled } from "./inheritance.js";
 import { flushPendingCounterCacheColumns, _foreignKeysEqual } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
@@ -1195,7 +1195,7 @@ export function buildHasOne(
 
   let targetModel = resolveAssocClass(record, _assocName, className);
   const inheritanceCol = getInheritanceColumn(targetModel);
-  if (inheritanceCol && buildAttrs[inheritanceCol]) {
+  if (stiEnabled(targetModel) && buildAttrs[inheritanceCol]) {
     const typeName = buildAttrs[inheritanceCol] as string;
     targetModel = findStiClass(targetModel, typeName);
   }
@@ -1218,7 +1218,7 @@ export function buildBelongsTo(
 
   let targetModel = resolveAssocClass(_record, _assocName, className);
   const inheritanceCol = getInheritanceColumn(targetModel);
-  if (inheritanceCol && attrs[inheritanceCol]) {
+  if (stiEnabled(targetModel) && attrs[inheritanceCol]) {
     const typeName = attrs[inheritanceCol] as string;
     targetModel = findStiClass(targetModel, typeName);
   }
@@ -2050,7 +2050,7 @@ export function buildThroughAssociation(
   const targetClassName = assocDef.options.className ?? camelize(assocName);
   let targetModel = resolveModel(targetClassName);
   const inheritanceCol = getInheritanceColumn(targetModel);
-  if (inheritanceCol && attrs[inheritanceCol]) {
+  if (stiEnabled(targetModel) && attrs[inheritanceCol]) {
     targetModel = findStiClass(targetModel, String(attrs[inheritanceCol]));
   }
   const target = new targetModel(attrs);

@@ -1785,7 +1785,10 @@ describe("Base.inheritanceColumn", () => {
       }
     }
 
-    expect(User.inheritanceColumn).toBeNull();
+    // Rails defaults `inheritance_column` to "type" for every model, regardless
+    // of whether STI is enabled; the column merely names where STI *would* read
+    // the type. Whether dispatch happens is gated on `_has_attribute?` instead.
+    expect(User.inheritanceColumn).toBe("type");
   });
 });
 
