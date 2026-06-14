@@ -110,6 +110,22 @@ function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
   return true;
 }
 
+/**
+ * True for a plain `integer` column spec. Deliberately excludes `big_integer`:
+ * the serial-PK path routes through `createTable({ primaryKey })`, whose
+ * `primary_key` type emits `SERIAL` (INT4) on PG — not `BIGSERIAL` — so a
+ * `big_integer` PK would silently narrow to INT4. No canonical schema declares
+ * a `big_integer` custom PK; if one is added it needs an explicit BIGSERIAL
+ * branch rather than this fast path.
+ *
+ * @internal
+ */
+function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
+  if (spec === undefined) return false;
+  const type = typeof spec === "string" ? spec : spec.type;
+  return type === "integer";
+}
+
 /** @internal */
 function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
   return isWrappedSchema(table) ? table.columns : (table as Record<string, ColumnSpec>);
@@ -543,13 +559,21 @@ async function _resetAutoIncrement(
   adapter: DatabaseAdapter,
   _ss: SchemaStatements,
   table: string,
+  // Defaults to "id" but accepts a custom-named serial PK (e.g. `movieid`):
+  // those columns are now SERIAL too, so the persists-across-files fast path
+  // must reset their sequence as well or a later naked `create()` could draw a
+  // value a prior file's explicit-id fixture already advanced past. MySQL's
+  // table-wide AUTO_INCREMENT reset and SQLite's sqlite_sequence row are keyed
+  // by table, so only PostgreSQL needs the column name.
+  pkColumn = "id",
 ): Promise<void> {
   try {
     const qt = adapter.quoteTableName(table);
     switch (adapter.adapterName) {
       case "postgres":
-        await adapter.executeMutation(`SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)`, [
+        await adapter.executeMutation(`SELECT setval(pg_get_serial_sequence($1, $2), 1, false)`, [
           table,
+          pkColumn,
         ]);
         break;
       case "mysql":
@@ -627,6 +651,16 @@ async function _defineSchemaImpl(
 
   for (const table of order) {
     const raw = schema[table];
+    const columns = columnsOf(raw);
+    const pk = primaryKeyOf(raw);
+    // A single-column integer PK declared via `primaryKey: ["col"]` mirrors
+    // Rails' `t.primary_key :col` (movieid/key_number/monkeyID), which makes
+    // the column a serial/identity. Emit it via the string `primaryKey` form
+    // so the adapter generates the auto-increment sequence — the array form
+    // would create a plain integer PK with no sequence, and on PostgreSQL an
+    // INSERT that omits the PK then trips a NOT NULL violation.
+    const serialPkName =
+      Array.isArray(pk) && pk.length === 1 && isIntegerSpec(columns[pk[0]]) ? pk[0] : null;
     const newSig = tableSignature(raw);
     const cachedSig = cache.get(table);
     const sc = adapter.schemaCache;
@@ -637,11 +671,13 @@ async function _defineSchemaImpl(
         : cachedSig !== undefined;
     if (cachedSig === newSig && stillExists) {
       // D-Z: table persists across files. Reset auto-increment so tests
-      // that depend on id=1 (e.g. toParam, findEach start/finish) work.
-      // Skip for tables without a default id PK (composite/false).
-      const pk = primaryKeyOf(raw);
+      // that depend on id=1 (e.g. toParam, findEach start/finish) work. The
+      // default `id` PK and a custom-named single integer PK are both SERIAL;
+      // composite (string[]) and id-less (false) tables have no sequence.
       if (pk === undefined) {
         await _resetAutoIncrement(adapter, ss, table);
+      } else if (serialPkName !== null) {
+        await _resetAutoIncrement(adapter, ss, table, serialPkName);
       }
       if (warm) await _warmSchemaCache(adapter, table);
       continue;
@@ -650,17 +686,26 @@ async function _defineSchemaImpl(
     // dropAllTables clearing the signature cache, this eliminates the need
     // for afterAll(dropAllTables) in useHandlerTransactionalFixtures.
     await ss.dropTable(table, { ifExists: true });
-    const columns = columnsOf(raw);
-    const pk = primaryKeyOf(raw);
-    const createOpts: { id?: boolean; primaryKey?: string[] } = {};
+    const createOpts: { id?: boolean | { type: string }; primaryKey?: string | string[] } = {};
     if (pk === false) createOpts.id = false;
-    else if (Array.isArray(pk)) {
+    else if (serialPkName !== null) {
+      createOpts.primaryKey = serialPkName;
+      // Preserve the declared INTEGER width across adapters. The default
+      // `primary_key` type widens to BIGINT on MySQL, which breaks integer FK
+      // references (e.g. fk_test_has_fk.fk_id → fk_test_has_pk.pk_id, errno 150).
+      // PG `serial` → INT4 serial; MySQL/SQLite `integer` → INT auto-increment.
+      // (`integer` does NOT auto-increment on PG, hence the per-adapter split.)
+      createOpts.id = { type: adapter.adapterName === "postgres" ? "serial" : "integer" };
+    } else if (Array.isArray(pk)) {
       createOpts.primaryKey = pk;
       createOpts.id = false;
     }
-    const compositePkCols = Array.isArray(pk) ? new Set(pk) : null;
+    const compositePkCols = Array.isArray(pk) && serialPkName === null ? new Set(pk) : null;
     await ss.createTable(table, createOpts, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
+        // The serial PK column is emitted by createTable's string-`primaryKey`
+        // path; emitting it again here would duplicate the column.
+        if (colName === serialPkName) continue;
         const primitive: AnyPrimitiveColumnSpec = typeof spec === "string" ? spec : spec.type;
         const isArray = typeof spec === "object" && spec.array === true;
         if (PG_ONLY_TYPES.has(primitive) && adapter.adapterName !== "postgres") {
