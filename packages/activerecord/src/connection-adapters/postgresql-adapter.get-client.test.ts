@@ -26,6 +26,7 @@ interface PrivatePgAdapter {
   reconnect: () => void;
   resetBang: () => void;
   close: () => Promise<void>;
+  isConnected: () => boolean;
 }
 
 describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
@@ -67,6 +68,30 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
     // TX active — _client points at the same persistent client.
     adapter._client = persistentClient;
     expect(await adapter._acquireFreshClient()).toBe(persistentClient);
+  });
+
+  // Deterministic mirror of Rails' `connected?`
+  // (`!(@raw_connection.nil? || @raw_connection.finished?)`): isConnected()
+  // tracks node-pg's "finished" liveness flags, not just `_connection !== null`.
+  it("isConnected() reflects the raw pg.Client finished? state", () => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+
+    adapter._rawConnection = { _queryable: true, _ending: false, _ended: false };
+    expect(adapter.isConnected()).toBe(true);
+
+    // Each node-pg "finished" signal independently flips connected? false.
+    adapter._rawConnection = { _queryable: false };
+    expect(adapter.isConnected()).toBe(false);
+    adapter._rawConnection = { _ending: true };
+    expect(adapter.isConnected()).toBe(false);
+    adapter._rawConnection = { _ended: true };
+    expect(adapter.isConnected()).toBe(false);
+    adapter._rawConnection = { _connectionError: true };
+    expect(adapter.isConnected()).toBe(false);
+
+    // A nil raw connection is connected? false via the existing _connection guard.
+    adapter._rawConnection = null;
+    expect(adapter.isConnected()).toBe(false);
   });
 
   it("resetBang barrier: real _acquireFreshClient waits until DISCARD ALL resolves", async () => {

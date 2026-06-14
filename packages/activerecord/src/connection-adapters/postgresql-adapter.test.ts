@@ -573,6 +573,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].active).toBe(true);
       expect(rows[0].price).toBeCloseTo(9.99);
     });
+
+    // Mirrors Rails' `connected?`
+    // (`!(@raw_connection.nil? || @raw_connection.finished?)`): once the
+    // underlying socket is gone, `connected?`/`isConnected()` reports false even
+    // though the adapter has not nulled its handle (no `disconnect!`). Closing
+    // the live pg.Client underneath the adapter is the node-pg analog of a
+    // server-side `pg_terminate_backend` / `PQfinish`.
+    it("connected? is false after the raw connection is finished", async () => {
+      await adapter.exec("SELECT 1");
+      const rawConnection = (adapter as unknown as { _rawConnection: pg.Client | null })
+        ._rawConnection;
+      expect(rawConnection).not.toBeNull();
+      expect(adapter.isConnected()).toBe(true);
+
+      // Finish the socket without going through disconnectBang, so _connection
+      // is still set but the client is `finished?`.
+      await rawConnection!.end();
+
+      expect(adapter.isConnected()).toBe(false);
+    });
   });
 
   describe("schema introspection", () => {

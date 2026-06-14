@@ -127,6 +127,16 @@ import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 const OID_JSON = 114;
 const OID_JSONB = 3802;
 
+// Internal liveness flags node-pg sets on its `pg.Client` (lib/client.js).
+// Not part of pg's public typings, so we narrow the client through this shape
+// to mirror libpq's `PGconn#finished?`. See `rawConnectionFinished()`.
+interface PgClientLiveness {
+  _ending?: boolean;
+  _ended?: boolean;
+  _connectionError?: boolean;
+  _queryable?: boolean;
+}
+
 function toError(value: unknown): Error {
   if (value instanceof Error) return value;
   try {
@@ -201,6 +211,40 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   override get active(): boolean {
     return !this._closed && this._pgClientOptions != null;
+  }
+
+  // Mirrors Rails' `PostgreSQLAdapter#connected?`
+  // (`!(@raw_connection.nil? || @raw_connection.finished?)`,
+  // postgresql_adapter.rb:343), which overrides the base `connected?`
+  // (`!@raw_connection.nil?`, abstract_adapter.rb:649). The null check is the
+  // base behavior; PG additionally rejects a handle whose socket is gone via
+  // libpq's `PGconn#finished?` (`_rawConnectionFinished` below).
+  override isConnected(): boolean {
+    return this._connection !== null && !this._rawConnectionFinished();
+  }
+
+  /**
+   * Mirrors libpq's `PGconn#finished?` (the `@raw_connection.finished?` half of
+   * Rails' `connected?`) over node-pg's `pg.Client`. A client is "finished" once
+   * its socket is gone: `end()` was called (`_ending`/`_ended`) or a post-connect
+   * error fired and flipped it un-queryable (`_queryable === false` — set by pg's
+   * `_handleErrorEvent`, e.g. a server-side `pg_terminate_backend`/FATAL or a
+   * dropped socket). `_connectionError` is included defensively for the
+   * connection-phase fatal (lib/client.js:376), though `isConnected()`'s null
+   * guard already short-circuits before `_rawConnection` is published post-connect.
+   * Verified against the pinned `pg@8.20` Client internals (lib/client.js:
+   * `_ending`/`_ended`/`_queryable`/`_connectionError`).
+   * @internal
+   */
+  private _rawConnectionFinished(): boolean {
+    const client = this._rawConnection as PgClientLiveness | null;
+    if (client === null) return false;
+    return (
+      client._ending === true ||
+      client._ended === true ||
+      client._connectionError === true ||
+      client._queryable === false
+    );
   }
 
   // Mirrors: PostgreSQLAdapter::NATIVE_DATABASE_TYPES (postgresql_adapter.rb:134)
