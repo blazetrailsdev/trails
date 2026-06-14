@@ -13,7 +13,13 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
-import { buildCteSql, buildJoinDependencies, QueryMethodBangs } from "./query-methods.js";
+import { modelRegistry } from "../associations.js";
+import {
+  arelColumn,
+  buildCteSql,
+  joinDependenciesForTypeLookup,
+  QueryMethodBangs,
+} from "./query-methods.js";
 
 /**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
@@ -84,6 +90,53 @@ const SQL_FN_NAMES: Record<AggFn, string> = {
 };
 
 /**
+ * Resolve the cast type for an aggregate target column, mirroring Rails'
+ * `type_for` (calculations.rb): the model's own attribute type, then a type
+ * discovered through the join dependencies, then — for a `.joins(:assoc)` that
+ * pre-resolved to a SQL clause — the joined model recovered by table name.
+ */
+function resolveColType(rel: CalculationRelation, column: string): unknown {
+  if (column === "*") return null;
+  // A "table.column" aggregate target resolves through joins; the cast type
+  // lives on the joined model, keyed by the bare column name.
+  const dot = column.lastIndexOf(".");
+  const bare = dot >= 0 ? column.slice(dot + 1) : column;
+  return (
+    pluckCastTypeForKnownColumn(rel, bare) ??
+    (lookupCastTypeFromJoinDependencies(rel, bare) as ColumnType | null) ??
+    joinedColumnType(rel, dot >= 0 ? column.slice(0, dot) : null, bare)
+  );
+}
+
+/**
+ * Resolve a column's cast type from a joined table when the model itself does
+ * not own it. `.joins(:assoc)` pre-resolves the association into a SQL join
+ * clause that keeps only the table name (the target class is discarded), so the
+ * model is recovered from the registry by table name: a qualified
+ * "topics.written_on" looks up "topics" directly, while a bare "written_on"
+ * scans the relation's join-clause tables for the one model that owns it.
+ */
+function joinedColumnType(
+  rel: CalculationRelation,
+  tableName: string | null,
+  bare: string,
+): ColumnType | null {
+  const tables = tableName
+    ? [tableName]
+    : ((rel as { _joinClauses?: Array<{ table: string }> })._joinClauses ?? []).map((j) => j.table);
+  for (const table of tables) {
+    for (const klass of modelRegistry.values()) {
+      const model = klass as unknown as CalculationRelation["_modelClass"] & {
+        tableName?: string;
+      };
+      if (model.tableName !== table) continue;
+      if (model._attributeDefinitions?.has(bare)) return model.typeForAttribute?.(bare) ?? null;
+    }
+  }
+  return null;
+}
+
+/**
  * Cast an aggregate result value. Partially mirrors Rails'
  * `type_cast_calculated_value` (calculations.rb:627).
  *
@@ -91,27 +144,24 @@ const SQL_FN_NAMES: Record<AggFn, string> = {
  *               precision (Rails returns arbitrary-precision Integer).
  *   - sum     → for BigIntegerType: type.deserialize(val ?? 0) → bigint;
  *               otherwise Number(val ?? 0) → number.
- *   - min/max → for BigIntegerType: type.deserialize(val) → bigint;
- *               otherwise returns raw driver value.
+ *   - min/max → type.deserialize(val) for any column type with a deserialize
+ *               (Rails' else-branch, calculations.rb:638): big_integer → bigint,
+ *               datetime → Temporal instant, etc.; raw value when none.
  *   - average → JS number via Number(val). Rails returns BigDecimal for
  *               integer/decimal columns — documented limitation.
  *
- * Only BigIntegerType is dispatched through the column type today.
- * Other types fall back to Number() or raw value. Extend castAggValue
- * when additional types need precision-preserving deserialize dispatch.
+ * sum and average still coerce integer/decimal columns to a JS number (a
+ * documented Rails-→JS limitation); min/max and other non-numeric types route
+ * through the column type's deserialize so callers get the domain object.
  */
-function resolveColType(rel: CalculationRelation, column: string): unknown {
-  if (column === "*") return null;
-  const table = rel._modelClass.arelTable as { typeForAttribute?(c: string): unknown };
-  return table.typeForAttribute?.(column) ?? null;
-}
-
 function castAggValue(val: unknown, fn: AggFn, colType: unknown, coerceNumeric: boolean): unknown {
   if (!coerceNumeric) {
-    // minimum/maximum: route through column type so big_integer columns
-    // return bigint rather than the raw driver string/number.
+    // minimum/maximum: Rails' type_cast_calculated_value else-branch is
+    // `type.deserialize(value)`, so route through the column type — big_integer
+    // columns return bigint, datetime columns return a Temporal instant, etc.
     if (val === null || val === undefined) return null;
-    if (colType instanceof BigIntegerType) return colType.deserialize(val);
+    const ct = colType as { deserialize?(v: unknown): unknown } | null;
+    if (typeof ct?.deserialize === "function") return ct.deserialize(val);
     return val;
   }
 
@@ -157,51 +207,48 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
   );
 }
 
-function buildAggNode(
-  rel: CalculationRelation,
-  table: any,
-  fn: AggFn,
-  column: string,
-  distinct: boolean,
-): any {
+function buildAggNode(rel: CalculationRelation, fn: AggFn, column: string, distinct: boolean): any {
   const sqlName = SQL_FN_NAMES[fn];
   if (column === "*") {
     return new Nodes.NamedFunction(sqlName, [new Nodes.SqlLiteral("*")], undefined, distinct);
   }
-  // Mirrors Rails' arel_column (query_methods.rb): the column-vs-expression
-  // decision is columns-first — a known column (after attribute-alias
-  // resolution) is always a column reference, so an unusual-but-valid name
-  // like "first name" is still quoted, never emitted as raw SQL. Only when
-  // the model has no such column do we fall through: a bare or table-qualified
-  // identifier stays a quoted reference (preserving prior behaviour), and any
-  // other string (e.g. "id * wealth") passes through as raw SQL so
-  // SUM(id * wealth) is emitted, not a quoted pseudo-column.
-  //
-  // APPROXIMATION: a qualified "table.column" resolves against the model's own
-  // table (not through join dependencies, unlike Rails' arel_column_with_table)
-  // and a schema-qualified "schema.table.column" falls through to raw SQL.
-  // Neither is exercised by current callers.
-  const aliases = (rel._modelClass as { _attributeAliases?: Record<string, string> })
-    ._attributeAliases;
-  const isColumn = isAllAttributes(rel, [column]);
-  if (!isColumn && !/^[A-Za-z_]\w*(\.[A-Za-z_]\w*)?$/.test(column)) {
-    return new Nodes.NamedFunction(sqlName, [new Nodes.SqlLiteral(column)], undefined, distinct);
-  }
-  const attr = table.get(isColumn ? (aliases?.[column] ?? column) : column);
+  // Mirrors Rails' aggregate_column → arel_column (query_methods.rb): a known
+  // column (after attribute-alias resolution) becomes a qualified column
+  // reference, a "table.column" string resolves through the join dependencies
+  // so it lands on the joined table (not the model's own), and any other
+  // string (e.g. "id * wealth") passes through as raw SQL. Every Arel node —
+  // attribute or SqlLiteral — mixes in Expressions, so the aggregate builder
+  // (count/sum/…) is callable uniformly.
+  // Fallback for a column absent from the model's columns_hash: the primary key
+  // still belongs to the base table (our test models omit the implicit PK from
+  // columns_hash, unlike Rails), so qualify it there; anything else is a joined
+  // or expression column and stays unqualified raw SQL — exactly what
+  // MIN(written_on) over a joined table needs.
+  const pk = rel._modelClass.primaryKey;
+  const pks = Array.isArray(pk) ? pk : [pk];
+  const node = arelColumn.call(rel as never, column, (field: string) =>
+    pks.includes(field) ? rel._modelClass.arelTable.get(field) : new Nodes.SqlLiteral(field),
+  ) as Nodes.Node & {
+    count(distinct: boolean): Nodes.Node;
+    sum(): Nodes.Node;
+    average(): Nodes.Node;
+    minimum(): Nodes.Node;
+    maximum(): Nodes.Node;
+  };
   if (distinct) {
-    return new Nodes.NamedFunction(sqlName, [attr], undefined, true);
+    return new Nodes.NamedFunction(sqlName, [node], undefined, true);
   }
   switch (fn) {
     case "count":
-      return attr.count(false);
+      return node.count(false);
     case "sum":
-      return attr.sum();
+      return node.sum();
     case "average":
-      return attr.average();
+      return node.average();
     case "minimum":
-      return attr.minimum();
+      return node.minimum();
     case "maximum":
-      return attr.maximum();
+      return node.maximum();
   }
 }
 
@@ -313,7 +360,7 @@ async function singleAggregate(
   // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
-  const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
+  const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const projection = aggNode.as("val");
   const manager = table.project(projection);
   rel._applyJoinsToManager(manager);
@@ -357,7 +404,7 @@ async function groupedAggregate(
   }
   const effectiveGroupCol = association ? (association.foreignKey as string) : groupCol;
   const groupNode = groupColumnToArel(effectiveGroupCol, table);
-  const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
+  const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
   const manager = table.project(groupKeyAlias, aggNode.as("val"));
   rel._applyJoinsToManager(manager);
@@ -406,9 +453,19 @@ async function groupedAggregate(
     return result;
   }
 
+  // Rails keys the result by the group column's deserialized value
+  // (execute_grouped_calculation → type_cast_calculated_value on the key), so a
+  // boolean column yields true/false keys rather than the raw driver 1/0.
+  const keyType = pluckCastTypeForKnownColumn(rel, effectiveGroupCol) as {
+    deserialize?(v: unknown): unknown;
+  } | null;
   const result: Record<string, unknown> = {};
   for (const row of rows) {
-    const key = String(row.group_key ?? "null");
+    const raw = row.group_key;
+    const key =
+      raw == null
+        ? "null"
+        : String(typeof keyType?.deserialize === "function" ? keyType.deserialize(raw) : raw);
     result[key] = aggOf(row.val);
   }
   return result;
@@ -449,7 +506,7 @@ async function groupedCompositeAssoc(
   const fkCols = association.foreignKey as string[];
   const aliases = fkCols.map((_, i) => `group_key_${i}`);
   const groupNodes = fkCols.map((c) => groupColumnToArel(c, table));
-  const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
+  const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const projections = groupNodes.map((n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])));
   const manager = table.project(...projections, aggNode.as("val"));
   rel._applyJoinsToManager(manager);
@@ -1038,7 +1095,7 @@ export function lookupCastTypeFromJoinDependencies(
   name: string,
   joinDependencies?: JoinDependency[],
 ): unknown {
-  const deps = joinDependencies ?? buildJoinDependencies.call(rel as any);
+  const deps = joinDependencies ?? joinDependenciesForTypeLookup.call(rel as any);
   for (const jd of deps) {
     for (const node of jd) {
       const klass = node.baseKlass;
