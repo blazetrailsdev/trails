@@ -107,7 +107,6 @@ export class JoinDependency {
   private _aliasesCache?: Aliases;
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
-  private _references: Record<string, string> = Object.create(null) as Record<string, string>;
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
@@ -146,20 +145,14 @@ export class JoinDependency {
     return result;
   }
 
-  /**
-   * Seed the references map (mirrors the `references` arg threaded into Rails'
-   * `JoinDependency#join_constraints`). A reference whose name matches an
-   * association name aliases that association's join to the reference name.
-   * @internal
-   */
-  setReferences(references: string[]): void {
-    this._references = Object.create(null) as Record<string, string>;
-    for (const name of references) this._references[name] = name;
-  }
-
   addAssociation(
     assocName: string,
-    options?: { fromModel?: any; fromAlias?: string; parentAssocName?: string },
+    options?: {
+      fromModel?: any;
+      fromAlias?: string;
+      parentAssocName?: string;
+      references?: string[];
+    },
   ): JoinPart | null {
     const modelClass = (options?.fromModel ?? this._baseModel) as any;
     const associations: any[] = modelClass._associations ?? [];
@@ -239,10 +232,13 @@ export class JoinDependency {
     }
 
     // Rails join_dependency.rb:204 — `table_name = @references[reflection.name]`
-    // is preferred over the derived alias, so `includes(:author)` with an
-    // `order(author: …)`/references(:author) aliases the join to that name
+    // is preferred over the derived alias, so `includes(:author)` paired with an
+    // `order(author: …)`/`references(:author)` aliases the join to that name
     // (`authors AS author`). Only honored when the referenced alias is free.
-    const referencedAlias = this._references[assocName];
+    // References arrive as a build argument (threaded from join_constraints'
+    // caller) rather than a stored field. A colliding table otherwise gets the
+    // derived `t{index}` alias (mirrors aliased_table_for in make_constraints).
+    const referencedAlias = options?.references?.includes(assocName) ? assocName : undefined;
     const effectiveName =
       referencedAlias &&
       referencedAlias !== targetTable! &&
@@ -349,8 +345,8 @@ export class JoinDependency {
    * then returns the leaf node for the path. Returns null if any segment is
    * un-joinable (the whole path is rolled back, per `addAssociationSpec`).
    */
-  addNestedAssociation(path: string): JoinPart | null {
-    if (!this.addAssociationSpec(path)) return null;
+  addNestedAssociation(path: string, references: string[] = []): JoinPart | null {
+    if (!this.addAssociationSpec(path, references)) return null;
     return this._findNodeByPath(path);
   }
 
@@ -373,14 +369,17 @@ export class JoinDependency {
    * Mirrors: ActiveRecord::Associations::JoinDependency#build (recursive tree
    * construction from the eager_load values hash).
    */
-  addAssociationSpec(spec: AssociationSpec): boolean {
+  addAssociationSpec(spec: AssociationSpec, references: string[] = []): boolean {
     // Normalize the spec into a make_tree-style nested hash up front, then
     // construct the tree from it in one walk (mirrors Rails building the whole
     // tree once from `make_tree(associations)` rather than incrementally).
+    // `references` is threaded down to each `addAssociation` (replacing the
+    // old stored `_references` field) so a referenced association is aliased
+    // to its reference name, mirroring Rails' make_constraints `@references`.
     const tree = JoinDependency.makeTree(spec);
     const snapshot = this._capture();
     try {
-      if (!this._buildSpecTree(tree, this._baseModel, this._baseAlias, "")) {
+      if (!this._buildSpecTree(tree, this._baseModel, this._baseAlias, "", references)) {
         this._rollback(snapshot);
         return false;
       }
@@ -427,17 +426,18 @@ export class JoinDependency {
     model: typeof Base,
     alias: string,
     parentPath: string,
+    references: string[],
   ): boolean {
     for (const key of Reflect.ownKeys(hash)) {
       const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
-      const node = this._addOrReuse(name, model, alias, parentPath);
+      const node = this._addOrReuse(name, model, alias, parentPath, references);
       if (!node) return false;
       const child = hash[key];
       const childPath = parentPath ? `${parentPath}.${name}` : name;
       if (
         child != null &&
         Reflect.ownKeys(child).length > 0 &&
-        !this._buildSpecTree(child, node.baseKlass, node.effectiveSqlName, childPath)
+        !this._buildSpecTree(child, node.baseKlass, node.effectiveSqlName, childPath, references)
       ) {
         return false;
       }
@@ -455,6 +455,7 @@ export class JoinDependency {
     fromModel: typeof Base,
     fromAlias: string,
     parentPath: string,
+    references: string[],
   ): JoinPart | null {
     const existing = this._findNodeByPath(parentPath ? `${parentPath}.${assocName}` : assocName);
     if (existing) return existing;
@@ -462,6 +463,7 @@ export class JoinDependency {
       fromModel,
       fromAlias,
       parentAssocName: parentPath || undefined,
+      references,
     });
   }
 
@@ -553,18 +555,19 @@ export class JoinDependency {
     return this._joinType;
   }
 
+  // Rails' `join_constraints(joins_to_add, alias_tracker, references)` threads
+  // `references` so make_constraints can alias a join to a referenced table name
+  // (`@references[reflection.name]`). trails resolves all table aliasing eagerly
+  // during tree construction, so `references` is consumed in `addAssociationSpec`
+  // (the build entry) — replacing the old stored `_references` field +
+  // `setReferences` setter — and is accepted here only to keep Rails' arity.
   joinConstraints(
     joinsToAdd: JoinDependency[],
     aliasTracker?: AliasTracker,
     references?: string[],
   ): Nodes.Join[] {
     if (aliasTracker) this._aliasTracker = aliasTracker;
-    this._references = Object.create(null) as Record<string, string>;
-    if (references) {
-      for (const tableName of references) {
-        this._references[tableName] = tableName;
-      }
-    }
+    void references;
     const joins = this.makeJoinConstraints(this._joinRoot, this._joinType);
 
     for (const oj of joinsToAdd) {
@@ -585,7 +588,14 @@ export class JoinDependency {
     return joinRoot.children.flatMap((child) => this.makeConstraints(joinRoot, child, joinType));
   }
 
-  /** @internal */
+  /**
+   * Mirrors Rails JoinDependency#walk: partition the right node's children into
+   * those matched in the left tree (intersection) and those not (missing).
+   * Matched nodes are merged into the existing left join by reassigning the
+   * right node's table to the left's (`r.table = l.table`) and recursing;
+   * missing nodes get fresh constraints under `left`.
+   * @internal
+   */
   private walk(
     left: JoinPart,
     right: JoinPart,
@@ -594,35 +604,57 @@ export class JoinDependency {
     const intersection: [JoinPart, JoinPart][] = [];
     const missing: JoinPart[] = [];
 
-    for (const rc of right.children) {
-      const lc = left.children.find((l) => rc.isMatch(l));
-      if (lc) {
-        intersection.push([lc, rc]);
-      } else {
-        missing.push(rc);
-      }
+    for (const r of right.children) {
+      const l = left.children.find((lc) => r.isMatch(lc));
+      if (l) intersection.push([l, r]);
+      else missing.push(r);
     }
 
     const joins = intersection.flatMap(([l, r]) => {
-      if (r instanceof JoinAssociation || r instanceof JoinLeaf) {
-        const originalTable = r.effectiveSqlName || r.table;
-        const lEffective = l.effectiveSqlName;
-        let resolvedTable: string;
-        if (lEffective) {
-          resolvedTable = lEffective;
-        } else {
-          const lt = l.table;
-          resolvedTable = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
-        }
-        r.table = resolvedTable;
-        if (originalTable !== resolvedTable) {
-          this._rebindChildOnPredicates(r, originalTable, resolvedTable);
-        }
-      }
+      this._reassignTable(l, r);
       return this.walk(l, r, joinType);
     });
 
     return joins.concat(missing.flatMap((n) => this.makeConstraints(left, n, joinType)));
+  }
+
+  /**
+   * Rails: `r.table = l.table`. trails precomputes each join's ON predicates at
+   * tree-construction time, so reassigning the table also rebinds the matched
+   * node's child ON predicates from the right tree's table name to the left's.
+   * @internal
+   */
+  private _reassignTable(l: JoinPart, r: JoinPart): void {
+    if (!(r instanceof JoinAssociation || r instanceof JoinLeaf)) return;
+    const originalTable = r.effectiveSqlName || r.table;
+    const lEffective = l.effectiveSqlName;
+    let resolvedTable: string;
+    if (lEffective) {
+      resolvedTable = lEffective;
+    } else {
+      const lt = l.table;
+      resolvedTable = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
+    }
+    r.table = resolvedTable;
+    if (originalTable === resolvedTable) return;
+
+    // r's children were built referencing r's old table name; re-point their ON
+    // predicates to the merged (left) table so the emitted SQL is self-consistent.
+    const toTable = new Table(resolvedTable);
+    for (const child of r.children) {
+      const arelJoin = child.arelJoin;
+      if (!arelJoin) continue;
+      const on = arelJoin.right;
+      if (!(on instanceof Nodes.On)) continue;
+      const rebound = rebindTableReferences(on.expr as Nodes.Node, originalTable, toTable);
+      if (rebound !== on.expr) {
+        const JoinClass = arelJoin.constructor as new (
+          left: Nodes.Node,
+          right: Nodes.Node,
+        ) => Nodes.Join;
+        child.arelJoin = new JoinClass(arelJoin.left, new Nodes.On(rebound));
+      }
+    }
   }
 
   /** @internal */
@@ -641,29 +673,6 @@ export class JoinDependency {
       }
     }
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
-  }
-
-  /** @internal */
-  private _rebindChildOnPredicates(
-    parent: JoinPart,
-    fromTableName: string,
-    toTableName: string,
-  ): void {
-    const toTable = new Table(toTableName);
-    for (const child of parent.children) {
-      if (!child.arelJoin) continue;
-      const arelJoin = child.arelJoin;
-      const on = arelJoin.right;
-      if (!(on instanceof Nodes.On)) continue;
-      const rebound = rebindTableReferences(on.expr as Nodes.Node, fromTableName, toTable);
-      if (rebound !== on.expr) {
-        const JoinClass = arelJoin.constructor as new (
-          left: Nodes.Node,
-          right: Nodes.Node,
-        ) => Nodes.Join;
-        child.arelJoin = new JoinClass(arelJoin.left, new Nodes.On(rebound));
-      }
-    }
   }
 
   instantiate(resultSet: Record<string, unknown>[], strictLoadingValue?: boolean): any[] {
