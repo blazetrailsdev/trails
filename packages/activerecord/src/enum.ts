@@ -54,9 +54,12 @@ export function installEnumAttribute(
       return (this as unknown as { _attributes: Map<string, unknown> })._attributes.get(attribute);
     },
     set(this: Base, value: unknown) {
-      // Mirrors Rails' attribute writer invoking EnumType#assert_valid_value on
-      // user assignment — `record.current_mood = "angry"` raises ArgumentError.
-      enumType.assertValidValue(value);
+      // Custom setter only because the paired custom getter would otherwise make
+      // the property read-only. Validation is NOT done here: Rails' enum has no
+      // custom writer — `EnumType#assert_valid_value` is invoked by the attribute
+      // write pipeline (ActiveModel::Attribute#with_value_from_user), which our
+      // writeAttribute → withValueFromUser mirrors. So `record.status = "angry"`
+      // still raises ArgumentError, via the type, on every write path.
       (this as unknown as EnumInstanceHost).writeAttribute(attribute, value);
     },
     configurable: true,
