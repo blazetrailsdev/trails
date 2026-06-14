@@ -169,6 +169,40 @@ describe("SQLite adapter driver binding", () => {
     await expect(adapter.close()).resolves.toBeUndefined();
   });
 
+  it("completes a deferred async-only open on the first query (sync checkout path)", async () => {
+    // Mirrors what the synchronous pool checkout does: construct the adapter
+    // without awaiting openAsync(), then issue the first query. The query must
+    // transparently complete the deferred open rather than touch an unset handle.
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver: asyncOnlyDriver });
+    expect(adapter.active).toBe(false);
+    await adapter.internalExecute(
+      "CREATE TABLE sync_checkout (id INTEGER PRIMARY KEY, name TEXT)",
+      "SCHEMA",
+    );
+    expect(adapter.active).toBe(true);
+    await adapter.internalExecute("INSERT INTO sync_checkout (name) VALUES ('lazy')", "SQL");
+    const rows = await adapter.execute("SELECT name FROM sync_checkout");
+    expect(rows).toEqual([{ name: "lazy" }]);
+    adapter.disconnectBang();
+  });
+
+  it("opens once when several queries race the deferred async-only open", async () => {
+    let opens = 0;
+    const driver = asyncDriver((config) => {
+      opens++;
+      return openVia(config);
+    });
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver });
+    await adapter.internalExecute("CREATE TABLE race_t (id INTEGER PRIMARY KEY)", "SCHEMA");
+    await Promise.all([
+      adapter.execute("SELECT 1 AS one"),
+      adapter.execQuery("SELECT 2 AS two"),
+      adapter.pragma("foreign_keys"),
+    ]);
+    expect(opens).toBe(1);
+    adapter.disconnectBang();
+  });
+
   it("reconnects an async-only driver and reapplies pragmas", async () => {
     const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", { driver: asyncOnlyDriver });
     adapter.disconnectBang();
