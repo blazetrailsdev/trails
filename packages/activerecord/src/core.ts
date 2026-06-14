@@ -20,7 +20,7 @@ import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import { buildPkWhereNode } from "./model-schema.js";
+import { buildPkWhereNode, columnNames } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 
 /**
@@ -660,15 +660,6 @@ function relation(this: CoreHost): any {
   return (this as any).all();
 }
 
-/** @internal */
-function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
-  const conditions: Record<string, unknown> = {};
-  for (let i = 0; i < keys.length; i++) {
-    conditions[keys[i]] = values[i];
-  }
-  return (this as any).findBy(conditions);
-}
-
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // Reflect the schema before casting ids — the cast below reads
   // attribute definitions that lazy reflection populates.
@@ -679,6 +670,27 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       this.name,
       String(this.primaryKey),
       [],
+    );
+  }
+  // Rails Core#find fast-path: a single supported scalar id on a simple
+  // primary key (no scope, no block) goes through the cached StatementCache.
+  if (
+    ids.length === 1 &&
+    !(this as any).currentScope &&
+    this.primaryKey != null &&
+    !this.compositePrimaryKey &&
+    !Array.isArray(ids[0]) &&
+    !StatementCache.unsupportedValue(ids[0])
+  ) {
+    const pk = this.primaryKey as string;
+    const castId = this._castAttributeValue(pk, ids[0]);
+    const record = await cachedFindBy.call(this, [pk], [castId]);
+    if (record) return record;
+    throw new RecordNotFound(
+      `${this.name} with ${this.primaryKey}=${ids[0]} not found`,
+      this.name,
+      pk,
+      ids[0],
     );
   }
   if (ids.length > 1) {
@@ -783,8 +795,9 @@ export function findBy(this: CoreHost, conditions: Record<string, unknown>): Pro
 
 /**
  * Rails: Core::ClassMethods#find_by routes a flat-hash lookup through a cached
- * StatementCache keyed by the column names, falling back to the relation path
- * for scoped lookups or unsupported (nil/Array/Range/Hash/Relation) values.
+ * StatementCache, falling back to the relation path for scoped lookups, keys
+ * that are not real columns (associations/aliases), or unsupported
+ * (nil/Array/Range/Hash/Relation/Base) values.
  */
 async function findByThroughCache(
   this: CoreHost,
@@ -792,11 +805,28 @@ async function findByThroughCache(
 ): Promise<any> {
   if ((this as any).currentScope) return this.all().findBy(conditions);
   const keys = Object.keys(conditions);
-  const values = keys.map((k) => conditions[k]);
-  if (keys.length === 0 || values.some((v) => StatementCache.unsupportedValue(v))) {
-    return this.all().findBy(conditions);
-  }
+  if (keys.length === 0) return this.all().findBy(conditions);
   await this.ensureSchemaLoaded();
+  const columns = new Set(columnNames.call(this as any));
+  const values: unknown[] = [];
+  for (const k of keys) {
+    const v = conditions[k];
+    if (!columns.has(k) || StatementCache.unsupportedValue(v)) {
+      return this.all().findBy(conditions);
+    }
+    values.push(v);
+  }
+  return cachedFindBy.call(this, keys, values);
+}
+
+/**
+ * Rails: Core::ClassMethods#cached_find_by — build (once) and execute a
+ * StatementCache keyed by the lookup columns, bucketed by the connection's
+ * prepared_statements setting.
+ *
+ * @internal
+ */
+async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
   const connection = (this as any).connection;
   const statement = cachedFindByStatement.call(this, connection, keys.join(","), () =>
     StatementCache.create(connection, (params) => {
@@ -805,7 +835,7 @@ async function findByThroughCache(
       return (this as any).where(wheres).limit(1);
     }),
   );
-  const records = await statement.execute(values, connection);
+  const records = await statement.execute(values, connection, { allowRetry: true });
   return records[0] ?? null;
 }
 
