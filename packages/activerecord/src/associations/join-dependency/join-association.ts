@@ -45,10 +45,6 @@ export class JoinAssociation extends JoinPart {
     }
   }
 
-  get arelTable(): Table {
-    return this._table ?? new Table(this.reflection.tableName);
-  }
-
   isMatch(other: JoinPart): boolean {
     if (this === other) return true;
     return (

@@ -28,11 +28,10 @@ import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js
 import { ConfigurationError } from "../errors.js";
 import { AliasTracker } from "./alias-tracker.js";
 
+/** Mirrors: ActiveRecord::Associations::JoinDependency::Aliases::Column (name, alias). */
 export interface AliasMap {
-  alias: string;
-  tableIndex: number;
-  columnIndex: number;
   column: string;
+  alias: string;
 }
 
 function getModelColumns(modelClass: any): string[] {
@@ -67,13 +66,13 @@ function getModelColumns(modelClass: any): string[] {
  */
 export class Aliases {
   private _aliasCache: Map<JoinPart | null, Map<string, string>>;
-  private _columnsCache: Map<JoinPart | null, AliasMap[]>;
   private _allColumns: AliasMap[];
+  private _tables: Array<{ node: JoinPart | null; table: Table; columns: AliasMap[] }>;
 
-  constructor(tables: Array<{ node: JoinPart | null; columns: AliasMap[] }>) {
+  constructor(tables: Array<{ node: JoinPart | null; table: Table; columns: AliasMap[] }>) {
     this._aliasCache = new Map();
-    this._columnsCache = new Map();
     this._allColumns = [];
+    this._tables = tables;
     for (const table of tables) {
       const colMap = new Map<string, string>();
       for (const col of table.columns) {
@@ -81,7 +80,6 @@ export class Aliases {
         this._allColumns.push(col);
       }
       this._aliasCache.set(table.node, colMap);
-      this._columnsCache.set(table.node, table.columns);
     }
   }
 
@@ -89,23 +87,24 @@ export class Aliases {
     return this._allColumns;
   }
 
-  columnAliases(node: JoinPart | null): AliasMap[] {
-    return this._columnsCache.get(node) ?? [];
-  }
-
   columnAlias(node: JoinPart | null, column: string): string | undefined {
     return this._aliasCache.get(node)?.get(column);
+  }
+
+  /**
+   * Build the SELECT projection — `table[column].as(alias)` for every column of
+   * every joined table. Mirrors Rails' Aliases#columns returning Arel nodes.
+   */
+  selectArel(): Nodes.As[] {
+    return this._tables.flatMap((t) => t.columns.map((c) => t.table.get(c.column).as(c.alias)));
   }
 }
 
 export class JoinDependency {
   private _baseModel: typeof Base;
   private _baseAlias: string;
-  private _baseTableIndex = 0;
-  private _nextTableIndex = 1;
-  private _aliases: AliasMap[] = [];
   private _aliasTracker: AliasTracker;
-  private _arelTablesByIndex: Map<number, Table> = new Map();
+  private _aliasesCache?: Aliases;
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   private _references: Record<string, string> = Object.create(null) as Record<string, string>;
@@ -114,10 +113,22 @@ export class JoinDependency {
     this._baseAlias = (baseModel as any).tableName;
     this._aliasTracker = new AliasTracker(undefined, new Map([[this._baseAlias, 1]]));
     const baseTable = (baseModel as any).arelTable;
-    this._arelTablesByIndex.set(this._baseTableIndex, baseTable);
     this._joinRoot = new JoinBase(baseModel, baseTable);
     this._joinType = joinType ?? Nodes.OuterJoin;
-    this._buildBaseAliases();
+  }
+
+  /**
+   * The t-index for the next table to join: 0 is the base (join root), then one
+   * per joined node in allocation order. Derived from the live tree rather than
+   * a mutable counter, so rollback (node pruning) restores it for free.
+   * @internal
+   */
+  private _nextTableIndex(): number {
+    let count = 1;
+    this._joinRoot.each((p) => {
+      if (p !== this._joinRoot) count++;
+    });
+    return count;
   }
 
   /** @internal */
@@ -165,7 +176,7 @@ export class JoinDependency {
     const sourcePk = modelClass.primaryKey ?? "id";
     if (Array.isArray(sourcePk)) return null;
 
-    const tableIndex = this._nextTableIndex++;
+    const tableIndex = this._nextTableIndex();
     const tableAlias = `t${tableIndex}`;
 
     let targetModel: typeof Base | undefined;
@@ -199,9 +210,7 @@ export class JoinDependency {
       assocDef.type === "hasAndBelongsToMany"
     ) {
       if (assocDef.options.through) {
-        this._nextTableIndex--;
         if (reflection && reflection.isThroughReflection()) {
-          const snapshotIndex = this._nextTableIndex;
           const result = this._addThroughViaJoinAssociation(
             assocDef,
             reflection,
@@ -210,7 +219,6 @@ export class JoinDependency {
             options?.parentAssocName,
           );
           if (result) return result;
-          this._nextTableIndex = snapshotIndex;
         }
         return null;
       }
@@ -248,7 +256,6 @@ export class JoinDependency {
       effectiveName === targetTable!
         ? new Table(targetTable!)
         : new Table(targetTable!, { as: effectiveName });
-    this._arelTablesByIndex.set(tableIndex, targetArelTable);
     const sourceArelTable = new Table(sourceAlias);
 
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
@@ -316,17 +323,9 @@ export class JoinDependency {
       arelJoin = new this._joinType(targetArelTable, new Nodes.On(predicate));
     }
 
-    for (let i = 0; i < columns.length; i++) {
-      this._aliases.push({
-        alias: `t${tableIndex}_r${i}`,
-        tableIndex,
-        columnIndex: i,
-        column: columns[i],
-      });
-    }
-
     const treePart = reflection ? new JoinAssociation(reflection) : new JoinLeaf(targetModel!);
     treePart.tableIndex = tableIndex;
+    treePart.arelTable = targetArelTable;
     treePart.tableAlias = tableAlias;
     treePart.tableName = targetTable!;
     treePart.effectiveSqlName = effectiveName;
@@ -386,7 +385,7 @@ export class JoinDependency {
         return false;
       }
     } catch (e) {
-      // addAssociation mutates _nextTableIndex/aliasTracker before the
+      // addAssociation mutates the tree/aliasTracker before the
       // polymorphic check throws. Restore so the instance is left unchanged
       // (all-or-nothing) before propagating EagerLoadPolymorphicError.
       this._rollback(snapshot);
@@ -490,8 +489,6 @@ export class JoinDependency {
    */
   private _capture(): {
     nodes: Set<JoinPart>;
-    aliases: number;
-    nextIndex: number;
     tracker: Map<string, number>;
   } {
     const nodes = new Set<JoinPart>();
@@ -500,19 +497,12 @@ export class JoinDependency {
     });
     return {
       nodes,
-      aliases: this._aliases.length,
-      nextIndex: this._nextTableIndex,
       tracker: new Map(this._aliasTracker.aliases),
     };
   }
 
   /** @internal */
-  private _rollback(snapshot: {
-    nodes: Set<JoinPart>;
-    aliases: number;
-    nextIndex: number;
-    tracker: Map<string, number>;
-  }): void {
+  private _rollback(snapshot: { nodes: Set<JoinPart>; tracker: Map<string, number> }): void {
     const prune = (parent: JoinPart): void => {
       for (let i = parent.children.length - 1; i >= 0; i--) {
         const child = parent.children[i];
@@ -524,17 +514,13 @@ export class JoinDependency {
       }
     };
     prune(this._joinRoot);
-    this._aliases.length = snapshot.aliases;
-    this._nextTableIndex = snapshot.nextIndex;
+    this._aliasesCache = undefined;
     this._aliasTracker.aliases.clear();
     for (const [k, v] of snapshot.tracker) this._aliasTracker.aliases.set(k, v);
   }
 
   private _buildSelectArelNodes(): Nodes.As[] {
-    return this._aliases.map((a) => {
-      const table = this._arelTablesByIndex.get(a.tableIndex)!;
-      return table.get(a.column).as(a.alias);
-    });
+    return this.aliases().selectArel();
   }
 
   buildSelectArel(): Nodes.As[] {
@@ -765,8 +751,9 @@ export class JoinDependency {
     const modelCache = new Map<JoinPart, Map<unknown, any>>();
     const seenChildren = new WeakMap<object, Map<string, Set<unknown>>>();
 
+    const aliases = this.aliases();
     const baseColumns = getModelColumns(this._baseModel);
-    const columnNames = new Set(this._aliases.map((a) => a.alias));
+    const columnNames = new Set(aliases.columns().map((a) => a.alias));
 
     const nodeReadonly = new Map<JoinPart, boolean>();
     const nodeStrictLoading = new Map<JoinPart, boolean>();
@@ -778,7 +765,7 @@ export class JoinDependency {
     for (const row of rows) {
       const parentAttrs: Record<string, unknown> = Object.create(null);
       for (let i = 0; i < baseColumns.length; i++) {
-        parentAttrs[baseColumns[i]] = row[`t${this._baseTableIndex}_r${i}`];
+        parentAttrs[baseColumns[i]] = row[aliases.columnAlias(this._joinRoot, baseColumns[i])!];
       }
       for (const key of Object.keys(row)) {
         if (!columnNames.has(key)) {
@@ -806,6 +793,7 @@ export class JoinDependency {
         parent,
         parentKey,
         row,
+        aliases,
         modelCache,
         seenChildren,
         assocMap,
@@ -827,6 +815,7 @@ export class JoinDependency {
     arParent: any,
     rootParentKey: unknown,
     row: Record<string, unknown>,
+    aliases: Aliases,
     modelCache: Map<JoinPart, Map<unknown, any>>,
     seenChildren: WeakMap<object, Map<string, Set<unknown>>>,
     assocMap: Map<unknown, Map<string, any[]>>,
@@ -844,6 +833,7 @@ export class JoinDependency {
           arParent,
           rootParentKey,
           row,
+          aliases,
           modelCache,
           seenChildren,
           assocMap,
@@ -865,6 +855,7 @@ export class JoinDependency {
           model,
           rootParentKey,
           row,
+          aliases,
           modelCache,
           seenChildren,
           assocMap,
@@ -878,7 +869,7 @@ export class JoinDependency {
       const childAttrs: Record<string, unknown> = {};
       let hasNonNull = false;
       for (let i = 0; i < child.columns.length; i++) {
-        const val = row[`t${child.tableIndex}_r${i}`];
+        const val = row[aliases.columnAlias(child, child.columns[i])!];
         childAttrs[child.columns[i]] = val;
         if (val !== null && val !== undefined) hasNonNull = true;
       }
@@ -957,6 +948,7 @@ export class JoinDependency {
         childInstance,
         rootParentKey,
         row,
+        aliases,
         modelCache,
         seenChildren,
         assocMap,
@@ -1015,19 +1007,36 @@ export class JoinDependency {
     });
   }
 
-  /** @internal */
+  /**
+   * Build the `Aliases` value object lazily from the tree (mirrors Rails
+   * JoinDependency#aliases — `join_root.each_with_index` over column names).
+   * The base table is keyed by the join root; each joined node supplies its own
+   * column names and Arel table. Replaces the index-keyed `_aliases`/`_arelTablesByIndex`.
+   *
+   * Memoized like Rails' `@aliases ||=`; the cache is cleared on any tree
+   * mutation (`_insertTreeNode` / `_rollback`) so it can never go stale.
+   * @internal
+   */
   private aliases(): Aliases {
-    const baseAliasMap: AliasMap[] = this._aliases.filter(
-      (a) => a.tableIndex === this._baseTableIndex,
-    );
-    const tables: Array<{ node: JoinPart | null; columns: AliasMap[] }> = [
-      { node: null, columns: baseAliasMap },
-    ];
+    if (this._aliasesCache) return this._aliasesCache;
+    const columnsFor = (
+      node: JoinPart,
+      columns: string[],
+      tableIndex: number,
+    ): { node: JoinPart; table: Table; columns: AliasMap[] } => ({
+      node,
+      table: node.arelTable!,
+      columns: columns.map((column, columnIndex) => ({
+        column,
+        alias: `t${tableIndex}_r${columnIndex}`,
+      })),
+    });
+
+    const tables = [columnsFor(this._joinRoot, getModelColumns(this._baseModel), 0)];
     for (const node of this.nodes) {
-      const nodeCols = this._aliases.filter((a) => a.tableIndex === node.tableIndex);
-      tables.push({ node, columns: nodeCols });
+      tables.push(columnsFor(node, node.columns, node.tableIndex));
     }
-    return new Aliases(tables);
+    return (this._aliasesCache = new Aliases(tables));
   }
 
   /**
@@ -1132,18 +1141,6 @@ export class JoinDependency {
     return !!refl.strictLoading;
   }
 
-  private _buildBaseAliases(): void {
-    const columns = getModelColumns(this._baseModel);
-    for (let i = 0; i < columns.length; i++) {
-      this._aliases.push({
-        alias: `t${this._baseTableIndex}_r${i}`,
-        tableIndex: this._baseTableIndex,
-        columnIndex: i,
-        column: columns[i],
-      });
-    }
-  }
-
   private _insertTreeNode(treePart: JoinPart): void {
     const parentPath = treePart.parentPath;
     const parent = this._findNodeByPath(parentPath);
@@ -1153,6 +1150,7 @@ export class JoinDependency {
       );
     }
     parent.children.push(treePart);
+    this._aliasesCache = undefined;
   }
 
   private _addThroughViaJoinAssociation(
@@ -1182,11 +1180,14 @@ export class JoinDependency {
       model: typeof Base;
     }> = [];
 
+    // Nothing is inserted into the tree yet, so the indices for the whole chain
+    // are allocated up front off the current next-index (base + already-joined).
+    const startIndex = this._nextTableIndex();
     for (let i = 0; i < chain.length; i++) {
       const refl = chain[i];
       const model = refl.klass as typeof Base;
       const tableName = (model as any).tableName;
-      const tableIndex = this._nextTableIndex++;
+      const tableIndex = startIndex + i;
       const tableAlias = `t${tableIndex}`;
       const collides =
         (this._aliasTracker.aliases.get(tableName) ?? 0) > 0 ||
@@ -1270,21 +1271,12 @@ export class JoinDependency {
       const isTarget = chainIdx === 0;
       const arelJoin = joins[i] as Nodes.Join;
 
-      this._arelTablesByIndex.set(entry.tableIndex, entry.table);
       this._aliasTracker.aliases.set(
         entry.tableName,
         (this._aliasTracker.aliases.get(entry.tableName) ?? 0) + 1,
       );
 
       const columns = getModelColumns(entry.model);
-      for (let c = 0; c < columns.length; c++) {
-        this._aliases.push({
-          alias: `t${entry.tableIndex}_r${c}`,
-          tableIndex: entry.tableIndex,
-          columnIndex: c,
-          column: columns[c],
-        });
-      }
 
       if (isTarget) {
         const fullAssocName = parentAssocName
@@ -1292,6 +1284,7 @@ export class JoinDependency {
           : assocDef.name;
         const treePart = new JoinAssociation(reflection);
         treePart.tableIndex = entry.tableIndex;
+        treePart.arelTable = entry.table;
         treePart.tableAlias = entry.tableAlias;
         treePart.tableName = entry.tableName;
         treePart.effectiveSqlName = entry.effectiveName;
@@ -1312,6 +1305,7 @@ export class JoinDependency {
         const refl = chain[chainIdx];
         const treePart = new JoinLeaf(entry.model);
         treePart.tableIndex = entry.tableIndex;
+        treePart.arelTable = entry.table;
         treePart.tableAlias = entry.tableAlias;
         treePart.tableName = entry.tableName;
         treePart.effectiveSqlName = entry.effectiveName;
