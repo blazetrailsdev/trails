@@ -1852,6 +1852,13 @@ describe("BasicsTest", () => {
     expect(Account.tableName).toBe("accounts");
   });
   it("utc as time zone", async () => {
+    // Rails asserts Time.utc(2000, 1, 1, 5, 42, 0). The `time` type models a SQL
+    // TIME column, which is timezone-naive: AR::Type::Time.cast_value returns a
+    // Time whose date/zone are an artifact of the dummy 2000-01-01 reference, and
+    // our port returns a Temporal.PlainTime carrying only the time-of-day. So the
+    // assertion is on the parsed hour/minute/second — the same component check the
+    // "utc as time zone and new" test uses. `default: "utc"` is kept to mirror
+    // Rails' fixture setup even though PlainTime carries no zone to distinguish it.
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Topic extends Base {
         static {
@@ -2161,7 +2168,9 @@ describe("BasicsTest", () => {
       expect(bonusTime.minute).toBe(42);
       expect(bonusTime.second).toBe(0);
 
-      await topic.save();
+      // Rails uses save!; saveBang is the faithful form (surfaces save errors).
+      // findBy exercises the serialize round-trip, which is the stronger check.
+      await topic.saveBang();
       const found = await Topic.findBy({ bonus_time: "5:42:00AM" });
       expect(found?.id).toBe(topic.id);
     });
