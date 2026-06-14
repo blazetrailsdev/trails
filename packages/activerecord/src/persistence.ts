@@ -11,19 +11,12 @@ import {
   isDateNegativeInfinity,
   sanitizeForMassAssignment,
 } from "@blazetrails/activemodel";
-import {
-  InsertManager,
-  UpdateManager,
-  DeleteManager,
-  Table as ArelTable,
-  star as arelStar,
-} from "@blazetrails/arel";
+import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ActiveRecordError,
   AttributeAssignmentError,
   ReadOnlyRecord,
   RecordNotDestroyed,
-  RecordNotFound,
   RecordNotSaved,
   UnknownAttributeError,
 } from "./errors.js";
@@ -1084,6 +1077,9 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   um.table(table);
   um.set(setPairs as Parameters<UpdateManager["set"]>[0]);
   um.where(ctor._buildPkWhereNode(originalId));
+  // Mirrors Rails' update_columns → _update_record: an all_queries default
+  // scope (and any global current scope) is stacked onto the UPDATE constraints.
+  applyDefaultAndGlobalConstraints(um as never, ctor as never);
 
   const adapter = ctor.connection;
   if (typeof adapter.update === "function") {
@@ -1101,28 +1097,16 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
 // ---------------------------------------------------------------------------
 
 interface ReloadRecord {
-  _attributes: {
-    set(name: string, value: unknown): void;
-    writeFromDatabase(name: string, value: unknown): void;
-  };
+  _attributes: unknown;
   _dirty: { snapshot(attrs: unknown): void; clearChangesInformation(): void };
-  _collectionProxies: Map<string, unknown>;
   _preloadedAssociations: Map<string, unknown>;
-  _associationInstances: Map<string, unknown>;
   _resetAssociationCaches(): void;
   id: unknown;
   constructor: {
     name: string;
     primaryKey: string | string[];
-    arelTable: { project(...cols: unknown[]): { where(node: unknown): { toSql(): string } } };
-    _buildPkWhereNode(id: unknown): unknown;
-    connection: {
-      selectAll(
-        sql: string,
-        name: string,
-      ): Promise<{ first(): Record<string, unknown> | undefined }>;
-      toSql(arel: unknown): string;
-    };
+    clearQueryCachesForCurrentThread?(): void;
+    unscoped<R>(block: () => R | Promise<R>): Promise<R>;
   };
 }
 
@@ -1130,60 +1114,42 @@ interface ReloadRecord {
  * Re-fetch the record from the database and overwrite in-memory attributes,
  * resetting dirty tracking and clearing association/proxy caches.
  *
+ * The refetch routes through `_findRecord` so default scopes apply exactly as
+ * Rails' `apply_scoping?` dictates: with an all_queries default scope (or a
+ * global current scope) and no `unscoped: true`, `_findRecord` runs with
+ * `all_queries: true`; otherwise the fetch is wrapped in `unscoped { }`. This
+ * also makes reload raise `RecordNotFound` when the active scope excludes the
+ * just-saved row (Rails uses `find_by!`).
+ *
  * Mirrors: ActiveRecord::Persistence#reload
  */
-export async function reload<T extends ReloadRecord>(this: T): Promise<T> {
+export async function reload<T extends ReloadRecord>(
+  this: T,
+  options?: { lock?: boolean | string; unscoped?: boolean },
+): Promise<T> {
   const ctor = this.constructor;
-  const sm = ctor.arelTable.project(arelStar).where(ctor._buildPkWhereNode(this.id));
-  const result = await ctor.connection.selectAll(ctor.connection.toSql(sm), "Reload");
-  const row = result.first();
+  ctor.clearQueryCachesForCurrentThread?.();
 
-  if (row === undefined) {
-    throw new RecordNotFound(
-      `${ctor.name} with ${String(ctor.primaryKey)}=${String(this.id)} not found`,
-      ctor.name,
-      String(ctor.primaryKey),
-      this.id,
-    );
-  }
+  const findOptions = { lock: options?.lock };
+  const fresh = (
+    isApplyScoping.call(this as never, options)
+      ? await _findRecord.call(this as never, { ...findOptions, allQueries: true })
+      : await ctor.unscoped(() => _findRecord.call(this as never, findOptions))
+  ) as { _attributes: unknown; _preloadedAssociations: Map<string, unknown> };
 
-  for (const [key, value] of Object.entries(row)) {
-    this._attributes.writeFromDatabase(key, value);
-  }
-
+  // Rails swaps the whole attribute set (`@attributes = fresh.@attributes`);
+  // then dirty tracking re-baselines on the fresh values.
+  this._attributes = fresh._attributes;
   this._dirty.snapshot(this._attributes);
   this._dirty.clearChangesInformation();
 
-  // Rails' Persistence#reload re-preloads `strict_loaded_associations` so that
-  // re-reading an association that was loaded before the reload does not
-  // trigger a fresh lazy load (which, on a strict_loading record, would raise
-  // StrictLoadingViolationError). `strictLoadedAssociations` reads the current
-  // (pre-clear) association caches, so resolve the fresh copy before clearing.
-  const strictPreloads = strictLoadedAssociations.call(
-    this as unknown as ThisParameterType<typeof strictLoadedAssociations>,
-  );
-  let freshPreloaded: Map<string, unknown> | undefined;
-  if (strictPreloads.length > 0) {
-    try {
-      const fresh = (await _findRecord.call(this as never)) as {
-        _preloadedAssociations?: Map<string, unknown>;
-      };
-      freshPreloaded = fresh._preloadedAssociations;
-    } catch {
-      // A default scope (or similar) may exclude the just-refetched row from
-      // the preloading query; degrade to the plain cache-clear below.
-    }
-  }
-
-  // RFC 0022 b1+: reset the singular holder / collection proxy. The holder
-  // (`_associationInstances`) and the collection proxy (`_collectionProxies`)
-  // are the source of truth; clearing them drops any cached/loaded target.
-  // Reload no longer *copies* a fresh snapshot back: re-preloaded strict-loaded
-  // targets come back through `_preloadedAssociations`, which the rebuilt
-  // holders sync from on next access.
+  // RFC 0022 b1+: drop the (now-stale) singular holders / collection proxies,
+  // then re-point the freshly re-preloaded strict-loaded associations onto this
+  // record. `_findRecord` preloads `strict_loaded_associations` so re-reading
+  // one after reload doesn't trigger a StrictLoadingViolationError lazy load.
   this._resetAssociationCaches();
-  if (freshPreloaded) {
-    for (const [name, value] of freshPreloaded) this._preloadedAssociations.set(name, value);
+  for (const [name, value] of fresh._preloadedAssociations) {
+    this._preloadedAssociations.set(name, value);
   }
   clearAutosaveState(this as unknown as Parameters<typeof clearAutosaveState>[0]);
   return this;
@@ -1426,9 +1392,11 @@ export function isApplyScoping(
 ): boolean {
   if (options?.unscoped) return false;
   const ctor = this.constructor as any;
-  const hasDefaultScope = !!ctor.defaultScopes?.length;
-  const current = typeof ctor.currentScope === "function" ? ctor.currentScope() : ctor.currentScope;
-  return !!(hasDefaultScope || current);
+  // Rails: default_scopes?(all_queries: true) || global_current_scope — only an
+  // all_queries-flagged default scope (or a global current scope) opts a
+  // mutation/reload into scoping; a plain default scope does not.
+  const hasAllQueriesDefaultScope = !!ctor.defaultScopes?.some((s: any) => s.allQueries);
+  return !!(hasAllQueriesDefaultScope || ScopeRegistry.globalCurrentScope(ctor));
 }
 
 /** @internal */
