@@ -38,6 +38,19 @@ describe("diffOptionKeys", () => {
     expect(diff.extraInTs).toEqual([]);
   });
 
+  it("drops a positional-param name leaked into the Ruby key set (new_column_definition :type)", () => {
+    // `type` is the second positional arg of `new_column_definition(name, type, options)`
+    // — a leaked symbol, not a real options-hash key, so it must not flag missing.
+    const diff = diffOptionKeys(["type", "limit"], ["limit"], ["name", "type", "options"]);
+    expect(diff.missingInTs).toEqual([]);
+    expect(diff.extraInTs).toEqual([]);
+  });
+
+  it("normalizes positional param names before excluding them", () => {
+    const diff = diffOptionKeys(["inverse_of", "real_opt"], [], ["inverse_of"]);
+    expect(diff.missingInTs).toEqual(["realOpt"]);
+  });
+
   it("normalizes both sides so equal keys don't surface, and sorts", () => {
     expect(diffOptionKeys(["inverse_of"], ["inverseOf"])).toEqual({
       missingInTs: [],
@@ -70,6 +83,15 @@ describe("matchOptionKeysAgainst", () => {
       missingInTs: ["inverseOf"],
       extraInTs: [],
     });
+  });
+
+  it("excludes positional params passed through the matcher", () => {
+    const verdict = matchOptionKeysAgainst(
+      ["type", "limit"],
+      [["limit"]],
+      ["name", "type", "options"],
+    );
+    expect(verdict).toEqual({ comparable: true, missingInTs: [], extraInTs: [] });
   });
 
   it("unions checkable candidates so a binding's empty type doesn't mask the real one", () => {
