@@ -247,13 +247,41 @@ export class BelongsTo extends SingularAssociation {
       await BelongsTo.touchRecord(record, changes, foreignKey, name, touch);
     };
 
-    afterCreate(model, makeCallback("savedChanges"));
-    afterUpdate(model, makeCallback("savedChanges"));
-    afterDestroy(model, async (record: any) => {
-      if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
-        await BelongsTo.touchRecord(record, {}, foreignKey, name, touch);
-      }
-    });
+    // Mirrors Rails Associations::Builder::BelongsTo.add_touch_callbacks: when
+    // the association also maintains a counter cache, the counter-cache update
+    // already carries the `touch:` option (folding the timestamp + lock-version
+    // bump into one statement), so the standalone touch must NOT fire on create
+    // or destroy. On update it fires only when the target object itself was not
+    // swapped — otherwise the counter-cache path on the new target owns the
+    // touch. Without this guard the separate touch would re-touch a record whose
+    // lock_version the counter update already advanced, raising StaleObjectError.
+    const hasCounterCache =
+      typeof reflection.counterCacheColumn === "function" &&
+      reflection.counterCacheColumn() != null;
+    if (hasCounterCache) {
+      // Rails: `model.after_update update_callback, if: :saved_changes?` —
+      // `instance_exec(record, &touch_callback) unless association(name)
+      // .saved_change_to_target?`. The `if: :saved_changes?` skips no-op saves;
+      // the inner guard skips the case where the target was swapped (the
+      // counter-cache update on the *new* target already carries the touch).
+      afterUpdate(model, async (record: any) => {
+        if (typeof record.isSavedChanges === "function" && !record.isSavedChanges()) return;
+        const assoc =
+          typeof record.association === "function" ? record.association(name) : undefined;
+        if (assoc && typeof assoc.isSavedChangeToTarget === "function") {
+          if (assoc.isSavedChangeToTarget()) return;
+        }
+        await makeCallback("savedChanges")(record);
+      });
+    } else {
+      afterCreate(model, makeCallback("savedChanges"));
+      afterUpdate(model, makeCallback("savedChanges"));
+      afterDestroy(model, async (record: any) => {
+        if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
+          await BelongsTo.touchRecord(record, {}, foreignKey, name, touch);
+        }
+      });
+    }
 
     if (typeof model.afterTouch === "function") {
       model.afterTouch(async (record: any) => {

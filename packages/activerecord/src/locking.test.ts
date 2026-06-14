@@ -19,6 +19,12 @@ import { Reference } from "./test-helpers/models/reference.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { LockWithoutDefault } from "./test-helpers/models/lock-without-default.js";
 import { LockWithCustomColumnWithoutDefault } from "./test-helpers/models/lock-with-custom-column-without-default.js";
+import { Car } from "./test-helpers/models/car.js";
+import { Wheel } from "./test-helpers/models/wheel.js";
+import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/bulb.js";
+import { Engine } from "./test-helpers/models/engine.js";
+import { travel, travelBack } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 
 describe("OptimisticLockingTest", () => {
@@ -55,9 +61,24 @@ describe("OptimisticLockingTest", () => {
         lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
         treasures: canonicalSchema.treasures,
         peoples_treasures: canonicalSchema.peoples_treasures,
+        cars: canonicalSchema.cars,
+        wheels: canonicalSchema.wheels,
+        bulbs: canonicalSchema.bulbs,
+        engines: canonicalSchema.engines,
       },
       { dropExisting: true },
     );
+    registerModel("Car", Car);
+    registerModel("Wheel", Wheel);
+    registerModel("Bulb", Bulb);
+    registerModel("CustomBulb", CustomBulb);
+    registerModel("FunkyBulb", FunkyBulb);
+    registerModel("FailedBulb", FailedBulb);
+    registerModel("Engine", Engine);
+    Car.resetColumnInformation();
+    Wheel.resetColumnInformation();
+    await Car.loadSchema();
+    await Wheel.loadSchema();
     registerModel(Treasure);
   });
 
@@ -454,17 +475,84 @@ describe("OptimisticLockingTest", () => {
     expect(p1.lock_version).toBe(lockVersion);
   });
 
-  it.skip("counter cache with touch and lock version", () => {
-    // BLOCKED: belongs-to counter cache updates the target through the
-    // relation-level `updateCounters` (with a combined `touch`), which bypasses
-    // the class-level Locking::Optimistic#update_counters override that bumps
-    // lock_version, and the separate belongs-to touch path raises a stale
-    // object. Needs the belongs-to counter-cache+touch+lock integration.
+  const after = (a: unknown, b: unknown): boolean =>
+    Temporal.Instant.compare(a as Temporal.Instant, b as Temporal.Instant) > 0;
+
+  it("counter cache with touch and lock version", async () => {
+    const car = await Car.createBang({});
+
+    expect(car.wheels_count).toBe(0);
+    expect(car.lock_version).toBe(0);
+
+    let previouslyUpdatedAt = car.updated_at;
+    let previouslyWheelsOwnedAt = car.wheels_owned_at;
+    travel(1000);
+    try {
+      await Wheel.createBang({ wheelable: car });
+    } finally {
+      travelBack();
+    }
+
+    await car.reload();
+    expect(car.wheels_count).toBe(1);
+    expect(car.lock_version).toBe(1);
+    expect(after(car.updated_at, previouslyUpdatedAt)).toBe(true);
+    expect(after(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBe(true);
+
+    previouslyUpdatedAt = car.updated_at;
+    previouslyWheelsOwnedAt = car.wheels_owned_at;
+    travel(2000);
+    try {
+      await ((await association(car, "wheels").first()) as any).update({ size: 42 });
+    } finally {
+      travelBack();
+    }
+
+    await car.reload();
+    expect(car.wheels_count).toBe(1);
+    expect(car.lock_version).toBe(2);
+    expect(after(car.updated_at, previouslyUpdatedAt)).toBe(true);
+    expect(after(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBe(true);
+
+    previouslyUpdatedAt = car.updated_at;
+    previouslyWheelsOwnedAt = car.wheels_owned_at;
+    travel(3000);
+    try {
+      await ((await association(car, "wheels").first()) as any).destroyBang();
+    } finally {
+      travelBack();
+    }
+
+    await car.reload();
+    expect(car.wheels_count).toBe(0);
+    expect(car.lock_version).toBe(3);
+    expect(after(car.updated_at, previouslyUpdatedAt)).toBe(true);
+    expect(after(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBe(true);
+
+    await association(car, "wheels").push(await Wheel.createBang({}));
+    expect(car.wheels_count).toBe(1);
+    expect(car.lock_version).toBe(4);
+    expect((car as any).attributeChanged("lock_version")).toBe(false);
+    await car.update({ name: "herbie" });
   });
-  it.skip("polymorphic destroy with dependencies and lock version", () => {
-    // BLOCKED: same belongs-to counter-cache+touch+lock integration gap — a
-    // wheel create touches the car via the relation-level counter update and
-    // the separate touch raises StaleObjectError.
+
+  it("polymorphic destroy with dependencies and lock version", async () => {
+    const car = await Car.createBang({});
+
+    const wheels = association(car, "wheels");
+    const beforeCreate = await wheels.count();
+    await wheels.create({});
+    expect(await wheels.count()).toBe(beforeCreate + 1);
+
+    const reloaded = await car.reload();
+    // Mirrors Rails `assert_difference "car.wheels.count", -1 { car.reload.destroy }`:
+    // the dependent: :destroy cascade must actually remove the wheel row.
+    const beforeDestroy = Number(await Wheel.where({ wheelable_id: reloaded.id }).count());
+    expect(beforeDestroy).toBe(1);
+    await reloaded.destroy();
+    const afterDestroy = Number(await Wheel.where({ wheelable_id: reloaded.id }).count());
+    expect(afterDestroy).toBe(beforeDestroy - 1);
+    expect(reloaded.isDestroyed()).toBe(true);
   });
   it("removing has and belongs to many associations upon destroy", async () => {
     // RichPerson's async beforeValidation callbacks conflict with the sync

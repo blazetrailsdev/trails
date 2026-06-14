@@ -45,7 +45,7 @@ export class Car extends Base {
     this.scope("inclEngines", (q: any) => q.includes("engines"));
     this.scope("orderUsingNewStyle", (q: any) => q.order("name asc"));
 
-    this.attribute("wheelsOwnedAt", "datetime", { default: () => Temporal.Now.instant() });
+    this.attribute("wheels_owned_at", "datetime", { default: () => Temporal.Now.instant() });
   }
 }
 
