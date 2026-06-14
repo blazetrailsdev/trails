@@ -81,7 +81,9 @@ function scanPackage(pkg: RailsPackage): TosqlClass[] {
       // Map each Ruby method to its TS name via the shared convention so the
       // snapshot records exactly the TS method names the rule will look for.
       const methods = [...new Set(railsMethods.flatMap((m) => rubyMethodToTs(m) ?? []))];
-      const name = leaf(info.name ?? fqn);
+      // Prefer the manifest's own (already-unqualified) name field; fall back
+      // to extracting the leaf from the FQN only when it's absent.
+      const name = info.name ?? leaf(fqn);
       const rubyFile = info.file ?? "";
       const tsFile = rubyFile ? rubyFileToTs(rubyFile) : "";
       const existing = byName.get(name);
