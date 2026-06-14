@@ -1,6 +1,1 @@
-[
-  "packages/activerecord/src/persistence.ts",
-  "packages/activerecord/src/relation.ts",
-  "packages/activerecord/src/relation/query-methods.ts",
-  "packages/activerecord/src/relation/where-clause.ts"
-]
+[]

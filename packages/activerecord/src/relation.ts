@@ -4130,10 +4130,9 @@ export class Relation<T extends Base> {
     // Handles both ? (SQLite/MySQL) and $N (PostgreSQL) placeholders.
     // Use the connection's quote() so binary, temporal, and other non-primitive
     // values are formatted correctly (e.g. bytea → '\x271f5c', not raw bytes).
-    let i = 0;
     const adapter = this._resolveAdapter();
-    return sql.replace(/\?|\$\d+/g, (match) => {
-      const val = binds[i++];
+    return Visitors.substituteBoundValues(sql, (match, i) => {
+      const val = binds[i];
       if (val === undefined) return match;
       if (adapter) return adapter.quote(val);
       if (val === null) return "NULL";
@@ -4513,9 +4512,8 @@ export class Relation<T extends Base> {
     const [sql, binds] = this._arelVisitor().compileWithBinds(node);
     if (binds.length === 0) return sql;
     const adapter = this._resolveAdapter();
-    let i = 0;
-    return sql.replace(/\?|\$\d+/g, (match) => {
-      const raw = binds[i++];
+    return Visitors.substituteBoundValues(sql, (match, i) => {
+      const raw = binds[i];
       if (raw === undefined) return match;
       const val = raw instanceof ModelAttribute ? raw.valueForDatabase : raw;
       return adapter ? adapter.quote(val) : String(val);
