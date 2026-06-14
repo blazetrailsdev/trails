@@ -17,6 +17,13 @@ export abstract class JoinPart {
   tableIndex = -1;
   tableAlias = "";
   tableName = "";
+  /**
+   * The Arel table this part selects from. Set at tree-construction time so the
+   * `Aliases` value object can build column aliases (`node.table[col].as(...)`)
+   * the way Rails' JoinPart#table does — no separate index-keyed table map.
+   * @internal
+   */
+  arelTable: Table | null = null;
   columns: string[] = [];
   assocName = "";
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
