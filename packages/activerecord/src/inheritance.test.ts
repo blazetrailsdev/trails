@@ -1777,7 +1777,7 @@ describe("abstract_class", () => {
 });
 
 describe("Base.inheritanceColumn", () => {
-  it("returns null when STI is not enabled", () => {
+  it("defaults to 'type' when STI is not enabled", () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");

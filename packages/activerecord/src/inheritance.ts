@@ -751,10 +751,10 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
  * `current_scope`'s create attributes, then (for a base class) the table's
  * `column_defaults` — stopping at the first that names a subclass. We resolve
  * each through {@link findStiClassInHierarchy} (registry-safe) instead of
- * Rails' constant-lookup `find_sti_class`, and default the inheritance column
- * to `"type"` when STI was not explicitly enabled (Rails' `inheritance_column`
- * default for every model). Returns null (no dispatch) when no source names a
- * subclass in this class's subtree.
+ * Rails' constant-lookup `find_sti_class`. `inheritance_column` now always
+ * resolves to a name (default `"type"`), and the dispatch is gated on the
+ * column-aware `_has_attribute?` ({@link classHasAttribute}). Returns null (no
+ * dispatch) when no source names a subclass in this class's subtree.
  *
  * One intentional deviation from Rails: for a value present but naming no
  * in-hierarchy subclass, Rails' `find_sti_class` raises SubclassNotFound; the
@@ -770,10 +770,15 @@ export function subclassFromAttributesForNew(
   // Rails gates the whole `new` dispatch on `_has_attribute?(inheritance_column)`
   // so a stray `type` key on a non-STI model can never dispatch. `inheritance_column`
   // defaults to "type"; the column-aware `_has_attribute?` (declared attribute or
-  // reflected DB column) is the real guard — and short-circuits the source probing,
-  // including the non-memoized columnDefaults build, on the hot path.
+  // reflected DB column) is the primary guard. But trails' schema reflection is
+  // not always warm at construction — a canonical STI base like `Company` declares
+  // no `attribute("type")` and its `type` column only reflects once the schema
+  // loads — so a tracked STI subtree stands in as the trails-reliable signal that
+  // `findStiClassInHierarchy` could resolve. A plain model with neither can never
+  // dispatch (it has no in-subtree match), so short-circuit the source probing —
+  // including the non-memoized columnDefaults build — on the hot path.
   const col = getInheritanceColumn(modelClass);
-  if (!classHasAttribute(modelClass, col)) return null;
+  if (!classHasAttribute(modelClass, col) && descendants(modelClass).length === 0) return null;
 
   const resolve = (source: unknown): typeof Base | null => {
     if (!source || typeof source !== "object") return null;
