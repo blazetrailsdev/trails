@@ -1,3 +1,4 @@
+import { BigDecimal } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
 
@@ -12,6 +13,44 @@ export class DecimalType extends NumericValueType {
 
   typeCastForSchema(value: unknown): string {
     return JSON.stringify(value) ?? String(value);
+  }
+
+  /**
+   * Serialize a decimal for the database as a {@link BigDecimal} so the
+   * adapter's `quote`/`typeCast` renders it in fixed ("F") form
+   * (`1.5`, `42.0`) — Rails: `when BigDecimal then value.to_s("F")` —
+   * rather than as a single-quoted string literal (`'1.5'`).
+   *
+   * Rails' `Type::Decimal#cast` already returns a BigDecimal, so
+   * `serialize` (which delegates to `cast`) naturally yields one. Trails
+   * models decimals as strings internally, so the cast value is bridged
+   * to a BigDecimal here, at the database boundary, instead.
+   *
+   * `serialize` and `serializeCastValue` are overridden at the same
+   * prototype depth so the type stays `serialize_cast_value` compatible
+   * (the `FromUser` value-for-database fast path uses
+   * `serializeCastValue`; `insertAll` prefers it too).
+   */
+  override serialize(value: unknown): unknown {
+    return this.toDatabaseDecimal(this.cast(value));
+  }
+
+  override serializeCastValue(value: unknown): unknown {
+    return this.toDatabaseDecimal(value as string | null);
+  }
+
+  private toDatabaseDecimal(casted: string | null): unknown {
+    if (casted === null) return null;
+    // BigDecimal has no NaN form; keep the "NaN" sentinel as a string so
+    // PG's 'NaN'::numeric round-trip (quoted) still works.
+    if (casted === "NaN") return casted;
+    try {
+      return new BigDecimal(casted);
+    } catch {
+      // Adversarial exponents (e.g. "1e10000000") exceed BigDecimal's
+      // expansion cap; leave the raw cast string for the quoter.
+      return casted;
+    }
   }
 
   // JS has no BigDecimal, so we represent decimals as strings to avoid

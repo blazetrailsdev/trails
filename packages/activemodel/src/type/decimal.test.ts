@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Model, Types } from "../index.js";
 
 describe("DecimalTest", () => {
@@ -157,7 +158,11 @@ describe("DecimalType", () => {
 
   it("serialize delegates to cast via Helpers::Numeric", () => {
     const type = new Types.DecimalType();
-    expect(type.serialize("1.5")).toBe("1.5");
+    // serialize bridges the cast value to a BigDecimal so it quotes in
+    // fixed ("F") form rather than as a single-quoted string literal.
+    const serialized = type.serialize("1.5");
+    expect(serialized).toBeInstanceOf(BigDecimal);
+    expect((serialized as BigDecimal).toString("F")).toBe("1.5");
     expect(type.serialize("")).toBeNull();
   });
 
@@ -199,6 +204,27 @@ describe("DecimalType", () => {
     expect(type.cast(-Infinity)).toBe("-Infinity");
     expect(type.cast("Infinity")).toBe("Infinity");
     expect(type.cast("-Infinity")).toBe("-Infinity");
+  });
+
+  it("serialize bridges to BigDecimal F-form for quoting", () => {
+    const type = new Types.DecimalType();
+    // Whole values gain a trailing ".0" in fixed form, fractional values
+    // drop the quotes — both quote bare, not as 'string' literals.
+    expect((type.serialize(42) as BigDecimal).toString("F")).toBe("42.0");
+    expect((type.serialize("1.5") as BigDecimal).toString("F")).toBe("1.5");
+    expect((type.serializeCastValue("1.5") as BigDecimal).toString("F")).toBe("1.5");
+    expect(type.serialize(null)).toBeNull();
+  });
+
+  it("serialize keeps the NaN sentinel as a string (BigDecimal has no NaN)", () => {
+    const type = new Types.DecimalType();
+    expect(type.serialize(NaN)).toBe("NaN");
+    expect(type.serializeCastValue("NaN")).toBe("NaN");
+  });
+
+  it("serialize leaves adversarial exponents as the raw cast string", () => {
+    const type = new Types.DecimalType({ scale: 2 });
+    expect(type.serialize("1e10000000")).toBe("1e10000000");
   });
 
   it("applyScale leaves the NaN sentinel untouched", () => {
