@@ -28,8 +28,7 @@ import {
   SQLWarning,
 } from "../errors.js";
 import { Result } from "../result.js";
-import { CreateIndexDefinition, ForeignKeyDefinition } from "./abstract/schema-definitions.js";
-import type { AddIndexOptions } from "./abstract/schema-definitions.js";
+import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import { typeCastedBinds, transactionIsolationLevels } from "./abstract/database-statements.js";
@@ -37,71 +36,12 @@ import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
-import { SchemaStatements } from "./abstract/schema-statements.js";
-import { columns as mysqlColumns } from "./mysql/schema-statements.js";
-import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
-
-/**
- * MySQL-specific SchemaStatements subclass. Extends the base `dropTable` to support
- * the `temporary: true` option, which emits `DROP TEMPORARY TABLE` — a MySQL/MariaDB
- * extension required to drop temporary tables without affecting base tables.
- *
- * Returned by `Mysql2Adapter#schemaStatements()` so Migration#schema picks it up.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (partial)
- */
-class MysqlSchemaStatements extends SchemaStatements {
-  private _mysqlSchemaCreation?: MysqlSchemaCreation;
-  override get schemaCreation(): MysqlSchemaCreation {
-    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this.adapter));
-  }
-
-  /**
-   * `Migration#addIndex` routes through `this.schema.addIndex(...)`, so
-   * we override here. Mirrors Rails' `AbstractMysqlAdapter#add_index` /
-   * `#build_create_index_definition` pair: pre-flight via
-   * `indexExists()` and emit `CREATE INDEX` without `IF NOT EXISTS`
-   * (MySQL doesn't support the keyword; MariaDB does but Rails
-   * standardizes on the pre-flight for portability). Without this, the
-   * second `addIndex(..., { ifNotExists: true })` call trips
-   * `ER_DUP_KEYNAME` on MariaDB because `MysqlSchemaCreation`
-   * correctly omits the keyword.
-   *
-   * Mirrors: AbstractMysqlAdapter#add_index +
-   * AbstractMysqlAdapter#build_create_index_definition
-   */
-  override async addIndex(
-    tableName: string,
-    columnName: string | string[],
-    options: AddIndexOptions = {},
-  ): Promise<void> {
-    const [idx, algorithmClause, ifNotExists] = this.addIndexOptions(
-      tableName,
-      columnName,
-      options as Record<string, unknown>,
-    );
-    if (ifNotExists && (await this.indexExists(tableName, idx.columns, { name: idx.name }))) {
-      return;
-    }
-    const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
-    await this.adapter.executeMutation(this.schemaCreation.accept(createDef));
-  }
-
-  override async dropTable(
-    ...args:
-      | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
-  ): Promise<void> {
-    const last = args[args.length - 1];
-    const hasOpts = last !== null && last !== undefined && typeof last === "object";
-    const opts = (hasOpts ? last : {}) as { temporary?: boolean };
-    if (opts.temporary) {
-      return (this.adapter as Mysql2Adapter).dropTable(...(args as any));
-    }
-
-    return super.dropTable(...(args as any));
-  }
-}
+import {
+  columns as mysqlColumns,
+  foreignKeys as mysqlForeignKeys,
+  parseMysqlName as mysqlParseName,
+  MysqlSchemaStatements,
+} from "./mysql/schema-statements.js";
 
 /**
  * Mysql2-flavored StatementPool. Evicted entries send COM_STMT_CLOSE
@@ -1361,87 +1301,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this._statisticsHasExpression;
   }
 
-  /**
-   * Split a `schema.table` or `` `schema`.`table` `` into `{schema, table}`.
-   *
-   * Whole-string parser (not regex-tokenize): walks the input once and
-   * requires exactly one part or two parts joined by a single dot,
-   * respecting `` ` `` quoting and doubled-backtick escapes. Rejects
-   * empty segments (`.widgets`, `a..b`, `db.widgets.`), extra parts
-   * (`a.b.c`), and unterminated quoted tokens. This is intentionally
-   * stricter than the PG helper in
-   * `packages/activerecord/src/connection-adapters/postgresql/utils.ts`
-   * (which tolerates empty segments and trailing parts) so a typo in
-   * a MySQL introspection call surfaces instead of silently pointing
-   * at the wrong table.
-   */
+  /** Delegates to {@link mysqlParseName} in `mysql/schema-statements.ts`. */
   parseMysqlName(name: string): { schema?: string; table: string } {
-    const input = name.trim();
-    const invalid = (): never => {
-      throw new Error(`Invalid MySQL identifier "${name}": expected "table" or "schema.table".`);
-    };
-    const unquote = (s: string): string =>
-      s.startsWith("`") && s.endsWith("`") ? s.slice(1, -1).replace(/``/g, "`") : s;
-
-    // Parse a single identifier token starting at `start`. Returns the
-    // raw token (with backticks kept, to preserve quote distinctness)
-    // and the index of the next unconsumed character. Throws on empty
-    // or unterminated tokens.
-    const parsePart = (start: number): { part: string; nextIndex: number } => {
-      if (start >= input.length) invalid();
-      if (input[start] === "`") {
-        let part = "`";
-        let i = start + 1;
-        while (i < input.length) {
-          if (input[i] === "`") {
-            if (input[i + 1] === "`") {
-              part += "``";
-              i += 2;
-              continue;
-            }
-            part += "`";
-            return { part, nextIndex: i + 1 };
-          }
-          part += input[i];
-          i += 1;
-        }
-        invalid(); // unterminated
-      }
-      let i = start;
-      // Stop at `.`, the start of a quoted token, or any whitespace.
-      // MySQL only permits whitespace inside *backtick-quoted*
-      // identifiers; an unquoted "db .widgets" would therefore be
-      // invalid. Treating whitespace as a token boundary (rather than
-      // part of the name) lets the extra-content check downstream
-      // reject the input cleanly.
-      while (i < input.length && input[i] !== "." && input[i] !== "`" && !/\s/.test(input[i])) {
-        i += 1;
-      }
-      if (i === start) invalid(); // empty
-      return { part: input.slice(start, i), nextIndex: i };
-    };
-
-    if (input.length === 0) invalid();
-
-    // unquote + re-validate non-empty: a quoted token like "``" lexes
-    // fine in parsePart (backticks match, body is empty) but unquotes
-    // to "", which would break COALESCE(?, database()) and make the
-    // introspection call silently scan the wrong catalog. Centralize
-    // the empty-check here so both bare and quoted forms are covered.
-    const checkNonEmpty = (part: string): string => {
-      const s = unquote(part);
-      if (s.length === 0) invalid();
-      return s;
-    };
-
-    const first = parsePart(0);
-    if (first.nextIndex === input.length) {
-      return { table: checkNonEmpty(first.part) };
-    }
-    if (input[first.nextIndex] !== ".") invalid();
-    const second = parsePart(first.nextIndex + 1);
-    if (second.nextIndex !== input.length) invalid(); // extra content
-    return { schema: checkNonEmpty(first.part), table: checkNonEmpty(second.part) };
+    return mysqlParseName(name);
   }
 
   supportsAdvisoryLocks(): boolean {
@@ -1589,61 +1451,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this._client;
   }
 
+  /** Delegates to {@link mysqlForeignKeys} in `mysql/schema-statements.ts`. */
   override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    const rows = (await this.schemaQuery(
-      `SELECT fk.referenced_table_name AS to_table,
-              fk.referenced_column_name AS primary_key,
-              fk.column_name AS \`column\`,
-              fk.constraint_name AS name,
-              fk.ordinal_position AS position,
-              rc.update_rule AS on_update,
-              rc.delete_rule AS on_delete
-       FROM information_schema.referential_constraints rc
-       JOIN information_schema.key_column_usage fk
-         USING (constraint_schema, constraint_name)
-       WHERE fk.referenced_column_name IS NOT NULL
-         AND fk.table_schema = DATABASE()
-         AND fk.table_name = ${this.quote(tableName)}
-         AND rc.constraint_schema = DATABASE()
-         AND rc.table_name = ${this.quote(tableName)}
-       ORDER BY fk.constraint_name, fk.ordinal_position`,
-    )) as Array<Record<string, unknown>>;
-
-    const grouped = new Map<string, Array<Record<string, unknown>>>();
-    for (const row of rows) {
-      const name = row.name as string;
-      if (!grouped.has(name)) grouped.set(name, []);
-      grouped.get(name)!.push(row);
-    }
-    const results: ForeignKeyDefinition[] = [];
-    for (const group of grouped.values()) {
-      group.sort((a, b) => (a.position as number) - (b.position as number));
-      const first = group[0];
-      const toTable = first.to_table as string;
-      const fkName = first.name as string;
-      const onDelete = this._mysqlFkAction(first.on_delete as string);
-      const onUpdate = this._mysqlFkAction(first.on_update as string);
-      const column =
-        group.length === 1
-          ? (first.column as string)
-          : group.map((r) => r.column as string).join(",");
-      const primaryKey =
-        group.length === 1
-          ? (first.primary_key as string)
-          : group.map((r) => r.primary_key as string).join(",");
-      results.push(
-        new ForeignKeyDefinition(
-          tableName,
-          toTable,
-          column,
-          primaryKey,
-          fkName,
-          onDelete,
-          onUpdate,
-        ),
-      );
-    }
-    return results;
+    // `_mysqlFkAction` is protected on AbstractMysqlAdapter, so bind a public
+    // host surface rather than handing `this` straight to the standalone helper.
+    return mysqlForeignKeys.call(
+      {
+        schemaQuery: this.schemaQuery.bind(this),
+        quote: this.quote.bind(this),
+        _mysqlFkAction: this._mysqlFkAction.bind(this),
+      },
+      tableName,
+    );
   }
 
   /** @internal */

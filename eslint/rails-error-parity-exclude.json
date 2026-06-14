@@ -50,6 +50,7 @@
   "packages/activerecord/src/connection-adapters/mysql/database-statements.ts",
   "packages/activerecord/src/connection-adapters/mysql/quoting.ts",
   "packages/activerecord/src/connection-adapters/mysql/schema-creation.ts",
+  "packages/activerecord/src/connection-adapters/mysql/schema-statements.ts",
   "packages/activerecord/src/connection-adapters/mysql2-adapter.ts",
   "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
   "packages/activerecord/src/connection-adapters/postgresql/oid/range.ts",
