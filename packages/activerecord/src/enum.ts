@@ -31,10 +31,6 @@ export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDef
 
 /** Minimal instance-side surface for enum-generated prototype callbacks. */
 interface EnumInstanceHost {
-  readAttribute(name: string): unknown;
-  writeAttribute(name: string, val: unknown): void;
-  isPersisted(): boolean;
-  updateColumn(name: string, val: unknown): Promise<void>;
   updateBang(attrs: Record<string, unknown>): Promise<true>;
   readAttributeForDatabase(name: string): unknown;
 }
@@ -174,11 +170,10 @@ export function defineEnum(
         configurable: true,
       });
       Object.defineProperty(modelClass.prototype, `${friendlyName}Bang`, {
-        value: async function (this: EnumInstanceHost) {
-          this.writeAttribute(attribute, value);
-          if (this.isPersisted()) {
-            await this.updateColumn(attribute, value);
-          }
+        value: function (this: EnumInstanceHost) {
+          // Mirrors Rails' bang setter: update!(attribute => value), which runs
+          // validations/callbacks, inserts when new, and returns true.
+          return this.updateBang({ [attribute]: value });
         },
         writable: true,
         configurable: true,
@@ -205,12 +200,11 @@ export function defineEnum(
     }
 
     // Bang setter: record.draftBang() or record.statusDraftBang()
+    // Mirrors Rails' bang setter: update!(attribute => value), which runs
+    // validations/callbacks, inserts when new, and returns true.
     Object.defineProperty(modelClass.prototype, bangName, {
-      value: async function (this: EnumInstanceHost) {
-        this.writeAttribute(attribute, value);
-        if (this.isPersisted()) {
-          await this.updateColumn(attribute, value);
-        }
+      value: function (this: EnumInstanceHost) {
+        return this.updateBang({ [attribute]: value });
       },
       writable: true,
       configurable: true,
@@ -233,11 +227,10 @@ export function defineEnum(
         configurable: true,
       });
       Object.defineProperty(modelClass.prototype, origBang, {
-        value: async function (this: EnumInstanceHost) {
-          this.writeAttribute(attribute, value);
-          if (this.isPersisted()) {
-            await this.updateColumn(attribute, value);
-          }
+        value: function (this: EnumInstanceHost) {
+          // Mirrors Rails' bang setter: update!(attribute => value), which runs
+          // validations/callbacks, inserts when new, and returns true.
+          return this.updateBang({ [attribute]: value });
         },
         writable: true,
         configurable: true,
