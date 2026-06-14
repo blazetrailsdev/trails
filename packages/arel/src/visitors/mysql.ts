@@ -259,8 +259,15 @@ export class MySQL extends ToSql {
   // adding DISTINCT (when LIMIT/OFFSET/ORDER doesn't already materialize)
   // and wrapping the subselect in another SELECT aliased as
   // `__active_record_temp`. Mirrors Rails MySQL's `build_subselect`.
+  //
+  // A composite primary key arrives as `Node[]`; the outer projection reads
+  // `key.name`, which has no array equivalent. This is a pre-existing Rails
+  // parity gap — `arel/visitors/mysql.rb`'s `build_subselect` likewise calls
+  // `quote_column_name(key.name)` and does not handle composite keys on the
+  // join+LIMIT delete path — so composite-PK MySQL deletes through this branch
+  // are unsupported in both implementations.
   protected override buildSubselect(
-    key: Node,
+    key: Node | Node[],
     o: {
       relation: Node | null;
       wheres: Node[];
