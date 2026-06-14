@@ -70,6 +70,7 @@ export function installEnumAttribute(
 interface EnumInstanceHost {
   updateBang(attrs: Record<string, unknown>): Promise<true>;
   readAttributeForDatabase(name: string): unknown;
+  writeAttribute(name: string, value: unknown): void;
 }
 
 /**
