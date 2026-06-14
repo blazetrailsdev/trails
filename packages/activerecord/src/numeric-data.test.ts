@@ -2,6 +2,7 @@
  * Mirrors activerecord/test/cases/numeric_data_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -63,11 +64,11 @@ describe("NumericDataTest", () => {
     expect(typeof m1!.my_house_population).toBe("bigint");
     expect(m1!.my_house_population).toBe(3n);
 
-    expect(typeof m1!.bank_balance).toBe("string");
-    expect(m1!.bank_balance).toBe("1586.43");
+    expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
+    expect((m1!.bank_balance as BigDecimal).toString("F")).toBe("1586.43");
 
-    expect(typeof m1!.big_bank_balance).toBe("string");
-    expect(m1!.big_bank_balance).toBe("1000234000567.95");
+    expect(m1!.big_bank_balance).toBeInstanceOf(BigDecimal);
+    expect((m1!.big_bank_balance as BigDecimal).toString("F")).toBe("1000234000567.95");
   });
 
   it("numeric fields with scale", async () => {
@@ -90,17 +91,17 @@ describe("NumericDataTest", () => {
     expect(typeof m1!.my_house_population).toBe("bigint");
     expect(m1!.my_house_population).toBe(3n);
 
-    expect(typeof m1!.bank_balance).toBe("string");
-    expect(m1!.bank_balance).toBe("1586.43");
+    expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
+    expect((m1!.bank_balance as BigDecimal).toString("F")).toBe("1586.43");
 
-    expect(typeof m1!.big_bank_balance).toBe("string");
-    expect(m1!.big_bank_balance).toBe("234000567.95");
+    expect(m1!.big_bank_balance).toBeInstanceOf(BigDecimal);
+    expect((m1!.big_bank_balance as BigDecimal).toString("F")).toBe("234000567.95");
   });
 
   itPg("numeric fields with nan", async () => {
-    // Decimals are modelled as strings, so BigDecimal("NaN") (passed in as
-    // the JS NaN) round-trips as the sentinel "NaN" — the stand-in for
-    // Rails' `nan?` predicate.
+    // BigDecimal has no NaN form, so BigDecimal("NaN") (passed in as the JS
+    // NaN) round-trips as the sentinel "NaN" rather than a BigDecimal — the
+    // stand-in for Rails' `nan?` predicate.
     const m = NumericData.new({
       bank_balance: NaN,
       big_bank_balance: NaN,
