@@ -29,20 +29,18 @@ export class Serializer {
   }
 
   warmup(): void {
-    this.ensureInstalled();
+    this.messagePackPool();
   }
 
   dump(object: unknown): Buffer {
-    this.ensureInstalled();
-    const packer = this.messagePackFactory.packer();
+    const packer = this.messagePackPool().packer();
     packer.write(SIGNATURE_INT);
     packer.write(object);
     return packer.toBuffer();
   }
 
   load(dumped: Buffer): unknown {
-    this.ensureInstalled();
-    const unpacker = this.messagePackFactory.unpacker(dumped);
+    const unpacker = this.messagePackPool().unpacker(dumped);
     if (unpacker.read() !== SIGNATURE_INT)
       throw new MessagePackError("Invalid serialization format");
     return unpacker.read();
@@ -52,12 +50,18 @@ export class Serializer {
     return dumped[0] === 0xcc && dumped[1] === 0x80;
   }
 
-  /** @internal */
-  protected ensureInstalled(): void {
-    if (this.installed) return;
-    Extensions.install(this.messagePackFactory);
-    this.installUnregisteredTypeHandler();
-    this.installed = true;
+  /**
+   * @internal Memoizes extension install + handler registration, then returns
+   * the factory. Ruby builds and freezes a packer/unpacker pool here; with no
+   * threads to pool against, the factory itself plays the role of the pool.
+   */
+  protected messagePackPool(): Factory {
+    if (!this.installed) {
+      Extensions.install(this.messagePackFactory);
+      this.installUnregisteredTypeHandler();
+      this.installed = true;
+    }
+    return this.messagePackFactory;
   }
 
   /** @internal */

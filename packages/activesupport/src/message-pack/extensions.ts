@@ -40,22 +40,6 @@ function classOf(value: object): ObjectClass {
   return (value as { constructor: ObjectClass }).constructor;
 }
 
-function dumpClass(klass: ObjectClass): string {
-  if (!klass.name) throw new UnserializableObjectError("Cannot serialize anonymous class");
-  return klass.name;
-}
-
-function loadClass(name: string): ObjectClass {
-  const klass = objectClassRegistry.get(name);
-  if (!klass) throw new MissingClassError(`Missing class: ${name}`);
-  return klass;
-}
-
-function raiseUnserializable(object: unknown): never {
-  const name = typeof object === "object" && object ? classOf(object).name : typeof object;
-  throw new UnserializableObjectError(`Unsupported type ${name} for object ${String(object)}`);
-}
-
 export const Extensions = {
   install(registry: Factory): void {
     registry.registerType({
@@ -72,10 +56,8 @@ export const Extensions = {
       type: 127,
       recursive: false,
       match: (v) => typeof v === "object" && v !== null,
-      packer: (v) => raiseUnserializable(v),
-      unpacker: () => {
-        throw new MessagePackError("Invalid format");
-      },
+      packer: (v) => Extensions.raiseUnserializable(v),
+      unpacker: () => Extensions.raiseInvalidFormat(),
     });
   },
 
@@ -89,29 +71,57 @@ export const Extensions = {
     });
   },
 
+  dumpClass(klass: ObjectClass): string {
+    if (!klass.name) throw new UnserializableObjectError("Cannot serialize anonymous class");
+    return klass.name;
+  },
+
+  loadClass(name: string): ObjectClass {
+    const klass = objectClassRegistry.get(name);
+    if (!klass) throw new MissingClassError(`Missing class: ${name}`);
+    return klass;
+  },
+
+  writeClass(klass: ObjectClass, packer: Packer): void {
+    packer.write(Extensions.dumpClass(klass));
+  },
+
+  readClass(unpacker: Unpacker): ObjectClass {
+    return Extensions.loadClass(unpacker.read() as string);
+  },
+
+  raiseUnserializable(object: unknown): never {
+    const name = typeof object === "object" && object ? classOf(object).name : typeof object;
+    throw new UnserializableObjectError(`Unsupported type ${name} for object ${String(object)}`);
+  },
+
+  raiseInvalidFormat(): never {
+    throw new MessagePackError("Invalid format");
+  },
+
   writeObject(object: object, packer: Packer): void {
     const klass = classOf(object);
     if (typeof klass.fromMsgpackExt === "function") {
       packer.write(LOAD_WITH_MSGPACK_EXT);
-      packer.write(dumpClass(klass));
+      Extensions.writeClass(klass, packer);
       packer.write((object as { toMsgpackExt: () => unknown }).toMsgpackExt());
     } else if (typeof klass.jsonCreate === "function") {
       packer.write(LOAD_WITH_JSON_CREATE);
-      packer.write(dumpClass(klass));
+      Extensions.writeClass(klass, packer);
       packer.write((object as { asJson: () => unknown }).asJson());
     } else {
-      raiseUnserializable(object);
+      Extensions.raiseUnserializable(object);
     }
   },
 
   readObject(unpacker: Unpacker): unknown {
     switch (unpacker.read()) {
       case LOAD_WITH_MSGPACK_EXT:
-        return loadClass(unpacker.read() as string).fromMsgpackExt!(unpacker.read());
+        return Extensions.readClass(unpacker).fromMsgpackExt!(unpacker.read());
       case LOAD_WITH_JSON_CREATE:
-        return loadClass(unpacker.read() as string).jsonCreate!(unpacker.read());
+        return Extensions.readClass(unpacker).jsonCreate!(unpacker.read());
       default:
-        throw new MessagePackError("Invalid format");
+        return Extensions.raiseInvalidFormat();
     }
   },
 };
