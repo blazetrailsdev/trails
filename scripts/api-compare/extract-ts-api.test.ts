@@ -19,6 +19,7 @@ import {
   extractFromProgram,
   harvestObjectLiteralMethods,
   packageFingerprint,
+  tsLiteralValue,
 } from "./extract-ts-api.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
@@ -747,5 +748,25 @@ describe("packageFingerprint (per-package cache key)", () => {
       return dest;
     });
     expect(packageFingerprint(moved, dir2)).toBe(before);
+  });
+});
+
+describe("tsLiteralValue — negative numbers", () => {
+  const parseExpr = (src: string): ts.Expression => {
+    const sf = ts.createSourceFile("t.ts", `const x = ${src};`, ts.ScriptTarget.Latest, true);
+    const stmt = sf.statements[0] as ts.VariableStatement;
+    return stmt.declarationList.declarations[0].initializer!;
+  };
+
+  it("folds a negative integer prefix-unary into an int literal", () => {
+    expect(tsLiteralValue(parseExpr("-1"))).toEqual({ kind: "int", value: "-1" });
+  });
+
+  it("folds a negative float prefix-unary into a float literal", () => {
+    expect(tsLiteralValue(parseExpr("-2.5"))).toEqual({ kind: "float", value: "-2.5" });
+  });
+
+  it("leaves a unary minus over a non-literal uncomparable", () => {
+    expect(tsLiteralValue(parseExpr("-x"))).toBeUndefined();
   });
 });
