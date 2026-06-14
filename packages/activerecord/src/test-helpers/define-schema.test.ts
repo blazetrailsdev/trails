@@ -138,6 +138,28 @@ describe("defineSchema", () => {
       expect("id" in rows[0]).toBe(false);
     });
 
+    it("single-element integer primaryKey array becomes a serial PK (auto-assigns on INSERT)", async () => {
+      // Mirrors Rails' `create_table id: false do |t| t.primary_key :thing_id end`:
+      // a custom-named single integer PK is a serial/identity column, so an
+      // INSERT that omits the PK auto-assigns it instead of failing NOT NULL.
+      await adapter.executeMutation(`DROP TABLE IF EXISTS "serial_pk"`).catch(() => {});
+      await defineSchema(adapter, {
+        serial_pk: { columns: { thing_id: "integer", label: "string" }, primaryKey: ["thing_id"] },
+      });
+      await adapter.executeMutation(`INSERT INTO "serial_pk" ("label") VALUES ('a')`);
+      await adapter.executeMutation(`INSERT INTO "serial_pk" ("label") VALUES ('b')`);
+      const rows = (await adapter.execute(
+        `SELECT * FROM "serial_pk" ORDER BY "thing_id"`,
+      )) as Array<Record<string, unknown>>;
+      expect(rows).toHaveLength(2);
+      // The PK was auto-populated (not null) and the column was not duplicated
+      // (no auto `id`).
+      expect(rows[0].thing_id).not.toBeNull();
+      expect(rows[1].thing_id).not.toBeNull();
+      expect(Number(rows[1].thing_id)).toBeGreaterThan(Number(rows[0].thing_id));
+      expect("id" in rows[0]).toBe(false);
+    });
+
     it("composite primary key columns are NOT NULL (matches Rails; SQLite quirk-proof)", async () => {
       await defineSchema(adapter, {
         cpk_nn: {

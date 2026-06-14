@@ -39,22 +39,6 @@ describe("PrimaryKeysTest", () => {
       },
       { dropExisting: true },
     );
-    // keyboards and mixed_case_monkeys use non-id primary keys that Rails creates
-    // as SERIAL/AUTO_INCREMENT (t.primary_key). Use the string primaryKey form so
-    // our adapter creates the auto-increment sequence on PG/MySQL too.
-    const conn = Base.connection as any;
-    await conn.dropTable("keyboards", { ifExists: true });
-    await conn.createTable("keyboards", { primaryKey: "key_number" }, (t: any) => {
-      t.string("name");
-    });
-    await conn.dropTable("mixed_case_monkeys", { ifExists: true });
-    await conn.createTable("mixed_case_monkeys", { primaryKey: "monkeyID" }, (t: any) => {
-      t.integer("fleaCount");
-    });
-    Keyboard.resetColumnInformation();
-    MixedCaseMonkey.resetColumnInformation();
-    await Keyboard.loadSchema();
-    await MixedCaseMonkey.loadSchema();
   });
 
   it("to key with default primary key", async () => {
