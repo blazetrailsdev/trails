@@ -739,6 +739,14 @@ describe("RelationTest", () => {
       expect(sql).toMatch(/\) subq/);
     });
 
+    it("from with a plain relation subquery passes the alias verbatim", () => {
+      // Rails' build_from stores subquery_name verbatim (no safe-identifier
+      // gate), so a non-bareword alias is accepted and rendered as given —
+      // consistent with the set-op branch above.
+      const sql = Post.from(Post.where({ author: "alice" }), 'a"b').toSql();
+      expect(sql).toContain('a"b');
+    });
+
     it("composes a CTE operand into a single WITH compound statement", () => {
       const sql = Post.with({ tech_posts: Post.where({ category: "tech" }) })
         .from("tech_posts AS posts")
