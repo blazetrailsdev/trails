@@ -194,12 +194,16 @@ describe("QueryCache mixin live adapter path", () => {
 // `dirties_query_cache base, ..., :create, :insert, ...` (query_cache.rb:13).
 describe("create alias (alias_method create, insert)", () => {
   it("delegates to insert with the same arguments", async () => {
+    // Rails' `alias create insert` copies the *original* insert body, so
+    // `create` runs that body directly rather than re-entering the separately
+    // query-cache-wrapped `insert` method. We therefore observe its delegation
+    // through the body's `execInsert` dispatch, not by stubbing `insert`.
     const adapter = Object.create(AbstractAdapter.prototype) as {
       create(...args: unknown[]): Promise<unknown>;
-      insert(...args: unknown[]): Promise<unknown>;
+      execInsert(...args: unknown[]): Promise<unknown>;
     };
     let received: unknown[] | undefined;
-    adapter.insert = (...args: unknown[]) => {
+    adapter.execInsert = (...args: unknown[]) => {
       received = args;
       return Promise.resolve("the-id");
     };
@@ -208,17 +212,19 @@ describe("create alias (alias_method create, insert)", () => {
       returning: ["id"],
     });
 
-    expect(ret).toBe("the-id");
-    expect(received).toEqual(["arel", "name", "pk", "id-value", "seq", [1], { returning: ["id"] }]);
+    // idValue ("id-value") wins over the execInsert result, returned as the
+    // single-element array the RETURNING path produces.
+    expect(ret).toEqual(["id-value"]);
+    expect(received).toEqual(["arel", "name", [1], "pk", "seq", ["id"]]);
   });
 
   it("dirties the query cache", async () => {
     const adapter = Object.create(AbstractAdapter.prototype) as {
       create(...args: unknown[]): Promise<unknown>;
-      insert(...args: unknown[]): Promise<unknown>;
+      execInsert(...args: unknown[]): Promise<unknown>;
       _queryCache: Store;
     };
-    adapter.insert = () => Promise.resolve("the-id");
+    adapter.execInsert = () => Promise.resolve("the-id");
     adapter._queryCache = new Store();
     adapter._queryCache.enabled = true;
     adapter._queryCache.dirties = true;
@@ -228,5 +234,34 @@ describe("create alias (alias_method create, insert)", () => {
     await adapter.create("arel");
 
     expect(adapter._queryCache.empty).toBe(true);
+  });
+
+  it("clears the query cache exactly once per create call", async () => {
+    // Rails' `create` clears the cache once (its own `dirties_query_cache`
+    // wrapper) then runs the *unwrapped* insert body. Delegating via
+    // `this.insert(...)` would re-enter the wrapped `insert` and clear a second
+    // time — a structural divergence. With `execInsert` stubbed (so its own
+    // wrapper doesn't fire), a single `create` must trigger exactly one clear.
+    let clears = 0;
+    const store = new Store();
+    store.enabled = true;
+    store.dirties = true;
+    const realClear = store.clear.bind(store);
+    store.clear = () => {
+      clears++;
+      realClear();
+    };
+
+    const adapter = Object.create(AbstractAdapter.prototype) as {
+      create(...args: unknown[]): Promise<unknown>;
+      execInsert(...args: unknown[]): Promise<unknown>;
+      _queryCache: Store;
+    };
+    adapter.execInsert = () => Promise.resolve("the-id");
+    adapter._queryCache = store;
+
+    await adapter.create("arel");
+
+    expect(clears).toBe(1);
   });
 });
