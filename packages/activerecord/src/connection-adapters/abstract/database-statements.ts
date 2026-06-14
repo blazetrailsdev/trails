@@ -1592,12 +1592,8 @@ export const DatabaseStatements = {
 
   insert: insertStatement,
 
-  // Rails: `alias create insert`. Rails' `alias` copies the *original* insert
-  // body, so after `dirties_query_cache` wraps both, `create` clears the cache
-  // once (its own wrapper) and runs the unwrapped insert body — it never
-  // re-enters the wrapped `insert`. Referencing the same standalone function
-  // here (rather than `this.insert(...)`) reproduces that: a `create` call
-  // dirties the query cache exactly once.
+  // Rails: `alias create insert` — see `insertStatement` for why both reference
+  // the same unwrapped function rather than `create` delegating to `this.insert`.
   create: insertStatement,
 
   async update(
