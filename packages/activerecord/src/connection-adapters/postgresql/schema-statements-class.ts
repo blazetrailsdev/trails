@@ -11,7 +11,7 @@ import type { CreateDatabaseOptions } from "./schema-statements.js";
 interface PgSchemaAdapter {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
   exec(sql: string): Promise<void>;
-  execute(sql: string, ...rest: unknown[]): Promise<unknown>;
+  execute(sql: string): Promise<unknown>;
   quoteIdentifier(name: string): string;
   quoteLiteral(value: unknown): string;
 }
