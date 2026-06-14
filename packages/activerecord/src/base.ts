@@ -526,11 +526,19 @@ async function performClassUpdate(
  * only write scope attrs for keys NOT in the explicit set.
  */
 function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
-  // Mirrors Rails' `scope_attributes?` (`current_scope || default_scoped?`):
-  // a default scope seeds its `where` equalities onto new records too, not
-  // only an explicit current scope. The all_queries flag is irrelevant here —
-  // `all` (and thus `scope_for_create`) applies every default scope, so both
-  // all_queries and non-all_queries `where` conditions propagate on create.
+  // Mirrors Rails' `Scoping::Default::ClassMethods#scope_attributes?`
+  // (scoping/default.rb): `super || default_scopes.any? || respond_to?(:default_scope)`,
+  // where `super` is `Scoping::ClassMethods#scope_attributes?` (`current_scope`).
+  // A default scope seeds its `where` equalities onto new records too, not only
+  // an explicit current scope. We drop the third term: in Rails every model
+  // `respond_to?(:default_scope)` (the inherited DSL method), so that term is
+  // always true and `scope_attributes?` is effectively always true — the no-op
+  // case is gated downstream by `attributes.any?`. This port has no proc-based
+  // `def self.default_scope` override (default scopes register into
+  // `defaultScopes` via the macro), so `currentScope || defaultScopes.any?` is
+  // equivalent. The all_queries flag is irrelevant here — `all` (and thus
+  // `scope_for_create`) applies every default scope, so both all_queries and
+  // non-all_queries `where` conditions propagate on create.
   const c = ctor as any;
   return !!c.currentScope || (c.defaultScopes?.length ?? 0) > 0;
 }

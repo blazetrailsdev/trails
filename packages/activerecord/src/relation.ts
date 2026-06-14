@@ -2146,6 +2146,10 @@ export class Relation<T extends Base> {
     } finally {
       ScopeRegistry.setCurrentScope(modelClass, prev);
     }
+    // The block runs AFTER current_scope is restored, matching Rails'
+    // `current_scope_restoring_block` (relation.rb:1345): it captures the
+    // PRIOR scope before `scoping {}` and re-installs it before yielding, so
+    // the user block sees the prior scope, not this relation's scope.
     if (block) block(record);
     return record;
   }
