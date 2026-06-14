@@ -5,7 +5,8 @@
  * normalized digit strings (no float round-trip) to preserve precision.
  *
  * Mirrors: Ruby's `BigDecimal` together with the ActiveSupport core-ext that
- * defaults `#to_s` to the `"F"` (non-scientific, fixed) format.
+ * defaults `#to_s` to the `"F"` (non-scientific, fixed) format. Both the
+ * fixed (`"F"`) and engineering/scientific (`"E"`) forms are implemented.
  * (activesupport/lib/active_support/core_ext/big_decimal/conversions.rb)
  */
 
@@ -39,34 +40,47 @@ export class BigDecimal {
    * `n` inserts a space every `n` digits counting outward from the decimal
    * point; a trailing `F`/`f` selects fixed notation.
    *
-   * Only fixed (`"F"`) notation is implemented — Ruby's engineering/scientific
-   * `"E"` form has no caller in trails (quoting and the defaulted `to_s` both
-   * use `"F"`). `"E"`/`"e"` throws rather than silently emitting fixed-point.
+   * The engineering/scientific `"E"`/`"e"` form normalizes the value to
+   * `0.<digits>e<exp>` (mantissa in `[0.1, 1)`, exponent the power of ten),
+   * matching Ruby's `BigDecimal#to_s`. The output exponent marker is always a
+   * lowercase `e`; the grouping flag spaces the mantissa digits from the left.
    */
   toString(format = "F"): string {
-    const { signFlag, group } = parseFormat(format);
-    const frac = this.fracDigits === "" ? "0" : this.fracDigits;
-    const intPart = group > 0 ? groupFromRight(this.intDigits, group) : this.intDigits;
-    const fracPart = group > 0 ? groupFromLeft(frac, group) : frac;
+    const { signFlag, group, scientific } = parseFormat(format);
     let prefix = "";
     if (this.sign === "-") prefix = "-";
     else if (signFlag === "+") prefix = "+";
     else if (signFlag === " ") prefix = " ";
+    if (scientific) return `${prefix}${this.toScientific(group)}`;
+    const frac = this.fracDigits === "" ? "0" : this.fracDigits;
+    const intPart = group > 0 ? groupFromRight(this.intDigits, group) : this.intDigits;
+    const fracPart = group > 0 ? groupFromLeft(frac, group) : frac;
     return `${prefix}${intPart}.${fracPart}`;
+  }
+
+  /** Render as `0.<digits>e<exp>` (Ruby's `"E"` form, sans sign prefix). */
+  private toScientific(group: number): string {
+    const allDigits = this.intDigits + this.fracDigits;
+    const mantissa = allDigits.replace(/^0+/, "").replace(/0+$/, "");
+    if (mantissa === "") return "0.0";
+    const leadingZeros = allDigits.length - allDigits.replace(/^0+/, "").length;
+    const exp = this.intDigits.length - leadingZeros;
+    const digits = group > 0 ? groupFromLeft(mantissa, group) : mantissa;
+    return `0.${digits}e${exp}`;
   }
 }
 
-function parseFormat(format: string): { signFlag: "" | "+" | " "; group: number } {
+function parseFormat(format: string): {
+  signFlag: "" | "+" | " ";
+  group: number;
+  scientific: boolean;
+} {
   const m = format.match(/^([+ ]?)(\d*)([eEfF]?)$/);
-  if (!m) return { signFlag: "", group: 0 };
-  if (m[3] === "e" || m[3] === "E") {
-    throw new TypeError(
-      `BigDecimal#toString: scientific ("E") notation is not implemented — only fixed ("F")`,
-    );
-  }
+  if (!m) return { signFlag: "", group: 0, scientific: false };
   const signFlag = (m[1] as "" | "+" | " ") || "";
   const group = m[2] ? Number(m[2]) : 0;
-  return { signFlag, group };
+  const scientific = m[3] === "e" || m[3] === "E";
+  return { signFlag, group, scientific };
 }
 
 /** Group digits with a space every `n`, counting from the right. */
