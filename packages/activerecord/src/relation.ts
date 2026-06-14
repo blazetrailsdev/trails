@@ -5,6 +5,7 @@ import {
   SelectManager,
   Nodes,
   Visitors,
+  Collectors,
   UpdateManager,
   DeleteManager,
 } from "@blazetrails/arel";
@@ -422,6 +423,9 @@ export class Relation<T extends Base> {
   // visitor's collector. Read by toArray() to set allowRetry and pass binds.
   private _lastSelectRetryable = false;
   private _lastSelectBinds: unknown[] = [];
+  // AST node of the most recently compiled SELECT, so `toSql()` can re-render it
+  // through a SubstituteBinds collector instead of regex-substituting placeholders.
+  private _lastSelectNode: Nodes.Node | null = null;
 
   private _table: Table | null = null;
 
@@ -4167,20 +4171,19 @@ export class Relation<T extends Base> {
   toSql(): string {
     const sql = this._toSql();
     const binds = this._lastSelectBinds;
-    if (binds.length === 0) return sql;
-    // Substitute bind values inline for human-readable output (mirrors Rails to_sql).
-    // Handles both ? (SQLite/MySQL) and $N (PostgreSQL) placeholders.
-    // Use the connection's quote() so binary, temporal, and other non-primitive
-    // values are formatted correctly (e.g. bytea → '\x271f5c', not raw bytes).
-    const adapter = this._resolveAdapter();
-    return Visitors.substituteBoundValues(sql, (match, i) => {
-      const val = binds[i];
-      if (val === undefined) return match;
-      if (adapter) return adapter.quote(val);
-      if (val === null) return "NULL";
-      if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
-      return String(val);
-    });
+    const node = this._lastSelectNode;
+    if (binds.length === 0 || node === null) return sql;
+    // Re-render the compiled AST through a SubstituteBinds collector that quotes
+    // each bind during traversal (mirrors Rails' to_sql under
+    // unprepared_statement), rather than regex-substituting placeholders.
+    const collector = new Collectors.SubstituteBinds(
+      this._inlineBindQuoter(),
+      new Collectors.SQLString(),
+    );
+    const inlined = this._arelVisitor().compile(node, collector);
+    // Strip the set-op visitor's embedding parens, as _toSqlSetOperation does.
+    if (this._setOperation) return inlined.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
+    return inlined;
   }
 
   private _instrumentInstantiation(rows: Record<string, unknown>[]): T[] {
@@ -4215,6 +4218,7 @@ export class Relation<T extends Base> {
     const [raw, binds, retryable] = v.compileWithBinds(node);
     this._lastSelectRetryable = retryable;
     this._lastSelectBinds = this._typeCastBinds(binds);
+    this._lastSelectNode = node;
     // The set-operation visitors wrap the compound SELECT in `( ... )` for
     // embedded use (subquery / derived table). As a standalone statement
     // SQLite rejects the leading paren, so strip the single enclosing pair the
@@ -4541,6 +4545,7 @@ export class Relation<T extends Base> {
     const [sql, binds, retryable] = v.compileWithBinds(manager.ast);
     this._lastSelectRetryable = retryable;
     this._lastSelectBinds = this._typeCastBinds(binds);
+    this._lastSelectNode = manager.ast;
     return sql;
   }
 
@@ -4551,15 +4556,28 @@ export class Relation<T extends Base> {
   // would leak an unbound placeholder into executable SQL. Inlines via the
   // adapter quoter, matching `Relation#toSql` / `connection.toSql`.
   private _compileArelNode(node: Nodes.Node): string {
-    const [sql, binds] = this._arelVisitor().compileWithBinds(node);
-    if (binds.length === 0) return sql;
+    const collector = new Collectors.SubstituteBinds(
+      this._inlineBindQuoter(),
+      new Collectors.SQLString(),
+    );
+    return this._arelVisitor().compile(node, collector);
+  }
+
+  // Quoter for the inline-bind debug paths (`toSql`, `_compileArelNode`): cast a
+  // remaining ActiveModel::Attribute to its DB value, then quote through the
+  // adapter (so binary/temporal/etc. format correctly), falling back to a bare
+  // `'…'`/NULL/String rendering when no connection is established.
+  private _inlineBindQuoter(): { quote(value: unknown): string } {
     const adapter = this._resolveAdapter();
-    return Visitors.substituteBoundValues(sql, (match, i) => {
-      const raw = binds[i];
-      if (raw === undefined) return match;
-      const val = raw instanceof ModelAttribute ? raw.valueForDatabase : raw;
-      return adapter ? adapter.quote(val) : String(val);
-    });
+    return {
+      quote(value: unknown): string {
+        const val = value instanceof ModelAttribute ? value.valueForDatabase : value;
+        if (adapter) return adapter.quote(val);
+        if (val === null || val === undefined) return "NULL";
+        if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+        return String(val);
+      },
+    };
   }
 
   /**

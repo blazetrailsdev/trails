@@ -4,3 +4,4 @@ export { Composite } from "./composite.js";
 export { SubstituteBindCollector } from "./substitute-bind-collector.js";
 export { PlainString } from "./plain-string.js";
 export { SubstituteBinds } from "./substitute-binds.js";
+export { InlineBinds } from "./inline-binds.js";

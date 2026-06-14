@@ -3,6 +3,7 @@ import { SQLString } from "../collectors/sql-string.js";
 import { Bind } from "../collectors/bind.js";
 import { Composite } from "../collectors/composite.js";
 import { SubstituteBinds } from "../collectors/substitute-binds.js";
+import { InlineBinds } from "../collectors/inline-binds.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
@@ -15,7 +16,6 @@ import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors
 // here so api:compare finds it where Rails defines it.
 export { UnsupportedVisitError };
 import { defaultQuoter } from "./default-quoter.js";
-import { substituteBoundValues } from "./substitute-bound-values.js";
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
@@ -33,18 +33,8 @@ import type { ArelConnection } from "./connection.js";
  */
 export type ArelQuoter = ArelConnection;
 
-/**
- * Resolve a bind's database value. QueryAttribute exposes
- * `valueForDatabase` as a method; ActiveModel::Attribute (TS port)
- * exposes it as a getter. A normal property read handles both shapes —
- * the getter evaluates to its value, a method reference yields a
- * function that we then invoke.
- */
-export function resolveValueForDatabase(value: unknown): unknown {
-  if (!value || typeof value !== "object" || !("valueForDatabase" in value)) return value;
-  const v = (value as Record<string, unknown>).valueForDatabase;
-  return typeof v === "function" ? (v as () => unknown).call(value) : v;
-}
+export { resolveValueForDatabase } from "./resolve-value-for-database.js";
+import { resolveValueForDatabase } from "./resolve-value-for-database.js";
 
 /** Default placeholder block; mirrors Rails' module-level `BIND_BLOCK`. */
 const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
@@ -105,23 +95,10 @@ export class ToSql extends Visitor {
       }
       return collector.value;
     }
-    const sqlCollector = new SQLString();
-    const bindCollector = new Bind();
-    const composite = new Composite(sqlCollector, bindCollector);
-    this.visit(node as Node, composite as unknown as SQLString);
-    const sql = sqlCollector.value;
-    const binds = bindCollector.value;
-    if (binds.length === 0) return sql;
-    return substituteBoundValues(sql, (match, i) => {
-      const raw = binds[i];
-      // BindParam collects a placeholder rather than inlining its value —
-      // mirrors Rails `visit_Arel_Nodes_BindParam` (`BIND_BLOCK = proc { "?" }`),
-      // so `Nodes::BindParam.new(v).to_sql` is always `?`. Casted/Quoted/date
-      // values still inline below (Rails inlines those via `quote`).
-      if (raw instanceof Nodes.BindParam || raw === undefined) return match;
-      const val = resolveValueForDatabase(raw);
-      return this.quote(val);
-    });
+    // Inline quoted literals during traversal, leaving BindParam as `?`/`$N`.
+    const inline = new InlineBinds((value) => this.quote(value));
+    this.visit(node as Node, inline as unknown as SQLString);
+    return inline.value;
   }
 
   protected visitArelNodesDeleteStatement(

@@ -8,7 +8,24 @@
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
 
-import { Visitors, Nodes } from "@blazetrails/arel";
+import { Visitors, Nodes, Collectors } from "@blazetrails/arel";
+
+/**
+ * Quoter for `WhereClause#toSql`'s human-readable inspect output: `'…'`/NULL/
+ * String, the rendering this debug path has always used (distinct from adapter
+ * value quoting). Mirrors the value-block Rails passes to its inline collector.
+ */
+const inspectQuoter = {
+  quote(value: unknown): string {
+    let val = value;
+    if (val !== null && typeof val === "object" && "valueForDatabase" in val) {
+      val = (val as { valueForDatabase: unknown }).valueForDatabase;
+    }
+    if (val === null || val === undefined) return "NULL";
+    if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+    return String(val);
+  },
+};
 
 export class WhereClause {
   private _predicates: Nodes.Node[];
@@ -106,19 +123,10 @@ export class WhereClause {
     const wrapped = predicatesWithWrappedSqlLiterals(this.predicates);
     if (wrapped.length === 0) return "";
     const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
-    const [sql, rawBinds] = visitor.compileWithBinds(node);
-    if (rawBinds.length === 0) return sql;
-    // Substitute bind values inline for human-readable inspect output.
-    // Handles both ? (SQLite/MySQL) and $N (PostgreSQL) placeholders.
-    return Visitors.substituteBoundValues(sql, (_placeholder, i) => {
-      let val: unknown = rawBinds[i];
-      if (val !== null && typeof val === "object" && "valueForDatabase" in val) {
-        val = (val as { valueForDatabase: unknown }).valueForDatabase;
-      }
-      if (val === null || val === undefined) return "NULL";
-      if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
-      return String(val);
-    });
+    // Inline bind values during traversal (Rails' SubstituteBinds collector)
+    // instead of regex-substituting placeholders. See inspectQuoter.
+    const collector = new Collectors.SubstituteBinds(inspectQuoter, new Collectors.SQLString());
+    return visitor.compile(node, collector);
   }
 
   isContradiction(): boolean {
