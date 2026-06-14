@@ -298,7 +298,9 @@ describe("stale claims", () => {
   });
 
   it("does not flag in-progress stories", () => {
-    const s = story({ status: "in-progress", pr: 5, claim: hoursAgo(72) });
+    // pr: null so only the status guard can exempt this — isolates that
+    // in-progress is excluded by status, not incidentally by having a PR.
+    const s = story({ status: "in-progress", pr: null, claim: hoursAgo(72) });
     expect(isStaleClaim(s, NOW, 48)).toBe(false);
   });
 

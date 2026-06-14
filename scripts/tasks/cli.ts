@@ -1999,9 +1999,10 @@ export function claimAgeHours(claim: string | null, nowMs: number): number | nul
 }
 
 // A story orphaned in `claimed`: no PR, and its claim is older than the
-// threshold. `in-progress` is exempt — it has a PR by definition, so this only
-// ever fires on `claimed`. Auto-release is deliberately out of scope; an agent
-// may legitimately be mid-flight.
+// threshold. Only `claimed` can ever match — the status guard exempts
+// everything else (including `in-progress`, which moves past `claimed` once a
+// PR lands). Auto-release is deliberately out of scope; an agent may
+// legitimately be mid-flight.
 export function isStaleClaim(s: StoryEntry, nowMs: number, thresholdHours: number): boolean {
   if (s.status !== "claimed" || s.pr != null) return false;
   const age = claimAgeHours(s.claim, nowMs);
