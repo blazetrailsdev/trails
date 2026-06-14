@@ -49,6 +49,12 @@ function primaryKeyOf(t: TableSchema): string[] | false | undefined {
   return isWrapped(t) ? (t as { primaryKey: string[] | false }).primaryKey : undefined;
 }
 
+function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
+  if (spec === undefined) return false;
+  const type = typeof spec === "string" ? spec : spec.type;
+  return type === "integer" || type === "big_integer";
+}
+
 function colOpts(
   spec: ColumnSpec,
   colName: string,
@@ -107,15 +113,24 @@ function generateCode(schema: Schema, adapterName?: string): string {
   for (const [tableName, tableSpec] of Object.entries(schema)) {
     const cols = columnsOf(tableSpec);
     const pk = primaryKeyOf(tableSpec);
-    const cpkCols = Array.isArray(pk) ? new Set(pk) : null;
+    // A single-column integer PK declared via `primaryKey: ["col"]` mirrors
+    // Rails' `t.primary_key :col`, which makes the column a serial/identity.
+    // Emit it via the string `primaryKey` form (auto-increment) rather than the
+    // array form (plain integer PK, no sequence). Keep them in sync with
+    // define-schema.ts, which applies the same rule for the fixtures path.
+    const serialPkName =
+      Array.isArray(pk) && pk.length === 1 && isIntegerSpec(cols[pk[0]]) ? pk[0] : null;
+    const cpkCols = Array.isArray(pk) && serialPkName === null ? new Set(pk) : null;
 
     const tOptsEntries: string[] = [];
     if (pk === false) tOptsEntries.push(`id: false`);
+    else if (serialPkName !== null)
+      tOptsEntries.push(`primaryKey: ${JSON.stringify(serialPkName)}`);
     else if (Array.isArray(pk)) tOptsEntries.push(`primaryKey: ${JSON.stringify(pk)}`);
     if (needsForce) tOptsEntries.push(`force: "cascade"`);
     const tOpts = tOptsEntries.length === 0 ? `{}` : `{ ${tOptsEntries.join(", ")} }`;
 
-    const colEntries = Object.entries(cols);
+    const colEntries = Object.entries(cols).filter(([colName]) => colName !== serialPkName);
     if (colEntries.length === 0) {
       lines.push(`  await ctx.createTable(${JSON.stringify(tableName)}, ${tOpts});`);
     } else {

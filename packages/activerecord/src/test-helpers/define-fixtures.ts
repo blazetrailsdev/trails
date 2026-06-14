@@ -733,13 +733,13 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // post-fixtures `create`. Composite (`string[]`) and id-less (`null`) PKs are
   // skipped, and the `if (sequence)` guard no-ops for non-serial PKs.
   if (adapter.adapterName === "postgres" && typeof pkCol === "string") {
-    // pg_get_serial_sequence lowercases its column argument unless it is
-    // double-quoted; defineSchema quotes every identifier, so a mixed-case PK
-    // (e.g. `monkeyID`) is stored verbatim. Pass the name double-quoted so it
-    // matches exactly for both lowercase (`id`, `pet_id`) and mixed-case PKs.
+    // pg_get_serial_sequence takes the column as a bound text value and matches
+    // it verbatim (case-sensitive, no quote-stripping); defineSchema stores
+    // every identifier with its exact case, so passing `pkCol` as-is matches
+    // both lowercase (`id`, `pet_id`) and mixed-case (`monkeyID`) PKs.
     const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
       tableName,
-      `"${pkCol}"`,
+      pkCol,
     ]);
     const sequence = seqRows[0]?.seq as string | null | undefined;
     if (sequence) {
