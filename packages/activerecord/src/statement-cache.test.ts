@@ -328,6 +328,33 @@ describe("StatementCacheTest", () => {
     }
   });
 
+  it("class-level find_by returns null for an out-of-range value through the cache", async () => {
+    // The relation path's findBy rescues ActiveModelRangeError → null; routing
+    // find_by through cachedFindBy must preserve that contract.
+    await import("./relation.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+    const { Base } = await import("./base.js");
+
+    const conn = new BetterSQLite3Adapter(":memory:");
+    try {
+      await defineSchema(conn, { books: canonicalSchema.books });
+
+      class Book extends Base {
+        static {
+          this.tableName = "books";
+          this.adapter = conn;
+          // 4-byte integer so an out-of-range value triggers RangeError.
+          this.attribute("author_id", "integer", { limit: 4 });
+        }
+      }
+
+      expect(await Book.findBy({ author_id: 99999999999999 })).toBeNull();
+    } finally {
+      conn.disconnectBang();
+    }
+  });
+
   it("find association does not use statement cache if table name is changed", async () => {
     await import("./relation.js");
     const { BetterSQLite3Adapter } =

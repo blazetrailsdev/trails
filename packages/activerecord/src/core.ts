@@ -22,6 +22,7 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnNames } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
+import { ActiveModelRangeError } from "@blazetrails/activemodel";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -563,7 +564,18 @@ export function cachedFindByStatement(
   key: string,
   block: () => any,
 ): any {
-  if (!this._findByStatementCache) initializeFindByCache.call(this);
+  // Static fields are inherited via the prototype chain, so a subclass that
+  // never initialized its own cache would see the parent's map as truthy and
+  // hit the parent's cached statement (returning Parent instances). Require an
+  // own property — mirroring Rails initializing @find_by_statement_cache per
+  // class in the `inherited` hook. The `|| !value` arm re-inits after a
+  // table_name change clears it to undefined (an own, falsy property).
+  if (
+    !Object.prototype.hasOwnProperty.call(this, "_findByStatementCache") ||
+    !this._findByStatementCache
+  ) {
+    initializeFindByCache.call(this);
+  }
   const prepared = connection?.preparedStatements ?? true;
   const cache = this._findByStatementCache!.get(prepared)!;
   if (!cache.has(key)) {
@@ -850,6 +862,10 @@ async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): 
     const records = await statement.execute(values, connection, { allowRetry: true });
     return records[0] ?? null;
   } catch (e) {
+    // An out-of-range value for the column type returns null, matching the
+    // relation path's findBy (finder-methods.ts). Rails catches ::RangeError
+    // at the bind layer; our typed ActiveModelRangeError is the port of that.
+    if (e instanceof ActiveModelRangeError) return null;
     // Rails: rescue TypeError; raise ActiveRecord::StatementInvalid — a bind
     // value that slips past unsupportedValue but fails type coercion surfaces
     // as the AR error callers rescue, not a raw TypeError.
