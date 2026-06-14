@@ -683,8 +683,10 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     !StatementCache.unsupportedValue(ids[0])
   ) {
     const pk = this.primaryKey as string;
-    const castId = this._castAttributeValue(pk, ids[0]);
-    const record = await cachedFindBy.call(this, [pk], [castId]);
+    // Rails passes the raw id; type coercion happens inside the StatementCache
+    // bind path (the bound pk attribute carries the column type), so neither
+    // find nor find_by pre-casts here.
+    const record = await cachedFindBy.call(this, [pk], [ids[0]]);
     if (record) return record;
     throw new RecordNotFound(
       `${this.name} with ${this.primaryKey}=${ids[0]} not found`,
@@ -834,7 +836,10 @@ async function findByThroughCache(
  */
 async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
   const connection = (this as any).connection;
-  const statement = cachedFindByStatement.call(this, connection, keys.join(","), () =>
+  // Rails keys the cache on the array itself (structural equality); we
+  // serialize it so ["a","b"] and ["a,b"] don't collide on a "," join.
+  const cacheKey = JSON.stringify(keys);
+  const statement = cachedFindByStatement.call(this, connection, cacheKey, () =>
     StatementCache.create(connection, (params) => {
       const wheres: Record<string, unknown> = {};
       for (const k of keys) wheres[k] = params.bind();
