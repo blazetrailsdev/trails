@@ -14,13 +14,17 @@ import {
   ParameterFilter,
   camelize,
 } from "@blazetrails/activesupport";
-import { strictLoadingViolationMessage } from "./reflection.js";
+import {
+  strictLoadingViolationMessage,
+  _reflectOnAssociation,
+  reflectOnAggregation,
+} from "./reflection.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import { buildPkWhereNode, columnNames } from "./model-schema.js";
+import { buildPkWhereNode, columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { ActiveModelRangeError } from "@blazetrails/activemodel";
 
@@ -819,11 +823,11 @@ export function findBy(this: CoreHost, conditions: Record<string, unknown>): Pro
  * that are not real columns, or unsupported (nil/Array/Range/Hash/Relation/Base)
  * values.
  *
- * Known gap vs Rails: Rails first resolves attribute_aliases[key] and
- * dereferences belongs_to association objects to their FK column + PK value
- * (core.rb#find_by), so an alias or `find_by({author: postInstance})` still
- * hits the cache there. Here those keys fail the columnNames check and take the
- * relation path — correct, but a missed cache hit, not yet ported.
+ * Before the cache check, Rails resolves each key through attribute_aliases,
+ * bails to super on an aggregation, and for a non-polymorphic belongs_to swaps
+ * the association name for its join FK column + the value's PK. A plain object
+ * value with an `id` is dereferenced to that id. This mirrors core.rb#find_by
+ * so aliases and `find_by({author: postInstance})` still hit the cache.
  */
 async function findByThroughCache(
   this: CoreHost,
@@ -837,16 +841,53 @@ async function findByThroughCache(
   // unprepared (PartialQuery) inlining path doesn't drop the bind payload the
   // relation path logs.
   if (!(this as any).connection?.preparedStatements) return this.all().findBy(conditions);
-  const columns = new Set(columnNames.call(this as any));
+
+  const aliases: Record<string, string> = (this as any)._attributeAliases ?? {};
+  const columns = columnsHash.call(this as any);
+  const resolvedKeys: string[] = [];
   const values: unknown[] = [];
-  for (const k of keys) {
-    const v = conditions[k];
-    if (!columns.has(k) || StatementCache.unsupportedValue(v)) {
+
+  for (const rawKey of keys) {
+    let key = aliases[rawKey] ?? rawKey;
+    let value = conditions[rawKey];
+
+    // Aggregations have no single backing column — defer the whole lookup.
+    if (reflectOnAggregation(this as any, key)) return this.all().findBy(conditions);
+
+    const reflection = _reflectOnAssociation(this as any, key);
+
+    if (!reflection) {
+      if (respondsToId(value)) value = (value as any).id;
+    } else if (reflection.belongsTo() && !reflection.isPolymorphic()) {
+      const fk = reflection.joinForeignKey;
+      const pkey = reflection.joinPrimaryKey;
+      // Composite-key belongs_to yields array key/value pairs the single-column
+      // StatementCache below can't bind — defer to the relation path.
+      if (Array.isArray(fk) || Array.isArray(pkey)) return this.all().findBy(conditions);
+      key = fk;
+      if (respondsTo(value, pkey)) value = (value as any)[pkey];
+    }
+
+    if (
+      !Object.prototype.hasOwnProperty.call(columns, key) ||
+      StatementCache.unsupportedValue(value)
+    ) {
       return this.all().findBy(conditions);
     }
-    values.push(v);
+
+    resolvedKeys.push(key);
+    values.push(value);
   }
-  return cachedFindBy.call(this, keys, values);
+
+  return cachedFindBy.call(this, resolvedKeys, values);
+}
+
+function respondsToId(value: unknown): boolean {
+  return respondsTo(value, "id");
+}
+
+function respondsTo(value: unknown, name: string): boolean {
+  return value != null && typeof value === "object" && name in value;
 }
 
 /**
