@@ -19,6 +19,13 @@ const manifest = {
       { name: "RecordNotFound", parent: "ActiveRecordError", rubyFile: "active_record/errors.rb" },
       { name: "StatementInvalid", parent: "AdapterError", rubyFile: "active_record/errors.rb" },
     ],
+    activesupport: [
+      {
+        name: "MessageVerifierError",
+        parent: "StandardError",
+        rubyFile: "active_support/errors.rb",
+      },
+    ],
   },
 };
 
@@ -41,6 +48,8 @@ const { default: rule } = await import("./rails-error-parity.mjs");
 const errorsFile = path.join(REPO_ROOT, "packages/activerecord/src/errors.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const excludedFile = path.join(REPO_ROOT, excludedRel);
+const asErrorsFile = path.join(REPO_ROOT, "packages/activesupport/src/errors.ts");
+const asBaseFile = path.join(REPO_ROOT, "packages/activesupport/src/duration.ts");
 
 // Class declarations for synthetic errors.ts files; `nl` joins into a file.
 const AD = "export class AdapterError extends ActiveRecordError {}";
@@ -65,6 +74,11 @@ tester.run("rails-error-parity", rule, {
     { filename: baseFile, code: `throw new RecordNotFound("nope");\n` },
     // Excluded file: bare throw is skipped.
     { filename: excludedFile, code: `throw new Error("bare");\n` },
+    // activesupport is in scope: errors.ts mirrors its manifest class.
+    {
+      filename: asErrorsFile,
+      code: `export class MessageVerifierError extends Error {}\n`,
+    },
   ],
   invalid: [
     // Missing class: errors.ts omits RecordNotFound.
@@ -91,6 +105,18 @@ tester.run("rails-error-parity", rule, {
       filename: errorsFile,
       code: nl("export class ActiveRecordError {}", AD, RNF, SI),
       errors: [{ messageId: "rootExtends" }],
+    },
+    // activesupport is in scope: bare throw is flagged there too.
+    {
+      filename: asBaseFile,
+      code: `throw new TypeError("boom");\n`,
+      errors: [{ messageId: "bareThrow" }],
+    },
+    // activesupport is in scope: errors.ts missing its manifest class.
+    {
+      filename: asErrorsFile,
+      code: `export class SomethingElse extends Error {}\n`,
+      errors: [{ messageId: "missingClass" }],
     },
   ],
 });
