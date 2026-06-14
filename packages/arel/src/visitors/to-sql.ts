@@ -2,6 +2,7 @@ import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { Bind } from "../collectors/bind.js";
 import { Composite } from "../collectors/composite.js";
+import { SubstituteBinds } from "../collectors/substitute-binds.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
@@ -77,18 +78,29 @@ export class ToSql extends Visitor {
   }
 
   compile(node: Node): string;
-  compile(node: Node | ReadonlyArray<Nodes.NodeOrValue>, collector: SQLString): string;
-  compile(node: Node | ReadonlyArray<Nodes.NodeOrValue>, collector?: SQLString): string {
+  compile(
+    node: Node | ReadonlyArray<Nodes.NodeOrValue>,
+    collector: SQLString | SubstituteBinds,
+  ): string;
+  compile(
+    node: Node | ReadonlyArray<Nodes.NodeOrValue>,
+    collector?: SQLString | SubstituteBinds,
+  ): string {
     // Rails-faithful `compile(node, collector)`: drive the supplied collector
     // (so callers control its bind state) and return the rendered SQL. An array
     // node renders as a comma-joined list, mirroring Arel's `visit_Array` — this
     // is what bind_parameter_test's `bind_params` helper relies on to compile a
-    // list of `BindParam` nodes through a single shared collector.
+    // list of `BindParam` nodes through a single shared collector. The collector
+    // type covers the string-rendering collectors (`SQLString` keeps `?`
+    // placeholders, `SubstituteBinds` inlines quoted values); the visitor's
+    // dispatch is typed against `SQLString`, so cast at the boundary as the rest
+    // of this file does.
     if (collector !== undefined) {
+      const c = collector as unknown as SQLString;
       if (Array.isArray(node)) {
-        this.visitArray(node as ReadonlyArray<Nodes.NodeOrValue>, collector);
+        this.visitArray(node as ReadonlyArray<Nodes.NodeOrValue>, c);
       } else {
-        this.visit(node as Node, collector);
+        this.visit(node as Node, c);
       }
       return collector.value;
     }
