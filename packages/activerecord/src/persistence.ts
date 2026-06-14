@@ -26,6 +26,7 @@ import {
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
 import { assignAssociationIfMatch } from "./attribute-assignment.js";
+import { EnumType } from "./enum.js";
 import { clearAutosaveState } from "./autosave-association.js";
 import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
@@ -1062,14 +1063,20 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
       typeName === "time" ||
       typeName === "timestamp" ||
       typeName === "timestamptz";
+    // Enum columns store a label string in memory but must persist the
+    // underlying integer/string mapping value — serialize() bridges the two.
+    // (Temporal types likewise need serialize; all other cast values are
+    // already DB-ready and must not be re-serialized.)
     const dbValue =
-      cast instanceof Temporal.Instant ||
-      cast instanceof Temporal.PlainDate ||
-      cast instanceof Temporal.PlainTime ||
-      cast instanceof Temporal.ZonedDateTime ||
-      (isTemporalType && (isDateInfinity(cast) || isDateNegativeInfinity(cast)))
-        ? (def?.type.serialize?.(cast) ?? cast)
-        : cast;
+      def?.type instanceof EnumType
+        ? (def.type.serialize(cast) ?? cast)
+        : cast instanceof Temporal.Instant ||
+            cast instanceof Temporal.PlainDate ||
+            cast instanceof Temporal.PlainTime ||
+            cast instanceof Temporal.ZonedDateTime ||
+            (isTemporalType && (isDateInfinity(cast) || isDateNegativeInfinity(cast)))
+          ? (def?.type.serialize?.(cast) ?? cast)
+          : cast;
     setPairs.push([table.get(key), dbValue]);
   }
 

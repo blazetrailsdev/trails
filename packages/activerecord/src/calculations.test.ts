@@ -3808,7 +3808,7 @@ describe("CalculationsTest", () => {
     await (conv as any).archivedBang();
     expect((conv as any).isArchived()).toBe(true);
     const reloaded = await Conversation.find(conv.id);
-    expect(reloaded.status).toBe(1);
+    expect(reloaded.status).toBe("archived");
   });
 
   // Rails: test "enum generates not-scopes"
