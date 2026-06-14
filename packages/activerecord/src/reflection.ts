@@ -752,7 +752,7 @@ export class AssociationReflection extends MacroReflection {
     return null;
   }
 
-  get joinTable(): string | null {
+  get joinTable(): string {
     if (this.options.joinTable) return this.options.joinTable as string;
     return this.deriveJoinTable();
   }
@@ -1148,7 +1148,7 @@ export class AssociationReflection extends MacroReflection {
 
   /**
    * @internal
-   * Mirrors ActiveRecord::Reflection::AbstractReflection#derive_join_table:
+   * Mirrors ActiveRecord::Reflection::AssociationReflection#derive_join_table:
    * collapses a shared `[._]`-terminated prefix across the two table names.
    */
   protected deriveJoinTable(): string {
@@ -1451,7 +1451,7 @@ export class ThroughReflection extends AbstractReflection {
     return through;
   }
 
-  get joinTable(): string | null {
+  get joinTable(): string {
     return this._delegate.joinTable;
   }
 

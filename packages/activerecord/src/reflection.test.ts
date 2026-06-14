@@ -2597,10 +2597,15 @@ describe("ReflectionTest", () => {
     Associations.hasMany.call(Department, "chefs", { foreignKey: "department_id" });
     const hotel = await Hotel.create({ name: "Grand" });
     const dept = await Department.create({ hotel_id: hotel.id, name: "Kitchen" });
-    await Chef.create({ department_id: dept.id, name: "Gordon" });
+    const chef = await Chef.create({ department_id: dept.id, name: "Gordon" });
     // includes should accept a nested association hash (Rails `[departments: :chefs]`)
+    // and actually preload the nested association onto the loaded records.
     const hotels = await Hotel.all().includes({ departments: "chefs" }).toArray();
     expect(hotels).toHaveLength(1);
+    const departments = hotels[0].association("departments").target as Base[];
+    expect(departments).toHaveLength(1);
+    const chefs = departments[0].association("chefs").target as Base[];
+    expect(chefs.map((c) => (c as any).id)).toEqual([chef.id]);
   });
 
   it("association primary key uses explicit primary key option as first priority", () => {
