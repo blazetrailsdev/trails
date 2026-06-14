@@ -739,9 +739,15 @@ export function main() {
     // pooling all signatures and matching ANY (see matchArityAgainst) finds the
     // true arity and keeps those bindings/overloads from false-positiving.
     const tsParamsByName = new Map<string, ParamInfo[][]>();
-    // Per-name resolved options-object keys (null = uncheckable). Pooled
-    // GLOBALLY like tsParamsByName so a real options type wins over a binding.
-    const tsOptionKeysByName = new Map<string, (string[] | null)[]>();
+    // Per-(file, name) resolved options-object keys (null = uncheckable).
+    // Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
+    // same-named method (e.g. PostgreSQL `createDatabase`) can't lend its keys
+    // to a different adapter's Ruby method and manufacture a cross-adapter
+    // `missingInTs` artifact (`create_database :charset`). The mixin
+    // re-export/real-type split is preserved because the option-key check runs
+    // against the file the method actually MATCHED in (the real-type file for
+    // include-chain matches), where the union within that file still applies.
+    const tsOptionKeysByFileName = new Map<string, Map<string, (string[] | null)[]>>();
     // Literal-default candidates scoped per (file, name) — unlike arity's global pool.
     const tsParamsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
     const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
@@ -752,9 +758,9 @@ export function main() {
       byName.set(m.name, [...(byName.get(m.name) ?? []), m.params]);
       tsParamsByFileName.set(file, byName);
       if (m.optionKeys !== undefined) {
-        const ok = tsOptionKeysByName.get(m.name) ?? [];
-        ok.push(m.optionKeys);
-        tsOptionKeysByName.set(m.name, ok);
+        const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
+        byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
+        tsOptionKeysByFileName.set(file, byName);
       }
     };
 
@@ -1114,9 +1120,12 @@ export function main() {
       const checkOptionKeys = (rubyName: string, tsName: string, tsFile: string) => {
         const rubyKeys = rubyOptionKeysByName.get(rubyName);
         if (!rubyKeys) return;
-        const candidates = tsOptionKeysByName.get(tsName);
+        const candidates = tsOptionKeysByFileName.get(tsFile)?.get(tsName);
         if (!candidates || candidates.length === 0) return;
-        const verdict = matchOptionKeysAgainst(rubyKeys, candidates);
+        const positionalParams = (rubyParamsByName.get(rubyName) ?? [])
+          .filter((p) => p.kind === "required" || p.kind === "optional")
+          .map((p) => p.name);
+        const verdict = matchOptionKeysAgainst(rubyKeys, candidates, positionalParams);
         if (!verdict.comparable) return;
         optionKeysCompared++;
         if (verdict.missingInTs.length === 0 && verdict.extraInTs.length === 0) return;
