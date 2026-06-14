@@ -7,8 +7,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setBeforeCommittedOnAllRecords } from "./ar-config.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
@@ -18,8 +17,18 @@ import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
+// Mirrors Rails `fixtures :nodes, :trees, :owners, :pets`. The fixture loader
+// seeds explicit PKs and resets serial sequences, which a plain `create` does
+// not do for the custom-named `owner_id`/`pet_id` PKs on Postgres.
+const { nodes, trees, owners, pets } = useHandlerFixtures(["nodes", "trees", "owners", "pets"]);
+
+registerModel("Invoice", Invoice);
+registerModel("LineItem", LineItem);
+registerModel("Node", Node);
+registerModel("Tree", Tree);
+registerModel("Owner", Owner);
+registerModel("Pet", Pet);
+
 beforeAll(async () => {
   await defineSchema({
     // `amount`/`created_at` are local extras for the makeTouchModel tests;
@@ -32,17 +41,7 @@ beforeAll(async () => {
       created_at: "datetime",
     },
     line_items: TEST_SCHEMA.line_items,
-    nodes: TEST_SCHEMA.nodes,
-    trees: TEST_SCHEMA.trees,
-    owners: TEST_SCHEMA.owners,
-    pets: TEST_SCHEMA.pets,
   });
-  registerModel("Invoice", Invoice);
-  registerModel("LineItem", LineItem);
-  registerModel("Node", Node);
-  registerModel("Tree", Tree);
-  registerModel("Owner", Owner);
-  registerModel("Pet", Pet);
 });
 // Mirrors Ruby's `time.to_i` — whole epoch seconds, the granularity Rails'
 // touch_later assertions compare at (DB datetime columns drop sub-second
@@ -160,50 +159,44 @@ describe("TouchLaterTest", () => {
     expect(inv.changed).toBe(false);
   });
   it("touching three deep", async () => {
-    // Mirror the nodes/trees fixtures: root tree → grandparent → parent_a →
-    // child_one_of_a.
-    const root = await Tree.create({ id: 1, name: "The Root" });
-    const grandparent = await Node.create({ id: 1, tree_id: 1, name: "Grand Parent" });
-    const parentA = await Node.create({ id: 2, tree_id: 1, parent_id: 1, name: "Parent A" });
-    const childOneOfA = await Node.create({ id: 4, tree_id: 1, parent_id: 2, name: "Child one" });
-
-    const previousTreeUpdatedAt = root.updated_at;
-    const previousGrandparentUpdatedAt = grandparent.updated_at;
-    const previousParentUpdatedAt = parentA.updated_at;
-    const previousChildUpdatedAt = childOneOfA.updated_at;
+    const previousTreeUpdatedAt = (trees("root") as any).updated_at;
+    const previousGrandparentUpdatedAt = (nodes("grandparent") as any).updated_at;
+    const previousParentUpdatedAt = (nodes("parent_a") as any).updated_at;
+    const previousChildUpdatedAt = (nodes("child_one_of_a") as any).updated_at;
 
     travel(5000);
     try {
-      await Node.create({ parent: childOneOfA, tree: root });
+      await Node.create({ parent: nodes("child_one_of_a"), tree: trees("root") });
     } finally {
       travelBack();
     }
 
-    expect((await Node.find(4)).updated_at).not.toEqual(previousChildUpdatedAt);
-    expect((await Node.find(2)).updated_at).not.toEqual(previousParentUpdatedAt);
-    expect((await Node.find(1)).updated_at).not.toEqual(previousGrandparentUpdatedAt);
-    expect((await Tree.find(1)).updated_at).not.toEqual(previousTreeUpdatedAt);
+    expect((await (nodes("child_one_of_a") as any).reload()).updated_at).not.toEqual(
+      previousChildUpdatedAt,
+    );
+    expect((await (nodes("parent_a") as any).reload()).updated_at).not.toEqual(
+      previousParentUpdatedAt,
+    );
+    expect((await (nodes("grandparent") as any).reload()).updated_at).not.toEqual(
+      previousGrandparentUpdatedAt,
+    );
+    expect((await (trees("root") as any).reload()).updated_at).not.toEqual(previousTreeUpdatedAt);
   });
-
-  async function seedOwnerWithPets() {
-    const owner = await Owner.create({ owner_id: 1, name: "blackbeard" });
-    await Pet.create({ pet_id: 1, owner_id: 1, name: "parrot" });
-    await Pet.create({ pet_id: 4, owner_id: 1, name: "bulbul" });
-    return owner;
-  }
 
   it("touching through nested attributes without before committed on all records", async () => {
     setBeforeCommittedOnAllRecords(false);
     try {
       const time = Temporal.Now.instant().subtract({ hours: 24 * 25 });
-      const owner = await seedOwnerWithPets();
-      await owner.touch({ time });
-      expect(toI((await Owner.find(1)).updated_at)).toBe(toI(time));
+      const owner = owners("blackbeard") as any;
+      const petId = (pets("parrot") as any).readAttribute("pet_id");
 
-      await owner.update({ petsAttributes: { "0": { id: "1", name: "Alfred" } } });
+      await owner.touch({ time });
+      expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
+
+      await owner.update({ petsAttributes: { "0": { id: String(petId), name: "Alfred" } } });
 
       // The second copy of the parent is not touched, so updated_at is unchanged.
-      expect(toI((await Owner.find(1)).updated_at)).toBe(toI(time));
+      expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
     } finally {
       setBeforeCommittedOnAllRecords(false);
     }
@@ -213,13 +206,15 @@ describe("TouchLaterTest", () => {
     setBeforeCommittedOnAllRecords(true);
     try {
       const time = Temporal.Now.instant().subtract({ hours: 24 * 25 });
-      const owner = await seedOwnerWithPets();
+      const owner = owners("blackbeard") as any;
+      const petId = (pets("parrot") as any).readAttribute("pet_id");
+
       await owner.touch({ time });
-      expect(toI((await Owner.find(1)).updated_at)).toBe(toI(time));
+      expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
 
-      await owner.update({ petsAttributes: { "0": { id: "1", name: "Alfred" } } });
+      await owner.update({ petsAttributes: { "0": { id: String(petId), name: "Alfred" } } });
 
-      expect(toI((await Owner.find(1)).updated_at)).not.toBe(toI(time));
+      expect(toI((await owner.reload()).updated_at)).not.toBe(toI(time));
     } finally {
       setBeforeCommittedOnAllRecords(false);
     }

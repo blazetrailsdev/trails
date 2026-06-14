@@ -595,14 +595,15 @@ export class Transaction {
    * @internal
    */
   private uniqueRecordsByEquality(recs: unknown[]): unknown[] {
+    // Symmetric like Ruby's `==`: try either side's `equals`, falling back to
+    // object identity for non-record entries.
+    const equal = (a: unknown, b: unknown): boolean =>
+      a === b ||
+      (typeof (a as any)?.equals === "function" && (a as any).equals(b)) ||
+      (typeof (b as any)?.equals === "function" && (b as any).equals(a));
     const result: unknown[] = [];
     for (const record of recs) {
-      const isDup = result.some(
-        (kept) =>
-          kept === record ||
-          (typeof (record as any)?.equals === "function" && (record as any).equals(kept)),
-      );
-      if (!isDup) result.push(record);
+      if (!result.some((kept) => equal(record, kept))) result.push(record);
     }
     return result;
   }
