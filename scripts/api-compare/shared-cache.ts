@@ -100,9 +100,11 @@ function entryPath(dir: string, name: string, key: string): string {
 
 /** Outcome of a prune pass — counts so callers can log what was reclaimed. */
 export interface PruneResult {
-  /** Stale entry files removed from the current-version dir. */
+  /** Stale `<name>-<key>.json` entry files removed from the current-version dir. */
   removedEntries: number;
-  /** Superseded `v<N>` sibling directories removed wholesale. */
+  /** Stale crashed-writer `.tmp-` fragments removed from the current-version dir. */
+  removedFragments: number;
+  /** Superseded `v<N>` (N < CACHE_VERSION) sibling directories removed wholesale. */
   removedVersionDirs: number;
 }
 
@@ -112,8 +114,11 @@ export interface PruneResult {
  *   1. Entry files (and crashed-writer `.tmp-` fragments) in the current
  *      `v${CACHE_VERSION}` dir whose mtime is older than `maxAgeMs` — orphaned
  *      content keys and partial writes (see CACHE_MAX_AGE_MS).
- *   2. Sibling `v<N>` directories left behind by a bumped CACHE_VERSION; nothing
- *      reads them again, so they're deleted whole.
+ *   2. Sibling `v<N>` directories left behind by a SUPERSEDED CACHE_VERSION,
+ *      i.e. only N < CACHE_VERSION. Higher-numbered dirs belong to a newer code
+ *      version that may be running concurrently (a bisect or mixed-version
+ *      parallel run); wiping those would mutually destroy the live cache, so we
+ *      leave them strictly alone.
  *
  * `now` is injected (defaulting to the wall clock) so tests pin the horizon
  * without touching the entries' real mtimes. Entirely best-effort: a missing or
@@ -124,11 +129,10 @@ export async function pruneSharedCache(
   rootDir: string,
   opts: { now?: number; maxAgeMs?: number } = {},
 ): Promise<PruneResult> {
-  const result: PruneResult = { removedEntries: 0, removedVersionDirs: 0 };
+  const result: PruneResult = { removedEntries: 0, removedFragments: 0, removedVersionDirs: 0 };
   const currentDir = await sharedCacheDir(rootDir);
   if (!currentDir) return result;
   const parent = path.dirname(currentDir);
-  const currentName = path.basename(currentDir);
   const now = opts.now ?? Date.now();
   const maxAgeMs = opts.maxAgeMs ?? CACHE_MAX_AGE_MS;
 
@@ -139,7 +143,8 @@ export async function pruneSharedCache(
     return result;
   }
   for (const name of siblings) {
-    if (name === currentName || !/^v\d+$/.test(name)) continue;
+    const match = name.match(/^v(\d+)$/);
+    if (!match || Number(match[1]) >= CACHE_VERSION) continue;
     try {
       await fs.rm(path.join(parent, name), { recursive: true, force: true });
       result.removedVersionDirs++;
@@ -159,13 +164,15 @@ export async function pruneSharedCache(
       // Entries (`<name>-<key>.json`) and tmp fragments left by a crashed or
       // raced writeShared (`<entry>.tmp-<tag>`) — both age out; nothing else
       // should live here, but anything that isn't one of those is left alone.
-      if (!name.endsWith(".json") && !name.includes(".tmp-")) return;
+      const isFragment = name.includes(".tmp-");
+      if (!name.endsWith(".json") && !isFragment) return;
       const file = path.join(currentDir, name);
       try {
         const stat = await fs.stat(file);
         if (now - stat.mtimeMs > maxAgeMs) {
           await fs.rm(file, { force: true });
-          result.removedEntries++;
+          if (isFragment) result.removedFragments++;
+          else result.removedEntries++;
         }
       } catch {
         // best-effort
@@ -178,10 +185,12 @@ export async function pruneSharedCache(
 
 /**
  * Read a cached entry body, or null on miss / unreadable cache. On a hit we
- * bump the entry's mtime to now (fire-and-forget) so `pruneSharedCache` evicts
- * by LAST ACCESS, not last write: a stable source file's key never changes, so
- * without this its entry — read every run — would still age out at maxAgeMs and
- * be needlessly regenerated. The touch failing (e.g. read-only FS) is harmless.
+ * bump the entry's mtime to now so `pruneSharedCache` evicts by LAST ACCESS,
+ * not last write: a stable source file's key never changes, so without this its
+ * entry — read every run — would still age out at maxAgeMs and be needlessly
+ * regenerated. The touch is awaited (one cheap syscall) so callers and tests
+ * observe the new mtime deterministically; a touch failure (e.g. read-only FS)
+ * is swallowed since the body is already in hand.
  */
 export async function readShared(dir: string, name: string, key: string): Promise<string | null> {
   const file = entryPath(dir, name, key);
@@ -192,7 +201,7 @@ export async function readShared(dir: string, name: string, key: string): Promis
     return null;
   }
   const stamp = new Date();
-  void fs.utimes(file, stamp, stamp).catch(() => {});
+  await fs.utimes(file, stamp, stamp).catch(() => {});
   return body;
 }
 

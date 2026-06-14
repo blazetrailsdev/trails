@@ -162,9 +162,10 @@ async function main(): Promise<void> {
   // failure here can never affect the comparison result.
   if (!force) {
     const pruned = await pruneSharedCache(ROOT);
-    if (pruned.removedEntries || pruned.removedVersionDirs) {
+    if (pruned.removedEntries || pruned.removedFragments || pruned.removedVersionDirs) {
       process.stdout.write(
         `Pruned shared cache: ${pruned.removedEntries} stale entr${pruned.removedEntries === 1 ? "y" : "ies"}, ` +
+          `${pruned.removedFragments} tmp fragment${pruned.removedFragments === 1 ? "" : "s"}, ` +
           `${pruned.removedVersionDirs} superseded version dir${pruned.removedVersionDirs === 1 ? "" : "s"}\n`,
       );
     }

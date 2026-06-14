@@ -108,16 +108,12 @@ describe("pruneSharedCache", () => {
     return path.join(cacheParent(root), `v${CACHE_VERSION}`);
   }
 
+  const EMPTY = { removedEntries: 0, removedFragments: 0, removedVersionDirs: 0 };
+
   it("no-ops cleanly when there is no cache or no .git", async () => {
-    expect(await pruneSharedCache(mkTmp())).toEqual({
-      removedEntries: 0,
-      removedVersionDirs: 0,
-    });
+    expect(await pruneSharedCache(mkTmp())).toEqual(EMPTY);
     const root = mkRoot();
-    expect(await pruneSharedCache(root)).toEqual({
-      removedEntries: 0,
-      removedVersionDirs: 0,
-    });
+    expect(await pruneSharedCache(root)).toEqual(EMPTY);
   });
 
   it("removes entries older than maxAgeMs and keeps fresh ones", async () => {
@@ -133,7 +129,7 @@ describe("pruneSharedCache", () => {
     fs.utimesSync(fresh, new Date(now - 1 * DAY), new Date(now - 1 * DAY));
 
     const result = await pruneSharedCache(root, { now, maxAgeMs: 14 * DAY });
-    expect(result).toEqual({ removedEntries: 1, removedVersionDirs: 0 });
+    expect(result).toEqual({ removedEntries: 1, removedFragments: 0, removedVersionDirs: 0 });
     expect(fs.existsSync(stale)).toBe(false);
     expect(fs.existsSync(fresh)).toBe(true);
   });
@@ -151,24 +147,26 @@ describe("pruneSharedCache", () => {
     fs.utimesSync(unrelated, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
 
     const result = await pruneSharedCache(root, { now, maxAgeMs: 14 * DAY });
-    expect(result.removedEntries).toBe(1);
+    expect(result.removedFragments).toBe(1);
+    expect(result.removedEntries).toBe(0);
     expect(fs.existsSync(staleTmp)).toBe(false);
     expect(fs.existsSync(unrelated)).toBe(true);
   });
 
-  it("removes superseded version dirs but never the current one", async () => {
+  it("removes superseded version dirs but never the current or a newer one", async () => {
     const root = mkRoot();
     fs.mkdirSync(currentDir(root), { recursive: true });
     const parent = cacheParent(root);
-    fs.mkdirSync(path.join(parent, `v${CACHE_VERSION + 1}`));
+    const newer = path.join(parent, `v${CACHE_VERSION + 1}`);
+    fs.mkdirSync(newer); // a concurrent newer-version run — must NOT be wiped
     fs.mkdirSync(path.join(parent, "v0"));
     fs.mkdirSync(path.join(parent, "scratch")); // non-version dir, untouched
 
     const result = await pruneSharedCache(root, { now: 0, maxAgeMs: DAY });
-    expect(result.removedVersionDirs).toBe(2);
+    expect(result.removedVersionDirs).toBe(1);
     expect(fs.existsSync(currentDir(root))).toBe(true);
     expect(fs.existsSync(path.join(parent, "v0"))).toBe(false);
-    expect(fs.existsSync(path.join(parent, `v${CACHE_VERSION + 1}`))).toBe(false);
+    expect(fs.existsSync(newer)).toBe(true);
     expect(fs.existsSync(path.join(parent, "scratch"))).toBe(true);
   });
 });
@@ -190,7 +188,7 @@ describe("readShared / writeShared", () => {
     expect((await fs.promises.stat(file)).mtimeMs).toBe(0);
 
     expect(await readShared(dir, "ts-arel", "key1")).toBe('{"v":1}');
-    await new Promise((r) => setTimeout(r, 20)); // let the fire-and-forget touch land
+    // readShared awaits its own touch, so the new mtime is observable immediately.
     expect((await fs.promises.stat(file)).mtimeMs).toBeGreaterThan(0);
   });
 });
