@@ -14,6 +14,7 @@ import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors
 // here so api:compare finds it where Rails defines it.
 export { UnsupportedVisitError };
 import { defaultQuoter } from "./default-quoter.js";
+import { substituteBoundValues } from "./substitute-bound-values.js";
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
@@ -84,9 +85,8 @@ export class ToSql extends Visitor {
     const sql = sqlCollector.value;
     const binds = bindCollector.value;
     if (binds.length === 0) return sql;
-    let i = 0;
-    return sql.replace(/\?|\$\d+/g, (match) => {
-      const raw = binds[i++];
+    return substituteBoundValues(sql, (match, i) => {
+      const raw = binds[i];
       // BindParam collects a placeholder rather than inlining its value —
       // mirrors Rails `visit_Arel_Nodes_BindParam` (`BIND_BLOCK = proc { "?" }`),
       // so `Nodes::BindParam.new(v).to_sql` is always `?`. Casted/Quoted/date
