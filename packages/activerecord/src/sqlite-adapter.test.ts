@@ -293,7 +293,7 @@ describe("SQLite adapter driver binding", () => {
     expect(adapter.encoding).toBe("UTF-8");
   });
 
-  it("encoding reads the live value for a sync driver", () => {
+  it("encoding returns the database encoding for a sync driver", () => {
     const adapter = new AbstractSQLite3Adapter(":memory:", { driver: betterSqlite3Driver });
     expect(adapter.encoding).toBe("UTF-8");
     adapter.disconnectBang();
