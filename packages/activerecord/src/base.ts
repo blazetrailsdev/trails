@@ -525,13 +525,30 @@ async function performClassUpdate(
  * attrs overwrite scope attrs). In TS we call it after super, so we invert:
  * only write scope attrs for keys NOT in the explicit set.
  */
+function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
+  // Mirrors Rails' `Scoping::Default::ClassMethods#scope_attributes?`
+  // (scoping/default.rb): `super || default_scopes.any? || respond_to?(:default_scope)`,
+  // where `super` is `Scoping::ClassMethods#scope_attributes?` (`current_scope`).
+  // A default scope seeds its `where` equalities onto new records too, not only
+  // an explicit current scope. We drop the third term: in Rails every model
+  // `respond_to?(:default_scope)` (the inherited DSL method), so that term is
+  // always true and `scope_attributes?` is effectively always true — the no-op
+  // case is gated downstream by `attributes.any?`. This port has no proc-based
+  // `def self.default_scope` override (default scopes register into
+  // `defaultScopes` via the macro), so `currentScope || defaultScopes.any?` is
+  // equivalent. The all_queries flag is irrelevant here — `all` (and thus
+  // `scope_for_create`) applies every default scope, so both all_queries and
+  // non-all_queries `where` conditions propagate on create.
+  const c = ctor as any;
+  return !!c.currentScope || (c.defaultScopes?.length ?? 0) > 0;
+}
+
 function _applyScopeAttributes(
   ctor: typeof Base,
   record: InstanceType<typeof Base>,
   explicitKeys: Set<string>,
 ): void {
-  const scope = (ctor as any).currentScope;
-  if (!scope) return;
+  if (!_shouldApplyScopeAttributes(ctor)) return;
   const attrs = scopeAttributes.call(ctor as any);
   if (!attrs || Object.keys(attrs).length === 0) return;
   const toApply: Record<string, unknown> = Object.create(null);
@@ -2524,8 +2541,8 @@ export class Base extends Model {
       if (!wasSuppressed) {
         // Mirrors Rails' initialize_internals_callback chain order:
         //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)
-        // Guard on currentScope before allocating the Set — the no-scope case is the hot path.
-        if ((ctor as any).currentScope) {
+        // Guard before allocating the Set — the no-scope case is the hot path.
+        if (_shouldApplyScopeAttributes(ctor)) {
           _applyScopeAttributes(
             ctor,
             this as any,
@@ -2594,8 +2611,8 @@ export class Base extends Model {
       if (!wasSuppressed2) {
         // Mirrors Rails' initialize_internals_callback chain order:
         //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)
-        // Guard on currentScope before allocating the Set — the no-scope case is the hot path.
-        if ((ctor2 as any).currentScope) {
+        // Guard before allocating the Set — the no-scope case is the hot path.
+        if (_shouldApplyScopeAttributes(ctor2)) {
           _applyScopeAttributes(ctor2, this as any, new Set(Object.keys(attrs)));
         }
         inheritanceInitializeInternalsCallback.call(this as any);
