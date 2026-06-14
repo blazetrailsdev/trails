@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, RecordNotFound, SoleRecordExceeded } from "./index.js";
+import { Base, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -2445,10 +2445,23 @@ describe("FinderTest", () => {
     expect(sql).toContain("SELECT");
   });
 
+  // Rails: test_find_on_hash_conditions_with_array_of_integers_and_ranges
+  //   Comment.where(id: [1..2, 3, 5, 6..8, 9]) => [1, 2, 3, 5, 6, 7, 8, 9]
+  // An array mixing inclusive ranges and bare integers ORs together; id 4,
+  // which falls in no range and matches no scalar, is excluded.
   it("find on hash conditions with array of integers and ranges", async () => {
-    await Post.create({ title: "a" });
-    const results = await Post.where({ title: ["a", "b"] }).toArray();
-    expect(Array.isArray(results)).toBe(true);
+    const posts: any[] = [];
+    for (let i = 0; i < 9; i++) posts.push(await Post.create({ title: `p${i}` }));
+    const id = (i: number) => posts[i].id;
+
+    const results = await Post.where({
+      id: [new Range(id(0), id(1)), id(2), id(4), new Range(id(5), id(7)), id(8)],
+    }).toArray();
+
+    const got = results.map((p: any) => p.id).sort((a, b) => a - b);
+    const expected = [0, 1, 2, 4, 5, 6, 7, 8].map(id);
+    expect(got).toEqual(expected);
+    expect(got).not.toContain(id(3));
   });
 
   it("member on unloaded relation with match", async () => {
