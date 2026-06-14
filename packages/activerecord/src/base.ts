@@ -125,6 +125,7 @@ import * as Translation from "./translation.js";
 import * as Sanitization from "./sanitization.js";
 import * as Serialization from "./serialization.js";
 import * as Querying from "./querying.js";
+import * as QueryCacheClassMethods from "./query-cache.js";
 import {
   include,
   extend,
@@ -1134,6 +1135,9 @@ export class Base extends Model {
   declare static prohibitShardSwapping: typeof ConnectionHandling.prohibitShardSwapping;
   declare static isShardSwappingProhibited: typeof ConnectionHandling.isShardSwappingProhibited;
   declare static clearQueryCachesForCurrentThread: typeof ConnectionHandling.clearQueryCachesForCurrentThread;
+  // --- QueryCache::ClassMethods mixin (wired via extend() after class) ---
+  declare static cache: typeof QueryCacheClassMethods.ClassMethods.cache;
+  declare static uncached: typeof QueryCacheClassMethods.ClassMethods.uncached;
   declare static leaseConnection: typeof ConnectionHandling.leaseConnection;
   declare static releaseConnection: typeof ConnectionHandling.releaseConnection;
   declare static withConnection: typeof ConnectionHandling.withConnection;
@@ -3665,6 +3669,7 @@ function _castEnumDirtyOpts(
 // ---------------------------------------------------------------------------
 
 extend(Base, ConnectionHandling.ClassMethods);
+extend(Base, QueryCacheClassMethods.ClassMethods);
 
 // Re-define `connection` as a getter (accessor) after extend() overwrites it
 // with a data property. The getter delegates to ConnectionHandling.connection

@@ -147,6 +147,40 @@ async function setup() {
   return { cached, hits, Task };
 }
 
+// A Task backed by a real ConnectionPool (not a bare raw adapter), so the
+// model-level `Model.cache` / `Model.uncached` delegation — which routes
+// through `connection_pool` exactly like Rails' QueryCache::ClassMethods —
+// has a pool to drive. The leased connection is also wired as the model's
+// adapter so reads/writes share the pool's query cache.
+async function setupPooledTask() {
+  const dbConfig = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    database: "test.db",
+    pool: 2,
+    reapingFrequency: null,
+  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+    adapterFactory: newRawTestAdapter,
+  });
+  const pool = new ConnectionPool(pc);
+  trackedAdapters.push({ disconnect: () => pool.disconnectBang() });
+  const conn = pool.leaseConnection();
+  await defineSchema(conn as unknown as Parameters<typeof defineSchema>[0], TEST_SCHEMA);
+
+  class Task extends Base {
+    static {
+      this.attribute("title", "string");
+      this.adapter = conn;
+    }
+  }
+  // `Model.cache` resolves its pool via `connectionPool()`; the model is bound
+  // to a standalone pool not registered with the handler, so point the resolver
+  // and `connected?` at it directly.
+  (Task as unknown as { connectionPool: () => ConnectionPool }).connectionPool = () => pool;
+  (Task as unknown as { isConnectedQ: () => boolean }).isConnectedQ = () => true;
+  return { pool, conn, Task };
+}
+
 // Post<=>Category HABTM bound to a standalone raw adapter, mirroring Rails'
 // `Post.has_and_belongs_to_many :categories`. Join-table writes (`<<` /
 // `delete_all`) route through `cached`, so they trip `dirtiesQueryCache` and
@@ -582,16 +616,61 @@ describe("QueryCacheTest", () => {
   });
 
   it("cache is available when connection is connected", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "row" });
-    await cached.cache(async () => {
-      await Task.all().toArray();
-      await Task.all().toArray();
-      expect(cached.queryCache.size).toBe(1);
+    await withExecutionContext(async () => {
+      const { pool, conn, Task } = await setupPooledTask();
+      const t = await Task.create({ title: "row" });
+      const queries = trackQueries(conn);
+      // Drive the model-level `Model.cache` delegation (Rails'
+      // QueryCache::ClassMethods#cache), which enables the pool's query cache
+      // for the block — the second find is served from cache, so only one query
+      // reaches the connection.
+      await Task.cache(async () => {
+        await Task.find(t.id);
+        await Task.find(t.id);
+        expect(queries.count).toBe(1);
+        expect(pool.queryCache.size).toBe(1);
+      });
+      // Cache was disabled before the block, so it is cleared on exit.
+      expect(pool.queryCacheEnabled).toBe(false);
+      expect(pool.queryCache.empty).toBe(true);
     });
   });
   it.skip("cache is available when using a not connected connection", () => {
     // BLOCKED: connection-pool — in-memory DB cannot test lazy (not-yet-connected) connections
+  });
+
+  // not in Rails query_cache_test.rb — unit coverage for the model-level
+  // `Model.uncached` delegation and the unconfigured short-circuit. Rails
+  // exercises these through `connection.uncached` / `Base.uncached`; the
+  // dedicated checks below pin the ClassMethods wiring directly.
+  it("uncached delegates to the connection pool", async () => {
+    await withExecutionContext(async () => {
+      const { pool, conn, Task } = await setupPooledTask();
+      pool.enableQueryCacheBang();
+      const t = await Task.create({ title: "row" });
+      await Task.find(t.id);
+      const queries = trackQueries(conn);
+      await Task.uncached(async () => {
+        await Task.find(t.id);
+        await Task.find(t.id);
+      });
+      // With the cache disabled inside the block, both finds hit the connection.
+      expect(queries.count).toBe(2);
+    });
+  });
+
+  it("cache and uncached yield without a connection when unconfigured", async () => {
+    class Disconnected extends Base {}
+    let cacheRan = false;
+    let uncachedRan = false;
+    await (Disconnected as unknown as typeof Base).cache(() => {
+      cacheRan = true;
+    });
+    await (Disconnected as unknown as typeof Base).uncached(() => {
+      uncachedRan = true;
+    });
+    expect(cacheRan).toBe(true);
+    expect(uncachedRan).toBe(true);
   });
 
   it("query cache executes new queries within block", async () => {

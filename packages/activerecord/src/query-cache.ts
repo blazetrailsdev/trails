@@ -12,6 +12,8 @@
 // Import under the qualified TS name so the public surface doesn't leak the
 // generic `Store` symbol into the generated `.d.ts`.
 import { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
+import type { Base } from "./base.js";
 
 // Deep-import convenience: consumers doing
 // `import { ... } from "@blazetrails/activerecord/query-cache.js"`
@@ -138,3 +140,58 @@ export class QueryCache {
     executor.registerHook(ExecutorHooks);
   }
 }
+
+/**
+ * Mirrors Rails' `connected? || !configurations.empty?` guard. The raw
+ * `configurations` static can hold a `DatabaseConfigurations`, a raw config
+ * map, an array of configs, or nothing; normalize all of them to the
+ * emptiness check Rails performs on its always-`DatabaseConfigurations` reader.
+ */
+function configurationsEmpty(klass: typeof Base): boolean {
+  const configs = (klass as { configurations?: unknown }).configurations;
+  if (configs == null) return true;
+  if (configs instanceof DatabaseConfigurations) return configs.empty;
+  if (Array.isArray(configs)) return configs.length === 0;
+  if (typeof configs === "object") return Object.keys(configs).length === 0;
+  return true;
+}
+
+/**
+ * Model-level query-cache delegation, mixed into `Base` via `extend`.
+ *
+ * Mirrors: ActiveRecord::QueryCache::ClassMethods (lib/active_record/query_cache.rb).
+ * Both methods short-circuit to a plain `yield` when Active Record is not
+ * configured (no connection and no configurations), exactly as Rails does, so
+ * callers can wrap blocks unconditionally.
+ */
+export const ClassMethods = {
+  /**
+   * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
+   * (`connection_pool.enable_query_cache(&block)` with the
+   * `clear_query_cache unless was_enabled` ensure — both owned by the pool's
+   * `withQueryCache`, which `QueryCache.cache` drives).
+   */
+  cache<T>(this: typeof Base, block: () => T | Promise<T>): Promise<T> {
+    if (this.isConnectedQ() || !configurationsEmpty(this)) {
+      return QueryCache.cache(this.connectionPool(), block);
+    }
+    return Promise.resolve(block());
+  },
+
+  /**
+   * Mirrors: ActiveRecord::QueryCache::ClassMethods#uncached
+   * (`connection_pool.disable_query_cache(dirties: dirties, &block)`). Pass
+   * `dirties: false` to stop writes inside the block from clearing every
+   * connection's query cache.
+   */
+  uncached<T>(
+    this: typeof Base,
+    block: () => T | Promise<T>,
+    options: { dirties?: boolean } = {},
+  ): Promise<T> {
+    if (this.isConnectedQ() || !configurationsEmpty(this)) {
+      return QueryCache.uncached(this.connectionPool(), block, options);
+    }
+    return Promise.resolve(block());
+  },
+};
