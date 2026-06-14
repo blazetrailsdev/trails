@@ -584,6 +584,9 @@ async function _resetAutoIncrement(
 async function _warmSchemaCache(adapter: DatabaseAdapter, table: string): Promise<void> {
   const sc = adapter.schemaCache;
   const pool = adapter.pool ?? null;
+  // `!sc` is required, not dead: the `DatabaseAdapter` interface types
+  // `schemaCache` as optional (`adapter.ts`), even though AbstractAdapter's
+  // getter always returns one. Dropping it fails typecheck (TS18048).
   if (!sc || pool === null) return;
   try {
     // `SchemaCache.columnsHash` short-circuits on `_columnsHash.has(table)`, so
