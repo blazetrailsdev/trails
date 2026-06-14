@@ -983,16 +983,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Return the persistent connection, opening it lazily on first call.
-   * After the dual-pool collapse there is one connection per adapter, so
-   * `getClient()` and the in-TX `_client` always reference the same
-   * `pg.Client` — every caller queues on its socket.
-   */
-  private async getClient(): Promise<pg.Client> {
-    return this._acquireFreshClient();
-  }
-
-  /**
    * Open (or return) the single persistent pg.Client. Configures the
    * session once and drains any orphaned server-side prepared
    * statements left by a prior PSCE event. All checkouts go through
@@ -1110,24 +1100,33 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Execute `fn` with the persistent connection. After the dual-pool
-   * collapse there is no per-call checkout/release: every caller —
-   * inside or outside a transaction, sequential or under Promise.all —
-   * uses the single `_rawConnection`. pg.Client serializes concurrent
-   * `query()` calls on its socket, so a Promise.all of writes under a
-   * pinned trails context cannot fan across sockets the way the old
-   * pg.Pool-backed path could (the root cause of #2253).
-   */
-  /**
-   * Overrides the abstract acquisition seam so the base withRawConnection
-   * retry loop acquires a pg.Client instead of the generic _connection.
-   * Called on every loop iteration so a reconnectBang() + continue picks
-   * up a fresh client automatically via _acquireFreshClient().
+   * Drain the async reset barrier before the base `withRawConnection` loop
+   * yields `this._connection`. `resetBang` defers ROLLBACK + DISCARD ALL +
+   * reconfigure behind `_inFlightReset` (it can't block the way Rails'
+   * `reset!` does); awaiting it here — once per call, pre-loop — guarantees
+   * the yielded socket is scrubbed and reconfigured, with no per-iteration
+   * re-acquire. The connection itself is opened eagerly by `connectBang()`
+   * (initial use) or `reconnect()` (post-failure), so there is nothing left
+   * to acquire here. Replaces the deleted `rawConnectionForBlock` seam.
    *
    * @internal
    */
-  protected override async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
-    return (await this.getClient()) as unknown as AbstractAdapter;
+  protected override async awaitRawConnectionReady(): Promise<void> {
+    while (this._inFlightReset) await this._inFlightReset;
+    // If the reset's reconfigure step failed it tore down the socket; re-open
+    // a fresh, configured connection so the loop never yields an unconfigured
+    // (or null) one. connect() throws here only if the server is truly down —
+    // the same pre-loop failure shape as a failed initial connectBang().
+    if (!this._closed && this._rawConnection === null && this._pgClientOptions !== null) {
+      await this.connect();
+    }
+    // Drain server-side prepared statements orphaned by a prior PSCE event
+    // (clearCacheBang's reset branch tagged `_needsDeallocateAll` while the
+    // socket was torn down). When the connection is reopened by connectBang's
+    // `_acquireFreshClient` this already ran; this covers the case where the
+    // live socket survives so the loop never yields it un-drained.
+    const client = this._rawConnection;
+    if (client && !this._closed) await this._maybeDrainOrphanedPreparedStatements(client);
   }
 
   /**
@@ -1555,7 +1554,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // Connection-level error on BEGIN poisons the single pg.Client.
       // Tear down so the next caller gets a fresh connection — mirrors
       // the pre-collapse PoolClient.release(err) discard.
-      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
+      if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
       throw error;
     }
   }
@@ -1587,7 +1586,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // single pg.Client unusable. Tear down so the next caller gets a
       // fresh connection — mirrors the pool-discard safety net the
       // pre-collapse design got for free via PoolClient.release(err).
-      if (PostgreSQLAdapter._isConnectionError(e)) this.reconnect();
+      if (PostgreSQLAdapter._isConnectionError(e)) this._discardRawConnection();
       throw e;
     } finally {
       // PG prepared statements are session-scoped, not transaction-scoped
@@ -1628,7 +1627,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // gets a fresh client. Mirrors the pre-collapse pool-discard
       // safety net (PoolClient.release(err) discarded broken sockets).
       if (PostgreSQLAdapter._isConnectionError(e)) {
-        this.reconnect();
+        this._discardRawConnection();
         return;
       }
       throw e;
@@ -1654,7 +1653,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // aborts the server-side TX. Mirrors the pool-discard safety net
       // the pre-collapse design got via PoolClient.release(err).
       if (PostgreSQLAdapter._isConnectionError(e)) {
-        this.reconnect();
+        this._discardRawConnection();
         return;
       }
       throw e;
@@ -1746,7 +1745,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._inTransaction = false;
       // See beginDbTransaction — discard the poisoned client on
       // connection-level failure so callers can recover.
-      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
+      if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
       throw error;
     }
   }
@@ -2172,33 +2171,44 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Mirrors Rails' private `PostgreSQLAdapter#connect`. With the
-   * single-client design the actual `pg.Client.connect()` happens
-   * lazily inside `_acquireFreshClient`; this method is preserved for
-   * `reconnect()` to call but performs no eager I/O.
+   * Mirrors Rails' private `PostgreSQLAdapter#connect`: open `@raw_connection`
+   * and run `configure_connection`. With the single-client design that work
+   * lives in `_acquireFreshClient` (open + `_maybeConfigureConnection`), which
+   * this delegates to. Driven by `connectBang()` (initial use) and
+   * `reconnect()` (post-failure) so both populate `_connection` eagerly.
    *
    * @internal
    */
-  connect(): void {
-    // Lazy: `_acquireFreshClient` opens the connection on first use.
+  async connect(): Promise<void> {
+    await this._acquireFreshClient();
   }
 
   /**
-   * Mirrors Rails' private `PostgreSQLAdapter#reconnect`. Fires a
-   * non-blocking `client.end()` on the old connection (fire-and-forget),
-   * resets all per-connection state, and leaves the new connection to
-   * be opened lazily on next use.
-   *
-   * Like Rails' private `reconnect`, this does NOT reset the transaction
-   * manager — that is owned by the inherited `AbstractAdapter#reconnectBang`
-   * lifecycle (Rails' `reconnect!`), which runs the restore-aware
-   * `resetTransaction` after this raw reconnect. Callers wanting the full
-   * reset/reconfigure/retry cycle drive `reconnectBang` (as `verifyBang` does),
-   * not this primitive.
+   * Mirrors Rails' `connect!` establishing `@raw_connection`. Eagerly opens
+   * and configures the single pg.Client (via `connect()`) so the base
+   * `withRawConnection` loop yields `this._connection` directly — no lazy
+   * per-iteration re-acquire. Called pre-loop by the base when `_connection`
+   * is null and the transaction state is restorable.
    *
    * @internal
    */
-  reconnect(): void {
+  override async connectBang(): Promise<void> {
+    await this.connect();
+  }
+
+  /**
+   * Tear down the current socket (fire-and-forget `client.end()`) and reset
+   * all per-connection state WITHOUT re-opening. `_closed` stays false so the
+   * next acquire re-opens lazily. Used by the connection-error handlers in the
+   * transaction-control paths (begin/commit/rollback): they only need to
+   * discard the poisoned client so the next `withRawConnection` pre-loop
+   * `connectBang()` opens a fresh one — they must NOT eagerly re-open, or a
+   * subsequent `reconnect()` would close the just-opened socket and open
+   * another (a wasted open/close cycle).
+   *
+   * @internal
+   */
+  private _discardRawConnection(): void {
     const conn = this._rawConnection;
     this._rawConnection = null;
     this._client = null;
@@ -2209,7 +2219,33 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._inTransaction = false;
     this._closed = false;
     conn?.end().catch(() => {});
-    this.connect();
+  }
+
+  /**
+   * Mirrors the role of Rails' private `PostgreSQLAdapter#reconnect`. Rails
+   * does `@raw_connection&.reset` (libpq PQreset, an in-place reconnect on the
+   * existing socket) and only opens a fresh connection if that fails; node-pg
+   * has no in-place reset, so trails always tears down and opens a fresh
+   * `pg.Client` via `connect()` — the behavior differs (fresh socket vs reuse)
+   * but the role is identical: leave `@raw_connection` live and reconfigured.
+   *
+   * Like Rails' private `reconnect`, this does NOT reset the transaction
+   * manager — that is owned by the inherited `AbstractAdapter#reconnectBang`
+   * lifecycle (Rails' `reconnect!`), which runs the restore-aware
+   * `resetTransaction` after this raw reconnect. Callers wanting the full
+   * reset/reconfigure/retry cycle drive `reconnectBang` (as `verifyBang` does),
+   * not this primitive.
+   *
+   * @internal
+   */
+  async reconnect(): Promise<void> {
+    this._discardRawConnection();
+    // Rails' private `reconnect` repopulates `@raw_connection`. Eagerly
+    // open + configure the new pg.Client via `connect()` so `withRawConnection`
+    // yields a live handle directly, with no lazy second acquire. The inherited
+    // `reconnectBang` awaits this (and retries connection errors); the
+    // fire-and-forget error-handler callers ignore the result via `.catch`.
+    await this.connect();
   }
 
   /**
@@ -2292,8 +2328,39 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // this specific reset is still the active one — prevents a second
     // concurrent resetBang() from having its barrier cleared prematurely
     // by the first reset's .finally().
+    // DISCARD ALL also resets session-level GUCs (standard_conforming_
+    // strings, intervalstyle, client_min_messages, custom variables) —
+    // mark the connection unconfigured so the chain below (and any racing
+    // acquire) re-runs _maybeConfigureConnection. Matches Rails' reset!,
+    // which calls attempt_configure_connection via super
+    // (abstract_adapter.rb:729). Set BEFORE building the chain so the
+    // chained _maybeConfigureConnection sees it false and reconfigures.
+    this._connectionConfigured = false;
     const reset: Promise<void> = work
       .then(() => live.query("DISCARD ALL"))
+      // Re-run configure_connection on the SAME socket once DISCARD ALL has
+      // landed, so a connection yielded by withRawConnection (which drains
+      // this barrier via awaitRawConnectionReady) is already reconfigured —
+      // mirroring Rails' blocking reset! → super → configure_connection.
+      // Guard on socket identity: a concurrent reconnect may have swapped in
+      // a new client, in which case its own acquire handles configuration.
+      // On configure failure, tear down the socket (mirroring _doAcquire's
+      // catch) so awaitRawConnectionReady re-opens a fresh, configured
+      // connection rather than yielding an unconfigured one.
+      .then(() => {
+        if (this._rawConnection === live && !this._closed) {
+          return this._maybeConfigureConnection(live).catch((error: unknown) => {
+            if (this._rawConnection === live) {
+              this._rawConnection = null;
+              this._connectionConfigured = false;
+              this._statementPool?.detach();
+              this._statementPool = null;
+            }
+            live.end().catch(() => {});
+            throw error;
+          });
+        }
+      })
       .then(() => {})
       .catch(() => {})
       .finally(() => {
@@ -2303,12 +2370,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // DISCARD ALL drops server-side prepared statements — reset the
     // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
     this._statementPool?.reset();
-    // DISCARD ALL also resets session-level GUCs (standard_conforming_
-    // strings, intervalstyle, client_min_messages, custom variables) —
-    // mark the connection unconfigured so the next acquire re-runs
-    // _maybeConfigureConnection. Matches Rails' reset!, which calls
-    // attempt_configure_connection via super (abstract_adapter.rb:729).
-    this._connectionConfigured = false;
     super.resetBang();
   }
 
@@ -2504,10 +2565,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (this._databaseVersion !== null) return this._databaseVersion;
     // Off the withRawConnection loop: this is a memoized bootstrap probe run
     // during init / schema introspection (lock-free). Acquire the raw client
-    // directly via getClient(); tear down on a dead socket so the next caller
+    // directly via _acquireFreshClient(); tear down on a dead socket so the next caller
     // gets a fresh connection (the recovery withClient used to provide).
     {
-      const client = await this.getClient();
+      const client = await this._acquireFreshClient();
       try {
         const version = await this._serverVersion(client);
         // Mirrors Rails' get_database_version: a zero version means the version
@@ -2518,14 +2579,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         }
         this._databaseVersion = version;
       } catch (error) {
-        if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
+        if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
         throw error;
       }
     }
     // Eagerly populate optimizer hints flag
     if (this._hasOptimizerHints === null) {
       try {
-        const client = await this.getClient();
+        const client = await this._acquireFreshClient();
         const result = await client.query(
           "SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1",
           ["pg_hint_plan"],
@@ -2533,10 +2594,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         this._hasOptimizerHints = Number(result.rows[0]?.count) > 0;
       } catch (error) {
         // Carry the version-probe block's recovery forward: tear down on a
-        // dead socket so the next getClient() opens a fresh pg.Client rather
+        // dead socket so the next _acquireFreshClient() opens a fresh pg.Client rather
         // than handing back the stale handle (the recovery the former
         // withClient body provided before being swallowed by a bare catch).
-        if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
+        if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
         this._hasOptimizerHints = false;
       }
     }
@@ -5544,9 +5605,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // sub-step of an already-in-flight query on the already-acquired live
     // handle: re-entering the leaf loop would redundantly re-run its verify /
     // materialize / dirtyCurrentTransaction bookkeeping for a session variable.
-    // Acquire the raw client directly via getClient(); tear down on a dead
+    // Acquire the raw client directly via _acquireFreshClient(); tear down on a dead
     // socket so the next caller gets a fresh connection.
-    const client = await this.getClient();
+    const client = await this._acquireFreshClient();
     try {
       if (tz === "utc") {
         await client.query("SET SESSION timezone TO 'UTC'");
@@ -5554,7 +5615,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         await client.query("SET SESSION timezone TO DEFAULT");
       }
     } catch (error) {
-      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
+      if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
       throw error;
     }
   }

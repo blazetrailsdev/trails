@@ -1654,7 +1654,12 @@ export class AbstractAdapter implements Quoting {
     this.disconnectBang();
   }
 
-  connectBang(): void {
+  // Async to let adapters with async driver-level connect (PostgreSQLAdapter)
+  // eagerly populate `_connection` here — mirroring Rails' `connect!` setting
+  // `@raw_connection` — so `withRawConnection` can yield `_connection` directly
+  // instead of re-acquiring inside the retry loop. The base stays a no-op;
+  // SQLite/MySQL inherit it unchanged (they populate via their own seams).
+  async connectBang(): Promise<void> {
     // Concrete adapters override to establish the raw connection.
   }
 
@@ -1876,7 +1881,14 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = opts.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
-      if (this._connection === null && this.isReconnectCanRestoreState()) this.connectBang();
+      if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
+      // Drain any deferred connection-readiness work (PostgreSQLAdapter's
+      // async reset barrier: ROLLBACK + DISCARD ALL + reconfigure) ONCE here,
+      // before any query runs. Rails' `reset!` blocks, so the connection is
+      // already scrubbed by the time the loop yields it; trails' `resetBang`
+      // can't block, so it defers behind a promise this hook awaits. Pre-loop
+      // (not per-iteration) — a no-op for adapters with no deferred work.
+      await this.awaitRawConnectionReady();
       if (materializeTransactions) await this.materializeTransactions();
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
@@ -1935,15 +1947,27 @@ export class AbstractAdapter implements Quoting {
    * Overridable async seam yielding the raw connection on each iteration of
    * withRawConnection's retry loop. The default returns _connection, which
    * is set by the pre-loop connectBang() call and updated by reconnectBang()
-   * on retry. Adapters with async acquisition (e.g. PostgreSQLAdapter via
-   * getClient()) override this to re-await their driver-level connect so
-   * reconnectBang() + continue picks up a fresh handle automatically.
+   * on retry. Mysql2Adapter overrides this to re-await its driver-level
+   * connect so reconnectBang() + continue picks up a fresh handle. PG no
+   * longer overrides it: connectBang()/reconnect() populate _connection
+   * eagerly and awaitRawConnectionReady() drains the reset barrier pre-loop.
    *
    * Mirrors: AbstractAdapter#with_raw_connection (yield @raw_connection)
    */
   protected async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
     return this._connection;
   }
+
+  /**
+   * @internal
+   * Overridable readiness barrier awaited once per `withRawConnection` call,
+   * after the eager `connectBang()` and before any query. Default no-op.
+   * PostgreSQLAdapter overrides it to drain its async reset barrier
+   * (`_inFlightReset`: ROLLBACK → DISCARD ALL → reconfigure) so the connection
+   * yielded by the loop is guaranteed scrubbed + reconfigured, matching Rails
+   * where `reset!` blocks before `with_raw_connection` ever yields.
+   */
+  protected async awaitRawConnectionReady(): Promise<void> {}
 
   /** @internal Mirrors: AbstractAdapter#verified! */
   verifiedBang(): void {
