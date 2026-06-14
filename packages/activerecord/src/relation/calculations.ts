@@ -486,7 +486,7 @@ async function groupedCompositeAssoc(
   const pk = (Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]) as string[];
   // NUL-join so string-valued key components cannot collide across the tuple
   // boundary (e.g. ["a b","c"] vs ["a","b c"]).
-  const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join(" ");
+  const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
   const tuples = rows
     .map((row) => aliases.map((a) => row[a]))
     .filter((vals) => vals.every((v) => v != null));
