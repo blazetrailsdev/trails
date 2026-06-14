@@ -183,6 +183,20 @@ describe("DeleteAllTest", () => {
     expect(await Pet.includes("toys").where(whereArgs).deleteAll()).toBe(count);
   });
 
+  it("delete all with includes and group skips limit materialization guard", async () => {
+    await makePetWithBone();
+    // Mirrors Rails `apply_join_dependency(eager_loading: group_values.empty?)`
+    // (finder_methods.rb:457): a grouped delete passes `eager_loading: false`,
+    // so the limit/offset materialization guard is skipped — `includes + group
+    // + limit` deletes rather than raising NotImplementedError.
+    const rel = Pet.includes("toys")
+      .where({ toys: { name: "Bone" } })
+      .group("da_pets.id")
+      .limit(5);
+    expect(await rel.deleteAll()).toBe(1);
+    expect(await Pet.all().toArray()).toHaveLength(0);
+  });
+
   it("delete all with from clause still targets the table", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "fromtest", author: "ivan" });
