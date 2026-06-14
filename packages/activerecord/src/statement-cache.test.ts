@@ -296,11 +296,11 @@ describe("StatementCacheTest", () => {
     }
   });
 
-  it("find and find_by route through the unprepared (PartialQuery) cache path", async () => {
-    // Regression: find/find_by add LIMIT 1, whose concrete bind is collected
-    // as a raw BindParam on the unprepared path. Without normalization it
-    // reached the adapter's quote() ("can't quote BindParam"). CI runs the
-    // suite with preparedStatements: false, so exercise that mode explicitly.
+  it("find and find_by stay correct under an unprepared connection", async () => {
+    // find/find_by only use the statement cache under prepared statements; with
+    // preparedStatements: false (the mysql default) they fall back to the
+    // relation path, which keeps placeholders + binds and logs them. Verify the
+    // unprepared connection still returns the right records via that fallback.
     await import("./relation.js");
     const { BetterSQLite3Adapter } =
       await import("./connection-adapters/better-sqlite3-adapter.js");
