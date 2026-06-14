@@ -121,9 +121,10 @@ describe("PredicateBuilderTest", () => {
     ).predicateBuilder.buildFromHash({ "schema.table.column": "value" });
     const sql = new Visitors.ToSql().compile(node);
     // Arel resolves "schema.table" as schema.table identifier, producing:
-    // "schema"."table"."column" = 'value'
+    // "schema"."table"."column" = ?  (the value is a BindParam, not inlined —
+    // Rails parity, see Arel BindParam#toSql).
     expect(sql).toMatch(/"schema"\."table"\."column"/);
-    expect(sql).toContain("value");
+    expect(sql).toContain("= ?");
   });
 
   it("does not mutate", () => {
@@ -151,7 +152,8 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(table);
       const [node] = builder.buildFromHash({ title: "hello" });
       expect(compile(node)).toContain('"posts"."title"');
-      expect(compile(node)).toContain("'hello'");
+      // Value is a BindParam → rendered as `?`, not inlined (Rails parity).
+      expect(compile(node)).toContain("= ?");
     });
 
     it("builds IS NULL for null values", () => {
@@ -264,9 +266,11 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(table);
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql();
-      const sql = visitor.compile(node);
-      expect(sql).toContain('"users"."name"');
-      expect(sql).toContain("alice");
+      // The value is wrapped in a BindParam, so raw Arel compile emits `?`
+      // (mirrors Rails); the value is carried as a bind, not inlined.
+      expect(visitor.compile(node)).toBe('"users"."name" = ?');
+      const [, binds] = visitor.compileWithBinds(node);
+      expect(binds).toHaveLength(1);
     });
   });
 
@@ -301,7 +305,7 @@ describe("PredicateBuilderTest", () => {
       const nodes = builder.buildFromHash({ authors: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
-      expect(sql).toContain("Rails");
+      expect(sql).toContain("= ?");
       expect(sql).not.toContain('"posts"."authors"');
     });
 
@@ -311,7 +315,7 @@ describe("PredicateBuilderTest", () => {
       const nodes = builder.buildFromHash({ writer: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
-      expect(sql).toContain("Rails");
+      expect(sql).toContain("= ?");
       expect(sql).not.toContain('"writer"."name"');
     });
 

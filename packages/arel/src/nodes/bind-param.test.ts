@@ -21,6 +21,23 @@ describe("BindParam", () => {
     expect(a.value).not.toBe(b.value);
   });
 
+  // Rails parity: `BindParam#to_sql` always emits the `?` placeholder (the
+  // value is collected, not inlined). Mirrors Rails' visit_Arel_Nodes_BindParam
+  // with `BIND_BLOCK = proc { "?" }`. See the BindParam class doc.
+  describe("toSql emits the ? placeholder", () => {
+    it("renders a scalar value as ?", () => {
+      expect(new Nodes.BindParam(1).toSql()).toBe("?");
+    });
+
+    it("renders a null value as ?", () => {
+      expect(new Nodes.BindParam(null).toSql()).toBe("?");
+    });
+
+    it("renders a valueless bind param as ?", () => {
+      expect(new Nodes.BindParam().toSql()).toBe("?");
+    });
+  });
+
   describe("valueBeforeTypeCast", () => {
     it("returns value when value has no valueBeforeTypeCast", () => {
       const bp = new Nodes.BindParam(42);

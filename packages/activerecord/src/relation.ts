@@ -722,7 +722,7 @@ export class Relation<T extends Base> {
         onPredicates.push(tgt.get(typeCol).eq(modelClass.name));
       }
       const onNode = onPredicates.length === 1 ? onPredicates[0] : new Nodes.And(onPredicates);
-      const on = this._arelVisitor().compile(onNode);
+      const on = this._compileArelNode(onNode);
       return { joins: [{ table: targetTable, on }], table: targetTable, pks: ["id"] };
     }
     return null;
@@ -1734,7 +1734,7 @@ export class Relation<T extends Base> {
       this._appendAssociationScope(predicates, assocDef, targetModel);
       return {
         table: targetTable,
-        on: this._arelVisitor().compile(
+        on: this._compileArelNode(
           predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         ),
       };
@@ -1780,7 +1780,7 @@ export class Relation<T extends Base> {
       this._appendAssociationScope(predicates, assocDef, targetModel);
       return {
         table: targetTable,
-        on: this._arelVisitor().compile(
+        on: this._compileArelNode(
           predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         ),
       };
@@ -1873,7 +1873,7 @@ export class Relation<T extends Base> {
       throughJoins = [
         {
           table: throughTable,
-          on: this._arelVisitor().compile(
+          on: this._compileArelNode(
             throughPredicates.length === 1
               ? throughPredicates[0]
               : new Nodes.And(throughPredicates),
@@ -1952,7 +1952,7 @@ export class Relation<T extends Base> {
       ...throughJoins,
       {
         table: targetTable,
-        on: this._arelVisitor().compile(
+        on: this._compileArelNode(
           targetPredicates.length === 1 ? targetPredicates[0] : new Nodes.And(targetPredicates),
         ),
       },
@@ -1998,11 +1998,11 @@ export class Relation<T extends Base> {
     return [
       {
         table: joinTable,
-        on: this._arelVisitor().compile(joinT.get(ownerFk).eq(srcT.get(sourcePk))),
+        on: this._compileArelNode(joinT.get(ownerFk).eq(srcT.get(sourcePk))),
       },
       {
         table: targetTable,
-        on: this._arelVisitor().compile(tgtT.get(targetPk as string).eq(joinT.get(targetFk))),
+        on: this._compileArelNode(tgtT.get(targetPk as string).eq(joinT.get(targetFk))),
       },
     ];
   }
@@ -4421,8 +4421,23 @@ export class Relation<T extends Base> {
     return sql;
   }
 
+  // Compile a node to an embedded SQL string (JOIN ON clauses, order/select
+  // fragments) with bind values inlined. The result is spliced into a larger
+  // query as raw text with no separate bind array, so any BindParam must be
+  // substituted here — raw Arel `compile` now emits `?` (Rails parity), which
+  // would leak an unbound placeholder into executable SQL. Inlines via the
+  // adapter quoter, matching `Relation#toSql` / `connection.toSql`.
   private _compileArelNode(node: Nodes.Node): string {
-    return this._arelVisitor().compile(node);
+    const [sql, binds] = this._arelVisitor().compileWithBinds(node);
+    if (binds.length === 0) return sql;
+    const adapter = this._resolveAdapter();
+    let i = 0;
+    return sql.replace(/\?|\$\d+/g, (match) => {
+      const raw = binds[i++];
+      if (raw === undefined) return match;
+      const val = raw instanceof ModelAttribute ? raw.valueForDatabase : raw;
+      return adapter ? adapter.quote(val) : String(val);
+    });
   }
 
   /**

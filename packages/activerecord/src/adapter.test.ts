@@ -34,24 +34,37 @@ import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Event } from "./test-helpers/models/event.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 
-// Rails renders the placeholder via `Arel::Nodes::BindParam.new(nil).to_sql`,
-// which collects a "?" marker; our default Node#toSql inlines the value, so the
-// placeholder is written literally here. Drives the same insert/update/select/
-// delete bind round-trip as Rails' AdapterTest casted/non-casted bind probes.
+// Build the placeholder the same way Rails does — `Arel::Nodes::BindParam.new(nil)
+// .to_sql` collects the `?` marker — rather than hard-coding a literal `?`.
+const qm = new Nodes.BindParam(null).toSql();
+
+// Drives the same insert/update/select/delete bind round-trip as Rails'
+// AdapterTest casted/non-casted bind probes.
 async function roundTripBinds(conn: AbstractSQLite3Adapter, binds: unknown[]): Promise<void> {
-  const id = await conn.insert("INSERT INTO events(id) VALUES (?)", null, null, null, null, binds);
+  const id = await conn.insert(
+    `INSERT INTO events(id) VALUES (${qm})`,
+    null,
+    null,
+    null,
+    null,
+    binds,
+  );
   expect(id).toBe(1);
 
-  const updated = await conn.update("UPDATE events SET title = 'foo' WHERE id = ?", null, binds);
+  const updated = await conn.update(
+    `UPDATE events SET title = 'foo' WHERE id = ${qm}`,
+    null,
+    binds,
+  );
   expect(updated).toBe(1);
 
-  const found = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
+  const found = await conn.selectAll(`SELECT * FROM events WHERE id = ${qm}`, null, binds);
   expect(found.first()).toEqual({ id: 1, title: "foo" });
 
-  const deleted = await conn.delete("DELETE FROM events WHERE id = ?", null, binds);
+  const deleted = await conn.delete(`DELETE FROM events WHERE id = ${qm}`, null, binds);
   expect(deleted).toBe(1);
 
-  const empty = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
+  const empty = await conn.selectAll(`SELECT * FROM events WHERE id = ${qm}`, null, binds);
   expect(empty.first()).toBeUndefined();
 }
 
