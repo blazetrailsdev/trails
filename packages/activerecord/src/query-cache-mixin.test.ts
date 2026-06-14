@@ -11,6 +11,7 @@ import {
   makeCachedSelectAll,
   dirtiesQueryCache,
 } from "./connection-adapters/abstract/query-cache.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 
 const TEST_SCHEMA = { tasks: { title: "string" } } as const;
 
@@ -185,5 +186,47 @@ describe("QueryCache mixin live adapter path", () => {
       // it so the suite doesn't leak connections/sockets across tests.
       (b as unknown as { disconnect(): void }).disconnect();
     }
+  });
+});
+
+// Rails: `alias create insert` (database_statements.rb). The alias is mixed onto
+// the adapter via `include DatabaseStatements` and is listed in
+// `dirties_query_cache base, ..., :create, :insert, ...` (query_cache.rb:13).
+describe("create alias (alias_method create, insert)", () => {
+  it("delegates to insert with the same arguments", async () => {
+    const adapter = Object.create(AbstractAdapter.prototype) as {
+      create(...args: unknown[]): Promise<unknown>;
+      insert(...args: unknown[]): Promise<unknown>;
+    };
+    let received: unknown[] | undefined;
+    adapter.insert = (...args: unknown[]) => {
+      received = args;
+      return Promise.resolve("the-id");
+    };
+
+    const ret = await adapter.create("arel", "name", "pk", "id-value", "seq", [1], {
+      returning: ["id"],
+    });
+
+    expect(ret).toBe("the-id");
+    expect(received).toEqual(["arel", "name", "pk", "id-value", "seq", [1], { returning: ["id"] }]);
+  });
+
+  it("dirties the query cache", async () => {
+    const adapter = Object.create(AbstractAdapter.prototype) as {
+      create(...args: unknown[]): Promise<unknown>;
+      insert(...args: unknown[]): Promise<unknown>;
+      _queryCache: Store;
+    };
+    adapter.insert = () => Promise.resolve("the-id");
+    adapter._queryCache = new Store();
+    adapter._queryCache.enabled = true;
+    adapter._queryCache.dirties = true;
+    await adapter._queryCache.computeIfAbsent("k", async () => [{ a: 1 }]);
+    expect(adapter._queryCache.size).toBe(1);
+
+    await adapter.create("arel");
+
+    expect(adapter._queryCache.empty).toBe(true);
   });
 });
