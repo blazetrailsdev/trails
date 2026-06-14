@@ -1540,6 +1540,14 @@ export async function countHasMany(
     // loading so the count works on strict-loading models.
     record._strictLoadingBypassCount++;
     try {
+      // Preserve loadHasManyThrough's loud failure for a misconfigured through:
+      // buildThroughJoinScope returns null for a missing reflection, which would
+      // otherwise silently count as 0.
+      const ctor = record.constructor as typeof Base;
+      const throughRegistered = (ctor._associations ?? []).some((a) => a.name === options.through);
+      if (!throughRegistered) {
+        throw _hmtNotFound(ctor, assocName, options.through!);
+      }
       const rel = buildThroughJoinScope(record, assocName, options);
       if (!rel) return 0;
       const result = await rel.count();
