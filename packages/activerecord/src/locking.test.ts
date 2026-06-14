@@ -626,9 +626,9 @@ describe("OptimisticLockingTest", () => {
     await proxy.create({});
     expect(await proxy.isEmpty()).toBe(false);
     await p.destroy();
-    // Rails clears the association cache on destroy; in TS the proxy cache is
-    // not invalidated automatically, so force a reload to mirror Rails' fresh-
-    // query behavior before asserting empty.
+    // Rails' destroy does NOT clear @association_cache (it only freezes the
+    // record), so the in-memory proxy still holds the pre-destroy records.
+    // Force a reload to re-query the join table and confirm the rows are gone.
     await proxy.reload();
     expect(await proxy.isEmpty()).toBe(true);
     const rows = await (Base.connection as any).selectRows(
