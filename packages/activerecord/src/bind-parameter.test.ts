@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/bind_parameter_test.rb
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { IntegerType, StringType } from "@blazetrails/activemodel";
@@ -13,6 +13,7 @@ import { QueryAttribute } from "./relation/query-attribute.js";
 import { Base } from "./index.js";
 import { registerModel } from "./associations.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -74,6 +75,27 @@ describe("BindParameterTest", () => {
   // Rails: `fixtures :topics, :authors, :author_addresses, :posts`.
   useHandlerFixtures(["topics", "authors", "authorAddresses", "posts"], {
     schema: canonicalSchema,
+  });
+
+  beforeAll(async () => {
+    // A sibling file (e.g. coders/json.test.ts's SerializedTopic) physically
+    // replaces `topics` with a bespoke shape lacking `author_name`. The worker's
+    // canonical-schema preload keeps the signature cache warm, so the fixtures'
+    // own `defineSchema` is a no-op and the bespoke table survives into this
+    // suite — its fixture load then fails with "table topics has no column named
+    // author_name". `dropExisting` bypasses the cache and rebuilds the canonical
+    // shape verbatim (mirrors the shield in locking.test.ts / dirty.test.ts).
+    await defineSchema(
+      {
+        topics: canonicalSchema.topics,
+        authors: canonicalSchema.authors,
+        author_addresses: canonicalSchema.author_addresses,
+        posts: canonicalSchema.posts,
+      },
+      { dropExisting: true },
+    );
+    registerModel(Author);
+    registerModel(Post);
   });
 
   afterEach(() => {
@@ -143,12 +165,9 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
 
     // Rails: `joins(:thinking_posts)` — a bare association name resolved to an
-    // INNER JOIN. trails resolves association joins through the model registry,
-    // so register the canonical Author/Post here (their fixtures load above but
-    // don't auto-register the classes).
-    registerModel(Author);
-    registerModel(Post);
-
+    // INNER JOIN. trails resolves association joins through the model registry;
+    // Author/Post are registered in `beforeAll` (their fixtures load but don't
+    // auto-register the classes).
     const subquery = Author.joins("thinkingPosts").where({ name: "David" });
     const scope = Author.from(subquery, "authors").where({ id: 1 });
     expect(await scope.count()).toBe(1);
@@ -260,14 +279,12 @@ describe("BindParameterTest", () => {
     // MySQL/MariaDB default it off, so mirror that class-level guard here.
     const conn = Topic.leaseConnection() as any;
     ctx.skip(!conn.preparedStatements);
-    registerModel(Author);
     await assertBindParamsToSql(conn);
   });
 
   it("bind params to sql with unprepared statements", async (ctx) => {
     const conn = Topic.leaseConnection() as any;
     ctx.skip(!conn.preparedStatements);
-    registerModel(Author);
     await conn.unpreparedStatement(async () => {
       await assertBindParamsToSql(conn);
     });
