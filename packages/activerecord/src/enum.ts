@@ -29,6 +29,43 @@ export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDef
   return enumRegistry.get(modelClass)!;
 }
 
+/**
+ * Register an EnumType in the attribute set and install the label-returning
+ * accessor, the single Rails-faithful storage model shared by both the
+ * `Base.enum` macro (`_enum`) and `defineEnum`. After this, the attribute
+ * stores the label string (via EnumType.cast on write), the getter returns it,
+ * and assignment runs `assertValidValue`.
+ *
+ * Mirrors: ActiveRecord::Enum#_enum calling `klass.attribute(name, enum_type)`.
+ *
+ * @internal
+ */
+export function installEnumAttribute(
+  klass: typeof Base,
+  attribute: string,
+  enumType: EnumType,
+): void {
+  klass.attribute(attribute, enumType);
+  // Define the getter after attribute() so the EnumType is already in
+  // _attributeDefinitions / the pending-type queue when we overwrite whatever
+  // accessor attribute() installed.
+  Object.defineProperty(klass.prototype, attribute, {
+    get(this: Base) {
+      return (this as unknown as { _attributes: Map<string, unknown> })._attributes.get(attribute);
+    },
+    set(this: Base, value: unknown) {
+      // Custom setter only because the paired custom getter would otherwise make
+      // the property read-only. Validation is NOT done here: Rails' enum has no
+      // custom writer — `EnumType#assert_valid_value` is invoked by the attribute
+      // write pipeline (ActiveModel::Attribute#with_value_from_user), which our
+      // writeAttribute → withValueFromUser mirrors. So `record.status = "angry"`
+      // still raises ArgumentError, via the type, on every write path.
+      (this as unknown as EnumInstanceHost).writeAttribute(attribute, value);
+    },
+    configurable: true,
+  });
+}
+
 /** Minimal instance-side surface for enum-generated prototype callbacks. */
 interface EnumInstanceHost {
   readAttribute(name: string): unknown;
@@ -82,6 +119,12 @@ export function defineEnum(
   }
   const enumType = new EnumType(attribute, mapping, subtype);
   const def: EnumDefinition = { attribute, mapping, type: enumType };
+
+  // Converge onto the Rails-faithful `_enum` storage model: the attribute
+  // stores the label string (not the raw integer), the getter returns the
+  // label, and `assertValidValue` is enforced on assignment — identical to
+  // `Base.enum`.
+  installEnumAttribute(modelClass, attribute, enumType);
 
   // Compute prefix/suffix for method names
   const prefixStr =
@@ -168,7 +211,7 @@ export function defineEnum(
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
       Object.defineProperty(modelClass.prototype, fp, {
         value: function (this: Base) {
-          return this.readAttribute(attribute) === value;
+          return this.readAttribute(attribute) === name;
         },
         writable: true,
         configurable: true,
@@ -187,7 +230,7 @@ export function defineEnum(
 
     Object.defineProperty(modelClass.prototype, predicateName, {
       value: function (this: Base) {
-        return this.readAttribute(attribute) === value;
+        return this.readAttribute(attribute) === name;
       },
       writable: true,
       configurable: true,
@@ -227,7 +270,7 @@ export function defineEnum(
       const origBang = `${originalName}Bang`;
       Object.defineProperty(modelClass.prototype, origPredicate, {
         value: function (this: Base) {
-          return this.readAttribute(attribute) === value;
+          return this.readAttribute(attribute) === name;
         },
         writable: true,
         configurable: true,
@@ -326,6 +369,15 @@ export class EnumType extends ValueType<string> {
       if (!Number.isNaN(num) && this._reverseMapping.has(num)) return num;
     }
     return null;
+  }
+
+  // The in-memory value is the label string; the database value is the mapped
+  // integer/string. Callers that prefer serializeCastValue (e.g. insertAll/
+  // upsertAll bulk paths) must still get the mapping value, not the identity
+  // label — so delegate to serialize rather than inheriting the identity
+  // default from ValueType.
+  serializeCastValue(value: unknown): number | string | null {
+    return this.serialize(value);
   }
 
   isSerializable(value: unknown): boolean {
@@ -519,26 +571,11 @@ export function _enum(
   }
 
   // Register EnumType so typeForAttribute() returns it for predicate-builder
-  // serialization — e.g. where({status: "draft"}) serializes "draft" → 0.
-  // Mirrors: ActiveRecord::Enum#_enum calling klass.attribute(name, enum_type).
+  // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
+  // install the label-returning accessor. Shared with `defineEnum` via
+  // installEnumAttribute so both macros use one Rails-faithful storage model.
   const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
-  this.attribute(name, enumType);
-
-  // Define getter after this.attribute() so EnumType is in _attributeDefinitions
-  // and the pending-type queue before the enum-specific getter overwrites whatever
-  // attribute() may have installed.
-  Object.defineProperty(this.prototype, attribute, {
-    get(this: Base) {
-      return this._attributes.get(attrName);
-    },
-    set(this: Base, value: unknown) {
-      // Mirrors Rails' attribute writer invoking EnumType#assert_valid_value on
-      // user assignment — `record.current_mood = "angry"` raises ArgumentError.
-      enumType.assertValidValue(value);
-      this.writeAttribute(attrName, value);
-    },
-    configurable: true,
-  });
+  installEnumAttribute(this, attrName, enumType);
 
   for (const [n, value] of Object.entries(mapping)) {
     const methodBase = `${prefix}${n}${suffix}`;
@@ -666,8 +703,12 @@ export function readEnumValue(record: Base, attribute: string): string | null {
   const def = defs.get(attribute);
   if (!def) return null;
 
-  const numericValue = record.readAttribute(attribute);
-  return def.type.deserialize(numericValue);
+  // Storage is now label-based (EnumType cast runs on write), so the stored
+  // value is usually the label string itself. Fall back to deserialize for any
+  // raw storage value (e.g. an integer read straight off the database row).
+  const stored = record.readAttribute(attribute);
+  if (typeof stored === "string" && def.mapping.has(stored)) return stored;
+  return def.type.deserialize(stored);
 }
 
 /**

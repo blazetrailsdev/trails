@@ -234,7 +234,7 @@ describe("InsertAllTest", () => {
     ]);
     const all = await Book.all().toArray();
     expect(all).toHaveLength(2);
-    expect(all.find((b: any) => b.title === "Draft Book")!.status).toBe(0);
+    expect(all.find((b: any) => b.title === "Draft Book")!.status).toBe("draft");
   });
 
   it("insert all on relation", async () => {

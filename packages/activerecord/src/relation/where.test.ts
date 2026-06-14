@@ -605,7 +605,7 @@ describe("WhereTest", () => {
     // Enum where uses the integer value
     const result = await Post.where({ status: 1 }).toArray();
     expect(result).toHaveLength(1);
-    expect(result[0].status).toBe(1);
+    expect(result[0].status).toBe("published");
   });
   it("where with enum conditions string", async () => {
     class Post extends Base {

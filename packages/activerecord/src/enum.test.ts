@@ -371,7 +371,7 @@ describe("EnumTest", () => {
     const Book = await makeBook();
     const b = await Book.create({ status: castEnumValue(Book, "status", "proposed") });
     expect(readEnumValue(b, "status")).toBe("proposed");
-    expect(b.readAttribute("status")).toBe(0);
+    expect(b.readAttribute("status")).toBe("proposed");
   });
 
   it("creating new object with enum using keyword_arguments", async () => {
@@ -579,8 +579,8 @@ describe("EnumTest", () => {
     b.writeAttribute("status", 2);
     const changes = b.changes;
     expect(changes.status).toBeDefined();
-    expect(changes.status[0]).toBe(0); // from: proposed (0)
-    expect(changes.status[1]).toBe(2); // to: published (2)
+    expect(changes.status[0]).toBe("proposed"); // from: proposed
+    expect(changes.status[1]).toBe("published"); // to: published
   });
 
   it("building new objects with enum scopes", async () => {
@@ -726,7 +726,7 @@ describe("EnumTest", () => {
     cat.writeAttribute = (_attr: string, val: unknown) => {
       cat._val = val;
     };
-    cat.readAttribute = () => "american_bobtail";
+    cat.readAttribute = () => "American Bobtail";
     cat.isPersisted = () => false;
     expect((cat as any)["isAmerican Bobtail"]()).toBe(true);
     expect((cat as any)["isBalinese-Javanese"]()).toBe(false);
@@ -901,7 +901,7 @@ describe("EnumTest", () => {
   it("build from where with enum", async () => {
     const P = makeEnum();
     const p = P.where({ status: 0 }).build() as any;
-    expect(p.readAttribute("status")).toBe(0);
+    expect(p.readAttribute("status")).toBe("draft");
   });
 
   it("enum predicate returns false for other values", async () => {
@@ -1189,7 +1189,7 @@ describe("EnumTest", () => {
     expect((post as any).isDraft()).toBe(true);
     (post as any).published();
     expect((post as any).isPublished()).toBe(true);
-    expect(post.readAttribute("status")).toBe(1);
+    expect(post.readAttribute("status")).toBe("published");
   });
 
   it("supports hash mapping", () => {
@@ -1229,10 +1229,10 @@ describe("EnumTest", () => {
 
     const task = await Task.create({ status: 0 });
     await (task as any).activeBang();
-    expect(task.readAttribute("status")).toBe(1);
+    expect(task.readAttribute("status")).toBe("active");
     // Verify persisted
     const reloaded = await Task.find(task.id);
-    expect(reloaded.readAttribute("status")).toBe(1);
+    expect(reloaded.readAttribute("status")).toBe("active");
   });
 
   it("generates not-scopes", async () => {
@@ -1386,7 +1386,7 @@ describe("EnumTest", () => {
 
     const task = await Task.create({ status: 0 });
     (task as any).active();
-    expect(task.readAttribute("status")).toBe(1);
+    expect(task.readAttribute("status")).toBe("active");
   });
 
   it("creates scope for each value", async () => {
@@ -1416,7 +1416,7 @@ describe("EnumTest", () => {
     const task = await Task.create({ status: 0 });
     await (task as any).activeBang();
     const reloaded = await Task.find(task.id);
-    expect(reloaded.readAttribute("status")).toBe(1);
+    expect(reloaded.readAttribute("status")).toBe("active");
   });
 
   it("readEnumValue returns string name", async () => {
@@ -1460,7 +1460,7 @@ describe("EnumTest", () => {
     defineEnum(Conversation, "status", ["active", "archived"]);
 
     const conv = await Conversation.create({ status: 0 });
-    expect(conv.readAttribute("status")).toBe(0);
+    expect((conv as any).readAttributeForDatabase("status")).toBe(0);
     expect(readEnumValue(conv, "status")).toBe("active");
   });
 
@@ -1529,7 +1529,7 @@ describe("EnumTest", () => {
     expect((conv as any).isActive()).toBe(true);
     (conv as any).archived();
     expect((conv as any).isArchived()).toBe(true);
-    expect(conv.readAttribute("status")).toBe(1);
+    expect(conv.readAttribute("status")).toBe("archived");
   });
 
   // Rails: test "multiple enums on same model"
@@ -1610,7 +1610,7 @@ describe("EnumTest", () => {
 
       const p = new Post({});
       (p as any).published();
-      expect(p.readAttribute("status")).toBe(1);
+      expect(p.readAttribute("status")).toBe("published");
       expect((p as any).isPublished()).toBe(true);
     });
   });
