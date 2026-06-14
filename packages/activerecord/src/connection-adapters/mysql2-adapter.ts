@@ -39,6 +39,7 @@ import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import {
   columns as mysqlColumns,
   foreignKeys as mysqlForeignKeys,
+  indexes as mysqlIndexes,
   parseMysqlName as mysqlParseName,
   MysqlSchemaStatements,
 } from "./mysql/schema-statements.js";
@@ -279,11 +280,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.clearCacheBang();
     this._stmtPool?.clear();
   }
-  // Cached capability flag — information_schema.statistics.expression
-  // is MySQL 8.0.13+. Pre-8 MySQL and MariaDB (through at least 10.x)
-  // don't expose it, so we detect once and remember. `undefined` =
-  // not yet probed, `true`/`false` = result.
-  private _statisticsHasExpression: boolean | undefined;
   private _fullVersionString: string | null = null;
   private _database: string | undefined;
 
@@ -1184,14 +1180,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return mysqlColumns.call(this, tableName);
   }
 
-  /**
-   * Return user-defined indexes for the given table. Uses
-   * `information_schema.statistics` (cross-schema-capable) and surfaces
-   * `using` / `type` fields the way Rails' MySQL `indexes` does via
-   * `Index_type`: btree/hash map to `using`, fulltext/spatial map to `type`.
-   * Functional-index expressions are surfaced on MySQL 8.0.13+ (detected
-   * via statisticsHasExpressionColumn).
-   */
+  /** Delegates to {@link mysqlIndexes} in `mysql/schema-statements.ts`. */
   async indexes(tableName: string): Promise<
     Array<{
       name: string;
@@ -1202,103 +1191,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       comment?: string;
     }>
   > {
-    const { schema, table } = this.parseMysqlName(tableName);
-    const hasExpr = await this.statisticsHasExpressionColumn();
-    const exprSelect = hasExpr ? "expression AS expr" : "NULL AS expr";
-    const rows = (await this.schemaQuery(
-      `SELECT index_name AS name,
-              column_name AS col,
-              ${exprSelect},
-              non_unique AS non_unique,
-              index_type AS idx_type,
-              index_comment AS idx_comment
-         FROM information_schema.statistics
-         WHERE table_schema = COALESCE(?, database())
-         AND table_name = ?
-         AND index_name <> 'PRIMARY'
-         ORDER BY index_name, seq_in_index`,
-      [schema ?? null, table],
-    )) as Array<Record<string, unknown>>;
-
-    const byIndex = new Map<
-      string,
-      { columns: string[]; unique: boolean; using?: string; type?: string; comment?: string }
-    >();
-    for (const r of rows) {
-      const name = String((r.name ?? r.NAME ?? r.INDEX_NAME) as string);
-      // MySQL 8+ functional indexes store NULL in column_name and the
-      // raw SQL expression in `expression`. Rails wraps those in parens
-      // for its IndexDefinition; we do the same so the entry is
-      // unambiguous and doesn't serialize as the literal string "null"
-      // (what String(null) would produce).
-      const rawCol = r.col ?? r.COL ?? r.COLUMN_NAME;
-      const rawExpr = r.expr ?? r.EXPR ?? r.EXPRESSION;
-      let column: string | null;
-      if (rawCol != null) {
-        column = String(rawCol);
-      } else if (rawExpr != null) {
-        const expr = String(rawExpr);
-        column = expr.startsWith("(") ? expr : `(${expr})`;
-      } else {
-        column = null;
-      }
-      if (column == null) continue;
-      const nonUnique = Number(r.non_unique ?? r.NON_UNIQUE ?? 0);
-      if (!byIndex.has(name)) {
-        const idxType = String(r.idx_type ?? r.IDX_TYPE ?? r.INDEX_TYPE ?? "BTREE").toUpperCase();
-        let using: string | undefined;
-        let type: string | undefined;
-        if (idxType === "FULLTEXT" || idxType === "SPATIAL") {
-          type = idxType.toLowerCase();
-        } else {
-          using = idxType.toLowerCase();
-        }
-        // Mirrors Rails' `row["Index_comment"].presence` — blank (incl. whitespace-only) → nil.
-        const rawComment = r.idx_comment ?? r.IDX_COMMENT ?? r.INDEX_COMMENT;
-        const comment =
-          rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
-        byIndex.set(name, { columns: [], unique: nonUnique === 0, using, type, comment });
-      }
-      byIndex.get(name)!.columns.push(column);
-    }
-    return Array.from(byIndex.entries()).map(
-      ([name, { columns, unique, using, type, comment }]) => ({
-        name,
-        columns,
-        unique,
-        ...(using !== undefined ? { using } : {}),
-        ...(type !== undefined ? { type } : {}),
-        ...(comment !== undefined ? { comment } : {}),
-      }),
+    return mysqlIndexes.call(
+      {
+        schemaQuery: this.schemaQuery.bind(this),
+        quoteTableName: this.quoteTableName.bind(this),
+      },
+      tableName,
     );
-  }
-
-  /**
-   * Check whether `information_schema.statistics` exposes an
-   * `expression` column. Added in MySQL 8.0.13; absent on earlier
-   * MySQL and on MariaDB (through 10.x). Probed once per adapter
-   * instance and memoized — the result can't change mid-connection.
-   */
-  private async statisticsHasExpressionColumn(): Promise<boolean> {
-    if (this._statisticsHasExpression !== undefined) {
-      return this._statisticsHasExpression;
-    }
-    try {
-      const rows = (await this.schemaQuery(
-        `SELECT 1 AS one FROM information_schema.columns
-           WHERE table_schema = 'information_schema'
-           AND table_name = 'STATISTICS'
-           AND column_name = 'EXPRESSION'
-           LIMIT 1`,
-      )) as Array<unknown>;
-      this._statisticsHasExpression = rows.length > 0;
-    } catch {
-      // Defensive: if the probe itself fails, assume no — we'll just
-      // miss functional index expressions, which matches pre-8 MySQL
-      // semantics anyway.
-      this._statisticsHasExpression = false;
-    }
-    return this._statisticsHasExpression;
   }
 
   /** Delegates to {@link mysqlParseName} in `mysql/schema-statements.ts`. */
