@@ -70,7 +70,6 @@ import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements, JoinTableOptions } from "./abstract/schema-statements.js";
-import { indexNameForRemoveFrom, indexExistsForRemoveFrom } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
@@ -3066,138 +3065,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
-    // supportsIndexInclude() reads databaseVersion; ensure it's populated.
-    await this.getDatabaseVersion();
-    const { schema, table } = this.parseSchemaQualifiedName(tableName);
-
-    let tableCondition: string;
-    const binds: unknown[] = [];
-
-    if (schema) {
-      binds.push(table, schema);
-      tableCondition = `t.relname = $1 AND n.nspname = $2`;
-    } else {
-      binds.push(tableName);
-      tableCondition = `t.oid = to_regclass($1)`;
-    }
-
-    // ix.indnkeyatts was added in PG11 (covering indexes); on older servers
-    // INCLUDE columns don't exist, so all indkey columns are key columns.
-    const includeFilter = this.supportsIndexInclude() ? `WHERE k < ix.indnkeyatts` : "";
-
-    const rows = await this.schemaQuery(
-      `SELECT i.relname AS index_name,
-              ix.indisunique AS is_unique,
-              am.amname AS using,
-              ARRAY(
-                SELECT pg_get_indexdef(ix.indexrelid, k + 1, true)
-                FROM generate_subscripts(ix.indkey, 1) AS k
-                ${includeFilter}
-                ORDER BY k
-              ) AS columns,
-              pg_get_indexdef(ix.indexrelid) AS definition,
-              ix.indoption AS options,
-              obj_description(ix.indexrelid, 'pg_class') AS comment,
-              t.relname AS table_name
-       FROM pg_class t
-       JOIN pg_index ix ON t.oid = ix.indrelid
-       JOIN pg_class i ON i.oid = ix.indexrelid
-       JOIN pg_namespace n ON n.oid = t.relnamespace
-       JOIN pg_am am ON am.oid = i.relam
-       WHERE ${tableCondition}
-         AND ix.indisprimary = false
-       ORDER BY i.relname`,
-      binds,
-    );
-
-    return rows.map((row) => {
-      const columns = row.columns as string[];
-      const def = row.definition as string;
-
-      // Extract the expressions, INCLUDE, NULLS NOT DISTINCT, and WHERE clauses.
-      // Mirrors Rails' regex: / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?\z/m
-      const defMatch = def.match(
-        / USING \w+? \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
-      );
-      const expressions = defMatch?.[1] ?? "";
-      const includeStr = defMatch?.[2];
-      const nullsNotDistinctStr = defMatch?.[3];
-      const whereStr = defMatch?.[4];
-
-      const include = includeStr
-        ? includeStr.split(",").map((c) => c.trim().replace(/^"|"$/g, ""))
-        : undefined;
-      const where = whereStr?.trim();
-      const nullsNotDistinct = nullsNotDistinctStr ? true : undefined;
-
-      // Parse opclasses and orders from the expressions string.
-      // Mirrors Rails regex: /(?<column>\w+)"?\s?(?<opclass>\w+_ops(_\w+)?)?\s?(?<desc>DESC)?\s?(?<nulls>NULLS (?:FIRST|LAST))?/
-      const opclassesMap: Record<string, string> = {};
-      const ordersMap: Record<string, string> = {};
-      const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
-      for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
-        if (opclass) opclassesMap[column] = opclass;
-        if (nulls) {
-          ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
-        } else if (desc) {
-          ordersMap[column] = "desc";
-        }
-      }
-
-      // concise_options: collapse to a single scalar when all key columns share the same value.
-      // `columns` is already key-only because the SQL limits to ix.indnkeyatts.
-      let opclasses: Record<string, string> | string | undefined;
-      const opclassVals = Object.values(opclassesMap);
-      if (opclassVals.length > 0) {
-        if (columns.length === opclassVals.length && new Set(opclassVals).size === 1) {
-          opclasses = opclassVals[0];
-        } else {
-          opclasses = opclassesMap;
-        }
-      }
-
-      let orders: Record<string, string> | string | undefined;
-      const orderVals = Object.values(ordersMap);
-      if (orderVals.length > 0) {
-        if (columns.length === orderVals.length && new Set(orderVals).size === 1) {
-          orders = orderVals[0];
-        } else {
-          orders = ordersMap;
-        }
-      }
-
-      return {
-        table: row.table_name as string,
-        name: row.index_name as string,
-        unique: row.is_unique as boolean,
-        columns,
-        using: row.using as string,
-        orders,
-        opclasses,
-        include,
-        where,
-        nullsNotDistinct,
-        // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.
-        comment: (row.comment as string | null)?.trim() ? (row.comment as string) : undefined,
-      };
-    });
+    return this.pgSchemaStatements().indexes(tableName);
   }
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
-    const table = this.pgQuotedScope(tableName, "BASE TABLE");
-    const idxName = this.quoteLiteral(indexName);
-    const rows = await this.schemaQuery(`
-      SELECT COUNT(*) AS cnt
-      FROM pg_class t
-      INNER JOIN pg_index d ON t.oid = d.indrelid
-      INNER JOIN pg_class i ON d.indexrelid = i.oid
-      LEFT JOIN pg_namespace n ON n.oid = t.relnamespace
-      WHERE i.relkind IN ('i', 'I')
-        AND i.relname = ${idxName}
-        AND t.relname = ${table.name}
-        AND n.nspname = ${table.schema}
-    `);
-    return Number(rows[0].cnt) > 0;
+    return this.pgSchemaStatements().indexNameExists(tableName, indexName);
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {
@@ -3339,11 +3211,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    const { schema } = this.parseSchemaQualifiedName(tableName);
-    const qualifiedOld = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(oldName)}`
-      : this.quoteIdentifier(oldName);
-    await this.exec(`ALTER INDEX ${qualifiedOld} RENAME TO ${this.quoteIdentifier(newName)}`);
+    return this.pgSchemaStatements().renameIndex(tableName, oldName, newName);
   }
 
   async columns(tableName: string): Promise<Column[]> {
@@ -3928,12 +3796,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
-    if (typeof columnNames === "string") return this.quoteIdentifier(columnNames);
-    const quoted: Record<string, string> = {};
-    for (const name of columnNames) {
-      quoted[name] = this.quoteIdentifier(name);
-    }
-    return Object.values(quoted).join(", ");
+    return this.pgSchemaStatements().quotedIncludeColumnsForIndex(columnNames);
   }
 
   /** @internal */
@@ -4077,65 +3940,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       comment?: string;
     } = {},
   ): Promise<string> {
-    const cols = Array.isArray(columns) ? columns : [columns];
-    const quotedTable = this.quoteTableName(tableName);
-
-    const indexName =
-      options.name ?? `index_${tableName.replace(/[."]/g, "_")}_on_${cols.join("_and_")}`;
-
-    if (options.algorithm && options.algorithm !== "concurrently") {
-      throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
-    }
-    if (options.algorithm === "concurrently" && this._inTransaction) {
-      throw new Error("CREATE INDEX CONCURRENTLY cannot run inside a transaction");
-    }
-
-    const unique = options.unique ? "UNIQUE " : "";
-    const concurrently = options.algorithm === "concurrently" ? "CONCURRENTLY " : "";
-    const ifNotExists = options.ifNotExists ? "IF NOT EXISTS " : "";
-    const using = options.using ? ` USING ${options.using}` : "";
-
-    const colDefs = cols.map((col) => {
-      const isExpression = col.includes("(") || col.includes(" ");
-      let result = isExpression ? col : this.quoteIdentifier(col);
-      if (options.opclass) {
-        const op = options.opclass[col];
-        if (op) result += ` ${op}`;
-      }
-      if (options.order) {
-        if (typeof options.order === "string") {
-          result += ` ${options.order}`;
-        } else {
-          const o = options.order[col];
-          if (o) result += ` ${o.toUpperCase()}`;
-        }
-      }
-      return result;
-    });
-
-    let sql = `CREATE ${unique}INDEX ${concurrently}${ifNotExists}${this.quoteIdentifier(indexName)} ON ${quotedTable}${using} (${colDefs.join(", ")})`;
-
-    if (options.include) {
-      sql += ` INCLUDE (${options.include.map((c) => this.quoteIdentifier(c)).join(", ")})`;
-    }
-    if (options.nullsNotDistinct) {
-      sql += " NULLS NOT DISTINCT";
-    }
-    if (options.where) {
-      sql += ` WHERE ${options.where}`;
-    }
-
-    await this.exec(sql);
-
-    if (options.comment?.trim()) {
-      const { schema } = this.parseSchemaQualifiedName(tableName);
-      const qualifiedIndex = schema
-        ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(indexName)}`
-        : this.quoteIdentifier(indexName);
-      await this.exec(`COMMENT ON INDEX ${qualifiedIndex} IS ${this.quote(options.comment)}`);
-    }
-
-    return sql;
+    return this.pgSchemaStatements().addIndex(tableName, columns, options);
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#remove_index
@@ -4152,67 +3957,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       ifExists?: boolean;
     } = {},
   ): Promise<void> {
-    // Rails: `remove_index(table_name, column_name = nil, **options)` — column
-    // may be positional or in the options hash.
-    let columnName: string | string[] | undefined;
-    let opts: { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean };
-    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
-      columnName = columnOrOptions;
-      opts = options;
-    } else {
-      columnName = undefined;
-      opts = columnOrOptions ?? {};
-    }
-
-    if (opts.algorithm && opts.algorithm !== "concurrently") {
-      throw new Error(`Unknown algorithm: ${opts.algorithm}. Only 'concurrently' is supported.`);
-    }
-    if (opts.algorithm === "concurrently" && this._inTransaction) {
-      throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
-    }
-
-    // Rails strips the schema from the table (PG `index_name` resolves against
-    // the unqualified table) and, when a name is given, splits its schema off:
-    // the bare identifier becomes the name to match, the index is dropped in the
-    // table's schema (or the name's schema when the table is unqualified), and a
-    // conflicting schema pair raises.
-    const { schema: tableSchema, table: bareTable } = this.parseSchemaQualifiedName(tableName);
-    let dropSchema = tableSchema;
-    let resolveOpts = opts;
-    if (opts.name != null) {
-      const { schema: nameSchema, table: nameIdent } = this.parseSchemaQualifiedName(opts.name);
-      resolveOpts = { ...opts, name: nameIdent };
-      if (!tableSchema) dropSchema = nameSchema;
-      if (nameSchema && tableSchema && nameSchema !== tableSchema) {
-        throw new ArgumentError(
-          `Index schema '${nameSchema}' does not match table schema '${tableSchema}'`,
-        );
-      }
-    }
-
-    // A bare `{ name }` resolves without introspection (Rails
-    // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
-    const canRemoveByName =
-      columnName == null && resolveOpts.name != null && resolveOpts.column == null;
-    const all =
-      opts.ifExists || !canRemoveByName
-        ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
-        : [];
-    // Rails: `return if options[:if_exists] && !index_exists?(...)`.
-    const genName = (t: string, c: string | string[]) => this.generateIndexName(t, c);
-    if (
-      opts.ifExists &&
-      !indexExistsForRemoveFrom(genName, all, bareTable, columnName, resolveOpts)
-    ) {
-      return;
-    }
-    const indexName = indexNameForRemoveFrom(genName, all, bareTable, columnName, resolveOpts);
-
-    const concurrently = opts.algorithm === "concurrently" ? " CONCURRENTLY" : "";
-    const qualifiedIndex = dropSchema
-      ? `${this.quoteIdentifier(dropSchema)}.${this.quoteIdentifier(indexName)}`
-      : this.quoteIdentifier(indexName);
-    await this.exec(`DROP INDEX${concurrently} ${qualifiedIndex}`);
+    return this.pgSchemaStatements().removeIndex(tableName, columnOrOptions, options);
   }
 
   async addForeignKey(
@@ -4710,11 +4455,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   override schemaStatements(host?: DatabaseAdapter): SchemaStatements {
-    return new PostgreSQLSchemaStatements((host ?? this) as unknown as DatabaseAdapter);
+    // PostgreSQLSchemaStatements#addIndex returns Promise<string> (the generated
+    // SQL) rather than the base Promise<void>, so it is not a structural subtype
+    // of SchemaStatements — cast through unknown.
+    return new PostgreSQLSchemaStatements(
+      (host ?? this) as unknown as DatabaseAdapter,
+    ) as unknown as SchemaStatements;
   }
 
   private pgSchemaStatements(): PostgreSQLSchemaStatements {
-    return this.schemaStatements() as PostgreSQLSchemaStatements;
+    return this.schemaStatements() as unknown as PostgreSQLSchemaStatements;
   }
 
   async dropTable(
