@@ -315,6 +315,11 @@ describe("ResponseTest", () => {
     expect(res.body).toBe("created");
   });
 
+  it("Response.create with an enumerable body", () => {
+    const res = Response.create(200, {}, ["Hello", " ", "World"]);
+    expect(res.body).toBe("Hello World");
+  });
+
   // --- Default constructor ---
 
   it("default constructor has status 200", () => {
