@@ -109,8 +109,9 @@ export interface PruneResult {
 /**
  * Evict from the shared cache anchored at `rootDir`:
  *
- *   1. Entry files in the current `v${CACHE_VERSION}` dir whose mtime is older
- *      than `maxAgeMs` — these are orphaned content keys (see CACHE_MAX_AGE_MS).
+ *   1. Entry files (and crashed-writer `.tmp-` fragments) in the current
+ *      `v${CACHE_VERSION}` dir whose mtime is older than `maxAgeMs` — orphaned
+ *      content keys and partial writes (see CACHE_MAX_AGE_MS).
  *   2. Sibling `v<N>` directories left behind by a bumped CACHE_VERSION; nothing
  *      reads them again, so they're deleted whole.
  *
@@ -155,7 +156,10 @@ export async function pruneSharedCache(
   }
   await Promise.all(
     entries.map(async (name) => {
-      if (!name.endsWith(".json")) return;
+      // Entries (`<name>-<key>.json`) and tmp fragments left by a crashed or
+      // raced writeShared (`<entry>.tmp-<tag>`) — both age out; nothing else
+      // should live here, but anything that isn't one of those is left alone.
+      if (!name.endsWith(".json") && !name.includes(".tmp-")) return;
       const file = path.join(currentDir, name);
       try {
         const stat = await fs.stat(file);
@@ -172,13 +176,24 @@ export async function pruneSharedCache(
   return result;
 }
 
-/** Read a cached entry body, or null on miss / unreadable cache. */
+/**
+ * Read a cached entry body, or null on miss / unreadable cache. On a hit we
+ * bump the entry's mtime to now (fire-and-forget) so `pruneSharedCache` evicts
+ * by LAST ACCESS, not last write: a stable source file's key never changes, so
+ * without this its entry — read every run — would still age out at maxAgeMs and
+ * be needlessly regenerated. The touch failing (e.g. read-only FS) is harmless.
+ */
 export async function readShared(dir: string, name: string, key: string): Promise<string | null> {
+  const file = entryPath(dir, name, key);
+  let body: string;
   try {
-    return await fs.readFile(entryPath(dir, name, key), "utf-8");
+    body = await fs.readFile(file, "utf-8");
   } catch {
     return null;
   }
+  const stamp = new Date();
+  void fs.utimes(file, stamp, stamp).catch(() => {});
+  return body;
 }
 
 /**

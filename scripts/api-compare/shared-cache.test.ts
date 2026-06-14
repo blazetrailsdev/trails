@@ -138,18 +138,22 @@ describe("pruneSharedCache", () => {
     expect(fs.existsSync(fresh)).toBe(true);
   });
 
-  it("ignores non-.json files and only evicts by mtime", async () => {
+  it("evicts stale crashed-writer .tmp- fragments but leaves unrelated files", async () => {
     const root = mkRoot();
     const dir = currentDir(root);
     fs.mkdirSync(dir, { recursive: true });
     const now = 100 * DAY;
-    const other = path.join(dir, "rails-api-old.json.tmp-worktree_a");
-    fs.writeFileSync(other, "partial");
-    fs.utimesSync(other, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
+    const staleTmp = path.join(dir, "rails-api-old.json.tmp-worktree_a");
+    const unrelated = path.join(dir, "README");
+    fs.writeFileSync(staleTmp, "partial");
+    fs.writeFileSync(unrelated, "note");
+    fs.utimesSync(staleTmp, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
+    fs.utimesSync(unrelated, new Date(now - 30 * DAY), new Date(now - 30 * DAY));
 
     const result = await pruneSharedCache(root, { now, maxAgeMs: 14 * DAY });
-    expect(result.removedEntries).toBe(0);
-    expect(fs.existsSync(other)).toBe(true);
+    expect(result.removedEntries).toBe(1);
+    expect(fs.existsSync(staleTmp)).toBe(false);
+    expect(fs.existsSync(unrelated)).toBe(true);
   });
 
   it("removes superseded version dirs but never the current one", async () => {
@@ -176,5 +180,17 @@ describe("readShared / writeShared", () => {
     await writeShared(dir, "ts-arel", "key1", '{"v":1}', "worktree/a");
     expect(await readShared(dir, "ts-arel", "key1")).toBe('{"v":1}');
     expect(fs.readdirSync(dir).filter((f) => f.includes(".tmp-"))).toEqual([]);
+  });
+
+  it("bumps mtime on a hit so prune evicts by last access, not last write", async () => {
+    const dir = path.join(mkTmp(), "cache");
+    await writeShared(dir, "ts-arel", "key1", '{"v":1}', "worktree/a");
+    const file = path.join(dir, "ts-arel-key1.json");
+    fs.utimesSync(file, new Date(0), new Date(0)); // age the entry to the epoch
+    expect((await fs.promises.stat(file)).mtimeMs).toBe(0);
+
+    expect(await readShared(dir, "ts-arel", "key1")).toBe('{"v":1}');
+    await new Promise((r) => setTimeout(r, 20)); // let the fire-and-forget touch land
+    expect((await fs.promises.stat(file)).mtimeMs).toBeGreaterThan(0);
   });
 });
