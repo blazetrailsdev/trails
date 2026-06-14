@@ -349,7 +349,7 @@ export interface AbstractAdapter {
   /** @internal */
   toSqlAndBinds(arel: unknown, binds?: unknown[]): [string, unknown[]];
   selectAll(
-    sql: string,
+    arel: string | unknown,
     name?: string | null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean },
