@@ -727,15 +727,26 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // exists — an `id` PK without a serial sequence (UUID / explicit PK) yields a
   // NULL sequence, and `setval(NULL, …)` would raise and poison the surrounding
   // per-test transaction (a swallowed JS catch can't un-abort it).
-  if (adapter.adapterName === "postgres" && pkCol === "id") {
-    const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, 'id') AS seq`, [
+  // Applies to any single-column serial PK, not just `id`: a custom-named
+  // integer PK (e.g. `movieid`, `pet_id`) is also a serial sequence under
+  // `defineSchema`, so it needs the same MAX-sync to avoid colliding with a
+  // post-fixtures `create`. Composite (`string[]`) and id-less (`null`) PKs are
+  // skipped, and the `if (sequence)` guard no-ops for non-serial PKs.
+  if (adapter.adapterName === "postgres" && typeof pkCol === "string") {
+    // pg_get_serial_sequence lowercases its column argument unless it is
+    // double-quoted; defineSchema quotes every identifier, so a mixed-case PK
+    // (e.g. `monkeyID`) is stored verbatim. Pass the name double-quoted so it
+    // matches exactly for both lowercase (`id`, `pet_id`) and mixed-case PKs.
+    const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
       tableName,
+      `"${pkCol}"`,
     ]);
     const sequence = seqRows[0]?.seq as string | null | undefined;
     if (sequence) {
       const qt = adapter.quoteTableName(tableName);
+      const qc = adapter.quoteColumnName(pkCol);
       await adapter.executeMutation(
-        `SELECT setval($1, GREATEST(COALESCE(MAX(id), 0), 1), COALESCE(MAX(id), 0) <> 0) FROM ${qt}`,
+        `SELECT setval($1, GREATEST(COALESCE(MAX(${qc}), 0), 1), COALESCE(MAX(${qc}), 0) <> 0) FROM ${qt}`,
         [sequence],
       );
     }
