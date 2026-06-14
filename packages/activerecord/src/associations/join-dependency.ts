@@ -28,11 +28,10 @@ import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js
 import { ConfigurationError } from "../errors.js";
 import { AliasTracker } from "./alias-tracker.js";
 
+/** Mirrors: ActiveRecord::Associations::JoinDependency::Aliases::Column (name, alias). */
 export interface AliasMap {
-  alias: string;
-  tableIndex: number;
-  columnIndex: number;
   column: string;
+  alias: string;
 }
 
 function getModelColumns(modelClass: any): string[] {
@@ -67,13 +66,11 @@ function getModelColumns(modelClass: any): string[] {
  */
 export class Aliases {
   private _aliasCache: Map<JoinPart | null, Map<string, string>>;
-  private _columnsCache: Map<JoinPart | null, AliasMap[]>;
   private _allColumns: AliasMap[];
   private _tables: Array<{ node: JoinPart | null; table: Table; columns: AliasMap[] }>;
 
   constructor(tables: Array<{ node: JoinPart | null; table: Table; columns: AliasMap[] }>) {
     this._aliasCache = new Map();
-    this._columnsCache = new Map();
     this._allColumns = [];
     this._tables = tables;
     for (const table of tables) {
@@ -83,16 +80,11 @@ export class Aliases {
         this._allColumns.push(col);
       }
       this._aliasCache.set(table.node, colMap);
-      this._columnsCache.set(table.node, table.columns);
     }
   }
 
   columns(): AliasMap[] {
     return this._allColumns;
-  }
-
-  columnAliases(node: JoinPart | null): AliasMap[] {
-    return this._columnsCache.get(node) ?? [];
   }
 
   columnAlias(node: JoinPart | null, column: string): string | undefined {
@@ -1029,10 +1021,8 @@ export class JoinDependency {
       node,
       table: node.arelTable!,
       columns: columns.map((column, columnIndex) => ({
-        alias: `t${tableIndex}_r${columnIndex}`,
-        tableIndex,
-        columnIndex,
         column,
+        alias: `t${tableIndex}_r${columnIndex}`,
       })),
     });
 
