@@ -10,7 +10,6 @@ import {
 } from "../abstract/schema-definitions.js";
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
 import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
-import { SchemaCreation as SQLite3SchemaCreation } from "./schema-creation.js";
 
 export class TableDefinition extends AbstractTableDefinition {
   constructor(
@@ -48,10 +47,6 @@ export class TableDefinition extends AbstractTableDefinition {
         ((options as Record<string, unknown>)["type"] as ColumnType) ?? ("string" as ColumnType);
     }
     return super.newColumnDefinition(name, type, options);
-  }
-
-  toSql(): string {
-    return new SQLite3SchemaCreation("sqlite", this._adapter).accept(this);
   }
 
   /** @internal */

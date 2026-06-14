@@ -1,6 +1,1 @@
-[
-  "packages/activerecord/src/connection-adapters/mysql/schema-definitions.ts",
-  "packages/activerecord/src/connection-adapters/postgresql/schema-definitions.ts",
-  "packages/activerecord/src/connection-adapters/sqlite3/schema-definitions.ts",
-  "packages/activerecord/src/relation/where-clause.ts"
-]
+["packages/activerecord/src/relation/where-clause.ts"]

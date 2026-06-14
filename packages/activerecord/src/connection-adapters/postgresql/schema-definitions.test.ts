@@ -7,6 +7,7 @@ import {
   AlterTable,
   type SchemaStatementsConstraintLike,
 } from "./schema-definitions.js";
+import { SchemaCreation as PgSchemaCreation } from "./schema-creation.js";
 
 describe("ExclusionConstraintDefinition", () => {
   it("exposes options as accessors", () => {
@@ -157,23 +158,30 @@ describe("AlterTable", () => {
 });
 
 describe("TableDefinition#toSql", () => {
+  // Rails generates CREATE TABLE SQL by accepting the TableDefinition into the
+  // adapter's SchemaCreation visitor; there is no TableDefinition#to_sql.
+  const toSql = (td: TableDefinition): string => {
+    const adapter = (td as any)._adapter;
+    return new PgSchemaCreation("typeToSql" in adapter ? adapter : undefined).accept(td);
+  };
+
   it("emits UNLOGGED when unlogged: true", () => {
     const td = new TableDefinition("products", { id: false, unlogged: true });
     td.string("name");
-    expect(td.toSql()).toMatch(/^CREATE UNLOGGED TABLE/);
+    expect(toSql(td)).toMatch(/^CREATE UNLOGGED TABLE/);
   });
 
   it("does not emit UNLOGGED by default", () => {
     const td = new TableDefinition("products", { id: false });
     td.string("name");
-    expect(td.toSql()).toMatch(/^CREATE TABLE/);
-    expect(td.toSql()).not.toContain("UNLOGGED");
+    expect(toSql(td)).toMatch(/^CREATE TABLE/);
+    expect(toSql(td)).not.toContain("UNLOGGED");
   });
 
   it("emits exclusion constraint in CREATE TABLE", () => {
     const td = new TableDefinition("meetings", { id: false });
     td.exclusionConstraint("room WITH =, during WITH &&", { name: "no_overlap", using: "gist" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain(
       'CONSTRAINT "no_overlap" EXCLUDE USING gist (room WITH =, during WITH &&)',
     );
@@ -182,7 +190,7 @@ describe("TableDefinition#toSql", () => {
   it("emits unique constraint in CREATE TABLE", () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position", { name: "unique_pos", deferrable: "deferred" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain(
       'CONSTRAINT "unique_pos" UNIQUE ("position") DEFERRABLE INITIALLY DEFERRED',
     );
@@ -191,21 +199,21 @@ describe("TableDefinition#toSql", () => {
   it("emits unique constraint with nulls not distinct", () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position", { name: "unique_pos", nullsNotDistinct: true });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain("NULLS NOT DISTINCT");
   });
 
   it("emits unique constraint using index", () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position", { name: "unique_pos", usingIndex: "orders_pos_idx" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain('USING INDEX "orders_pos_idx"');
   });
 
   it("emits DEFERRABLE without INITIALLY clause when deferrable: true", () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position", { name: "unique_pos", deferrable: true });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain('CONSTRAINT "unique_pos" UNIQUE ("position") DEFERRABLE');
     expect(sql).not.toContain("INITIALLY TRUE");
     expect(sql).not.toContain("INITIALLY");
@@ -214,7 +222,7 @@ describe("TableDefinition#toSql", () => {
   it("emits exclusion constraint without CONSTRAINT clause when name is omitted", () => {
     const td = new TableDefinition("meetings", { id: false });
     td.exclusionConstraint("room WITH =", { using: "gist" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain("EXCLUDE USING gist (room WITH =)");
     expect(sql).not.toContain('CONSTRAINT ""');
   });
@@ -222,7 +230,7 @@ describe("TableDefinition#toSql", () => {
   it("emits unique constraint without CONSTRAINT clause when name is omitted", () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position");
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain('UNIQUE ("position")');
     expect(sql).not.toContain('CONSTRAINT ""');
   });
@@ -230,7 +238,7 @@ describe("TableDefinition#toSql", () => {
   it("handles constraint-only table with no columns (id: false)", () => {
     const td = new TableDefinition("link_table", { id: false });
     td.uniqueConstraint("ref", { name: "unique_ref" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).not.toContain("(,");
     expect(sql).toContain('UNIQUE ("ref")');
   });
@@ -242,7 +250,7 @@ describe("TableDefinition#toSql", () => {
     });
     td.string("message");
     td.uniqueConstraint("message", { name: "unique_msg" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     // Constraint must appear inside the column list, before the trailing WITH clause
     const constraintPos = sql.indexOf('CONSTRAINT "unique_msg"');
     const withPos = sql.indexOf("WITH (");
@@ -256,7 +264,7 @@ describe("TableDefinition#toSql", () => {
       as: "SELECT (1) AS id, amount FROM orders WHERE archived = true",
     });
     td.uniqueConstraint("id", { name: "unique_id" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).not.toContain("CONSTRAINT");
     expect(sql).toContain("AS SELECT");
   });
@@ -279,7 +287,7 @@ describe("TableDefinition#toSql", () => {
     td.money("price");
     td.oid("oid_col");
     td.tsrange("during");
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain('"net" cidr');
     expect(sql).toContain('"addr" inet');
     expect(sql).toContain('"props" hstore');
@@ -311,7 +319,7 @@ describe("TableDefinition#toSql", () => {
     td.macaddr("mac");
     td.tsvector("doc");
     td.money("price");
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain('"net" cidr');
     expect(sql).toContain('"addr" inet');
     expect(sql).toContain('"props" hstore');
@@ -324,7 +332,7 @@ describe("TableDefinition#toSql", () => {
     const td = new TableDefinition("messages", { id: false });
     td.string("body", { default: "Bob's" });
     td.uniqueConstraint("body", { name: "unique_body" });
-    const sql = td.toSql();
+    const sql = toSql(td);
     expect(sql).toContain("Bob''s");
     expect(sql).toContain('CONSTRAINT "unique_body"');
   });
