@@ -2617,11 +2617,22 @@ export class Relation<T extends Base> {
     let limitedIds: unknown[] | undefined;
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
     if (hasLimit && jd.nodes.some((n) => n.assocType === "hasMany")) {
+      // Resolve the DISTINCT select list here, where the connection is proven
+      // live (we execute the subquery immediately below), rather than inside the
+      // AST builder. Mirrors Rails' `limited_ids_for`, which computes
+      // `columns_for_distinct` against the live connection.
+      const distinctSelect = this._distinctSelectForLimitedIds(basePk);
       const [idSql, idBinds] = this._compileAstWithBinds(
-        this._buildEagerIdSubquery(jd, basePk).ast,
+        this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
       );
       const idRows = await this._modelClass.connection.execute(idSql, idBinds);
-      limitedIds = (idRows as Record<string, unknown>[]).map((row) => Object.values(row)[0]);
+      // columns_for_distinct projects the order columns first and the pk last
+      // (unaliased), so the pk is keyed by its column name. When an order column
+      // shares that name (e.g. ordering by `posts.id`), duplicate keys collapse
+      // to the last write — which is the pk, since it is projected last.
+      limitedIds = (idRows as Record<string, unknown>[]).map(
+        (row) => row[basePk] ?? Object.values(row).pop(),
+      );
       if (limitedIds.length === 0) {
         this._records = [];
         return;
@@ -4342,21 +4353,29 @@ export class Relation<T extends Base> {
    * nests it inside `pk IN (...)`; the execution path runs it standalone to
    * materialize literal IDs (Rails' `distinct_relation_for_primary_key`).
    *
-   * Two known limitations, both pre-existing (carried over verbatim from the
-   * former inline subquery) and not exercised by any active test:
-   * - Rails' `columns_for_distinct` also appends the `order_values` to the
-   *   SELECT list, because `SELECT DISTINCT id ... ORDER BY <col>` requires the
-   *   ordered column to be projected on PostgreSQL/MySQL. We project only the
-   *   pk, so a limited collection eager-load that orders on a *joined* column
-   *   (e.g. the still-skipped `order on join table with include and limit`,
-   *   ordering by `developers_projects.joined_on`) needs that handling first.
-   * - Single-column pk only: callers read `Object.values(row)[0]` and emit a
-   *   scalar `pk IN (...)`. Composite keys (Rails' `results.last(pk.length)` +
-   *   `zip`) are unhandled, matching the rest of this eager path (`basePk`).
+   * When `distinctSelectSql` is provided (the standalone execution path), it is
+   * the precomputed `columns_for_distinct` SELECT list — order columns appended
+   * after the pk, because `SELECT DISTINCT id ... ORDER BY <col>` requires every
+   * ordered column to be projected on PostgreSQL. The pk stays last, so callers
+   * extract it as the final column. The inline `pk IN (...)` path omits it and
+   * projects the pk only (a multi-column subquery is invalid as an `IN` operand)
+   * and is never executed.
+   *
+   * Known limitation (pre-existing): single-column pk only. Callers read the
+   * last column value and emit a scalar `pk IN (...)`. Composite keys (Rails'
+   * `results.last(pk.length)` + `zip`) are unhandled, matching the rest of this
+   * eager path (`basePk`).
    */
-  private _buildEagerIdSubquery(jd: JoinDependency, basePk: string): SelectManager {
+  private _buildEagerIdSubquery(
+    jd: JoinDependency,
+    basePk: string,
+    distinctSelectSql?: string,
+  ): SelectManager {
     const table = this._modelClass.arelTable;
-    const idSubquery = table.project(table.get(basePk));
+    const idSubquery =
+      distinctSelectSql !== undefined
+        ? table.project(new Nodes.SqlLiteral(distinctSelectSql))
+        : table.project(table.get(basePk));
     idSubquery.distinct();
     for (const node of jd.nodes) {
       idSubquery.appendJoinNode(node.arelJoin!);
@@ -4367,6 +4386,32 @@ export class Relation<T extends Base> {
     if (this._limitValue !== null) idSubquery.take(this._limitValue);
     if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
     return idSubquery;
+  }
+
+  /**
+   * Precompute the DISTINCT-pk subquery's SELECT list via the adapter's
+   * `columns_for_distinct` (Rails' `limited_ids_for`). Order columns are
+   * appended after the pk so PostgreSQL accepts `SELECT DISTINCT ... ORDER BY
+   * <ordered col>`. Called from `_executeEagerLoad`, where the connection is
+   * established (the subquery executes immediately after), so the adapter is
+   * always resolvable here.
+   *
+   * Order values are shaped for `columns_for_distinct`: strings and Arel nodes
+   * pass through (the adapter compiles nodes via its visitor); internal
+   * `[col, dir]` tuples are flattened to a SqlLiteral so they compile as plain
+   * SQL.
+   */
+  private _distinctSelectForLimitedIds(basePk: string): string {
+    const table = this._modelClass.arelTable;
+    const pkSql = this._compileArelNode(table.get(basePk));
+    const adapter = this._modelClass.connection as unknown as {
+      columnsForDistinct?: (cols: string, orders: (string | Nodes.Node)[]) => string | string[];
+    };
+    const orders = this.orderValues.map((clause) =>
+      Array.isArray(clause) ? new Nodes.SqlLiteral(`${clause[0]} ${clause[1]}`) : clause,
+    );
+    const values = adapter.columnsForDistinct ? adapter.columnsForDistinct(pkSql, orders) : pkSql;
+    return Array.isArray(values) ? values.join(", ") : values;
   }
 
   // Mirrors: ActiveRecord::Relation#to_sql when eager_loading? — builds the
