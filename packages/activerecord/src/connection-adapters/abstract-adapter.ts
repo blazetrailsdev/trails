@@ -268,6 +268,7 @@ export interface AbstractAdapter {
   ): Promise<void>;
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
   indexName(tableName: string, options: { column?: string | string[] }): string;
+  generateIndexName(tableName: string, column: string | string[]): string;
   indexExists(
     tableName: string,
     columns: string | string[],
