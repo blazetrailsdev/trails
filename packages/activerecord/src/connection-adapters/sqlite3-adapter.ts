@@ -817,7 +817,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Check if the database is open.
    */
   get isOpen(): boolean {
-    return this.driver.isOpen();
+    return this.driver?.isOpen() ?? false;
   }
 
   /**
@@ -842,7 +842,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * handle that driver documents. Consumers cast at the use site.
    */
   get raw(): unknown {
-    return this.driver.raw;
+    return this.driver?.raw;
   }
 
   /**

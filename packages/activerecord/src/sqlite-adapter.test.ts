@@ -298,4 +298,10 @@ describe("SQLite adapter driver binding", () => {
     expect(adapter.encoding).toBe("UTF-8");
     adapter.disconnectBang();
   });
+
+  it("isOpen and raw degrade gracefully before a deferred async-only open", () => {
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver: asyncOnlyDriver });
+    expect(adapter.isOpen).toBe(false);
+    expect(adapter.raw).toBeUndefined();
+  });
 });
