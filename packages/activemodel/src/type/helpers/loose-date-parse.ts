@@ -112,17 +112,25 @@ export function looseDateParse(input: string): LooseDateParts | null {
     if (month) return { year: int(m[3]), month, day: int(m[1]) };
   }
 
-  // 12-hour time: "3pm", "3:30 PM", "12 AM" — valid hours are 1–12
-  m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i.exec(s);
+  // 12-hour time: "3pm", "3:30 PM", "5:42:00AM", "12 AM" — valid hours are 1–12
+  m = /^(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*(am|pm)$/i.exec(s);
   if (m) {
     const rawHour = int(m[1]);
     const minute = m[2] !== undefined ? int(m[2]) : undefined;
-    if (rawHour < 1 || rawHour > 12 || (minute !== undefined && minute > 59)) return null;
-    const ampm = m[3].toLowerCase();
+    const second = m[3] !== undefined ? int(m[3]) : undefined;
+    if (
+      rawHour < 1 ||
+      rawHour > 12 ||
+      (minute !== undefined && minute > 59) ||
+      (second !== undefined && second > 59)
+    )
+      return null;
+    const ampm = m[4].toLowerCase();
     const hour =
       ampm === "am" ? (rawHour === 12 ? 0 : rawHour) : rawHour === 12 ? 12 : rawHour + 12;
     const parts: LooseDateParts = { hour };
     if (minute !== undefined) parts.minute = minute;
+    if (second !== undefined) parts.second = second;
     return parts;
   }
 
