@@ -3450,7 +3450,23 @@ export class Relation<T extends Base> {
       // into a row-value tuple (`relation.rb`: `primary_key.map { |pk| table[pk] }`).
       // Routing both PK shapes through one path keeps the TS port structurally
       // faithful to Rails (no second code path to sync).
-      const arel = this._buildArel();
+      //
+      // Mirrors `relation.rb:1023`: when the relation requires eager loading
+      // (e.g. an `includes` promoted to a join by a `where`/`order` reference),
+      // build the arel from the join-dependency relation
+      // (`apply_join_dependency.arel`) instead of the plain `build_arel`. Rails
+      // passes `apply_join_dependency(eager_loading: group_values.empty?)`
+      // implicitly here (the no-arg default, finder_methods.rb:457), so a
+      // grouped delete skips the limit/offset materialization guard.
+      const arel = this._eagerLoadingForSql()
+        ? this.applyJoinDependencyForArel(this._groupColumns.length === 0)._buildArel()
+        : this._buildArel();
+      // Mirrors `relation.rb:1024` (`arel.source.left = table`): force the FROM
+      // target back to the bare table before `compile_delete`. For the common
+      // and join cases `source.left` is already the table, but an explicit
+      // `from(custom)` would otherwise leave the DELETE targeting the custom
+      // FROM node rather than the model table.
+      arel.source.left = table;
       const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
       const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
       const key = Array.isArray(primaryKey)
@@ -4042,9 +4058,15 @@ export class Relation<T extends Base> {
    * (finder_methods.rb:457). trails models the same outcome with
    * `leftOuterJoins` (rendered as OUTER joins by `_applyJoinsToManager`) over
    * the cleared eager specs.
+   *
+   * `eagerLoading` mirrors Rails `apply_join_dependency(eager_loading:
+   * group_values.empty?)` (finder_methods.rb:457): when `false` (a grouped
+   * relation), the limit/offset materialization guard below is skipped, because
+   * Rails only rewrites the relation via `distinct_relation_for_primary_key`
+   * when `eager_loading` is truthy.
    * @internal
    */
-  applyJoinDependencyForArel(): Relation<T> {
+  applyJoinDependencyForArel(eagerLoading = true): Relation<T> {
     if (!this._eagerLoadingForSql()) return this;
     const eagerSpecs = [
       ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
@@ -4064,7 +4086,7 @@ export class Relation<T extends Base> {
     // claim parity we reject this combination explicitly. Tracked by the
     // `relation-handler-distinct-pk-materialization` continuation story.
     const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    if (hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) {
+    if (eagerLoading && hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) {
       // @nie disposition=TODO
       throw new NotImplementedError(
         "Using an eager-loaded relation with a limit/offset over a collection " +
