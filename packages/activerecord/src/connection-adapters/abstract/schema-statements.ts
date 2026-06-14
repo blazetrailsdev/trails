@@ -865,13 +865,13 @@ export class SchemaStatements {
 
   indexName(
     tableName: string,
-    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+    options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
   ): string {
     // Rails `index_name`: the `column` branch routes through generate_index_name
     // (length/hash fallback) by default; the bare `_and_` join is only used when
     // `options[:_uses_legacy_index_name]` is set (Rails migration compatibility).
     if (options.column != null) {
-      if (options.usesLegacyIndexName) {
+      if (options._usesLegacyIndexName) {
         const cols = Array.isArray(options.column) ? options.column : [options.column];
         return `index_${tableName}_on_${cols.join("_and_")}`;
       }

@@ -190,7 +190,7 @@ export interface SchemaStatements {
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
   indexName(
     tableName: string,
-    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+    options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
   ): string;
   addForeignKey(
     fromTable: string,

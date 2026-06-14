@@ -5142,11 +5142,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   indexName(
     tableName: string,
-    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+    options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
   ): string {
     const normalizedTableName = tableName.replace(/[."]/g, "_");
     if (options.column != null) {
-      if (options.usesLegacyIndexName) {
+      if (options._usesLegacyIndexName) {
         const cols = Array.isArray(options.column) ? options.column : [options.column];
         return `index_${normalizedTableName}_on_${cols.join("_and_")}`;
       }

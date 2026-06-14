@@ -40,9 +40,9 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.indexName("users", { column: "a".repeat(60) }).length).toBeLessThanOrEqual(62);
   });
 
-  it("indexName uses the bare _and_ form when usesLegacyIndexName is set", () => {
+  it("indexName uses the bare _and_ form when _usesLegacyIndexName is set", () => {
     const ss = makeStatements();
-    expect(ss.indexName("users", { column: "a".repeat(60), usesLegacyIndexName: true })).toBe(
+    expect(ss.indexName("users", { column: "a".repeat(60), _usesLegacyIndexName: true })).toBe(
       `index_users_on_${"a".repeat(60)}`,
     );
   });

@@ -1082,7 +1082,7 @@ export abstract class Migration {
 
   indexName(
     tableName: string,
-    options: { column?: string | string[]; name?: string; usesLegacyIndexName?: boolean },
+    options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
   ): string {
     return this.schema.indexName(this._pt(tableName), options);
   }
