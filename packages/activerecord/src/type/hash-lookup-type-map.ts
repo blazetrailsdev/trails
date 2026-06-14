@@ -1,4 +1,4 @@
-import { Type, ValueType } from "@blazetrails/activemodel";
+import { ArgumentError, Type, ValueType } from "@blazetrails/activemodel";
 
 /**
  * A type map that uses exact string keys (hash lookup) rather than
@@ -84,7 +84,7 @@ export class HashLookupTypeMap {
     key: string | number,
     value?: Type | ((lookupKey: string | number, ...args: unknown[]) => Type),
   ): void {
-    if (value == null) throw new Error("registerType requires a value or block");
+    if (value == null) throw new ArgumentError("registerType requires a value or block");
     if (typeof value === "function") {
       this._mapping.set(key, value as (...args: unknown[]) => Type);
     } else {

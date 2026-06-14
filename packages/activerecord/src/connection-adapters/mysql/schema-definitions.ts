@@ -24,6 +24,7 @@ import {
   type VisitorHostAdapter,
 } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 // Mirrors Rails' `deprecate :unsigned_float, :unsigned_decimal` on MySQL::ColumnMethods,
 // which passes no `:message`, so ActiveSupport builds the default
@@ -165,7 +166,9 @@ export class TableDefinition extends AbstractTableDefinition {
   unsignedDecimal(name: string, options: ColumnOptions = {}): this {
     deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
     if (options.scale !== undefined && options.precision === undefined) {
-      throw new Error("Error adding decimal column: precision is required if scale is specified");
+      throw new ArgumentError(
+        "Error adding decimal column: precision is required if scale is specified",
+      );
     }
     const precision = options.precision ?? 10;
     const scale = options.scale ?? 0;
