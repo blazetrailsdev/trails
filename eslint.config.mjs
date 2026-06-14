@@ -214,7 +214,11 @@ export default defineConfig(
   //    violators are grandfathered in eslint/rails-error-parity-exclude.json
   //    and ratcheted down. ──
   {
-    files: ["packages/activerecord/src/**/*.ts", "packages/activemodel/src/**/*.ts"],
+    files: [
+      "packages/activerecord/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+    ],
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-error-parity": "error",
