@@ -2050,25 +2050,76 @@ export function prLocDelta(pr: number, estLoc: number | null): string | null {
 export const PRIORITY_LEGEND =
   "priority: lower N = higher priority; absent = unprioritized; ties have undefined order";
 
+// Default age (hours) past which a `claimed` story with no PR is flagged stale.
+// Overridable via `--stale-hours N`. Read once per command so `status` and
+// `list` can't disagree.
+export const DEFAULT_STALE_HOURS = 48;
+
+// Hours elapsed since `claim` was stamped, or null when there's no claim or the
+// timestamp doesn't parse (a malformed claim is never treated as stale).
+export function claimAgeHours(claim: string | null, nowMs: number): number | null {
+  if (!claim) return null;
+  const t = Date.parse(claim);
+  if (Number.isNaN(t)) return null;
+  return (nowMs - t) / 3_600_000;
+}
+
+// A story orphaned in `claimed`: no PR, and its claim is older than the
+// threshold. Only `claimed` can ever match — the status guard exempts
+// everything else (including `in-progress`, which moves past `claimed` once a
+// PR lands). Auto-release is deliberately out of scope; an agent may
+// legitimately be mid-flight.
+export function isStaleClaim(s: StoryEntry, nowMs: number, thresholdHours: number): boolean {
+  if (s.status !== "claimed" || s.pr != null) return false;
+  const age = claimAgeHours(s.claim, nowMs);
+  return age != null && age > thresholdHours;
+}
+
+// Stale claims, oldest first — the most urgent (longest orphaned) lead the
+// `status` section.
+export function staleClaims(index: Index, nowMs: number, thresholdHours: number): StoryEntry[] {
+  return index.stories
+    .filter((s) => isStaleClaim(s, nowMs, thresholdHours))
+    .sort((a, b) => (claimAgeHours(b.claim, nowMs) ?? 0) - (claimAgeHours(a.claim, nowMs) ?? 0));
+}
+
+// Renders the `stale claims` section for `tasks status`. Empty string when
+// nothing is stale so the caller can omit the section entirely.
+export function formatStaleClaims(rows: StoryEntry[], nowMs: number): string {
+  if (!rows.length) return "";
+  const header = ["id", "assignee", "age_h"];
+  const cells = rows.map((r) => [
+    r.id,
+    r.assignee ?? "—",
+    String(Math.floor(claimAgeHours(r.claim, nowMs) ?? 0)),
+  ]);
+  const widths = header.map((h, i) => Math.max(h.length, ...cells.map((c) => c[i].length)));
+  const line = (c: string[]) => c.map((x, i) => x.padEnd(widths[i])).join("  ");
+  return ["stale claims", line(header), ...cells.map(line)].join("\n");
+}
+
 // Pure renderer for the story table — exported so tests can assert column
 // content (e.g. est_loc rendered from a numeric value, priority shown) without
-// capturing stdout. `null` cells render as an em dash.
-export function formatRows(rows: StoryEntry[]): string {
+// capturing stdout. `null` cells render as an em dash. Ids in `staleIds` get a
+// `!` suffix in the status column, computed by the caller via staleClaims().
+export function formatRows(rows: StoryEntry[], staleIds: ReadonlySet<string> = new Set()): string {
   if (!rows.length) return "(none)";
   const cols = ["id", "rfc", "status", "priority", "est_loc", "cluster"] as const;
-  const widths = cols.map((c) =>
-    Math.max(c.length, ...rows.map((r) => String(r[c] ?? "—").length)),
-  );
+  const cell = (r: StoryEntry, c: (typeof cols)[number]) => {
+    const v = String(r[c] ?? "—");
+    return c === "status" && staleIds.has(r.id) ? `${v}!` : v;
+  };
+  const widths = cols.map((c) => Math.max(c.length, ...rows.map((r) => cell(r, c).length)));
   const line = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i])).join("  ");
   return [
     PRIORITY_LEGEND,
     line([...cols]),
-    ...rows.map((r) => line(cols.map((c) => String(r[c] ?? "—")))),
+    ...rows.map((r) => line(cols.map((c) => cell(r, c)))),
   ].join("\n");
 }
 
-function fmt(rows: StoryEntry[]): void {
-  console.log(formatRows(rows));
+function fmt(rows: StoryEntry[], staleIds?: ReadonlySet<string>): void {
+  console.log(formatRows(rows, staleIds));
 }
 
 // Pure renderer for `show <id>`: the resolved file path followed by the story's
@@ -2093,7 +2144,7 @@ function showStory(index: Index, id: string): void {
   console.log(renderStoryView(entry.file_path, readFileSync(file, "utf8")));
 }
 
-function statusCounts(index: Index): void {
+function statusCounts(index: Index, thresholdHours: number): void {
   const byRfc = new Map<string, Record<string, number>>();
   for (const s of index.stories) {
     const row = byRfc.get(s.rfc) ?? Object.fromEntries(STORY_STATUSES.map((k) => [k, 0]));
@@ -2111,6 +2162,10 @@ function statusCounts(index: Index): void {
   const line = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i])).join("  ");
   console.log(line(header));
   for (const r of rows) console.log(line(r));
+
+  const now = Date.now();
+  const stale = formatStaleClaims(staleClaims(index, now, thresholdHours), now);
+  if (stale) console.log(`\n${stale}`);
 }
 
 // ──────────────────── argv ────────────────────
@@ -2191,6 +2246,7 @@ function main(): void {
     "relate",
     "clusters",
     "packages",
+    "stale-hours",
   ];
   for (const k of valueFlags) if (flags[k] === true) usage();
 
@@ -2226,12 +2282,18 @@ function main(): void {
     }
     case "list": {
       syncFromOrigin();
-      const rows = listFiltered(loadIndex(), {
+      const idx = loadIndex();
+      const rows = listFiltered(idx, {
         rfc: stringFlag(flags, "rfc"),
         status: stringFlag(flags, "status"),
         cluster: stringFlag(flags, "cluster"),
       });
-      flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows);
+      const staleIds = new Set(
+        staleClaims(idx, Date.now(), numberFlag(flags, "stale-hours") ?? DEFAULT_STALE_HOURS).map(
+          (s) => s.id,
+        ),
+      );
+      flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows, staleIds);
       break;
     }
     case "show": {
@@ -2243,7 +2305,7 @@ function main(): void {
     }
     case "status":
       syncFromOrigin();
-      statusCounts(loadIndex());
+      statusCounts(loadIndex(), numberFlag(flags, "stale-hours") ?? DEFAULT_STALE_HOURS);
       break;
     case "claim": {
       const id = pos[0];
