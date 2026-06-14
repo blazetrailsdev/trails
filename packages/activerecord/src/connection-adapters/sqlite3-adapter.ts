@@ -1083,9 +1083,26 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     };
   }
 
+  /**
+   * Database text encoding. Rails reads `@raw_connection.encoding`
+   * synchronously; an async-only driver (no `openSync()`) returns a Promise
+   * from `pragma()`, so we memoize the value during `connect()`/`connectAsync()`
+   * — mirroring how `_databaseVersion` is pre-warmed — and the getter serves the
+   * cached string. Before the connection is open (deferred async-only checkout),
+   * there is nothing to read, so we fall back to SQLite's "UTF-8" default rather
+   * than leaking a Promise cast as an array.
+   */
   get encoding(): string {
-    const result = this.driver.pragma("encoding") as Array<{ encoding: string }>;
-    return result[0]?.encoding ?? "UTF-8";
+    if (this._encoding !== null) return this._encoding;
+    return AbstractSQLite3Adapter.parseEncoding(this.driver?.pragma("encoding"));
+  }
+
+  private _encoding: string | null = null;
+
+  /** Extract the encoding string from a sync `PRAGMA encoding` result. @internal */
+  private static parseEncoding(result: unknown): string {
+    const rows = result as Array<{ encoding: string }> | undefined;
+    return rows?.[0]?.encoding ?? "UTF-8";
   }
 
   isSharedCache(): boolean {
@@ -2427,6 +2444,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       // getDatabaseVersion() never needs to touch this.driver directly. (#1269)
       const vRow = syncConn.prepare("SELECT sqlite_version() AS v").get() as any;
       this._databaseVersion = new Version(vRow?.v ?? "0.0.0");
+      // Pre-warm encoding too, so the sync `encoding` getter never touches the
+      // driver directly (parity with _databaseVersion).
+      this._encoding = AbstractSQLite3Adapter.parseEncoding(syncConn.pragma("encoding"));
       this.driver = syncConn as SqliteConnection;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -2462,6 +2482,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       const vStmt = await conn.prepare("SELECT sqlite_version() AS v");
       const vRow = (await vStmt.get()) as any;
       this._databaseVersion = new Version(vRow?.v ?? "0.0.0");
+      // Memoize encoding while we can still await the async pragma, so the sync
+      // `encoding` getter serves a cached value rather than a Promise.
+      this._encoding = AbstractSQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
       this.driver = conn;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

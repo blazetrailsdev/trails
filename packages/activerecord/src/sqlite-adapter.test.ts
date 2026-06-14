@@ -261,4 +261,41 @@ describe("SQLite adapter driver binding", () => {
     expect(rows).toEqual([{ foreign_keys: 1 }]);
     adapter.disconnectBang();
   });
+
+  // A driver whose connection returns a Promise from pragma() — the way a
+  // genuinely async-only driver (expo-sqlite, WASM) behaves. The plain
+  // `asyncOnlyDriver` above is backed by a sync better-sqlite3 handle, so it
+  // can't surface the sync-getter-on-async-driver hazard this story closes.
+  const asyncPragmaDriver = asyncDriver(async (config) => {
+    const conn = await openVia(config);
+    return new Proxy(conn, {
+      get(target, prop, receiver) {
+        if (prop === "pragma") {
+          return (source: string, opts?: { simple?: boolean }) =>
+            Promise.resolve(target.pragma(source, opts));
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as unknown as SqliteConnection;
+  });
+
+  it("encoding is memoized at connect for an async-only driver", async () => {
+    const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", {
+      driver: asyncPragmaDriver,
+    });
+    expect(adapter.encoding).toBe("UTF-8");
+    adapter.disconnectBang();
+  });
+
+  it("encoding falls back to UTF-8 before a deferred async-only open completes", () => {
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver: asyncPragmaDriver });
+    expect(adapter.active).toBe(false);
+    expect(adapter.encoding).toBe("UTF-8");
+  });
+
+  it("encoding reads the live value for a sync driver", () => {
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver: betterSqlite3Driver });
+    expect(adapter.encoding).toBe("UTF-8");
+    adapter.disconnectBang();
+  });
 });
