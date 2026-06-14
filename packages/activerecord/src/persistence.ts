@@ -591,6 +591,7 @@ interface DeleteRecord {
   _destroyed: boolean;
   _previouslyNewRecord: boolean;
   id: unknown;
+  idInDatabase(): unknown;
   isPersisted(): boolean;
   freeze(): unknown;
   constructor: {
@@ -613,7 +614,12 @@ interface DeleteRecord {
 export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   const ctor = this.constructor;
   if (this.isPersisted()) {
-    const dm = new DeleteManager().from(ctor.arelTable).where(ctor._buildPkWhereNode(this.id));
+    // Mirrors Rails Persistence#delete → _delete_record(_query_constraints_hash):
+    // the WHERE targets `id_in_database`, so a dirty (in-memory mutated) primary
+    // key still deletes the row identified by the value last loaded from the DB.
+    const dm = new DeleteManager()
+      .from(ctor.arelTable)
+      .where(ctor._buildPkWhereNode(this.idInDatabase()));
     await ctor.connection.execDelete(ctor.connection.toSql(dm), "Delete");
   }
   this._destroyed = true;

@@ -4,7 +4,14 @@
  * Mirrors: activerecord/test/cases/locking_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, StaleObjectError, ReadonlyAttributeError } from "./index.js";
+import {
+  Base,
+  registerModel,
+  StaleObjectError,
+  ReadonlyAttributeError,
+  RecordNotUnique,
+  RecordNotFound,
+} from "./index.js";
 import { Associations, association } from "./associations.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -16,6 +23,9 @@ import { Treasure } from "./test-helpers/models/treasure.js";
 import { StringKeyObject } from "./test-helpers/models/string-key-object.js";
 import { LegacyThing } from "./test-helpers/models/legacy-thing.js";
 import { Reference } from "./test-helpers/models/reference.js";
+import { Job } from "./test-helpers/models/job.js";
+import { Comment } from "./test-helpers/models/comment.js";
+import { PersonalLegacyThing } from "./test-helpers/models/personal-legacy-thing.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { LockWithoutDefault } from "./test-helpers/models/lock-without-default.js";
 import { LockWithCustomColumnWithoutDefault } from "./test-helpers/models/lock-with-custom-column-without-default.js";
@@ -49,7 +59,10 @@ describe("OptimisticLockingTest", () => {
     // from the canonical schema verbatim, so we never write a reduced shape that
     // could in turn contaminate later suites. Covers the fixture tables plus the
     // bespoke-class tables: `ships` (ReadonlyNameShip) and the
-    // `lock_without_defaults*` pair (Rails: `t.timestamps null: true`).
+    // `lock_without_defaults*` pair (Rails: `t.timestamps null: true`). The
+    // `jobs`/`comments`/`personal_legacy_things` tables back Person's
+    // `dependent:` associations, which `destroy with dirty primary key`
+    // traverses (see the model registrations below).
     await defineSchema(
       {
         people: canonicalSchema.people,
@@ -65,6 +78,9 @@ describe("OptimisticLockingTest", () => {
         wheels: canonicalSchema.wheels,
         bulbs: canonicalSchema.bulbs,
         engines: canonicalSchema.engines,
+        jobs: canonicalSchema.jobs,
+        comments: canonicalSchema.comments,
+        personal_legacy_things: canonicalSchema.personal_legacy_things,
       },
       { dropExisting: true },
     );
@@ -80,6 +96,14 @@ describe("OptimisticLockingTest", () => {
     await Car.loadSchema();
     await Wheel.loadSchema();
     registerModel(Treasure);
+    // Destroying a Person runs its `dependent:` association callbacks
+    // (`jobs_with_dependent_destroy` through `references`, `personal_legacy_things`,
+    // `comments`), so those models must be registered for the reflections to
+    // resolve during `destroy with dirty primary key`.
+    registerModel(Reference);
+    registerModel(Job);
+    registerModel(Comment);
+    registerModel(PersonalLegacyThing);
   });
 
   it("quote value passed lock col", async () => {
@@ -240,14 +264,39 @@ describe("OptimisticLockingTest", () => {
     expect(Object.keys(stalePerson.savedChanges).length).toBe(0);
   });
 
-  it.skip("update with dirty primary key", () => {
-    // BLOCKED: unknown — primary key mutation not supported
+  it("update with dirty primary key", async () => {
+    await expect(
+      (async () => {
+        const person = await Person.find(1);
+        person.id = 2;
+        await person.saveBang();
+      })(),
+    ).rejects.toBeInstanceOf(RecordNotUnique);
+
+    const person = await Person.find(1);
+    person.id = 42;
+    await person.saveBang();
+
+    expect(await Person.find(42)).toBeDefined();
+    await expect(Person.find(1)).rejects.toBeInstanceOf(RecordNotFound);
   });
-  it.skip("delete with dirty primary key", () => {
-    // BLOCKED: unknown — primary key mutation not supported
+
+  it("delete with dirty primary key", async () => {
+    const person = await Person.find(1);
+    person.id = 2;
+    await person.delete();
+
+    expect(await Person.find(2)).toBeDefined();
+    await expect(Person.find(1)).rejects.toBeInstanceOf(RecordNotFound);
   });
-  it.skip("destroy with dirty primary key", () => {
-    // BLOCKED: unknown — primary key mutation not supported
+
+  it("destroy with dirty primary key", async () => {
+    const person = await Person.find(1);
+    person.id = 2;
+    await person.destroy();
+
+    expect(await Person.find(2)).toBeDefined();
+    await expect(Person.find(1)).rejects.toBeInstanceOf(RecordNotFound);
   });
 
   it("explicit update lock column raise error", async () => {

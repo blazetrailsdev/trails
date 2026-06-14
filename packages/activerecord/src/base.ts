@@ -2983,7 +2983,10 @@ export class Base extends Model {
     const um = new UpdateManager()
       .table(table)
       .set(updateValues)
-      .where(ctor._buildPkWhereNode(this.id));
+      // Mirrors Rails _update_record(_query_constraints_hash): WHERE targets
+      // `id_in_database`, so a dirty primary key updates the original row (and
+      // can write a new PK value into it).
+      .where(ctor._buildPkWhereNode((this as any).idInDatabase()));
     if (ctor.lockingEnabled) {
       if (lockWhereValue == null) {
         um.where(table.get(lockCol).isNull());
@@ -3044,7 +3047,12 @@ export class Base extends Model {
       const table = ctor.arelTable;
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
-        const dm = new DeleteManager().from(table).where(ctor._buildPkWhereNode(pk));
+        // Mirrors Rails Persistence#destroy → _delete_record(_query_constraints_hash):
+        // WHERE targets `id_in_database`, so destroying a record whose primary key
+        // was mutated in memory still removes the originally loaded row.
+        const dm = new DeleteManager()
+          .from(table)
+          .where(ctor._buildPkWhereNode((this as any).idInDatabase()));
         const lockCol = ctor.lockingColumn;
         if (ctor.lockingEnabled) {
           // Mirrors Rails _lock_value_for_database: if user explicitly changed lock_version,
