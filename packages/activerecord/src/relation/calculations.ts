@@ -802,7 +802,7 @@ export async function performCount(
   const effectiveColumn = column === "*" ? undefined : column;
 
   if (effectiveColumn) {
-    const countNode = table.get(effectiveColumn).count(this._isDistinct);
+    const countNode = (aggregateColumn(this, effectiveColumn) as any).count(this._isDistinct);
     const manager = table.project(countNode.as("count"));
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
@@ -999,11 +999,16 @@ export function aggregateColumn(rel: CalculationRelation, columnName: string): u
   if (columnName === "*" || columnName === "1") {
     return (table as any).sql ? (table as any).sql(columnName) : columnName;
   }
-  if (columnName.includes(".")) {
-    const parts = columnName.split(".");
-    return new Table(parts[0]).get(parts[1]);
-  }
-  return table.get(columnName);
+  // Mirrors buildAggNode / Rails' aggregate_column → arel_column: a known column
+  // qualifies onto the model's own table, a "table.column" string resolves
+  // through the join dependencies onto the joined table, and the primary key
+  // falls back to the base table (our test models omit the implicit PK from
+  // columns_hash). Anything else passes through as raw SQL.
+  const pk = rel._modelClass.primaryKey;
+  const pks = Array.isArray(pk) ? pk : [pk];
+  return arelColumn.call(rel as never, columnName, (field: string) =>
+    pks.includes(field) ? table.get(field) : new Nodes.SqlLiteral(field),
+  );
 }
 
 /** @internal */
@@ -1203,7 +1208,10 @@ export function buildCountSubquery(
   distinct: boolean,
 ): string {
   const table = rel._modelClass.arelTable;
-  const col = columnName === "*" ? new Nodes.SqlLiteral("*") : table.get(columnName);
+  const col =
+    columnName === "*"
+      ? new Nodes.SqlLiteral("*")
+      : (aggregateColumn(rel, columnName) as Nodes.Node);
   const countNode = distinct
     ? new Nodes.NamedFunction("COUNT", [col], undefined, true)
     : new Nodes.NamedFunction("COUNT", [col]);
