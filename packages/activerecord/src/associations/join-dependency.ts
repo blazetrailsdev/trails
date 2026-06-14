@@ -345,43 +345,14 @@ export class JoinDependency {
   }
 
   /**
-   * Add a nested association path like "comments.author".
-   * Walks the chain, adding JOINs for each segment.
+   * Add a nested association path like "comments.author", joining each segment.
+   * Routes through the single make_tree-style build path (`addAssociationSpec`),
+   * then returns the leaf node for the path. Returns null if any segment is
+   * un-joinable (the whole path is rolled back, per `addAssociationSpec`).
    */
   addNestedAssociation(path: string): JoinPart | null {
-    const parts = path.split(".");
-    if (parts.length === 1) return this.addAssociation(parts[0]);
-
-    const snapshot = this._capture();
-
-    let currentModel = this._baseModel as any;
-    let currentAlias = this._baseAlias;
-    let lastNode: JoinPart | null = null;
-    let parentPath = "";
-
-    try {
-      for (const part of parts) {
-        const node = this._addOrReuse(part, currentModel, currentAlias, parentPath);
-        if (!node) {
-          this._rollback(snapshot);
-          return null;
-        }
-        lastNode = node;
-        currentModel = node.baseKlass;
-        // Use effectiveSqlName, not tableAlias: the JOIN SQL references the
-        // effective name (real table name or tN alias), so the next level's ON
-        // clause must use the same name as the source of the join.
-        currentAlias = node.effectiveSqlName;
-        parentPath = parentPath ? `${parentPath}.${part}` : part;
-      }
-    } catch (e) {
-      // addAssociation mutates _nextTableIndex/aliasTracker before the
-      // polymorphic check throws; restore so a mid-walk throw leaves the
-      // instance unchanged before propagating (e.g. EagerLoadPolymorphicError).
-      this._rollback(snapshot);
-      throw e;
-    }
-    return lastNode;
+    if (!this.addAssociationSpec(path)) return null;
+    return this._findNodeByPath(path);
   }
 
   /**
@@ -407,7 +378,7 @@ export class JoinDependency {
     // Normalize the spec into a make_tree-style nested hash up front, then
     // construct the tree from it in one walk (mirrors Rails building the whole
     // tree once from `make_tree(associations)` rather than incrementally).
-    const tree = eagerSpecToTree(spec);
+    const tree = JoinDependency.makeTree(spec);
     const snapshot = this._capture();
     try {
       if (!this._buildSpecTree(tree, this._baseModel, this._baseAlias, "")) {
@@ -441,12 +412,12 @@ export class JoinDependency {
    * Mirrors: ActiveRecord::Associations::JoinDependency#build.
    */
   validateEagerLoadSpec(spec: AssociationSpec): void {
-    this.build(eagerSpecToTree(spec), this._baseModel);
+    this.build(JoinDependency.makeTree(spec), this._baseModel);
   }
 
   /**
    * Build the join tree from a normalized make_tree-style hash (dotted strings
-   * already split into nested keys by `eagerSpecToTree`). Each key becomes a
+   * already split into nested keys by `walkTree`). Each key becomes a
    * JOIN via `_addOrReuse`; children recurse under the joined node's model and
    * effective alias. Returns false on the first un-joinable segment so the
    * caller can roll back and degrade to preloading.
@@ -739,8 +710,15 @@ export class JoinDependency {
   }
 
   static walkTree(associations: any, hash: Record<PropertyKey, any>): void {
-    if (typeof associations === "string" || typeof associations === "symbol") {
+    if (typeof associations === "symbol") {
       if (!hash[associations]) hash[associations] = Object.create(null);
+    } else if (typeof associations === "string") {
+      // Dotted strings ("comments.author") are a trails affordance: split them
+      // into nested levels so the builder joins each segment in turn.
+      let cur = hash;
+      for (const part of associations.split(".")) {
+        cur = cur[part] ??= Object.create(null);
+      }
     } else if (Array.isArray(associations)) {
       for (const assoc of associations) {
         JoinDependency.walkTree(assoc, hash);
@@ -1351,33 +1329,6 @@ export class JoinDependency {
 
     return targetNode;
   }
-}
-
-/**
- * Convert an eager-load spec (string, dotted string, array, or nested hash)
- * into the nested-hash tree `JoinDependency#build` consumes. Unlike
- * `JoinDependency.makeTree`, dotted strings ("comments.author") are split into
- * nested levels, so `_buildSpecTree` joins them segment-by-segment.
- */
-function eagerSpecToTree(
-  spec: AssociationSpec | AssociationSpec[],
-  hash: Record<PropertyKey, any> = Object.create(null),
-): Record<PropertyKey, any> {
-  if (typeof spec === "string") {
-    let cur = hash;
-    for (const part of spec.split(".")) {
-      cur = cur[part] ??= Object.create(null);
-    }
-  } else if (Array.isArray(spec)) {
-    for (const s of spec) eagerSpecToTree(s, hash);
-  } else if (spec && typeof spec === "object") {
-    for (const key of Reflect.ownKeys(spec)) {
-      const child = (spec as any)[key];
-      const sub = (hash[key] ??= Object.create(null));
-      if (child != null) eagerSpecToTree(child, sub);
-    }
-  }
-  return hash;
 }
 
 function rebindTableReferences(
