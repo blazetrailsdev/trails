@@ -49,10 +49,13 @@ function primaryKeyOf(t: TableSchema): string[] | false | undefined {
   return isWrapped(t) ? (t as { primaryKey: string[] | false }).primaryKey : undefined;
 }
 
+// Excludes `big_integer` on purpose: the serial-PK path emits a `primary_key`
+// column, which is `SERIAL` (INT4) on PG, not `BIGSERIAL`. Keep in sync with
+// define-schema.ts's isIntegerSpec.
 function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
   if (spec === undefined) return false;
   const type = typeof spec === "string" ? spec : spec.type;
-  return type === "integer" || type === "big_integer";
+  return type === "integer";
 }
 
 function colOpts(

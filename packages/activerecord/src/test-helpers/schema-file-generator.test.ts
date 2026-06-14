@@ -17,6 +17,16 @@ const MINI_SCHEMA: Schema = {
     primaryKey: ["book_id", "edition_num"],
   },
   drafts: { columns: {}, primaryKey: false },
+  // Single-column integer custom PK → serial (Rails `t.primary_key :gadget_id`).
+  gadgets: {
+    columns: { gadget_id: "integer", name: "string" },
+    primaryKey: ["gadget_id"],
+  },
+  // Single-column STRING custom PK → stays the array form (not serial).
+  registries: {
+    columns: { code: "string", label: "string" },
+    primaryKey: ["code"],
+  },
 };
 
 describe("generateSchemaFile", () => {
@@ -73,6 +83,21 @@ describe("generateSchemaFile", () => {
 
   it("does not emit force:cascade for non-mysql/pg adapters", () => {
     expect(content).not.toContain('force: "cascade"');
+  });
+
+  it("emits a single-column integer custom PK via the string primaryKey (serial) form", () => {
+    // String `primaryKey` makes createTable generate a serial PK column...
+    expect(content).toContain('"gadgets", { primaryKey: "gadget_id" }');
+    // ...and the PK column is NOT re-emitted as a plain integer column.
+    expect(content).not.toContain('"gadget_id", "integer"');
+    // The non-PK column is still emitted.
+    expect(content).toContain('"name", "string"');
+  });
+
+  it("keeps a single-column string custom PK as the array (non-serial) form", () => {
+    expect(content).toContain('primaryKey: ["code"]');
+    // The string PK column is still emitted as a column (NOT NULL via composite path).
+    expect(content).toContain('"code", "string"');
   });
 });
 

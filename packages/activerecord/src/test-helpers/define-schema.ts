@@ -110,11 +110,20 @@ function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
   return true;
 }
 
-/** @internal */
+/**
+ * True for a plain `integer` column spec. Deliberately excludes `big_integer`:
+ * the serial-PK path routes through `createTable({ primaryKey })`, whose
+ * `primary_key` type emits `SERIAL` (INT4) on PG — not `BIGSERIAL` — so a
+ * `big_integer` PK would silently narrow to INT4. No canonical schema declares
+ * a `big_integer` custom PK; if one is added it needs an explicit BIGSERIAL
+ * branch rather than this fast path.
+ *
+ * @internal
+ */
 function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
   if (spec === undefined) return false;
   const type = typeof spec === "string" ? spec : spec.type;
-  return type === "integer" || type === "big_integer";
+  return type === "integer";
 }
 
 /** @internal */
@@ -550,13 +559,21 @@ async function _resetAutoIncrement(
   adapter: DatabaseAdapter,
   _ss: SchemaStatements,
   table: string,
+  // Defaults to "id" but accepts a custom-named serial PK (e.g. `movieid`):
+  // those columns are now SERIAL too, so the persists-across-files fast path
+  // must reset their sequence as well or a later naked `create()` could draw a
+  // value a prior file's explicit-id fixture already advanced past. MySQL's
+  // table-wide AUTO_INCREMENT reset and SQLite's sqlite_sequence row are keyed
+  // by table, so only PostgreSQL needs the column name.
+  pkColumn = "id",
 ): Promise<void> {
   try {
     const qt = adapter.quoteTableName(table);
     switch (adapter.adapterName) {
       case "postgres":
-        await adapter.executeMutation(`SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)`, [
+        await adapter.executeMutation(`SELECT setval(pg_get_serial_sequence($1, $2), 1, false)`, [
           table,
+          pkColumn,
         ]);
         break;
       case "mysql":
@@ -634,29 +651,6 @@ async function _defineSchemaImpl(
 
   for (const table of order) {
     const raw = schema[table];
-    const newSig = tableSignature(raw);
-    const cachedSig = cache.get(table);
-    const sc = adapter.schemaCache;
-    const pool = adapter.pool ?? null;
-    const stillExists =
-      sc && pool !== null
-        ? ((await sc.dataSourceExists(pool, table)) ?? cachedSig !== undefined)
-        : cachedSig !== undefined;
-    if (cachedSig === newSig && stillExists) {
-      // D-Z: table persists across files. Reset auto-increment so tests
-      // that depend on id=1 (e.g. toParam, findEach start/finish) work.
-      // Skip for tables without a default id PK (composite/false).
-      const pk = primaryKeyOf(raw);
-      if (pk === undefined) {
-        await _resetAutoIncrement(adapter, ss, table);
-      }
-      if (warm) await _warmSchemaCache(adapter, table);
-      continue;
-    }
-    // D-Z: always drop the specific table before recreating. Together with
-    // dropAllTables clearing the signature cache, this eliminates the need
-    // for afterAll(dropAllTables) in useHandlerTransactionalFixtures.
-    await ss.dropTable(table, { ifExists: true });
     const columns = columnsOf(raw);
     const pk = primaryKeyOf(raw);
     // A single-column integer PK declared via `primaryKey: ["col"]` mirrors
@@ -667,6 +661,31 @@ async function _defineSchemaImpl(
     // INSERT that omits the PK then trips a NOT NULL violation.
     const serialPkName =
       Array.isArray(pk) && pk.length === 1 && isIntegerSpec(columns[pk[0]]) ? pk[0] : null;
+    const newSig = tableSignature(raw);
+    const cachedSig = cache.get(table);
+    const sc = adapter.schemaCache;
+    const pool = adapter.pool ?? null;
+    const stillExists =
+      sc && pool !== null
+        ? ((await sc.dataSourceExists(pool, table)) ?? cachedSig !== undefined)
+        : cachedSig !== undefined;
+    if (cachedSig === newSig && stillExists) {
+      // D-Z: table persists across files. Reset auto-increment so tests
+      // that depend on id=1 (e.g. toParam, findEach start/finish) work. The
+      // default `id` PK and a custom-named single integer PK are both SERIAL;
+      // composite (string[]) and id-less (false) tables have no sequence.
+      if (pk === undefined) {
+        await _resetAutoIncrement(adapter, ss, table);
+      } else if (serialPkName !== null) {
+        await _resetAutoIncrement(adapter, ss, table, serialPkName);
+      }
+      if (warm) await _warmSchemaCache(adapter, table);
+      continue;
+    }
+    // D-Z: always drop the specific table before recreating. Together with
+    // dropAllTables clearing the signature cache, this eliminates the need
+    // for afterAll(dropAllTables) in useHandlerTransactionalFixtures.
+    await ss.dropTable(table, { ifExists: true });
     const createOpts: { id?: boolean; primaryKey?: string | string[] } = {};
     if (pk === false) createOpts.id = false;
     else if (serialPkName !== null) {
