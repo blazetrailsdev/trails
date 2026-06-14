@@ -1976,6 +1976,72 @@ export function checkPrNotOpen(pr: number): void {
   }
 }
 
+// ──────────────────── done completion guards ────────────────────
+
+// Returns the text of every unchecked `- [ ]` checkbox in a story body, in
+// document order. Checked boxes (`- [x]` / `- [X]`, case-insensitive) and
+// non-checkbox bullets are ignored. Used by the `done` guard to force a
+// close-time reconciliation of the story's acceptance criteria. Exported for
+// unit tests.
+export function uncheckedCheckboxes(body: string): string[] {
+  const out: string[] = [];
+  for (const line of body.split("\n")) {
+    const m = line.match(/^\s*[-*+]\s+\[ \](?:\s+(.*\S))?\s*$/);
+    if (m) out.push((m[1] ?? "").trim());
+  }
+  return out;
+}
+
+// Refuses `done` while the story body has any unchecked checkbox — the agent
+// must either check the boxes (asserting the criteria are met) or edit the
+// criteria with a reason. `--force` bypasses with a printed warning. Exits 1
+// on unchecked boxes without --force; stories with no checkboxes pass
+// unchanged. Exported for unit tests.
+export function checkCheckboxesDone(body: string, force: boolean): void {
+  const unchecked = uncheckedCheckboxes(body);
+  if (unchecked.length === 0) return;
+  if (force) {
+    console.warn(
+      `warning: marking done with ${unchecked.length} unchecked checkbox(es) — bypassed with --force`,
+    );
+    return;
+  }
+  console.error(
+    `error: story has ${unchecked.length} unchecked checkbox(es) — check them off or edit the criteria, or use --force to bypass:`,
+  );
+  for (const item of unchecked) console.error(`  - [ ] ${item}`);
+  process.exit(1);
+}
+
+// Advisory estimate-feedback: fetches the merged PR's additions+deletions via
+// gh and returns a `est-loc <E> vs actual <A> (<delta>)` line, or null when
+// est-loc is absent or gh is unavailable/unparseable. Never throws, never
+// exits — a missing estimate or gh failure degrades to silence. Exported for
+// unit tests.
+export function prLocDelta(pr: number, estLoc: number | null): string | null {
+  if (estLoc === null) return null;
+  let raw: string;
+  try {
+    raw = execFileSync("gh", ["pr", "view", String(pr), "--json", "additions,deletions"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch {
+    return null;
+  }
+  let data: { additions?: number; deletions?: number } = {};
+  try {
+    data = JSON.parse(raw) as typeof data;
+  } catch {
+    return null;
+  }
+  if (typeof data.additions !== "number" || typeof data.deletions !== "number") return null;
+  const actual = data.additions + data.deletions;
+  const delta = actual - estLoc;
+  const sign = delta > 0 ? `+${delta}` : String(delta);
+  return `est-loc ${estLoc} vs actual ${actual} (${sign})`;
+}
+
 // ──────────────────── presentation ────────────────────
 
 // One-line legend printed above every story table so the priority column's
@@ -2198,7 +2264,13 @@ function main(): void {
       const pr = numberFlag(flags, "pr");
       if (!id || pr === null) usage();
       if (!flags.force) checkPrNotOpen(pr);
+      const index = loadIndex();
+      const file = storyFilePath(index, id);
+      checkCheckboxesDone(splitFrontmatter(file).body, flags.force === true);
       done(id, pr);
+      const entry = index.stories.find((s) => s.id === id);
+      const delta = prLocDelta(pr, entry?.est_loc ?? null);
+      if (delta) console.log(delta);
       break;
     }
     case "new": {
