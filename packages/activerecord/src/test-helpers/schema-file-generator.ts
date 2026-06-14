@@ -127,9 +127,15 @@ function generateCode(schema: Schema, adapterName?: string): string {
 
     const tOptsEntries: string[] = [];
     if (pk === false) tOptsEntries.push(`id: false`);
-    else if (serialPkName !== null)
+    else if (serialPkName !== null) {
       tOptsEntries.push(`primaryKey: ${JSON.stringify(serialPkName)}`);
-    else if (Array.isArray(pk)) tOptsEntries.push(`primaryKey: ${JSON.stringify(pk)}`);
+      // Preserve INTEGER width: PG `serial` → INT4 serial; MySQL/SQLite
+      // `integer` → INT auto-increment. The default `primary_key` type widens to
+      // BIGINT on MySQL and breaks integer FK references. Keep in sync with
+      // define-schema.ts.
+      const serialIdType = adapterName === "postgres" ? "serial" : "integer";
+      tOptsEntries.push(`id: { type: ${JSON.stringify(serialIdType)} }`);
+    } else if (Array.isArray(pk)) tOptsEntries.push(`primaryKey: ${JSON.stringify(pk)}`);
     if (needsForce) tOptsEntries.push(`force: "cascade"`);
     const tOpts = tOptsEntries.length === 0 ? `{}` : `{ ${tOptsEntries.join(", ")} }`;
 

@@ -86,8 +86,9 @@ describe("generateSchemaFile", () => {
   });
 
   it("emits a single-column integer custom PK via the string primaryKey (serial) form", () => {
-    // String `primaryKey` makes createTable generate a serial PK column...
-    expect(content).toContain('"gadgets", { primaryKey: "gadget_id" }');
+    // String `primaryKey` + an explicit integer-width id makes createTable
+    // generate an INT-width serial PK column (default adapter → "integer").
+    expect(content).toContain('"gadgets", { primaryKey: "gadget_id", id: { type: "integer" } }');
     // ...and the PK column is NOT re-emitted as a plain integer column.
     expect(content).not.toContain('"gadget_id", "integer"');
     // The non-PK column is still emitted.
@@ -161,5 +162,27 @@ describe("generateSchemaFile (MySQL adapter)", () => {
 
   it("emits force:cascade on createTable for per-table drop+recreate on shared DB", () => {
     expect(content).toContain('force: "cascade"');
+  });
+});
+
+describe("generateSchemaFile single-column integer PK id type per adapter", () => {
+  const SCHEMA: Schema = {
+    gadgets: { columns: { gadget_id: "integer", name: "string" }, primaryKey: ["gadget_id"] },
+  };
+
+  it("uses serial on postgres (INT4 serial, not the bigint primary_key type)", async () => {
+    const filePath = await generateSchemaFile(SCHEMA, "postgres");
+    const fs = await getFsAsync();
+    const content = fs.readFileSync(filePath, "utf-8");
+    expect(content).toContain('primaryKey: "gadget_id", id: { type: "serial" }');
+    fs.unlinkSync(filePath);
+  });
+
+  it("uses integer (INT auto-increment) on mysql, not bigint", async () => {
+    const filePath = await generateSchemaFile(SCHEMA, "mysql");
+    const fs = await getFsAsync();
+    const content = fs.readFileSync(filePath, "utf-8");
+    expect(content).toContain('primaryKey: "gadget_id", id: { type: "integer" }');
+    fs.unlinkSync(filePath);
   });
 });

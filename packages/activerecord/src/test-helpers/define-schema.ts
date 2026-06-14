@@ -686,10 +686,16 @@ async function _defineSchemaImpl(
     // dropAllTables clearing the signature cache, this eliminates the need
     // for afterAll(dropAllTables) in useHandlerTransactionalFixtures.
     await ss.dropTable(table, { ifExists: true });
-    const createOpts: { id?: boolean; primaryKey?: string | string[] } = {};
+    const createOpts: { id?: boolean | { type: string }; primaryKey?: string | string[] } = {};
     if (pk === false) createOpts.id = false;
     else if (serialPkName !== null) {
       createOpts.primaryKey = serialPkName;
+      // Preserve the declared INTEGER width across adapters. The default
+      // `primary_key` type widens to BIGINT on MySQL, which breaks integer FK
+      // references (e.g. fk_test_has_fk.fk_id → fk_test_has_pk.pk_id, errno 150).
+      // PG `serial` → INT4 serial; MySQL/SQLite `integer` → INT auto-increment.
+      // (`integer` does NOT auto-increment on PG, hence the per-adapter split.)
+      createOpts.id = { type: adapter.adapterName === "postgres" ? "serial" : "integer" };
     } else if (Array.isArray(pk)) {
       createOpts.primaryKey = pk;
       createOpts.id = false;
