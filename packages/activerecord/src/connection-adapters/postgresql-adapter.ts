@@ -167,6 +167,37 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return pgColumnNameWithOrderMatcher();
   }
 
+  // Mirrors Rails' PostgreSQLAdapter.dbconsole, which exports PG* env vars
+  // before exec'ing psql. We can't mutate the process environment (no
+  // process.* access), so we return the env map the PTY exec would set;
+  // PGPASSWORD is included only when `includePassword` is set, matching Rails.
+  static override dbconsole(
+    config: Record<string, unknown> = {},
+    options: { includePassword?: boolean } = {},
+  ): Record<string, string> {
+    const env: Record<string, string> = {};
+    if (config.username) env.PGUSER = String(config.username);
+    if (config.host) env.PGHOST = String(config.host);
+    if (config.port) env.PGPORT = String(config.port);
+    if (config.password != null && options.includePassword) {
+      env.PGPASSWORD = String(config.password);
+    }
+    if (config.sslmode) env.PGSSLMODE = String(config.sslmode);
+    if (config.sslcert) env.PGSSLCERT = String(config.sslcert);
+    if (config.sslkey) env.PGSSLKEY = String(config.sslkey);
+    if (config.sslrootcert) env.PGSSLROOTCERT = String(config.sslrootcert);
+    const variables = config.variables as Record<string, unknown> | undefined;
+    if (variables) {
+      // Rails: PGOPTIONS = variables.filter_map { "-c name=value" unless :default }
+      const pgOptions = Object.entries(variables)
+        .filter(([, v]) => v !== ":default")
+        .map(([name, v]) => `-c ${name}=${String(v).replace(/[ \\]/g, "\\$&")}`)
+        .join(" ");
+      if (pgOptions) env.PGOPTIONS = pgOptions;
+    }
+    return env;
+  }
+
   override get active(): boolean {
     return !this._closed && this._pgClientOptions != null;
   }

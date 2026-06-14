@@ -1387,11 +1387,13 @@ export function strictLoadedAssociations(this: PersistencePrivateHost): string[]
 /** @internal */
 export function _findRecord(
   this: PersistencePrivateHost & { constructor: any },
-  options?: { lock?: boolean | string },
+  options?: { lock?: boolean | string; allQueries?: boolean | null },
 ): Promise<unknown> {
   const ctor = this.constructor as any;
   const preloads = strictLoadedAssociations.call(this);
-  let scope = ctor.all();
+  // Rails: self.class.all(all_queries: all_queries).preload(...) — the
+  // all_queries flag controls whether `all_queries: true` default scopes apply.
+  let scope = ctor.all({ allQueries: options?.allQueries ?? null });
   if (preloads.length > 0) scope = scope.preload(...preloads);
   const constraints = _inMemoryQueryConstraintsHash.call(this);
   if (options?.lock) scope = scope.lock(options.lock);
