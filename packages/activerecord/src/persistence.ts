@@ -1098,6 +1098,8 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
 
 interface ReloadRecord {
   _attributes: unknown;
+  _newRecord: boolean;
+  _previouslyNewRecord: boolean;
   _dirty: { snapshot(attrs: unknown): void; clearChangesInformation(): void };
   _preloadedAssociations: Map<string, unknown>;
   _resetAssociationCaches(): void;
@@ -1137,9 +1139,12 @@ export async function reload<T extends ReloadRecord>(
       : await ctor.unscoped(() => _findRecord.call(this as never, findOptions))
   ) as { _attributes: unknown; _preloadedAssociations: Map<string, unknown> };
 
-  // Rails swaps the whole attribute set (`@attributes = fresh.@attributes`);
-  // then dirty tracking re-baselines on the fresh values.
+  // Rails swaps the whole attribute set (`@attributes = fresh.@attributes`),
+  // then unconditionally clears the new-record flags; dirty tracking
+  // re-baselines on the fresh values.
   this._attributes = fresh._attributes;
+  this._newRecord = false;
+  this._previouslyNewRecord = false;
   this._dirty.snapshot(this._attributes);
   this._dirty.clearChangesInformation();
 
