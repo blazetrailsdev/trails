@@ -86,6 +86,10 @@ tester.run("rails-arel-tosql", rule, {
     // A method named toSql on a class with NO toSql counterpart but in a
     // different (non-class) position — plain function — is not flagged.
     { filename: builderFile, code: `function toSql() { return "x"; }\n` },
+    // Type-only declaration (`declare toSql`) is not a definition.
+    { filename: builderFile, code: `export class SqlBuilder { declare toSql: () => string; }\n` },
+    // Object-literal method (not a class) is not flagged.
+    { filename: builderFile, code: `export const o = { toSql() { return "x"; } };\n` },
     // Out-of-scope file is ignored entirely.
     {
       filename: path.join(REPO_ROOT, "packages/activesupport/src/x.ts"),
@@ -128,6 +132,20 @@ tester.run("rails-arel-tosql", rule, {
       filename: builderFile,
       code: `const C = class { toSql() { return "x"; } };\n`,
       errors: [{ messageId: "anonToSql" }],
+    },
+    // Cross-package non-leakage: `Node` is allowed in arel but NOT in
+    // activerecord, so a bespoke `Node.toSql` in activerecord is flagged.
+    {
+      filename: path.join(REPO_ROOT, "packages/activerecord/src/node.ts"),
+      code: `export class Node { toSql() { return "x"; } }\n`,
+      errors: [{ messageId: "bespokeToSql" }],
+    },
+    // Mixin idiom: `static toSql = importedFn` assigns a `this`-typed function
+    // to the class — a bespoke definition, so it's flagged.
+    {
+      filename: builderFile,
+      code: `import { toSqlImpl } from "./impl.js";\nexport class SqlBuilder { static toSql = toSqlImpl; }\n`,
+      errors: [{ messageId: "bespokeToSql" }],
     },
   ],
 });

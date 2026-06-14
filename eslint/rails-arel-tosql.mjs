@@ -48,11 +48,13 @@ function loadJson(p, fallback) {
 }
 
 /**
- * Allow-map: TS class name → Set of method names that class's Rails
- * counterpart actually defines. Built from every in-scope package in the
- * snapshot (class names are unique enough across these packages that a flat
- * map is faithful, and the per-method granularity keeps `toSqlAndBinds`
- * gated to the one Rails class that defines it).
+ * Allow-map keyed by package: pkg → (TS class name → Set of method names that
+ * class's Rails counterpart actually defines). Scoping by package keeps the
+ * lookup faithful — a bespoke `Node.toSql` in `activerecord` must NOT be
+ * waved through by `Arel::Nodes::Node` living in the `arel` package. The
+ * per-method granularity keeps `toSqlAndBinds` gated to the one Rails class
+ * that defines it. Matching is by class name (not file) so a subclass that
+ * overrides an allowed method in a sibling file still passes.
  */
 function loadAllow() {
   const manifest = loadJson(manifestPath(), { packages: {} });
@@ -61,12 +63,14 @@ function loadAllow() {
   const hit = cache.get(cacheKey);
   if (hit) return hit;
   const allow = new Map();
-  for (const entries of Object.values(manifest.packages ?? {})) {
+  for (const [pkg, entries] of Object.entries(manifest.packages ?? {})) {
+    const byName = new Map();
     for (const entry of entries) {
-      const set = allow.get(entry.name) ?? new Set();
+      const set = byName.get(entry.name) ?? new Set();
       for (const m of entry.methods ?? []) set.add(m);
-      allow.set(entry.name, set);
+      byName.set(entry.name, set);
     }
+    allow.set(pkg, byName);
   }
   cache.set(cacheKey, allow);
   return allow;
@@ -93,19 +97,19 @@ function enclosingClassName(node) {
   return null;
 }
 
-/** Static-or-not method name from a class member node, if it's toSql/toSqlAndBinds. */
+/** Method name from a class member node, if it defines toSql/toSqlAndBinds. */
 function tosqlMemberName(node) {
-  // MethodDefinition covers method/get/set/static; PropertyDefinition covers
-  // `toSql = () => …` / `toSql = function …`.
+  // MethodDefinition covers method/get/set/static. PropertyDefinition covers
+  // both inline functions (`toSql = () => …`) and this repo's mixin idiom
+  // (`static toSql = toSqlImpl`, an imported `this`-typed function assigned to
+  // the class). A bare `declare toSql: …` is a type-only declaration with no
+  // implementation, so it's not a definition and is skipped.
   if (node.type !== "MethodDefinition" && node.type !== "PropertyDefinition") return null;
   if (node.computed) return null;
   const key = node.key;
   const name = key?.type === "Identifier" ? key.name : null;
   if (!name || !TOSQL_METHODS.has(name)) return null;
-  if (node.type === "PropertyDefinition") {
-    const v = node.value;
-    if (!v || (v.type !== "ArrowFunctionExpression" && v.type !== "FunctionExpression")) return null;
-  }
+  if (node.type === "PropertyDefinition" && (node.declare || node.value == null)) return null;
   return name;
 }
 
@@ -130,7 +134,7 @@ const rule = {
     if (!scope) return {};
     if (loadExclude().has(scope.rel)) return {};
 
-    const allow = loadAllow();
+    const pkgAllow = loadAllow().get(scope.pkg);
 
     const check = (node) => {
       const method = tosqlMemberName(node);
@@ -140,7 +144,7 @@ const rule = {
         context.report({ node: node.key, messageId: "anonToSql", data: { method } });
         return;
       }
-      if (allow.get(cls)?.has(method)) return;
+      if (pkgAllow?.get(cls)?.has(method)) return;
       context.report({ node: node.key, messageId: "bespokeToSql", data: { cls, method } });
     };
 
