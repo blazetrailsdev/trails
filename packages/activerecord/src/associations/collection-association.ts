@@ -684,6 +684,12 @@ export class CollectionAssociation extends Association {
     for (const record of records) {
       const idx = (this.target as Base[]).indexOf(record);
       if (idx !== -1) (this.target as Base[]).splice(idx, 1);
+      // A `dependent: :destroy` record is frozen once destroyed, so clearing its
+      // inverse foreign key would raise FrozenError. Rails leaves the destroyed
+      // record's attributes untouched here (remove_records only prunes @target),
+      // so skip inverse removal for already-destroyed records.
+      if (typeof (record as any).isDestroyed === "function" && (record as any).isDestroyed())
+        continue;
       this.removeInverseInstance(record);
     }
     this._associationIds = null;

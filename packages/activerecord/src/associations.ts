@@ -78,7 +78,7 @@ import {
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
 import { getInheritanceColumn, findStiClass } from "./inheritance.js";
-import { flushPendingCounterCacheColumns } from "./counter-cache.js";
+import { flushPendingCounterCacheColumns, _foreignKeysEqual } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
@@ -2341,6 +2341,25 @@ function wrapCollectionProxy<T extends Base = Base>(
  *
  * Mirrors: ActiveRecord::CounterCache
  */
+/**
+ * Resolve the foreign key of the association a record was `destroyed_by`.
+ * `destroyedByAssociation` may hold a Reflection (with a `foreignKey` getter)
+ * or a raw AssociationDefinition (`{ type, name, options }`); for the latter we
+ * derive the key the same way Reflection does — explicit `foreignKey`, else
+ * `<as>_id` for a polymorphic `has_many ... as:`, else `<owner>_id`.
+ */
+function destroyedByAssociationForeignKey(
+  destroyed: Base,
+  dba: { foreignKey?: unknown; options?: AssociationOptions },
+): unknown {
+  if (dba.foreignKey != null) return dba.foreignKey;
+  const options = dba.options ?? {};
+  if (options.foreignKey != null) return options.foreignKey;
+  if (options.queryConstraints != null) return options.queryConstraints;
+  if (options.as != null) return `${underscore(String(options.as))}_id`;
+  return `${underscore((destroyed.constructor as typeof Base).name)}_id`;
+}
+
 export async function updateCounterCaches(
   record: Base,
   direction: "increment" | "decrement",
@@ -2354,6 +2373,21 @@ export async function updateCounterCaches(
     const rawForeignKey =
       assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(assoc.name)}_id`;
     const fkCols = Array.isArray(rawForeignKey) ? rawForeignKey : [rawForeignKey];
+
+    // Mirrors Rails CounterCache#destroy_row: when this record is itself being
+    // destroyed as a `dependent: :destroy` of the very association whose counter
+    // we'd adjust, skip the decrement — the parent is going away (or already
+    // accounts for it) and re-touching it would bump its lock_version, raising a
+    // StaleObjectError on the parent's own delete.
+    if (direction === "decrement") {
+      const dba = (record as any).destroyedByAssociation as {
+        foreignKey?: unknown;
+        name?: string;
+        options?: AssociationOptions;
+      } | null;
+      if (dba && _foreignKeysEqual(destroyedByAssociationForeignKey(record, dba), rawForeignKey))
+        continue;
+    }
     const fkValues = fkCols.map((col) => record._readAttribute(col));
     if (fkValues.some((v) => v === null || v === undefined)) continue;
 
@@ -2414,7 +2448,37 @@ export async function updateCounterCaches(
     } else {
       await (parent as Base).decrementBang(counterCol, 1, opts);
     }
+    // The counter UPDATE bumps the parent's lock_version in the DB (via the
+    // Locking::Optimistic#update_counters override). When the parent is the
+    // caller's in-memory record, sync that bump cleanly so a read without a
+    // reload sees it and the record isn't left diffing against a stale baseline.
+    if (cachedMatches) reflectLockVersionBump(parent as Base);
   }
+}
+
+/**
+ * Sync a record's optimistic lock column in memory after a counter-cache UPDATE
+ * advanced it in the database. Uses `writeFromDatabase` so the new value is a
+ * clean, DB-sourced attribute (not dirty, not diffed against a stale baseline).
+ *
+ * Coupling note: callers invoke this immediately after `parent.incrementBang(...)`.
+ * The wired instance `incrementBang` is `Persistence#incrementBang`
+ * (`persistence.ts`, registered in `base.ts`), which persists via
+ * `this.constructor.updateCounters` → the `Locking::Optimistic#updateCounters`
+ * override that merges `locking_column => 1` into the DB statement — and it does
+ * NOT write `lock_version` into memory (it only clears the counter column's
+ * change). So this +1 is the sole in-memory lock write and exactly mirrors the
+ * DB. (The separate `Locking::Optimistic#incrementBang` in `locking/optimistic.ts`,
+ * which uses `updateColumn` and would bypass that override, is intentionally not
+ * wired for instance dispatch; if a future change routes instance dispatch
+ * through it, the DB bump disappears and this sync must be revisited.)
+ */
+export function reflectLockVersionBump(record: Base): void {
+  const ctor = record.constructor as typeof Base;
+  if (!ctor.lockingEnabled) return;
+  const lc = ctor.lockingColumn;
+  const bumped = (Number((record as any).readAttribute?.(lc)) || 0) + 1;
+  (record as any)._attributes?.writeFromDatabase(lc, bumped);
 }
 
 /**
