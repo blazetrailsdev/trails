@@ -2360,6 +2360,23 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
   return stashedJoins;
 }
 
+/**
+ * Join dependencies consulted when resolving a column's cast type: the eager /
+ * includes / left-outer set built by `buildJoinDependencies`, plus the named
+ * INNER-join associations (`.joins(:assoc)`). Rails' `arel_column` resolves a
+ * joined column's type through all of `joins_values`; our inner-join specs are
+ * routed separately (buildJoins), so they are folded back in here.
+ *
+ * @internal
+ */
+export function joinDependenciesForTypeLookup(this: QueryMethodsHost): JoinDependency[] {
+  const deps = buildJoinDependencies.call(this);
+  if (this._namedInnerJoins.length > 0) {
+    deps.push(constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin));
+  }
+  return deps;
+}
+
 /** @internal */
 export function buildArel(
   this: QueryMethodsHost,

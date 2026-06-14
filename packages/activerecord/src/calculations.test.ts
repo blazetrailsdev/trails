@@ -1178,12 +1178,6 @@ describe("CalculationsTest", () => {
     const sum = await Account.sum("credits");
     expect(sum).toBe(5);
   });
-  it("minimum and maximum on time attributes", async () => {
-    const { Account } = makeModel();
-    await Account.create({ name: "minmax" });
-    const count = await Account.count();
-    expect(count).toBe(1);
-  });
   it("minimum and maximum on tz aware attributes", async () => {
     const { Account } = makeModel();
     await Account.create({ name: "tz" });
@@ -7379,10 +7373,28 @@ describe("CalculationsTest", () => {
   registerModel("Topic", Topic);
   registerModel("Reply", Reply);
 
+  // Rails' Author `has_many :topics, primary_key: "name", foreign_key:
+  // "author_name"`. Defined locally under a distinct class name (not the
+  // canonical Author model) so importing it does not perturb the shared model
+  // registry / name-disambiguation counter used by other describe blocks.
+  class CalcAuthor extends Base {
+    static {
+      this._tableName = "authors";
+      this.attribute("name", "string");
+      this.hasMany("topics", {
+        primaryKey: "name",
+        foreignKey: "author_name",
+        className: "Topic",
+      });
+    }
+  }
+
   // Rails: `fixtures :accounts, :companies, :topics`. Companies load first so
   // accounts' `firm_id` ref() resolves to companies' declared ids, not the
   // CRC32 fallback (see define-fixtures.ts ref() ordering requirement).
-  const { companies } = useHandlerFixtures(["companies", "accounts", "topics"], {
+  // `authors` is added for the Author.joins(:topics) aggregate-through-joins
+  // assertions (Author has_many :topics on name → author_name).
+  const { companies } = useHandlerFixtures(["companies", "accounts", "topics", "authors"], {
     schema: canonicalSchema,
   });
 
@@ -7503,5 +7515,58 @@ describe("CalculationsTest", () => {
   it("pluck with includes offset", async () => {
     expect(await Topic.includes("replies").order("id").offset(4).pluck("id")).toEqual([5]);
     expect(await Topic.includes("replies").order("id").offset(5).pluck("id")).toEqual([]);
+  });
+
+  // Rails ports the joins-with-column assertions through a private helper called
+  // twice: with a table-qualified column ("topics.written_on", resolved through
+  // the join dependency) and a bare one ("written_on", which only exists on the
+  // joined table). The non-TZ-aware `assert_minimum_and_maximum_on_time_attributes`
+  // body covers the model-table min/max and group(:approved) cases.
+  const eq = (actual: unknown, iso: string): void => {
+    expect(actual).toBeInstanceOf(Temporal.Instant);
+    expect(Temporal.Instant.from(iso).equals(actual as Temporal.Instant)).toBe(true);
+  };
+
+  const assertMinimumAndMaximumOnTimeAttributesJoinsWithColumn = async (
+    column: string,
+  ): Promise<void> => {
+    eq(await CalcAuthor.joins("topics").maximum(column), "2004-07-15T14:28:00.0099Z");
+    eq(await CalcAuthor.joins("topics").minimum(column), "2003-07-16T14:28:11.2233Z");
+
+    const max = (await CalcAuthor.joins("topics").group("id").maximum(column)) as Record<
+      string,
+      Temporal.Instant
+    >;
+    eq(max[1], "2003-07-16T14:28:11.2233Z");
+    eq(max[2], "2004-07-15T14:28:00.0099Z");
+
+    const min = (await CalcAuthor.joins("topics").group("id").minimum(column)) as Record<
+      string,
+      Temporal.Instant
+    >;
+    eq(min[1], "2003-07-16T14:28:11.2233Z");
+    eq(min[2], "2004-07-15T14:28:00.0099Z");
+  };
+
+  it("minimum and maximum on time attributes", async () => {
+    eq(await Topic.minimum("written_on"), "2003-07-16T14:28:11.2233Z");
+    eq(await Topic.maximum("written_on"), "2013-07-13T11:11:00.0099Z");
+
+    const minByApproved = (await Topic.group("approved").minimum("written_on")) as Record<
+      string,
+      Temporal.Instant
+    >;
+    eq(minByApproved.false, "2003-07-16T14:28:11.2233Z");
+    eq(minByApproved.true, "2004-07-15T14:28:00.0099Z");
+
+    const maxByApproved = (await Topic.group("approved").maximum("written_on")) as Record<
+      string,
+      Temporal.Instant
+    >;
+    eq(maxByApproved.false, "2003-07-16T14:28:11.2233Z");
+    eq(maxByApproved.true, "2013-07-13T11:11:00.0099Z");
+
+    await assertMinimumAndMaximumOnTimeAttributesJoinsWithColumn("topics.written_on");
+    await assertMinimumAndMaximumOnTimeAttributesJoinsWithColumn("written_on");
   });
 });
