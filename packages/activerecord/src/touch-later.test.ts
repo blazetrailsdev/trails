@@ -4,18 +4,52 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Base } from "./index.js";
+import { travel, travelBack } from "@blazetrails/activesupport";
+import { Base, registerModel } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { setBeforeCommittedOnAllRecords } from "./ar-config.js";
+import { Invoice } from "./test-helpers/models/invoice.js";
+import { LineItem } from "./test-helpers/models/line-item.js";
+import { Node } from "./test-helpers/models/node.js";
+import { Tree } from "./test-helpers/models/tree.js";
+import { Owner } from "./test-helpers/models/owner.js";
+import { Pet } from "./test-helpers/models/pet.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
+// Mirrors Rails `fixtures :nodes, :trees, :owners, :pets`. The fixture loader
+// seeds explicit PKs and resets serial sequences, which a plain `create` does
+// not do for the custom-named `owner_id`/`pet_id` PKs on Postgres.
+const { nodes, trees, owners, pets } = useHandlerFixtures(["nodes", "trees", "owners", "pets"]);
+
+registerModel("Invoice", Invoice);
+registerModel("LineItem", LineItem);
+registerModel("Node", Node);
+registerModel("Tree", Tree);
+registerModel("Owner", Owner);
+registerModel("Pet", Pet);
+
 beforeAll(async () => {
   await defineSchema({
-    invoices: { amount: "integer", updated_at: "datetime", created_at: "datetime" },
+    // `amount`/`created_at` are local extras for the makeTouchModel tests;
+    // `balance`/`updated_at` mirror Rails' canonical invoices so the canonical
+    // Invoice model (which sets `balance` in a before_save) introspects cleanly.
+    invoices: {
+      amount: "integer",
+      balance: "integer",
+      updated_at: "datetime",
+      created_at: "datetime",
+    },
+    line_items: TEST_SCHEMA.line_items,
   });
 });
+// Mirrors Ruby's `time.to_i` — whole epoch seconds, the granularity Rails'
+// touch_later assertions compare at (DB datetime columns drop sub-second
+// precision on round-trip).
+function toI(value: unknown): number {
+  return Math.floor((value as Temporal.Instant).epochMilliseconds / 1000);
+}
+
 describe("TouchLaterTest", () => {
   function makeTouchModel() {
     class Invoice extends Base {
@@ -82,11 +116,22 @@ describe("TouchLaterTest", () => {
     expect(reloaded.updated_at).toBeDefined();
   });
 
-  it.skip("touch later an association dont autosave parent", () => {
-    // BLOCKED: associations — touch: true / touch_later not implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#touchRecord or TouchLater not implemented
-    // SCOPE: ~30 LOC fix in associations/belongs-to.ts; affects ~4 tests in touch-later.test.ts
-    /* needs association autosave */
+  it("touch later an association dont autosave parent", async () => {
+    const time = Temporal.Now.instant().subtract({ hours: 24 * 25 });
+    const lineItem = await LineItem.create({ amount: 1 });
+    const invoice = await Invoice.create({ lineItems: [lineItem] });
+    await invoice.touch({ time });
+
+    await Invoice.transaction(async () => {
+      await lineItem.update({ amount: 2 });
+      const reloaded = await Invoice.find(invoice.id!);
+      // The touch is deferred to before_committed!, so the DB copy still
+      // carries the original time inside the transaction.
+      expect(toI(reloaded.updated_at)).toBe(toI(time));
+    });
+
+    // After commit the deferred touch flushed onto the in-memory parent.
+    expect(toI(invoice.updated_at)).not.toBe(toI(time));
   });
 
   it("touch touches immediately with a custom time", async () => {
@@ -113,23 +158,66 @@ describe("TouchLaterTest", () => {
     // No dirty tracking — the attribute change was cleared by surreptitiouslyTouch.
     expect(inv.changed).toBe(false);
   });
-  it.skip("touching three deep", () => {
-    // BLOCKED: associations — touch: true / touch_later not implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#touchRecord or TouchLater not implemented
-    // SCOPE: ~30 LOC fix in associations/belongs-to.ts; affects ~4 tests in touch-later.test.ts
-    /* needs multi-level association touch */
+  it("touching three deep", async () => {
+    const previousTreeUpdatedAt = (trees("root") as any).updated_at;
+    const previousGrandparentUpdatedAt = (nodes("grandparent") as any).updated_at;
+    const previousParentUpdatedAt = (nodes("parent_a") as any).updated_at;
+    const previousChildUpdatedAt = (nodes("child_one_of_a") as any).updated_at;
+
+    travel(5000);
+    try {
+      await Node.create({ parent: nodes("child_one_of_a"), tree: trees("root") });
+    } finally {
+      travelBack();
+    }
+
+    expect((await (nodes("child_one_of_a") as any).reload()).updated_at).not.toEqual(
+      previousChildUpdatedAt,
+    );
+    expect((await (nodes("parent_a") as any).reload()).updated_at).not.toEqual(
+      previousParentUpdatedAt,
+    );
+    expect((await (nodes("grandparent") as any).reload()).updated_at).not.toEqual(
+      previousGrandparentUpdatedAt,
+    );
+    expect((await (trees("root") as any).reload()).updated_at).not.toEqual(previousTreeUpdatedAt);
   });
-  it.skip("touching through nested attributes without before committed on all records", () => {
-    // BLOCKED: associations — touch: true / touch_later not implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#touchRecord or TouchLater not implemented
-    // SCOPE: ~30 LOC fix in associations/belongs-to.ts; affects ~4 tests in touch-later.test.ts
-    /* needs nested attributes + touch */
+
+  it("touching through nested attributes without before committed on all records", async () => {
+    setBeforeCommittedOnAllRecords(false);
+    try {
+      const time = Temporal.Now.instant().subtract({ hours: 24 * 25 });
+      const owner = owners("blackbeard") as any;
+      const petId = (pets("parrot") as any).readAttribute("pet_id");
+
+      await owner.touch({ time });
+      expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
+
+      await owner.update({ petsAttributes: { "0": { id: String(petId), name: "Alfred" } } });
+
+      // The second copy of the parent is not touched, so updated_at is unchanged.
+      expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
+    } finally {
+      setBeforeCommittedOnAllRecords(false);
+    }
   });
-  it.skip("touching through nested attributes with before committed on all records", () => {
-    // BLOCKED: associations — touch: true / touch_later not implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#touchRecord or TouchLater not implemented
-    // SCOPE: ~30 LOC fix in associations/belongs-to.ts; affects ~4 tests in touch-later.test.ts
-    /* needs nested attributes + touch */
+
+  it("touching through nested attributes with before committed on all records", async () => {
+    setBeforeCommittedOnAllRecords(true);
+    try {
+      const time = Temporal.Now.instant().subtract({ hours: 24 * 25 });
+      const owner = owners("blackbeard") as any;
+      const petId = (pets("parrot") as any).readAttribute("pet_id");
+
+      await owner.touch({ time });
+      expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
+
+      await owner.update({ petsAttributes: { "0": { id: String(petId), name: "Alfred" } } });
+
+      expect(toI((await owner.reload()).updated_at)).not.toBe(toI(time));
+    } finally {
+      setBeforeCommittedOnAllRecords(false);
+    }
   });
 });
 

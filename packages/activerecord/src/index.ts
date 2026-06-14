@@ -134,6 +134,8 @@ export {
   setActionOnStrictLoadingViolation,
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
+  beforeCommittedOnAllRecords,
+  setBeforeCommittedOnAllRecords,
 } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {

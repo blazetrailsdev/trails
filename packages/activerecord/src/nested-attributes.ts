@@ -202,15 +202,20 @@ async function processNestedAttributes(record: Base): Promise<void> {
         knownAttrs.add(name);
       }
     }
-    // Also allow the primary key and foreign key
+    // Also allow the primary key and foreign key. Nested attributes
+    // conventionally address the existing record by the literal `id` key (Rails
+    // matches `record.id.to_s == attributes["id"].to_s`), which maps to the
+    // model's primary key even when it is named something other than `id`.
     knownAttrs.add(childPk);
     knownAttrs.add(foreignKey);
+    knownAttrs.add("id");
 
     for (const attrs of attrsList) {
       const { _destroy, ...restAttrs } = attrs as any;
-      const pkValue = restAttrs[childPk];
-      // Remove PK from child attrs so it's not set as a regular attribute during update
-      const { [childPk]: _pkIgnored, ...childAttrs } = restAttrs;
+      const pkValue = restAttrs[childPk] ?? restAttrs["id"];
+      // Remove the PK (and its `id` alias) from child attrs so they aren't set
+      // as regular attributes during update.
+      const { [childPk]: _pkIgnored, id: _idIgnored, ...childAttrs } = restAttrs;
 
       // Validate attributes against the target model's known columns
       if (knownAttrs.size > 0) {

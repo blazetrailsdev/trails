@@ -42,6 +42,20 @@ export function setDisablePreparedStatements(value: boolean): void {
 }
 
 /**
+ * When true, `before_committed!` runs on every distinct in-memory copy of a
+ * record enrolled in a transaction; when false (the raw framework default) it
+ * runs only on the first copy of each logical record (deduped by record
+ * equality). Affects deferred-touch propagation through associations that hold
+ * a second copy of a parent. Mirrors `ActiveRecord.before_committed_on_all_records`
+ * (active_record.rb:348-349).
+ */
+export let beforeCommittedOnAllRecords = false;
+
+export function setBeforeCommittedOnAllRecords(value: boolean): void {
+  beforeCommittedOnAllRecords = value;
+}
+
+/**
  * Controls what happens when a strict-loading violation is detected: either
  * `"raise"` (the default — throw `StrictLoadingViolationError`) or `"log"`
  * (instrument `strict_loading_violation.active_record` and continue loading).
