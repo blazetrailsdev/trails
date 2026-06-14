@@ -3101,10 +3101,12 @@ export class Base extends Model {
       }
 
       this._destroyed = true;
-      // Rails' destroy ends with a `freeze` call. Delegate to it so we
-      // pick up the clone-and-freeze semantics on `_attributes`.
+      // Rails' destroy ends with a bare `freeze` (persistence.rb) — it does
+      // NOT touch `@association_cache`. Delegate to `freeze` for the
+      // clone-and-freeze semantics on `_attributes` and leave the association
+      // caches intact: loaded associations stay readable on a destroyed record
+      // exactly as in Rails (and as `Core#freeze` already documents).
       this.freeze();
-      this._resetAssociationCaches();
     });
 
     if (!destroyResult) return false;
