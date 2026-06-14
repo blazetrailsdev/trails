@@ -29,6 +29,40 @@ export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDef
   return enumRegistry.get(modelClass)!;
 }
 
+/**
+ * Register an EnumType in the attribute set and install the label-returning
+ * accessor, the single Rails-faithful storage model shared by both the
+ * `Base.enum` macro (`_enum`) and `defineEnum`. After this, the attribute
+ * stores the label string (via EnumType.cast on write), the getter returns it,
+ * and assignment runs `assertValidValue`.
+ *
+ * Mirrors: ActiveRecord::Enum#_enum calling `klass.attribute(name, enum_type)`.
+ *
+ * @internal
+ */
+export function installEnumAttribute(
+  klass: typeof Base,
+  attribute: string,
+  enumType: EnumType,
+): void {
+  klass.attribute(attribute, enumType);
+  // Define the getter after attribute() so the EnumType is already in
+  // _attributeDefinitions / the pending-type queue when we overwrite whatever
+  // accessor attribute() installed.
+  Object.defineProperty(klass.prototype, attribute, {
+    get(this: Base) {
+      return (this as unknown as { _attributes: Map<string, unknown> })._attributes.get(attribute);
+    },
+    set(this: Base, value: unknown) {
+      // Mirrors Rails' attribute writer invoking EnumType#assert_valid_value on
+      // user assignment — `record.current_mood = "angry"` raises ArgumentError.
+      enumType.assertValidValue(value);
+      (this as unknown as EnumInstanceHost).writeAttribute(attribute, value);
+    },
+    configurable: true,
+  });
+}
+
 /** Minimal instance-side surface for enum-generated prototype callbacks. */
 interface EnumInstanceHost {
   readAttribute(name: string): unknown;
@@ -83,23 +117,11 @@ export function defineEnum(
   const enumType = new EnumType(attribute, mapping, subtype);
   const def: EnumDefinition = { attribute, mapping, type: enumType };
 
-  // Converge onto the Rails-faithful `_enum` storage model: register the
-  // EnumType in the attribute set so the column round-trips through cast/
-  // serialize. The attribute then stores the label string (not the raw
-  // integer), the getter returns the label, and `assertValidValue` is enforced
-  // on assignment — identical to `Base.enum`. Mirrors ActiveRecord::Enum#_enum
-  // calling `klass.attribute(name, enum_type)`.
-  modelClass.attribute(attribute, enumType);
-  Object.defineProperty(modelClass.prototype, attribute, {
-    get(this: Base) {
-      return (this as unknown as { _attributes: Map<string, unknown> })._attributes.get(attribute);
-    },
-    set(this: Base, value: unknown) {
-      enumType.assertValidValue(value);
-      (this as unknown as EnumInstanceHost).writeAttribute(attribute, value);
-    },
-    configurable: true,
-  });
+  // Converge onto the Rails-faithful `_enum` storage model: the attribute
+  // stores the label string (not the raw integer), the getter returns the
+  // label, and `assertValidValue` is enforced on assignment — identical to
+  // `Base.enum`.
+  installEnumAttribute(modelClass, attribute, enumType);
 
   // Compute prefix/suffix for method names
   const prefixStr =
@@ -546,26 +568,11 @@ export function _enum(
   }
 
   // Register EnumType so typeForAttribute() returns it for predicate-builder
-  // serialization — e.g. where({status: "draft"}) serializes "draft" → 0.
-  // Mirrors: ActiveRecord::Enum#_enum calling klass.attribute(name, enum_type).
+  // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
+  // install the label-returning accessor. Shared with `defineEnum` via
+  // installEnumAttribute so both macros use one Rails-faithful storage model.
   const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
-  this.attribute(name, enumType);
-
-  // Define getter after this.attribute() so EnumType is in _attributeDefinitions
-  // and the pending-type queue before the enum-specific getter overwrites whatever
-  // attribute() may have installed.
-  Object.defineProperty(this.prototype, attribute, {
-    get(this: Base) {
-      return this._attributes.get(attrName);
-    },
-    set(this: Base, value: unknown) {
-      // Mirrors Rails' attribute writer invoking EnumType#assert_valid_value on
-      // user assignment — `record.current_mood = "angry"` raises ArgumentError.
-      enumType.assertValidValue(value);
-      this.writeAttribute(attrName, value);
-    },
-    configurable: true,
-  });
+  installEnumAttribute(this, attrName, enumType);
 
   for (const [n, value] of Object.entries(mapping)) {
     const methodBase = `${prefix}${n}${suffix}`;
