@@ -121,6 +121,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // The adapter's unknown-OID warning sink is console.warn, so spying on it
     // is the vitest equivalent of capturing stderr.
     it("no oid warning", async () => {
+      await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
         await PostgresqlEnum.first();
