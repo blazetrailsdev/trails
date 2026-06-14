@@ -282,6 +282,16 @@ export class SchemaCache {
     return this._columnsHash.get(tableName);
   }
 
+  /**
+   * Synchronous, query-free read of an already-cached primary key. Returns
+   * `undefined` when the table's primary key has not been reflected yet (the
+   * caller should fall back to the convention default), or the cached value
+   * — which may be `null` for a primary-key-less data source such as a view.
+   */
+  getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
+    return this._primaryKeys.has(tableName) ? this._primaryKeys.get(tableName) : undefined;
+  }
+
   async indexes(pool: unknown, tableName: string): Promise<unknown[]> {
     if (this._indexes.has(tableName)) {
       return this._indexes.get(tableName)!;

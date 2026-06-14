@@ -133,14 +133,36 @@ interface PrimaryKeyHost {
   primaryKey: string | string[];
   _primaryKey?: string | string[];
   name: string;
+  tableName?: string;
+  connection?: { schemaCache?: { getCachedPrimaryKeys?(table: string): unknown } };
 }
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key
+ *
+ * Honors an explicitly-configured primary key — read through the prototype
+ * chain, so an STI subclass inherits the value its base set with `primary_key=`
+ * (Rails copies base_class.primary_key into the subclass; the chain is the
+ * equivalent here). When nothing is configured anywhere up the chain, mirror
+ * Rails' get_primary_key: consult the schema cache so a key-less data source
+ * (e.g. a view) resolves to `null` rather than the "id" convention. The lookup
+ * is query-free — it reads only what `loadSchema` already warmed — so a cold
+ * cache falls back to "id". The declared non-null return mirrors the host
+ * contract used elsewhere; the `null` it can return matches Rails'
+ * dynamically-nil `primary_key` for a view.
  * @internal
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] {
-  return this._primaryKey ?? "id";
+  const configured = this._primaryKey;
+  if (configured !== undefined) return configured;
+  try {
+    const table = this.tableName;
+    const cached = table ? this.connection?.schemaCache?.getCachedPrimaryKeys?.(table) : undefined;
+    if (cached !== undefined) return cached as string | string[];
+  } catch {
+    // No connection/schema configured — fall through to the convention.
+  }
+  return "id";
 }
 
 /**
@@ -153,10 +175,16 @@ export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]):
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#composite_primary_key?
+ *
+ * Rails resolves this through the same path as `primary_key` (both trigger
+ * `reset_primary_key` on first access), so go through `getPrimaryKeyAttr` rather
+ * than reading `_primaryKey` directly — otherwise, now that Base carries no
+ * "id" field default, a chain with no configured pk would skip the schema cache
+ * and the two methods could disagree.
  * @internal
  */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
-  return Array.isArray(this._primaryKey ?? "id");
+  return Array.isArray(getPrimaryKeyAttr.call(this));
 }
 
 /**

@@ -989,6 +989,15 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   }
   if (!hash) return;
 
+  // Warm the primary-key cache alongside columns so the synchronous
+  // `primary_key` resolution (getPrimaryKeyAttr) can detect a key-less data
+  // source — e.g. a view, whose introspected primary key is null — instead of
+  // assuming the "id" convention. Mirrors Rails' get_primary_key reading
+  // connection.schema_cache.primary_keys(table_name).
+  if (typeof cache.primaryKeys === "function") {
+    await cache.primaryKeys(pool, table);
+  }
+
   // Guard against adapter swaps during the async work above. Verify the
   // *same* host that supplied startingAdapter still has it — checking
   // other candidates would let a stale reflection slip through if the
