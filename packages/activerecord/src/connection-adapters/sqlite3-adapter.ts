@@ -831,6 +831,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Execute raw SQL (for DDL and other non-query statements).
    */
   async exec(sql: string): Promise<void> {
+    await this.ensureConnected();
     await this.driver.exec(sql);
   }
 
@@ -1568,6 +1569,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
              UNION ALL
              SELECT sql FROM sqlite_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`;
     }
+    await this.ensureConnected();
     const stmt = await this.driver.prepare(sql);
     const row = (await stmt.get()) as { sql: string } | undefined;
     return row?.sql ?? null;
@@ -2001,6 +2003,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     overrideCheckConstraints?: CheckConstraintDefinition[],
     extraDefinition?: (def: import("./abstract/schema-definitions.js").TableDefinition) => void,
   ): Promise<void> {
+    await this.ensureConnected();
     const { schema, bare: bareTable } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const qTable = quoteTableName(tableName);

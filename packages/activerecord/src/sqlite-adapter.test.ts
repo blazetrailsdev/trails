@@ -3,7 +3,12 @@ import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
 import { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
+import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import { PoolConfig } from "./connection-adapters/pool-config.js";
+import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
 import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
+import type { DatabaseAdapter } from "./adapter.js";
 import type { SqliteConnection, SqliteDriver } from "./sqlite-adapter.js";
 
 // Async-only drivers (no `openSync()`) exercising the async construction path
@@ -186,6 +191,16 @@ describe("SQLite adapter driver binding", () => {
     adapter.disconnectBang();
   });
 
+  it("completes a deferred open when the first call is a schema introspection", async () => {
+    // columns()/exec() must also drain the pending open: the first call after a
+    // sync checkout is not always a SELECT.
+    const adapter = new AbstractSQLite3Adapter(":memory:", { driver: asyncOnlyDriver });
+    await adapter.exec("CREATE TABLE schema_first (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
+    const cols = await adapter.columns("schema_first");
+    expect(cols.map((c) => c.name)).toEqual(["id", "name"]);
+    adapter.disconnectBang();
+  });
+
   it("opens once when several queries race the deferred async-only open", async () => {
     let opens = 0;
     const driver = asyncDriver((config) => {
@@ -201,6 +216,34 @@ describe("SQLite adapter driver binding", () => {
     ]);
     expect(opens).toBe(1);
     adapter.disconnectBang();
+  });
+
+  it("serves an async-only driver through the synchronous pool checkout", async () => {
+    // End-to-end: ConnectionPool#checkout is synchronous and hands back the
+    // freshly-constructed (still-pending) adapter without awaiting the open.
+    // The first query on the checked-out connection must complete it.
+    const dbConfig = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    const poolConfig = new PoolConfig(
+      new ConnectionDescriptor("primary"),
+      dbConfig,
+      "writing",
+      "default",
+      {
+        adapterFactory: () =>
+          new AbstractSQLite3Adapter(":memory:", {
+            driver: asyncOnlyDriver,
+          }) as unknown as DatabaseAdapter,
+      },
+    );
+    const pool = new ConnectionPool(poolConfig);
+    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    expect(conn.active).toBe(false);
+    await conn.internalExecute("CREATE TABLE pool_t (id INTEGER PRIMARY KEY, name TEXT)", "SCHEMA");
+    expect(conn.active).toBe(true);
+    await conn.internalExecute("INSERT INTO pool_t (name) VALUES ('pooled')", "SQL");
+    const rows = await conn.execute("SELECT name FROM pool_t");
+    expect(rows).toEqual([{ name: "pooled" }]);
+    pool.disconnectBang();
   });
 
   it("reconnects an async-only driver and reapplies pragmas", async () => {
