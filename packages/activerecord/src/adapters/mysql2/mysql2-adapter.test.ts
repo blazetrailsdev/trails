@@ -221,6 +221,29 @@ describeIfMysql("Mysql2Adapter", () => {
         await adapter.executeMutation("DROP TABLE IF EXISTS `ex`");
       }
     });
+    it("#exec_query queries with an empty result set still return the columns", async () => {
+      // Mirrors adapter_test.rb: a zero-row SELECT must still report its
+      // columns from the field descriptors, not collapse to an empty Result.
+      // `subscribers` mirrors the canonical test schema.rb definition
+      // (id: false; nick/name/books_count; unique index on nick).
+      await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+      await adapter.executeMutation(
+        "CREATE TABLE `subscribers` (" +
+          "`nick` VARCHAR(255) NOT NULL, " +
+          "`name` VARCHAR(255), " +
+          "`books_count` INT NOT NULL DEFAULT 0, " +
+          "UNIQUE KEY `index_subscribers_on_nick` (`nick`)" +
+          ") ENGINE=InnoDB",
+      );
+      try {
+        const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");
+        expect(result).toBeInstanceOf(Result);
+        expect(result.rows).toEqual([]);
+        expect(result.columns).toEqual(["nick", "name", "books_count"]);
+      } finally {
+        await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+      }
+    });
     it("database exists returns false if database does not exist", async () => {
       // Mirrors: test_database_exists_returns_false_if_database_does_not_exist
       const url = new URL(MYSQL_TEST_URL);
