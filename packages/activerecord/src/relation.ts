@@ -3411,12 +3411,15 @@ export class Relation<T extends Base> {
       (this._limitValue !== null || this._offsetValue !== null || this._orderClauses.length > 0)
     ) {
       // Mirrors Rails `delete_all`: build the SELECT arel and `compile_delete`
-      // with the primary key so the visitor rewrites a limited/ordered delete
-      // into `WHERE pk IN (SELECT pk ... ORDER BY ... LIMIT ...)`. The
-      // unconstrained branch keeps the plain DeleteManager — the visitor would
-      // emit identical SQL there, but this avoids touching the hot path.
+      // with the primary key, having clause, and group columns so the visitor
+      // rewrites a limited/ordered delete into
+      // `WHERE pk IN (SELECT pk ... ORDER BY ... LIMIT ...)`. The unconstrained
+      // branch keeps the plain DeleteManager — the visitor would emit identical
+      // SQL there, but this avoids touching the hot path.
       const arel = this._buildArel();
-      stmtAst = arel.compileDelete(table.get(primaryKey)).ast;
+      const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
+      const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
+      stmtAst = arel.compileDelete(table.get(primaryKey), havingAst, groupColumns).ast;
     } else {
       const dm = new DeleteManager().from(table);
       for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
