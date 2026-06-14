@@ -175,10 +175,16 @@ export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]):
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#composite_primary_key?
+ *
+ * Rails resolves this through the same path as `primary_key` (both trigger
+ * `reset_primary_key` on first access), so go through `getPrimaryKeyAttr` rather
+ * than reading `_primaryKey` directly — otherwise, now that Base carries no
+ * "id" field default, a chain with no configured pk would skip the schema cache
+ * and the two methods could disagree.
  * @internal
  */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
-  return Array.isArray(this._primaryKey ?? "id");
+  return Array.isArray(getPrimaryKeyAttr.call(this));
 }
 
 /**
