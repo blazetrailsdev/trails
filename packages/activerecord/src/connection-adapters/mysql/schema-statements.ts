@@ -760,3 +760,98 @@ export async function foreignKeys(
   }
   return results;
 }
+
+/** @internal Host surface for {@link indexes}: runs `SHOW KEYS` via the schema
+ * channel and quotes the (optionally schema-qualified) table name. */
+interface IndexesHost {
+  schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
+  quoteTableName(name: string): string;
+}
+
+/** @internal
+ * Return user-defined indexes for the given table. Mirrors Rails'
+ * MySQL `indexes`: reads `SHOW KEYS FROM <table>`, skips the primary
+ * key, groups multi-column indexes by `Key_name`, maps `Index_type`
+ * (btree/hash → `using`; fulltext/spatial → `type`), and wraps
+ * functional-index `Expression` values in parens (unescaping `\'`).
+ * Returns `[]` when the table doesn't exist, matching Rails' rescue.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#indexes
+ */
+export async function indexes(
+  this: IndexesHost,
+  tableName: string,
+): Promise<
+  Array<{
+    name: string;
+    columns: string[];
+    unique: boolean;
+    using?: string;
+    type?: string;
+    comment?: string;
+  }>
+> {
+  let rows: Array<Record<string, unknown>>;
+  try {
+    rows = (await this.schemaQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`)) as Array<
+      Record<string, unknown>
+    >;
+  } catch (e) {
+    // Mirrors Rails' `rescue StatementInvalid` — a missing table yields []
+    // rather than propagating ER_NO_SUCH_TABLE.
+    const message = `${(e as { message?: string })?.message ?? ""} ${
+      (e as { cause?: { message?: string } })?.cause?.message ?? ""
+    }`;
+    if (/Table '.+' doesn't exist/.test(message)) return [];
+    throw e;
+  }
+
+  const byIndex = new Map<
+    string,
+    { columns: string[]; unique: boolean; using?: string; type?: string; comment?: string }
+  >();
+  let currentIndex: string | null = null;
+  for (const r of rows) {
+    const keyName = String((r.Key_name ?? r.KEY_NAME) as string);
+    if (currentIndex !== keyName) {
+      if (keyName === "PRIMARY") continue; // skip the primary key
+      currentIndex = keyName;
+
+      const idxType = String((r.Index_type ?? r.INDEX_TYPE ?? "BTREE") as string).toLowerCase();
+      let using: string | undefined;
+      let type: string | undefined;
+      if (idxType === "fulltext" || idxType === "spatial") {
+        type = idxType;
+      } else if (idxType === "btree" || idxType === "hash") {
+        using = idxType;
+      }
+      const nonUnique = Number(r.Non_unique ?? r.NON_UNIQUE ?? 0);
+      // Mirrors Rails' `row["Index_comment"].presence` — blank (incl. whitespace-only) → nil.
+      const rawComment = r.Index_comment ?? r.INDEX_COMMENT;
+      const comment =
+        rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
+      byIndex.set(keyName, { columns: [], unique: nonUnique === 0, using, type, comment });
+    }
+
+    const entry = byIndex.get(currentIndex!)!;
+    const rawExpr = r.Expression ?? r.EXPRESSION;
+    if (rawExpr != null) {
+      // MySQL 8+ functional indexes carry the raw SQL in `Expression` (and
+      // NULL in `Column_name`). Unescape `\'` then wrap in parens unless the
+      // expression already is, matching Rails' IndexDefinition shape.
+      let expr = String(rawExpr).replace(/\\'/g, "'");
+      if (!expr.startsWith("(")) expr = `(${expr})`;
+      entry.columns.push(expr);
+    } else {
+      entry.columns.push(String((r.Column_name ?? r.COLUMN_NAME) as string));
+    }
+  }
+  return Array.from(byIndex.entries()).map(([name, { columns, unique, using, type, comment }]) => ({
+    name,
+    columns,
+    unique,
+    ...(using !== undefined ? { using } : {}),
+    ...(type !== undefined ? { type } : {}),
+    ...(comment !== undefined ? { comment } : {}),
+  }));
+}
