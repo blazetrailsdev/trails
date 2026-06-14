@@ -2546,18 +2546,66 @@ describe("ReflectionTest", () => {
     expect(postCommentsRef.isNested()).toBe(true);
   });
 
-  it.skip("join table", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    // Requires habtm join table support
+  it("join table", () => {
+    // Rails stubs klass on a has_many reflection; join_table derives from both
+    // table names regardless of which side declares the association.
+    class DjtCategory extends Base {
+      static _tableName = "categories";
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class DjtProduct extends Base {
+      static _tableName = "products";
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("DjtCategory", DjtCategory);
+    registerModel("DjtProduct", DjtProduct);
+    Associations.hasMany.call(DjtProduct, "categories", { className: "DjtCategory" });
+    const ref1 = reflectOnAssociation(DjtProduct, "categories");
+    expect(ref1!.joinTable).toBe("categories_products");
+
+    Associations.hasMany.call(DjtCategory, "products", { className: "DjtProduct" });
+    const ref2 = reflectOnAssociation(DjtCategory, "products");
+    expect(ref2!.joinTable).toBe("categories_products");
   });
 
-  it.skip("includes accepts symbols", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    // Requires includes() support on reflection
+  it("includes accepts symbols", async () => {
+    class Hotel extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Department extends Base {
+      static {
+        this.attribute("hotel_id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class Chef extends Base {
+      static {
+        this.attribute("department_id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("Hotel", Hotel);
+    registerModel("Department", Department);
+    registerModel("Chef", Chef);
+    Associations.hasMany.call(Hotel, "departments", { foreignKey: "hotel_id" });
+    Associations.hasMany.call(Department, "chefs", { foreignKey: "department_id" });
+    const hotel = await Hotel.create({ name: "Grand" });
+    const dept = await Department.create({ hotel_id: hotel.id, name: "Kitchen" });
+    const chef = await Chef.create({ department_id: dept.id, name: "Gordon" });
+    // includes should accept a nested association hash (Rails `[departments: :chefs]`)
+    // and actually preload the nested association onto the loaded records.
+    const hotels = await Hotel.all().includes({ departments: "chefs" }).toArray();
+    expect(hotels).toHaveLength(1);
+    const departments = hotels[0].association("departments").target as Base[];
+    expect(departments).toHaveLength(1);
+    const chefs = departments[0].association("chefs").target as Base[];
+    expect(chefs.map((c) => (c as any).id)).toEqual([chef.id]);
   });
 
   it("association primary key uses explicit primary key option as first priority", () => {
