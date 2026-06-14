@@ -9,7 +9,7 @@ import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { Nodes } from "@blazetrails/arel";
 import { camelize, isPresent, underscore } from "@blazetrails/activesupport";
-import { runAfterCallbacksOnProto } from "@blazetrails/activemodel";
+import { ArgumentError, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 
 /**
  * Helper: cast inheritance column value through its attribute type.
@@ -459,7 +459,7 @@ export function applicationRecordClassQ(modelClass: typeof Base): boolean {
  */
 export function primaryAbstractClass(modelClass: typeof Base): void {
   if (_applicationRecordClass && _applicationRecordClass !== modelClass) {
-    throw new Error(
+    throw new ArgumentError(
       `The \`primary_abstract_class\` is already set to ${_applicationRecordClass.name}. ` +
         "There can only be one `primary_abstract_class` in an application.",
     );

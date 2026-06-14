@@ -2,6 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { loadHasMany } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
+import { RecordNotSaved } from "../errors.js";
 import { CollectionAssociation } from "./collection-association.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
@@ -90,7 +91,10 @@ export class HasManyAssociation extends CollectionAssociation {
     if (typeof (record as any).save === "function") {
       saved = !!(await (record as any).save({ validate }));
       if (!saved && raise)
-        throw new Error(`Failed to save the new associated ${this.reflection.name}.`);
+        throw new RecordNotSaved(
+          `Failed to save the new associated ${this.reflection.name}.`,
+          record,
+        );
     }
     // Rails: update_counter_if_success(super, 1) — sync counter on successful insert
     return updateCounterIfSuccess(this, saved, 1);

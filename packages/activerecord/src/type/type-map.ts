@@ -1,7 +1,7 @@
 /**
  * Mirrors: ActiveRecord::Type::TypeMap
  */
-import { Type, ValueType } from "@blazetrails/activemodel";
+import { ArgumentError, Type, ValueType } from "@blazetrails/activemodel";
 
 export class TypeMap {
   private _mapping: Map<string | RegExp, (lookupKey: string) => Type> = new Map();
@@ -25,7 +25,7 @@ export class TypeMap {
   }
 
   registerType(key: string | RegExp, value?: Type, block?: (lookupKey: string) => Type): void {
-    if (!value && !block) throw new Error("registerType requires a value or block");
+    if (!value && !block) throw new ArgumentError("registerType requires a value or block");
     if (block) {
       this._mapping.set(key, block);
     } else {
