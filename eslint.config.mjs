@@ -368,6 +368,9 @@ export default defineConfig(
       "packages/activerecord/src/adapters/**",
       "packages/activerecord/src/tasks/**",
       "packages/activerecord/src/**/schema-*.ts",
+      // Test-infra DDL helpers render SQL by design (never migrating to arel).
+      "packages/activerecord/src/test-helpers/**",
+      "packages/activerecord/src/test-setup-*.ts",
     ],
     rules: {
       "blazetrails/no-raw-sql": "error",
