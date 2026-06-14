@@ -108,9 +108,15 @@ describe("DeleteAllTest", () => {
   it("delete all with unpermitted relation raises error", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "t" });
-    await Post.all().deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
+    // Mirrors Rails: distinct / with / with_recursive cannot be honored by
+    // delete_all, so it raises ActiveRecordError instead of silently dropping
+    // them.
+    await expect(Post.distinct().deleteAll()).rejects.toThrow(
+      "delete_all doesn't support distinct",
+    );
+    await expect(Post.with({ limited: Post.limit(2) }).deleteAll()).rejects.toThrow(
+      "delete_all doesn't support with",
+    );
   });
 
   it("delete all with joins and where part is hash", async () => {

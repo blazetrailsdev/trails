@@ -11,6 +11,7 @@ import {
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import {
+  ActiveRecordError,
   ConnectionNotEstablished,
   NotImplementedError,
   RecordNotSaved,
@@ -3406,24 +3407,38 @@ export class Relation<T extends Base> {
   async deleteAll(): Promise<number> {
     if (this._isNone) return 0;
 
+    // Mirrors Rails `INVALID_METHODS_FOR_DELETE_ALL = [:distinct, :with,
+    // :with_recursive]`: `delete_all` cannot honor these clauses, so it raises
+    // rather than silently dropping them. The TS port stores `with` /
+    // `with_recursive` together in `_ctes` (distinguished by the `recursive`
+    // flag), so split them back out to reproduce Rails' message verbatim.
+    const invalidMethods: string[] = [];
+    if (this._isDistinct) invalidMethods.push("distinct");
+    if (this._ctes.some((cte) => !cte.recursive)) invalidMethods.push("with");
+    if (this._ctes.some((cte) => cte.recursive)) invalidMethods.push("with_recursive");
+    if (invalidMethods.length > 0) {
+      throw new ActiveRecordError(`delete_all doesn't support ${invalidMethods.join(", ")}`);
+    }
+
     const table = this._modelClass.arelTable;
     const primaryKey = this._modelClass.primaryKey;
     let stmtAst;
-    if (
-      typeof primaryKey === "string" &&
-      (this._limitValue !== null || this._offsetValue !== null || this._orderClauses.length > 0)
-    ) {
-      // Mirrors Rails `delete_all`: build the SELECT arel and `compile_delete`
-      // with the primary key, having clause, and group columns so the visitor
-      // rewrites a limited/ordered delete into
-      // `WHERE pk IN (SELECT pk ... ORDER BY ... LIMIT ...)`. The unconstrained
-      // branch keeps the plain DeleteManager — the visitor would emit identical
-      // SQL there, but this avoids touching the hot path.
+    if (typeof primaryKey === "string") {
+      // Mirrors Rails `delete_all`: always run `build_arel` + `compile_delete`
+      // with the primary key, having clause, and group columns. For a
+      // limited/ordered/grouped delete the visitor rewrites it into
+      // `WHERE pk IN (SELECT pk ... ORDER BY ... LIMIT ...)`; for the
+      // unconstrained case it emits a plain `DELETE FROM ... WHERE`, identical
+      // to a hand-built DeleteManager. Routing both through one path keeps the
+      // TS port structurally faithful to Rails (no second code path to sync).
       const arel = this._buildArel();
       const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
       const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
       stmtAst = arel.compileDelete(table.get(primaryKey), havingAst, groupColumns).ast;
     } else {
+      // Composite primary key — left on the plain DeleteManager path; the
+      // limited/subselect rewrite for CPK is the
+      // `delete-all-composite-pk-limited-subselect` story.
       const dm = new DeleteManager().from(table);
       for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
         dm.where(node);
