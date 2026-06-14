@@ -183,12 +183,22 @@ describe("DecimalType", () => {
   it("casts NaN (BigDecimal NaN sentinel) — number and string forms", () => {
     // BigDecimal("NaN") has no decimal string form; it round-trips as the
     // sentinel "NaN" (the JS NaN on assignment, the string "NaN" from PG on
-    // load). ±Infinity has no BigDecimal equivalent here and stays null.
+    // load).
     const type = new Types.DecimalType();
     expect(type.cast(NaN)).toBe("NaN");
     expect(type.cast("NaN")).toBe("NaN");
-    expect(type.cast(Infinity)).toBeNull();
-    expect(type.cast(-Infinity)).toBeNull();
+  });
+
+  it("casts ±Infinity (BigDecimal Infinity sentinel) — number and string forms", () => {
+    // Rails routes Float through `value.to_d`, and `Float::INFINITY.to_d`
+    // yields BigDecimal::INFINITY ("Infinity") rather than nil. With decimals
+    // modelled as strings the value round-trips as the "Infinity"/"-Infinity"
+    // sentinel (the JS ±Infinity on assignment, the string from PG on load).
+    const type = new Types.DecimalType();
+    expect(type.cast(Infinity)).toBe("Infinity");
+    expect(type.cast(-Infinity)).toBe("-Infinity");
+    expect(type.cast("Infinity")).toBe("Infinity");
+    expect(type.cast("-Infinity")).toBe("-Infinity");
   });
 
   it("applyScale leaves the NaN sentinel untouched", () => {
@@ -197,5 +207,13 @@ describe("DecimalType", () => {
     const type = new Types.DecimalType({ precision: 10, scale: 2 });
     expect(type.cast(NaN)).toBe("NaN");
     expect(type.cast("NaN")).toBe("NaN");
+  });
+
+  it("applyScale leaves the Infinity sentinel untouched", () => {
+    // A scaled decimal column must not mangle the "Infinity"/"-Infinity"
+    // sentinel — roundHalfUpToScale's splitDecimal returns null for it.
+    const type = new Types.DecimalType({ precision: 10, scale: 2 });
+    expect(type.cast(Infinity)).toBe("Infinity");
+    expect(type.cast(-Infinity)).toBe("-Infinity");
   });
 });
