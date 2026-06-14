@@ -211,9 +211,6 @@ export class Association {
           if (i === 0) {
             association.setInverseInstance(record);
           }
-          if (!(owner as any)._preloadedAssociations) {
-            (owner as any)._preloadedAssociations = new Map();
-          }
           (owner as any)._preloadedAssociations.set(this.reflection.name, record);
         } catch {
           // Ignore
@@ -245,9 +242,6 @@ export class Association {
     // Shadow-map bridge: many readers in `associations.ts` still consult
     // `_preloadedAssociations`. Migrating them to read from the real proxy
     // is a follow-up PR; keep the cache in sync for now.
-    if (!(owner as any)._preloadedAssociations) {
-      (owner as any)._preloadedAssociations = new Map();
-    }
     (owner as any)._preloadedAssociations.set(this.reflection.name, value);
 
     // Route through `reflection.inverseName()` so automatic inverse detection

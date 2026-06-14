@@ -87,9 +87,6 @@ export class Batch {
 
     for (const record of branch.sourceRecords) {
       if (coveredRecords.has(record)) continue;
-      if (!(record as any)._preloadedAssociations) {
-        (record as any)._preloadedAssociations = new Map();
-      }
       if (!(record as any)._preloadedAssociations.has(branch.association)) {
         (record as any)._preloadedAssociations.set(branch.association, null);
       }
