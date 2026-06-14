@@ -203,9 +203,11 @@ describe("JoinDependency Arel node construction", () => {
     (Owner as any)._associations = [];
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
     const node2 = jd.addAssociation("assets");
-    expect(node2!.effectiveSqlName).toBe("t2");
+    // Rails names self-join collisions via reflection.alias_candidate —
+    // `{plural_name}_{parent_table}` (join_dependency.rb:204-206), not `t2`.
+    expect(node2!.effectiveSqlName).toBe("assets_owners");
     const table2 = (node2!.arelJoin as Nodes.OuterJoin).left;
-    expect((table2 as any).tableAlias).toBe("t2");
+    expect((table2 as any).tableAlias).toBe("assets_owners");
   });
 
   it("respects joinType constructor arg (InnerJoin)", () => {
