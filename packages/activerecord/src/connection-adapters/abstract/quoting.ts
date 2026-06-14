@@ -21,6 +21,30 @@ import {
 } from "./sql-datetime.js";
 
 /**
+ * Host shape the standalone {@link quote} / {@link quoteTableName} dispatch
+ * through, mirroring Rails where `quote` calls `self.quoted_date` /
+ * `self.quoted_time` and `quote_table_name` calls `self.quote_column_name`.
+ * Threading `this` lets an adapter override (e.g. PostgreSQL's BC-aware
+ * `quotedDate`) flow into the inherited `quote`. Bare calls (`this === void`)
+ * fall back to the module-level helpers below.
+ */
+export interface QuotingDispatchHost {
+  /** @internal */
+  quotedDate?(value: TemporalDateLike): string;
+  /** @internal */
+  quotedTime?(value: Temporal.PlainTime | Temporal.PlainDateTime): string;
+  /** @internal */
+  quoteColumnName?(name: string): string;
+}
+
+type TemporalDateLike =
+  | Temporal.Instant
+  | Temporal.ZonedDateTime
+  | Temporal.PlainDateTime
+  | Temporal.PlainDate
+  | Temporal.PlainTime;
+
+/**
  * ANSI double-quote identifier quoter (`""`-escaped). Not a Rails-layer
  * method — Rails' abstract `Quoting` has no `quote_identifier`. This is the
  * SQL-92 fallback used only by {@link ABSTRACT_SCHEMA_QUOTER} when DDL is
@@ -52,7 +76,10 @@ export function quoteColumnName(_columnName: string): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting::ClassMethods#quote_table_name
  * (activerecord/.../abstract/quoting.rb L66 — `quote_column_name(table_name)`)
  */
-export function quoteTableName(name: string): string {
+export function quoteTableName(this: QuotingDispatchHost | void, name: string): string {
+  if (this && typeof this === "object" && typeof this.quoteColumnName === "function") {
+    return this.quoteColumnName(name);
+  }
   return quoteColumnName(name);
 }
 
@@ -61,18 +88,25 @@ export function quoteTableName(name: string): string {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote
  */
-export function quote(value: unknown): string {
+export function quote(this: QuotingDispatchHost | void, value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   // BigDecimals need to be put in a non-normalized (fixed, ".0"-bearing) form
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
-  if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
-  if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
-  if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
-  if (value instanceof Temporal.PlainTime) return `'${formatPlainTimeForSql(value)}'`;
-  if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
+  // Rails dispatches date/time literals through `self.quoted_time` (Time::Value)
+  // and `self.quoted_date` (Date/Time) so adapter overrides — e.g. PostgreSQL's
+  // BC-suffixing `quoted_date` — are honored. Thread `this` to mirror that.
+  if (value instanceof Temporal.PlainTime) return `'${dispatchQuotedTime(this, value)}'`;
+  if (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.ZonedDateTime
+  ) {
+    return `'${dispatchQuotedDate(this, value)}'`;
+  }
   if (value instanceof Date)
     throw new TypeError(
       "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
@@ -309,6 +343,22 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
   );
 }
 
+/** @internal */
+function dispatchQuotedDate(host: QuotingDispatchHost | void, value: TemporalDateLike): string {
+  if (host && typeof host === "object" && typeof host.quotedDate === "function") {
+    return host.quotedDate(value);
+  }
+  return quotedDate(value);
+}
+
+/** @internal */
+function dispatchQuotedTime(host: QuotingDispatchHost | void, value: Temporal.PlainTime): string {
+  if (host && typeof host === "object" && typeof host.quotedTime === "function") {
+    return host.quotedTime(value);
+  }
+  return quotedTime(value);
+}
+
 /**
  * Format a date/time value for SQL without surrounding quotes.
  * Temporal.Instant and ZonedDateTime respect default_timezone.
@@ -349,9 +399,18 @@ export function quotedDate(
 /**
  * Format a time value for SQL, stripping the date prefix.
  *
+ * Mirrors Rails' `quoted_time` (abstract/quoting.rb:203), which normalises the
+ * date to 2000-01-01 then returns `quoted_date(value).sub(/\A\d\d\d\d-\d\d-\d\d /, "")`
+ * — dispatching through `self.quoted_date`. We thread `this` the same way so an
+ * adapter `quotedDate` override is honored here too; bare calls fall back to the
+ * module helper.
+ *
  * @internal
  */
-export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
+export function quotedTime(
+  this: QuotingDispatchHost | void,
+  value: Temporal.PlainTime | Temporal.PlainDateTime,
+): string {
   const dt =
     value instanceof Temporal.PlainTime
       ? new Temporal.PlainDateTime(
@@ -366,7 +425,7 @@ export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): 
           value.nanosecond,
         )
       : value.with({ year: 2000, month: 1, day: 1 });
-  return formatPlainDateTimeForSql(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
+  return dispatchQuotedDate(this, dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 
 /** @internal */

@@ -585,7 +585,9 @@ export class AbstractAdapter implements Quoting {
    * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote
    */
   quote(value: unknown): string {
-    return abstractQuote(value);
+    // `.call(this)` so Rails' `quote` → `self.quoted_date`/`self.quoted_time`
+    // dispatch reaches adapter overrides (abstract/quoting.rb:84-85).
+    return abstractQuote.call(this, value);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { BinaryData } from "@blazetrails/activemodel";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describe, expect, it } from "vitest";
 import { Data as ArrayData, Array as OidArray } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
@@ -13,6 +14,7 @@ import {
   quote,
   quoteDefaultExpression,
   quotedBinary,
+  quotedDate,
   quotedFalse,
   quotedTrue,
   quoteSchemaName,
@@ -210,6 +212,17 @@ describe("PostgreSQL quoting", () => {
   it("quote(new Date()) throws — Date is no longer accepted", () => {
     expect(() => quote(new Date())).toThrow(TypeError);
     expect(() => quote(new Date())).toThrow(/Temporal/);
+  });
+
+  it("quoted_date suffixes BC for proleptic years <= 0", () => {
+    expect(quotedDate(Temporal.PlainDate.from("-000043-03-15"))).toBe("0044-03-15 BC");
+  });
+
+  it("quote dispatches Date/Time through this.quoted_date (BC suffix)", () => {
+    // Rails' PG#quote calls super, whose Date branch is `'#{quoted_date(value)}'`
+    // — dispatching through PG's BC-aware quoted_date. Threading `this` reaches it.
+    const v = Temporal.PlainDate.from("-000043-03-15");
+    expect(quote.call({ quotedDate }, v)).toBe("'0044-03-15 BC'");
   });
 
   it("typeCast(new Date()) throws — Date is no longer accepted", () => {
