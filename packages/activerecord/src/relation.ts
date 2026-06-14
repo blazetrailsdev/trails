@@ -3404,12 +3404,25 @@ export class Relation<T extends Base> {
     if (this._isNone) return 0;
 
     const table = this._modelClass.arelTable;
-    const dm = new DeleteManager().from(table);
-    for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
-      dm.where(node);
+    const primaryKey = this._modelClass.primaryKey;
+    let stmtAst;
+    if (
+      typeof primaryKey === "string" &&
+      (this._limitValue !== null || this._offsetValue !== null || this._orderClauses.length > 0)
+    ) {
+      // Mirrors Rails: a limited/ordered delete_all compiles through the
+      // SELECT manager so the visitor emits `WHERE pk IN (SELECT pk ...)`.
+      const arel = this._buildArel();
+      stmtAst = arel.compileDelete(table.get(primaryKey)).ast;
+    } else {
+      const dm = new DeleteManager().from(table);
+      for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
+        dm.where(node);
+      }
+      stmtAst = dm.ast;
     }
 
-    const [deleteSql, deleteBinds] = this._compileAstWithBinds(dm.ast);
+    const [deleteSql, deleteBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._modelClass.connection.execDelete(
       deleteSql,
       `${this._modelClass.name} Delete All`,

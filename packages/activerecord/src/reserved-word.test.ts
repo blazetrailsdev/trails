@@ -130,13 +130,16 @@ describe("ReservedWordTest", () => {
     await expect(schema().renameTable("group", "order")).resolves.toBeUndefined();
   });
 
-  it.skip("change columns", async () => {
-    // BLOCKED: SQLite adapter gap — changeColumnDefault/changeColumn emit
-    // Postgres-style `ALTER TABLE ... ALTER COLUMN ... SET DEFAULT`, which
-    // SQLite rejects ("near ALTER: syntax error"). Rails' SQLite3Adapter
-    // implements these via a table copy (alter_table). Needs a SQLite
-    // table-rebuild path in connection-adapters/sqlite + schema-statements.ts.
-    const conn = schema();
+  it("change columns", async () => {
+    // Mirrors Rails' `@connection.change_column*` — schema mutations dispatch
+    // through the connection adapter (the SQLite copy-table `alterTable` path),
+    // not the generic SchemaStatements helper which emits Postgres-style
+    // `ALTER TABLE ... ALTER COLUMN`.
+    const conn = Base.connection as unknown as {
+      changeColumnDefault(t: string, c: string, d: unknown): Promise<void>;
+      changeColumn(t: string, c: string, ty: string, o?: Record<string, unknown>): Promise<void>;
+      renameColumn(t: string, c: string, n: string): Promise<void>;
+    };
     await conn.changeColumnDefault("group", "order", "whatever");
     await conn.changeColumn("group", "order", "text", { default: null });
     await conn.renameColumn("group", "order", "values");
@@ -160,25 +163,17 @@ describe("ReservedWordTest", () => {
     expect((await Group.find(x.id)).id).toBe(x.id);
   });
 
-  it.skip("delete all with subselect", async () => {
-    // BLOCKED: deleteAll ignores limit/offset — it deletes every matching row
-    // (2) instead of emitting Rails' `DELETE ... WHERE <pk> IN (SELECT <pk>
-    // ... ORDER BY ... LIMIT 1 OFFSET 1)` subselect (deletes 1). Needs a
-    // limited-delete subselect in the relation's deleteAll path.
+  it("delete all with subselect", async () => {
     await createTestFixtures("values");
     expect(await Values.order("as").limit(1).offset(1).deleteAll()).toBe(1);
     await expect(Values.find(2)).rejects.toThrow(RecordNotFound);
     expect(await Values.find(1)).not.toBeNull();
   });
 
-  it.skip("has one associations", async () => {
-    // BLOCKED: the has_one reader returns null for the reserved-word `values`
-    // target table even though the FK row exists — a manual
-    // `Values.where({ group_id: 1 })` finds it (as = 2). Association-layer
-    // reserved-word resolution gap in the singular-association reader.
+  it("has one associations", async () => {
     await createTestFixtures("group", "values");
     const g = await Group.find(1);
-    const v = await (g as unknown as { values: Promise<Values> }).values;
+    const v = (await g.association("values").loadTarget()) as Values;
     expect(v.id).toBe(2);
   });
 

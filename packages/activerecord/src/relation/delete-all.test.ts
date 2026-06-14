@@ -147,22 +147,27 @@ describe("DeleteAllTest", () => {
 
   it("delete all with order and limit deletes subset only", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "first", author: "frank" });
-    await Post.create({ title: "second", author: "frank" });
-    await Post.where({ author: "frank" }).limit(1).deleteAll();
-    // After deleting 1, at least some should remain or all gone - just verify no error
-    const remaining = await Post.all().toArray();
-    expect(Array.isArray(remaining)).toBe(true);
+    const first = await Post.create({ title: "first", author: "frank" });
+    const second = await Post.create({ title: "second", author: "frank" });
+    const limitedPosts = Post.where({ author: "frank" }).order("id").limit(1);
+    expect(await limitedPosts.count()).toBe(1);
+    expect(await limitedPosts.limit(2).count()).toBe(2);
+    expect(await limitedPosts.deleteAll()).toBe(1);
+    const remainingIds = (await Post.all().toArray()).map((p) => p.id);
+    expect(remainingIds).not.toContain(first.id);
+    expect(remainingIds).toContain(second.id);
   });
 
   it("delete all with order and limit and offset deletes subset only", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "a1", author: "grace" });
-    await Post.create({ title: "a2", author: "grace" });
-    await Post.create({ title: "a3", author: "grace" });
-    await Post.where({ author: "grace" }).offset(1).deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(Array.isArray(remaining)).toBe(true);
+    const first = await Post.create({ title: "first", author: "grace" });
+    const second = await Post.create({ title: "second", author: "grace" });
+    const limitedPosts = Post.where({ author: "grace" }).order("id").limit(1).offset(1);
+    expect(await limitedPosts.count()).toBe(1);
+    expect(await limitedPosts.deleteAll()).toBe(1);
+    const remainingIds = (await Post.all().toArray()).map((p) => p.id);
+    expect(remainingIds).toContain(first.id);
+    expect(remainingIds).not.toContain(second.id);
   });
 
   it("delete all composite model with join subquery", async () => {
