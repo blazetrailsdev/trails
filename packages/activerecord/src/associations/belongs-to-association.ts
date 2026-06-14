@@ -1,8 +1,8 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { loadBelongsTo, resolveModel } from "../associations.js";
+import { loadBelongsTo, resolveModel, reflectLockVersionBump } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
-import { belongsToCounterCacheColumn, resolveAliasedColumn } from "../reflection.js";
+import { belongsToCounterCacheColumn } from "../reflection.js";
 import { SingularAssociation } from "./singular-association.js";
 
 /**
@@ -362,6 +362,46 @@ export class BelongsToAssociation extends SingularAssociation {
     if (!this.owner.isPersisted()) return;
     if (!this.foreignKeyPresent()) return;
 
+    const touch = (this.reflection.options as any).touch;
+
+    // Mirrors Rails belongs_to_association.rb#update_counters: when the target is
+    // loaded and still the owner's current parent, dispatch through
+    // `target.increment!(col, by, touch:)` so the class-level
+    // Locking::Optimistic#update_counters override bumps the lock version (and
+    // applies `touch`) on the in-memory record. Otherwise fall back to an
+    // in-place relation `update_counters`.
+    //
+    // Rails guards this with `target && !stale_target?`. We express the same
+    // intent — "the loaded target is still the owner's parent" — directly as
+    // FK==PK rather than via `isStaleTarget()`, because trails' inverse-wiring
+    // diverges from Rails by one step on the has_many `<<`/`push` path:
+    //   - Rails `set_inverse_instance` runs the belongs_to's `inversed_from` →
+    //     `replace_keys`, which writes the owner FK *before* the stale-state
+    //     snapshot is taken, so `stale_target?` is already correct.
+    //   - trails' shared inverse primitive (`associations.ts#_cacheSingularTarget`)
+    //     caches the target via `setTarget` WITHOUT the `replace_keys` FK write;
+    //     `insert_record` writes the FK afterwards, so `_staleState` snapshots a
+    //     nil FK and `isStaleTarget()` then spuriously reports true.
+    // Routing `_cacheSingularTarget` through `inversedFrom` would make
+    // `isStaleTarget()` correct, but it mutates owner FKs during read-side
+    // inverse/preload wiring across the whole codebase — out of scope for this
+    // locking change. The FK==PK test is the faithful local read of
+    // `stale_target?`'s intent. (Follow-up: align the primitive with Rails.)
+    const target = this.target as any;
+    if (
+      target &&
+      this.targetMatchesOwnerForeignKey(target) &&
+      typeof target.incrementBang === "function"
+    ) {
+      await target.incrementBang(counterCol, by, touch != null ? { touch } : {});
+      // The counter UPDATE advanced the target's lock_version in the DB; sync it
+      // on the in-memory record so a read without a reload sees it and it isn't
+      // left dirty (Rails keeps the loaded record consistent with the row it
+      // just wrote).
+      reflectLockVersionBump(target as Base);
+      return;
+    }
+
     const fks = this.foreignKeyNames();
     const pks = this.associationPrimaryKeys(null);
     const conditions: Record<string, unknown> = {};
@@ -372,7 +412,6 @@ export class BelongsToAssociation extends SingularAssociation {
     }
 
     const Klass = this.klass;
-    const touch = (this.reflection.options as any).touch;
     const opts = touch != null ? { touch } : undefined;
     if (Klass && typeof (Klass as any).where === "function") {
       const scope = (Klass as any).where(conditions);
@@ -380,17 +419,27 @@ export class BelongsToAssociation extends SingularAssociation {
         await scope.updateCounters({ [counterCol]: by }, opts);
       }
     }
+  }
 
-    // Mirror the updated value in-memory if target is loaded. Rails calls
-    // `target.increment!(counter_cache_column, by)` (belongs_to_association.rb),
-    // which resolves the column through alias_attribute; resolve here too so an
-    // aliased counter updates the real in-memory column rather than writing a
-    // stray snake-named property.
-    if (this.target && !this.isStaleTarget()) {
-      const col = resolveAliasedColumn(this.target.constructor as any, counterCol);
-      const current = (this.target as any)[col] ?? 0;
-      (this.target as any)[col] = current + by;
+  /**
+   * True when `target`'s association primary key still equals the owner's
+   * current foreign key — i.e. the loaded target is genuinely the owner's
+   * parent (not a record left over from a prior, since-reassigned value).
+   */
+  private targetMatchesOwnerForeignKey(target: Base): boolean {
+    const fks = this.foreignKeyNames();
+    const pks = this.associationPrimaryKeys(null);
+    for (let i = 0; i < fks.length; i++) {
+      const fkValue = (this.owner as any)._readAttribute?.(fks[i]);
+      if (fkValue == null) return false;
+      const pk = pks[i] ?? pks[0];
+      const pkValue =
+        typeof (target as any)._readAttribute === "function"
+          ? (target as any)._readAttribute(pk)
+          : (target as any)[pk];
+      if (pkValue == null || String(pkValue) !== String(fkValue)) return false;
     }
+    return true;
   }
 
   protected ownerAttributeChanged(attr: string): boolean {
