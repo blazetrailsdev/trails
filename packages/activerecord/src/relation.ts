@@ -2132,7 +2132,20 @@ export class Relation<T extends Base> {
     if (Array.isArray(attrs)) {
       return attrs.map((a) => this.build(a, block));
     }
-    const record = new this._modelClass({ ...this.scopeForCreate(), ...attrs }) as T;
+    // Rails' `Relation#build` runs `scoping { klass.new(...) }` so the new
+    // record's `populate_with_current_scope_attributes` seeds from THIS
+    // relation's `scope_for_create` (which may be empty, e.g. `unscoped`)
+    // rather than the class-level default scope. Set current_scope across the
+    // construction so the constructor's seeding honors the relation's scope.
+    const modelClass = this._modelClass as any;
+    const prev = ScopeRegistry.currentScope(modelClass);
+    ScopeRegistry.setCurrentScope(modelClass, this as any);
+    let record: T;
+    try {
+      record = new this._modelClass({ ...this.scopeForCreate(), ...attrs }) as T;
+    } finally {
+      ScopeRegistry.setCurrentScope(modelClass, prev);
+    }
     if (block) block(record);
     return record;
   }

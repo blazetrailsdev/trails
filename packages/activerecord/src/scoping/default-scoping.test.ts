@@ -682,8 +682,7 @@ describe("DefaultScopingTest", () => {
   //    tracked by test:compare while the behavior is unimplemented. Each notes
   //    the missing capability.
 
-  // default-scope `where` conditions are not yet applied as attributes on new/create.
-  it.skip("default scope with conditions hash", async () => {
+  it("default scope with conditions hash", async () => {
     const expected = (await Developer.where({ name: "Jamis" }).toArray())
       .map((d: any) => d.id)
       .sort();
@@ -692,14 +691,12 @@ describe("DefaultScopingTest", () => {
     expect(((await DeveloperCalledJamis.create()) as any).name).toBe("Jamis");
   });
 
-  // default-scope `where` → attribute propagation on new is unimplemented.
-  it.skip("default scope attribute", () => {
+  it("default scope attribute", () => {
     const jamis = PoorDeveloperCalledJamis.new({ name: "David" }) as any;
     expect(jamis.salary).toBe(50000);
   });
 
-  // default-scope `where` → attribute propagation on create is unimplemented.
-  it.skip("create attribute overwrites default values", async () => {
+  it("create attribute overwrites default values", async () => {
     expect(((await PoorDeveloperCalledJamis.create({ salary: null })) as any).salary).toBeNull();
     expect(((await PoorDeveloperCalledJamis.create({ name: "David" })) as any).salary).toBe(50000);
   });
@@ -746,8 +743,7 @@ describe("DefaultScopingTest", () => {
     expect(reloadSql).toMatch(/firm_id/);
   });
 
-  // `allQueries` default scope on update for a mixed-scope model is unimplemented.
-  it.skip("combined default scope without and with all queries works", async () => {
+  it("combined default scope without and with all queries works", async () => {
     await Mentor.create();
     const klass =
       DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries;
