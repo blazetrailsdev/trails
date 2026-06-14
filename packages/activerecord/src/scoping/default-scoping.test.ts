@@ -721,24 +721,21 @@ describe("DefaultScopingTest", () => {
     expect(await Project.count()).toBeGreaterThan(0);
   });
 
-  // `allQueries` default scope is not applied to update_columns yet.
-  it.skip("default scope with all queries runs on update columns", async () => {
+  it("default scope with all queries runs on update columns", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
     const updateSql = (await capSql(() => dev.updateColumns({ name: "Not Eileen" })))[0];
     expect(updateSql).toMatch(/mentor_id/);
   });
 
-  // `allQueries` default scope is not applied to reload yet.
-  it.skip("default scope with all queries runs on reload", async () => {
+  it("default scope with all queries runs on reload", async () => {
     await Mentor.create();
     const dev = (await DeveloperWithDefaultMentorScopeAllQueries.create({ name: "Eileen" })) as any;
     const reloadSql = (await capSql(() => dev.reload()))[0];
     expect(reloadSql).toMatch(/mentor_id/);
   });
 
-  // `allQueries` default scope on reload (mixed-scope model) is unimplemented.
-  it.skip("default scope with all queries runs on reload but default scope without all queries does not", async () => {
+  it("default scope with all queries runs on reload but default scope without all queries does not", async () => {
     await Mentor.create();
     const dev =
       (await DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries.create(
