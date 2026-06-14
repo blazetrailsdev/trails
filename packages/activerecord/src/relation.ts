@@ -349,6 +349,14 @@ const StrictLoadingScope = {
   isStrictLoading: true,
 } as const;
 
+/**
+ * One pre-resolved association JOIN: the SQL table + ON predicate, plus the
+ * target model so cast-type / where lookups can recover the joined klass by
+ * table name (mirroring Rails' lookup_table_klass_from_join_dependencies)
+ * without scanning the global model registry.
+ */
+type JoinClauseSpec = { table: string; on: string; klass?: unknown };
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
   private _modelClass: typeof Base;
@@ -385,6 +393,10 @@ export class Relation<T extends Base> {
     // The base alias candidate a self-join alias was minted from (see
     // _selfJoinAlias) — used to attribute repeat counts to the right candidate.
     aliasBase?: string;
+    // The target model a `.joins(:assoc)` resolved to, retained so cast-type /
+    // where table-klass lookups recover the joined model by table name without a
+    // global registry scan (mirrors Rails keeping the join dependency).
+    klass?: unknown;
   }> = [];
   private _joinValues: (string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
@@ -1503,7 +1515,13 @@ export class Relation<T extends Base> {
       if (resolved) {
         const entries = Array.isArray(resolved) ? resolved : [resolved];
         for (const j of entries) {
-          rel._joinClauses.push({ type: "inner", table: j.table, on: j.on, quoted: true });
+          rel._joinClauses.push({
+            type: "inner",
+            table: j.table,
+            on: j.on,
+            quoted: true,
+            klass: j.klass,
+          });
         }
       } else {
         if (!rel._joinValues.includes(arg as string)) rel._joinValues.push(arg as string);
@@ -1697,9 +1715,7 @@ export class Relation<T extends Base> {
    * Through and HABTM associations produce multiple joins (the intermediate
    * table(s) plus the final target).
    */
-  private _resolveAssociationJoin(
-    name: string,
-  ): { table: string; on: string } | Array<{ table: string; on: string }> | null {
+  private _resolveAssociationJoin(name: string): JoinClauseSpec | JoinClauseSpec[] | null {
     const modelClass = this._modelClass as any;
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === name);
@@ -1738,6 +1754,7 @@ export class Relation<T extends Base> {
         on: this._compileArelNode(
           predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         ),
+        klass: targetModel,
       };
     }
 
@@ -1784,6 +1801,7 @@ export class Relation<T extends Base> {
         on: this._compileArelNode(
           predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         ),
+        klass: targetModel,
       };
     }
 
@@ -1806,10 +1824,7 @@ export class Relation<T extends Base> {
   /**
    * Resolve a has_many/has_one :through association into multiple JOIN clauses.
    */
-  private _resolveThroughJoin(
-    modelClass: any,
-    assocDef: any,
-  ): Array<{ table: string; on: string }> | null {
+  private _resolveThroughJoin(modelClass: any, assocDef: any): JoinClauseSpec[] | null {
     const sourceTable = modelClass.tableName;
     const sourcePk = modelClass.primaryKey ?? "id";
     const associations: any[] = modelClass._associations ?? [];
@@ -1840,7 +1855,7 @@ export class Relation<T extends Base> {
       (throughAssocDef.type as string) === "hasManyThrough" ||
       (throughAssocDef.type as string) === "hasOneThrough";
 
-    let throughJoins: Array<{ table: string; on: string }>;
+    let throughJoins: JoinClauseSpec[];
     if (throughIsNested) {
       const resolved = this._resolveAssociationJoin(throughName);
       if (!resolved) return null;
@@ -1879,6 +1894,7 @@ export class Relation<T extends Base> {
               ? throughPredicates[0]
               : new Nodes.And(throughPredicates),
           ),
+          klass: throughModel,
         },
       ];
     }
@@ -1956,6 +1972,7 @@ export class Relation<T extends Base> {
         on: this._compileArelNode(
           targetPredicates.length === 1 ? targetPredicates[0] : new Nodes.And(targetPredicates),
         ),
+        klass: targetModel,
       },
     ];
   }
@@ -1963,10 +1980,7 @@ export class Relation<T extends Base> {
   /**
    * Resolve a HABTM association into JOIN clauses through the join table.
    */
-  private _resolveHabtmJoin(
-    modelClass: any,
-    assocDef: any,
-  ): Array<{ table: string; on: string }> | null {
+  private _resolveHabtmJoin(modelClass: any, assocDef: any): JoinClauseSpec[] | null {
     // Rails' HABTM macro does not forward `:primary_key` to the generated
     // through-`has_many` (Builder::HasAndBelongsToMany#middle_options); the
     // owner-side join always resolves to the model's primary key.
@@ -2004,6 +2018,7 @@ export class Relation<T extends Base> {
       {
         table: targetTable,
         on: this._compileArelNode(tgtT.get(targetPk as string).eq(joinT.get(targetFk))),
+        klass: targetModel,
       },
     ];
   }
