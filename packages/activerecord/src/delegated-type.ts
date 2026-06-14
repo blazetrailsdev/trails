@@ -7,6 +7,12 @@ import { resolveModel } from "./associations.js";
  */
 export interface DelegatedTypeOptions {
   types: string[];
+  /**
+   * Optional association scope lambda, forwarded to the generated polymorphic
+   * `belongsTo`. Mirrors Rails' `delegated_type(role, types:, **options)`,
+   * which passes `options.delete(:scope)` as the `belongs_to` scope proc.
+   */
+  scope?: (rel: any, owner?: any) => any;
   foreignKey?: string;
   foreignType?: string;
   /**
@@ -58,8 +64,9 @@ export function delegatedType(
   const primaryKey = options.primaryKey ?? "id";
   const config = { ...options, foreignKey, foreignType, primaryKey };
 
-  // Rails: belongs_to role, **options.merge(polymorphic: true)
-  // (Rails also accepts an optional scope proc; we omit it as there's no proc equivalent)
+  // Rails: belongs_to role, options.delete(:scope), **options.merge(polymorphic: true)
+  // — the `:scope` proc becomes the belongs_to scope; the rest are options.
+  // trails' belongsTo takes the scope as `options.scope`, so forward it there.
   const { types: _types, ...assocOptions } = options as DelegatedTypeOptions & { types?: unknown };
   (modelClass as any).belongsTo(role, {
     ...assocOptions,
