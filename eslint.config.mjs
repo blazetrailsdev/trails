@@ -9,6 +9,7 @@ import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
 import railsErrorParity from "./eslint/rails-error-parity.mjs";
+import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
@@ -117,6 +118,7 @@ export default defineConfig(
           "no-process-bypass": noProcessBypass,
           "rails-private-jsdoc": railsPrivateJsdoc,
           "rails-error-parity": railsErrorParity,
+          "rails-arel-tosql": railsArelTosql,
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "no-native-date": noNativeDate,
           "sqlite-driver-await": sqliteDriverAwait,
@@ -216,6 +218,25 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-error-parity": "error",
+    },
+  },
+
+  // ── rails-arel-tosql: a class may define `toSql`/`toSqlAndBinds` only if
+  //    its Rails counterpart defines `to_sql`/`to_sql_and_binds`. Enforces
+  //    Arel fidelity — build SQL through real Arel AST nodes + visitors, not
+  //    hand-mashed strings. Allow-set: eslint/rails-tosql-classes.json (built
+  //    by `pnpm tsx scripts/build-rails-tosql-manifest.ts` from the api-compare
+  //    manifest). Pre-existing violators are grandfathered in
+  //    eslint/rails-arel-tosql-exclude.json and ratcheted down. ──
+  {
+    files: [
+      "packages/activerecord/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/arel/src/**/*.ts",
+    ],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/rails-arel-tosql": "error",
     },
   },
 
