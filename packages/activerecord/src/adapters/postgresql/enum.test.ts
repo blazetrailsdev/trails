@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/enum_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
@@ -68,6 +68,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TYPE IF EXISTS "color" CASCADE`);
     // test_schema is managed by withTestSchema — no DROP here
     PostgresqlEnum.resetColumnInformation();
+    vi.restoreAllMocks();
   });
 
   describe("PostgresqlEnumTest", () => {
@@ -117,12 +118,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       }).toThrow(ArgumentError);
     });
 
-    // Needs stderr capture
-    it.skip("no oid warning", () => {
-      // BLOCKED: infra — no vitest equivalent of Ruby capture(:stderr); the PG
-      //   adapter has no stderr/warn sink to assert against (no process.* per
-      //   repo rules). Tracked as follow-up story p3-pg-enum-no-oid-warning.
-      // SCOPE: console/stderr hook helper + adapter warn plumbing.
+    // Rails: capture(:stderr) { PostgresqlEnum.first }; assert blank.
+    // The adapter's unknown-OID warning sink is console.warn, so spying on it
+    // is the vitest equivalent of capturing stderr.
+    it("no oid warning", async () => {
+      await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await PostgresqlEnum.first();
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it("enum type cast", async () => {
