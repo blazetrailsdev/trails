@@ -296,6 +296,38 @@ describe("StatementCacheTest", () => {
     }
   });
 
+  it("find and find_by route through the unprepared (PartialQuery) cache path", async () => {
+    // Regression: find/find_by add LIMIT 1, whose concrete bind is collected
+    // as a raw BindParam on the unprepared path. Without normalization it
+    // reached the adapter's quote() ("can't quote BindParam"). CI runs the
+    // suite with preparedStatements: false, so exercise that mode explicitly.
+    await import("./relation.js");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+    const { Base } = await import("./base.js");
+
+    const conn = new BetterSQLite3Adapter(":memory:");
+    conn.preparedStatements = false;
+    try {
+      await defineSchema(conn, { books: canonicalSchema.books });
+      await conn.executeMutation('INSERT INTO "books" ("name") VALUES (?)', ["Ruby"]);
+
+      class Book extends Base {
+        static {
+          this.tableName = "books";
+          this.adapter = conn;
+        }
+      }
+
+      expect((await Book.findBy({ name: "Ruby" }))!.readAttribute("name")).toBe("Ruby");
+      expect((await Book.find(1)).readAttribute("name")).toBe("Ruby");
+      // String id must coerce through the bind path (no pre-cast).
+      expect((await Book.find("1" as any)).readAttribute("name")).toBe("Ruby");
+    } finally {
+      conn.disconnectBang();
+    }
+  });
+
   it("find association does not use statement cache if table name is changed", async () => {
     await import("./relation.js");
     const { BetterSQLite3Adapter } =
