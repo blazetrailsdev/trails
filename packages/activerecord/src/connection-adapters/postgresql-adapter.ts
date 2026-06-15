@@ -3584,9 +3584,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const cols = Array.isArray(columns) ? columns : [columns];
     const quotedTable = this.quoteTableName(tableName);
 
-    const indexName =
-      options.name ?? `index_${tableName.replace(/[."]/g, "_")}_on_${cols.join("_and_")}`;
-
     if (options.algorithm && options.algorithm !== "concurrently") {
       throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
     }
@@ -3596,7 +3593,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
     // Route through addIndexOptions (Rails' add_index_options) so the
     // bare-column-name `:where` quoting lives there, matching Rails' structure.
+    // idx.name is resolved via index_name → generate_index_name, applying the
+    // identifier-length/hash fallback so add_index and remove_index agree on the
+    // default name for over-long table+column combinations.
     const [idx] = await this.addIndexOptions(tableName, columns, options);
+
+    const indexName = idx.name;
 
     const unique = options.unique ? "UNIQUE " : "";
     const concurrently = options.algorithm === "concurrently" ? "CONCURRENTLY " : "";
