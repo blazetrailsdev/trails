@@ -49,8 +49,13 @@ package list, and the `declare` / associations / enums / schema reference, see
   ship the portion that fits and register the rest as new stories. If the work
   is larger than one PR, or you discover additional work that belongs in a
   separate PR, do NOT open it yourself — add a new story to the epic with
-  `pnpm tasks new <rfc-slug> <story-slug>` so it gets scheduled and owned
-  separately. This keeps the one-agent-per-PR ownership model intact (a single
+  `pnpm tasks new <rfc-slug> <story-slug> --body-file <path>` so it gets
+  scheduled and owned separately. **Capture the context you have right now:**
+  `tasks new` refuses an empty/skeleton-only body, so pass `--body-file` with
+  the `## Context` (the trails/Rails `file:line` you just read) and
+  `## Acceptance criteria` — a title-only stub forces an expensive re-derivation
+  later. Use `--allow-empty` only when you deliberately want a bare placeholder.
+  This keeps the one-agent-per-PR ownership model intact (a single
   agent fanning out N PRs and then dying orphans all of them — this happened).
   The only exception is a single mechanical rename — note it in the PR body.
 - **Do NOT stack PRs.** Each PR branches from `main` and stands alone.
