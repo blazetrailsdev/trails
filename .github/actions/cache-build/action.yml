@@ -17,6 +17,13 @@ description: Restores the per-package dist/ + tsc --build incremental state so p
 # the job unchanged; it simply becomes near-instant on a hit. The first of the
 # parallel jobs to finish populates the cache; the rest restore it. No
 # `needs:` edge is introduced, so job parallelism is preserved.
+#
+# USE ONLY IN JOBS THAT RUN A FULL-WORKSPACE `pnpm build` (`tsc --build`).
+# `actions/cache` saves only on a key miss, so the first job to finish wins
+# the save. A job that builds just a SUBSET of packages (e.g. a `--filter`
+# parity dump) would save an incomplete `dist/` under this shared key and
+# poison it for every full-build consumer until the source hash changes —
+# so the partial-build parity jobs intentionally do NOT use this action.
 
 runs:
   using: composite

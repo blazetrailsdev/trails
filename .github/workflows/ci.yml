@@ -964,7 +964,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - uses: ./.github/actions/cache-build
       - name: Build dependency packages for trails introspection
         run: pnpm --filter @blazetrails/arel --filter @blazetrails/activesupport --filter @blazetrails/activemodel --filter @blazetrails/globalid build
       - name: Run trails-side dump
@@ -1075,7 +1074,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - uses: ./.github/actions/cache-build
       - name: Build dependency packages for trails query runner
         # activerecord is needed for AR-style fixtures (ar-*): ar_dump.ts
         # imports Base from @blazetrails/activerecord and fixture models.ts
