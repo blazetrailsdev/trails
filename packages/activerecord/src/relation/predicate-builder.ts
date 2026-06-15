@@ -210,6 +210,13 @@ export class PredicateBuilder {
   }
 
   buildNegated(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+    // Mirror build()'s deref (predicate_builder.rb:58). In Rails the deref lives in
+    // build() and negation is the inversion of a positively-built predicate, so
+    // `value = value.id if value.respond_to?(:id)` always applies — `where.not(col: record)`
+    // must compare against record.id, not the whole record object.
+    if (respondsToId(value)) {
+      value = (value as { id: unknown }).id;
+    }
     if (value === null || value === undefined) {
       return attribute.isNotNull();
     }
