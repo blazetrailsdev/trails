@@ -146,6 +146,11 @@ export class Merger {
     if (this.other._isReadonly) rel._isReadonly = true;
     if (this.other._isStrictLoading !== undefined)
       rel._isStrictLoading = this.other._isStrictLoading;
+    // Mirrors merge_single_values (merger.rb): create_with merges hash-wise with
+    // the other relation's values winning (last-wins precedence).
+    if (this.other._createWithAttrs && Object.keys(this.other._createWithAttrs).length > 0) {
+      rel._createWithAttrs = { ...(rel._createWithAttrs ?? {}), ...this.other._createWithAttrs };
+    }
   }
 
   private mergeClauses(rel: any): void {
