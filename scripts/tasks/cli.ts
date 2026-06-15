@@ -363,6 +363,10 @@ function syncFromOrigin(): void {
 function storyFilePath(index: Index, id: string): string {
   const entry = index.stories.find((s) => s.id === id);
   if (!entry) {
+    // loadIndex() (run by the caller before this) may have rebuilt and so
+    // dirtied the generated index files; restore them before this error exit so
+    // the tasks checkout isn't left dirty (matches rfcFilePath).
+    restoreGeneratedFiles(TASKS_DIR);
     console.error(`error: story "${id}" not found in index`);
     process.exit(1);
   }
