@@ -656,7 +656,9 @@ export async function establishConnection(
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter.validate_default_timezone
  */
 function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc" | "local" | null {
-  const raw = config.default_timezone ?? config.defaultTimezone;
+  // Rails reads only `config[:default_timezone]` (abstract_adapter.rb:73-81);
+  // no camelCase alias.
+  const raw = config.default_timezone;
   if (raw == null) return null;
   if (raw !== "utc" && raw !== "local") {
     throw new ArgumentError("default_timezone must be either 'utc' or 'local'");
