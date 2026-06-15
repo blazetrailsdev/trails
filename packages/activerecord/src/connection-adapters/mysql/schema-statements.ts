@@ -14,6 +14,7 @@ import { Column } from "./column.js";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { CreateIndexDefinition, ForeignKeyDefinition } from "../abstract/schema-definitions.js";
+import { unquoteIdentifier } from "./quoting.js";
 import type { AddIndexOptions } from "../abstract/schema-definitions.js";
 
 /**
@@ -742,18 +743,18 @@ export async function foreignKeys(
   for (const group of grouped.values()) {
     group.sort((a, b) => (a.position as number) - (b.position as number));
     const first = group[0];
-    const toTable = first.to_table as string;
+    const toTable = unquoteIdentifier(first.to_table as string) as string;
     const fkName = first.name as string;
     const onDelete = this._mysqlFkAction(first.on_delete as string);
     const onUpdate = this._mysqlFkAction(first.on_update as string);
     const column =
       group.length === 1
-        ? (first.column as string)
-        : group.map((r) => r.column as string).join(",");
+        ? (unquoteIdentifier(first.column as string) as string)
+        : group.map((r) => unquoteIdentifier(r.column as string) as string);
     const primaryKey =
       group.length === 1
         ? (first.primary_key as string)
-        : group.map((r) => r.primary_key as string).join(",");
+        : group.map((r) => r.primary_key as string);
     results.push(
       new ForeignKeyDefinition(tableName, toTable, column, primaryKey, fkName, onDelete, onUpdate),
     );

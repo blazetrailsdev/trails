@@ -16,8 +16,21 @@ import {
   typeWithSizeToSql,
   limitToSize,
   integerToSql,
+  foreignKeys,
 } from "./schema-statements.js";
 import { quote } from "./quoting.js";
+
+// Minimal ForeignKeysHost: foreignKeys() reads via schemaQuery, quotes the
+// table name, and maps referential actions. We stub schemaQuery to return the
+// information_schema rows MySQL would yield (1 row per FK column).
+function fkHost(rows: Record<string, unknown>[]) {
+  return {
+    schemaQuery: async () => rows,
+    quote,
+    _mysqlFkAction: (action: string) =>
+      action === "CASCADE" ? "cascade" : action === "SET NULL" ? "nullify" : undefined,
+  };
+}
 
 // quotedScope/dataSourceSql dispatch quoting through the adapter instance
 // (`this.quote`); supply a minimal host carrying the MySQL `quote` standalone.
@@ -326,5 +339,75 @@ describe("MySQL::SchemaStatements", () => {
     expect(integerToSql(4)).toBe("int");
     expect(integerToSql(8)).toBe("bigint");
     expect(() => integerToSql(9)).toThrow("No integer type has byte size");
+  });
+
+  it("foreignKeys: single-column key returns scalar column and primaryKey", async () => {
+    const fks = await foreignKeys.call(
+      fkHost([
+        {
+          to_table: "rockets",
+          primary_key: "id",
+          column: "rocket_id",
+          name: "fk_1",
+          position: 1,
+          on_update: "RESTRICT",
+          on_delete: "CASCADE",
+        },
+      ]),
+      "astronauts",
+    );
+    expect(fks).toHaveLength(1);
+    expect(fks[0]!.column).toBe("rocket_id");
+    expect(fks[0]!.primaryKey).toBe("id");
+    expect(fks[0]!.toTable).toBe("rockets");
+    expect(fks[0]!.onDelete).toBe("cascade");
+  });
+
+  it("test_add_composite_foreign_key_infers_column", async () => {
+    const fks = await foreignKeys.call(
+      fkHost([
+        {
+          to_table: "rockets",
+          primary_key: "tenant_id",
+          column: "rocket_tenant_id",
+          name: "fk_2",
+          position: 1,
+          on_update: "RESTRICT",
+          on_delete: "RESTRICT",
+        },
+        {
+          to_table: "rockets",
+          primary_key: "id",
+          column: "rocket_id",
+          name: "fk_2",
+          position: 2,
+          on_update: "RESTRICT",
+          on_delete: "RESTRICT",
+        },
+      ]),
+      "astronauts",
+    );
+    expect(fks).toHaveLength(1);
+    expect(fks[0]!.column).toEqual(["rocket_tenant_id", "rocket_id"]);
+    expect(fks[0]!.primaryKey).toEqual(["tenant_id", "id"]);
+  });
+
+  it("foreignKeys: unquotes backtick-quoted column and to_table identifiers", async () => {
+    const fks = await foreignKeys.call(
+      fkHost([
+        {
+          to_table: "`roc``kets`",
+          primary_key: "id",
+          column: "`rocket_id`",
+          name: "fk_3",
+          position: 1,
+          on_update: "RESTRICT",
+          on_delete: "RESTRICT",
+        },
+      ]),
+      "astronauts",
+    );
+    expect(fks[0]!.column).toBe("rocket_id");
+    expect(fks[0]!.toTable).toBe("roc`kets");
   });
 });

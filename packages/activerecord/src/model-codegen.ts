@@ -229,16 +229,20 @@ export function generateModels(
     // Sort FKs by column here only so TODO-comment ordering is stable for
     // composite FKs (which share a class and share no belongsTo name).
     // belongsTo output order is re-sorted by association name below.
-    const fks = [...t.foreignKeys].sort((a, b) => a.column.localeCompare(b.column));
+    const colKey = (c: string | string[]): string => (Array.isArray(c) ? c.join(",") : c);
+    const fks = [...t.foreignKeys].sort((a, b) => colKey(a.column).localeCompare(colKey(b.column)));
     for (const fk of fks) {
       // Normalise PG-qualified table names (e.g. "other_schema.authors" →
       // "authors") before class lookup and name derivation. classes Map is
       // keyed by the unqualified names returned from introspectTables().
       const toTableUnqual = unqualify(fk.toTable);
-      // Composite FK: emit TODO comment, no association.
-      if (fk.column.includes(",")) {
+      // Composite FK: emit TODO comment, no association. Composites arrive as
+      // arrays (MySQL/PG introspection) or legacy comma-joined strings (SQLite).
+      if (Array.isArray(fk.column) || fk.column.includes(",")) {
+        const colStr = Array.isArray(fk.column) ? fk.column.join(",") : fk.column;
+        const pkStr = Array.isArray(fk.primaryKey) ? fk.primaryKey.join(",") : fk.primaryKey;
         fromCls.leadingComments.push(
-          `// TODO composite FK ${fk.name}: ${fk.column} -> ${fk.toTable}.${fk.primaryKey}`,
+          `// TODO composite FK ${fk.name}: ${colStr} -> ${fk.toTable}.${pkStr}`,
         );
         continue;
       }
@@ -365,7 +369,10 @@ export function generateModels(
         (n, t) =>
           n +
           t.foreignKeys.filter(
-            (fk) => !fk.column.includes(",") && classes.has(unqualify(fk.toTable)),
+            (fk) =>
+              !Array.isArray(fk.column) &&
+              !fk.column.includes(",") &&
+              classes.has(unqualify(fk.toTable)),
           ).length,
         0,
       );
