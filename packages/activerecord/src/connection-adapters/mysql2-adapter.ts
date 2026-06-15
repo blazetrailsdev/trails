@@ -522,8 +522,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
           }
           // DML results in a ResultSetHeader (no rows array); SELECT results
-          // in an array of row objects. Return empty Result for DML to avoid
-          // throwing on INSERT/UPDATE/DELETE passed to execQuery.
+          // in an array of positional row arrays. Return empty Result for DML
+          // to avoid throwing on INSERT/UPDATE/DELETE passed to execQuery.
           if (!Array.isArray(result)) {
             payload.row_count = (result as mysql.ResultSetHeader).affectedRows ?? 0;
             await this._handleWarningsOn(mysqlConn, driverSql);
