@@ -1426,7 +1426,11 @@ function rebindTableReferences(
     // Match by the table's *effective* SQL name: an unaliased table uses its
     // real name; a join whose table was already aliased (a second join onto the
     // same table) is identified by its alias. Both must rebind when the
-    // referenced-alias pass renames the table.
+    // referenced-alias pass renames the table. No false-positive risk: AliasTracker
+    // mints aliases from a namespace seeded with every real table name in the
+    // query (bumping on collision), so an alias can never equal a sibling join's
+    // real table name — and this rebind only walks one join's ON (its own table
+    // plus its grandchildren), not the whole FROM list.
     if (rel instanceof Table && (rel.tableAlias ?? rel.name) === fromTableName) {
       return toTable.get(node.name);
     }

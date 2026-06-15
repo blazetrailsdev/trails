@@ -57,9 +57,11 @@ describe("SelectTest", () => {
     );
     // Warm PostWithDefaultSelect's column cache up front. Its first lazy
     // columnsHash() load otherwise lands mid-suite after a sibling test resolves
-    // an aliased-table hash select (a known pre-existing interaction that leaves
-    // a fresh same-table model load returning no columns), which would
-    // un-qualify the `reselect with default scope select` projection.
+    // an aliased-table hash select, a pre-existing interaction (reproduced with
+    // this PR's src changes reverted) that leaves a fresh same-table model load
+    // returning no columns and would un-qualify the `reselect with default scope
+    // select` projection. Tracked upstream: RFC 0030 story
+    // columnshash-empty-after-aliased-hash-select (remove this warm-up when fixed).
     (PostWithDefaultSelect as unknown as { columnsHash(): unknown }).columnsHash();
   });
   const q = (name: string) => escapeRegExp(quoteTableName(name));
