@@ -177,6 +177,28 @@ describeIfMysql("Mysql2Adapter", () => {
     });
   });
 
+  // -- cast_result column derivation --
+  describe("execQuery", () => {
+    it("preserves duplicate column names via positional rows", async () => {
+      // Rails' cast_result builds the Result from `result.fields` +
+      // positional `result.to_a`, so `SELECT 1 AS a, 2 AS a` keeps both
+      // columns. Object-keyed rows would collapse the second `a` onto the
+      // first; array-mode rows recover them.
+      const result = await adapter.execQuery("SELECT 1 AS a, 2 AS a");
+      expect(result.columns).toEqual(["a", "a"]);
+      expect(result.rows[0]).toEqual([1, 2]);
+    });
+
+    it("derives columns from field descriptors when zero rows match", async () => {
+      await adapter.exec(
+        "CREATE TABLE `widgets` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT)",
+      );
+      const result = await adapter.execQuery("SELECT `id`, `name` FROM `widgets` WHERE 1 = 0");
+      expect(result.columns).toEqual(["id", "name"]);
+      expect(result.length).toBe(0);
+    });
+  });
+
   // -- Transactions --
   describe("transactions", () => {
     beforeEach(async () => {
