@@ -576,14 +576,8 @@ export class Builder implements InsertBuilder {
       // serialize but not serializeCastValue (binary, json, serialized, the
       // PG OID types) inherits identity serializeCastValue and would
       // otherwise persist the in-memory cast value.
-      if (
-        type &&
-        typeof type.serializeCastValue === "function" &&
-        typeof type.serialize === "function"
-      ) {
+      if (type && typeof type.serialize === "function") {
         value = SerializeCastValue.serialize(type, castValue);
-      } else if (type && typeof type.serialize === "function") {
-        value = type.serialize(castValue);
       } else if (type && typeof type.serializeCastValue === "function") {
         value = type.serializeCastValue(castValue);
       } else {
