@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import {
   Base,
   RecordNotFound,
@@ -88,6 +88,9 @@ describe("BasicsTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(SCHEMA);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("table name based on model name", () => {
@@ -1628,14 +1631,11 @@ describe("BasicsTest", () => {
     // columns then propagates that error. Already-loaded records are
     // unaffected — the data survives once the cache works again.
     const adapter = Topic.connection as any;
-    const spy = vi.spyOn(adapter, "schemaCache", "get").mockImplementation(() => {
+    vi.spyOn(adapter, "schemaCache", "get").mockImplementation(() => {
       throw new Error("Some Error");
     });
-    try {
-      expect(() => (Topic as any).columnsHash()).toThrow("Some Error");
-    } finally {
-      spy.mockRestore();
-    }
+    expect(() => (Topic as any).columnsHash()).toThrow("Some Error");
+    vi.restoreAllMocks();
 
     const reloaded = await Topic.first();
     expect((reloaded as any).content).toEqual(payload);
