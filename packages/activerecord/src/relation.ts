@@ -5,6 +5,7 @@ import {
   SelectManager,
   Nodes,
   Visitors,
+  Collectors,
   UpdateManager,
   DeleteManager,
 } from "@blazetrails/arel";
@@ -4191,22 +4192,55 @@ export class Relation<T extends Base> {
    * Generate the SQL for this relation.
    */
   toSql(): string {
-    const sql = this._toSql();
-    const binds = this._lastSelectBinds;
-    if (binds.length === 0) return sql;
-    // Substitute bind values inline for human-readable output (mirrors Rails to_sql).
-    // Handles both ? (SQLite/MySQL) and $N (PostgreSQL) placeholders.
-    // Use the connection's quote() so binary, temporal, and other non-primitive
-    // values are formatted correctly (e.g. bytea → '\x271f5c', not raw bytes).
+    // Mirrors `model.with_connection { |c| c.unprepared_statement { c.to_sql(arel) } }`
+    // (relation.rb:1217-1218): build the same arel `_toSql` compiles and render
+    // it through the connection, which inlines binds during AST traversal via
+    // the SubstituteBinds collector. No cached node, no bespoke quoter, no
+    // post-hoc string pass.
+    if (this._setOperation) {
+      // The set-operation visitors wrap the compound SELECT in `( ... )` for
+      // embedded use. As a standalone statement SQLite rejects the leading
+      // paren, so strip the single enclosing pair the visitor added (operand
+      // parens for ORDER/LIMIT/OFFSET sides use no inner space, so are kept).
+      const raw = this._toSqlViaConnection(this._buildSetOperationNode());
+      return raw.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
+    }
+    if (this._eagerLoadingForSql()) {
+      const manager = this._buildEagerOperandManager();
+      if (manager !== null) {
+        this._applyCtesAndAnnotationsToManager(manager);
+        return this._toSqlViaConnection(manager.ast);
+      }
+      // null (e.g. unresolvable association): fall through to plain SQL.
+    }
+    return this._toSqlViaConnection(this._buildArel().ast);
+  }
+
+  /**
+   * Render an Arel node to inlined display SQL through the connection, mirroring
+   * Rails' `conn.unprepared_statement { conn.to_sql(arel) }`. `unpreparedStatement`
+   * forces prepared statements off so `connection.toSql` compiles through the
+   * SubstituteBinds collector; the toggle is applied synchronously (the async
+   * `unpreparedStatement` exists for EXPLAIN, but `toSql` is sync). When no
+   * connection is established (HABTM join models), fall back to a default ANSI
+   * visitor inlining binds through the shared `defaultQuoter` — debug-only
+   * output, as in Rails' connection-less `Node#to_sql`.
+   */
+  private _toSqlViaConnection(node: Nodes.Node): string {
     const adapter = this._resolveAdapter();
-    return Visitors.substituteBoundValues(sql, (match, i) => {
-      const val = binds[i];
-      if (val === undefined) return match;
-      if (adapter) return adapter.quote(val);
-      if (val === null) return "NULL";
-      if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
-      return String(val);
-    });
+    if (adapter === null) {
+      return new Visitors.ToSql().compile(
+        node,
+        new Collectors.SubstituteBinds(Visitors.defaultQuoter, new Collectors.SQLString()),
+      );
+    }
+    const wasPrepared = adapter.preparedStatements;
+    adapter.preparedStatements = false;
+    try {
+      return adapter.toSql(node);
+    } finally {
+      adapter.preparedStatements = wasPrepared;
+    }
   }
 
   private _instrumentInstantiation(rows: Record<string, unknown>[]): T[] {
