@@ -790,6 +790,8 @@ export async function indexes(
     using?: string;
     type?: string;
     comment?: string;
+    lengths?: Record<string, number>;
+    orders?: Record<string, string>;
   }>
 > {
   let rows: Array<Record<string, unknown>>;
@@ -809,7 +811,15 @@ export async function indexes(
 
   const byIndex = new Map<
     string,
-    { columns: string[]; unique: boolean; using?: string; type?: string; comment?: string }
+    {
+      columns: string[];
+      unique: boolean;
+      using?: string;
+      type?: string;
+      comment?: string;
+      lengths: Record<string, number>;
+      orders: Record<string, string>;
+    }
   >();
   let currentIndex: string | null = null;
   for (const r of rows) {
@@ -831,10 +841,20 @@ export async function indexes(
       const rawComment = r.Index_comment ?? r.INDEX_COMMENT;
       const comment =
         rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
-      byIndex.set(keyName, { columns: [], unique: nonUnique === 0, using, type, comment });
+      byIndex.set(keyName, {
+        columns: [],
+        unique: nonUnique === 0,
+        using,
+        type,
+        comment,
+        lengths: {},
+        orders: {},
+      });
     }
 
     const entry = byIndex.get(currentIndex!)!;
+    // Mirrors Rails' `row[:Collation] == "D"` — descending column/expression.
+    const desc = String((r.Collation ?? r.COLLATION) as string) === "D";
     const rawExpr = r.Expression ?? r.EXPRESSION;
     if (rawExpr != null) {
       // MySQL 8+ functional indexes carry the raw SQL in `Expression` (and
@@ -843,16 +863,26 @@ export async function indexes(
       let expr = String(rawExpr).replace(/\\'/g, "'");
       if (!expr.startsWith("(")) expr = `(${expr})`;
       entry.columns.push(expr);
+      if (desc) entry.orders[expr] = "desc";
     } else {
-      entry.columns.push(String((r.Column_name ?? r.COLUMN_NAME) as string));
+      const column = String((r.Column_name ?? r.COLUMN_NAME) as string);
+      entry.columns.push(column);
+      // Mirrors Rails' `lengths.merge!(col => Sub_part.to_i) if row[:Sub_part]`.
+      const subPart = r.Sub_part ?? r.SUB_PART;
+      if (subPart != null) entry.lengths[column] = Number(subPart);
+      if (desc) entry.orders[column] = "desc";
     }
   }
-  return Array.from(byIndex.entries()).map(([name, { columns, unique, using, type, comment }]) => ({
-    name,
-    columns,
-    unique,
-    ...(using !== undefined ? { using } : {}),
-    ...(type !== undefined ? { type } : {}),
-    ...(comment !== undefined ? { comment } : {}),
-  }));
+  return Array.from(byIndex.entries()).map(
+    ([name, { columns, unique, using, type, comment, lengths, orders }]) => ({
+      name,
+      columns,
+      unique,
+      ...(using !== undefined ? { using } : {}),
+      ...(type !== undefined ? { type } : {}),
+      ...(comment !== undefined ? { comment } : {}),
+      ...(Object.keys(lengths).length > 0 ? { lengths } : {}),
+      ...(Object.keys(orders).length > 0 ? { orders } : {}),
+    }),
+  );
 }

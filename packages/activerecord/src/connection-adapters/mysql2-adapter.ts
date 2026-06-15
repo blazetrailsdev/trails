@@ -1228,6 +1228,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       using?: string;
       type?: string;
       comment?: string;
+      lengths?: Record<string, number>;
+      orders?: Record<string, string>;
     }>
   > {
     return mysqlIndexes.call(
