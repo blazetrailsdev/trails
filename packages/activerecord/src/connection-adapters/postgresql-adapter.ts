@@ -1815,11 +1815,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   /** @internal */
   executeBatch = pgExecuteBatch;
 
-  // Mirrors: PostgreSQL::DatabaseStatements#build_truncate_statements
-  // Emits a single combined TRUNCATE TABLE a, b, c statement.
-  /** @internal */
-  buildTruncateStatements = pgBuildTruncateStatements;
-
   // Mirrors: DatabaseStatements#high_precision_current_timestamp (database_statements.rb:92)
   // Rails: HIGH_PRECISION_CURRENT_TIMESTAMP = Arel.sql("CURRENT_TIMESTAMP")
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
@@ -5497,6 +5492,10 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
 (PostgreSQLAdapter.prototype as any).performQuery = performQuery;
 (PostgreSQLAdapter.prototype as any).castResult = castResult;
 (PostgreSQLAdapter.prototype as any).handleWarnings = handleWarnings;
+// Mirrors: PostgreSQL::DatabaseStatements#build_truncate_statements (database_statements.rb)
+// Combines all table names into a single TRUNCATE TABLE a, b, c statement, so
+// the abstract `truncateTables` emits Rails' combined form instead of N per-table ones.
+(PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
 
 // `executeMutation` is this adapter's write/DDL primitive (reads go through the
 // overridden `execQuery`), so dirtying it clears the query cache on writes and
