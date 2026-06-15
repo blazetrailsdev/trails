@@ -711,8 +711,7 @@ describe("DefaultScopingTest", () => {
     expect(((await PoorDeveloperCalledJamis.create({ name: "David" })) as any).salary).toBe(50000);
   });
 
-  // `create_with` merge precedence (later create_with wins) is unimplemented.
-  it.skip("create with merge", () => {
+  it("create with merge", () => {
     const aaron = (PoorDeveloperCalledJamis.createWith({ name: "foo", salary: 20 }) as any)
       .merge(PoorDeveloperCalledJamis.createWith({ name: "Aaron" }))
       .new();
