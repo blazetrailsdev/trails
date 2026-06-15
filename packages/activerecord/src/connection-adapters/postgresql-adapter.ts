@@ -2039,35 +2039,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.execute("SET standard_conforming_strings = on");
   }
 
-  // Mirrors: PostgreSQLAdapter#enum_types (postgresql_adapter.rb:518)
-  // Returns an array of [fullName, values] pairs for all enum types visible on the search path
-  // (current_schemas(false) — all schemas in search_path, not just the current one).
-  // Enum types in the default schema are returned without a schema prefix.
   async enumTypes(): Promise<[string, string[]][]> {
-    const query = `
-      SELECT
-        type.typname AS name,
-        type.OID AS oid,
-        n.nspname AS schema,
-        json_agg(enum.enumlabel ORDER BY enum.enumsortorder) AS value
-      FROM pg_enum AS enum
-      JOIN pg_type AS type ON (type.oid = enum.enumtypid)
-      JOIN pg_namespace n ON type.typnamespace = n.oid
-      WHERE n.nspname = ANY (current_schemas(false))
-      GROUP BY type.OID, n.nspname, type.typname
-    `;
-    const currentSchema = await this.currentSchema();
-    const rows = (await this.schemaQuery(query)) as Array<{
-      name: string;
-      schema: string;
-      value: string[];
-    }>;
-    return rows.map((row) => {
-      const schema = row.schema === currentSchema ? null : row.schema;
-      const fullName = [schema, row.name].filter(Boolean).join(".");
-      const values: string[] = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
-      return [fullName, values] as [string, string[]];
-    });
+    return this.pgSchemaStatements().enumTypes();
   }
 
   // Mirrors: PostgreSQLAdapter#max_identifier_length (postgresql_adapter.rb:620)
@@ -3836,42 +3809,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async createEnum(
     name: string,
     values: string[],
-    _options?: Record<string, unknown>,
+    options?: Record<string, unknown>,
   ): Promise<void> {
-    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
-      : this.quoteIdentifier(enumName);
-    const valueList = values.map((v) => this.quoteLiteral(v)).join(", ");
-    // Mirrors Rails create_enum: guard with IF NOT EXISTS so re-running a
-    // Schema.define under a different search_path is idempotent. The schema
-    // scope defaults to the search path (current_schemas) when unqualified.
-    const schemaScope = schema ? this.quoteLiteral(schema) : "ANY (current_schemas(false))";
-    await this.exec(`
-      DO $$
-      BEGIN
-          IF NOT EXISTS (
-            SELECT 1
-            FROM pg_type t
-            JOIN pg_namespace n ON t.typnamespace = n.oid
-            WHERE t.typname = ${this.quoteLiteral(enumName)}
-              AND n.nspname = ${schemaScope}
-          ) THEN
-              CREATE TYPE ${qualifiedName} AS ENUM (${valueList});
-          END IF;
-      END
-      $$;
-    `);
-    await this.reloadTypeMap();
+    await this.pgSchemaStatements().createEnum(name, values, options);
   }
 
   async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
-      : this.quoteIdentifier(enumName);
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+    await this.pgSchemaStatements().dropEnum(name, options);
   }
 
   // ---------------------------------------------------------------------------
@@ -3882,55 +3826,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     name: string,
     options: { subtype: string; subtypeDiff?: string },
   ): Promise<void> {
-    const { schema, table: rangeName } = this.parseSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(rangeName)}`
-      : this.quoteIdentifier(rangeName);
-    const quoteQualifiedIdentifier = (identifier: string, param: string) => {
-      if (/[\s()]/.test(identifier)) {
-        throw new Error(
-          `PostgreSQLAdapter#createRange: ${param} must be a simple or schema-qualified identifier ` +
-            `(e.g. "float8", "myschema.mytype"). Use the single-word alias instead of "${identifier}".`,
-        );
-      }
-      const parts = splitQuotedIdentifier(identifier);
-      if (parts.length === 0 || parts.length > 2) {
-        throw new Error(
-          `PostgreSQLAdapter#createRange: ${param} must have 1 or 2 dot-separated parts, got ${parts.length}: "${identifier}".`,
-        );
-      }
-      const { schema: s, table: t } = this.parseSchemaQualifiedName(identifier);
-      return s ? `${this.quoteIdentifier(s)}.${this.quoteIdentifier(t)}` : this.quoteIdentifier(t);
-    };
-    const parts = [`SUBTYPE = ${quoteQualifiedIdentifier(options.subtype, "subtype")}`];
-    if (options.subtypeDiff) {
-      parts.push(`SUBTYPE_DIFF = ${quoteQualifiedIdentifier(options.subtypeDiff, "subtypeDiff")}`);
-    }
-    await this.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
+    await this.pgSchemaStatements().createRange(name, options);
   }
 
   async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    const { schema, table: rangeName } = this.parseSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(rangeName)}`
-      : this.quoteIdentifier(rangeName);
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+    await this.pgSchemaStatements().dropRange(name, options);
   }
 
   async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
-    const newName = typeof newNameOrOptions === "string" ? newNameOrOptions : newNameOrOptions.to;
-    const { schema: newSchema } = this.parseSchemaQualifiedName(newName);
-    if (newSchema) {
-      throw new Error(
-        "PostgreSQLAdapter#renameEnum does not support changing enum schema; pass an unqualified type name.",
-      );
-    }
-    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
-      : this.quoteIdentifier(enumName);
-    await this.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.quoteIdentifier(newName)}`);
+    await this.pgSchemaStatements().renameEnum(name, newNameOrOptions);
   }
 
   async addEnumValue(
@@ -3938,33 +3842,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     value: string,
     options: { before?: string; after?: string; ifNotExists?: boolean } = {},
   ): Promise<void> {
-    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
-      : this.quoteIdentifier(enumName);
-    const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
-    if (options.before && options.after) {
-      throw new Error("Cannot specify both `before` and `after` for addEnumValue");
-    }
-    let position = "";
-    if (options.before) {
-      position = ` BEFORE ${this.quoteLiteral(options.before)}`;
-    } else if (options.after) {
-      position = ` AFTER ${this.quoteLiteral(options.after)}`;
-    }
-    await this.exec(
-      `ALTER TYPE ${qualifiedName} ADD VALUE${ifNotExists} ${this.quoteLiteral(value)}${position}`,
-    );
+    await this.pgSchemaStatements().addEnumValue(name, value, options);
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
-    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
-    const qualifiedName = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
-      : this.quoteIdentifier(enumName);
-    await this.exec(
-      `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.quoteLiteral(options.from)} TO ${this.quoteLiteral(options.to)}`,
-    );
+    await this.pgSchemaStatements().renameEnumValue(name, options);
   }
 
   async enumValues(name: string): Promise<string[]> {
