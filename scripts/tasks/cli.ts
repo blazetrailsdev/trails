@@ -1595,6 +1595,29 @@ function readRfcClusters(tasksDir: string, rfcSlug: string): string[] {
   }
 }
 
+// Reads the `status:` scalar from an RFC's README.md frontmatter, parsed with
+// the same yaml.load semantics as readRfcClusters. Returns null when the README
+// is missing, unparseable, or carries no status field — the caller treats an
+// unknown status conservatively (see the new-story default below).
+export function readRfcStatus(tasksDir: string, rfcSlug: string): RfcStatus | null {
+  const readmePath = join(tasksDir, "rfcs", rfcSlug, "README.md");
+  let text: string;
+  try {
+    text = readFileSync(readmePath, "utf8");
+  } catch {
+    return null;
+  }
+  const fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return null;
+  try {
+    const fm = parseYaml(fmMatch[1]) as { status?: unknown } | null;
+    const status = fm?.status;
+    return RFC_STATUSES.includes(status as RfcStatus) ? (status as RfcStatus) : null;
+  } catch {
+    return null;
+  }
+}
+
 // Pure content generator — exported so tests can verify the exact file format
 // without needing a real git repo or TASKS_DIR.
 export function buildStoryContent(
@@ -1623,6 +1646,11 @@ export function buildStoryContent(
     opts.body != null
       ? `\n${opts.body.replace(/^\n+/, "").replace(/\n+$/, "")}\n`
       : "\n## Context\n\n## Acceptance criteria\n";
+  // Default to `draft` here, not `ready`: this pure generator has no view of the
+  // parent RFC's status, and an unguarded `ready` would let a direct caller
+  // produce an immediately-claimable story under a still-draft RFC. `newStory`
+  // is the single source of the `ready` default — it gates on an active RFC
+  // before passing an explicit status through (see effectiveStatus above).
   return `---
 title: ${qs(title)}
 status: ${opts.status ?? "draft"}
@@ -1715,6 +1743,16 @@ export function newStory(
       process.exit(1);
     }
   }
+  // Default a new story to `ready` so it surfaces in `pnpm tasks ready` without
+  // a manual status edit — but only under an `active` RFC. `ready()` filters by
+  // story status alone and does not exclude stories whose own RFC is still
+  // `draft` (or postponed/superseded), so auto-`ready` under such an RFC would
+  // make the story immediately claimable, violating the README invariant that
+  // draft-RFC stories "should not be claimed". Under any non-active RFC (or one
+  // whose status we cannot read) fall back to `draft`. An explicit `--status`
+  // always wins.
+  const effectiveStatus: StoryStatus =
+    opts.status ?? (readRfcStatus(tasksDir, rfcSlug) === "active" ? "ready" : "draft");
   // Read the optional --body-file up front (before the commit loop) so a missing
   // path fails loudly rather than silently producing an empty-skeleton story.
   let body: string | undefined;
@@ -1763,7 +1801,12 @@ export function newStory(
       mkdirSync(storiesDir, { recursive: true });
       writeFileSync(
         storyFile,
-        buildStoryContent(rfcSlug, storySlug, { ...opts, body, date: today() }),
+        buildStoryContent(rfcSlug, storySlug, {
+          ...opts,
+          status: effectiveStatus,
+          body,
+          date: today(),
+        }),
       );
       // Hand-authored bodies often violate prettier's wrapping rules, which the
       // tasks pre-commit hook rejects; format the file in place so the commit is
