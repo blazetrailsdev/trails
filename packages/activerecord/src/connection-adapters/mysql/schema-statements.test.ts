@@ -28,7 +28,13 @@ function fkHost(rows: Record<string, unknown>[]) {
     schemaQuery: async () => rows,
     quote,
     _mysqlFkAction: (action: string) =>
-      action === "CASCADE" ? "cascade" : action === "SET NULL" ? "nullify" : undefined,
+      action === "CASCADE"
+        ? "cascade"
+        : action === "SET NULL"
+          ? "nullify"
+          : action === "RESTRICT"
+            ? "restrict"
+            : undefined,
   };
 }
 
