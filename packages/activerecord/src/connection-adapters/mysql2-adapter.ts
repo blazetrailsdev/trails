@@ -484,9 +484,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           const mysqlConn = conn as unknown as mysql.Connection;
           const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
           if (prepare) this._trackPrepared(mysqlConn, driverSql);
+          // Request array-mode rows so duplicate column names
+          // (e.g. `SELECT 1 AS a, 2 AS a`) survive: object-keyed rows would
+          // collapse the second `a` onto the first. This mirrors Rails, whose
+          // `configure_connection` sets `query_options[:as] = :array`
+          // (mysql2_adapter.rb:159), making `raw_result.to_a` positional — so
+          // cast_result builds the Result from `result.fields` + positional rows.
           const [rawResult, rawFields] = prepare
-            ? await mysqlConn.execute(driverSql, driverBinds as any[])
-            : await mysqlConn.query(driverSql, driverBinds);
+            ? await mysqlConn.execute(
+                { sql: driverSql, rowsAsArray: true } as any,
+                driverBinds as any[],
+              )
+            : await mysqlConn.query({ sql: driverSql, rowsAsArray: true } as any, driverBinds);
           // CALL sets _resultIndex > 0 in mysql2, wrapping rows AND fields in
           // parallel nested arrays. Mirror Rails' abandon_results! + cast_result:
           // take the first result set and use rawFields[0] (field-descriptor array,
@@ -515,8 +524,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
           }
           // DML results in a ResultSetHeader (no rows array); SELECT results
-          // in an array of row objects. Return empty Result for DML to avoid
-          // throwing on INSERT/UPDATE/DELETE passed to execQuery.
+          // in an array of positional row arrays. Return empty Result for DML
+          // to avoid throwing on INSERT/UPDATE/DELETE passed to execQuery.
           if (!Array.isArray(result)) {
             payload.row_count = (result as mysql.ResultSetHeader).affectedRows ?? 0;
             await this._handleWarningsOn(mysqlConn, driverSql);
@@ -524,15 +533,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           }
           payload.row_count = result.length;
           await this._handleWarningsOn(mysqlConn, driverSql);
-          // A zero-row SELECT yields no row hashes for `fromRowHashes` to read
-          // columns from, dropping the column set. Mirror Rails' `cast_result`:
-          // take the columns from the field descriptors so the Result still
-          // reports its columns when the query matched no rows.
-          if (result.length === 0) {
-            const names = (fields ?? []).map((f) => f.name);
-            return names.length === 0 ? Result.empty() : new Result(names, []);
-          }
-          return Result.fromRowHashes(result as Record<string, unknown>[]);
+          // Build the Result from the field descriptors plus the positional
+          // (array-mode) rows, mirroring Rails' `cast_result`: columns come
+          // from `result.fields` and rows from `result.to_a`. This preserves
+          // duplicate column names and keeps the column set when zero rows
+          // matched (the field descriptors are present whenever a SELECT
+          // projected columns).
+          const names = (fields ?? []).map((f) => f.name);
+          return names.length === 0 ? Result.empty() : new Result(names, result as unknown[][]);
         });
       } catch (e: any) {
         const translated =
