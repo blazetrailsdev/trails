@@ -7565,8 +7565,8 @@ describe("AssociationProxyTest", () => {
     registerModel("APAuditLog", APAuditLog);
 
     const developer = await APDeveloper.create({ name: "Bryan", salary: 50_000 });
-    const reloaded = await APDeveloper.find(developer.id);
-    expect(await association(reloaded, "apAuditLogs").size()).toBe(1);
+    await developer.reload();
+    expect(await association(developer, "apAuditLogs").size()).toBe(1);
   });
   it("reload returns association", async () => {
     const { APPost, APComment } = setupProxyModels();
