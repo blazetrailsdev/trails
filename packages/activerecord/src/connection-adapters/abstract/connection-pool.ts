@@ -313,6 +313,8 @@ export class ConnectionPool implements ReapablePool {
     // cache data from the old reflection.
     this._lazyLoadTriggered = false;
     this._lazyLoadPromise = null;
+    this._eagerWarmTriggered = false;
+    this._eagerWarmPromise = null;
     this.poolConfig.schemaCache = null;
   }
 
@@ -1002,8 +1004,14 @@ export class ConnectionPool implements ReapablePool {
     // defensive — it should never fire in practice. Callers can
     // observe the pending/resolved load via _lazyLoadPromise (used
     // by tests to await the actual completion instead of timing hacks).
+    // Skip the disk-only lazy load when eager warming is on: loadAllBang
+    // below already consults the on-disk dump as a base before introspecting,
+    // so eager warming subsumes the lazy path. Running both would double-load
+    // the dump and (because the lazy block sets _lazyLoadTriggered) would
+    // otherwise suppress the eager introspection top-up entirely.
     if (
       SchemaReflection.lazilyLoadSchemaCache &&
+      !SchemaReflection.eagerLoadSchemaCache &&
       !this._lazyLoadTriggered &&
       !this.poolConfig.schemaCache
     ) {
@@ -1048,6 +1056,46 @@ export class ConnectionPool implements ReapablePool {
           );
         });
     }
+    // Eagerly warm the schema cache by DB introspection when
+    // SchemaReflection.eagerLoadSchemaCache is on — the production analogue of
+    // Rails' `schema_cache.addAll(pool)` at boot. Unlike the lazy-load above
+    // (disk dump only), this populates real DB columns even with no
+    // schema_cache.json on disk, so a synchronous Model.columnNames() on a
+    // connected model excludes virtual attribute() declarations without a
+    // prior `await ensureSchemaLoaded()`.
+    //
+    // loadAllBang first consults the on-disk dump (if any) as a base, so
+    // eager warming subsumes lazy loading — when this flag is on, the lazy
+    // block above is skipped so eager wins. Fire-and-forget for the same
+    // reason as the lazy path: newConnection is sync. The whole warm is
+    // best-effort, not per-table: addAll loops `add` without per-table
+    // rescue (mirroring Rails' SchemaCache#add_all), so a single table's
+    // reflection failure rejects the warm and abandons the rest — the .catch
+    // logs and swallows it, leaving any not-yet-reflected tables to fall back
+    // to the synthesized columnsHash branch on first access.
+    if (
+      SchemaReflection.eagerLoadSchemaCache &&
+      !this._eagerWarmTriggered &&
+      !this.poolConfig.schemaCache
+    ) {
+      this._eagerWarmTriggered = true;
+      const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
+      this._eagerWarmPromise = loneRef
+        .loadAllBang()
+        .then(() => {
+          const loaded = this.schemaReflection.loadedCache;
+          if (loaded) {
+            this.poolConfig.schemaCache = loaded;
+          }
+        })
+        .catch((err) => {
+          console.warn(
+            `[trails] Failed to eagerly warm schema cache for pool ` +
+              `${this.poolConfig.connectionSpecName}: ` +
+              `${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+    }
     return conn;
   }
 
@@ -1063,6 +1111,18 @@ export class ConnectionPool implements ReapablePool {
    * lazy load's completion. Null when no lazy load was triggered.
    */
   _lazyLoadPromise: Promise<void> | null = null;
+
+  /**
+   * Set once per pool when the eager-warm trigger fires, so subsequent
+   * connections don't re-introspect. Counterpart to {@link _lazyLoadTriggered}.
+   */
+  private _eagerWarmTriggered = false;
+
+  /**
+   * @internal Exposed so tests (and eager-boot callers) can await the eager
+   * warm's completion. Null when no eager warm was triggered.
+   */
+  _eagerWarmPromise: Promise<void> | null = null;
 
   remove(conn: DatabaseAdapter): void {
     this._connectionLease().clear(conn);

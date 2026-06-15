@@ -1210,6 +1210,148 @@ describe("ConnectionPool schema cache", () => {
     }
   });
 
+  it("eagerly warms the schema cache by introspection on first connection when enabled", async () => {
+    // Production analogue of Rails' schema_cache.addAll(pool) at boot: with
+    // no schema_cache.json on disk, eager warming introspects the live DB so
+    // a synchronous read sees real columns. Await pool._eagerWarmPromise so
+    // we're not timing-dependent.
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-eager-warm-"));
+    const dbFile = path.join(tmp, "eager.sqlite3");
+    const seeded = new BetterSQLite3Adapter(dbFile);
+    try {
+      await seeded.executeMutation(
+        "CREATE TABLE sprockets (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
+      );
+    } finally {
+      await seeded.close();
+    }
+
+    const prevEager = SchemaReflection.eagerLoadSchemaCache;
+    SchemaReflection.eagerLoadSchemaCache = true;
+
+    // No schemaCachePath: there is no dump file, so only DB introspection
+    // can populate the cache.
+    const dbConfig = new HashConfig("test", "primary", {
+      adapter: "sqlite3",
+      database: dbFile,
+      reapingFrequency: null,
+      schemaCachePath: "",
+    });
+    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
+    });
+    const pool = new ConnectionPool(pc);
+    try {
+      pool.leaseConnection();
+      pool.releaseConnection();
+      expect(pool._eagerWarmPromise).not.toBeNull();
+      await pool._eagerWarmPromise;
+      expect(pool.schemaCache.isCached("sprockets")).toBe(true);
+      // Adapter-visible raw cache is propagated so synchronous consumers
+      // (Model.columnNames) see the introspected columns without a DB hit.
+      expect(pool.poolConfig.schemaCache).not.toBeNull();
+      expect(pool.poolConfig.schemaCache!.isColumnsHashCached(null, "sprockets")).toBe(true);
+    } finally {
+      SchemaReflection.eagerLoadSchemaCache = prevEager;
+      await closePoolConnections(pool);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("lets eager warming win when both lazy and eager flags are on", async () => {
+    // Eager subsumes lazy (loadAllBang consults the dump first, then
+    // introspects). With both flags on and NO dump file, the lazy path must
+    // not suppress the eager introspection — otherwise the cache stays empty.
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-both-warm-"));
+    const dbFile = path.join(tmp, "both.sqlite3");
+    const seeded = new BetterSQLite3Adapter(dbFile);
+    try {
+      await seeded.executeMutation("CREATE TABLE sprockets (id INTEGER PRIMARY KEY, label TEXT)");
+    } finally {
+      await seeded.close();
+    }
+
+    const prevLazy = SchemaReflection.lazilyLoadSchemaCache;
+    const prevEager = SchemaReflection.eagerLoadSchemaCache;
+    SchemaReflection.lazilyLoadSchemaCache = true;
+    SchemaReflection.eagerLoadSchemaCache = true;
+
+    const dbConfig = new HashConfig("test", "primary", {
+      adapter: "sqlite3",
+      database: dbFile,
+      reapingFrequency: null,
+      schemaCachePath: "",
+    });
+    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
+    });
+    const pool = new ConnectionPool(pc);
+    try {
+      pool.leaseConnection();
+      pool.releaseConnection();
+      // Lazy path suppressed; eager path drove the warm.
+      expect(pool._lazyLoadPromise).toBeNull();
+      expect(pool._eagerWarmPromise).not.toBeNull();
+      await pool._eagerWarmPromise;
+      expect(pool.schemaCache.isCached("sprockets")).toBe(true);
+    } finally {
+      SchemaReflection.lazilyLoadSchemaCache = prevLazy;
+      SchemaReflection.eagerLoadSchemaCache = prevEager;
+      await closePoolConnections(pool);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("does not eagerly warm when the flag is off (default)", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const { BetterSQLite3Adapter } =
+      await import("./connection-adapters/better-sqlite3-adapter.js");
+
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-eager-"));
+    const dbFile = path.join(tmp, "no_eager.sqlite3");
+    const seeded = new BetterSQLite3Adapter(dbFile);
+    try {
+      await seeded.executeMutation("CREATE TABLE sprockets (id INTEGER PRIMARY KEY)");
+    } finally {
+      await seeded.close();
+    }
+    expect(SchemaReflection.eagerLoadSchemaCache).toBe(false);
+
+    const dbConfig = new HashConfig("test", "primary", {
+      adapter: "sqlite3",
+      database: dbFile,
+      reapingFrequency: null,
+      schemaCachePath: "",
+    });
+    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
+    });
+    const pool = new ConnectionPool(pc);
+    try {
+      pool.leaseConnection();
+      pool.releaseConnection();
+      expect(pool._eagerWarmPromise).toBeNull();
+      expect(pool.schemaCache.isCached("sprockets")).toBe(false);
+    } finally {
+      await closePoolConnections(pool);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("BoundSchemaReflection.dumpTo(filename) round-trips through the pool", async () => {
     // End-to-end Rails path: pool.schema_cache.dump_to(filename)
     // allocates a fresh SchemaCache, addAll(pool) populates it via
