@@ -908,6 +908,10 @@ describe("DefaultScopingTest", () => {
     expect(await ConditionalStiPost.count()).toBe(2);
     expect((await ConditionalStiPost.all().toArray()).length).toBe(2);
     expect((await ConditionalStiPost.unscope({ where: "title" }).toArray()).length).toBe(3);
+
+    expect(await SubConditionalStiPost.count()).toBe(1);
+    expect((await SubConditionalStiPost.all().toArray()).length).toBe(1);
+    expect((await SubConditionalStiPost.unscope({ where: "title" }).toArray()).length).toBe(2);
   });
 
   it("default scope include with count", async () => {
