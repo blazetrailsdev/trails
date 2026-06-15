@@ -10142,10 +10142,12 @@ describe("CollectionProxyDelegation", () => {
 // ==========================================================================
 // AssociationsTest cases that rely on the canonical Rails fixtures
 // (associations_test.rb test_subselect, test_using_limitable_reflections_helper,
-// test_association_with_references). They live in their own describe so the
-// canonical Author / AuthorFavorite, Firm / Client, and Tag / Tagging /
-// Developer models can be imported and registered without clashing with the
-// bespoke Tag / Developer / Firm definitions the rest of this file relies on.
+// test_association_with_references). They live in a second `AssociationsTest`
+// describe (same class name, so test:compare still maps them to the Rails
+// AssociationsTest) kept separate so the canonical Author / AuthorFavorite,
+// Firm / Client, and Tag / Tagging / Developer models can be imported and
+// registered without clashing with the bespoke Tag / Developer / Firm
+// definitions the rest of this file relies on.
 // Canonical names are (re)registered in beforeEach so they win the global
 // registry right before each test. The canonical model modules are imported
 // dynamically in beforeAll — never at the top level — so their module-level
@@ -10155,11 +10157,12 @@ describe("CollectionProxyDelegation", () => {
 // `eagerLoadBang`, whose `vi.resetModules()` would otherwise hand the dynamic
 // imports a fresh, unwired module graph ("Relation not loaded").
 // ==========================================================================
-describe("AssociationsTest (canonical fixtures)", () => {
-  const { companies, authors, authorFavorites } = useHandlerFixtures(
-    ["companies", "authors", "authorFavorites"],
-    { schema: canonicalSchema },
-  );
+describe("AssociationsTest", () => {
+  // `authorFavorites` is declared so its rows are loaded (Rails: `fixtures
+  // :author_favorites`); the subselect test reads them through the association.
+  const { companies, authors } = useHandlerFixtures(["companies", "authors", "authorFavorites"], {
+    schema: canonicalSchema,
+  });
 
   let Author: typeof AuthorT;
   let AuthorFavorite: typeof Base;
@@ -10195,7 +10198,6 @@ describe("AssociationsTest (canonical fixtures)", () => {
   });
 
   it("subselect", async () => {
-    void authorFavorites;
     const author = authors("david");
     const favs = await association(author, "authorFavorites").toArray();
     const fav2 = await association(author, "authorFavorites")
