@@ -5657,7 +5657,7 @@ export class Relation<T extends Base> {
         const innerBinds = inner._lastSelectBinds.slice();
         const subAlias = new Nodes.TableAlias(
           new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)),
-          subqueryAlias,
+          new Nodes.SqlLiteral(subqueryAlias, { retryable: true }),
         );
         const subTable = new Table(subqueryAlias);
         const subColumn = subTable.get("collection_cache_key_timestamp");

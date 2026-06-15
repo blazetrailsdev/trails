@@ -831,13 +831,8 @@ export class ToSql extends Visitor {
     // cases come from the *value*, not the relation shape: `SelectManager#as`
     // and the set-op `from()` path both name the alias with a `SqlLiteral`
     // (`quoteTableName` returns its `value` unchanged), while `Table#alias("foo")`
-    // keeps `"foo"`. The legacy `SelectManager#as` plain-string subquery alias
-    // (relation is a Grouping) is still emitted bare for back-compat.
-    if (node.relation instanceof Nodes.Grouping && !(node.name instanceof Nodes.SqlLiteral)) {
-      collector.append(` ${node.name}`);
-    } else {
-      collector.append(` ${this.quoteTableName(node.name)}`);
-    }
+    // keeps `"foo"`.
+    collector.append(` ${this.quoteTableName(node.name)}`);
     return collector;
   }
 

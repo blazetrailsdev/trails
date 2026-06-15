@@ -748,7 +748,7 @@ export async function performCount(
     const [innerSql, allInnerBinds] = compileManagerWithBinds(this, innerManager);
     const subqueryNode = new Nodes.TableAlias(
       new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)),
-      "subquery_for_count",
+      new Nodes.SqlLiteral("subquery_for_count", { retryable: true }),
     );
     const countNode = new Nodes.NamedFunction("COUNT", [columnAlias]);
     const outerManager = innerTable.project(countNode.as("count"));
