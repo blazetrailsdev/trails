@@ -4622,3 +4622,41 @@ describe("PersistenceTest", () => {
     });
   });
 });
+
+// ==========================================================================
+// Regression: updateColumns must serialize the cast value to its DB form for
+// any type whose in-memory representation differs from its serialized form —
+// not just the former Temporal+Enum allowlist. A json column casts to an
+// in-memory object but must persist the JSON string. Before generalizing the
+// gate to SerializeCastValue.serialize, the object was written verbatim.
+// ==========================================================================
+describe("PersistenceTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      json_topics: { name: "string", config: "json" },
+    });
+  });
+
+  it("update columns serializes a mapped (json) attribute to its db value", async () => {
+    class JsonTopic extends Base {
+      static _tableName = "json_topics";
+      static {
+        this.attribute("name", "string");
+        this.attribute("config", "json");
+      }
+    }
+    const t = await JsonTopic.create({ name: "t", config: { a: 1 } });
+    await t.updateColumns({ config: { a: 2, b: ["x"] } });
+
+    const raw = await JsonTopic.connection.selectValue(
+      `SELECT config FROM json_topics WHERE id = ${t.id}`,
+    );
+    expect(typeof raw).toBe("string");
+    expect(JSON.parse(raw as string)).toEqual({ a: 2, b: ["x"] });
+
+    const found = await JsonTopic.find(t.id);
+    expect(found.config).toEqual({ a: 2, b: ["x"] });
+  });
+});

@@ -366,26 +366,27 @@ export async function encryptRecord(record: any): Promise<void> {
   // raises Errors::Configuration when the context is frozen (protected mode).
   EncryptableRecord.validateEncryptionAllowed(record);
 
-  // Save plaintext values before calling updateColumns, which would overwrite
-  // in-memory attributes with the ciphertext (since updateColumns uses cast()).
+  // Capture plaintext before updateColumns, which serializes each cast value
+  // to its DB form (ciphertext, via SerializeCastValue.serialize) and sets the
+  // ciphertext as the live value through cast().
   const plaintextValues: Record<string, unknown> = {};
-  const assignments: Record<string, unknown> = {};
   for (const attr of encryptedAttrs) {
-    const plaintext = record.readAttribute(attr);
-    plaintextValues[attr] = plaintext;
-    // Explicitly serialize via the type so updateColumns writes ciphertext —
-    // updateColumns uses cast() not serialize(), so we pre-serialize here.
-    const type = klass._attributeDefinitions?.get(attr)?.type;
-    assignments[attr] =
-      type instanceof EncryptedAttributeType ? type.serialize(plaintext) : plaintext;
+    plaintextValues[attr] = record.readAttribute(attr);
   }
 
-  await record.updateColumns(assignments);
+  // Pass plaintext: updateColumns encrypts it exactly once for the DB write.
+  // (Pre-serializing here would double-encrypt now that updateColumns
+  // serializes the cast value itself.)
+  await record.updateColumns(plaintextValues);
 
-  // Restore plaintext as the in-memory cast value so record.attr still reads
-  // as plaintext, while preserving the ciphertext as valueBeforeTypeCast
-  // (used by encryptedAttribute? / ciphertextFor on this instance).
+  // Restore the in-memory state: ciphertext as valueBeforeTypeCast (consulted
+  // by encryptedAttribute? / ciphertextFor on this instance) with plaintext as
+  // the live cast value.
   for (const [attr, plaintext] of Object.entries(plaintextValues)) {
+    const type = klass._attributeDefinitions?.get(attr)?.type;
+    if (type instanceof EncryptedAttributeType) {
+      record._attributes.set(attr, type.serialize(plaintext));
+    }
     record._attributes.writeCastValue(attr, plaintext);
   }
   // Re-snapshot the dirty tracker so it sees the restored plaintext as the

@@ -6,11 +6,7 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import {
-  isDateInfinity,
-  isDateNegativeInfinity,
-  sanitizeForMassAssignment,
-} from "@blazetrails/activemodel";
+import { sanitizeForMassAssignment, SerializeCastValue } from "@blazetrails/activemodel";
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ActiveRecordError,
@@ -26,7 +22,6 @@ import {
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
 import { assignAssociationIfMatch } from "./attribute-assignment.js";
-import { EnumType } from "./enum.js";
 import { clearAutosaveState } from "./autosave-association.js";
 import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
@@ -1053,36 +1048,28 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     }
     const cast = def ? def.type.cast(value) : value;
     this._attributes.set(key, cast);
-    // Pre-serialize only Temporal objects and date-infinity sentinels so the
-    // Arel quote layer receives a string. All other cast values (strings,
-    // numbers, null, booleans) are already DB-ready and must not be passed
-    // through serialize() — doing so would corrupt types whose serialize()
-    // has side effects (e.g. re-encrypting an already-encrypted value).
-    // Only pre-serialize for temporal types and their PG ±infinity sentinels.
-    // isDateInfinity matches `Number.POSITIVE_INFINITY`, so without the
-    // type-name gate a Float column carrying Infinity would route through
-    // serialize() — corrupting the value via the date-infinity wire string.
-    const typeName = def?.type.type?.();
-    const isTemporalType =
-      typeName === "date" ||
-      typeName === "datetime" ||
-      typeName === "time" ||
-      typeName === "timestamp" ||
-      typeName === "timestamptz";
-    // Enum columns store a label string in memory but must persist the
-    // underlying integer/string mapping value — serialize() bridges the two.
-    // (Temporal types likewise need serialize; all other cast values are
-    // already DB-ready and must not be re-serialized.)
+    // Bridge the in-memory cast value to its DB representation via the
+    // faithful SerializeCastValue.serialize dispatcher — the same path
+    // insertAll/upsertAll use (insert-all.ts valuesList). It only takes the
+    // serializeCastValue fast-path when the type declares it compatible, and
+    // otherwise calls full serialize, so every type whose memory shape differs
+    // from its column shape persists correctly: Enum (label → mapping
+    // integer/string), Temporal (date/datetime/time → wire string, including
+    // PG ±infinity sentinels), encryption (plaintext → ciphertext), and any
+    // serialize-overriding type (binary, json, serialized, PG OID types). This
+    // replaces the former Temporal+Enum type-name allowlist, which silently
+    // wrote the in-memory value for any other diverging type.
+    const type = def?.type as
+      | {
+          serializeCastValue(v: unknown): unknown;
+          serialize(v: unknown): unknown;
+          itselfIfSerializeCastValueCompatible?(): unknown;
+        }
+      | undefined;
     const dbValue =
-      def?.type instanceof EnumType
-        ? (def.type.serialize(cast) ?? cast)
-        : cast instanceof Temporal.Instant ||
-            cast instanceof Temporal.PlainDate ||
-            cast instanceof Temporal.PlainTime ||
-            cast instanceof Temporal.ZonedDateTime ||
-            (isTemporalType && (isDateInfinity(cast) || isDateNegativeInfinity(cast)))
-          ? (def?.type.serialize?.(cast) ?? cast)
-          : cast;
+      type && typeof type.serialize === "function"
+        ? SerializeCastValue.serialize(type, cast)
+        : cast;
     setPairs.push([table.get(key), dbValue]);
   }
 
