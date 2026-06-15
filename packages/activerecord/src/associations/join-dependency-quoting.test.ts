@@ -106,15 +106,22 @@ describe("JoinDependency Arel node construction", () => {
     expect(and).toBeInstanceOf(Nodes.And);
     expect(and.children).toHaveLength(2);
 
-    // First child: STI IN-list (Car has descendant ElectricCar, so klass.all() produces IN)
-    const inNode = and.children[0] as Nodes.In;
+    // First child: FK equality. Rails' join_scope adds the pk/fk equality
+    // before the STI type_condition, so the FK predicate leads the AND.
+    const eq = and.children[0] as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
+
+    // Second child: STI IN-list (Car has descendant ElectricCar, so
+    // type_condition produces an IN over [Car, ElectricCar]).
+    const inNode = and.children[1] as Nodes.In;
     expect(inNode).toBeInstanceOf(Nodes.In);
     expect((inNode.left as any).name).toBe("type");
 
-    // Second child: FK equality
-    const eq = and.children[1] as Nodes.Equality;
-    expect(eq).toBeInstanceOf(Nodes.Equality);
-    expect((eq.left as any).name).toBe("owner_id");
+    // The STI predicate is qualified by the join's table — the same Arel table
+    // the FK equality references — rather than the model's own arel_table. This
+    // is what lets a self-referential / aliased STI join filter on the alias.
+    expect((inNode.left as any).relation).toBe((eq.left as any).relation);
   });
 
   it("emits simple OuterJoin for hasMany without polymorphic/STI", () => {

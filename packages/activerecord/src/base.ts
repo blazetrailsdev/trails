@@ -1688,6 +1688,19 @@ export class Base extends Model {
     return this._applyStiTypeCondition(_wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel);
   }
 
+  /** @internal Bare relation against an optional Arel table — no default
+   *  scope and no STI `type_condition`. Mirrors Rails' `Relation.create`
+   *  as used by reflection's `build_scope`, where the STI predicate is added
+   *  later by `join_scope` (qualified by the join's, possibly aliased, table)
+   *  rather than baked into the base relation. */
+  static _buildBareRelation(table?: any): any {
+    if (!_RelationCtor) {
+      throw new Error("Relation not loaded. Import relation.ts first.");
+    }
+    const rel = new _RelationCtor(this, table);
+    return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
+  }
+
   /** @internal Re-apply the STI `type_condition` WHERE for subclasses.
    *  Rails bakes this into `relation()` so both `unscoped` and the
    *  default-scoped path carry it; we layer it onto the base relation. */
