@@ -700,6 +700,7 @@ function populateInMemoryExistingRecord(
   const proxy = collectionProxyFor(record, associationName);
   const id = (attrs as any).id;
   let existing = findRecordById(targetModel, proxy.target as Base[], id);
+  let isNewStub = false;
   if (!existing) {
     if (proxy.loaded) {
       // Loaded association: the target IS Rails' authoritative `existing_records`
@@ -709,10 +710,16 @@ function populateInMemoryExistingRecord(
     const pk = (targetModel as any).primaryKey;
     const pkCol = Array.isArray(pk) ? pk[0] : (pk ?? "id");
     existing = (targetModel as any)._instantiate({ [pkCol]: id });
-    (proxy as any).addExistingRecord(existing);
+    isNewStub = true;
   }
 
+  // Rails adds the record to the target and assigns inside the
+  // `unless call_reject_if(...)` block (nested_attributes.rb:528-539), so a
+  // rejected existing record never enters `@target`. Defer the stub's
+  // `add_to_target` until after the reject check to avoid leaving a partial
+  // (PK-only) stub in the in-memory collection.
   if (callRejectIf(record, associationName, attrs)) return;
+  if (isNewStub) (proxy as any).addExistingRecord(existing);
   assignToOrMarkForDestruction(existing!, attrs, isAllowDestroy(record, associationName));
 }
 
