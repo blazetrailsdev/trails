@@ -740,8 +740,8 @@ function unscopeBang(
   this: QueryMethodsHost,
   ...types: Array<string | { where: string | string[] }>
 ): any {
-  // Rails unscope! records each scope in unscope_values so a later merge of
-  // this relation re-applies the reset (query_methods.rb / merger.rb).
+  // Rails unscope! does `self.unscope_values += args` so a later merge of this
+  // relation re-applies the resets (query_methods.rb / merger.rb).
   this._unscopeValues.push(...types);
   for (const rawScope of types) {
     if (typeof rawScope === "string") {
