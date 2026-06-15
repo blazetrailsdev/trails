@@ -1278,8 +1278,13 @@ function rfc(
 // edited node's edges from `newDeps` so it runs against the *post-edit* graph
 // before anything is committed. The pre-edit graph is acyclic (validate.mjs
 // enforces it), so any new cycle must pass through `id` — visiting from `id`
-// alone is sufficient. When validate-as-library lands this should import its
-// shared check rather than restating the traversal.
+// alone is sufficient. This restates the traversal now shared as
+// `checkDepGraph` in the tasks repo's `scripts/validate-lib.mjs` (which accepts
+// a `seeds` override for exactly this post-edit, single-node case). Wiring this
+// to import it is deferred: `cli.ts` runs in trails CI, where the tasks repo —
+// and thus `validate-lib.mjs` — is gitignored and absent, so an unconditional
+// import would break these unit tests. The tasks pre-commit hook runs the
+// shared check via `validate.mjs` regardless, so the two can't silently drift.
 export function depCyclePath(index: Index, id: string, newDeps: string[]): string[] | null {
   const known = new Set(index.stories.map((s) => s.id));
   const depsOf = (sid: string): string[] =>
