@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   quote,
   quoteIdentifier,
@@ -10,6 +11,7 @@ import {
   columnNameMatcher,
   columnNameWithOrderMatcher,
 } from "./quoting.js";
+import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 
 describe("MySQL quoting — quote", () => {
   it("returns NULL for null / undefined", () => {
@@ -42,6 +44,38 @@ describe("MySQL quoting — quote", () => {
     expect(quote("null\0byte")).toBe("'null\\0byte'");
     expect(quote("with 'quote'")).toBe("'with \\'quote\\''");
     expect(quote('a "double" quote')).toBe("'a \\\"double\\\" quote'");
+  });
+});
+
+describe("MySQL quoting — quote dispatches date/time through the adapter", () => {
+  // The standalone `quote` delegates non-MySQL-specific branches to the abstract
+  // `quote`, which dispatches date/time onto the adapter's `quotedDate`
+  // (microsecond-capped) and the inherited `quotedTime`. These guard that an
+  // adapter-bound `quote(Temporal)` never emits 7–9 fractional digits (rejected
+  // by MySQL TIME/DATETIME/TIMESTAMP in strict mode). Exercised via the prototype
+  // so no live connection is needed — `quote` only touches `this.quotedDate` /
+  // `this.quotedTime`. No Rails counterpart: this is trails dispatch plumbing.
+  const proto = AbstractMysqlAdapter.prototype as unknown as { quote(v: unknown): string };
+  const host = Object.create(AbstractMysqlAdapter.prototype) as object;
+
+  it("caps PlainTime fractional seconds at microseconds (drops nanoseconds)", () => {
+    const t = new Temporal.PlainTime(12, 0, 0, 123, 456, 789);
+    expect(proto.quote.call(host, t)).toBe("'12:00:00.123456'");
+  });
+
+  it("drops a sub-microsecond PlainTime fraction entirely", () => {
+    const t = new Temporal.PlainTime(12, 0, 0, 0, 0, 1);
+    expect(proto.quote.call(host, t)).toBe("'12:00:00'");
+  });
+
+  it("caps PlainDateTime fractional seconds at microseconds", () => {
+    const dt = new Temporal.PlainDateTime(2026, 5, 8, 14, 32, 0, 123, 456, 789);
+    expect(proto.quote.call(host, dt)).toBe("'2026-05-08 14:32:00.123456'");
+  });
+
+  it("caps Instant fractional seconds at microseconds", () => {
+    const i = Temporal.Instant.from("2026-05-08T14:32:00.123456789Z");
+    expect(proto.quote.call(host, i)).toBe("'2026-05-08 14:32:00.123456'");
   });
 });
 
