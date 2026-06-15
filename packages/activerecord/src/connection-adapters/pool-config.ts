@@ -178,6 +178,19 @@ export class PoolConfig {
     }
   }
 
+  /**
+   * Async-draining variant of `disconnect`: awaits each adapter's pending
+   * async `driver.close()` (async-only SQLite drivers) before resolving, so
+   * the underlying handle is fully closed before the caller re-opens the DB.
+   * No-ops to a resolved promise when the pool is uninitialized or all drivers
+   * close synchronously.
+   */
+  async disconnectAsync(): Promise<void> {
+    if (this._pool) {
+      await this._pool.disconnectAsync();
+    }
+  }
+
   discardPoolBang(): void {
     if (!this._pool) return;
     this._pool.disconnectBang();

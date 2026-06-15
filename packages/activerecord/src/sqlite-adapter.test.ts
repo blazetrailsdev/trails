@@ -249,6 +249,76 @@ describe("SQLite adapter driver binding", () => {
     pool.disconnectBang();
   });
 
+  it("pool disconnectAsync drains an in-flight async-only close before resolving", async () => {
+    // Pool teardown with an async-only driver: disconnectBang() fires
+    // driver.close() but can't await it (sync void contract). disconnectAsync
+    // must drain the per-adapter _closingDriver so the handle is fully closed
+    // before a subsequent re-open of the same DB races the prior handle.
+    let closed = false;
+    let resolveClose: () => void;
+    const closeGate = new Promise<void>((resolve) => {
+      resolveClose = resolve;
+    });
+    const driver = asyncDriver(async (config) => {
+      const conn = (await openVia(config)) as SqliteConnection;
+      return new Proxy(conn, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              await closeGate;
+              (target.close as () => void)();
+              closed = true;
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    });
+    const dbConfig = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    const poolConfig = new PoolConfig(
+      new ConnectionDescriptor("primary"),
+      dbConfig,
+      "writing",
+      "default",
+      {
+        adapterFactory: () =>
+          new AbstractSQLite3Adapter(":memory:", { driver }) as unknown as DatabaseAdapter,
+      },
+    );
+    const pool = new ConnectionPool(poolConfig);
+    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    await conn.internalExecute("CREATE TABLE drain_t (id INTEGER PRIMARY KEY)", "SCHEMA");
+
+    const draining = pool.disconnectAsync();
+    expect(closed).toBe(false);
+    resolveClose!();
+    await draining;
+    expect(closed).toBe(true);
+  });
+
+  it("pool disconnectAsync no-ops to a resolved promise for a sync driver", async () => {
+    // better-sqlite3 closes synchronously inside disconnectBang(); the drain
+    // contributes nothing and disconnectAsync still resolves.
+    const dbConfig = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    const poolConfig = new PoolConfig(
+      new ConnectionDescriptor("primary"),
+      dbConfig,
+      "writing",
+      "default",
+      {
+        adapterFactory: () =>
+          new AbstractSQLite3Adapter(":memory:", {
+            driver: betterSqlite3Driver,
+          }) as unknown as DatabaseAdapter,
+      },
+    );
+    const pool = new ConnectionPool(poolConfig);
+    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    await conn.internalExecute("CREATE TABLE sync_drain_t (id INTEGER PRIMARY KEY)", "SCHEMA");
+    await expect(pool.disconnectAsync()).resolves.toBeUndefined();
+    expect(conn.active).toBe(false);
+  });
+
   it("reconnects an async-only driver and reapplies pragmas", async () => {
     const adapter = await AbstractSQLite3Adapter.openAsync(":memory:", { driver: asyncOnlyDriver });
     adapter.disconnectBang();
