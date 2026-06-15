@@ -40,12 +40,42 @@ describe("JoinDependency referenced-table aliasing", () => {
     return left.tableAlias ?? left.name;
   };
 
+  // Collect every table name referenced by an Attribute anywhere in a node.
+  const tablesInPredicate = (node: Nodes.Node): Set<string> => {
+    const tables = new Set<string>();
+    node.fetchAttribute((attr: Nodes.Node) => {
+      if (attr instanceof Nodes.Attribute) {
+        const rel = attr.relation as any;
+        tables.add(rel.tableAlias ?? rel.name);
+      }
+      return true;
+    });
+    return tables;
+  };
+
   it("aliases a referenced association to its reference name", () => {
     const jd = new JoinDependency(Post);
     jd.addAssociation("author");
     const joins = jd.joinConstraints([], undefined, ["author"]);
     expect(joins).toHaveLength(1);
     expect(joinTableName(joins[0])).toBe("author");
+
+    // The ON predicate is rebound to the alias — no stray reference to the real
+    // `authors` table survives, so the emitted SQL is self-consistent.
+    const on = (joins[0] as any).right as Nodes.On;
+    const tables = tablesInPredicate(on.expr as Nodes.Node);
+    expect(tables.has("author")).toBe(true);
+    expect(tables.has("authors")).toBe(false);
+
+    // The SELECT projection follows the re-aliased table.
+    const selectTables = new Set(
+      jd.buildSelectArel().map((as) => {
+        const rel = ((as as any).left as Nodes.Attribute).relation as any;
+        return rel.tableAlias ?? rel.name;
+      }),
+    );
+    expect(selectTables.has("author")).toBe(true);
+    expect(selectTables.has("authors")).toBe(false);
   });
 
   it("leaves the join on its real table when not referenced", () => {

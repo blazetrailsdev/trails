@@ -119,8 +119,11 @@ export class JoinDependency {
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   /**
    * Mirrors: ActiveRecord::Associations::JoinDependency#@references
-   * (join_dependency.rb:88–92). Keyed by reflection name → referenced table
-   * name; populated by `joinConstraints` and read lazily in `makeConstraints`.
+   * (join_dependency.rb:88–92). Populated by `joinConstraints` from its
+   * `references` argument and read lazily in `makeConstraints` by reflection
+   * name. Like Rails — where `@references` keys by referenced table symbol and
+   * `make_constraints` reads `@references[reflection.name]` — a join is only
+   * re-aliased when a reference and the reflection name coincide.
    */
   private _references: Map<string, string> = new Map();
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
