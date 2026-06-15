@@ -34,12 +34,13 @@ export class SubstituteBinds {
     return this.append(this.quoter.quote(extractValue(bind)));
   }
 
-  addBinds(binds: unknown[], procForBinds?: ((v: unknown) => unknown) | null): this {
-    const quoted = binds.map((bind) => {
-      const value = procForBinds ? procForBinds(bind) : bind;
-      return this.quoter.quote(extractValue(value));
-    });
-    this.append(quoted.join(", "));
+  // Mirrors Rails `SubstituteBinds#add_binds` (substitute_binds.rb:23-25):
+  // it keeps the `proc_for_binds` parameter for caller-signature parity but
+  // ignores it, and quotes each bind directly with NO `value_for_database`
+  // unwrapping (unlike `add_bind`). The callers pass already-cast values
+  // (`HomogeneousIn#casted_values`), so no further transformation is needed.
+  addBinds(binds: unknown[], _procForBinds?: ((v: unknown) => unknown) | null): this {
+    this.append(binds.map((bind) => this.quoter.quote(bind)).join(", "));
     return this;
   }
 
