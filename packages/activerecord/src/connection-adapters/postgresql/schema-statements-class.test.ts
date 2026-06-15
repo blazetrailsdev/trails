@@ -71,7 +71,7 @@ function makeSchemaAdapter() {
   const execed: string[] = [];
   const adapter = {
     adapterName: "postgres" as const,
-    schemaSearchPathMemo: null as string | null,
+    _schemaSearchPathMemo: null as string | null,
     exec: vi.fn(async (sql: string) => {
       execed.push(sql);
     }),
@@ -127,7 +127,17 @@ describe("PostgreSQLSchemaStatements#schemaSearchPath", () => {
     await ss.setSchemaSearchPath(null);
     expect(execed).toEqual([]);
     expect(
-      (adapter as unknown as { schemaSearchPathMemo: string | null }).schemaSearchPathMemo,
+      (adapter as unknown as { _schemaSearchPathMemo: string | null })._schemaSearchPathMemo,
+    ).toBeNull();
+  });
+
+  it("setSchemaSearchPath with empty string is a no-op", async () => {
+    const { adapter, execed } = makeSchemaAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    await ss.setSchemaSearchPath("");
+    expect(execed).toEqual([]);
+    expect(
+      (adapter as unknown as { _schemaSearchPathMemo: string | null })._schemaSearchPathMemo,
     ).toBeNull();
   });
 });

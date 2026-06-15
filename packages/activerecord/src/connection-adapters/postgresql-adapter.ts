@@ -348,7 +348,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _minMessages = "warning";
   // Memoized search path, backing Rails' @schema_search_path. Populated lazily
   // by schemaSearchPath() and updated by setSchemaSearchPath().
-  schemaSearchPathMemo: string | null = null;
+  private _schemaSearchPathMemo: string | null = null;
   private _warnedOids = new Set<number>();
   private _caseInsensitiveCache: Map<string, boolean> = new Map([["citext", false]]);
   private _sessionVariables: Record<string, string | number | boolean | null | "default"> = {};

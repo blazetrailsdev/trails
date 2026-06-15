@@ -51,7 +51,7 @@ interface PgSchemaAdapter {
   createTableDefinition(name: string, options?: Record<string, unknown>): AbstractTableDefinition;
   createAlterTable(name: string): AlterTable;
   // Connection-scoped memo backing Rails' @schema_search_path.
-  schemaSearchPathMemo: string | null;
+  _schemaSearchPathMemo: string | null;
 }
 
 export class PostgreSQLSchemaStatements extends SchemaStatements {
@@ -461,21 +461,22 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Rails memoizes: @schema_search_path ||= query_value("SHOW search_path").
     // The memo lives on the adapter (connection-scoped), since this statements
     // object is reconstructed per call.
-    if (this.pg.schemaSearchPathMemo == null) {
+    if (this.pg._schemaSearchPathMemo == null) {
       const rows = await this.pg.schemaQuery("SHOW search_path");
-      this.pg.schemaSearchPathMemo = rows[0].search_path as string;
+      this.pg._schemaSearchPathMemo = rows[0].search_path as string;
     }
-    return this.pg.schemaSearchPathMemo;
+    return this.pg._schemaSearchPathMemo;
   }
 
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
-    if (searchPath == null) return;
+    // Rails guards with `if schema_csv` (truthy), so "" is also a no-op.
+    if (!searchPath) return;
     // Mirrors Rails' schema_search_path= which uses direct interpolation:
     //   internal_execute("SET search_path TO #{schema_csv}"); @schema_search_path = schema_csv
     // This means unquoted $user causes a PG parse error (dollar-quoted string),
     // matching Rails' behavior. Use '$user' (with single quotes) for the special token.
     await this.pg.execute(`SET search_path TO ${searchPath}`);
-    this.pg.schemaSearchPathMemo = searchPath;
+    this.pg._schemaSearchPathMemo = searchPath;
   }
 
   async clientMinMessages(): Promise<string> {
