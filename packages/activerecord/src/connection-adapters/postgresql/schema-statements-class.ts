@@ -110,6 +110,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
               ) AS columns,
               pg_get_indexdef(ix.indexrelid) AS definition,
               ix.indoption AS options,
+              ix.indisvalid AS is_valid,
               obj_description(ix.indexrelid, 'pg_class') AS comment,
               t.relname AS table_name
        FROM pg_class t
@@ -118,6 +119,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
        JOIN pg_namespace n ON n.oid = t.relnamespace
        JOIN pg_am am ON am.oid = i.relam
        WHERE ${tableCondition}
+         AND i.relkind IN ('i', 'I')
          AND ix.indisprimary = false
        ORDER BY i.relname`,
       binds,
@@ -192,6 +194,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         nullsNotDistinct,
         // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.
         comment: (row.comment as string | null)?.trim() ? (row.comment as string) : undefined,
+        valid: row.is_valid as boolean,
       };
     });
   }

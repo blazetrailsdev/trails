@@ -90,6 +90,49 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec("DROP TABLE IF EXISTS people");
     });
 
+    it("add index quotes a bare column name where", async () => {
+      // Mirrors Rails PG#add_index_options: when `:where` is itself a column
+      // name, it is quoted as an identifier rather than passed through verbatim.
+      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec(
+        "CREATE TABLE people (id serial primary key, last_name varchar, active boolean)",
+      );
+
+      const sql = await adapter.addIndex("people", ["last_name"], {
+        where: "active",
+        name: "index_people_on_last_name",
+      });
+      expect(sql).toBe(
+        `CREATE INDEX "index_people_on_last_name" ON "people" ("last_name") WHERE "active"`,
+      );
+      await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
+
+      // A non-column where expression is left verbatim.
+      const sql2 = await adapter.addIndex("people", ["last_name"], {
+        where: "active IS TRUE",
+        name: "index_people_on_last_name",
+      });
+      expect(sql2).toBe(
+        `CREATE INDEX "index_people_on_last_name" ON "people" ("last_name") WHERE active IS TRUE`,
+      );
+      await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
+
+      await adapter.exec("DROP TABLE IF EXISTS people");
+    });
+
+    it("rename index validates the new name length", async () => {
+      // Mirrors Rails PG#rename_index → validate_index_length!.
+      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec("CREATE TABLE people (id serial primary key, last_name varchar)");
+      await adapter.exec('CREATE INDEX index_people_on_last_name ON people ("last_name")');
+
+      await expect(
+        adapter.renameIndex("people", "index_people_on_last_name", "a".repeat(65)),
+      ).rejects.toThrow(/too long/);
+
+      await adapter.exec("DROP TABLE IF EXISTS people");
+    });
+
     it("remove index", async () => {
       await adapter.exec("DROP TABLE IF EXISTS people");
       await adapter.exec("CREATE TABLE people (id serial primary key, last_name varchar)");

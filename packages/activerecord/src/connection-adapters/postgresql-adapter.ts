@@ -3219,6 +3219,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
+    this.pgSchemaStatements().validateIndexLengthBang(tableName, newName);
     const { schema } = this.parseSchemaQualifiedName(tableName);
     const qualifiedOld = schema
       ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(oldName)}`
@@ -3707,7 +3708,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       sql += " NULLS NOT DISTINCT";
     }
     if (options.where) {
-      sql += ` WHERE ${options.where}`;
+      // Mirrors Rails PG#add_index_options: when `:where` is itself a bare
+      // column name, quote it as an identifier (`WHERE "deleted"` for a boolean
+      // column) rather than emitting it verbatim as an expression. Rails houses
+      // this in `add_index_options`, but that method is sync here (and unused on
+      // the PG path, which builds SQL inline) while `tableExists`/`columnExists`
+      // are async — so the check lives here at the only async PG add-index site.
+      // Only a bare identifier can name a column; anything with spaces, quotes,
+      // or operators (e.g. `state = 'active'`) is an expression and is left
+      // verbatim. The guard also keeps such values out of columnExists, whose
+      // SQL interpolates the name unescaped. Rails' parameterized column_exists?
+      // simply returns false for those, so this matches its result.
+      let where = options.where;
+      if (/^\w+$/.test(options.where)) {
+        const ss = this.pgSchemaStatements();
+        if (
+          (await ss.tableExists(tableName)) &&
+          (await ss.columnExists(tableName, options.where))
+        ) {
+          where = this.quoteColumnName(options.where);
+        }
+      }
+      sql += ` WHERE ${where}`;
     }
 
     await this.exec(sql);
