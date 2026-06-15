@@ -277,6 +277,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it.skip("recursive inverse on recursive model has many inversing", () => {
+    // Tracked: RFC 0030 story inverse-of-single-association-access-convergence
     // BLOCKED: the InverseOfAssociationRecursiveError class + the
     // checkValidityOfInverseBang recursion check both exist (reflection.ts:234),
     // but checkValidityBang is only invoked for through-reflections + join
@@ -503,6 +504,7 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("parent instance should be shared with every child on find for sti", () => {
+    // Tracked: RFC 0030 story inverse-of-single-association-access-convergence
     // BLOCKED: non-STI parent-sharing on find works, but the STI scoped
     // collection (`special_posts`, class_name SpecialPost) returns 0 rows when
     // loaded via loadHasMany — STI association-scope gap, not an inverse-of gap.
@@ -776,12 +778,14 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("inverse instance should be set before find callbacks are run", () => {
+    // Tracked: RFC 0030 story inverse-of-single-association-access-convergence
     // BLOCKED: afterFind callbacks exist, but the has_many inverse is wired
     // AFTER the child's find callbacks fire (loadHasMany post-processes the
     // loaded set), so an afterFind hook sees the inverse uncached. Rails sets
     // the inverse inside the load block, before run_callbacks(:find).
   });
   it.skip("inverse instance should be set before initialize callbacks are run", () => {
+    // Tracked: RFC 0030 story inverse-of-single-association-access-convergence
     // BLOCKED: same ordering gap as the find-callbacks case — the inverse is
     // wired after the child's after_initialize fires, not before.
   });
@@ -930,12 +934,6 @@ describe("AutomaticInverseFindingTests", () => {
     const assocs = (Man as any)._associations;
     const hasOneAssoc = assocs.find((a: any) => a.name === "mixedCaseMonkey");
     expect(hasOneAssoc.options.inverseOf).toBe("man");
-  });
-
-  it.skip("has many and belongs to should find inverse automatically for model in module", () => {
-    // NOT PORTABLE: automaticInverseOf demodulizes the class name, but trails
-    // has no Ruby module system and JS class names cannot contain "::", so the
-    // Admin::Account / Admin::User namespaced scenario isn't representable.
   });
 
   it("has one and belongs to should find inverse automatically", () => {
@@ -1547,6 +1545,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(newInversedMan).toBe(oldInversedMan);
   });
   it.skip("inversed instance should load after autosave if it is not already loaded", () => {
+    // Tracked: RFC 0030 story inverse-of-single-association-access-convergence
     // BLOCKED: needs the autosave path to load the (not-yet-loaded) inverse
     // has_one after the owner save (Rails autosave_association loads + saves the
     // inverse). Distinct from the other inverse tests; unverified scope.

@@ -2106,6 +2106,10 @@ describe("AssociationsTest", () => {
         columns: { blog_id: "integer", blog_post_id: "integer", body: "string", id: "integer" },
         primaryKey: ["blog_id", "id"],
       },
+      ss_authors: { name: "string" },
+      ss_author_favorites: { author_id: "integer", favorite_author_id: "integer" },
+      awr_firms: { name: "string" },
+      awr_clients: { name: "string", awr_firm_id: "integer" },
     });
   });
 
@@ -2140,11 +2144,42 @@ describe("AssociationsTest", () => {
     const countAfter = (await ELChild.all().toArray()).length;
     expect(countAfter).toBe(countBefore);
   });
-  it.skip("subselect", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs author_favorites association */
+  it("subselect", async () => {
+    class SsAuthor extends Base {
+      static _tableName = "ss_authors";
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SsAuthorFavorite extends Base {
+      static _tableName = "ss_author_favorites";
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("favorite_author_id", "integer");
+      }
+    }
+    registerModel("SsAuthor", SsAuthor);
+    registerModel("SsAuthorFavorite", SsAuthorFavorite);
+    Associations.hasMany.call(SsAuthor, "author_favorites", {
+      className: "SsAuthorFavorite",
+      foreignKey: "author_id",
+    });
+    Associations.belongsTo.call(SsAuthorFavorite, "author", {
+      className: "SsAuthor",
+      foreignKey: "author_id",
+    });
+
+    const author = await SsAuthor.create({ name: "David" });
+    await SsAuthorFavorite.create({ author_id: author.id, favorite_author_id: author.id });
+
+    const favs = await loadHasMany(author, "author_favorites", {
+      className: "SsAuthorFavorite",
+      foreignKey: "author_id",
+    });
+    const fav2 = await association(author, "author_favorites")
+      .where({ author: SsAuthor.where({ id: author.id }) })
+      .toArray();
+    expect(fav2.map((f: any) => f.id)).toEqual(favs.map((f: any) => f.id));
   });
   it("loading the association target should keep child records marked for destruction", async () => {
     class DPost extends Base {
@@ -2341,17 +2376,74 @@ describe("AssociationsTest", () => {
     const reloaded = await proxy.toArray();
     expect(reloaded.length).toBe(1);
   });
-  it.skip("using limitable reflections helper", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs limitable_reflections helper */
+  it("using limitable reflections helper", () => {
+    class UlrTag extends Base {
+      static _tableName = "ulr_tags";
+      static {
+        this.attribute("name", "string");
+        this.hasMany("ulrTaggings", { className: "UlrTagging", foreignKey: "ulr_tag_id" });
+      }
+    }
+    class UlrTagging extends Base {
+      static _tableName = "ulr_taggings";
+      static {
+        this.attribute("ulr_tag_id", "integer");
+        this.attribute("ulr_super_tag_id", "integer");
+        this.belongsTo("ulrTag", { className: "UlrTag", foreignKey: "ulr_tag_id" });
+        this.belongsTo("ulrSuperTag", { className: "UlrTag", foreignKey: "ulr_super_tag_id" });
+        this.hasMany("ulrThings", { className: "UlrThing", foreignKey: "ulr_tagging_id" });
+      }
+    }
+    class UlrThing extends Base {
+      static _tableName = "ulr_things";
+      static {
+        this.attribute("ulr_tagging_id", "integer");
+      }
+    }
+    registerModel("UlrTag", UlrTag);
+    registerModel("UlrTagging", UlrTagging);
+    registerModel("UlrThing", UlrThing);
+
+    const usingLimitableReflections = (reflections: any[]) =>
+      UlrTagging.all().usingLimitableReflections(reflections);
+    const belongsToReflections = [
+      reflectOnAssociation(UlrTagging, "ulrTag"),
+      reflectOnAssociation(UlrTagging, "ulrSuperTag"),
+    ];
+    const hasManyReflections = [
+      reflectOnAssociation(UlrTag, "ulrTaggings"),
+      reflectOnAssociation(UlrTagging, "ulrThings"),
+    ];
+    const mixedReflections = [...belongsToReflections, ...hasManyReflections];
+    expect(usingLimitableReflections(belongsToReflections)).toBe(true);
+    expect(usingLimitableReflections(hasManyReflections)).toBe(false);
+    expect(usingLimitableReflections(mixedReflections)).toBe(false);
   });
-  it.skip("association with references", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs references/includes support */
+  it("association with references", async () => {
+    class AwrFirm extends Base {
+      static _tableName = "awr_firms";
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class AwrClient extends Base {
+      static _tableName = "awr_clients";
+      static {
+        this.attribute("name", "string");
+        this.attribute("awr_firm_id", "integer");
+      }
+    }
+    registerModel("AwrFirm", AwrFirm);
+    registerModel("AwrClient", AwrClient);
+    Associations.hasMany.call(AwrFirm, "association_with_references", {
+      className: "AwrClient",
+      foreignKey: "awr_firm_id",
+      scope: (rel: any) => rel.references("foo"),
+    });
+
+    const firm = await AwrFirm.create({ name: "37signals" });
+    const scope = association(firm, "association_with_references").scope();
+    expect((scope as any)._referencesValues).toEqual(["foo"]);
   });
   it("belongs to a model with composite foreign key finds associated record", async () => {
     class CpkOrder extends Base {
@@ -7435,18 +7527,14 @@ describe("AssociationProxyTest", () => {
     expect(proxy.loaded).toBe(false);
   });
   it.skip("inspect does not reload a not yet loaded target", () => {
+    // Tracked: RFC 0030 story collection-proxy-inspect
     // BLOCKED: associations — collection/singular feature gap
     // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* Rails: assert_match on andreas.audit_logs.inspect — needs inspect() on CollectionProxy */
   });
-  it.skip("pretty print does not reload a not yet loaded target", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* Rails: pretty_print(PP.new) on proxy — no equivalent in JS */
-  });
   it.skip("save on parent saves children", () => {
+    // Tracked: RFC 0030 story autosave-has-many-save-on-parent
     // BLOCKED: associations — collection/singular feature gap
     // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
@@ -7473,12 +7561,6 @@ describe("AssociationProxyTest", () => {
     const results = await scope.toArray();
     expect(results.length).toBe(1);
     expect(results[0].body).toBe("scoped");
-  });
-  it.skip("proxy object can be stubbed", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* Rails: Mocha stub test — no JS equivalent for this Ruby testing infrastructure check */
   });
   it("inverses get set of subsets of the association", async () => {
     // Rails: human.interests.where("1=1").first.human should not re-query —
@@ -8413,6 +8495,7 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it.skip("preload groups queries with same sql at second level", () => {
+    // Tracked: RFC 0030 story preload-extending-grouping
     /* BLOCKED: associations — needs `extending` association option to differentiate vs `same scope`. */
   });
   it("preload with grouping sets inverse association", async () => {
@@ -8761,6 +8844,7 @@ describe("PreloaderTest", () => {
   // different databases. A single shared Base.adapter cannot express this
   // multi-database scenario.
   it.skip("multi database polymorphic preload with same table name", () => {
+    // Tracked: RFC 0030 story multi-db-polymorphic-preload
     // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment (multi-DB pattern).
     // Needs reimplementation against the pool (no bypass).
   });

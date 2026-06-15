@@ -242,6 +242,7 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it.skip("merging left joins should be left joins", () => {
+    // Tracked: RFC 0030 story left-joins-cross-model-merge
     // Rails: Author.left_joins(:posts).merge(Post.no_comments) and asserts the
     // cross-model merged result still returns the left-join rows. Blocked by the
     // cross-model path in mergeOuterJoins (merger.ts:88-93 stub vs

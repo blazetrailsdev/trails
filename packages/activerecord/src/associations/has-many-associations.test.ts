@@ -563,10 +563,39 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     expect(ids).toContain(p2.id);
   });
 
-  it.skip("ids on loaded association with custom primary key", () => {
-    // BLOCKED: associations — has-many feature gap
-    // ROOT-CAUSE: associations/has-many-associations.ts or preloader.ts missing has-many semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-associations.test.ts
+  it("ids on loaded association with custom primary key", async () => {
+    class LoadedIdsAuthor extends Base {
+      static _tableName = "ids_authors";
+      static {
+        this.attribute("name", "string");
+        this.attribute("author_code", "string");
+        this.primaryKey = "author_code";
+      }
+    }
+    class LoadedIdsPost extends Base {
+      static _tableName = "ids_posts";
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_code", "string");
+      }
+    }
+    registerModel("LoadedIdsAuthor", LoadedIdsAuthor);
+    registerModel("LoadedIdsPost", LoadedIdsPost);
+    Associations.hasMany.call(LoadedIdsAuthor, "loaded_ids_posts", {
+      className: "LoadedIdsPost",
+      foreignKey: "author_code",
+      primaryKey: "author_code",
+    });
+    const author = await LoadedIdsAuthor.create({ name: "Carol", author_code: "C1" });
+    const p1 = await LoadedIdsPost.create({ title: "P1", author_code: "C1" });
+    const p2 = await LoadedIdsPost.create({ title: "P2", author_code: "C1" });
+
+    const assoc = (author as any).association("loaded_ids_posts");
+    await assoc.loadTarget();
+    expect(assoc.isLoaded()).toBe(true);
+    const ids = await assoc.idsReader();
+    expect(ids).toContain(p1.id);
+    expect(ids).toContain(p2.id);
   });
 
   it("blank custom primary key on new record should not run queries", async () => {

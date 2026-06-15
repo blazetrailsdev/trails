@@ -762,6 +762,31 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Marshal.load(Marshal.dump(firm)) of an AR record with a loaded has-one " +
       "association cache. Ruby Marshal binary serialization has no Node.js equivalent.",
   },
+  {
+    testFile: "associations/inverse_associations_test.rb",
+    tests: ["has many and belongs to should find inverse automatically for model in module"],
+    reason:
+      "Asserts automatic inverse_of detection for namespaced models " +
+      "(Admin::Account / Admin::User). Ruby modules (`::`) have no TypeScript " +
+      "equivalent — JS class names cannot contain `::`, so the demodulized " +
+      "automatic-inverse scenario isn't representable.",
+  },
+  {
+    testFile: "associations_test.rb",
+    tests: ["pretty print does not reload a not yet loaded target"],
+    reason:
+      "Uses Ruby's PP.pp / pretty_print over a not-yet-loaded collection proxy " +
+      "(associations_test.rb). Ruby's pretty-printer has no Node.js equivalent; " +
+      "the inspect-without-reload behavior is covered by the inspect test.",
+  },
+  {
+    testFile: "associations_test.rb",
+    tests: ["proxy object can be stubbed"],
+    reason:
+      "Stubs a collection proxy via Mocha (`.stubs(...)`) to assert the proxy " +
+      "forwards to the stub. Ruby Mocha test-double infrastructure has no " +
+      "Node.js equivalent.",
+  },
   // --- Cross-version Psych/YAML schema-cache deserialization ---
   {
     testFile: "connection_adapters/schema_cache_test.rb",

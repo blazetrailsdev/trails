@@ -4178,6 +4178,14 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Rails `using_limitable_reflections?` (finder_methods.rb): a set of
+   * reflections is limitable when none of them is a collection association.
+   */
+  usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean {
+    return reflections.every((r) => !r.isCollection());
+  }
+
+  /**
    * Shared full-manager builder for `toArel`/`arel()` and the non-eager
    * `_toSql`. Mirrors Rails `build_arel` (query_methods.rb#build_arel): the
    * base select manager (projections, joins, wheres, order, distinct,
