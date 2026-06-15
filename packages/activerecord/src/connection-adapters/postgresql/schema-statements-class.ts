@@ -471,7 +471,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
     if (searchPath == null) return;
     // Mirrors Rails' schema_search_path= which uses direct interpolation:
-    //   execute("SET search_path TO #{schema_csv}"); @schema_search_path = schema_csv
+    //   internal_execute("SET search_path TO #{schema_csv}"); @schema_search_path = schema_csv
     // This means unquoted $user causes a PG parse error (dollar-quoted string),
     // matching Rails' behavior. Use '$user' (with single quotes) for the special token.
     await this.pg.execute(`SET search_path TO ${searchPath}`);
