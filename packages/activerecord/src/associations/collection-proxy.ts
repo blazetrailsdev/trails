@@ -201,6 +201,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._record;
   }
 
+  /**
+   * @internal Reassign the owner record. Mirrors Rails' settable
+   * `Association#owner`, which `reload` mutates when it re-points each adopted
+   * `@association_cache` entry back to the reloaded record
+   * (`persistence.rb:752`). Rails' proxy owner lives inside the `Association`
+   * object; ours is the `CollectionProxy`'s backing `_record`.
+   */
+  set owner(record: Base) {
+    this._record = record;
+  }
+
   /** @internal Association definition — used by AssociationRelation. */
   get reflection(): AssociationDefinition {
     return this._assocDef;
