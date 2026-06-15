@@ -3706,9 +3706,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // this in `add_index_options`, but that method is sync here (and unused on
       // the PG path, which builds SQL inline) while `tableExists`/`columnExists`
       // are async — so the check lives here at the only async PG add-index site.
+      // Only a bare identifier can name a column; anything with spaces, quotes,
+      // or operators (e.g. `state = 'active'`) is an expression and is left
+      // verbatim. The guard also keeps such values out of columnExists, whose
+      // SQL interpolates the name unescaped. Rails' parameterized column_exists?
+      // simply returns false for those, so this matches its result.
       const ss = this.pgSchemaStatements();
       const where =
-        (await ss.tableExists(tableName)) && (await ss.columnExists(tableName, options.where))
+        /^\w+$/.test(options.where) &&
+        (await ss.tableExists(tableName)) &&
+        (await ss.columnExists(tableName, options.where))
           ? this.quoteColumnName(options.where)
           : options.where;
       sql += ` WHERE ${where}`;
