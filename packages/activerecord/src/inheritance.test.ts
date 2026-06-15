@@ -160,56 +160,55 @@ describe("InheritanceTest", () => {
 
   it("new with invalid type", () => {
     const { Vehicle } = makeHierarchy();
-    const v = new Vehicle({ name: "test", type: "Vehicle" });
-    expect(v.type).toBe("Vehicle");
+    expect(() => new Vehicle({ name: "test", type: "InvalidType" })).toThrow(SubclassNotFound);
   });
 
   it("new with unrelated type", () => {
     const { Vehicle } = makeHierarchy();
-    const v = new Vehicle({ name: "test" });
-    expect(v.isNewRecord()).toBe(true);
+    expect(() => new Vehicle({ name: "test", type: "Account" })).toThrow(SubclassNotFound);
   });
 
   it("where new with invalid type", () => {
     const { Vehicle } = makeHierarchy();
-    const rel = Vehicle.where({ name: "test" });
-    expect(rel.toSql()).toContain("WHERE");
+    expect(() => (Vehicle.where({ type: "InvalidType" }) as any).new()).toThrow(SubclassNotFound);
   });
 
   it("where new with unrelated type", () => {
     const { Vehicle } = makeHierarchy();
-    const rel = Vehicle.where({ type: "Car" });
-    expect(rel.toSql()).toContain("WHERE");
+    expect(() => (Vehicle.where({ type: "Account" }) as any).new()).toThrow(SubclassNotFound);
   });
 
   it("where create with invalid type", async () => {
     const { Vehicle } = makeHierarchy();
-    const v = await Vehicle.create({ name: "test", type: "Vehicle" });
-    expect(v.isPersisted()).toBe(true);
+    await expect((Vehicle.where({ type: "InvalidType" }) as any).create()).rejects.toThrow(
+      SubclassNotFound,
+    );
   });
 
   it("where create with unrelated type", async () => {
-    const { Car } = makeHierarchy();
-    const c = await Car.create({ name: "test" });
-    expect(c.type).toBe("Car");
+    const { Vehicle } = makeHierarchy();
+    await expect((Vehicle.where({ type: "Account" }) as any).create()).rejects.toThrow(
+      SubclassNotFound,
+    );
   });
 
   it("where create bang with invalid type", async () => {
-    const { Car } = makeHierarchy();
-    const c = await Car.create({ name: "test" });
-    expect(c.isPersisted()).toBe(true);
+    const { Vehicle } = makeHierarchy();
+    await expect((Vehicle.where({ type: "InvalidType" }) as any).createBang()).rejects.toThrow(
+      SubclassNotFound,
+    );
   });
 
   it("where create bang with unrelated type", async () => {
-    const { Truck } = makeHierarchy();
-    const t = await Truck.create({ name: "test" });
-    expect(t.type).toBe("Truck");
+    const { Vehicle } = makeHierarchy();
+    await expect((Vehicle.where({ type: "Account" }) as any).createBang()).rejects.toThrow(
+      SubclassNotFound,
+    );
   });
 
   it("new with unrelated namespaced type", () => {
     const { Vehicle } = makeHierarchy();
-    const v = new Vehicle({ name: "test" });
-    expect(v.isNewRecord()).toBe(true);
+    expect(() => new Vehicle({ name: "test", type: "Namespaced::Firm" })).toThrow(SubclassNotFound);
   });
 
   it("new with complex inheritance", async () => {

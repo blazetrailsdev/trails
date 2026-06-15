@@ -781,6 +781,30 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
 }
 
 /**
+ * True when `typeName` names `modelClass` itself or one of its STI ancestors
+ * (up to and including the STI base). Such a value is not "invalid": the
+ * receiver already *is* that type, so `new` builds it as-is rather than raising.
+ * This is the registry-safe analogue of Rails resolving a base-class name — the
+ * lineage walk needs no global lookup, so it stays free of cross-test ambiguity.
+ *
+ * It also preserves the deliberate `_applyScopeAttributes` deviation where a
+ * scope that sets `type` to an ancestor (e.g. `Car.new` under
+ * `where(type: "Vehicle")`) keeps the receiver's own concrete type.
+ *
+ * @internal
+ */
+function namesSelfOrStiAncestor(modelClass: typeof Base, typeName: string): boolean {
+  const stiBase = getStiBase(modelClass);
+  let cur: typeof Base = modelClass;
+  while (cur && (cur as unknown) !== Function.prototype) {
+    if (stiName(cur) === typeName) return true;
+    if (cur === stiBase) break;
+    cur = Object.getPrototypeOf(cur) as typeof Base;
+  }
+  return false;
+}
+
+/**
  * Registry-safe row-path resolver: the database-row analogue of
  * {@link findStiClassInHierarchy} used by {@link discriminateClassForRecord}.
  *
@@ -824,12 +848,17 @@ function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Ba
  * Rails' constant-lookup `find_sti_class`. `inheritance_column` now always
  * resolves to a name (default `"type"`), and the dispatch is gated on the
  * column-aware `_has_attribute?` ({@link classHasAttribute}). Returns null (no
- * dispatch) when no source names a subclass in this class's subtree.
+ * dispatch) when no source names an inheritance value at all.
  *
- * One intentional deviation from Rails: for a value present but naming no
- * in-hierarchy subclass, Rails' `find_sti_class` raises SubclassNotFound; the
- * registry-safe resolver returns null (build the receiver as-is) instead, since
- * the global lookup that would raise is exactly the ambiguous path we avoid.
+ * Matching Rails' `subclass_from_attributes` → `find_sti_class`: when a source
+ * carries a *present* inheritance value that names no in-hierarchy subclass of
+ * the receiver, this raises {@link SubclassNotFound} (e.g. `Company.new(type:
+ * "Account")` or an unknown `"InvalidType"`), rather than silently building the
+ * receiver as-is. Resolution stays registry-safe — the receiver's own subtree
+ * is the only thing consulted to *resolve* a class, so a bare name like
+ * `"Client"` is never matched against the ambiguous global map. The raise needs
+ * no global lookup: a present value that the subtree can't resolve is invalid by
+ * Rails' rule regardless of what (if anything) the name refers to elsewhere.
  *
  * @internal Used by Base's constructor to dispatch `new` to a subclass.
  */
@@ -856,7 +885,17 @@ export function subclassFromAttributesForNew(
     if (!source || typeof source !== "object") return null;
     const cast = castStiValueFromAttrs(modelClass, source as Record<string, unknown>, col);
     if (!cast.found) return null;
-    return findStiClassInHierarchy(modelClass, cast.value as string);
+    const found = findStiClassInHierarchy(modelClass, cast.value as string);
+    if (found) return found;
+    // A value naming the receiver itself or an STI ancestor is not invalid — the
+    // receiver already is that type, so build it as-is (no dispatch, no raise).
+    if (namesSelfOrStiAncestor(modelClass, cast.value as string)) return null;
+    // Rails' subclass_from_attributes calls find_sti_class on any present
+    // inheritance value, which raises SubclassNotFound when it names no subclass
+    // of the receiver. We raise directly (no global lookup) for the same case.
+    throw new SubclassNotFound(
+      `Invalid single-table inheritance type: ${String(cast.value)} is not a subclass of ${modelClass.name}`,
+    );
   };
 
   // Rails Inheritance::ClassMethods#new tries each source in turn, stopping at
