@@ -1863,8 +1863,9 @@ export class ToSql extends Visitor {
   }
 
   private visitQuoted(node: Nodes.Quoted, collector: SQLString): SQLString {
-    // Mirrors Rails to_sql.rb `visit_Arel_Nodes_Quoted`: collector << quote(o.value_for_database).
-    // Quoted nodes (null, hard-coded literals) are always inlined; only Casted uses add_bind.
+    // Mirrors Rails to_sql.rb `visit_Arel_Nodes_Quoted` (aliased to Casted at :90):
+    // collector << quote(o.value_for_database). Quoted and Casted both inline their
+    // quoted literal; only BindParam uses add_bind.
     const value = resolveValueForDatabase(node.valueForDatabase());
     collector.append(this.quote(value));
     return collector;
