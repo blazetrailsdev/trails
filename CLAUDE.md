@@ -54,7 +54,8 @@ package list, and the `declare` / associations / enums / schema reference, see
   `tasks new` refuses an empty/skeleton-only body, so pass `--body-file` with
   the `## Context` (the trails/Rails `file:line` you just read) and
   `## Acceptance criteria` — a title-only stub forces an expensive re-derivation
-  later. Use `--allow-empty` only when you deliberately want a bare placeholder.
+  later. (`--allow-empty` exists as an escape hatch but avoid it: the bare
+  placeholder it creates is exactly the debt this rule and the guard prevent.)
   This keeps the one-agent-per-PR ownership model intact (a single
   agent fanning out N PRs and then dying orphans all of them — this happened).
   The only exception is a single mechanical rename — note it in the PR body.
