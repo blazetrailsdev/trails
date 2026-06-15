@@ -117,6 +117,12 @@ export class JoinDependency {
   private _aliasesCache?: Aliases;
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency#@references
+   * (join_dependency.rb:88–92). Keyed by reflection name → referenced table
+   * name; populated by `joinConstraints` and read lazily in `makeConstraints`.
+   */
+  private _references: Map<string, string> = new Map();
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
@@ -161,7 +167,6 @@ export class JoinDependency {
       fromModel?: any;
       fromAlias?: string;
       parentAssocName?: string;
-      references?: string[];
     },
   ): JoinPart | null {
     const modelClass = (options?.fromModel ?? this._baseModel) as any;
@@ -241,24 +246,17 @@ export class JoinDependency {
       return null;
     }
 
-    // Rails join_dependency.rb:204 — `table_name = @references[reflection.name]`
-    // is preferred over the derived alias, so `includes(:author)` paired with an
-    // `order(author: …)`/`references(:author)` aliases the join to that name
-    // (`authors AS author`). Only honored when the referenced alias is free.
-    // References arrive as a build argument (threaded from join_constraints'
-    // caller) rather than a stored field. This mirrors `aliased_table_for`: the
-    // collision key is the referenced name when present, otherwise the real
-    // table; a colliding table gets the reflection's `alias_candidate`
-    // (`{plural_name}_{parent_table}`, with `_N` on repeat), not `t{index}`.
-    const referencedAlias =
-      options?.references?.includes(assocName) && assocName !== targetTable!
-        ? assocName
-        : undefined;
-    const keyName = referencedAlias ?? targetTable!;
+    // Register the join's table for collision tracking, mirroring
+    // `aliased_table_for`: the real table on first use, otherwise the
+    // reflection's `alias_candidate` (`{plural_name}_{parent_table}`, with `_N`
+    // on repeat), not `t{index}`. Referenced-table aliasing
+    // (`includes(:author).references(:author)` → `authors AS author`) is NOT
+    // resolved here — it is deferred to `makeConstraints` (join_dependency.rb:202),
+    // mirroring Rails' lazy consumption of `@references`.
     let effectiveName: string;
-    if ((this._aliasTracker.aliases.get(keyName) ?? 0) === 0) {
-      this._aliasTracker.aliases.set(keyName, 1);
-      effectiveName = keyName;
+    if ((this._aliasTracker.aliases.get(targetTable!) ?? 0) === 0) {
+      this._aliasTracker.aliases.set(targetTable!, 1);
+      effectiveName = targetTable!;
     } else {
       // Collision: route through AliasTracker with the Rails alias candidate
       // (aliasNameFor bumps the candidate's count and suffixes `_N` on repeat).
@@ -357,8 +355,8 @@ export class JoinDependency {
    * then returns the leaf node for the path. Returns null if any segment is
    * un-joinable (the whole path is rolled back, per `addAssociationSpec`).
    */
-  addNestedAssociation(path: string, references: string[] = []): JoinPart | null {
-    if (!this.addAssociationSpec(path, references)) return null;
+  addNestedAssociation(path: string): JoinPart | null {
+    if (!this.addAssociationSpec(path)) return null;
     return this._findNodeByPath(path);
   }
 
@@ -381,17 +379,16 @@ export class JoinDependency {
    * Mirrors: ActiveRecord::Associations::JoinDependency#build (recursive tree
    * construction from the eager_load values hash).
    */
-  addAssociationSpec(spec: AssociationSpec, references: string[] = []): boolean {
+  addAssociationSpec(spec: AssociationSpec): boolean {
     // Normalize the spec into a make_tree-style nested hash up front, then
     // construct the tree from it in one walk (mirrors Rails building the whole
     // tree once from `make_tree(associations)` rather than incrementally).
-    // `references` is threaded down to each `addAssociation` (replacing the
-    // old stored `_references` field) so a referenced association is aliased
-    // to its reference name, mirroring Rails' make_constraints `@references`.
+    // Referenced-table aliasing is resolved lazily in `makeConstraints` from the
+    // `references` argument to `joinConstraints`, mirroring Rails' `@references`.
     const tree = JoinDependency.makeTree(spec);
     const snapshot = this._capture();
     try {
-      if (!this._buildSpecTree(tree, this._baseModel, this._baseAlias, "", references)) {
+      if (!this._buildSpecTree(tree, this._baseModel, this._baseAlias, "")) {
         this._rollback(snapshot);
         return false;
       }
@@ -438,18 +435,17 @@ export class JoinDependency {
     model: typeof Base,
     alias: string,
     parentPath: string,
-    references: string[],
   ): boolean {
     for (const key of Reflect.ownKeys(hash)) {
       const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
-      const node = this._addOrReuse(name, model, alias, parentPath, references);
+      const node = this._addOrReuse(name, model, alias, parentPath);
       if (!node) return false;
       const child = hash[key];
       const childPath = parentPath ? `${parentPath}.${name}` : name;
       if (
         child != null &&
         Reflect.ownKeys(child).length > 0 &&
-        !this._buildSpecTree(child, node.baseKlass, node.effectiveSqlName, childPath, references)
+        !this._buildSpecTree(child, node.baseKlass, node.effectiveSqlName, childPath)
       ) {
         return false;
       }
@@ -467,7 +463,6 @@ export class JoinDependency {
     fromModel: typeof Base,
     fromAlias: string,
     parentPath: string,
-    references: string[],
   ): JoinPart | null {
     const existing = this._findNodeByPath(parentPath ? `${parentPath}.${assocName}` : assocName);
     if (existing) return existing;
@@ -475,7 +470,6 @@ export class JoinDependency {
       fromModel,
       fromAlias,
       parentAssocName: parentPath || undefined,
-      references,
     });
   }
 
@@ -567,19 +561,20 @@ export class JoinDependency {
     return this._joinType;
   }
 
-  // Rails' `join_constraints(joins_to_add, alias_tracker, references)` threads
-  // `references` so make_constraints can alias a join to a referenced table name
-  // (`@references[reflection.name]`). trails resolves all table aliasing eagerly
-  // during tree construction, so `references` is consumed in `addAssociationSpec`
-  // (the build entry) — replacing the old stored `_references` field +
-  // `setReferences` setter — and is accepted here only to keep Rails' arity.
+  // Mirrors: ActiveRecord::Associations::JoinDependency#join_constraints.
+  // Records `references` into the `@references` map (join_dependency.rb:88–92);
+  // the referenced-table aliasing decision is then made lazily, per node, in
+  // `makeConstraints` (join_dependency.rb:202).
   joinConstraints(
     joinsToAdd: JoinDependency[],
     aliasTracker?: AliasTracker,
     references?: string[],
   ): Nodes.Join[] {
     if (aliasTracker) this._aliasTracker = aliasTracker;
-    void references;
+    this._references = new Map();
+    if (references) {
+      for (const tableName of references) this._references.set(tableName, tableName);
+    }
     const joins = this.makeJoinConstraints(this._joinRoot, this._joinType);
 
     for (const oj of joinsToAdd) {
@@ -669,12 +664,60 @@ export class JoinDependency {
     }
   }
 
+  /**
+   * Lazily resolve a referenced-table alias for `child`, mirroring Rails
+   * `make_constraints` reading `table_name = @references[reflection.name]` and
+   * feeding it to `alias_tracker.aliased_table_for` (join_dependency.rb:202).
+   *
+   * `includes(:author).references(:author)` records `author` in `@references`;
+   * when the join for `:author` is emitted, its table is re-aliased to that
+   * referenced name (`authors AS author`). The node's table was already
+   * collision-registered eagerly in `addAssociation`, so `aliasedTableFor` takes
+   * its candidate branch and yields the referenced name; the node's
+   * `effectiveSqlName`/`arelTable` and the join's (and its children's) ON
+   * predicates are rebound so the SELECT projection and SQL stay consistent.
+   * Idempotent: once the node already carries the referenced name, it no-ops.
+   * @internal
+   */
+  private _applyReferencedAlias(child: JoinPart): void {
+    if (this._references.size === 0 || !(child instanceof JoinAssociation)) return;
+    const referenced = this._references.get(child.immediateAssocName);
+    if (!referenced || referenced === child.effectiveSqlName) return;
+
+    const tableName = child.tableName;
+    const aliased = this._aliasTracker.aliasedTableFor(new Table(tableName), referenced);
+    const newName = aliased.tableAlias ?? aliased.name;
+
+    const fromName = child.effectiveSqlName || tableName;
+    const rebindOn = (part: JoinPart): void => {
+      const arelJoin = part.arelJoin;
+      if (!arelJoin) return;
+      const on = arelJoin.right;
+      if (!(on instanceof Nodes.On)) return;
+      const rebound = rebindTableReferences(on.expr as Nodes.Node, fromName, aliased);
+      if (rebound !== on.expr) {
+        const JoinClass = arelJoin.constructor as new (l: Nodes.Node, r: Nodes.Node) => Nodes.Join;
+        part.arelJoin = new JoinClass(
+          part === child ? aliased : arelJoin.left,
+          new Nodes.On(rebound),
+        );
+      }
+    };
+    rebindOn(child);
+    for (const grandchild of child.children) rebindOn(grandchild);
+
+    child.arelTable = aliased;
+    child.effectiveSqlName = newName;
+    this._aliasesCache = undefined;
+  }
+
   /** @internal */
   private makeConstraints(
     _parent: JoinPart,
     child: JoinPart,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
+    this._applyReferencedAlias(child);
     const joins: Nodes.Join[] = [];
     const arelJoin = child.arelJoin;
     if (arelJoin) {
