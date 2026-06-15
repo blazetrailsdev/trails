@@ -248,8 +248,11 @@ export interface ColumnOptions {
   ifNotExists?: boolean;
   autoIncrement?: boolean;
   unsigned?: boolean;
-  // Virtual/generated-column options (Rails: `t.virtual ..., as:, stored:`),
-  // read by MySQL/PostgreSQL/SQLite `add_column_options!`.
+  // Virtual/generated-column options (Rails: `t.virtual ..., type:, as:, stored:`).
+  // `as`/`stored` are read by MySQL/PostgreSQL/SQLite `add_column_options!`;
+  // `type` is the underlying type read by their `new_column_definition` when the
+  // positional type is `:virtual`.
+  type?: ColumnType;
   as?: string;
   stored?: boolean;
 }

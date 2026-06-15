@@ -43,8 +43,7 @@ export class TableDefinition extends AbstractTableDefinition {
     options: ColumnOptions = {},
   ): ColumnDefinition {
     if (type === ("virtual" as ColumnType)) {
-      type =
-        ((options as Record<string, unknown>)["type"] as ColumnType) ?? ("string" as ColumnType);
+      type = options.type ?? ("string" as ColumnType);
     }
     return super.newColumnDefinition(name, type, options);
   }

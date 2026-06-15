@@ -215,7 +215,7 @@ export class TableDefinition extends AbstractTableDefinition {
     options: ColumnOptions = {},
   ): ColumnDefinition {
     if ((type as string) === "virtual") {
-      type = (options as any).type ?? type;
+      type = options.type ?? type;
     }
     return super.newColumnDefinition(name, type, options);
   }
