@@ -756,14 +756,15 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
  * {@link findStiClassInHierarchy} used by {@link discriminateClassForRecord}.
  *
  * Like the `new`-path resolver it matches `typeName` against `baseClass`'s own
- * tracked subtree rather than the ambiguous global `modelRegistry`, where a bare
- * name like `"Client"` collides across test files. It differs in the no-match
- * case: a non-match on an *explicitly modeled* hierarchy (STI enabled, or the
- * base tracks at least one subclass) is a genuinely bad type and raises
- * `SubclassNotFound`, mirroring Rails' `find_sti_class`. A non-match on a plain
- * model that merely reflects a `type` column (no STI, no tracked subclasses)
- * builds the receiver as-is — that model is not really STI, so its stray `type`
- * value must not raise.
+ * tracked subtree first, rather than the ambiguous global `modelRegistry` where a
+ * bare name like `"Client"` collides across test files. It differs in the
+ * no-match case: on an *explicitly modeled* hierarchy (STI enabled, or the base
+ * tracks at least one subclass) it defers to the global {@link findStiClass} —
+ * Rails' autoloader analog — which resolves a uniquely-named subclass or raises
+ * `SubclassNotFound` for a genuinely bad type. A non-match on a plain model that
+ * merely reflects a `type` column (no STI, no tracked subclasses) builds the
+ * receiver as-is — that model is not really STI, so its stray `type` value must
+ * not raise.
  *
  * @internal
  */
