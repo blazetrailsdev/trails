@@ -73,6 +73,9 @@ registerModel(SpecialPostWithDefaultScope);
 registerModel(ConditionalStiPost);
 registerModel(SubConditionalStiPost);
 registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
+// SpecialComment is the STI target of `Post#specialComments`, resolved by the
+// "sti association with unscoped not affected by default scope" port.
+registerModel(SpecialComment);
 
 const names = (rows: any[]) => rows.map((r) => r.name);
 const salaries = (rows: any[]) => rows.map((r) => r.salary);
@@ -866,18 +869,14 @@ describe("DefaultScopingTest", () => {
     expect(received).toEqual(expected);
   });
 
-  // ROOT-CAUSE: eager_load/includes/preload of the STI `specialComments` hasMany
-  // builds the wrong foreign key (`comments.special_post_id` instead of
-  // `comments.post_id`), so the faithful body raises `no such column`. Tracked by
-  // upstream-fix story b2-sti-hasmany-preload-foreign-key.
-  it.skip("sti association with unscoped not affected by default scope", async () => {
+  it("sti association with unscoped not affected by default scope", async () => {
     const post = posts("thinking") as any;
     const expected = [comments("does_it_hurt").id];
 
     await (post.specialComments as any).updateAll({ deleted_at: new Date() });
 
     await expect(Post.joins("specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
-    expect(await (post.specialComments as any).reload().toArray()).toEqual([]);
+    expect(await (await (post.specialComments as any).reload()).toArray()).toEqual([]);
 
     await (SpecialComment as any).unscoped(async () => {
       const joined = await Post.joins("specialComments").find(post.id);

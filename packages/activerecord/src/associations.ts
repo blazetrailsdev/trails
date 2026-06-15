@@ -1447,8 +1447,15 @@ export function computeHasManyWhere(
     return { [foreignKey as string]: pkValue, [typeCol]: ctor.name };
   }
 
+  // Prefer the reflection's foreign key, which is derived from the class that
+  // *declared* the association (`reflection.active_record`), not the owner
+  // instance's class. For an STI subclass owner (e.g. a `SpecialPost` row whose
+  // `has_many :special_comments` is declared on `Post`) the column is still
+  // `post_id`, not `special_post_id`. Mirrors Rails using `reflection.foreign_key`.
+  const reflectionFk = (ctor as any)._reflectOnAssociation?.(assocName)?.foreignKey;
   const foreignKey =
     options.foreignKey ??
+    reflectionFk ??
     (options.queryConstraints
       ? options.queryConstraints
       : Array.isArray(primaryKey)
