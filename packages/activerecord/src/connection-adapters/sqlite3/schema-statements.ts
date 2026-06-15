@@ -90,6 +90,14 @@ export async function removeCheckConstraint(
   return adapter.removeCheckConstraint(tableName, expressionOrOptions);
 }
 
+// Matches the ON clause of a CREATE INDEX statement, capturing the
+// parenthesized column/expression list and an optional WHERE predicate.
+// Faithful translation of Rails' regex (schema_statements.rb#indexes); no
+// `s`/`m` flags so `.` and the `$` anchor behave like Ruby's default `.`
+// and `\z`.
+const INDEX_ON_REGEX =
+  /\bON\b\s*"?(\w+?)"?\s*\((?<expressions>.+?)\)(?:\s*WHERE\b\s*(?<where>.+))?(?:\s*\/\*.*\*\/)?$/i;
+
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#indexes
  *
@@ -105,39 +113,67 @@ export async function indexes(adapter: DatabaseAdapter, tableName: string): Prom
     [],
     "SCHEMA",
   )) as Array<{ name: string; unique: number; origin: string }>;
-  // Skip auto-indexes that SQLite generates for PRIMARY KEY / UNIQUE
-  // constraints — Rails' schema cache records user-defined indexes
-  // only, and the auto ones are redundant with the CREATE TABLE sql.
-  const userIndexes = rows.filter((r) => r.origin === "c");
   const sqliteMaster = schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master";
   const result: Array<{
     table: string;
     name: string;
-    columns: string[];
+    columns: string[] | string;
     unique: boolean;
     where?: string;
+    orders: Record<string, string>;
   }> = [];
-  for (const idx of userIndexes) {
-    // index_info takes the bare index name; the schema qualifier, if
-    // any, comes before the PRAGMA keyword — same shape as above.
+  for (const idx of rows) {
+    // Skip SQLite's internal auto-indexes (named `sqlite_*`); user-visible
+    // PK/UNIQUE-backed indexes (origin "pk"/"u") are kept, matching Rails.
+    if (idx.name.startsWith("sqlite_")) continue;
+
+    // Locate the index SQL across the main/attached schema and the temp
+    // schema (temp-table indexes live only in sqlite_temp_master), so their
+    // WHERE clauses are not silently dropped.
+    const idxSqlRows = (await adapter.execute(
+      `SELECT sql FROM ${sqliteMaster} WHERE name = ${quoteStringLiteral(idx.name)} AND type = 'index' ` +
+        `UNION ALL ` +
+        `SELECT sql FROM sqlite_temp_master WHERE name = ${quoteStringLiteral(idx.name)} AND type = 'index'`,
+      [],
+      "SCHEMA",
+    )) as Array<{ sql: string | null }>;
+    const indexSql = idxSqlRows[0]?.sql ?? null;
+    const match = indexSql ? INDEX_ON_REGEX.exec(indexSql) : null;
+    const expressions = match?.groups?.expressions;
+    let where = match?.groups?.where;
+    if (where != null) where = where.replace(/\s*\/\*.*\*\/$/, "");
+
+    // index_info takes the bare index name; the schema qualifier, if any,
+    // comes before the PRAGMA keyword — same shape as above.
     const cols = (await adapter.execute(
       `PRAGMA ${pragmaPrefix}index_info(${quoteColumnName(idx.name)})`,
       [],
       "SCHEMA",
-    )) as Array<{ name: string; seqno: number }>;
-    const idxSqlRows = (await adapter.execute(
-      `SELECT sql FROM ${sqliteMaster} WHERE type='index' AND name=${quoteStringLiteral(idx.name)}`,
-      [],
-      "SCHEMA",
-    )) as Array<{ sql: string }>;
-    const idxSqlRow = idxSqlRows[0];
-    const whereMatch = idxSqlRow?.sql ? /\bWHERE\b\s+(.+)$/i.exec(idxSqlRow.sql) : null;
+    )) as Array<{ name: string | null; seqno: number }>;
+    const columnNames = cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name);
+
+    const orders: Record<string, string> = {};
+    let columns: string[] | string;
+    if (columnNames.some((name) => name == null)) {
+      // Expression index: index_info has no column names, so fall back to
+      // the parenthesized expressions captured from the index SQL.
+      columns = expressions ?? "";
+    } else {
+      columns = columnNames as string[];
+      if (indexSql) {
+        for (const m of indexSql.matchAll(/"(\w+)" DESC/g)) {
+          orders[m[1]] = "desc";
+        }
+      }
+    }
+
     result.push({
       table: bare,
       name: idx.name,
-      columns: cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name),
-      unique: idx.unique === 1,
-      ...(whereMatch ? { where: whereMatch[1].trim() } : {}),
+      columns,
+      unique: idx.unique !== 0,
+      orders,
+      ...(where != null ? { where } : {}),
     });
   }
   return result;

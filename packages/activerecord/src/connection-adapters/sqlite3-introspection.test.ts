@@ -60,12 +60,69 @@ describe("SQLite3Adapter schema introspection", () => {
       name: string;
       columns: string[];
       unique: boolean;
+      orders: Record<string, string>;
     }>;
     // Only the explicitly-created index should surface; the auto-index for
-    // UNIQUE(email) and the primary-key rowid mapping are filtered out.
+    // UNIQUE(email) and the primary-key rowid mapping are filtered out
+    // (their names start with `sqlite_`, matching Rails' filter).
     expect(indexes).toEqual([
-      { table: "widgets", name: "widgets_on_owner", columns: ["owner"], unique: false },
+      {
+        table: "widgets",
+        name: "widgets_on_owner",
+        columns: ["owner"],
+        unique: false,
+        orders: {},
+      },
     ]);
+  });
+
+  it("indexes captures DESC column ordering", async () => {
+    await adapter.executeMutation(
+      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, weight REAL)",
+    );
+    await adapter.executeMutation(
+      `CREATE INDEX widgets_on_name_weight ON widgets ("name" ASC, "weight" DESC)`,
+    );
+    const indexes = (await adapter.indexes("widgets")) as Array<{
+      name: string;
+      columns: string[];
+      orders: Record<string, string>;
+    }>;
+    expect(indexes).toEqual([
+      {
+        table: "widgets",
+        name: "widgets_on_name_weight",
+        columns: ["name", "weight"],
+        unique: false,
+        orders: { weight: "desc" },
+      },
+    ]);
+  });
+
+  it("indexes surfaces expression-index columns from the index SQL", async () => {
+    await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+    await adapter.executeMutation("CREATE INDEX widgets_on_lower_name ON widgets (lower(name))");
+    const indexes = (await adapter.indexes("widgets")) as Array<{
+      name: string;
+      columns: string[] | string;
+    }>;
+    const idx = indexes.find((i) => i.name === "widgets_on_lower_name");
+    expect(idx?.columns).toBe("lower(name)");
+  });
+
+  it("indexes keeps the WHERE clause of temp-table indexes", async () => {
+    await adapter.executeMutation(
+      "CREATE TEMP TABLE temp_widgets (id INTEGER PRIMARY KEY, name TEXT)",
+    );
+    await adapter.executeMutation(
+      "CREATE INDEX temp.temp_widgets_on_name ON temp_widgets (name) WHERE name IS NOT NULL",
+    );
+    const indexes = (await adapter.indexes("temp.temp_widgets")) as Array<{
+      name: string;
+      where?: string;
+    }>;
+    const idx = indexes.find((i) => i.name === "temp_widgets_on_name");
+    expect(idx?.where).toBe("name IS NOT NULL");
   });
 
   it("introspection PRAGMAs work against schema-qualified names", async () => {
@@ -89,9 +146,16 @@ describe("SQLite3Adapter schema introspection", () => {
       table: string;
       name: string;
       columns: string[];
+      orders: Record<string, string>;
     }>;
     expect(indexes).toEqual([
-      { table: "widgets", name: "widgets_on_name", columns: ["name"], unique: false },
+      {
+        table: "widgets",
+        name: "widgets_on_name",
+        columns: ["name"],
+        unique: false,
+        orders: {},
+      },
     ]);
   });
 

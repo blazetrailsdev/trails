@@ -371,10 +371,12 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("index", async () => {
-    adapter.exec(`CREATE INDEX "idx_items_name" ON "items" ("name")`);
-    const rows = await adapter.execute(`PRAGMA index_list("items")`);
-    expect(rows.length).toBeGreaterThanOrEqual(1);
-    expect(rows[0].name).toBe("idx_items_name");
+    adapter.exec(`CREATE UNIQUE INDEX "fun" ON "items" ("id")`);
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "fun");
+    expect(index.table).toBe("items");
+    expect(index.unique).toBe(true);
+    expect(index.columns).toEqual(["id"]);
   });
 
   it("index with if not exists", async () => {
@@ -386,54 +388,64 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("non unique index", async () => {
-    adapter.exec(`CREATE INDEX "idx_items_price" ON "items" ("price")`);
-    const rows = await adapter.execute(`PRAGMA index_list("items")`);
-    const idx = rows.find((r: any) => r.name === "idx_items_price");
-    expect(idx!.unique).toBe(0);
+    adapter.exec(`CREATE INDEX "fun" ON "items" ("id")`);
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "fun");
+    expect(index.unique).toBe(false);
   });
 
   it("compound index", async () => {
-    adapter.exec(`CREATE INDEX "idx_items_name_price" ON "items" ("name", "price")`);
-    const cols = await adapter.execute(`PRAGMA index_info("idx_items_name_price")`);
-    expect(cols).toHaveLength(2);
+    adapter.exec(`CREATE INDEX "fun" ON "items" ("id", "price")`);
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "fun");
+    expect([...index.columns].sort()).toEqual(["id", "price"].sort());
   });
 
   it("partial index with comment", async () => {
-    adapter.exec(`CREATE INDEX "idx_items_active" ON "items" ("name") WHERE "active" = 1`);
-    const rows = await adapter.execute(`PRAGMA index_list("items")`);
-    expect(rows.some((r: any) => r.name === "idx_items_active")).toBe(true);
+    adapter.exec(`CREATE INDEX "fun" ON "items" ("id") WHERE price > 0 /*tag:test*/`);
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "fun");
+    expect(index.columns).toEqual(["id"]);
+    expect(index.where).toBe("price > 0");
   });
 
   it("expression index", async () => {
-    adapter.exec(`CREATE INDEX "idx_items_lower_name" ON "items" (LOWER("name"))`);
-    const rows = await adapter.execute(`PRAGMA index_list("items")`);
-    expect(rows.some((r: any) => r.name === "idx_items_lower_name")).toBe(true);
+    adapter.exec(`CREATE INDEX "expression" ON "items" (max(id, price))`);
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "expression");
+    expect(index.columns).toBe("max(id, price)");
   });
 
   it("expression index with trailing comment", async () => {
-    adapter.exec(`CREATE INDEX "idx_items_upper" ON "items" (UPPER("name"))`);
-    const rows = await adapter.execute(`PRAGMA index_list("items")`);
-    expect(rows.some((r: any) => r.name === "idx_items_upper")).toBe(true);
+    adapter.exec(`CREATE INDEX expression on items (price % 10) /* comment */`);
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "expression");
+    expect(index.columns).toBe("price % 10");
   });
 
   it("expression index with where", async () => {
-    adapter.exec(`CREATE INDEX "idx_items_active_name" ON "items" ("name") WHERE "active" = 1`);
-    const rows = await adapter.execute(`PRAGMA index_list("items")`);
-    expect(rows.some((r: any) => r.name === "idx_items_active_name")).toBe(true);
+    adapter.exec(`CREATE INDEX "expression" ON "items" (id % 10, max(id, price)) WHERE id > 1000`);
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "expression");
+    expect(index.columns).toBe("id % 10, max(id, price)");
+    expect(index.where).toBe("id > 1000");
   });
 
   it("complicated expression", async () => {
-    adapter.exec(`CREATE INDEX "idx_complex" ON "items" (COALESCE("name", 'unknown'))`);
-    const rows = await adapter.execute(`PRAGMA index_list("items")`);
-    expect(rows.some((r: any) => r.name === "idx_complex")).toBe(true);
+    adapter.exec(
+      `CREATE INDEX expression ON items (id % 10, (CASE WHEN price > 0 THEN max(id, price) END))WHERE(id > 1000)`,
+    );
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "expression");
+    expect(index.columns).toBe("id % 10, (CASE WHEN price > 0 THEN max(id, price) END)");
+    expect(index.where).toBe("(id > 1000)");
   });
 
   it("not everything an expression", async () => {
-    // A plain column index is not an expression index
-    adapter.exec(`CREATE INDEX "idx_plain" ON "items" ("price")`);
-    const cols = await adapter.execute(`PRAGMA index_info("idx_plain")`);
-    expect(cols).toHaveLength(1);
-    expect(cols[0].name).toBe("price");
+    adapter.exec(`CREATE INDEX "expression" ON "items" (id, max(id, price))`);
+    const indexes = (await adapter.indexes("items")) as any[];
+    const index = indexes.find((idx) => idx.name === "expression");
+    expect(index.columns).toBe("id, max(id, price)");
   });
 
   it("primary key", async () => {
@@ -495,12 +507,24 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("remove column preserves index options", async () => {
-    adapter.exec(`CREATE INDEX "idx_items_name" ON "items" ("name")`);
-    // SQLite doesn't natively support DROP COLUMN in older versions,
-    // but we can verify the index exists before and after adding a new column
-    adapter.exec(`ALTER TABLE "items" ADD COLUMN "extra" TEXT`);
-    const rows = await adapter.execute(`PRAGMA index_list("items")`);
-    expect(rows.some((r: any) => r.name === "idx_items_name")).toBe(true);
+    adapter.exec(
+      `CREATE TABLE "barcodes" ("id" INTEGER PRIMARY KEY, "code" TEXT, "region" TEXT, "bool_attr" INTEGER)`,
+    );
+    adapter.exec(`CREATE UNIQUE INDEX "unique" ON "barcodes" ("code")`);
+    adapter.exec(`CREATE INDEX "partial" ON "barcodes" ("code") WHERE bool_attr`);
+    adapter.exec(`CREATE INDEX "ordered" ON "barcodes" ("code" DESC)`);
+    await adapter.removeColumn("barcodes", "region");
+
+    const indexes = (await adapter.indexes("barcodes")) as any[];
+
+    const partialIndex = indexes.find((idx) => idx.name === "partial");
+    expect(partialIndex.where).toBe("bool_attr");
+
+    const uniqueIndex = indexes.find((idx) => idx.name === "unique");
+    expect(uniqueIndex.unique).toBe(true);
+
+    const orderedIndex = indexes.find((idx) => idx.name === "ordered");
+    expect(orderedIndex.orders).toEqual({ code: "desc" });
   });
 
   it("auto increment preserved on table changes", async () => {
