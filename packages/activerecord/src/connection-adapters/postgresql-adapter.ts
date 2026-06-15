@@ -78,6 +78,7 @@ import {
   preprocessQuery,
   temporalToBindString,
   extractTableRefFromInsertSql,
+  sqlForInsert,
 } from "./abstract/database-statements.js";
 import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
 
@@ -2118,6 +2119,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       });
     }
     if (this._useInsertReturning) {
+      // When the caller names RETURNING columns (a custom-named serial/identity
+      // PK), append them up front via sql_for_insert so executeMutation reads the
+      // DB-generated value back from the right column instead of falling back to
+      // its auto-appended `RETURNING id` (which errors on tables without an `id`
+      // column and leaves the in-memory PK stale). Mirrors Rails, where the
+      // abstract exec_insert runs sql_for_insert before the query.
+      if (returning && returning.length > 0) {
+        const [sqlWithReturning, resolvedBinds] = sqlForInsert.call(
+          this as never,
+          sql,
+          pk ?? null,
+          binds,
+          returning,
+        );
+        return super.execInsert(sqlWithReturning, name, resolvedBinds, pk, sequenceName, returning);
+      }
       return super.execInsert(sql, name, binds, pk, sequenceName, returning);
     }
     // Resolve sequence name before acquiring the INSERT client so the
