@@ -749,6 +749,9 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const configs = (Pirate as any)._nestedAttributeConfigs;
     expect(configs).toBeDefined();
     expect(configs.find((c: any) => c.associationName === "ship")).toBeDefined();
+    // Rails sets `reflection.autosave = true` (nested_attributes.rb:359).
+    const shipAssoc = (Pirate as any)._associations.find((a: any) => a.name === "ship");
+    expect(shipAssoc.options.autosave).toBe(true);
   });
 
   it("should accept update only option", () => {

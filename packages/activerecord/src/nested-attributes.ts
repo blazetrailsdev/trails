@@ -70,6 +70,16 @@ export function acceptsNestedAttributesFor(
     throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
   }
 
+  // Rails sets `reflection.autosave = true` for every nested-attributes
+  // association (nested_attributes.rb:359), so the parent's save cascades into
+  // the in-memory target. trails checks `options.autosave` dynamically at save
+  // time, so flipping the flag on the association definition is sufficient — and
+  // is what makes the synchronous in-memory target population in
+  // `assignNestedAttributesForCollectionAssociation` reachable for plain
+  // `acceptsNestedAttributesFor(Model, "assoc")` callers, not only those who
+  // also pass `{ autosave: true }` to `hasMany`.
+  assocExists.options = { ...assocExists.options, autosave: true };
+
   // Rails does NOT reject polymorphic belongs_to at declaration time — the
   // check is deferred to build time (the writer raises when it tries to build
   // a new record and finds no `build_#{association_name}` method). See
@@ -680,10 +690,13 @@ function populateInMemoryExistingRecord(
   associationName: string,
   attrs: Record<string, unknown>,
 ): void {
-  if (callRejectIf(record, associationName, attrs)) return;
   const targetModel = resolveCollectionTargetModel(record, associationName);
   if (!targetModel) return;
 
+  // Rails' ordering (nested_attributes.rb:527→543→528): find the record in
+  // `existing_records` first — raise RecordNotFound if absent — and only then
+  // consult `call_reject_if`. A non-existent id therefore raises even when the
+  // attributes would otherwise satisfy `reject_if`.
   const proxy = collectionProxyFor(record, associationName);
   const id = (attrs as any).id;
   let existing = findRecordById(targetModel, proxy.target as Base[], id);
@@ -698,6 +711,8 @@ function populateInMemoryExistingRecord(
     existing = (targetModel as any)._instantiate({ [pkCol]: id });
     (proxy as any).addExistingRecord(existing);
   }
+
+  if (callRejectIf(record, associationName, attrs)) return;
   assignToOrMarkForDestruction(existing!, attrs, isAllowDestroy(record, associationName));
 }
 
