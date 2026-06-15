@@ -47,6 +47,7 @@ import {
 } from "./mysql/schema-creation.js";
 import {
   quote as mysqlQuote,
+  quotedDate as mysqlQuotedDate,
   typeCast as mysqlTypeCast,
   castBoundValue as mysqlCastBoundValue,
   quotedBinary as mysqlQuotedBinary,
@@ -307,7 +308,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#quote
    */
   override quote(value: unknown): string {
-    return mysqlQuote(value);
+    // `.call(this)` so `mysqlQuote`'s delegation to the abstract `quote`
+    // dispatches `quoted_date`/`quoted_time` onto this adapter's overrides.
+    return mysqlQuote.call(this, value);
+  }
+
+  /**
+   * Mirrors the `self.quoted_date` dispatch target for the MySQL family:
+   * caps fractional seconds at 6 digits (microseconds). The inherited
+   * abstract `quote` / `quotedTime` date dispatch resolves through here.
+   */
+  quotedDate(value: Parameters<typeof mysqlQuotedDate>[0]): string {
+    return mysqlQuotedDate(value);
   }
 
   /**

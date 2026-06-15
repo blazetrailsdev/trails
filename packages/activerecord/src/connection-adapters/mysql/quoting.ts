@@ -18,6 +18,7 @@ import {
   formatPlainDateForSql,
   formatPlainTimeForSqlMysql as formatPlainTimeForSql,
 } from "../abstract/sql-datetime.js";
+import { quote as abstractQuote, type QuotingDispatchHost } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -171,28 +172,23 @@ export function columnNameWithOrderMatcher(): RegExp {
 /**
  * Quote a value for inclusion in a SQL literal.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#quote
+ * Rails' MySQL adapter has **no** `quote` override — `mysql/quoting.rb` defines
+ * only `quote_column_name` / `quote_table_name` / `cast_bound_value`, so a MySQL
+ * `quote` runs the abstract `quote` and the MySQL-specific behaviour flows in
+ * through the dispatched helpers (`quoted_true`/`quoted_false`, `quote_string`,
+ * `quoted_binary`, `quoted_date`/`quoted_time`). We mirror that here: only the
+ * branches whose dispatch the abstract `quote` doesn't thread through `this`
+ * (booleans, binary, symbols, strings — plus the trails-only non-finite guard)
+ * stay inline; everything else delegates to {@link abstractQuote} with `this`
+ * threaded so the date/time dispatch lands on MySQL's {@link quotedDate}.
  */
-export function quote(value: unknown): string {
-  if (value === null || value === undefined) return "NULL";
+export function quote(this: QuotingDispatchHost | void, value: unknown): string {
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   // Non-finite numbers (±Infinity, NaN) have no MySQL literal — `String(Infinity)`
   // produces the bareword `Infinity`, which MySQL parses as an identifier and
   // throws "Unknown column 'Infinity'". Mirror PG's behavior and quote them as
   // strings; MySQL coerces or rejects at the column-type boundary.
   if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
-  if (typeof value === "number" || typeof value === "bigint") return String(value);
-  // Rails: `when BigDecimal then value.to_s("F")` — bare, fixed-form literal.
-  if (value instanceof BigDecimal) return value.toString("F");
-  if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
-  if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
-  if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
-  if (value instanceof Temporal.PlainTime) return `'${formatPlainTimeForSql(value)}'`;
-  if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
-  if (value instanceof Date)
-    throw new TypeError(
-      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
-    );
   if (value instanceof Buffer || value instanceof Uint8Array) return quotedBinary(value);
   // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
   if (value instanceof BinaryData) return quotedBinary(value.bytes);
@@ -202,9 +198,39 @@ export function quote(value: unknown): string {
     return quoteString(desc);
   }
   if (typeof value === "string") return quoteString(value);
-  // Rails: when Class then "'#{value}'"
-  if (typeof value === "function" && value.name) return `'${value.name}'`;
-  throw new TypeError(`can't quote ${(value as object).constructor?.name ?? typeof value}`);
+  // nil, BigDecimal, finite numbers/bigints, Class, and date/time all match the
+  // abstract `quote`. Thread `this` so `quoted_date`/`quoted_time` dispatch onto
+  // MySQL's microsecond-capped {@link quotedDate} (and the inherited quotedTime).
+  return abstractQuote.call(this, value);
+}
+
+/**
+ * Format a date/time value for SQL without surrounding quotes, capping
+ * fractional seconds at 6 digits (microseconds) — MySQL TIME/DATETIME/TIMESTAMP
+ * reject 7–9 nanosecond digits in strict mode. Exposed on the adapter so the
+ * inherited abstract `quote` / `quoted_time` dispatch lands here instead of the
+ * nanosecond-precision abstract helper.
+ *
+ * Mirrors: the `self.quoted_date` dispatch target for AbstractMysqlAdapter.
+ *
+ * @internal
+ */
+export function quotedDate(
+  value:
+    | Temporal.Instant
+    | Temporal.ZonedDateTime
+    | Temporal.PlainDateTime
+    | Temporal.PlainDate
+    | Temporal.PlainTime,
+): string {
+  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
+  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
+  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
+  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
+  if (value instanceof Temporal.PlainTime) return formatPlainTimeForSql(value);
+  throw new TypeError(
+    `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
+  );
 }
 
 /**
