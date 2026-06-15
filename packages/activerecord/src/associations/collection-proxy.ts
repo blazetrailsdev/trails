@@ -604,14 +604,42 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const id = this._identityFor(r);
       if (id != null) existingByPk.set(id, r);
     }
-    const merged: T[] = results.map((r) => {
-      const id = this._identityFor(r);
-      return id != null && existingByPk.has(id) ? existingByPk.get(id)! : r;
+    const merged: T[] = results.map((dbRecord) => {
+      const id = this._identityFor(dbRecord);
+      if (id == null || !existingByPk.has(id)) return dbRecord;
+      const memRecord = existingByPk.get(id)!;
+      this._refreshUnchangedAttributes(memRecord, dbRecord);
+      return memRecord;
     });
     const unsaved = this._target.filter((r) => r.isNewRecord());
     this._target = unsaved.length > 0 ? [...merged, ...unsaved] : merged;
     this._targetLoaded = true;
     return this._target;
+  }
+
+  /**
+   * Reconcile a fresh DB record with the matching in-memory record, mirroring
+   * the attribute merge inside Rails' `CollectionAssociation#merge_target_lists`
+   * (collection_association.rb): for every attribute the two share, copy the
+   * database value onto the in-memory record *unless* that attribute carries an
+   * unsaved change or is readonly. Unsaved updates and scheduled destroys win;
+   * every other attribute reflects the database. This keeps the in-memory
+   * instance (so order, identity, and dirty/destroy state are preserved) while
+   * refreshing its untouched columns from the just-loaded row.
+   * @internal
+   */
+  private _refreshUnchangedAttributes(memRecord: T, dbRecord: T): void {
+    const memClass = memRecord.constructor as typeof Base;
+    const dbNames = new Set((dbRecord.constructor as typeof Base).attributeNames());
+    const changed = new Set(
+      (memRecord as unknown as { changedAttributeNamesToSave: string[] })
+        .changedAttributeNamesToSave,
+    );
+    const readonly = new Set(memClass.readonlyAttributes);
+    for (const name of memClass.attributeNames()) {
+      if (!dbNames.has(name) || changed.has(name) || readonly.has(name)) continue;
+      memRecord._writeAttribute(name, dbRecord._readAttribute(name));
+    }
   }
 
   private _identityFor(r: Base): string | null {
