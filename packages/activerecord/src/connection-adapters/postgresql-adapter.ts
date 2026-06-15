@@ -1415,8 +1415,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
-    binds = binds.map((v) => this._bindForPg(v));
-    const rewritten = this.rewriteBinds(sql, binds);
+    // Type-cast bind objects (QueryAttribute) → primitives via `value_for_database`,
+    // then run each through `_bindForPg` for Temporal / BinaryData normalization —
+    // mirrors `type_casted_binds` and the execQuery path.
+    const bindArray = typeCastedBinds(binds).map((v) => this._bindForPg(v));
+    const rewritten = this.rewriteBinds(sql, bindArray);
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
     // stores something that can be re-EXPLAIN'd on the same adapter
     // without re-running rewriteBinds.
@@ -1425,7 +1428,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       sql: rewritten,
       name,
       binds,
-      type_casted_binds: typeCastedBinds(binds),
+      type_casted_binds: bindArray,
       connection: this,
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
@@ -1437,7 +1440,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
-          const queryResult = await this._runQuery(client, rewritten, binds);
+          const queryResult = await this._runQuery(client, rewritten, bindArray);
           // Mirrors Rails' raw_execute → verified! (database_statements.rb):
           // a successful round-trip proves the connection is live, so mark it
           // verified to skip the verify ping on the next withRawConnection.
@@ -1455,7 +1458,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           return rows;
         });
       } catch (e: any) {
-        const translated = this._translateException(e, rewritten, binds);
+        const translated = this._translateException(e, rewritten, bindArray);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
@@ -1472,7 +1475,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     sql = this.preprocessQuery(sql);
-    binds = binds.map((v) => this._bindForPg(v));
+    // Type-cast bind objects (QueryAttribute) → primitives via `value_for_database`,
+    // then run each through `_bindForPg` for Temporal / BinaryData normalization —
+    // mirrors `type_casted_binds`. Without the typeCastedBinds unwrap, an INSERT
+    // routed through executeMutation would bind a raw QueryAttribute to pg.
+    const originalBinds = binds;
+    binds = typeCastedBinds(binds).map((v) => this._bindForPg(v));
     const pgSql = this.rewriteBinds(sql, binds);
     this._noticeReceiverSqlWarnings = [];
     // payload.sql records the rewritten SQL — ExplainSubscriber captures
@@ -1483,8 +1491,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const payload: Record<string, unknown> = {
       sql: pgSql,
       name,
-      binds,
-      type_casted_binds: typeCastedBinds(binds),
+      binds: originalBinds,
+      type_casted_binds: binds,
       connection: this,
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
