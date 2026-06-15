@@ -506,8 +506,10 @@ describe("BasicsTest", () => {
     }
     const p = (await Post.create({ title: "destroy me" })) as any;
     expect(p.isNewRecord()).toBe(false);
+    expect(p.isPreviouslyNewRecord()).toBe(true);
     await p.destroy();
     expect(p.isDestroyed()).toBe(true);
+    expect(p.isPreviouslyNewRecord()).toBe(false);
   });
 
   it("create after initialize with array param", async () => {
