@@ -12,10 +12,13 @@ import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-tra
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
-import { Post } from "../test-helpers/models/post.js";
+import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Category } from "../test-helpers/models/category.js";
+import { Vertex } from "../test-helpers/models/vertex.js";
+import { Edge } from "../test-helpers/models/edge.js";
+import { assertQueriesCount } from "../testing/query-assertions.js";
 
 describe("CascadedEagerLoadingTest", () => {
   setupHandlerSuite();
@@ -39,40 +42,17 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it.skip("eager association loading with hmt does not table name collide when joining associations", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
+    // BLOCKED: join-dependency self-join aliasing gap.
+    // ROOT-CAUSE: Author.joins(:posts).eager_load(:comments) (comments is
+    //   has_many :through :posts) emits a second un-aliased `posts` join and
+    //   raises `ambiguous column name: posts.id`. Rails aliases to
+    //   `posts_authors`. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
   it.skip("eager association loading grafts stashed associations to correct parent", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("cascaded eager association loading with join for count", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("cascaded eager association loading with duplicated includes", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("cascaded eager association loading with twice includes edge cases", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("eager association loading with join for count", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
+    // BLOCKED: join-dependency self-join aliasing gap.
+    // ROOT-CAUSE: Person.eager_load(primary_contact: :primary_contact) needs the
+    //   generated self-join alias `primary_contacts_people_2`; trails' alias
+    //   naming differs. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
   it("eager association loading with nil associations", async () => {
     class ENParent extends Base {
@@ -101,10 +81,10 @@ describe("CascadedEagerLoadingTest", () => {
     expect(children.length).toBe(0);
   });
   it.skip("eager association loading with cascaded three levels by ping pong", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
+    // BLOCKED: canonical Company model lacks enableSti.
+    // ROOT-CAUSE: Firm.all returns all 12 companies because
+    //   test-helpers/models/company.ts never calls enableSti, so STI type
+    //   scoping is absent. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
   it("eager association loading with has many sti", async () => {
     class StiTopic extends Base {
@@ -213,10 +193,10 @@ describe("CascadedEagerLoadingTest", () => {
     expect(parentTopic.title).toBe("First");
   });
   it.skip("eager association loading with multiple stis and order", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
+    // BLOCKED: join-dependency eager-load alias ordering gap.
+    // ROOT-CAUSE: includes + order on eager-load aliases
+    //   (`very_special_comments_posts.body`) needs the alias-naming fidelity
+    //   above. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
   it("eager association loading where first level returns nil", async () => {
     class EFParent extends Base {
@@ -301,18 +281,6 @@ describe("CascadedEagerLoadingTest", () => {
     expect(authors.filter((a: any) => a != null).length).toBe(1);
     expect(authors.filter((a: any) => a == null).length).toBe(1);
   });
-  it.skip("eager association loading with recursive cascading four levels has many through", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("eager association loading with recursive cascading four levels has and belongs to many", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
   it("preloaded records are not duplicated", async () => {
     class PDAuthor extends Base {
       static {
@@ -344,16 +312,16 @@ describe("CascadedEagerLoadingTest", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
   it.skip("preloading across has one constrains loaded records", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
+    // BLOCKED: no reset_callbacks / callback-removal API.
+    // ROOT-CAUSE: test installs a temporary after_initialize recorder via
+    //   reset_callbacks to assert a has_one (ordered) preload instantiates only
+    //   the constrained record; trails callbacks.ts exposes registration only.
+    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
   it.skip("preloading across has one through constrains loaded records", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
+    // BLOCKED: no reset_callbacks / callback-removal API.
+    // ROOT-CAUSE: as above, for a has_one :through (recent_response) preload.
+    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
 });
 
@@ -477,5 +445,138 @@ describe("CascadedEagerLoadingTest", () => {
       0,
     );
     expect(catSum).toBe(3);
+  });
+});
+
+// ==========================================================================
+// CascadedEagerLoadingTest (Vertex/Edge fixtures) — recursive cascading.
+// ==========================================================================
+describe("CascadedEagerLoadingTest", () => {
+  const { vertices } = useHandlerFixtures(["vertices", "edges"]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      { vertices: canonicalSchema.vertices, edges: canonicalSchema.edges } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Vertex);
+  registerModel(Edge);
+
+  const arr = (rec: Base, name: string): Base[] => (rec.association(name).target as Base[]) ?? [];
+
+  it("eager association loading with recursive cascading four levels has many through", async () => {
+    const source = (
+      await Vertex.all()
+        .includes({ sinks: { sinks: { sinks: "sinks" } } })
+        .order("vertices.id")
+        .toArray()
+    )[0];
+    await assertQueriesCount(0, false, () => {
+      expect(arr(arr(arr(source, "sinks")[0], "sinks")[0], "sinks")[0].id).toBe(
+        vertices("vertex_4").id,
+      );
+    });
+  });
+
+  it("eager association loading with recursive cascading four levels has and belongs to many", async () => {
+    const sink = (
+      await Vertex.all()
+        .includes({ sources: { sources: { sources: "sources" } } })
+        .order("vertices.id DESC")
+        .toArray()
+    )[0];
+    await assertQueriesCount(0, false, () => {
+      expect(
+        arr(arr(arr(arr(sink, "sources")[0], "sources")[0], "sources")[0], "sources")[0].id,
+      ).toBe(vertices("vertex_1").id);
+    });
+  });
+});
+
+// ==========================================================================
+// CascadedEagerLoadingTest (Category fixtures) — joins/includes with count.
+// ==========================================================================
+describe("CascadedEagerLoadingTest", () => {
+  useHandlerFixtures(["categories", "posts", "comments", "categorizations", "categoriesPosts"]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        categories: canonicalSchema.categories,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+        categorizations: canonicalSchema.categorizations,
+        categories_posts: canonicalSchema.categories_posts,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Category);
+  registerModel(Post);
+  registerModel(Comment);
+  registerModel(Categorization);
+
+  it("cascaded eager association loading with join for count", async () => {
+    const categories = Category.all()
+      .joins("categorizations")
+      .includes({ posts: "comments" }, "authors");
+    expect(await categories.count()).toBe(4);
+    expect((await categories.toArray()).length).toBe(4);
+    expect(await categories.distinct().count()).toBe(3);
+    const uniqIds = new Set((await categories.toArray()).map((c) => c.id));
+    expect(uniqIds.size).toBe(3);
+  });
+
+  it("cascaded eager association loading with duplicated includes", async () => {
+    const categories = Category.all()
+      .includes("categorizations")
+      .includes({ categorizations: "author" })
+      .where("categorizations.id is not null")
+      .references("categorizations");
+    expect(await categories.count()).toBe(3);
+    expect((await categories.toArray()).length).toBe(3);
+  });
+
+  it("cascaded eager association loading with twice includes edge cases", async () => {
+    const categories = Category.all()
+      .includes({ categorizations: "author" })
+      .includes({ categorizations: "post" })
+      .where("posts.id is not null")
+      .references("posts");
+    expect(await categories.count()).toBe(3);
+    expect((await categories.toArray()).length).toBe(3);
+  });
+});
+
+// ==========================================================================
+// CascadedEagerLoadingTest (Author special_posts) — joins + includes count.
+// ==========================================================================
+describe("CascadedEagerLoadingTest", () => {
+  useHandlerFixtures(["authors", "posts", "comments", "categorizations"]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+        categorizations: canonicalSchema.categorizations,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Author);
+  registerModel(Post);
+  registerModel(Comment);
+  registerModel(Categorization);
+
+  it("eager association loading with join for count", async () => {
+    registerModel(SpecialPost);
+    const authors = Author.all().joins("specialPosts").includes("posts", "categorizations");
+    await authors.count();
+    await assertQueriesCount(3, false, async () => {
+      await authors.toArray();
+    });
   });
 });
