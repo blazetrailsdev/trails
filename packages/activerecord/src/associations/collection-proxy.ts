@@ -630,18 +630,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private _refreshUnchangedAttributes(memRecord: T, dbRecord: T): void {
     const memClass = memRecord.constructor as typeof Base;
-    const dbNames = new Set((dbRecord.constructor as typeof Base).attributeNames());
+    // Rails intersects the *instance* `attribute_names` of both records
+    // (collection_association.rb:340) — the actually-loaded keys, not the class
+    // set — so a collection loaded under a `select` projection only refreshes
+    // the columns both rows actually carry. `attributeNamesList` is trails'
+    // instance-level mirror (reads `_attributes.keys()`); using the class set
+    // here would write columns absent from a partially-loaded dbRecord.
+    const dbNames = new Set(dbRecord.attributeNamesList);
     const changed = new Set(
       (memRecord as unknown as { changedAttributeNamesToSave: string[] })
         .changedAttributeNamesToSave,
     );
     const readonly = new Set(memClass.readonlyAttributes);
-    // We iterate the intersection of real attribute names (not aliases/virtual
+    // We iterate the intersection of loaded attribute names (not aliases/virtual
     // reads), so the low-level `_readAttribute` is equivalent to Rails'
     // `record[name]` (`read_attribute`, collection_association.rb:342) for every
     // name here — the value is already type-cast from the fresh row. Both sides
     // use the raw read/write pair, mirroring `_write_attribute` on the Rails side.
-    for (const name of memClass.attributeNames()) {
+    for (const name of memRecord.attributeNamesList) {
       if (!dbNames.has(name) || changed.has(name) || readonly.has(name)) continue;
       memRecord._writeAttribute(name, dbRecord._readAttribute(name));
     }
