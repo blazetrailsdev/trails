@@ -327,7 +327,14 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
   const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
   if (macro === "belongsTo" || macro === "hasOne") {
     const assoc = record.association(assocName);
-    assoc.setTarget(target);
+    // Route through `inversedFrom`, not `setTarget`, to mirror Rails'
+    // `set_inverse_instance` → `inversed_from`. For belongs_to this runs
+    // `replace_keys` (writing the owner FK) *before* the `_staleState`
+    // snapshot taken by `loadedBang`, so `isStaleTarget()` is authoritative
+    // for the cached target rather than over-reporting against a nil/stale FK.
+    // For has_one the FK lives on the target, so `inversedFrom` is equivalent
+    // to `setTarget` (assign + loadedBang) with no owner FK write.
+    assoc.inversedFrom(target);
     // Flag as an explicit assignment so the inner loaders' short-circuit
     // (`_loadedSingularTarget`) distinguishes it from a memoized query load.
     (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
@@ -920,13 +927,13 @@ export async function loadBelongsTo(
     if (cached) {
       // Honor staleness (Rails' `stale_target?`): if the owner's FK changed so
       // it no longer points at the cached target, the cache is stale — fall
-      // through to re-query. The holder reads this as FK==PK rather than its
-      // `isStaleTarget()` snapshot (see BelongsToAssociation#isCachedTargetStale).
+      // through to re-query. `_cacheSingularTarget` routes singular inverse
+      // writes through `inversedFrom` (→ `replace_keys` → `loadedBang`), so the
+      // holder's `isStaleTarget()` snapshot is now authoritative.
       const holder = record._associationInstances.get(assocName) as
-        | { isCachedTargetStale?: (t: Base) => boolean }
+        | { isStaleTarget?: () => boolean }
         | undefined;
-      const stale =
-        typeof holder?.isCachedTargetStale === "function" && holder.isCachedTargetStale(cached);
+      const stale = typeof holder?.isStaleTarget === "function" && holder.isStaleTarget();
       if (!stale) {
         const inverseName = _resolveInverseName(
           record.constructor as typeof Base,
@@ -2598,6 +2605,19 @@ export function setBelongsTo(
 
   // Cache the association on the singular holder (Rails' @target).
   _cacheSingularTarget(record, assocName, target);
+
+  // Mirror Rails `BelongsToAssociation#replace`: a non-nil writer assignment
+  // sets `@updated = true`. This is what gates the post-save `association.loaded!`
+  // re-snapshot in autosave (`save_belongs_to_association`), keeping
+  // `isStaleTarget()` correct after the FK is propagated to a freshly-saved
+  // target. `_cacheSingularTarget` runs `inversedFrom` (no `@updated`), so the
+  // writer marks it here.
+  if (target) {
+    const holder = record._associationInstances.get(assocName) as
+      | { _updated?: boolean }
+      | undefined;
+    if (holder) holder._updated = true;
+  }
 
   // Set inverse on target (polymorphic existence validated above).
   if (target && typeof options.inverseOf === "string") {
