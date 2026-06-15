@@ -486,8 +486,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           if (prepare) this._trackPrepared(mysqlConn, driverSql);
           // Request array-mode rows so duplicate column names
           // (e.g. `SELECT 1 AS a, 2 AS a`) survive: object-keyed rows would
-          // collapse the second `a` onto the first. Mirrors Rails' cast_result
-          // building the Result from `result.fields` + positional `to_a`.
+          // collapse the second `a` onto the first. This mirrors Rails, whose
+          // `configure_connection` sets `query_options[:as] = :array`
+          // (mysql2_adapter.rb:159), making `raw_result.to_a` positional — so
+          // cast_result builds the Result from `result.fields` + positional rows.
           const [rawResult, rawFields] = prepare
             ? await mysqlConn.execute(
                 { sql: driverSql, rowsAsArray: true } as any,
