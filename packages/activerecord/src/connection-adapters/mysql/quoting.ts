@@ -206,13 +206,16 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
 
 /**
  * Format a date/time value for SQL without surrounding quotes, capping
- * fractional seconds at 6 digits (microseconds). Mirrors Rails' MySQL
- * `quoted_date` (`mysql/quoting.rb`), which returns `super` (the abstract
- * `quoted_date`) for precision-capable MySQL — and Ruby's `usec` already bounds
- * that at 6 digits. Trails' abstract helper emits up to nanoseconds, so we
- * route through the MySQL-safe formatters here (the 7–9th digits are rejected by
- * TIME/DATETIME/TIMESTAMP in strict mode). Exposed on the adapter so the
- * inherited abstract `quote` / `quotedTime` date dispatch lands here.
+ * fractional seconds at 6 digits (microseconds).
+ *
+ * Not a Rails method: `mysql/quoting.rb` has no `quoted_date` override — MySQL
+ * inherits the abstract `quoted_date`, and Ruby's `Time#usec` is intrinsically
+ * microsecond-bounded, so Rails never needs an explicit cap. Trails' abstract
+ * helper emits up to nanoseconds (Temporal precision), and MySQL
+ * TIME/DATETIME/TIMESTAMP reject the 7–9th fractional digits in strict mode, so
+ * this trails-specific override re-routes through the MySQL-safe formatters.
+ * Exposed on the adapter so the inherited abstract `quote` / `quotedTime` date
+ * dispatch lands here instead of the nanosecond-precision abstract helper.
  *
  * @internal
  */

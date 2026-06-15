@@ -314,9 +314,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * Mirrors the `self.quoted_date` dispatch target for the MySQL family:
-   * caps fractional seconds at 6 digits (microseconds). The inherited
-   * abstract `quote` / `quotedTime` date dispatch resolves through here.
+   * Trails-specific microsecond cap on date/time literals. Rails' MySQL adapter
+   * has no `quoted_date` override (Ruby's `usec` is already µs-bounded), but
+   * trails' Temporal-backed abstract helper can emit nanoseconds. The inherited
+   * abstract `quote` / `quotedTime` date dispatch resolves through here so MySQL
+   * never emits the 7–9th fractional digits its column types reject in strict mode.
    */
   quotedDate(value: Parameters<typeof mysqlQuotedDate>[0]): string {
     return mysqlQuotedDate(value);
