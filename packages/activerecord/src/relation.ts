@@ -185,6 +185,24 @@ function _onEquals(a: string | Nodes.Node, b: string | Nodes.Node): boolean {
  * node-level equivalent of the legacy `"#{table}." → "#{alias}."` string
  * substitution. Other operands (the owner-side attribute, a `Casted` STI-type
  * literal, raw values) are left untouched.
+ *
+ * Two faithful limitations carried over verbatim from the string path this
+ * replaces (so executed SQL is unchanged — both are matched on the target
+ * table NAME, exactly as the old `quoteTable(join.table)` substitution was):
+ *
+ * - **True self-association** (e.g. `Employee has_many :subordinates,
+ *   foreign_key: :manager_id`): owner and target are the SAME table, so an ON
+ *   like `employees.manager_id = employees.id` rebinds BOTH sides to the alias.
+ *   Rails' AliasTracker aliases only the target table object, leaving the owner
+ *   unaliased; matching by name can't distinguish them. This is a pre-existing
+ *   latent deviation (identical under the old string substitution), not changed
+ *   here — converging it needs identity-based (target `Table` instance)
+ *   rebinding at the builder, out of scope for this string→AST conversion.
+ * - **`SqlLiteral` operand** (e.g. a raw `where("table.col = ?")` scope folded
+ *   into the ON): opaque text with no walkable attribute, so it falls through
+ *   unrebound. The builder call sites here emit purely Arel-node predicates, so
+ *   this never fires today; a top-level raw-SQL `on` string still takes the
+ *   `typeof join.on === "string"` substitution path in `_addAssocJoin`.
  */
 function _rebindOperand(value: unknown, fromName: string, alias: string): unknown {
   return value instanceof Nodes.Node ? _rebindTableInNode(value, fromName, alias) : value;
@@ -713,9 +731,7 @@ export class Relation<T extends Base> {
    *   and a JOIN ON is built from association options.
    * - through/HABTM: returns null (caller throws).
    */
-  private _resolveAssociationTarget(
-    assocName: string,
-  ): {
+  private _resolveAssociationTarget(assocName: string): {
     joins: Array<{ table: string; on: string | Nodes.Node }>;
     table: string;
     pks: string[];
