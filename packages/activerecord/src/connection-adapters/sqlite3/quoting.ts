@@ -120,16 +120,31 @@ export function quotedDate(
 }
 
 /**
- * Mirrors: SQLite3::Quoting#quoted_time. Unlike the abstract `quoted_time`
- * (which strips the date to a bare `HH:MM:SS`), SQLite keeps the fixed
- * 2000-01-01 date prefix so SQLite can round-trip times as datetime strings.
- * Returns the bare literal (no surrounding quotes) — the inherited `quote`
- * wraps it.
+ * Mirrors: SQLite3::Quoting#quoted_time —
+ * `value.change(year: 2000, ...); quoted_date(value).sub(/\A\d\d\d\d-\d\d-\d\d /, "2000-01-01 ")`.
+ * Unlike the abstract `quoted_time` (which strips the date to a bare
+ * `HH:MM:SS`), SQLite normalises the date to 2000-01-01, routes through
+ * `quoted_date`, then re-prefixes — so SQLite can round-trip times as datetime
+ * strings. Returns the bare literal (no surrounding quotes); the inherited
+ * `quote` wraps it.
  * @internal
  */
 export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
-  if (value instanceof Temporal.PlainTime) return `2000-01-01 ${formatPlainTimeForSql(value)}`;
-  return quotedDate(value.with({ year: 2000, month: 1, day: 1 }));
+  const dt =
+    value instanceof Temporal.PlainTime
+      ? new Temporal.PlainDateTime(
+          2000,
+          1,
+          1,
+          value.hour,
+          value.minute,
+          value.second,
+          value.millisecond,
+          value.microsecond,
+          value.nanosecond,
+        )
+      : value.with({ year: 2000, month: 1, day: 1 });
+  return quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
 /**
