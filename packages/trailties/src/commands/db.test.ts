@@ -1654,7 +1654,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       >;
     };
     expect(parsed.indexes["users"]).toEqual([
-      { table: "users", name: "users_on_email", columns: ["email"], unique: true },
+      { table: "users", name: "users_on_email", columns: ["email"], unique: true, orders: {} },
     ]);
   });
 
