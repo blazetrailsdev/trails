@@ -24,24 +24,16 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
-  quotedTrue(): string;
   unquotedTrue(): number;
-  quotedFalse(): string;
   unquotedFalse(): number;
   quoteTableName(name: string): string;
   quoteColumnName(name: string): string;
 }
 
-export function quotedTrue(): string {
-  return "1";
-}
-
+// Rails MySQL overrides unquoted_true/false (1/0) but NOT quoted_true/false,
+// which inherit the abstract "TRUE"/"FALSE" (mysql/quoting.rb).
 export function unquotedTrue(): number {
   return 1;
-}
-
-export function quotedFalse(): string {
-  return "0";
 }
 
 export function unquotedFalse(): number {
@@ -175,15 +167,15 @@ export function columnNameWithOrderMatcher(): RegExp {
  * Rails' MySQL adapter has **no** `quote` override — `mysql/quoting.rb` defines
  * only `quote_column_name` / `quote_table_name` / `cast_bound_value`, so a MySQL
  * `quote` runs the abstract `quote` and the MySQL-specific behaviour flows in
- * through the dispatched helpers (`quoted_true`/`quoted_false`, `quote_string`,
- * `quoted_binary`, `quoted_date`/`quoted_time`). We mirror that here: only the
- * branches whose dispatch the abstract `quote` doesn't thread through `this`
- * (booleans, binary, symbols, strings — plus the trails-only non-finite guard)
- * stay inline; everything else delegates to {@link abstractQuote} with `this`
- * threaded so the date/time dispatch lands on MySQL's {@link quotedDate}.
+ * through the dispatched helpers (`quote_string`, `quoted_binary`,
+ * `quoted_date`/`quoted_time`). We mirror that here: only the branches whose
+ * dispatch the abstract `quote` doesn't thread through `this` (binary, symbols,
+ * strings — plus the trails-only non-finite guard) stay inline; everything else
+ * delegates to {@link abstractQuote} with `this` threaded so the date/time
+ * dispatch lands on MySQL's {@link quotedDate}. Booleans fall through to the
+ * abstract `"TRUE"`/`"FALSE"`; binds serialize to 1/0 via {@link castBoundValue}.
  */
 export function quote(this: QuotingDispatchHost | void, value: unknown): string {
-  if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   // Non-finite numbers (±Infinity, NaN) have no MySQL literal — `String(Infinity)`
   // produces the bareword `Infinity`, which MySQL parses as an identifier and
   // throws "Unknown column 'Infinity'". Mirror PG's behavior and quote them as

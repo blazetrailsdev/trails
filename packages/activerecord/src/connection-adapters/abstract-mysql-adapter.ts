@@ -57,8 +57,6 @@ import {
   quoteIdentifier as mysqlQuoteIdentifier,
   quoteTableName as mysqlQuoteTableName,
   quoteColumnName as mysqlQuoteColumnName,
-  quotedTrue as mysqlQuotedTrue,
-  quotedFalse as mysqlQuotedFalse,
   unquotedTrue as mysqlUnquotedTrue,
   unquotedFalse as mysqlUnquotedFalse,
 } from "./mysql/quoting.js";
@@ -347,21 +345,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * - `unquoted_true` / `unquoted_false` → `1` / `0`
    *   (`mysql/quoting.rb:72-77`).
    *
-   * Note on `quotedTrue`/`quotedFalse`: Rails MySQL does NOT override
-   * these — it inherits `"TRUE"`/`"FALSE"` from `abstract/quoting.rb:166`.
-   * Trails MySQL's per-module standalone returns `"1"`/`"0"` (a
-   * pre-existing trails-vs-Rails divergence; not addressed here). We
-   * assign them here so `quote(true)` and `quotedTrue()` agree (both
-   * `"1"` via the per-module standalone). Without the assignment the
-   * adapter would inherit AbstractAdapter#quotedTrue (`"TRUE"`) while
-   * `quote()` returns `"1"`, breaking call sites that switch between
-   * the two through the Quoting interface.
+   * `quotedTrue`/`quotedFalse` are NOT overridden — Rails MySQL inherits the
+   * abstract `"TRUE"`/`"FALSE"`. Binds serialize to 1/0 via `cast_bound_value`.
    */
   override quoteIdentifier = mysqlQuoteIdentifier;
   override quoteTableName = mysqlQuoteTableName;
   override quoteColumnName = mysqlQuoteColumnName;
-  override quotedTrue = mysqlQuotedTrue;
-  override quotedFalse = mysqlQuotedFalse;
   override unquotedTrue = mysqlUnquotedTrue;
   override unquotedFalse = mysqlUnquotedFalse;
 

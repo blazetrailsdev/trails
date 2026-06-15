@@ -19,9 +19,12 @@ describe("MySQL quoting — quote", () => {
     expect(quote(undefined)).toBe("NULL");
   });
 
-  it("renders booleans as 1 / 0 (MySQL convention)", () => {
-    expect(quote(true)).toBe("1");
-    expect(quote(false)).toBe("0");
+  it("test_quote_true", () => {
+    expect(quote(true)).toBe("TRUE");
+  });
+
+  it("test_quote_false", () => {
+    expect(quote(false)).toBe("FALSE");
   });
 
   it("renders numbers / bigints bare", () => {
