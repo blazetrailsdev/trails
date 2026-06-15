@@ -118,7 +118,6 @@ import {
   type ColumnType,
   type ReferentialAction,
 } from "./abstract/schema-definitions.js";
-import { joinTableName as deriveJoinTableName } from "../migration/join-table.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
@@ -3212,60 +3211,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     type: string,
     options: ColumnOptions & { using?: string; castAs?: string } = {},
   ): Promise<void> {
-    this.clearCacheBang();
-    const quotedTable = this.quoteTableName(tableName);
-    const pgType = this.typeToSql(type, {
-      ...options,
-      precision: options.precision ?? undefined,
-    });
-
-    const quotedCol = this.quoteIdentifier(columnName);
-    let usingClause = "";
-    if (options.using) {
-      usingClause = ` USING ${options.using}`;
-    } else if (options.castAs) {
-      const castType = this.typeToSql(options.castAs, {
-        limit: options.limit,
-        precision: options.precision ?? undefined,
-        scale: options.scale,
-      });
-      if (options.array) {
-        usingClause = ` USING ARRAY[CAST(${quotedCol} AS ${castType})]`;
-      } else {
-        usingClause = ` USING CAST(${quotedCol} AS ${castType})`;
-      }
-    }
-
-    const collateSql = options.collation
-      ? ` COLLATE ${this.quoteIdentifier(options.collation as string)}`
-      : "";
-    await this.exec(
-      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} TYPE ${pgType}${collateSql}${usingClause}`,
-    );
-
-    if (options.default !== undefined) {
-      if (options.default === null) {
-        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`);
-      } else {
-        const defaultExpr = this.quoteDefaultExpression(options.default, {
-          array: options.array,
-          sqlType: pgType,
-        });
-        // pgQuoteDefaultExpression returns " DEFAULT value" — strip the prefix
-        const defaultValue = defaultExpr.replace(/^ DEFAULT /, "");
-        await this.exec(
-          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${defaultValue}`,
-        );
-      }
-    }
-
-    if (options.null !== undefined) {
-      if (options.null) {
-        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP NOT NULL`);
-      } else {
-        await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET NOT NULL`);
-      }
-    }
+    await this.pgSchemaStatements().changeColumn(tableName, columnName, type, options);
   }
 
   async createJoinTable(
@@ -3274,51 +3220,23 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     options?: JoinTableOptions | ((t: AbstractTableDefinition) => void),
     fn?: (t: AbstractTableDefinition) => void,
   ): Promise<void> {
-    let opts: JoinTableOptions = {};
-    let definer: ((t: AbstractTableDefinition) => void) | undefined;
-    if (typeof options === "function") {
-      definer = options;
-    } else if (options) {
-      opts = options;
-      definer = fn;
-    }
-    const joinName = opts.tableName ?? deriveJoinTableName(table1, table2);
-    const { columnOptions = {}, tableName: _t, ...tableOpts } = opts;
-    const mergedColOpts = { null: false, index: false, ...columnOptions };
-    const t1Ref = this.referenceNameForTable(table1);
-    const t2Ref = this.referenceNameForTable(table2);
-    await this.createTable(joinName, { ...tableOpts, id: false }, (td) => {
-      td.references(t1Ref, mergedColOpts);
-      td.references(t2Ref, mergedColOpts);
-      if (definer) definer(td);
-    });
+    await this.pgSchemaStatements().createJoinTable(table1, table2, options, fn);
   }
 
   async addColumn(
     tableName: string,
     columnName: string,
-    // `ColumnType` already accepts arbitrary strings via its `(string & {})`
-    // branch — Rails passes adapter-specific types (`timestamptz`, enum
-    // type names, etc.) verbatim, so no cast is needed.
     type: ColumnType,
     options: ColumnOptions & {
       comment?: string | null;
       ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#add_column: defer to the abstract
-    // implementation (which builds an AlterTable and accepts it through
-    // schema_creation), then propagate :comment via change_column_comment.
-    await super.addColumn(tableName, columnName, type, options);
-    if ("comment" in options) {
-      await this.changeColumnComment(tableName, columnName, options.comment ?? null);
-    }
+    await this.pgSchemaStatements().addColumn(tableName, columnName, type, options);
   }
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
-    await this.exec(
-      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME COLUMN ${this.quoteIdentifier(columnName)} TO ${this.quoteIdentifier(newColumnName)}`,
-    );
+    await this.pgSchemaStatements().renameColumn(tableName, columnName, newColumnName);
   }
 
   async changeColumnDefault(
@@ -3326,23 +3244,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
-    const quotedTable = this.quoteTableName(tableName);
-    const quotedCol = this.quoteIdentifier(columnName);
-    const defaultValue =
-      defaultOrChanges !== null &&
-      typeof defaultOrChanges === "object" &&
-      "from" in (defaultOrChanges as object) &&
-      "to" in (defaultOrChanges as object)
-        ? (defaultOrChanges as { from: unknown; to: unknown }).to
-        : defaultOrChanges;
-    if (defaultValue == null) {
-      await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`);
-    } else {
-      const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
-      const clause = this.quoteDefaultExpression(defaultValue, col);
-      const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
-      await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${expr}`);
-    }
+    await this.pgSchemaStatements().changeColumnDefault(tableName, columnName, defaultOrChanges);
   }
 
   buildChangeColumnDefinition(
@@ -3357,10 +3259,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       array?: boolean;
     } = {},
   ): ChangeColumnDefinition {
-    void tableName;
-    const cd = new ColumnDefinition(columnName, type as ColumnType, options);
-    cd.sqlType = this.typeToSql(type, options);
-    return new ChangeColumnDefinition(cd, columnName);
+    return this.pgSchemaStatements().buildChangeColumnDefinition(
+      tableName,
+      columnName,
+      type,
+      options,
+    );
   }
 
   async buildChangeColumnDefaultDefinition(
@@ -3388,19 +3292,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     nullable: boolean,
     defaultValue: unknown = null,
   ): Promise<void> {
-    const quotedTable = this.quoteTableName(tableName);
-    const quotedCol = this.quoteIdentifier(columnName);
-    if (!nullable && defaultValue != null) {
-      const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
-      const clause = this.quoteDefaultExpression(defaultValue, col);
-      const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
-      await this.exec(
-        `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
-      );
-    }
-    await this.exec(
-      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${nullable ? "DROP" : "SET"} NOT NULL`,
-    );
+    await this.pgSchemaStatements().changeColumnNull(tableName, columnName, nullable, defaultValue);
   }
 
   async changeColumnComment(
@@ -3408,13 +3300,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     columnName: string,
     comment: string | null,
   ): Promise<void> {
-    await this.exec(
-      `COMMENT ON COLUMN ${this.quoteTableName(tableName)}.${this.quoteIdentifier(columnName)} IS ${this.quote(comment)}`,
-    );
+    await this.pgSchemaStatements().changeColumnComment(tableName, columnName, comment);
   }
 
   async changeTableComment(tableName: string, comment: string | null): Promise<void> {
-    await this.exec(`COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.quote(comment)}`);
+    await this.pgSchemaStatements().changeTableComment(tableName, comment);
   }
 
   /** @internal */

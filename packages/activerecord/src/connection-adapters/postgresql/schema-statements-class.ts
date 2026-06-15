@@ -1,10 +1,18 @@
 import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, Visitors } from "@blazetrails/arel";
-import { SchemaStatements } from "../abstract/schema-statements.js";
+import { SchemaStatements, type JoinTableOptions } from "../abstract/schema-statements.js";
+import {
+  ChangeColumnDefinition,
+  ColumnDefinition,
+  TableDefinition as AbstractTableDefinition,
+  type ColumnOptions,
+  type ColumnType,
+} from "../abstract/schema-definitions.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { splitPgDefault } from "../postgresql-adapter.js";
+import { joinTableName as deriveJoinTableName } from "../../migration/join-table.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 
 /**
@@ -16,6 +24,8 @@ interface PgSchemaAdapter {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
   exec(sql: string): Promise<void>;
   execute(sql: string): Promise<unknown>;
+  clearCacheBang(): void;
+  quote(value: unknown): string;
   quoteIdentifier(name: string): string;
   quoteLiteral(value: unknown): string;
   parseSchemaQualifiedName(name: string): { schema: string | null; table: string };
@@ -703,5 +713,205 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       }
     }
     return array && type !== "primary_key" ? `${sql}[]` : sql;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Alter table
+  // ---------------------------------------------------------------------------
+
+  override async changeColumn(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options: ColumnOptions & { using?: string; castAs?: string } = {},
+  ): Promise<void> {
+    this.pg.clearCacheBang();
+    const quotedTable = this._qt(tableName);
+    const pgType = this.typeToSql(type, {
+      ...options,
+      precision: options.precision ?? undefined,
+    });
+
+    const quotedCol = this._qi(columnName);
+    let usingClause = "";
+    if (options.using) {
+      usingClause = ` USING ${options.using}`;
+    } else if (options.castAs) {
+      const castType = this.typeToSql(options.castAs, {
+        limit: options.limit,
+        precision: options.precision ?? undefined,
+        scale: options.scale,
+      });
+      if (options.array) {
+        usingClause = ` USING ARRAY[CAST(${quotedCol} AS ${castType})]`;
+      } else {
+        usingClause = ` USING CAST(${quotedCol} AS ${castType})`;
+      }
+    }
+
+    const collateSql = options.collation ? ` COLLATE ${this._qi(options.collation as string)}` : "";
+    await this.pg.exec(
+      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} TYPE ${pgType}${collateSql}${usingClause}`,
+    );
+
+    if (options.default !== undefined) {
+      if (options.default === null) {
+        await this.pg.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`);
+      } else {
+        const defaultExpr = this.adapter.quoteDefaultExpression(options.default, {
+          array: options.array,
+          sqlType: pgType,
+        });
+        // pgQuoteDefaultExpression returns " DEFAULT value" — strip the prefix
+        const defaultValue = defaultExpr.replace(/^ DEFAULT /, "");
+        await this.pg.exec(
+          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${defaultValue}`,
+        );
+      }
+    }
+
+    if (options.null !== undefined) {
+      if (options.null) {
+        await this.pg.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP NOT NULL`);
+      } else {
+        await this.pg.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET NOT NULL`);
+      }
+    }
+  }
+
+  override async createJoinTable(
+    table1: string,
+    table2: string,
+    options?: JoinTableOptions | ((t: AbstractTableDefinition) => void),
+    fn?: (t: AbstractTableDefinition) => void,
+  ): Promise<void> {
+    let opts: JoinTableOptions = {};
+    let definer: ((t: AbstractTableDefinition) => void) | undefined;
+    if (typeof options === "function") {
+      definer = options;
+    } else if (options) {
+      opts = options;
+      definer = fn;
+    }
+    const joinName = opts.tableName ?? deriveJoinTableName(table1, table2);
+    const { columnOptions = {}, tableName: _t, ...tableOpts } = opts;
+    const mergedColOpts = { null: false, index: false, ...columnOptions };
+    const t1Ref = this.referenceNameForTable(table1);
+    const t2Ref = this.referenceNameForTable(table2);
+    await this.createTable(joinName, { ...tableOpts, id: false }, (td) => {
+      td.references(t1Ref, mergedColOpts);
+      td.references(t2Ref, mergedColOpts);
+      if (definer) definer(td);
+    });
+  }
+
+  override async addColumn(
+    tableName: string,
+    columnName: string,
+    // `ColumnType` already accepts arbitrary strings via its `(string & {})`
+    // branch — Rails passes adapter-specific types (`timestamptz`, enum
+    // type names, etc.) verbatim, so no cast is needed.
+    type: ColumnType,
+    options: ColumnOptions & {
+      comment?: string | null;
+      ifNotExists?: boolean;
+    } = {},
+  ): Promise<void> {
+    // Mirrors PostgreSQL::SchemaStatements#add_column: defer to the abstract
+    // implementation (which builds an AlterTable and accepts it through
+    // schema_creation), then propagate :comment via change_column_comment.
+    await super.addColumn(tableName, columnName, type, options);
+    if ("comment" in options) {
+      await this.changeColumnComment(tableName, columnName, options.comment ?? null);
+    }
+  }
+
+  override async renameColumn(
+    tableName: string,
+    columnName: string,
+    newColumnName: string,
+  ): Promise<void> {
+    await this.pg.exec(
+      `ALTER TABLE ${this._qt(tableName)} RENAME COLUMN ${this._qi(columnName)} TO ${this._qi(newColumnName)}`,
+    );
+  }
+
+  override async changeColumnDefault(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<void> {
+    const quotedTable = this._qt(tableName);
+    const quotedCol = this._qi(columnName);
+    const defaultValue =
+      defaultOrChanges !== null &&
+      typeof defaultOrChanges === "object" &&
+      "from" in (defaultOrChanges as object) &&
+      "to" in (defaultOrChanges as object)
+        ? (defaultOrChanges as { from: unknown; to: unknown }).to
+        : defaultOrChanges;
+    if (defaultValue == null) {
+      await this.pg.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`);
+    } else {
+      const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
+      const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
+      const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
+      await this.pg.exec(
+        `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${expr}`,
+      );
+    }
+  }
+
+  buildChangeColumnDefinition(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options: {
+      using?: string;
+      castAs?: string;
+      default?: unknown;
+      null?: boolean;
+      array?: boolean;
+    } = {},
+  ): ChangeColumnDefinition {
+    void tableName;
+    const cd = new ColumnDefinition(columnName, type as ColumnType, options);
+    cd.sqlType = this.typeToSql(type, options);
+    return new ChangeColumnDefinition(cd, columnName);
+  }
+
+  override async changeColumnNull(
+    tableName: string,
+    columnName: string,
+    nullable: boolean,
+    defaultValue: unknown = null,
+  ): Promise<void> {
+    const quotedTable = this._qt(tableName);
+    const quotedCol = this._qi(columnName);
+    if (!nullable && defaultValue != null) {
+      const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
+      const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
+      const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
+      await this.pg.exec(
+        `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
+      );
+    }
+    await this.pg.exec(
+      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${nullable ? "DROP" : "SET"} NOT NULL`,
+    );
+  }
+
+  override async changeColumnComment(
+    tableName: string,
+    columnName: string,
+    comment: string | null,
+  ): Promise<void> {
+    await this.pg.exec(
+      `COMMENT ON COLUMN ${this._qt(tableName)}.${this._qi(columnName)} IS ${this.pg.quote(comment)}`,
+    );
+  }
+
+  override async changeTableComment(tableName: string, comment: string | null): Promise<void> {
+    await this.pg.exec(`COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`);
   }
 }
