@@ -19,8 +19,6 @@ describe("MySQL quoting — quote", () => {
     expect(quote(undefined)).toBe("NULL");
   });
 
-  // Rails MySQL inherits abstract quoted_true/quoted_false ("TRUE"/"FALSE");
-  // it does NOT override them. MySQL accepts both as aliases for 1/0.
   it("test_quote_true", () => {
     expect(quote(true)).toBe("TRUE");
   });

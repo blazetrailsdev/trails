@@ -30,13 +30,8 @@ export interface Quoting {
   quoteColumnName(name: string): string;
 }
 
-// Mirrors Rails MySQL: `mysql/quoting.rb` overrides only `unquoted_true`/
-// `unquoted_false` (→ 1 / 0), NOT `quoted_true`/`quoted_false`. The quoted
-// literals inherit the abstract `"TRUE"` / `"FALSE"` (`abstract/quoting.rb:166`)
-// — MySQL accepts both as aliases for 1 / 0. So there is no `quotedTrue`/
-// `quotedFalse` standalone here; the adapter inherits them from AbstractAdapter,
-// and `quote(true)` flows through abstract `quote` → `"TRUE"` (see {@link quote}).
-// Binds still serialize to 1 / 0 via {@link castBoundValue} / {@link typeCast}.
+// Rails MySQL overrides unquoted_true/false (1/0) but NOT quoted_true/false,
+// which inherit the abstract "TRUE"/"FALSE" (mysql/quoting.rb).
 export function unquotedTrue(): number {
   return 1;
 }
@@ -177,10 +172,8 @@ export function columnNameWithOrderMatcher(): RegExp {
  * dispatch the abstract `quote` doesn't thread through `this` (binary, symbols,
  * strings — plus the trails-only non-finite guard) stay inline; everything else
  * delegates to {@link abstractQuote} with `this` threaded so the date/time
- * dispatch lands on MySQL's {@link quotedDate}. Booleans deliberately fall
- * through to {@link abstractQuote} → `"TRUE"` / `"FALSE"` (abstract
- * `quoted_true`/`quoted_false`), matching Rails MySQL which does not override
- * the quoted literals; binds still serialize to 1 / 0 via {@link castBoundValue}.
+ * dispatch lands on MySQL's {@link quotedDate}. Booleans fall through to the
+ * abstract `"TRUE"`/`"FALSE"`; binds serialize to 1/0 via {@link castBoundValue}.
  */
 export function quote(this: QuotingDispatchHost | void, value: unknown): string {
   // Non-finite numbers (±Infinity, NaN) have no MySQL literal — `String(Infinity)`

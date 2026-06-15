@@ -345,14 +345,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * - `unquoted_true` / `unquoted_false` → `1` / `0`
    *   (`mysql/quoting.rb:72-77`).
    *
-   * `quotedTrue`/`quotedFalse` are deliberately NOT overridden: Rails MySQL
-   * inherits `"TRUE"`/`"FALSE"` from `abstract/quoting.rb:166` (MySQL accepts
-   * both as aliases for 1 / 0), so the adapter inherits AbstractAdapter#quotedTrue.
-   * The `quote(true)` / `quotedTrue()` consistency holds because the MySQL `quote`
-   * routes booleans through the abstract `quote` (→ `"TRUE"`), matching the
-   * inherited literal. Binds serialize to 1 / 0 separately via `cast_bound_value`
-   * / `type_cast` (Rails' own split: `unquoted_*` for binds, `quoted_*` for the
-   * literal).
+   * `quotedTrue`/`quotedFalse` are NOT overridden — Rails MySQL inherits the
+   * abstract `"TRUE"`/`"FALSE"`. Binds serialize to 1/0 via `cast_bound_value`.
    */
   override quoteIdentifier = mysqlQuoteIdentifier;
   override quoteTableName = mysqlQuoteTableName;
