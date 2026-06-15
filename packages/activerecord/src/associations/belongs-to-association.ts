@@ -48,6 +48,15 @@ export class BelongsToAssociation extends SingularAssociation {
    * to point to the new record.
    */
   override inversedFrom(record: Base | null): void {
+    // Make the assigned record available to `foreignKeyNames()` before
+    // `replaceKeys` derives the FK columns: its composite-PK branch reads the
+    // PK off the in-hand target instance (see `foreignKeyNames`), and without
+    // a set target it falls back to `this.klass`, forcing a registry resolve of
+    // the target class during pure inverse wiring (the has_many `<<`/push and
+    // readonly-collection paths route here via `_cacheSingularTarget`, where
+    // the class need not be registered). `super.inversedFrom` re-assigns the
+    // target and snapshots stale state; assigning early is otherwise inert.
+    if (record) this.target = record;
     this.replaceKeys(record);
     super.inversedFrom(record);
   }
@@ -365,34 +374,17 @@ export class BelongsToAssociation extends SingularAssociation {
     const touch = (this.reflection.options as any).touch;
 
     // Mirrors Rails belongs_to_association.rb#update_counters: when the target is
-    // loaded and still the owner's current parent, dispatch through
-    // `target.increment!(col, by, touch:)` so the class-level
+    // loaded and still the owner's current parent (`target && !stale_target?`),
+    // dispatch through `target.increment!(col, by, touch:)` so the class-level
     // Locking::Optimistic#update_counters override bumps the lock version (and
     // applies `touch`) on the in-memory record. Otherwise fall back to an
     // in-place relation `update_counters`.
     //
-    // Rails guards this with `target && !stale_target?`. We express the same
-    // intent — "the loaded target is still the owner's parent" — directly as
-    // FK==PK rather than via `isStaleTarget()`, because trails' inverse-wiring
-    // diverges from Rails by one step on the has_many `<<`/`push` path:
-    //   - Rails `set_inverse_instance` runs the belongs_to's `inversed_from` →
-    //     `replace_keys`, which writes the owner FK *before* the stale-state
-    //     snapshot is taken, so `stale_target?` is already correct.
-    //   - trails' shared inverse primitive (`associations.ts#_cacheSingularTarget`)
-    //     caches the target via `setTarget` WITHOUT the `replace_keys` FK write;
-    //     `insert_record` writes the FK afterwards, so `_staleState` snapshots a
-    //     nil FK and `isStaleTarget()` then spuriously reports true.
-    // Routing `_cacheSingularTarget` through `inversedFrom` would make
-    // `isStaleTarget()` correct, but it mutates owner FKs during read-side
-    // inverse/preload wiring across the whole codebase — out of scope for this
-    // locking change. The FK==PK test is the faithful local read of
-    // `stale_target?`'s intent. (Follow-up: align the primitive with Rails.)
+    // `_cacheSingularTarget` now routes singular inverse writes through
+    // `inversedFrom` (→ `replace_keys` → `loadedBang`), so `isStaleTarget()` is
+    // authoritative here just as Rails' `stale_target?` is.
     const target = this.target as any;
-    if (
-      target &&
-      this.targetMatchesOwnerForeignKey(target) &&
-      typeof target.incrementBang === "function"
-    ) {
+    if (target && !this.isStaleTarget() && typeof target.incrementBang === "function") {
       await target.incrementBang(counterCol, by, touch != null ? { touch } : {});
       // The counter UPDATE advanced the target's lock_version in the DB; sync it
       // on the in-memory record so a read without a reload sees it and it isn't
@@ -419,54 +411,6 @@ export class BelongsToAssociation extends SingularAssociation {
         await scope.updateCounters({ [counterCol]: by }, opts);
       }
     }
-  }
-
-  /**
-   * True when `target`'s association primary key still equals the owner's
-   * current foreign key — i.e. the loaded target is genuinely the owner's
-   * parent (not a record left over from a prior, since-reassigned value).
-   */
-  private targetMatchesOwnerForeignKey(target: Base): boolean {
-    const fks = this.foreignKeyNames();
-    const pks = this.associationPrimaryKeys(null);
-    for (let i = 0; i < fks.length; i++) {
-      const fkValue = (this.owner as any)._readAttribute?.(fks[i]);
-      if (fkValue == null) return false;
-      const pk = pks[i] ?? pks[0];
-      const pkValue =
-        typeof (target as any)._readAttribute === "function"
-          ? (target as any)._readAttribute(pk)
-          : (target as any)[pk];
-      if (pkValue == null || String(pkValue) !== String(fkValue)) return false;
-    }
-    return true;
-  }
-
-  /**
-   * Read of Rails' `stale_target?` for the inner `loadBelongsTo` cached
-   * short-circuit: the cached target is stale only when the owner holds a
-   * *non-null* FK that no longer equals the cached target's primary key. A
-   * null FK can't point at a different record, so the inverse-wired-but-unsaved
-   * holder (`new_man.face = face` before save) is kept — matching Rails, where
-   * `inversed_from` re-snapshots `@stale_state` after `replace_keys`. trails'
-   * shared inverse primitive skips that FK write, so the holder's
-   * `isStaleTarget()` snapshot over-reports; this FK==PK read is the faithful
-   * local substitute (see the `update_counters` note above).
-   */
-  protected isCachedTargetStale(target: Base): boolean {
-    const fks = this.foreignKeyNames();
-    const pks = this.associationPrimaryKeys(target);
-    for (let i = 0; i < fks.length; i++) {
-      const fkValue = (this.owner as any)._readAttribute?.(fks[i]);
-      if (fkValue == null) continue;
-      const pk = pks[i] ?? pks[0];
-      const pkValue =
-        typeof (target as any)._readAttribute === "function"
-          ? (target as any)._readAttribute(pk)
-          : (target as any)[pk];
-      if (pkValue == null || String(pkValue) !== String(fkValue)) return true;
-    }
-    return false;
   }
 
   protected ownerAttributeChanged(attr: string): boolean {
