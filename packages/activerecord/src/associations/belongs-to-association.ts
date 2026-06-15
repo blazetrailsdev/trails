@@ -48,6 +48,15 @@ export class BelongsToAssociation extends SingularAssociation {
    * to point to the new record.
    */
   override inversedFrom(record: Base | null): void {
+    // Make the assigned record available to `foreignKeyNames()` before
+    // `replaceKeys` derives the FK columns: its composite-PK branch reads the
+    // PK off the in-hand target instance (see `foreignKeyNames`), and without
+    // a set target it falls back to `this.klass`, forcing a registry resolve of
+    // the target class during pure inverse wiring (the has_many `<<`/push and
+    // readonly-collection paths route here via `_cacheSingularTarget`, where
+    // the class need not be registered). `super.inversedFrom` re-assigns the
+    // target and snapshots stale state; assigning early is otherwise inert.
+    if (record) this.target = record;
     this.replaceKeys(record);
     super.inversedFrom(record);
   }
