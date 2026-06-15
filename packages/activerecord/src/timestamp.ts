@@ -108,7 +108,10 @@ export async function touch(
   const um = new UpdateManager()
     .table(table)
     .set(setPairs)
-    .where((ctor as any)._buildPkWhereNode(this.id));
+    // Mirrors Rails' _touch_row → _update_row(_query_constraints_hash): the
+    // WHERE targets `id_in_database`, so a dirty (in-memory mutated) primary
+    // key still touches the row identified by the value last loaded from the DB.
+    .where((ctor as any)._buildPkWhereNode((this as any).idInDatabase()));
 
   if (ctor.lockingEnabled) {
     if (rawDbVersion == null) {
