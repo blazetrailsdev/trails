@@ -1625,7 +1625,7 @@ export function buildStoryContent(
       : "\n## Context\n\n## Acceptance criteria\n";
   return `---
 title: ${qs(title)}
-status: ${opts.status ?? "draft"}
+status: ${opts.status ?? "ready"}
 updated: ${opts.date}
 rfc: ${qs(rfcSlug)}
 cluster: ${opts.cluster != null ? opts.cluster : "null"}

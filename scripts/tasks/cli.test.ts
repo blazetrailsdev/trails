@@ -1370,7 +1370,7 @@ describe("buildStoryContent", () => {
   it("generates minimal story with defaults", () => {
     const content = buildStoryContent("0005-gaps", "my-story", { date: "2026-06-08" });
     expect(content).toContain(`title: "my-story"`);
-    expect(content).toContain(`status: draft`);
+    expect(content).toContain(`status: ready`);
     expect(content).toContain(`rfc: "0005-gaps"`);
     expect(content).toContain(`cluster: null`);
     expect(content).toContain(`deps: []`);
@@ -1414,8 +1414,8 @@ describe("buildStoryContent", () => {
   });
 
   it("honors an explicit status", () => {
-    const content = buildStoryContent("0005-gaps", "x", { status: "ready", date: "2026-06-08" });
-    expect(content).toContain(`status: ready`);
+    const content = buildStoryContent("0005-gaps", "x", { status: "draft", date: "2026-06-08" });
+    expect(content).toContain(`status: draft`);
   });
 
   it("substitutes a caller-supplied body for the empty skeleton", () => {
