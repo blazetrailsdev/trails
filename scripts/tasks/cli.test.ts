@@ -24,6 +24,7 @@ import {
   acquireTasksLock,
   buildRfcContent,
   buildStoryContent,
+  readRfcStatus,
   isEffectivelyEmptyBody,
   checkCheckboxesDone,
   checkPrNotOpen,
@@ -1641,6 +1642,78 @@ describe("newStory validation paths", () => {
     writeFileSync(join(dir, "rfcs", "0005-gaps", "stories", "existing.md"), "---\ntitle: x\n---\n");
     expect(() => newStory("0005-gaps", "existing", {}, dir)).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/already exists/));
+  });
+});
+
+describe("newStory status default", () => {
+  // git stays mocked (execFileSyncMock returns ""), and the shared lock is
+  // redirected to a throwaway dir so these don't block behind a live agent.
+  // The mutator still runs for real, so the story file lands on disk and we can
+  // read back its frontmatter status.
+  afterEach(() => __setLockDirForTest(null));
+
+  function setupTasksDir(rfcSlug: string, rfcStatus: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", rfcSlug), { recursive: true });
+    writeFileSync(
+      join(dir, "rfcs", rfcSlug, "README.md"),
+      `---\nrfc: "${rfcSlug}"\ntitle: "R"\nstatus: ${rfcStatus}\n---\nbody\n`,
+    );
+    __setLockDirForTest(mkdtempSync(join(tmpdir(), "trails-cap-lock-")));
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation(() => "" as never);
+    return dir;
+  }
+
+  function statusOfNewStory(rfcSlug: string, rfcStatus: string, opts = {}): string {
+    const dir = setupTasksDir(rfcSlug, rfcStatus);
+    newStory(rfcSlug, "s", { allowEmpty: true, ...opts }, dir);
+    const content = readFileSync(join(dir, "rfcs", rfcSlug, "stories", "s.md"), "utf8");
+    return content.match(/^status:\s*(\S+)/m)?.[1] ?? "";
+  }
+
+  it("defaults to ready under an active RFC", () => {
+    expect(statusOfNewStory("0005-gaps", "active")).toBe("ready");
+  });
+
+  it("falls back to draft under a draft RFC (would otherwise be claimable)", () => {
+    expect(statusOfNewStory("0005-gaps", "draft")).toBe("draft");
+  });
+
+  it("falls back to draft under a postponed/superseded RFC", () => {
+    expect(statusOfNewStory("0005-gaps", "postponed")).toBe("draft");
+    expect(statusOfNewStory("0005-gaps", "superseded")).toBe("draft");
+  });
+
+  it("honors an explicit --status regardless of RFC status", () => {
+    expect(statusOfNewStory("0005-gaps", "draft", { status: "ready" })).toBe("ready");
+    expect(statusOfNewStory("0005-gaps", "active", { status: "draft" })).toBe("draft");
+  });
+});
+
+describe("readRfcStatus", () => {
+  it("reads the status scalar from an RFC README", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, "rfcs", "0005-gaps"), { recursive: true });
+    writeFileSync(join(dir, "rfcs", "0005-gaps", "README.md"), `---\nstatus: active\n---\nbody\n`);
+    expect(readRfcStatus(dir, "0005-gaps")).toBe("active");
+  });
+
+  it("returns null when the README is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    expect(readRfcStatus(dir, "0005-gaps")).toBeNull();
+  });
+
+  it("returns null for an unrecognized status value", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, "rfcs", "0005-gaps"), { recursive: true });
+    writeFileSync(join(dir, "rfcs", "0005-gaps", "README.md"), `---\nstatus: bogus\n---\nbody\n`);
+    expect(readRfcStatus(dir, "0005-gaps")).toBeNull();
   });
 });
 
