@@ -8,7 +8,7 @@ import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
-import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
+import { type Nodes, Visitors, Collectors, relationName } from "@blazetrails/arel";
 import {
   ReadOnlyError,
   ActiveRecordError,
@@ -2146,20 +2146,18 @@ export class AbstractAdapter implements Quoting {
   }): Promise<import("./column.js").Column | undefined> {
     // A `TableAlias` relation may carry a `SqlLiteral` name (set-op / subquery
     // derived table); unwrap to the bare identifier for the schema-cache lookup.
-    const relationName = isSqlLiteral(attribute.relation.name)
-      ? attribute.relation.name.value
-      : attribute.relation.name;
-    let hash = await (this.schemaCache as any).columnsHash(this.pool, relationName);
+    const tableName = relationName(attribute.relation.name);
+    let hash = await (this.schemaCache as any).columnsHash(this.pool, tableName);
     if (!hash && this.pool == null && typeof (this as any).columns === "function") {
       // Bare-adapter path (no pool): the null-pool guard in columnsHash blocks the
       // DB fallback. Fetch directly so callers like caseSensitiveComparison can
       // resolve collations even when the schema cache was cleared by model
       // class creation (resetColumnInformation).
       try {
-        const cols: import("./column.js").Column[] = await (this as any).columns(relationName);
+        const cols: import("./column.js").Column[] = await (this as any).columns(tableName);
         if (cols?.length) {
-          this.schemaCache.setColumns(relationName, cols);
-          hash = this.schemaCache.getCachedColumnsHash(relationName);
+          this.schemaCache.setColumns(tableName, cols);
+          hash = this.schemaCache.getCachedColumnsHash(tableName);
         }
       } catch {
         // no connection — return undefined below
