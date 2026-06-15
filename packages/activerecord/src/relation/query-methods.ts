@@ -4,7 +4,13 @@
  *
  * Mirrors: ActiveRecord::QueryMethods
  */
-import { Nodes, SelectManager, Table as ArelTable, sql as arelSql } from "@blazetrails/arel";
+import {
+  Nodes,
+  SelectManager,
+  Table as ArelTable,
+  sql as arelSql,
+  relationName,
+} from "@blazetrails/arel";
 import {
   Attribute,
   ValueType,
@@ -1761,13 +1767,11 @@ export function columnReferences(orderArgs: unknown[]): string[] {
       const t = extractTableNameFrom(term);
       if (t) refs.push(t);
     } else if (arg instanceof Nodes.Attribute) {
-      const rn = (arg as any).relation.name;
-      refs.push(rn instanceof Nodes.SqlLiteral ? rn.value : rn);
+      refs.push(relationName(arg.relation.name));
     } else if (arg instanceof Nodes.Ordering) {
       const expr = (arg as any).expr;
       if (expr instanceof Nodes.Attribute) {
-        const rn = expr.relation.name;
-        refs.push(rn instanceof Nodes.SqlLiteral ? rn.value : rn);
+        refs.push(relationName(expr.relation.name));
       }
     } else if (isPlainObject(arg)) {
       for (const [key, value] of Object.entries(arg)) {
