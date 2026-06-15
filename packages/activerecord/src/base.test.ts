@@ -2304,11 +2304,74 @@ describe("BasicsTest", () => {
   it.skip("mutating time objects", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — env-tz
   });
-  it.skip("connection in local time", () => {
-    // BLOCKED: connection-pool — establish_connection: requires Base.establish_connection with per-connection default_timezone; SchemaAdapter does not support reconnecting with new config
+  // `establish_connection(default_timezone:)` is observed through default-string
+  // casting: the offset-less `"2004-01-01 00:00:00"` default is parsed lazily at
+  // read time by DateTimeType.cast → parseString, which interprets it in
+  // getDefaultTimezone() (the singleton establishConnection updates). Same cast
+  // path as the `default in utc` test above; Rails reaches it via DB column
+  // defaults + reset_column_information, we via attribute() defaults.
+  it("connection in local time", async () => {
+    await withTimezoneConfig({ default: "utc" }, async () => {
+      class Default extends Base {
+        static {
+          this.tableName = "defaults";
+          this.attribute("fixed_date", "date", { default: "2004-01-01" });
+          this.attribute("fixed_time", "datetime", { default: "2004-01-01 00:00:00" });
+        }
+      }
+      const newConfig = {
+        ...Base.connectionDbConfig().configurationHash,
+        default_timezone: "local",
+      };
+      await Default.establishConnection(
+        newConfig as Parameters<typeof Default.establishConnection>[0],
+      );
+
+      const d = new Default();
+      const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
+      expect(fd.year).toBe(2004);
+      expect(fd.month).toBe(1);
+      expect(fd.day).toBe(1);
+      const ft = d.readAttribute("fixed_time") as Temporal.Instant;
+      const expected = Temporal.PlainDateTime.from("2004-01-01T00:00:00")
+        .toZonedDateTime(Temporal.Now.timeZoneId())
+        .toInstant();
+      expect(ft.epochNanoseconds).toBe(expected.epochNanoseconds);
+      // Rails' PostgreSQL-only branch also asserts on `fixed_time_with_time_zone`
+      // (timestamptz, time-zone-aware); omitted until time_zone_aware_attributes
+      // defaults are wired — tracked under RFC 0016.
+    });
   });
-  it.skip("connection in utc time", () => {
-    // BLOCKED: connection-pool — establish_connection: same as "connection in local time"
+  it("connection in utc time", async () => {
+    await withTimezoneConfig({ default: "local" }, async () => {
+      class Default extends Base {
+        static {
+          this.tableName = "defaults";
+          this.attribute("fixed_date", "date", { default: "2004-01-01" });
+          this.attribute("fixed_time", "datetime", { default: "2004-01-01 00:00:00" });
+        }
+      }
+      const newConfig = {
+        ...Base.connectionDbConfig().configurationHash,
+        default_timezone: "utc",
+      };
+      await Default.establishConnection(
+        newConfig as Parameters<typeof Default.establishConnection>[0],
+      );
+
+      const d = new Default();
+      const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
+      expect(fd.year).toBe(2004);
+      expect(fd.month).toBe(1);
+      expect(fd.day).toBe(1);
+      const ft = d.readAttribute("fixed_time") as Temporal.Instant;
+      expect(ft.epochNanoseconds).toBe(
+        Temporal.Instant.from("2004-01-01T00:00:00Z").epochNanoseconds,
+      );
+      // Rails' PostgreSQL-only branch also asserts on `fixed_time_with_time_zone`
+      // (timestamptz, time-zone-aware); omitted until time_zone_aware_attributes
+      // defaults are wired — tracked under RFC 0016.
+    });
   });
   it("column name properly quoted", () => {
     class User extends Base {

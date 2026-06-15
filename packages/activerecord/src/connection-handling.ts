@@ -25,6 +25,7 @@ import {
   ActiveRecordError,
 } from "./errors.js";
 import { permanentConnectionCheckout } from "./ar-config.js";
+import { setDefaultTimezone } from "./type/internal/timezone.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   connectedToStack,
@@ -627,9 +628,42 @@ export async function establishConnection(
   if (config === undefined) {
     await autoConnect(modelClass);
   } else {
+    // Validate up front (mirrors Rails raising before the adapter is built)
+    // but only mutate the process-wide zone once the connection is actually
+    // established, so a failed resolve/connect can't leave the global in an
+    // intermediate value.
+    const tz = typeof config === "object" ? validateConfigDefaultTimezone(config) : null;
     const resolved = resolveConfig(modelClass, config);
     await establishWithConfig(modelClass, resolved.adapterName, resolved.url, resolved.config);
+    if (tz) setDefaultTimezone(tz);
   }
+}
+
+/**
+ * Validate a `default_timezone` entry in an `establish_connection` config,
+ * returning the normalized value (or `null` when absent).
+ *
+ * Rails stores the connection's `default_timezone` as per-adapter instance
+ * state (`AbstractAdapter#default_timezone`, abstract_adapter.rb:167/219-220),
+ * so two simultaneous connections can cast in different zones. Our date/time
+ * casting resolves the zone from the process-wide `setDefaultTimezone`, so the
+ * caller applies the validated value to that singleton on success — giving the
+ * same observable result for the single-connection case the tests exercise.
+ * The multi-connection divergence (last establish_connection wins for all
+ * subsequent casts) is a tracked fidelity deviation, not yet converged; see
+ * RFC 0023 (surfaced-deviations).
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter.validate_default_timezone
+ */
+function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc" | "local" | null {
+  // Rails reads only `config[:default_timezone]` (abstract_adapter.rb:73-81);
+  // no camelCase alias.
+  const raw = config.default_timezone;
+  if (raw == null) return null;
+  if (raw !== "utc" && raw !== "local") {
+    throw new ArgumentError("default_timezone must be either 'utc' or 'local'");
+  }
+  return raw;
 }
 
 async function establishWithConfig(
