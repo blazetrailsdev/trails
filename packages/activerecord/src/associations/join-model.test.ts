@@ -431,7 +431,7 @@ describe("AssociationsJoinModelTest", () => {
     const post = await SphmPost.create({ title: "Hello" });
     const tag1 = await SphmTag.create({ name: "ruby" });
     const tag2 = await SphmTag.create({ name: "rails" });
-    await setHasMany(post, "sphmTags", [tag1, tag2], { as: "taggable", className: "SphmTag" });
+    await setHasMany(post, "sphmTags", [tag1, tag2]);
     // Mirror Rails: assert on the in-memory tag records mutated by
     // setHasMany. Avoids a re-fetch that flakes on shared CI DBs where
     // parallel workers may briefly contend for the per-class id sequence.

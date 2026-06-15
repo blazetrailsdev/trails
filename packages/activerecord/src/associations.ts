@@ -2681,22 +2681,18 @@ export async function setHasOne(
  *
  * Mirrors: ActiveRecord::Associations::HasManyAssociation#writer
  */
-export async function setHasMany(
-  record: Base,
-  assocName: string,
-  targets: Base[],
-  _options: AssociationOptions = {},
-): Promise<void> {
+export async function setHasMany(record: Base, assocName: string, targets: Base[]): Promise<void> {
   // Mirror Rails' CollectionAssociation#replace (FK-diff true replace): the
   // association object diffs `targets` against the currently-associated rows
   // and only deletes (FK-nullifies) the removed records and concats (FK-sets +
   // saves) the genuinely-new ones, leaving unchanged members untouched. This
   // replaces the previous "nullify all not-included, then re-write+save every
   // target" pass, which re-persisted records that were already associated and
-  // diffed against a fresh DB query rather than the loaded target. Reflection
-  // options (foreign key, polymorphic `as`, inverse_of) drive the FK/type
-  // writes through `setOwnerAttributes`/`setInverseInstance`, so the per-call
-  // `_options` overrides are no longer threaded in.
+  // diffed against a fresh DB query rather than the loaded target. All FK,
+  // polymorphic-type, and inverse_of writes are driven by the model reflection
+  // through `setOwnerAttributes`/`setInverseInstance`, so there is no per-call
+  // options override — the previous one was dead (it duplicated the reflection
+  // at every call site and went unread once the diff moved into `replace`).
   const assoc = record.association(assocName) as unknown as {
     replace(records: Base[]): void;
     persistReplace(): Promise<void>;
