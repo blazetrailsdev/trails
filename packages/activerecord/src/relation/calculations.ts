@@ -16,7 +16,7 @@ import { columnType, type ColumnType, type Result } from "../result.js";
 import {
   arelColumn,
   buildCteSql,
-  joinDependenciesForTypeLookup,
+  buildJoinDependencies,
   QueryMethodBangs,
 } from "./query-methods.js";
 
@@ -1070,19 +1070,12 @@ export function lookupCastTypeFromJoinDependencies(
   name: string,
   joinDependencies?: JoinDependency[],
 ): unknown {
-  const deps = joinDependencies ?? joinDependenciesForTypeLookup.call(rel as any);
+  const deps = joinDependencies ?? buildJoinDependencies.call(rel as any);
   for (const jd of deps) {
     for (const node of jd) {
       const type = castTypeFromKlass(node.baseKlass, name);
       if (type) return type;
     }
-  }
-  // A plain `.joins(:assoc)` is pre-resolved to a SQL clause (not a join
-  // dependency) but retains its target klass; consult it so cast-type
-  // resolution covers the joined column without a global registry scan.
-  for (const j of (rel as { _joinClauses?: Array<{ klass?: unknown }> })._joinClauses ?? []) {
-    const type = castTypeFromKlass(j.klass, name);
-    if (type) return type;
   }
   return null;
 }

@@ -79,8 +79,22 @@ export class Merger {
     for (const v of this.other._leftOuterJoinsValues ?? []) {
       if (!rel._leftOuterJoinsValues.includes(v)) rel._leftOuterJoinsValues.push(v);
     }
+    // Rails merge_joins: when other.klass == relation.klass the association names
+    // union directly into joins_values; otherwise they resolve against other.klass
+    // (Merger builds a JoinDependency there). Same-klass names fold into
+    // _namedInnerJoins (resolved via buildJoinDependencies on the receiver);
+    // cross-klass names are resolved against the source relation into pre-built
+    // SQL join clauses, since they cannot be looked up on the receiver's model.
+    const sameKlass = this.other._modelClass === rel._modelClass;
     for (const v of this.other._namedInnerJoins ?? []) {
-      if (!rel._namedInnerJoins.includes(v)) rel._namedInnerJoins.push(v);
+      if (sameKlass) {
+        if (!rel._namedInnerJoins.includes(v)) rel._namedInnerJoins.push(v);
+      } else if (typeof v === "string") {
+        const resolved = this.other._resolveAssociationJoin(v);
+        for (const j of resolved ? (Array.isArray(resolved) ? resolved : [resolved]) : []) {
+          rel._joinClauses.push({ type: "inner", table: j.table, on: j.on, quoted: true });
+        }
+      }
     }
     void Nodes.InnerJoin;
   }
