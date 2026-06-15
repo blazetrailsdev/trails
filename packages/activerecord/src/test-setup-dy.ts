@@ -48,6 +48,17 @@ if ((adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive |
   await DatabaseTasks.loadSchema(envConfig, "ts", schemaFilePath);
 }
 
+// Repair canonical tables a PRIOR file in this worker drifted. The reconstruct
+// fast path above only TRUNCATEs rows on a schemaUpToDate worker DB; it never
+// restores table shape, so a sibling file's bespoke `defineSchema({topics:{…}})`
+// leaves the canonical `topics` mis-shaped for every later file that reads it.
+// This restores the canonical shape of exactly the tables a prior file mutated
+// (a no-op when none were). Gated by AR_DISABLE_SCHEMA_REPAIR as an escape hatch.
+if (process.env.AR_DISABLE_SCHEMA_REPAIR === undefined) {
+  const { repairWorkerSchema } = await import("./test-helpers/schema-repair.js");
+  await repairWorkerSchema(Base.connection, TEST_SCHEMA);
+}
+
 // Permanent worker-startup assertion: key canonical tables must exist after
 // DatabaseTasks loads the schema. Failure here means the load path is broken,
 // not just the signature cache. Cast because tableExists is on the concrete
