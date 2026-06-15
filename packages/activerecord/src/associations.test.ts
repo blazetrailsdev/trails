@@ -10155,7 +10155,12 @@ describe("CollectionProxyDelegation", () => {
 // run during this block's execution rather than at collection time, where they
 // would perturb the bespoke describe blocks above. This block also sits before
 // `eagerLoadBang`, whose `vi.resetModules()` would otherwise hand the dynamic
-// imports a fresh, unwired module graph ("Relation not loaded").
+// imports a fresh, unwired module graph ("Relation not loaded"). The canonical
+// `registerModel` calls below mutate the global registry, but that is contained:
+// the only describe that runs afterwards (`eagerLoadBang`) references just a
+// fresh `IsolatedPost` and the literal name `"nonexistent"` — it never resolves
+// Firm/Tag/Developer/Client/Project — and the registry is per-worker module
+// state, so nothing leaks to other test files.
 // ==========================================================================
 describe("AssociationsTest", () => {
   // `authorFavorites` is declared so its rows are loaded (Rails: `fixtures
