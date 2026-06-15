@@ -851,7 +851,11 @@ export class Base extends Model {
   }
 
   static get primaryKey(): string | string[] {
-    return _getPrimaryKeyAttr.call(this);
+    // Type-level assertion (not a runtime guarantee) of the non-null contract
+    // every persistable model satisfies — see getPrimaryKeyAttr for why. A view
+    // still returns null at runtime; the assertion just keeps callers off the
+    // null-guard treadmill.
+    return _getPrimaryKeyAttr.call(this) as string | string[];
   }
 
   static set primaryKey(key: string | string[]) {
