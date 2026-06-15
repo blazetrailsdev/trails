@@ -290,6 +290,19 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
       superclass.defineAttributeMethods();
     }
   }
+  // Rails gates the schema-load + accessor-generation body behind
+  // `unless abstract_class?` (attribute_methods.rb:113): an abstract class has
+  // no table, so it generates no per-attribute accessors and no id_value alias —
+  // only the superclass cascade (above) and generateAliasAttributes (below) run.
+  if (this.abstractClass !== true) {
+    generateConcreteAttributeMethods.call(this);
+  }
+  generateAliasAttributes.call(this);
+  this._attributeMethodsGenerated = true;
+  return true;
+}
+
+function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
   // Generate getter/setter for each attribute definition that doesn't
   // already have one on the prototype (mirrors Rails' define_attribute_methods).
   // This is the single generation path: the declaration sites
@@ -356,19 +369,14 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
       });
     }
   }
-  // Rails: `alias_attribute :id_value, :id if _has_attribute?("id")` (skipped for
-  // abstract classes). Routed through aliasAttribute so it composes with
-  // generateAliasAttributes and the alias getter reads the (CPK-aware) id column.
-  if (
-    this.abstractClass !== true &&
-    this._attributeDefinitions.has("id") &&
-    typeof this.aliasAttribute === "function"
-  ) {
+  // Rails: `alias_attribute :id_value, :id if _has_attribute?("id")` — inside the
+  // `unless abstract_class?` block, so it only runs for concrete classes (this
+  // helper is only invoked when not abstract). Routed through aliasAttribute so
+  // it composes with generateAliasAttributes and the alias getter reads the
+  // (CPK-aware) id column.
+  if (this._attributeDefinitions.has("id") && typeof this.aliasAttribute === "function") {
     this.aliasAttribute("idValue", "id");
   }
-  generateAliasAttributes.call(this);
-  this._attributeMethodsGenerated = true;
-  return true;
 }
 
 export function generateAliasAttributes(this: AttributeMethodsHost): void {

@@ -1331,14 +1331,40 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("inherited custom accessors", async () => {
+    // Mirrors Rails: an abstract parent with custom title accessors; the
+    // concrete subclass inherits them and they are not clobbered by generation.
     class Topic extends Base {
       static {
+        this.abstractClass = true;
         this.attribute("title", "string");
+        this.attribute("authorName", "string");
+      }
+      get title(): unknown {
+        return "omg";
+      }
+      set title(val: unknown) {
+        (this as any).authorName = val;
       }
     }
     class SubTopic extends Topic {}
-    const t = SubTopic.new({ title: "sub" }) as any;
-    expect(t.title).toBe("sub");
+    (Topic as any).defineAttributeMethods();
+    (SubTopic as any).defineAttributeMethods();
+
+    // Rails gates define_attribute_methods' generation body behind
+    // `unless abstract_class?`: the abstract class gets none of the AR-generated
+    // per-attribute accessors (*_before_type_cast / *_for_database) on its
+    // prototype, while the concrete subclass does.
+    expect(
+      Object.getOwnPropertyDescriptor(Topic.prototype, "authorNameForDatabase"),
+    ).toBeUndefined();
+    expect(
+      Object.getOwnPropertyDescriptor(SubTopic.prototype, "authorNameForDatabase"),
+    ).toBeDefined();
+
+    const t = SubTopic.new({}) as any;
+    expect(t.title).toBe("omg");
+    t.title = "lol";
+    expect(t.authorName).toBe("lol");
   });
 
   it("define_attribute_method works with both symbol and string", async () => {
