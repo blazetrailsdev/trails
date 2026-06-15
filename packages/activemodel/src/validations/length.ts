@@ -1,3 +1,4 @@
+import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { resolveValue } from "./resolve-value.js";
@@ -70,7 +71,7 @@ export class LengthValidator extends EachValidator {
           options["maximum"] = r.excludeEnd ? r.end - 1 : r.end;
         }
       } else {
-        throw new Error(
+        throw new ArgumentError(
           ":in and :within must be a [min, max] tuple or { begin, end, excludeEnd? } object",
         );
       }
@@ -156,7 +157,7 @@ export class LengthValidator extends EachValidator {
       this.options.is !== undefined;
 
     if (!hasCheck) {
-      throw new Error(
+      throw new ArgumentError(
         "Range unspecified. Specify the :in, :within, :maximum, :minimum, or :is option.",
       );
     }
@@ -172,7 +173,7 @@ export class LengthValidator extends EachValidator {
       ) {
         continue;
       }
-      throw new Error(
+      throw new ArgumentError(
         `:${key} must be a non-negative Integer, Infinity, string (method name), or Proc`,
       );
     }
