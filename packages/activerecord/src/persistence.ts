@@ -621,7 +621,7 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
     // The SQL is arel-built via `connection.toSql(dm)`; the flagged string is
     // the "Delete" operation-name label (Rails' log subscriber name), which the
     // rule's leading-verb heuristic false-matches as a DELETE statement.
-    // eslint-disable-next-line blazetrails/no-raw-sql
+
     await ctor.connection.execDelete(ctor.connection.toSql(dm), "Delete");
   }
   this._destroyed = true;
@@ -1104,7 +1104,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     // The SQL is arel-built via `adapter.toSql(um)`; the flagged string is the
     // "Update Columns" operation-name label (Rails' log subscriber name), which
     // the rule's leading-verb heuristic false-matches as an UPDATE statement.
-    // eslint-disable-next-line blazetrails/no-raw-sql
+
     await adapter.execUpdate(sql, "Update Columns");
   }
 
@@ -1121,6 +1121,8 @@ interface ReloadRecord {
   _previouslyNewRecord: boolean;
   _dirty: { snapshot(attrs: unknown): void; clearChangesInformation(): void };
   _preloadedAssociations: Map<string, unknown>;
+  _associationInstances: Map<string, { owner: unknown }>;
+  _collectionProxies: Map<string, unknown>;
   _resetAssociationCaches(): void;
   id: unknown;
   constructor: {
@@ -1156,7 +1158,12 @@ export async function reload<T extends ReloadRecord>(
     isApplyScoping.call(this as never, options)
       ? await _findRecord.call(this as never, { ...findOptions, allQueries: true })
       : await ctor.unscoped(() => _findRecord.call(this as never, findOptions))
-  ) as { _attributes: unknown; _preloadedAssociations: Map<string, unknown> };
+  ) as {
+    _attributes: unknown;
+    _preloadedAssociations: Map<string, unknown>;
+    _associationInstances: Map<string, { owner: unknown }>;
+    _collectionProxies: Map<string, unknown>;
+  };
 
   // Rails swaps the whole attribute set (`@attributes = fresh.@attributes`),
   // then unconditionally clears the new-record flags; dirty tracking
@@ -1172,18 +1179,34 @@ export async function reload<T extends ReloadRecord>(
   // self (persistence.rb):
   //   @association_cache = fresh_object.instance_variable_get(:@association_cache)
   //   @association_cache.each_value { |association| association.owner = self }
-  // Our cache is split across three maps (see `Base#_resetAssociationCaches`).
-  // Of those, `_findRecord` only ever populates `_preloadedAssociations` — it
-  // preloads `strict_loaded_associations` so re-reading one after reload won't
-  // trip a StrictLoadingViolationError lazy load — and those entries are raw,
-  // ownerless target records, not owner-bound Association objects. So the
-  // faithful analog is: drop this record's now-stale holders/proxies, then
-  // adopt fresh's preloaded targets. Rails' owner re-point has no analog here
-  // because the adopted store carries no owner to re-point (this record is
-  // already the owner for everything read back through `association()`).
+  // RFC-0022 folded our former three maps into one backing store surfaced as
+  // three facet views (see `Base#_resetAssociationCaches`). We mirror Rails by
+  // adopting fresh's whole cache — all three facets — then re-pointing every
+  // owner-bound holder (the `Association` instances and their `CollectionProxy`
+  // companions) back to self; the `_preloadedAssociations` facet carries raw,
+  // ownerless target records, so it needs no re-point.
+  //
+  // `_findRecord` only ever populates `_preloadedAssociations` (it preloads
+  // `strict_loaded_associations` so re-reading one after reload won't trip a
+  // StrictLoadingViolationError lazy load), so on today's preloaded-only path
+  // the instance/proxy facets are empty and the re-point loop is a no-op —
+  // behavior is unchanged. The re-point is the faithful analog kept correct
+  // for any future fetch that adopts owner-bound holders into fresh's cache.
   this._resetAssociationCaches();
   for (const [name, value] of fresh._preloadedAssociations) {
     this._preloadedAssociations.set(name, value);
+  }
+  for (const [name, value] of fresh._associationInstances) {
+    this._associationInstances.set(name, value);
+  }
+  for (const [name, value] of fresh._collectionProxies) {
+    this._collectionProxies.set(name, value);
+  }
+  for (const association of this._associationInstances.values()) {
+    association.owner = this;
+  }
+  for (const proxy of this._collectionProxies.values()) {
+    (proxy as { owner: unknown }).owner = this;
   }
   clearAutosaveState(this as unknown as Parameters<typeof clearAutosaveState>[0]);
   return this;
