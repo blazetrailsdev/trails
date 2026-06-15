@@ -3126,6 +3126,7 @@ export class Base extends Model {
       }
 
       this._destroyed = true;
+      this._previouslyNewRecord = false;
       // Rails' destroy ends with a bare `freeze` (persistence.rb) — it does
       // NOT touch `@association_cache`. Delegate to `freeze` for the
       // clone-and-freeze semantics on `_attributes` and leave the association
