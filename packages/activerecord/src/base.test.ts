@@ -59,6 +59,7 @@ const SCHEMA = {
     priority: "integer",
     author_name: "string",
     written_on: "date",
+    content: "json",
   },
   animals: { name: "string", type: "string" },
   authors: { name: "string" },
@@ -765,13 +766,6 @@ describe("BasicsTest", () => {
     expect(u.readAttribute("name")).toBe(null);
   });
 
-  it.skip("copy table with id", () => {
-    // BLOCKED: schema — SQLite copy_table DDL not implemented
-    // ROOT-CAUSE: connection-adapters/sqlite3/schema-statements.ts#copyTable not implemented
-    // SCOPE: ~20 LOC fix in sqlite3/schema-statements.ts; affects ~1 test
-    /* needs SQLite copy_table support */
-  });
-
   it("type cast attribute from select to false", async () => {
     class Topic extends Base {
       static {
@@ -1262,12 +1256,6 @@ describe("BasicsTest", () => {
     expect(u.isNewRecord()).toBe(true);
     expect(u.name).toBe("alice");
   });
-  it.skip("implicit readonly on left joins", () => {
-    // BLOCKED: relation — implicit readonly on left joins not implemented
-    // ROOT-CAUSE: relation.ts#buildFromJoin or Relation#readonly missing Rails auto-readonly-on-left-join semantics
-    // SCOPE: ~20 LOC fix in relation.ts; affects ~1 test
-    /* not in Rails test suite — left_outer_joins does not mark records readonly in Rails */
-  });
   it("to param with id", async () => {
     class User extends Base {
       static {
@@ -1397,11 +1385,6 @@ describe("BasicsTest", () => {
     // unscoped bypasses default scope
     const unscopedSql = User.unscoped().toSql();
     expect(unscopedSql).not.toContain("alice");
-  });
-  it.skip("find applies includes with default scope", () => {
-    // BLOCKED: associations — eager loading / includes with scoping gap
-    // ROOT-CAUSE: preloader.ts#preloadAssociations or Relation#includes not applying default scope on eager load
-    // SCOPE: ~30 LOC fix in preloader.ts; affects ~2 tests
   });
   it("find applies scope conditions", () => {
     class User extends Base {
@@ -1627,17 +1610,35 @@ describe("BasicsTest", () => {
     const sql = User.joins("INNER JOIN posts ON posts.user_id = users.id").toSql();
     expect(sql).toContain("INNER JOIN");
   });
-  it.skip("includes eager loads associations", () => {
-    // BLOCKED: associations — eager loading / includes with scoping gap
-    // ROOT-CAUSE: preloader.ts#preloadAssociations or Relation#includes not applying default scope on eager load
-    // SCOPE: ~30 LOC fix in preloader.ts; affects ~2 tests
-    /* not in Rails base_test.rb — covered by eager_test.rb tests */
-  });
-  it.skip("incomplete schema loading", () => {
-    // BLOCKED: schema — schema loading / cache invalidation gap
-    // ROOT-CAUSE: schema-cache.ts#clear or connection-handler.ts#clearCache not fully wired
-    // SCOPE: ~20 LOC fix in schema-cache.ts; affects ~1 test
-    /* Rails: stubs schema_cache to raise — relies on internal connection-pool stub infrastructure */
+  it("incomplete schema loading", async () => {
+    class Topic extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("content", "json");
+      }
+    }
+    registerModel(Topic);
+    const payload = { foo: 42 };
+    const topic = await Topic.create({ content: payload });
+    expect((topic as any).content).toEqual(payload);
+
+    Topic.resetColumnInformation();
+
+    // Rails stubs connection_pool.schema_cache to raise; reflecting the
+    // columns then propagates that error. Already-loaded records are
+    // unaffected — the data survives once the cache works again.
+    const adapter = Topic.connection as any;
+    const spy = vi.spyOn(adapter, "schemaCache", "get").mockImplementation(() => {
+      throw new Error("Some Error");
+    });
+    try {
+      expect(() => (Topic as any).columnsHash()).toThrow("Some Error");
+    } finally {
+      spy.mockRestore();
+    }
+
+    const reloaded = await Topic.first();
+    expect((reloaded as any).content).toEqual(payload);
   });
   it("primary key with no id", () => {
     class Widget extends Base {
