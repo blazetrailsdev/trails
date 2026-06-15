@@ -770,13 +770,19 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     }
 
     const collateSql = options.collation ? ` COLLATE ${this._qi(options.collation as string)}` : "";
-    await this.pg.exec(
+    // Route DDL through executeMutation (not the raw `exec`) so the
+    // dirties_query_cache wrapper clears the query cache on schema changes —
+    // mirrors what the base SchemaStatements DDL methods do and keeps the
+    // migration-path behavior the adapter previously inherited from the base.
+    await this.adapter.executeMutation(
       `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} TYPE ${pgType}${collateSql}${usingClause}`,
     );
 
     if (options.default !== undefined) {
       if (options.default === null) {
-        await this.pg.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`);
+        await this.adapter.executeMutation(
+          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`,
+        );
       } else {
         const defaultExpr = this.adapter.quoteDefaultExpression(options.default, {
           array: options.array,
@@ -784,7 +790,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         });
         // pgQuoteDefaultExpression returns " DEFAULT value" — strip the prefix
         const defaultValue = defaultExpr.replace(/^ DEFAULT /, "");
-        await this.pg.exec(
+        await this.adapter.executeMutation(
           `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${defaultValue}`,
         );
       }
@@ -792,9 +798,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
     if (options.null !== undefined) {
       if (options.null) {
-        await this.pg.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP NOT NULL`);
+        await this.adapter.executeMutation(
+          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP NOT NULL`,
+        );
       } else {
-        await this.pg.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET NOT NULL`);
+        await this.adapter.executeMutation(
+          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET NOT NULL`,
+        );
       }
     }
   }
@@ -851,7 +861,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     columnName: string,
     newColumnName: string,
   ): Promise<void> {
-    await this.pg.exec(
+    await this.adapter.executeMutation(
       `ALTER TABLE ${this._qt(tableName)} RENAME COLUMN ${this._qi(columnName)} TO ${this._qi(newColumnName)}`,
     );
   }
@@ -871,12 +881,14 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         ? (defaultOrChanges as { from: unknown; to: unknown }).to
         : defaultOrChanges;
     if (defaultValue == null) {
-      await this.pg.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`);
+      await this.adapter.executeMutation(
+        `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`,
+      );
     } else {
       const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
       const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
       const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
-      await this.pg.exec(
+      await this.adapter.executeMutation(
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${expr}`,
       );
     }
@@ -912,11 +924,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
       const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
       const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
-      await this.pg.exec(
+      await this.adapter.executeMutation(
         `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
       );
     }
-    await this.pg.exec(
+    await this.adapter.executeMutation(
       `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${nullable ? "DROP" : "SET"} NOT NULL`,
     );
   }
@@ -926,12 +938,14 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     columnName: string,
     comment: string | null,
   ): Promise<void> {
-    await this.pg.exec(
+    await this.adapter.executeMutation(
       `COMMENT ON COLUMN ${this._qt(tableName)}.${this._qi(columnName)} IS ${this.pg.quote(comment)}`,
     );
   }
 
   override async changeTableComment(tableName: string, comment: string | null): Promise<void> {
-    await this.pg.exec(`COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`);
+    await this.adapter.executeMutation(
+      `COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`,
+    );
   }
 }
