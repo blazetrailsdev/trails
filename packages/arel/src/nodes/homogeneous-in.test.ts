@@ -22,13 +22,15 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     it("compiles IN with values", () => {
       const node = new Nodes.HomogeneousIn([1, 2, 3], users.get("id"), "in");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe('"users"."id" IN (1, 2, 3)');
+      // HomogeneousIn keeps add_binds + bind_block (to_sql.rb:352), so a bare
+      // SQLString collector emits `?` placeholders — mirrors Rails test_in.
+      expect(sql).toBe('"users"."id" IN (?, ?, ?)');
     });
 
     it("compiles NOT IN with values", () => {
       const node = new Nodes.HomogeneousIn([4, 5], users.get("id"), "notin");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe('"users"."id" NOT IN (4, 5)');
+      expect(sql).toBe('"users"."id" NOT IN (?, ?)');
     });
 
     it("compiles empty IN as 1=0", () => {
@@ -46,7 +48,7 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     it("compiles string values", () => {
       const node = new Nodes.HomogeneousIn(["a", "b"], users.get("name"), "in");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("\"users\".\"name\" IN ('a', 'b')");
+      expect(sql).toBe('"users"."name" IN (?, ?)');
     });
   });
 

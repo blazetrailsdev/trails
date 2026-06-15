@@ -1160,11 +1160,10 @@ describe("the to_sql visitor", () => {
     };
 
     v.compileWithCollector(mgr.ast, collector);
-    // Casted values route through addBind (mirrors Rails visit_Arel_Nodes_Casted).
-    expect(binds).toHaveLength(1);
-    expect(binds[0]).toBe("alice");
-    // The Casted value becomes a ? placeholder in parts (not inlined).
-    expect(parts.some((p) => p === "?")).toBe(true);
+    // Casted values inline their quoted literal directly (mirrors Rails
+    // visit_Arel_Nodes_Casted, to_sql.rb:87-88) — no addBind, no placeholder.
+    expect(binds).toHaveLength(0);
+    expect(parts.some((p) => typeof p === "string" && p.includes("'alice'"))).toBe(true);
     expect(parts.some((p) => typeof p === "string" && p.includes("users"))).toBe(true);
   });
 
@@ -1489,8 +1488,8 @@ describe("the to_sql visitor", () => {
       }
       const tbl = new Table("users");
       const v = new NumberedVisitor();
-      // Both BindParam and Casted route through addBind (and therefore bindBlock).
-      // Quoted values (null comparisons, hard literals) still inline.
+      // Only BindParam routes through addBind (and therefore bindBlock); Casted
+      // and Quoted values inline their quoted literal (Rails to_sql.rb:87-88).
       const [sql] = v.compileWithBinds(
         tbl
           .where(tbl.get("id").eq(new Nodes.BindParam(1)))
@@ -1498,8 +1497,7 @@ describe("the to_sql visitor", () => {
           .project(tbl.get("id")).ast,
       );
       expect(sql).toContain("$1"); // BindParam → addBind → $1
-      expect(sql).toContain("$2"); // Casted → addBind → $2
-      expect(sql).not.toContain("'hi'"); // Casted value is bound, not inlined
+      expect(sql).toContain("'hi'"); // Casted value inlines via quote
       expect(sql).not.toContain("?");
     });
 

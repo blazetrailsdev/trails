@@ -220,7 +220,10 @@ describe("StatementCacheTest", () => {
     const { Table, Visitors, star } = await import("@blazetrails/arel");
     const v = new Visitors.ToSql();
     const table = new Table("users");
-    const mgr = table.project(star).where(table.get("name").eq("alice"));
+    // A Substitute slot comes from a BindParam (visit_Arel_Nodes_BindParam →
+    // add_bind), not from a Casted — Casted inlines its quoted literal
+    // (to_sql.rb:87-88). Statement-cache queries build BindParam substitutes.
+    const mgr = table.project(star).where(table.get("name").eq(new Nodes.BindParam("alice")));
 
     const collector = new PartialQueryCollector();
     v.compileWithCollector(mgr.ast, collector);
@@ -230,9 +233,11 @@ describe("StatementCacheTest", () => {
     expect(hasSubstitute).toBe(true);
     expect(binds.length).toBeGreaterThan(0);
 
-    // PartialQuery can interpolate values at these Substitute positions
+    // PartialQuery can interpolate values at these Substitute positions.
+    // BindParam records the node; the exec path unwraps it to `.value`.
     const pq = new PartialQuery(parts);
-    const sql = pq.sqlFor(binds, { quote: (v: unknown) => `'${v}'` });
+    const unwrapped = binds.map((b: unknown) => (b instanceof Nodes.BindParam ? b.value : b));
+    const sql = pq.sqlFor(unwrapped, { quote: (v: unknown) => `'${v}'` });
     expect(sql).toContain('"users"."name"');
     expect(sql).toContain("alice");
     expect(sql).not.toContain("?");
