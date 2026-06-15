@@ -151,7 +151,7 @@ export function stiName(modelClass: typeof Base): string {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name
  */
 export function polymorphicName(modelClass: typeof Base): string {
-  return modelClass.name;
+  return baseClass.call(modelClass).name;
 }
 
 /**

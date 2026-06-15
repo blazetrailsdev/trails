@@ -38,7 +38,7 @@ import {
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
 } from "./associations/errors.js";
-import { isFinderNeedsTypeCondition, typeCondition } from "./inheritance.js";
+import { isFinderNeedsTypeCondition, polymorphicName, typeCondition } from "./inheritance.js";
 
 type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
@@ -264,7 +264,7 @@ export class AbstractReflection {
 
     const typeCol = this._concrete().type;
     if (typeCol) {
-      scope = scope.where({ [typeCol]: foreignKlass.name });
+      scope = scope.where({ [typeCol]: polymorphicName(foreignKlass) });
     }
 
     for (const chainScope of this.joinScopes(table)) {
