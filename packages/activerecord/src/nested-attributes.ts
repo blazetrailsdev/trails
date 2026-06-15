@@ -679,10 +679,12 @@ export function assignNestedAttributesForCollectionAssociation(
  * deviations from Rails:
  *   1. A non-existent id is not rejected at assign time (Rails would raise); the
  *      stub's autosave UPDATE simply matches zero rows.
- *   2. The stub carries only the primary key, not the other persisted column
- *      values Rails' SELECT would load — fine for the assigned attributes, but an
- *      autosave callback reading an unassigned column sees a default, not the DB
- *      value.
+ *   2. The stub carries only the primary key plus the foreign key back to the
+ *      owner (so the child's `belongs_to` — and any `touch: true` on it —
+ *      resolves the owner like the DB-loaded record would). Other persisted
+ *      column values Rails' SELECT would load are absent — fine for the assigned
+ *      attributes, but an autosave callback reading some other column sees a
+ *      default, not the DB value.
  * @internal
  */
 function populateInMemoryExistingRecord(
@@ -690,8 +692,11 @@ function populateInMemoryExistingRecord(
   associationName: string,
   attrs: Record<string, unknown>,
 ): void {
+  const ctor = record.constructor as typeof Base;
+  const associations: any[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a: any) => a.name === associationName);
   const targetModel = resolveCollectionTargetModel(record, associationName);
-  if (!targetModel) return;
+  if (!targetModel || !assocDef) return;
 
   // Rails' ordering (nested_attributes.rb:527→543→528): find the record in
   // `existing_records` first — raise RecordNotFound if absent — and only then
@@ -709,7 +714,13 @@ function populateInMemoryExistingRecord(
     }
     const pk = (targetModel as any).primaryKey;
     const pkCol = Array.isArray(pk) ? pk[0] : (pk ?? "id");
-    existing = (targetModel as any)._instantiate({ [pkCol]: id });
+    // Seed the foreign key (and polymorphic type) back to the owner so the
+    // stub's `belongs_to` resolves — mirrors the FK seeding in
+    // `CollectionProxy#_buildRaw`. Instantiated as part of the persisted
+    // baseline (not assigned), so it is not dirtied and never enters the
+    // child's UPDATE; it only lets owner-touch / inverse reads find the owner.
+    const row: Record<string, unknown> = { [pkCol]: id, ...stubOwnerForeignKey(record, assocDef) };
+    existing = (targetModel as any)._instantiate(row);
     isNewStub = true;
   }
 
@@ -721,6 +732,31 @@ function populateInMemoryExistingRecord(
   if (callRejectIf(record, associationName, attrs)) return;
   if (isNewStub) (proxy as any).addExistingRecord(existing);
   assignToOrMarkForDestruction(existing!, attrs, isAllowDestroy(record, associationName));
+}
+
+/**
+ * Foreign-key (and polymorphic type) attributes pointing a freshly-instantiated
+ * collection stub back at its owner, mirroring the FK seeding in
+ * `CollectionProxy#_buildRaw`. Only meaningful for direct (non-through)
+ * has_many: a has_many :through / HABTM keeps the FK on the join row, not on the
+ * target, so seeding a `${owner}_id` column there would be wrong (and may not
+ * exist) — return nothing in that case.
+ * @internal
+ */
+function stubOwnerForeignKey(record: Base, assocDef: any): Record<string, unknown> {
+  if (assocDef.options?.through || assocDef.type === "hasAndBelongsToMany") return {};
+  const ctor = record.constructor as typeof Base;
+  const asName: string | undefined = assocDef.options?.as;
+  const foreignKey: string =
+    assocDef.options?.foreignKey ??
+    (asName ? `${underscore(asName)}_id` : `${underscore(ctor.name)}_id`);
+  const parentPk = assocDef.options?.primaryKey ?? (ctor as any).primaryKey;
+  const parentPkCol = Array.isArray(parentPk) ? parentPk[0] : parentPk;
+  const out: Record<string, unknown> = {
+    [foreignKey]: (record as any)._readAttribute(parentPkCol),
+  };
+  if (asName) out[`${underscore(asName)}_type`] = ctor.name;
+  return out;
 }
 
 /**
