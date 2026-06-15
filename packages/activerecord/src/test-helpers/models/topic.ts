@@ -68,7 +68,7 @@ export class Topic extends Base {
     this.scope("false", (q: any) => q.where({ approved: false }));
     this.scope("scopeWithLambda", (q: any) => q.all());
     this.scope("approvedAsString", (q: any) => q.where({ approved: true }));
-    this.scope("anonymousExtension", (q: any) => q);
+    this.scope("anonymousExtension", (q: any) => q, { one: () => 1 });
     this.scope("scopeStats", (q: any) => q);
     this.scope("withObject", (q: any) => q.where({ approved: true }));
     this.scope("withKwargs", (q: any, approved = false) => q.where({ approved }));

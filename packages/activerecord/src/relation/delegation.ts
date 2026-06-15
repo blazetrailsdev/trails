@@ -175,8 +175,15 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
           const result = scopeFn(target, ...args);
           const extensions = modelClass._scopeExtensions?.get(prop as string);
           if (extensions && result && typeof result === "object") {
-            for (const [name, fn] of Object.entries(extensions)) {
-              (result as any)[name] = fn.bind(result);
+            // Register the extension as a module on the relation (mirrors Ruby's
+            // anonymous-module `extend`) so its methods survive spawning — e.g.
+            // `Topic.anonymous_extension.none.one`.
+            if (typeof (result as any).extendingBang === "function") {
+              (result as any).extendingBang(extensions);
+            } else {
+              for (const [name, fn] of Object.entries(extensions)) {
+                (result as any)[name] = fn.bind(result);
+              }
             }
           }
           return result;

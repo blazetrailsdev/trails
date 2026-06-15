@@ -227,7 +227,9 @@ describe("WithTest", () => {
   });
 
   it.skip("raises when using block", () => {
-    // TypeScript has no block/proc syntax; this Rails constraint is not applicable.
+    // PERMANENT-SKIP: TypeScript has no block/proc syntax, so `.with(...) { }`
+    // cannot be expressed — the Rails "does not accept a block" ArgumentError
+    // guard has no equivalent here.
   });
 
   it("unscoping", async () => {
@@ -241,7 +243,8 @@ describe("WithTest", () => {
   });
 
   it.skip("common table expressions are unsupported", () => {
-    // The test adapter (SQLite) supports CTEs. This branch only runs on
-    // adapters that don't, which aren't exercised in the test suite.
+    // PERMANENT-SKIP: Rails' `else` branch for adapters lacking CTE support.
+    // Every adapter trails exercises (SQLite/PG/MySQL) supports CTEs, so this
+    // branch is unreachable here.
   });
 });

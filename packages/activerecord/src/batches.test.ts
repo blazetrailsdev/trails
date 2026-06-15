@@ -9,6 +9,8 @@ import { activeRecordConfig } from "./relation/batches.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
+import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 
 const TEST_SCHEMA: Schema = {
   posts: {
@@ -545,9 +547,47 @@ describe("EachTest", () => {
     expect(batchRels.length).toBeGreaterThan(0);
   });
 
-  it.skip("find in batches should quote batch order", () => {});
+  it("find in batches should quote batch order", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    for (let i = 0; i < 3; i++) await Post.create({ title: `post-${i}` });
+    await assertQueriesMatch(
+      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))}`, "i"),
+      undefined,
+      false,
+      async () => {
+        for await (const batch of Post.findInBatches({ batchSize: 1 })) {
+          expect(Array.isArray(batch)).toBe(true);
+          expect(batch[0]).toBeInstanceOf(Post);
+        }
+      },
+    );
+  });
 
-  it.skip("find in batches should ignore the order default scope", () => {});
+  it("find in batches should ignore the order default scope", async () => {
+    class PostWithDefaultScope extends Base {
+      static _tableName = "posts";
+      static {
+        this.attribute("title", "string");
+        this.defaultScope((rel: any) => rel.order("title"));
+      }
+    }
+    // Ids ascend while titles descend, so default-scope title order and
+    // primary-key order disagree; find_in_batches must use the pk order.
+    const welcome = await PostWithDefaultScope.create({ title: "zzz" });
+    await PostWithDefaultScope.create({ title: "aaa" });
+    const firstPost = await PostWithDefaultScope.first();
+    expect(firstPost!.readAttribute("title")).toBe("aaa");
+    const posts: any[] = [];
+    for await (const batch of PostWithDefaultScope.findInBatches()) {
+      posts.push(...batch);
+    }
+    expect(posts[0].id).not.toBe(firstPost!.id);
+    expect(posts[0].id).toBe(welcome.id);
+  });
 
   it("find in batches should error on ignore the order", async () => {
     class Post extends Base {
@@ -763,8 +803,20 @@ describe("EachTest", () => {
     expect(total).toBe(0);
   });
 
-  it.skip(".find_each respects table alias", () => {
-    // ROOT-CAUSE fixed: findEach no longer throws on CPK; table alias needs Relation.create test infra
+  it(".find_each respects table alias", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    await Post.create({ title: "post-0" });
+    await assertQueriesCount(1, false, async () => {
+      const tableAlias = Post.arelTable.alias("omg_posts");
+      const posts = new Relation(Post, tableAlias as any);
+      for await (const _ of posts.findEach({})) {
+        // no-op
+      }
+    });
   });
 
   it(".in_batches should start from the start option when using composite primary key", async () => {
