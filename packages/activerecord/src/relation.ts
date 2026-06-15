@@ -2421,8 +2421,18 @@ export class Relation<T extends Base> {
     // See ActiveRecord::Relation#references_eager_loaded_tables?
     const promotedIncludes = this._includesToPromoteFromReferences();
 
+    // When a set operation has an eager-load operand, compose both sides as a
+    // single JoinDependency-instantiated UNION (identical aliased projection on
+    // each side) rather than degrading to per-association preload.
+    const setOpEagerJd = this._setOperation ? this._setOperationEagerJoinDependency() : null;
+
     let loadedRecords: T[];
-    if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
+    if (setOpEagerJd) {
+      await this._executeSetOperationEagerLoad(setOpEagerJd.jd, setOpEagerJd.fallbackAssocs, token);
+      if (token !== this._loadToken) return [];
+      loadedRecords = this._records;
+      this.loadRecords(loadedRecords);
+    } else if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
       const allEager = [...new Set([...this._eagerLoadAssociations, ...promotedIncludes])];
       await this._executeEagerLoad(allEager);
       if (token !== this._loadToken) return [];
@@ -2472,11 +2482,22 @@ export class Relation<T extends Base> {
     // relation; its own specs are handled above + in the eager branch.)
     if (this._setOperation) {
       const other = this._setOperation.other;
-      preloadAssocs.push(
-        ...other._eagerLoadAssociations,
-        ...other._includesAssociations,
-        ...other._preloadAssociations,
-      );
+      if (setOpEagerJd) {
+        // The eager/references-promoted specs from both operands are already
+        // JD-joined into the compound; only plain includes/preloads not promoted
+        // to eager remain to load via separate queries.
+        const otherPromoted = other._includesToPromoteFromReferences();
+        preloadAssocs.push(
+          ...other._includesAssociations.filter((n) => !otherPromoted.includes(n)),
+          ...other._preloadAssociations,
+        );
+      } else {
+        preloadAssocs.push(
+          ...other._eagerLoadAssociations,
+          ...other._includesAssociations,
+          ...other._preloadAssociations,
+        );
+      }
     }
     if (preloadAssocs.length > 0 && this._records.length > 0) {
       await this._preloadAssociationsForRecords(this._records, preloadAssocs);
@@ -2677,7 +2698,27 @@ export class Relation<T extends Base> {
     const rows = await this._modelClass.connection.execute(sql, eagerBinds);
 
     const { parents, associations } = jd.instantiateFromRows(rows, this._isStrictLoading);
+    this._wireEagerInverses(jd, parents, associations, basePk);
 
+    this._records = parents as T[];
+
+    if (fallbackAssocs.length > 0 && this._records.length > 0) {
+      await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
+    }
+  }
+
+  /**
+   * Wire inverse_of back-references on JoinDependency-instantiated parents:
+   * for each top-level singular/collection node, cache the parent on each child
+   * through the configured `inverseOf` name. Shared by the plain eager-load path
+   * (`_executeEagerLoad`) and the set-operation JD-instantiated path.
+   */
+  private _wireEagerInverses(
+    jd: JoinDependency,
+    parents: any[],
+    associations: Map<unknown, Map<string, any[]>>,
+    basePk: string,
+  ): void {
     const inverseMap = new Map<string, string | undefined>();
     const modelAssocs: any[] = (this._modelClass as any)._associations ?? [];
     for (const assoc of modelAssocs) {
@@ -2703,9 +2744,42 @@ export class Relation<T extends Base> {
         }
       }
     }
+  }
 
+  /**
+   * Execute a set operation whose operands compose a shared JoinDependency:
+   * compile the compound node (both sides projecting the identical `t0_r*`
+   * aliased column list + LEFT OUTER JOINs), run it through one collector, then
+   * JoinDependency-instantiate the unioned rows so associations are populated
+   * from the JOINed columns. Specs that could not be JOINed preload afterwards.
+   */
+  private async _executeSetOperationEagerLoad(
+    jd: JoinDependency,
+    fallbackAssocs: AssociationSpec[],
+    token: number,
+  ): Promise<void> {
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    const node = this._buildSetOperationNodeWith(jd);
+    const v = this._arelVisitor();
+    const [raw, binds, retryable] = v.compileWithBinds(node);
+    this._lastSelectRetryable = retryable;
+    this._lastSelectBinds = this._typeCastBinds(binds);
+    // Standalone compound SELECT: strip the single enclosing paren pair the
+    // set-operation visitor adds for embedded use (mirrors _toSqlSetOperation).
+    const sql = raw.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
+    const result = await this._modelClass.connection.selectAll(
+      sql,
+      `${this._modelClass.name} Load`,
+      this._lastSelectBinds,
+      { allowRetry: false },
+    );
+    if (token !== this._loadToken) return;
+    const { parents, associations } = jd.instantiateFromRows(
+      result.toArray(),
+      this._isStrictLoading,
+    );
+    this._wireEagerInverses(jd, parents, associations, basePk);
     this._records = parents as T[];
-
     if (fallbackAssocs.length > 0 && this._records.length > 0) {
       await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
     }
@@ -4324,9 +4398,55 @@ export class Relation<T extends Base> {
    * @internal
    */
   _buildSetOperationNode(): Nodes.Node {
-    const leftManager = this._buildSetOperationOperandManager();
-    const rightManager = this._setOperation!.other._buildSetOperationOperandManager();
+    return this._buildSetOperationNodeWith(this._setOperationEagerJoinDependency()?.jd ?? null);
+  }
+
+  /**
+   * Compose the compound node, optionally threading a shared JoinDependency so
+   * both operands project the *same* aliased column list + LEFT OUTER JOINs
+   * (union requires identical projection shape across sides). When `jd` is null
+   * each operand keeps its plain projection.
+   * @internal
+   */
+  private _buildSetOperationNodeWith(jd: JoinDependency | null): Nodes.Node {
+    const leftManager = this._buildSetOperationOperandManager(jd);
+    const rightManager = this._setOperation!.other._buildSetOperationOperandManager(jd);
     return leftManager[this._setOperation!.type](rightManager) as unknown as Nodes.Node;
+  }
+
+  /**
+   * Merge both operands' eager-load specs (eager_load + references-promoted
+   * includes) and build a single shared JoinDependency for the compound. Both
+   * operands are the same model class (a set operation requires it), so the
+   * merged specs JOIN identically on each side. Returns null when nothing is
+   * eager-loaded or no spec is JoinDependency-joinable (composite PK falls back
+   * to the plain-projection + preload path). `fallbackAssocs` holds specs that
+   * could not be JOINed and must preload after JD-instantiation.
+   * @internal
+   */
+  private _setOperationEagerJoinDependency(): {
+    jd: JoinDependency;
+    fallbackAssocs: AssociationSpec[];
+  } | null {
+    if (!this._setOperation) return null;
+    if (Array.isArray((this._modelClass as any).primaryKey)) return null;
+    const other = this._setOperation.other;
+    const specs = [
+      ...new Set([
+        ...this._eagerLoadAssociations,
+        ...this._includesToPromoteFromReferences(),
+        ...other._eagerLoadAssociations,
+        ...other._includesToPromoteFromReferences(),
+      ]),
+    ];
+    if (specs.length === 0) return null;
+    const references = [
+      ...new Set([...this._aliasableReferences(), ...other._aliasableReferences()]),
+    ];
+    const jd = new JoinDependency(this._modelClass);
+    const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, specs, references);
+    if (jd.nodes.length === 0) return null;
+    return { jd, fallbackAssocs };
   }
 
   /**
@@ -4335,18 +4455,17 @@ export class Relation<T extends Base> {
    * into the operand AST so they thread through the compound's single collector
    * instead of being spliced into the compiled SQL string per side.
    *
-   * An eager-load operand is deliberately NOT compiled through its
-   * JoinDependency manager here: that emits the wide `t0_r*` aliased column list
-   * + LEFT OUTER JOINs, which (a) make the operand arity-incompatible with the
-   * other side of the UNION (DBs reject differing column counts) and (b) cannot
-   * be JoinDependency-instantiated, since the compound executes through the
-   * `_eagerLoadBypassesJoinDependency` branch and reads rows as plain models.
-   * So each operand keeps the plain projection (arity stays compatible) and the
-   * eager associations load via that bypass branch's `_preloadAssociationsForRecords`
-   * — Rails has no `Relation#union`, so there is no JD-through-union path to mirror.
+   * When `sharedJd` is supplied (any operand eager-loads), the operand is built
+   * through that JoinDependency instead: both sides project the identical wide
+   * `t0_r*` aliased column list + LEFT OUTER JOINs, so the UNION stays
+   * arity-compatible and the compound's rows are JoinDependency-instantiated
+   * (associations populated from the JOINed columns) rather than preloaded.
+   * Each operand still applies its own WHERE/ORDER/LIMIT via `_buildEagerJoinManager`.
    */
-  private _buildSetOperationOperandManager(): SelectManager {
-    const manager = this._buildSelectManager();
+  private _buildSetOperationOperandManager(sharedJd?: JoinDependency | null): SelectManager {
+    const manager = sharedJd
+      ? this._buildEagerJoinManager(sharedJd, (this._modelClass as any).primaryKey ?? "id")
+      : this._buildSelectManager();
     this._applyCtesAndAnnotationsToManager(manager);
     return manager;
   }

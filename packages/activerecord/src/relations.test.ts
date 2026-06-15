@@ -769,7 +769,7 @@ describe("RelationTest", () => {
       expect(sql).toContain("UNION");
     });
 
-    it("keeps an eager-load operand arity-compatible (no join-dependency aliases)", async () => {
+    it("composes an eager-load operand as a JoinDependency-instantiated UNION with arity-compatible sides", async () => {
       const { Associations, registerModel } = await import("./associations.js");
       class SetOpAuthor extends Base {
         static {
@@ -789,20 +789,22 @@ describe("RelationTest", () => {
         className: "SetOpAuthor",
         foreignKey: "setop_author_id",
       });
-      // An eager-load operand must NOT compile through its JoinDependency manager
-      // inside a set operation: the wide `t0_r*` alias list + LEFT OUTER JOINs
-      // would make the operand arity-incompatible with the other UNION side (and
-      // couldn't be JD-instantiated, since the compound reads rows as plain
-      // models). The operand keeps plain projections; the eager association loads
-      // via preload on the execution path.
+      // An eager-load operand composes its JoinDependency projection (wide
+      // `t0_r*` alias list + LEFT OUTER JOINs) into the compound. Both UNION
+      // sides project the identical aliased column list so the operands stay
+      // arity-compatible, and the JOINed columns drive JD-instantiation.
       const sql = SetOpPost.where({ title: "x" })
         .includes("setopAuthor")
         .references("setop_authors")
         .union(SetOpPost.where({ title: "y" }))
         .toSql();
-      expect(sql).not.toContain("LEFT OUTER JOIN");
-      expect(sql).not.toMatch(/t0_r0/);
-      expect(sql).toContain("UNION");
+      const sides = sql.split("UNION");
+      expect(sides).toHaveLength(2);
+      // Identical aliased projection on each side (arity-compatible).
+      const projection = (s: string) => s.slice(s.indexOf("SELECT"), s.indexOf("FROM"));
+      expect(projection(sides[0])).toEqual(projection(sides[1]));
+      expect(sql).toContain("LEFT OUTER JOIN");
+      expect(sql).toMatch(/t0_r0/);
     });
   });
 
@@ -2749,13 +2751,19 @@ describe("RelationTest", () => {
     await EagerSetopPost.create({ title: "x", eager_setop_author_id: (author as any).id });
     await EagerSetopPost.create({ title: "y", eager_setop_author_id: (author as any).id });
 
-    // Eager load on the left operand: the compound stays arity-compatible and the
-    // association is still loaded (via the eager-bypass preload path).
-    const left = EagerSetopPost.where({ title: "x" })
-      .includes("author")
-      .references("eager_setop_authors")
-      .union(EagerSetopPost.where({ title: "y" }));
-    const leftRows = (await left.toArray()) as any[];
+    // Eager load on the left operand (references-promoted to eager): the compound
+    // composes the JoinDependency projection on both sides and JD-instantiates
+    // the unioned rows — the association loads from the JOINed columns in a
+    // single query, not via a separate preload.
+    const { assertQueriesCount } = await import("./testing/query-assertions.js");
+    let leftRows: any[] = [];
+    await assertQueriesCount(1, false, async () => {
+      const left = EagerSetopPost.where({ title: "x" })
+        .includes("author")
+        .references("eager_setop_authors")
+        .union(EagerSetopPost.where({ title: "y" }));
+      leftRows = (await left.toArray()) as any[];
+    });
     expect(leftRows.map((p) => p.title).sort()).toEqual(["x", "y"]);
     expect(leftRows.every((p) => p.author?.name === "alice")).toBe(true);
 
