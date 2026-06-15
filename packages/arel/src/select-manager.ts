@@ -111,7 +111,7 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#as
    */
   as(alias: string): TableAlias {
-    return new TableAlias(new Grouping(this.ast), alias);
+    return new TableAlias(new Grouping(this.ast), new SqlLiteral(alias, { retryable: true }));
   }
 
   /**

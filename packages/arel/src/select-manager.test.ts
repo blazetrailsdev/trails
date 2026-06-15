@@ -55,7 +55,7 @@ describe("SelectManagerTest", () => {
         const mgr = new SelectManager();
         const as = mgr.as("foo");
         expect(as).toBeInstanceOf(Nodes.TableAlias);
-        expect(as.name).toBe("foo");
+        expect((as.name as Nodes.SqlLiteral).value).toBe("foo");
       });
 
       it("converts right to SqlLiteral if a string", () => {
@@ -299,7 +299,7 @@ describe("SelectManagerTest", () => {
       const mgr = users.project(users.get("id"));
       const aliased = mgr.as("sub");
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
-      expect(aliased.name).toBe("sub");
+      expect((aliased.name as Nodes.SqlLiteral).value).toBe("sub");
     });
   });
 
@@ -1126,7 +1126,7 @@ describe("SelectManagerTest", () => {
       const subquery = users.project(users.attr("id"));
       const aliased = subquery.as("sub");
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
-      expect(aliased.name).toBe("sub");
+      expect((aliased.name as Nodes.SqlLiteral).value).toBe("sub");
     });
   });
 
