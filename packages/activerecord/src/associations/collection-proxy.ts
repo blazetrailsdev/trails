@@ -636,6 +636,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         .changedAttributeNamesToSave,
     );
     const readonly = new Set(memClass.readonlyAttributes);
+    // We iterate the intersection of real attribute names (not aliases/virtual
+    // reads), so the low-level `_readAttribute` is equivalent to Rails'
+    // `record[name]` (`read_attribute`, collection_association.rb:342) for every
+    // name here — the value is already type-cast from the fresh row. Both sides
+    // use the raw read/write pair, mirroring `_write_attribute` on the Rails side.
     for (const name of memClass.attributeNames()) {
       if (!dbNames.has(name) || changed.has(name) || readonly.has(name)) continue;
       memRecord._writeAttribute(name, dbRecord._readAttribute(name));
