@@ -1877,6 +1877,37 @@ describe("buildRfcContent", () => {
     expect(content).not.toContain("related-rfcs");
   });
 
+  it("default body includes the full 0000-template sections", () => {
+    const content = buildRfcContent("my-rfc", { date: "2026-06-13" });
+    expect(content).toContain("## Alternatives considered");
+    expect(content).toContain("## Rollout");
+    expect(content).toContain("## Open questions");
+    // Sections appear in the same order as the 0000-template README.
+    const order = [
+      "## Summary",
+      "## Motivation",
+      "## Design",
+      "## Alternatives considered",
+      "## Rollout",
+      "## Open questions",
+      "## Stories",
+      "## Changelog",
+    ].map((h) => content.indexOf(h));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    // The scaffold prose must stay byte-identical to the 0000-template README so a
+    // freshly created RFC matches the canonical structure. The Stories/Changelog
+    // sections deliberately differ (the table is regenerated on commit), so this
+    // pins only the three sections this story adds, plus their placeholder prose.
+    expect(content).toContain(
+      "## Alternatives considered\n\n- **Name:** what it is, why it was not chosen.",
+    );
+    expect(content).toContain(
+      "## Rollout\n\nOrdered phases, referencing story IDs for each phase.\n\n1. Phase 1 — story IDs\n2. Phase 2 — story IDs",
+    );
+    expect(content).toContain("## Open questions\n\n1. **Question.** Options and recommendation.");
+  });
+
   it("applies title, owner, packages, and clusters", () => {
     const content = buildRfcContent("my-rfc", {
       title: "My prose title",
