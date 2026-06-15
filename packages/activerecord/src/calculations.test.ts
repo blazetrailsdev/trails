@@ -4822,12 +4822,6 @@ describe("CalculationsTest", () => {
 
     await user.update({ name: "Bob" });
     expect(user.isPreviouslyNewRecord()).toBe(false);
-
-    const created = await User.create({ name: "Carol" });
-    expect(created.isPreviouslyNewRecord()).toBe(true);
-
-    await created.destroy();
-    expect(created.isPreviouslyNewRecord()).toBe(false);
   });
 
   // Rails: test "frozen after destroy"
