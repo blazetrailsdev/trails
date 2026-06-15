@@ -29,13 +29,26 @@ export type SerializableHash = Record<string, unknown> & PromiseLike<Record<stri
  * lazy-loads it first. A call with no `:include` returns a plain hash like Rails
  * (no awaitable contract), so promise assimilation can't trigger a spurious load.
  */
+/**
+ * Module-private channel marking the synchronous re-entry of `serializableHash`.
+ * A Symbol (never a string key) so it cannot collide with any caller-supplied
+ * option, even one literally named `__sync`.
+ */
+const syncChannel = Symbol("serializableHash.sync");
+
+/** Internal view of options carrying the re-entry marker. */
+type SyncOptions = SerializeOptions & { [syncChannel]?: boolean };
+
 export function serializableHash(
   record: SerializationRecord,
   options: SerializeOptions = {},
 ): Record<string, unknown> {
-  // `__sync` is the internal re-entry that builds the body synchronously.
-  if (hasIncludes(options) && !(options as { __sync?: boolean }).__sync) {
-    const sync = { ...options, __sync: true } as SerializeOptions;
+  // `syncChannel` is the internal re-entry that builds the body synchronously.
+  // It is a module-private Symbol — not a string key — so a caller passing a
+  // castable option like `{ __sync: true }` can never collide with it and force
+  // a spurious sync build that skips include preloading.
+  if (hasIncludes(options) && !(options as SyncOptions)[syncChannel]) {
+    const sync = { ...options, [syncChannel]: true } as SerializeOptions;
     return thenableHash(
       () => serializableHash(record, sync),
       async () => {
@@ -99,7 +112,7 @@ export function serializableHash(
       const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
       // This callback only runs in the `__sync` build, so nested includes build
       // sync too rather than returning their own thenables.
-      const nested = { ...opts, __sync: true } as SerializeOptions;
+      const nested = { ...opts, [syncChannel]: true } as SerializeOptions;
       safeSet(
         result,
         assocName,
@@ -117,7 +130,7 @@ export function serializableHash(
           records as unknown as SerializationRecord,
           {
             ...opts,
-            __sync: true,
+            [syncChannel]: true,
           } as SerializeOptions,
         ),
       );
