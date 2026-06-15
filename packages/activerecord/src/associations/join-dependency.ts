@@ -126,6 +126,17 @@ export class JoinDependency {
    * re-aliased when a reference and the reflection name coincide.
    */
   private _references: Map<string, string> = new Map();
+  /**
+   * When true, `_applyReferencedAlias` only renames a join that already carries a
+   * synthetic collision alias (a second+ join onto the same table), and leaves a
+   * first/only-occurrence join on its real table name. The plain `joins(...)` path
+   * sets this because our where-hash table keys resolve to the *real* table name
+   * (not the reference alias as Rails does), so re-aliasing a first-occurrence join
+   * would desync the WHERE from the JOIN. The eager-load/references path leaves it
+   * false to preserve Rails' `includes(:author).references(:author)` → `authors
+   * AS author` aliasing, where the eager SELECT/WHERE already follow the alias.
+   */
+  private _referencedAliasCollisionsOnly = false;
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
@@ -584,9 +595,11 @@ export class JoinDependency {
     joinsToAdd: JoinDependency[],
     aliasTracker?: AliasTracker,
     references?: string[],
+    referencedAliasCollisionsOnly = false,
   ): Nodes.Join[] {
     if (aliasTracker) this._aliasTracker = aliasTracker;
     this._references = new Map();
+    this._referencedAliasCollisionsOnly = referencedAliasCollisionsOnly;
     if (references) {
       for (const tableName of references) this._references.set(tableName, tableName);
     }
@@ -701,6 +714,10 @@ export class JoinDependency {
     if (this._references.size === 0 || !(child instanceof JoinAssociation)) return;
     const referenced = this._references.get(child.immediateAssocName);
     if (!referenced || referenced === child.effectiveSqlName) return;
+    // In collisions-only mode, only a join already aliased away from its real
+    // table (a duplicate join, effectiveSqlName !== tableName) is renamed to the
+    // referenced name; a first/only-occurrence join keeps its real table name.
+    if (this._referencedAliasCollisionsOnly && child.effectiveSqlName === child.tableName) return;
 
     const tableName = child.tableName;
     // Inline of aliased_table_for(klass.arel_table, table_name) { candidate }:

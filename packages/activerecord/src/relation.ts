@@ -3088,7 +3088,10 @@ export class Relation<T extends Base> {
       // `select(comments_with_extend: { body: :x })` on a second `comments`
       // join) aliases that join's table to the referenced name, mirroring Rails
       // build_joins → join_constraints(stashed, alias_tracker, references_values).
-      for (const node of jd.joinConstraints([], undefined, this._referencesValues))
+      // Collisions-only: a first/only-occurrence join keeps its real table name,
+      // because our where-hash keys resolve to the real table (not the reference
+      // alias), so re-aliasing it would desync the WHERE from the JOIN.
+      for (const node of jd.joinConstraints([], undefined, this._referencesValues, true))
         manager.appendJoinNode(node);
     }
     // Cross-klass merged JoinDependencies (Rails merge_joins): already built
