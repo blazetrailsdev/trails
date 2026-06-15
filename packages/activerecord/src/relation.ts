@@ -2655,22 +2655,7 @@ export class Relation<T extends Base> {
     let limitedIds: unknown[] | undefined;
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
     if (hasLimit && jd.nodes.some((n) => n.assocType === "hasMany")) {
-      // Resolve the DISTINCT select list here, where the connection is proven
-      // live (we execute the subquery immediately below), rather than inside the
-      // AST builder. Mirrors Rails' `limited_ids_for`, which computes
-      // `columns_for_distinct` against the live connection.
-      const distinctSelect = this._distinctSelectForLimitedIds(basePk);
-      const [idSql, idBinds] = this._compileAstWithBinds(
-        this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
-      );
-      const idRows = await this._modelClass.connection.execute(idSql, idBinds);
-      // columns_for_distinct projects the order columns first and the pk last
-      // (unaliased), so the pk is keyed by its column name. When an order column
-      // shares that name (e.g. ordering by `posts.id`), duplicate keys collapse
-      // to the last write — which is the pk, since it is projected last.
-      limitedIds = (idRows as Record<string, unknown>[]).map(
-        (row) => row[basePk] ?? Object.values(row).pop(),
-      );
+      limitedIds = await this._materializeLimitedIds(jd, basePk);
       if (limitedIds.length === 0) {
         this._records = [];
         return;
@@ -3285,17 +3270,10 @@ export class Relation<T extends Base> {
     // the eager values) and recurses, so the plucked columns can reference the
     // joined tables. Rails builds the JoinDependency over `eager_load_values |
     // includes_values` (finder_methods.rb:457); we model that with leftOuterJoins
-    // over the cleared specs, matching applyJoinDependencyForArel. The cleared
-    // recursion takes the plain (else) branch, so there is no infinite loop.
-    //
-    // Not modeled: Rails apply_join_dependency, for a limit/offset over a
-    // collection reflection, replaces the relation with
-    // distinct_relation_for_primary_key (finder_methods.rb:463) — it executes a
-    // query to materialize the limited DISTINCT primary keys, which a single
-    // recurse cannot reproduce. The common cases still match (LIMIT 0 and
-    // WHERE-contradiction both yield no rows here too); only the nonempty
-    // limit/offset case diverges, tracked by the skipped
-    // `pluck with includes offset` test.
+    // over the cleared specs below. The cleared recursion takes the plain (else)
+    // branch, so there is no infinite loop. For a limit/offset over a collection
+    // reflection we also materialize the limited DISTINCT primary keys
+    // (distinct_relation_for_primary_key) before recursing.
     const firstColumnName =
       columns.length === 0
         ? null
@@ -3311,6 +3289,28 @@ export class Relation<T extends Base> {
       const rel = this._clone();
       rel._eagerLoadAssociations = [];
       rel._includesAssociations = [];
+
+      const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
+      if (hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) {
+        // Rails apply_join_dependency, for a limit/offset over a collection
+        // reflection, replaces the relation via distinct_relation_for_primary_key
+        // (finder_methods.rb:463): execute a query to materialize the limited
+        // DISTINCT primary keys, rewrite as `WHERE pk IN (ids)`, and clear
+        // limit/offset. Limiting the joined rows directly would be wrong under
+        // fan-out (it limits associated rows, not parents).
+        const basePk = (this._modelClass as any).primaryKey ?? "id";
+        const jd = new JoinDependency(this._modelClass);
+        this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
+        if (jd.nodes.length > 0) {
+          const limitedIds = await this._materializeLimitedIds(jd, basePk);
+          const limited = (rel.leftOuterJoins(eagerSpecs) as Relation<T>).where({
+            [basePk]: limitedIds,
+          }) as Relation<T>;
+          limited._limitValue = null;
+          limited._offsetValue = null;
+          return limited.pluck(...columns);
+        }
+      }
       return (rel.leftOuterJoins(eagerSpecs) as Relation<T>).pluck(...columns);
     }
 
@@ -4467,6 +4467,34 @@ export class Relation<T extends Base> {
     if (this._limitValue !== null) idSubquery.take(this._limitValue);
     if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
     return idSubquery;
+  }
+
+  /**
+   * Run the DISTINCT-primary-key query that materializes the limited parent IDs
+   * for a collection eager load with LIMIT/OFFSET — Rails' `limited_ids_for` /
+   * `distinct_relation_for_primary_key` (finder_methods.rb:463). Executes a
+   * standalone `SELECT DISTINCT pk … LIMIT n` and returns the literal IDs, so
+   * the caller can rewrite the relation as `WHERE pk IN (ids)` instead of
+   * nesting `IN (SELECT … LIMIT n)` (which MariaDB rejects). Shared by the
+   * toArray execution path (`_executeEagerLoad`) and pluck's apply-join-dependency
+   * branch; the connection is proven live at both call sites (the subquery
+   * executes immediately).
+   *
+   * `columns_for_distinct` projects the order columns first and the pk last
+   * (unaliased), so the pk is keyed by its column name. When an order column
+   * shares that name (e.g. ordering by `posts.id`), duplicate keys collapse to
+   * the last write — which is the pk, since it is projected last.
+   * @internal
+   */
+  private async _materializeLimitedIds(jd: JoinDependency, basePk: string): Promise<unknown[]> {
+    const distinctSelect = this._distinctSelectForLimitedIds(basePk);
+    const [idSql, idBinds] = this._compileAstWithBinds(
+      this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
+    );
+    const idRows = await this._modelClass.connection.execute(idSql, idBinds);
+    return (idRows as Record<string, unknown>[]).map(
+      (row) => row[basePk] ?? Object.values(row).pop(),
+    );
   }
 
   /**
