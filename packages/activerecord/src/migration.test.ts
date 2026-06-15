@@ -460,9 +460,10 @@ describe("MigrationTest", () => {
 
   it("decimal scale without precision should raise", () => {
     const td = new TableDefinition("products");
-    expect(() => {
-      td.decimal("price", { scale: 2 });
-    }).toThrow(/precision/i);
+    td.decimal("price", { scale: 2 });
+    expect(() => emitTableSql(td)).toThrow(
+      "Error adding decimal column: precision cannot be empty if scale is specified",
+    );
   });
 
   describe("IndexForTableWithSchemaMigrationTest", () => {

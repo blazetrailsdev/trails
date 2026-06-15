@@ -138,7 +138,7 @@ export class TableDefinition extends AbstractTableDefinition {
     deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
     if (options.scale !== undefined && options.precision === undefined) {
       throw new ArgumentError(
-        "Error adding decimal column: precision is required if scale is specified",
+        "Error adding decimal column: precision cannot be empty if scale is specified",
       );
     }
     const precision = options.precision ?? 10;

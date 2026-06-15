@@ -145,16 +145,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
         sql = "bigint";
         break;
       case "decimal": {
+        this.validateDecimalPrecision(options);
         const p = options.precision;
         const s = options.scale;
         if (p != null && s != null) {
           sql = `decimal(${p},${s})`;
         } else if (p != null) {
           sql = `decimal(${p})`;
-        } else if (s != null) {
-          throw new ArgumentError(
-            "Error adding decimal column: precision cannot be empty if scale is specified",
-          );
         } else {
           sql = "decimal";
         }

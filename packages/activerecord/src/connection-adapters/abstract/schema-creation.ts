@@ -292,6 +292,19 @@ export class SchemaCreation {
     return !(options.null === false && options.default === null);
   }
 
+  /**
+   * Mirrors the decimal branch of `type_to_sql` (schema_statements.rb:1400):
+   * a scale without a precision is an error. Lives in the abstract layer so
+   * every adapter raises identically rather than each override reimplementing
+   * the check.
+   */
+  protected validateDecimalPrecision(options: ColumnOptions): void {
+    if (options.precision == null && options.scale != null)
+      throw new ArgumentError(
+        "Error adding decimal column: precision cannot be empty if scale is specified",
+      );
+  }
+
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     let sql: string;
     switch (type) {
@@ -311,6 +324,7 @@ export class SchemaCreation {
         sql = this.adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
         break;
       case "decimal":
+        this.validateDecimalPrecision(options);
         sql = `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
         break;
       case "boolean":

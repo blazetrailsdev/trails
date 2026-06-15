@@ -959,9 +959,9 @@ export class TableDefinition {
   }
 
   decimal(name: string, options: ColumnOptions = {}): this {
-    if (options.scale !== undefined && typeof options.precision !== "number") {
-      throw new Error("Error adding decimal column: precision is required if scale is specified");
-    }
+    // Rails' TableDefinition#decimal performs no validation; a scale without a
+    // precision is rejected later in type_to_sql (schema_statements.rb:1400),
+    // so the same ArgumentError covers every column-creation path.
     return this.column(name, "decimal", options);
   }
 
