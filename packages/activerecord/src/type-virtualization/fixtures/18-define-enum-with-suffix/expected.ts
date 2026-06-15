@@ -3,13 +3,11 @@ import { defineEnum } from "@blazetrails/activerecord";
 export class Article extends Base {
   declare status: number;
   declare isDraftStatus: () => boolean;
-  declare draftStatus: () => void;
-  declare draftStatusBang: () => Promise<void>;
+  declare draftStatusBang: () => Promise<true>;
   declare static draftStatus: () => import("@blazetrails/activerecord").Relation<Article>;
   declare static notDraftStatus: () => import("@blazetrails/activerecord").Relation<Article>;
   declare isPublishedStatus: () => boolean;
-  declare publishedStatus: () => void;
-  declare publishedStatusBang: () => Promise<void>;
+  declare publishedStatusBang: () => Promise<true>;
   declare static publishedStatus: () => import("@blazetrails/activerecord").Relation<Article>;
   declare static notPublishedStatus: () => import("@blazetrails/activerecord").Relation<Article>;
 

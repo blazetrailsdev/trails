@@ -3,13 +3,11 @@ import { defineEnum } from "@blazetrails/activerecord";
 export class Conversation extends Base {
   declare status: number;
   declare isActive: () => boolean;
-  declare active: () => void;
-  declare activeBang: () => Promise<void>;
+  declare activeBang: () => Promise<true>;
   declare static active: () => import("@blazetrails/activerecord").Relation<Conversation>;
   declare static notActive: () => import("@blazetrails/activerecord").Relation<Conversation>;
   declare isArchived: () => boolean;
-  declare archived: () => void;
-  declare archivedBang: () => Promise<void>;
+  declare archivedBang: () => Promise<true>;
   declare static archived: () => import("@blazetrails/activerecord").Relation<Conversation>;
   declare static notArchived: () => import("@blazetrails/activerecord").Relation<Conversation>;
 
