@@ -714,6 +714,7 @@ export async function foreignKeys(
   this: ForeignKeysHost,
   tableName: string,
 ): Promise<ForeignKeyDefinition[]> {
+  const scope = quotedScope.call(this, tableName);
   const rows = (await this.schemaQuery(
     `SELECT fk.referenced_table_name AS to_table,
             fk.referenced_column_name AS primary_key,
@@ -726,10 +727,10 @@ export async function foreignKeys(
      JOIN information_schema.key_column_usage fk
        USING (constraint_schema, constraint_name)
      WHERE fk.referenced_column_name IS NOT NULL
-       AND fk.table_schema = DATABASE()
-       AND fk.table_name = ${this.quote(tableName)}
-       AND rc.constraint_schema = DATABASE()
-       AND rc.table_name = ${this.quote(tableName)}
+       AND fk.table_schema = ${scope.schema}
+       AND fk.table_name = ${scope.name}
+       AND rc.constraint_schema = ${scope.schema}
+       AND rc.table_name = ${scope.name}
      ORDER BY fk.constraint_name, fk.ordinal_position`,
   )) as Array<Record<string, unknown>>;
 
