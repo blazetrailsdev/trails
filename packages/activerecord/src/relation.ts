@@ -3383,33 +3383,15 @@ export class Relation<T extends Base> {
     rel._selectColumns = null;
     const manager = rel._buildSelectManager();
     manager.projections = projections as any;
+    // Fold CTEs (`WITH`) and annotate() comments into the manager AST — exactly
+    // as the main SELECT path does (`_buildArel` → `_applyCtesAndAnnotationsToManager`)
+    // — so a single visitor collector numbers every bind in document order (CTE
+    // binds precede the main query's; PG `$N` placeholders fall out by
+    // construction). Replaces the former `buildCteSql` string prefix and its
+    // manual `$N` renumbering.
+    this._applyCtesAndAnnotationsToManager(manager);
 
-    const [compiledSql, managerBinds] = this._compileAstWithBinds(manager.ast);
-    let pluckSql = compiledSql;
-    let pluckBinds = managerBinds;
-    // annotate() comments — appended like _toSqlWithoutSetOp (build_arel adds
-    // them to the manager's comment node).
-    if (this._annotations.length > 0) pluckSql = `${pluckSql} ${this._annotationComments()}`;
-    // Prepend CTE clauses, threading their bind values ahead of the main
-    // query's and shifting any $N placeholders up (PG numbers globally) —
-    // matching _toSqlWithoutSetOp.
-    if (this._ctes.length > 0) {
-      const { sql: cteSql, binds: cteBinds } = _qm.buildCteSql(
-        this._ctes,
-        (n) => this._compileArelNodeWithBinds(n),
-        (name) => this._modelClass.connection.quoteTableName(name),
-      );
-      if (cteBinds.length > 0) {
-        const shifted = pluckSql.replace(
-          /\$(\d+)/g,
-          (_m, n) => `$${parseInt(n, 10) + cteBinds.length}`,
-        );
-        pluckSql = `${cteSql} ${shifted}`;
-        pluckBinds = [...cteBinds, ...pluckBinds];
-      } else {
-        pluckSql = `${cteSql} ${pluckSql}`;
-      }
-    }
+    const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
     const result = await this._modelClass.connection.selectAll(
       pluckSql,
       `${this._modelClass.name} Pluck`,
@@ -4732,18 +4714,6 @@ export class Relation<T extends Base> {
     this._lastSelectRetryable = retryable;
     this._lastSelectBinds = this._typeCastBinds(binds);
     return sql;
-  }
-
-  /**
-   * Compile a CTE body node, collecting its bind values (type-cast as in
-   * `_compileSelectSql`) rather than inlining them — so a Relation/SelectManager
-   * CTE body parameterizes through the visitor. Folds the body's retryability
-   * into the relation's so a non-retryable CTE body marks the whole query.
-   */
-  private _compileArelNodeWithBinds(node: Nodes.Node): [string, unknown[]] {
-    const [sql, binds, retryable] = this._arelVisitor().compileWithBinds(node);
-    this._lastSelectRetryable = this._lastSelectRetryable && retryable;
-    return [sql, this._typeCastBinds(binds)];
   }
 
   /**
