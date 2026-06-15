@@ -134,7 +134,9 @@ interface PrimaryKeyHost {
   _primaryKey?: string | string[];
   name: string;
   tableName?: string;
-  connection?: { schemaCache?: { getCachedPrimaryKeys?(table: string): unknown } };
+  connection?: {
+    schemaCache?: { getCachedPrimaryKeys?(table: string): string | string[] | null | undefined };
+  };
 }
 
 /**
@@ -147,18 +149,22 @@ interface PrimaryKeyHost {
  * Rails' get_primary_key: consult the schema cache so a key-less data source
  * (e.g. a view) resolves to `null` rather than the "id" convention. The lookup
  * is query-free — it reads only what `loadSchema` already warmed — so a cold
- * cache falls back to "id". The declared non-null return mirrors the host
- * contract used elsewhere; the `null` it can return matches Rails'
- * dynamically-nil `primary_key` for a view.
+ * cache falls back to "id". The `null` it can return matches Rails'
+ * dynamically-nil `primary_key` for a key-less data source (a view); this is
+ * the one accessor that surfaces that case honestly. The public `Base.primaryKey`
+ * getter and the model-typed `PrimaryKeyHost` deliberately narrow to the non-null
+ * `string | string[]` contract — never null for a persistable model — so hot
+ * paths that read `primary_key` are not forced to null-guard. That single
+ * narrowing is the accepted deviation; this function is where the truth lives.
  * @internal
  */
-export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] {
+export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
   const configured = this._primaryKey;
   if (configured !== undefined) return configured;
   try {
     const table = this.tableName;
     const cached = table ? this.connection?.schemaCache?.getCachedPrimaryKeys?.(table) : undefined;
-    if (cached !== undefined) return cached as string | string[];
+    if (cached !== undefined) return cached ?? null;
   } catch {
     // No connection/schema configured — fall through to the convention.
   }
@@ -191,7 +197,10 @@ export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key,
  * primary_key=
  */
-export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): string | string[] {
+export function primaryKey(
+  this: PrimaryKeyHost,
+  value?: string | string[],
+): string | string[] | null {
   if (value !== undefined) {
     setPrimaryKeyAttr.call(this, value);
     return value;
