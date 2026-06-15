@@ -5419,7 +5419,9 @@ export function splitPgDefault(raw: string | null): { literal: unknown; fn: stri
   if (castNum) return { literal: castNum[1], fn: null };
   // Bare numeric / boolean / NULL literal.
   if (/^-?\d+(?:\.\d+)?$/.test(raw)) return { literal: raw, fn: null };
-  if (raw === "true" || raw === "false") return { literal: raw === "true", fn: null };
+  // Rails' extract_value_from_default keeps the raw "true"/"false" string;
+  // deserialization to a JS boolean happens later in Attribute.from_database.
+  if (raw === "true" || raw === "false") return { literal: raw, fn: null };
   if (raw === "NULL") return { literal: null, fn: null };
   // Everything else: only treat as a SQL function expression if it matches
   // Rails' has_default_function? regex — a function call, a parenthesized
