@@ -5,7 +5,7 @@
  * polymorphic, dependent, counterCache, touch, CollectionProxy, reflection,
  * strict loading, inverse_of, and scoped associations.
  */
-import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import {
   loadHabtm,
   Base,
@@ -23,6 +23,13 @@ import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import type { Author as AuthorT } from "./test-helpers/models/author.js";
+import type { Firm as FirmT } from "./test-helpers/models/company.js";
+import type { Tag as TagT } from "./test-helpers/models/tag.js";
+import type { Tagging as TaggingT } from "./test-helpers/models/tagging.js";
+import type { Developer as DeveloperT } from "./test-helpers/models/developer.js";
 import { seedAssociationCache } from "./test-helpers/seed-association-cache.js";
 import {
   Associations,
@@ -2106,10 +2113,6 @@ describe("AssociationsTest", () => {
         columns: { blog_id: "integer", blog_post_id: "integer", body: "string", id: "integer" },
         primaryKey: ["blog_id", "id"],
       },
-      ss_authors: { name: "string" },
-      ss_author_favorites: { author_id: "integer", favorite_author_id: "integer" },
-      awr_firms: { name: "string" },
-      awr_clients: { name: "string", awr_firm_id: "integer" },
     });
   });
 
@@ -2143,43 +2146,6 @@ describe("AssociationsTest", () => {
     // Count after eager loading should be the same
     const countAfter = (await ELChild.all().toArray()).length;
     expect(countAfter).toBe(countBefore);
-  });
-  it("subselect", async () => {
-    class SsAuthor extends Base {
-      static _tableName = "ss_authors";
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class SsAuthorFavorite extends Base {
-      static _tableName = "ss_author_favorites";
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("favorite_author_id", "integer");
-      }
-    }
-    registerModel("SsAuthor", SsAuthor);
-    registerModel("SsAuthorFavorite", SsAuthorFavorite);
-    Associations.hasMany.call(SsAuthor, "author_favorites", {
-      className: "SsAuthorFavorite",
-      foreignKey: "author_id",
-    });
-    Associations.belongsTo.call(SsAuthorFavorite, "author", {
-      className: "SsAuthor",
-      foreignKey: "author_id",
-    });
-
-    const author = await SsAuthor.create({ name: "David" });
-    await SsAuthorFavorite.create({ author_id: author.id, favorite_author_id: author.id });
-
-    const favs = await loadHasMany(author, "author_favorites", {
-      className: "SsAuthorFavorite",
-      foreignKey: "author_id",
-    });
-    const fav2 = await association(author, "author_favorites")
-      .where({ author: SsAuthor.where({ id: author.id }) })
-      .toArray();
-    expect(fav2.map((f: any) => f.id)).toEqual(favs.map((f: any) => f.id));
   });
   it("loading the association target should keep child records marked for destruction", async () => {
     class DPost extends Base {
@@ -2375,75 +2341,6 @@ describe("AssociationsTest", () => {
     // Re-query through proxy should find the new record
     const reloaded = await proxy.toArray();
     expect(reloaded.length).toBe(1);
-  });
-  it("using limitable reflections helper", () => {
-    class UlrTag extends Base {
-      static _tableName = "ulr_tags";
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ulrTaggings", { className: "UlrTagging", foreignKey: "ulr_tag_id" });
-      }
-    }
-    class UlrTagging extends Base {
-      static _tableName = "ulr_taggings";
-      static {
-        this.attribute("ulr_tag_id", "integer");
-        this.attribute("ulr_super_tag_id", "integer");
-        this.belongsTo("ulrTag", { className: "UlrTag", foreignKey: "ulr_tag_id" });
-        this.belongsTo("ulrSuperTag", { className: "UlrTag", foreignKey: "ulr_super_tag_id" });
-        this.hasMany("ulrThings", { className: "UlrThing", foreignKey: "ulr_tagging_id" });
-      }
-    }
-    class UlrThing extends Base {
-      static _tableName = "ulr_things";
-      static {
-        this.attribute("ulr_tagging_id", "integer");
-      }
-    }
-    registerModel("UlrTag", UlrTag);
-    registerModel("UlrTagging", UlrTagging);
-    registerModel("UlrThing", UlrThing);
-
-    const usingLimitableReflections = (reflections: any[]) =>
-      UlrTagging.all().usingLimitableReflections(reflections);
-    const belongsToReflections = [
-      reflectOnAssociation(UlrTagging, "ulrTag"),
-      reflectOnAssociation(UlrTagging, "ulrSuperTag"),
-    ];
-    const hasManyReflections = [
-      reflectOnAssociation(UlrTag, "ulrTaggings"),
-      reflectOnAssociation(UlrTagging, "ulrThings"),
-    ];
-    const mixedReflections = [...belongsToReflections, ...hasManyReflections];
-    expect(usingLimitableReflections(belongsToReflections)).toBe(true);
-    expect(usingLimitableReflections(hasManyReflections)).toBe(false);
-    expect(usingLimitableReflections(mixedReflections)).toBe(false);
-  });
-  it("association with references", async () => {
-    class AwrFirm extends Base {
-      static _tableName = "awr_firms";
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class AwrClient extends Base {
-      static _tableName = "awr_clients";
-      static {
-        this.attribute("name", "string");
-        this.attribute("awr_firm_id", "integer");
-      }
-    }
-    registerModel("AwrFirm", AwrFirm);
-    registerModel("AwrClient", AwrClient);
-    Associations.hasMany.call(AwrFirm, "association_with_references", {
-      className: "AwrClient",
-      foreignKey: "awr_firm_id",
-      scope: (rel: any) => rel.references("foo"),
-    });
-
-    const firm = await AwrFirm.create({ name: "37signals" });
-    const scope = association(firm, "association_with_references").scope();
-    expect((scope as any)._referencesValues).toEqual(["foo"]);
   });
   it("belongs to a model with composite foreign key finds associated record", async () => {
     class CpkOrder extends Base {
@@ -10239,6 +10136,95 @@ describe("CollectionProxyDelegation", () => {
     expect(reflectOnAllAssociations(BtPost).map((r) => r.name)).toContain("bt_blog");
     expect(reflectOnAllAssociations(BtAuthor).map((r) => r.name)).toContain("bt_post");
     expect(reflectOnAllAssociations(BtAuthor).map((r) => r.name)).toContain("bt_tags");
+  });
+});
+
+// ==========================================================================
+// AssociationsTest cases that rely on the canonical Rails fixtures
+// (associations_test.rb test_subselect, test_using_limitable_reflections_helper,
+// test_association_with_references). They live in their own describe so the
+// canonical Author / AuthorFavorite, Firm / Client, and Tag / Tagging /
+// Developer models can be imported and registered without clashing with the
+// bespoke Tag / Developer / Firm definitions the rest of this file relies on.
+// Canonical names are (re)registered in beforeEach so they win the global
+// registry right before each test. The canonical model modules are imported
+// dynamically in beforeAll — never at the top level — so their module-level
+// side effects (Company STI subtree registration, Developer type registration)
+// run during this block's execution rather than at collection time, where they
+// would perturb the bespoke describe blocks above. This block also sits before
+// `eagerLoadBang`, whose `vi.resetModules()` would otherwise hand the dynamic
+// imports a fresh, unwired module graph ("Relation not loaded").
+// ==========================================================================
+describe("AssociationsTest (canonical fixtures)", () => {
+  const { companies, authors, authorFavorites } = useHandlerFixtures(
+    ["companies", "authors", "authorFavorites"],
+    { schema: canonicalSchema },
+  );
+
+  let Author: typeof AuthorT;
+  let AuthorFavorite: typeof Base;
+  let Firm: typeof FirmT;
+  let Client: typeof Base;
+  let Tag: typeof TagT;
+  let Tagging: typeof TaggingT;
+  let Developer: typeof DeveloperT;
+  let Project: typeof Base;
+
+  beforeAll(async () => {
+    const authorMod = await import("./test-helpers/models/author.js");
+    Author = authorMod.Author as never;
+    AuthorFavorite = authorMod.AuthorFavorite as never;
+    const companyMod = await import("./test-helpers/models/company.js");
+    Firm = companyMod.Firm as never;
+    Client = companyMod.Client as never;
+    Tag = (await import("./test-helpers/models/tag.js")).Tag as never;
+    Tagging = (await import("./test-helpers/models/tagging.js")).Tagging as never;
+    Developer = (await import("./test-helpers/models/developer.js")).Developer as never;
+    Project = (await import("./test-helpers/models/project.js")).Project as never;
+  });
+
+  beforeEach(() => {
+    registerModel("Author", Author);
+    registerModel("AuthorFavorite", AuthorFavorite);
+    registerModel("Firm", Firm);
+    registerModel("Client", Client);
+    registerModel("Tag", Tag);
+    registerModel("Tagging", Tagging);
+    registerModel("Developer", Developer);
+    registerModel("Project", Project);
+  });
+
+  it("subselect", async () => {
+    void authorFavorites;
+    const author = authors("david");
+    const favs = await association(author, "authorFavorites").toArray();
+    const fav2 = await association(author, "authorFavorites")
+      .where({ author: Author.where({ id: author.id }) })
+      .toArray();
+    expect(fav2.map((f: any) => f.id)).toEqual(favs.map((f: any) => f.id));
+  });
+
+  it("using limitable reflections helper", () => {
+    const usingLimitableReflections = (reflections: any[]) =>
+      (Tagging.all() as any).usingLimitableReflections(reflections);
+    const belongsToReflections = [
+      reflectOnAssociation(Tagging, "tag"),
+      reflectOnAssociation(Tagging, "superTag"),
+    ];
+    const hasManyReflections = [
+      reflectOnAssociation(Tag, "taggings"),
+      reflectOnAssociation(Developer, "projects"),
+    ];
+    const mixedReflections = [...belongsToReflections, ...hasManyReflections];
+    expect(usingLimitableReflections(belongsToReflections)).toBe(true);
+    expect(usingLimitableReflections(hasManyReflections)).toBe(false);
+    expect(usingLimitableReflections(mixedReflections)).toBe(false);
+  });
+
+  it("association with references", async () => {
+    const firm = companies("first_firm");
+    const scope = association(firm, "associationWithReferences").scope();
+    expect((scope as any)._referencesValues).toEqual(["foo"]);
   });
 });
 
