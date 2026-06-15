@@ -34,7 +34,49 @@ class StubAdapter extends AbstractAdapter {
   }
 }
 
+/**
+ * Stub whose adapterName drives the dialect switch in tables()/views() and
+ * captures the SQL passed to execute(), so we can assert the postgres fallback
+ * arm matches Rails' data_source_sql shape (relkind IN ('r','p'), scoped via
+ * current_schemas(false)) rather than the pg_tables/'public' deviation.
+ */
+class CapturingAdapter extends AbstractAdapter {
+  lastSql = "";
+  constructor(private readonly dialect: "sqlite" | "postgres" | "mysql") {
+    super();
+  }
+  get adapterName() {
+    return this.dialect as any;
+  }
+  execute(sql: string) {
+    this.lastSql = sql;
+    return Promise.resolve([] as Record<string, unknown>[]);
+  }
+  executeMutation(_sql: string) {
+    return Promise.resolve(0);
+  }
+}
+
 describe("SchemaStatements mixed into AbstractAdapter", () => {
+  it("tables() postgres fallback includes partitioned tables and honors search_path", async () => {
+    const stub = new CapturingAdapter("postgres");
+    await stub.tables();
+    expect(stub.lastSql).toContain("FROM pg_class c");
+    expect(stub.lastSql).toContain("current_schemas(false)");
+    expect(stub.lastSql).toContain("c.relkind IN ('r', 'p')");
+    expect(stub.lastSql).not.toContain("pg_tables");
+    expect(stub.lastSql).not.toContain("'public'");
+  });
+
+  it("tables() sqlite/mysql fallback arms are unchanged", async () => {
+    const sqlite = new CapturingAdapter("sqlite");
+    await sqlite.tables();
+    expect(sqlite.lastSql).toContain("FROM sqlite_master");
+    const mysql = new CapturingAdapter("mysql");
+    await mysql.tables();
+    expect(mysql.lastSql).toContain("information_schema.tables");
+  });
+
   it("createTable is callable directly on the adapter", async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("things", (t) => {
