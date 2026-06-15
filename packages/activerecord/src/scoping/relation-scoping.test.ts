@@ -37,7 +37,7 @@ useHandlerTransactionalFixtures();
 // has-many forwarding cases, people/references for BadReference default scope).
 // The file's older bespoke tests ride prefixed throwaway tables (`rg_developers`,
 // `rg_posts`, `*_posts`) so seeded canonical rows never pollute their counts.
-const { developers, people } = useFixtures(
+const { developers, people, references } = useFixtures(
   ["developers", "projects", "developersProjects", "posts", "comments", "people", "references"],
   () => Base.connection as any,
   { schema: canonicalSchema },
@@ -546,18 +546,18 @@ describe("RelationScopingTest", () => {
   });
 
   it("circular joins with scoping does not crash", async () => {
-    const posts = await Post.joins({ comments: "post" }).scoping(async () =>
-      Post.joins({ comments: "post" }).limit(10).toArray(),
-    );
-    const expected = await Post.joins({ comments: "post" }).limit(10).toArray();
+    const posts = (await Post.joins({ comments: "post" }).scoping(async () =>
+      Post.first(10),
+    )) as Base[];
+    const expected = (await Post.joins({ comments: "post" }).first(10)) as Base[];
     expect(posts.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
 
   it("circular left joins with scoping does not crash", async () => {
-    const posts = await Post.leftJoins({ comments: "post" }).scoping(async () =>
-      Post.leftJoins({ comments: "post" }).limit(10).toArray(),
-    );
-    const expected = await Post.leftJoins({ comments: "post" }).limit(10).toArray();
+    const posts = (await Post.leftJoins({ comments: "post" }).scoping(async () =>
+      Post.first(10),
+    )) as Base[];
+    const expected = (await Post.leftJoins({ comments: "post" }).first(10)) as Base[];
     expect(posts.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
 
@@ -966,7 +966,7 @@ describe("Static shorthands (Rails-guided)", () => {
       const michael = (await Person.find(people("michael").id)) as Base;
       const refs = await (michael as any).fixedBadReferences.toArray();
       // references(:michael_unicyclist).becomes(BadReference) — favorite: true
-      expect(refs.map((r: any) => r.id)).toEqual([2]);
+      expect(refs.map((r: any) => r.id)).toEqual([references("michael_unicyclist").id]);
     });
 
     it("should maintain default scope on eager loaded associations", async () => {
