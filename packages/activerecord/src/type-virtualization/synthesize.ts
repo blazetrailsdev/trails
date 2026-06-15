@@ -211,7 +211,7 @@ function renderCall(info: ClassInfo, call: RuntimeCall): RenderedLine[] {
     case "enum":
       return renderEnum(info, call);
     case "defineEnum":
-      return renderDefineEnum(info, call);
+      return renderEnum(info, call);
   }
 }
 
@@ -257,41 +257,27 @@ function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
   ];
 }
 
-function renderEnum(info: ClassInfo, call: EnumCall): RenderedLine[] {
+// `enum` / `Base.enum` and the `defineEnum(...)` alias share one runtime path
+// (`_enum`), so both emit the same surface: predicate, persisting bang
+// (`updateBang` → `Promise<true>`), positive scope, and auto `not*` scope.
+// Rails generates no plain in-memory setter, so none is declared.
+function renderEnum(info: ClassInfo, call: EnumCall | DefineEnumCall): RenderedLine[] {
   const out: RenderedLine[] = [];
   const { prefix, suffix } = readPrefixSuffix(call.options, call.attr);
   for (const value of call.values) {
     const methodBase = `${prefix}${value}${suffix}`;
     const predicate = `is${pascal(methodBase)}`;
-    const bang = `${camelize(methodBase, false)}Bang`;
     const scopeName = camelize(methodBase, false);
+    const bang = `${scopeName}Bang`;
+    const notScope = `not${pascal(methodBase)}`;
     out.push(line(`declare ${predicate}: () => boolean;`, predicate, false));
-    out.push(line(`declare ${bang}: () => this;`, bang, false));
+    out.push(line(`declare ${bang}: () => Promise<true>;`, bang, false));
     out.push(
       line(
         `declare static ${scopeName}: () => ${AR_IMPORT}.Relation<${info.name}>;`,
         scopeName,
         true,
       ),
-    );
-  }
-  return out;
-}
-
-function renderDefineEnum(info: ClassInfo, call: DefineEnumCall): RenderedLine[] {
-  const out: RenderedLine[] = [];
-  const { prefix, suffix } = readPrefixSuffix(call.options, call.attr);
-  for (const value of call.values) {
-    const methodBase = `${prefix}${value}${suffix}`;
-    const predicate = `is${pascal(methodBase)}`;
-    const setter = camelize(methodBase, false);
-    const bang = `${setter}Bang`;
-    const notScope = `not${pascal(methodBase)}`;
-    out.push(line(`declare ${predicate}: () => boolean;`, predicate, false));
-    out.push(line(`declare ${setter}: () => void;`, setter, false));
-    out.push(line(`declare ${bang}: () => Promise<void>;`, bang, false));
-    out.push(
-      line(`declare static ${setter}: () => ${AR_IMPORT}.Relation<${info.name}>;`, setter, true),
     );
     out.push(
       line(

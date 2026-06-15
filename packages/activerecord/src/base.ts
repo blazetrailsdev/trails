@@ -1533,9 +1533,8 @@ export class Base extends Model {
   // Rails normalises these via AttributeMutationTracker#type_cast (which calls
   // type.cast on the attribute's EnumType); we mirror it here for both live
   // changes (attributeChanged) and persisted changes (savedChangeToAttribute).
-  // Handles both the `_enum` macro (label-stored via the registered EnumType,
-  // mapping in `_enums`) and `defineEnum` (integer-stored, mapping in the
-  // EnumType registry).
+  // All enums are label-stored via the registered EnumType with their mapping
+  // in the single `_enums` registry.
   override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     if (options) {
       const ctor = this.constructor as typeof Base;
@@ -3713,7 +3712,8 @@ export interface Base extends Included<typeof AutosaveAssociation> {
 
 // Normalise a single `from:` or `to:` option value through the enum mapping so
 // that label / symbol / integer forms all compare equal to the stored value.
-// Covers the `_enum` macro (ctor._enums) and `defineEnum` (EnumType registry).
+// All enums register their mapping in the single `_enums` registry (the former
+// `defineEnum` EnumType registry has been folded in).
 function _castEnumDirtyOpts(
   ctor: typeof Base,
   name: string,
@@ -3731,23 +3731,6 @@ function _castEnumDirtyOpts(
       if (found) return found[0];
       if (_isBlankValue(v)) return null;
       return v;
-    };
-    const result: { from?: unknown; to?: unknown } = {};
-    if ("from" in opts) result.from = cast(opts.from);
-    if ("to" in opts) result.to = cast(opts.to);
-    return result;
-  }
-  const enumDef = _EnumModule.getEnumDefinitions(ctor).get(name);
-  if (enumDef) {
-    // Mirror EnumType#cast order: mapping lookup first (has_key/has_value),
-    // then value.presence as the fallback for unrecognised values.
-    // EnumType.cast returns null for ALL unrecognised values (not just blank),
-    // so we apply isBlank only after cast returns null to distinguish blank
-    // (→ null) from nonblank unrecognised (→ preserve as-is).
-    const cast = (v: unknown): unknown => {
-      const casted = enumDef.type.cast(v);
-      if (casted != null) return casted;
-      return _isBlankValue(v) ? null : v;
     };
     const result: { from?: unknown; to?: unknown } = {};
     if ("from" in opts) result.from = cast(opts.from);

@@ -222,7 +222,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("works with activerecord enum", async () => {
       let model = await PostgresqlEnum.create();
       // Rails: model.current_mood_okay! — our _enum bang is in-memory; persist with save().
-      (model as any).current_mood_okayBang();
+      (model as any).currentMoodOkayBang();
       await model.save();
 
       model = (await PostgresqlEnum.find((model as any).id))!;
@@ -232,7 +232,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await model.save();
 
       model = (await PostgresqlEnum.find((model as any).id))!;
-      expect((model as any).isCurrent_mood_happy()).toBe(true);
+      expect((model as any).isCurrentMoodHappy()).toBe(true);
     });
 
     it("enum type scoped to schemas", async () => {

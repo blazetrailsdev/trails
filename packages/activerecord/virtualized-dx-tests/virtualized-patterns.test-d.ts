@@ -151,18 +151,19 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(Post.recent).toEqualTypeOf<(sinceDays: number) => Relation<Post>>();
   });
 
-  it("Base.enum produces predicates, bang setters, and class scopes", () => {
+  it("Base.enum produces predicates, persisting bangs, scopes, and not* scopes", () => {
     const t = new Task({ status: 0 });
     expectTypeOf(t.isLow()).toBeBoolean();
-    expectTypeOf(t.lowBang()).toMatchTypeOf<Task>();
+    expectTypeOf(t.lowBang).toEqualTypeOf<() => Promise<true>>();
     expectTypeOf(Task.low()).toMatchTypeOf<Relation<Task>>();
+    expectTypeOf(Task.notLow()).toMatchTypeOf<Relation<Task>>();
   });
 
-  it("defineEnum adds plain setters, async bangs, and not* scopes", async () => {
+  it("defineEnum (alias of _enum) produces predicates, persisting bangs, and not* scopes", () => {
     const a = new Article({ status: 0 });
-    expectTypeOf(a.draft).toEqualTypeOf<() => void>();
-    expectTypeOf(a.draftBang).toEqualTypeOf<() => Promise<void>>();
-    expectTypeOf(await a.draftBang()).toBeVoid();
+    expectTypeOf(a.isDraft()).toBeBoolean();
+    expectTypeOf(a.draftBang).toEqualTypeOf<() => Promise<true>>();
+    expectTypeOf(Article.draft()).toMatchTypeOf<Relation<Article>>();
     expectTypeOf(Article.notDraft()).toMatchTypeOf<Relation<Article>>();
   });
 

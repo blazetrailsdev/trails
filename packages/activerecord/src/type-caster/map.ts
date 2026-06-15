@@ -1,5 +1,5 @@
 import { Type, ValueType } from "@blazetrails/activemodel";
-import { getEnumDefinitions } from "../enum.js";
+import { enumTypeFor } from "../enum.js";
 
 /**
  * Casts attribute values for database operations using the model's
@@ -29,8 +29,8 @@ export class Map {
     // (used by the predicate builder) stays the raw subtype, so
     // `whereValuesHash` / `scopeForCreate` round-trip the raw value our
     // accessors expect.
-    const enumType = getEnumDefinitions(this._klass).get(attrName)?.type;
-    if (enumType) return enumType.serialize(value);
+    const enumMapping = this._klass._enums?.get(attrName);
+    if (enumMapping) return enumTypeFor(attrName, enumMapping).serialize(value);
     const type = this.typeForAttribute(attrName);
     return type.serialize(value);
   }
