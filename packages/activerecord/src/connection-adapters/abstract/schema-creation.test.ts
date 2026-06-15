@@ -12,3 +12,17 @@ describe("SchemaCreation#typeToSql blank type guard", () => {
     );
   });
 });
+
+describe("SchemaCreation#typeToSql decimal precision/scale", () => {
+  it("raises when a decimal scale is given without a precision", () => {
+    expect(() => new SchemaCreation("sqlite").typeToSql("decimal", { scale: 2 })).toThrow(
+      "Error adding decimal column: precision cannot be empty if scale is specified",
+    );
+  });
+
+  it("honors precision and scale when both are given", () => {
+    expect(new SchemaCreation("sqlite").typeToSql("decimal", { precision: 8, scale: 2 })).toBe(
+      "DECIMAL(8, 2)",
+    );
+  });
+});

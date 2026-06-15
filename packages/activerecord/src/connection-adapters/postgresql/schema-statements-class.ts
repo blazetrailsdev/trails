@@ -707,7 +707,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
           if (precision != null) {
             sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
           } else if (scale != null) {
-            throw new Error(
+            throw new ArgumentError(
               "Error adding decimal column: precision cannot be empty if scale is specified",
             );
           }
