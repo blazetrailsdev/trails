@@ -10,6 +10,7 @@ import {
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
+import { TypeMap } from "../type/type-map.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { splitQuotedIdentifier, Utils } from "./postgresql/utils.js";
 import {
@@ -665,9 +666,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Seeds a HashLookupTypeMap with the ~30 known PG types by typname.
    * Exposed as a static so tests and external callers can build their
    * own type_map without instantiating the adapter.
+   *
+   * Param is typed as the base `TypeMap` to keep the static override sound
+   * (a narrower `HashLookupTypeMap` param would be a contravariant violation);
+   * runtime callers always pass a HashLookupTypeMap, which the PG seeder needs.
    */
-  static initializeTypeMap(m: HashLookupTypeMap): void {
-    staticInitializeTypeMap(m);
+  static initializeTypeMap(m: TypeMap): void {
+    staticInitializeTypeMap(m as unknown as HashLookupTypeMap);
   }
 
   /**
@@ -3561,9 +3566,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return this.pgSchemaStatements().viewExists(name);
   }
 
-  // PG addIndex returns the generated SQL string for test/inspection purposes;
-  // Rails add_index returns void. Harmonize in a follow-up.
-  // @ts-expect-error TS2416 — return type is Promise<string> not Promise<void>
   async addIndex(
     tableName: string,
     columns: string | string[],
@@ -3580,7 +3582,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       include?: string[];
       comment?: string;
     } = {},
-  ): Promise<string> {
+  ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
     const quotedTable = this.quoteTableName(tableName);
 
@@ -3642,8 +3644,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         : this.quoteIdentifier(indexName);
       await this.exec(`COMMENT ON INDEX ${qualifiedIndex} IS ${this.quote(options.comment)}`);
     }
-
-    return sql;
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#remove_index

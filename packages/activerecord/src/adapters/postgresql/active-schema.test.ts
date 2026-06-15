@@ -61,23 +61,25 @@ describeIfPg("PostgreSQLAdapter", () => {
         "CREATE TABLE people (id serial primary key, last_name varchar, first_name varchar, state varchar)",
       );
 
-      const sql1 = await adapter.addIndex("people", ["last_name"], {
+      await adapter.addIndex("people", ["last_name"], {
         unique: true,
         where: "state = 'active'",
         name: "index_people_on_last_name",
       });
-      expect(sql1).toBe(
-        `CREATE UNIQUE INDEX "index_people_on_last_name" ON "people" ("last_name") WHERE state = 'active'`,
-      );
+      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
+      {
+        const [idx] = await adapter.indexes("people");
+        expect(idx.unique).toBe(true);
+        expect(idx.columns).toEqual(["last_name"]);
+        expect(idx.where).toContain("state");
+      }
       await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
 
-      const sql2 = await adapter.addIndex("people", ["last_name"], {
+      await adapter.addIndex("people", ["last_name"], {
         algorithm: "concurrently",
         name: "index_people_on_last_name",
       });
-      expect(sql2).toBe(
-        `CREATE INDEX CONCURRENTLY "index_people_on_last_name" ON "people" ("last_name")`,
-      );
+      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
       await adapter.exec("DROP INDEX CONCURRENTLY IF EXISTS index_people_on_last_name");
 
       await expect(
@@ -98,23 +100,34 @@ describeIfPg("PostgreSQLAdapter", () => {
         "CREATE TABLE people (id serial primary key, last_name varchar, active boolean)",
       );
 
-      const sql = await adapter.addIndex("people", ["last_name"], {
+      // A bare column name in `:where` is quoted as an identifier by
+      // addIndexOptions (Rails' add_index_options) — assert via that
+      // SQL-builder seam since addIndex itself now returns void.
+      {
+        const [idx] = await adapter.addIndexOptions("people", ["last_name"], {
+          where: "active",
+        });
+        expect(idx.where).toBe(`"active"`);
+      }
+      await adapter.addIndex("people", ["last_name"], {
         where: "active",
         name: "index_people_on_last_name",
       });
-      expect(sql).toBe(
-        `CREATE INDEX "index_people_on_last_name" ON "people" ("last_name") WHERE "active"`,
-      );
+      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
       await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
 
       // A non-column where expression is left verbatim.
-      const sql2 = await adapter.addIndex("people", ["last_name"], {
+      {
+        const [idx] = await adapter.addIndexOptions("people", ["last_name"], {
+          where: "active IS TRUE",
+        });
+        expect(idx.where).toBe("active IS TRUE");
+      }
+      await adapter.addIndex("people", ["last_name"], {
         where: "active IS TRUE",
         name: "index_people_on_last_name",
       });
-      expect(sql2).toBe(
-        `CREATE INDEX "index_people_on_last_name" ON "people" ("last_name") WHERE active IS TRUE`,
-      );
+      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
       await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
 
       await adapter.exec("DROP TABLE IF EXISTS people");
