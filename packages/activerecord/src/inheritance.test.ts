@@ -1515,6 +1515,17 @@ describe("InheritanceComputeTypeTest", () => {
     const c = await Car.create({ name: "subcar" });
     expect(c.type).toBe("Car");
   });
+});
+
+describe("inheritance_column = nil disables STI", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    // Rebuild the canonical "posts" table (title+body+type) with dropExisting —
+    // riding the shared posts table otherwise risks the documented shared-DB
+    // shape-drift flake (posts+body vs title-only schemas) under parallel forks.
+    await defineSchema({ posts: canonicalSchema.posts }, { dropExisting: true });
+  });
 
   it("inheritance_column = nil disables STI dispatch on new and find", async () => {
     // Mirrors Rails' PostWithErrorDestroying (table "posts", a real `type`
