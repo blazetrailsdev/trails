@@ -108,12 +108,12 @@ async function setupSchemas(adapter: PostgreSQLAdapter) {
 }
 
 async function teardownSchemas(adapter: PostgreSQLAdapter) {
-  await adapter.dropSchema(SCHEMA2_NAME, { ifExists: true, cascade: true });
-  await adapter.dropSchema(SCHEMA_NAME, { ifExists: true, cascade: true });
-  await adapter.dropSchema("test_schema3", { ifExists: true, cascade: true });
-  await adapter.dropSchema("some_schema", { ifExists: true, cascade: true });
-  await adapter.dropSchema("my_other_schema", { ifExists: true, cascade: true });
-  await adapter.dropSchema("music", { ifExists: true, cascade: true });
+  await adapter.dropSchema(SCHEMA2_NAME, { ifExists: true });
+  await adapter.dropSchema(SCHEMA_NAME, { ifExists: true });
+  await adapter.dropSchema("test_schema3", { ifExists: true });
+  await adapter.dropSchema("some_schema", { ifExists: true });
+  await adapter.dropSchema("my_other_schema", { ifExists: true });
+  await adapter.dropSchema("music", { ifExists: true });
 }
 
 setupHandlerSuite();
@@ -645,12 +645,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("SchemaForeignKeyTest", () => {
     beforeEach(async () => {
-      await adapter.dropSchema("my_schema", { ifExists: true, cascade: true });
+      await adapter.dropSchema("my_schema", { ifExists: true });
       await adapter.createSchema("my_schema");
     });
     afterEach(async () => {
-      await adapter.dropSchema("my_other_schema", { ifExists: true, cascade: true });
-      await adapter.dropSchema("my_schema", { ifExists: true, cascade: true });
+      await adapter.dropSchema("my_other_schema", { ifExists: true });
+      await adapter.dropSchema("my_schema", { ifExists: true });
     });
 
     it("dump foreign key targeting different schema", async () => {
@@ -680,7 +680,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("create foreign key different schemas", async () => {
-      await adapter.dropSchema("my_other_schema", { ifExists: true, cascade: true });
+      await adapter.dropSchema("my_other_schema", { ifExists: true });
       await adapter.createSchema("my_other_schema");
       await adapter.exec(`CREATE TABLE my_schema.trains (id serial primary key)`);
       await adapter.exec(
@@ -784,7 +784,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     const DOMAIN_SCHEMA = "schema_1";
 
     beforeEach(async () => {
-      await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true, cascade: true });
+      await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true });
       await adapter.createSchema(DOMAIN_SCHEMA);
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.text AS text`);
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.varchar AS varchar`);
@@ -803,7 +803,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     afterEach(async () => {
       await adapter.exec(`DROP TABLE IF EXISTS defaults`);
-      await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true, cascade: true });
+      await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true });
     });
 
     it("text defaults in new schema when overriding domain", async () => {
@@ -865,11 +865,11 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("SchemaWithDotsTest", () => {
     beforeEach(async () => {
-      await adapter.dropSchema("my.schema", { ifExists: true, cascade: true });
+      await adapter.dropSchema("my.schema", { ifExists: true });
       await adapter.createSchema("my.schema");
     });
     afterEach(async () => {
-      await adapter.dropSchema("my.schema", { ifExists: true, cascade: true });
+      await adapter.dropSchema("my.schema", { ifExists: true });
     });
 
     it("rename_table", async () => {

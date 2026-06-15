@@ -50,6 +50,8 @@ interface PgSchemaAdapter {
   nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
   createTableDefinition(name: string, options?: Record<string, unknown>): AbstractTableDefinition;
   createAlterTable(name: string): AlterTable;
+  // Connection-scoped memo backing Rails' @schema_search_path.
+  schemaSearchPathMemo: string | null;
 }
 
 export class PostgreSQLSchemaStatements extends SchemaStatements {
@@ -361,13 +363,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     await this.pg.exec(`CREATE SCHEMA${ifNotExists} ${this.quoteSchemaName(name)}`);
   }
 
-  async dropSchema(
-    name: string,
-    options: { ifExists?: boolean; cascade?: boolean } = {},
-  ): Promise<void> {
+  async dropSchema(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
+    // Rails' drop_schema unconditionally appends CASCADE — it is not gated on
+    // an option (PostgreSQL::SchemaStatements#drop_schema).
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.cascade ? " CASCADE" : "";
-    await this.pg.exec(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(name)}${cascade}`);
+    await this.pg.exec(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(name)} CASCADE`);
   }
 
   async schemaExists(name: string): Promise<boolean> {
@@ -458,17 +458,24 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
 
   async schemaSearchPath(): Promise<string> {
-    const rows = await this.pg.schemaQuery("SHOW search_path");
-    return rows[0].search_path as string;
+    // Rails memoizes: @schema_search_path ||= query_value("SHOW search_path").
+    // The memo lives on the adapter (connection-scoped), since this statements
+    // object is reconstructed per call.
+    if (this.pg.schemaSearchPathMemo == null) {
+      const rows = await this.pg.schemaQuery("SHOW search_path");
+      this.pg.schemaSearchPathMemo = rows[0].search_path as string;
+    }
+    return this.pg.schemaSearchPathMemo;
   }
 
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
     if (searchPath == null) return;
     // Mirrors Rails' schema_search_path= which uses direct interpolation:
-    //   execute("SET search_path TO #{schema_csv}")
+    //   execute("SET search_path TO #{schema_csv}"); @schema_search_path = schema_csv
     // This means unquoted $user causes a PG parse error (dollar-quoted string),
     // matching Rails' behavior. Use '$user' (with single quotes) for the special token.
     await this.pg.execute(`SET search_path TO ${searchPath}`);
+    this.pg.schemaSearchPathMemo = searchPath;
   }
 
   async clientMinMessages(): Promise<string> {
