@@ -2685,50 +2685,24 @@ export async function setHasMany(
   record: Base,
   assocName: string,
   targets: Base[],
-  options: AssociationOptions = {},
+  _options: AssociationOptions = {},
 ): Promise<void> {
-  const ctor = record.constructor as typeof Base;
-  const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const pkValue = record._readAttribute(primaryKey as string);
-
-  // Polymorphic "as" option
-  const asName = options.as;
-  const foreignKey = asName
-    ? (options.foreignKey ?? `${underscore(asName)}_id`)
-    : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
-  const typeCol = asName ? `${underscore(asName)}_type` : null;
-
-  // Nullify old targets
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveModel(className);
-  const findConditions: Record<string, unknown> = { [foreignKey as string]: pkValue };
-  if (typeCol) findConditions[typeCol] = ctor.name;
-  const existing = await targetModel.where(findConditions).toArray();
-  for (const old of existing) {
-    if (!targets.includes(old)) {
-      old._writeAttribute(foreignKey as string, null);
-      if (typeCol) old._writeAttribute(typeCol, null);
-      await old.save();
-    }
-  }
-
-  // Set FK on new targets
-  for (const t of targets) {
-    t._writeAttribute(foreignKey as string, pkValue);
-    if (typeCol) t._writeAttribute(typeCol, ctor.name);
-    if (t.isPersisted()) await t.save();
-
-    // Set inverse
-    if (typeof options.inverseOf === "string") {
-      _wireInverseAssociation(record, t, options.inverseOf);
-    }
-  }
-
-  // Cache the collection on its proxy (the canonical has_many target store).
-  const proxy = association(record, assocName) as unknown as {
-    _hydrateFromPreload(records: Base[]): void;
+  // Mirror Rails' CollectionAssociation#replace (FK-diff true replace): the
+  // association object diffs `targets` against the currently-associated rows
+  // and only deletes (FK-nullifies) the removed records and concats (FK-sets +
+  // saves) the genuinely-new ones, leaving unchanged members untouched. This
+  // replaces the previous "nullify all not-included, then re-write+save every
+  // target" pass, which re-persisted records that were already associated and
+  // diffed against a fresh DB query rather than the loaded target. Reflection
+  // options (foreign key, polymorphic `as`, inverse_of) drive the FK/type
+  // writes through `setOwnerAttributes`/`setInverseInstance`, so the per-call
+  // `_options` overrides are no longer threaded in.
+  const assoc = record.association(assocName) as unknown as {
+    replace(records: Base[]): void;
+    persistReplace(): Promise<void>;
   };
-  proxy._hydrateFromPreload(targets);
+  assoc.replace(targets);
+  await assoc.persistReplace();
 }
 
 export async function touchBelongsToParents(record: Base): Promise<void> {
