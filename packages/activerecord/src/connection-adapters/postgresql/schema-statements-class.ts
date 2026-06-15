@@ -1,6 +1,10 @@
-import { ArgumentError } from "@blazetrails/activemodel";
+import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
+import { Nodes, Visitors } from "@blazetrails/arel";
 import { SchemaStatements } from "../abstract/schema-statements.js";
+import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
+import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
+import { splitPgDefault } from "../postgresql-adapter.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 
 /**
@@ -18,6 +22,21 @@ interface PgSchemaAdapter {
   getDatabaseVersion(): Promise<number>;
   supportsIndexInclude(): boolean;
   pgQuotedScope(name: string, type: "BASE TABLE" | null): { schema: string; name: string | null };
+  readonly typeMap: HashLookupTypeMap;
+  readonly visitor: Visitors.ToSql;
+  loadAdditionalTypes(oids?: number[]): Promise<void>;
+  lookupCastTypeFromColumn(column: {
+    oid?: number | null;
+    fmod?: number | null;
+    sqlType?: string | null;
+    name?: string;
+  }): Type;
+  serialFromDefaultFunction(
+    tableName: string,
+    columnName: string,
+    defaultFunction: string | null,
+  ): boolean;
+  nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
 }
 
 export class PostgreSQLSchemaStatements extends SchemaStatements {
@@ -450,5 +469,239 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   private quoteSchemaName(name: string): string {
     return pgQuoteColumnName(name);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Columns / types
+  // ---------------------------------------------------------------------------
+
+  override async columns(tableName: string): Promise<Column[]> {
+    const { schema, table } = this.pg.parseSchemaQualifiedName(tableName);
+
+    let tableCondition: string;
+    const binds: unknown[] = [];
+
+    if (schema) {
+      binds.push(table, schema);
+      tableCondition = `t.relname = $1 AND n.nspname = $2`;
+    } else {
+      binds.push(tableName);
+      tableCondition = `t.oid = to_regclass($1)`;
+    }
+
+    const rows = await this.pg.schemaQuery(
+      `SELECT a.attname AS name,
+              pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
+              pg_get_expr(d.adbin, d.adrelid) AS "default",
+              a.attnotnull AS notnull,
+              (i.indisprimary IS TRUE) AS is_primary,
+              a.atttypid AS oid,
+              a.atttypmod AS fmod,
+              a.attidentity AS identity,
+              a.attgenerated AS attgenerated,
+              col.collname AS collation,
+              pgd.description AS col_comment
+       FROM pg_attribute a
+       JOIN pg_class t ON t.oid = a.attrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+       LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+       LEFT JOIN pg_index i
+         ON i.indrelid = a.attrelid
+        AND i.indisprimary
+        AND a.attnum = ANY(i.indkey)
+       LEFT JOIN pg_type pt ON a.atttypid = pt.oid
+       LEFT JOIN pg_collation col ON a.attcollation = col.oid AND a.attcollation <> pt.typcollation
+       LEFT JOIN pg_description pgd
+         ON pgd.objoid = a.attrelid
+        AND pgd.classoid = 'pg_class'::regclass
+        AND pgd.objsubid = a.attnum
+       WHERE ${tableCondition}
+         AND a.attnum > 0
+         AND NOT a.attisdropped
+       ORDER BY a.attnum`,
+      binds,
+    );
+
+    // Mirrors Rails' load_additional_types batch call: gather all OIDs not
+    // yet in the map and load them in a single pg_type query before building
+    // Column objects. This avoids N concurrent queries for wide tables.
+    const missingOids = [
+      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !this.pg.typeMap.has(oid))),
+    ];
+    if (missingOids.length > 0) {
+      await this.pg.loadAdditionalTypes(missingOids);
+      // Mirrors Rails' get_oid_type fallback: register any OIDs still absent
+      // after the pg_type query so repeated columns() calls don't re-query.
+      for (const oid of missingOids) {
+        if (!this.pg.typeMap.has(oid)) {
+          console.warn(`unknown OID ${oid}: unrecognized column type, treating as generic value.`);
+          this.pg.typeMap.registerType(oid, new ValueType());
+        }
+      }
+    }
+
+    return rows.map((r) => {
+      const sqlType = r.type as string;
+      const oid = Number(r.oid);
+      const fmod = Number(r.fmod);
+      // All OIDs are now registered (or warned as unknown) by the batch
+      // load above. lookupCastTypeFromColumn mirrors Rails' fetch_type_metadata
+      // after get_oid_type has pre-populated the map.
+      const castType = this.pg.lookupCastTypeFromColumn({ oid, fmod, sqlType });
+      const rawDefault = (r.default as string | null) ?? null;
+      const identity = (r.identity as string | null) || null;
+      const attgenerated = (r.attgenerated as string | null) || null;
+      // Mirrors Rails new_column_from_field: generated columns store the
+      // generation expression as defaultFunction; regular columns split into
+      // literal default vs. default function (nextval, CURRENT_TIMESTAMP, etc.).
+      const splitDefault = attgenerated ? null : splitPgDefault(rawDefault);
+      const defaultFunction = attgenerated ? rawDefault : (splitDefault?.fn ?? null);
+      const rawLiteral = attgenerated ? null : (splitDefault?.literal ?? null);
+      const literal = rawLiteral !== null ? castType.deserialize(rawLiteral) : null;
+      const isSerial = this.pg.serialFromDefaultFunction(
+        tableName,
+        r.name as string,
+        defaultFunction,
+      );
+
+      return new Column(
+        r.name as string,
+        literal,
+        {
+          sqlType,
+          type: castType.type(),
+          oid,
+          fmod,
+          limit: castType.limit ?? null,
+          precision: castType.precision ?? null,
+          scale: castType.scale ?? null,
+        },
+        !(r.notnull as boolean),
+        {
+          defaultFunction: defaultFunction ?? undefined,
+          primaryKey: r.is_primary as boolean,
+          serial: isSerial,
+          array: sqlType.endsWith("[]"),
+          identity,
+          generated: attgenerated,
+          collation: (r.collation as string | null) ?? undefined,
+          comment: (r.col_comment as string | null) ?? null,
+        },
+      );
+    });
+  }
+
+  async columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]> {
+    if (columnNumbers.length === 0) return [];
+    if (!Number.isSafeInteger(tableOid)) throw new TypeError("tableOid must be a safe integer");
+    const safeNums = columnNumbers.map((n) => {
+      if (!Number.isSafeInteger(n))
+        throw new TypeError("columnNumbers must contain only safe integers");
+      return n;
+    });
+    const rows = await this.pg.schemaQuery(
+      `SELECT a.attnum, a.attname FROM pg_attribute a WHERE a.attrelid = ${tableOid} AND a.attnum IN (${safeNums.join(", ")})`,
+    );
+    const map = Object.fromEntries(rows.map((r) => [Number(r.attnum), r.attname as string]));
+    return safeNums.map((n) => map[n]).filter(Boolean);
+  }
+
+  override columnsForDistinct(
+    columns: string | string[],
+    orders?: (string | Nodes.Node)[],
+  ): string {
+    const base = Array.isArray(columns) ? columns.join(", ") : columns;
+    const visitor = this.pg.visitor;
+    // Mirrors Rails two-pass compact_blank: filter blanks before AND after stripping
+    // so an order that becomes empty after stripping (e.g. bare "DESC") doesn't
+    // consume an alias index slot and shift subsequent aliases.
+    const orderColumns = (orders ?? [])
+      .map((o) => (typeof o === "string" ? o : visitor.compile(o as Nodes.Node)))
+      .filter((o) => o.trim().length > 0)
+      .map((o) =>
+        o
+          .replace(/\s+(?:ASC|DESC)\b/gi, "")
+          .replace(/\s+NULLS\s+(?:FIRST|LAST)\b/gi, "")
+          .trim(),
+      )
+      .filter((col) => col.length > 0)
+      .map((col, i) => `${col} AS alias_${i}`);
+    if (orderColumns.length === 0) return base;
+    return [...orderColumns, base].join(", ");
+  }
+
+  override typeToSql(
+    type: string,
+    options: {
+      limit?: number;
+      precision?: number;
+      scale?: number;
+      array?: boolean;
+      enumType?: string;
+    } = {},
+  ): string {
+    const { limit, array, enumType } = options;
+    let sql: string;
+    switch (type) {
+      case "binary":
+        if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
+          throw new Error(
+            `No binary type has byte size ${limit}. The limit on binary can be at most 1GB - 1 byte.`,
+          );
+        }
+        sql = "bytea";
+        break;
+      case "text":
+        if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
+          throw new Error(
+            `No text type has byte size ${limit}. The limit on text can be at most 1GB - 1 byte.`,
+          );
+        }
+        sql = "text";
+        break;
+      case "integer":
+        if (limit === 1 || limit === 2) sql = "smallint";
+        else if (limit == null || (limit >= 3 && limit <= 4)) sql = "integer";
+        else if (limit >= 5 && limit <= 8) sql = "bigint";
+        else
+          throw new Error(
+            `No integer type has byte size ${limit}. Use a numeric with scale 0 instead.`,
+          );
+        break;
+      case "enum":
+        if (!enumType) throw new Error("enumType is required for enums");
+        sql = enumType;
+        break;
+      default: {
+        const { precision, scale } = options;
+        const native = this.pg.nativeDatabaseTypes()[type];
+        const baseName = native
+          ? typeof native === "string"
+            ? native
+            : (native.name ?? type)
+          : type;
+        sql = baseName;
+        if (type === "decimal") {
+          if (precision != null) {
+            sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
+          } else if (scale != null) {
+            throw new Error(
+              "Error adding decimal column: precision cannot be empty if scale is specified",
+            );
+          }
+        } else if (["datetime", "timestamp", "time", "interval"].includes(type)) {
+          if (precision != null) {
+            if (precision < 0 || precision > 6)
+              throw new ArgumentError(
+                `No ${baseName} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
+              );
+            sql += `(${precision})`;
+          }
+        } else if (type !== "primary_key" && limit != null) {
+          sql += `(${limit})`;
+        }
+      }
+    }
+    return array && type !== "primary_key" ? `${sql}[]` : sql;
   }
 }
