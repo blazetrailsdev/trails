@@ -346,6 +346,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
   private _minMessages = "warning";
+  // Memoized search path, backing Rails' @schema_search_path. Populated lazily
+  // by schemaSearchPath() and updated by setSchemaSearchPath().
+  private _schemaSearchPathMemo: string | null = null;
   private _warnedOids = new Set<number>();
   private _caseInsensitiveCache: Map<string, boolean> = new Map([["citext", false]]);
   private _sessionVariables: Record<string, string | number | boolean | null | "default"> = {};
@@ -2850,10 +2853,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.pgSchemaStatements().createSchema(name, options);
   }
 
-  async dropSchema(
-    name: string,
-    options: { ifExists?: boolean; cascade?: boolean } = {},
-  ): Promise<void> {
+  async dropSchema(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
     await this.pgSchemaStatements().dropSchema(name, options);
   }
 

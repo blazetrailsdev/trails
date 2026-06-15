@@ -66,3 +66,78 @@ describe("PostgreSQLSchemaStatements#dropTable", () => {
     ).rejects.toBeInstanceOf(ArgumentError);
   });
 });
+
+function makeSchemaAdapter() {
+  const execed: string[] = [];
+  const adapter = {
+    adapterName: "postgres" as const,
+    _schemaSearchPathMemo: null as string | null,
+    exec: vi.fn(async (sql: string) => {
+      execed.push(sql);
+    }),
+    execute: vi.fn(async (sql: string) => {
+      execed.push(sql);
+    }),
+    schemaQuery: vi.fn(async () => [{ search_path: '"$user", public' }]),
+  } as unknown as DatabaseAdapter;
+  return { adapter, execed };
+}
+
+describe("PostgreSQLSchemaStatements#dropSchema", () => {
+  it("always appends CASCADE", async () => {
+    const { adapter, execed } = makeSchemaAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    await ss.dropSchema("things");
+    expect(execed).toEqual([`DROP SCHEMA "things" CASCADE`]);
+  });
+
+  it("appends IF EXISTS before CASCADE when ifExists: true", async () => {
+    const { adapter, execed } = makeSchemaAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    await ss.dropSchema("things", { ifExists: true });
+    expect(execed).toEqual([`DROP SCHEMA IF EXISTS "things" CASCADE`]);
+  });
+});
+
+describe("PostgreSQLSchemaStatements#schemaSearchPath", () => {
+  it("memoizes the search path and only queries once", async () => {
+    const { adapter } = makeSchemaAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    expect(await ss.schemaSearchPath()).toBe('"$user", public');
+    expect(await ss.schemaSearchPath()).toBe('"$user", public');
+    expect(
+      (adapter as unknown as { schemaQuery: ReturnType<typeof vi.fn> }).schemaQuery,
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it("setSchemaSearchPath updates the memo without re-querying", async () => {
+    const { adapter, execed } = makeSchemaAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    await ss.setSchemaSearchPath("my_schema, public");
+    expect(execed).toEqual([`SET search_path TO my_schema, public`]);
+    expect(await ss.schemaSearchPath()).toBe("my_schema, public");
+    expect(
+      (adapter as unknown as { schemaQuery: ReturnType<typeof vi.fn> }).schemaQuery,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("setSchemaSearchPath with null is a no-op", async () => {
+    const { adapter, execed } = makeSchemaAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    await ss.setSchemaSearchPath(null);
+    expect(execed).toEqual([]);
+    expect(
+      (adapter as unknown as { _schemaSearchPathMemo: string | null })._schemaSearchPathMemo,
+    ).toBeNull();
+  });
+
+  it("setSchemaSearchPath with empty string is a no-op", async () => {
+    const { adapter, execed } = makeSchemaAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    await ss.setSchemaSearchPath("");
+    expect(execed).toEqual([]);
+    expect(
+      (adapter as unknown as { _schemaSearchPathMemo: string | null })._schemaSearchPathMemo,
+    ).toBeNull();
+  });
+});

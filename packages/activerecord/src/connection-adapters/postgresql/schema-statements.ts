@@ -44,7 +44,7 @@ export interface SchemaStatements {
   dropDatabase(name: string): Promise<void>;
   recreateDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
   createSchema(name: string, options?: { force?: boolean; ifNotExists?: boolean }): Promise<void>;
-  dropSchema(name: string, options?: { ifExists?: boolean; cascade?: boolean }): Promise<void>;
+  dropSchema(name: string, options?: { ifExists?: boolean }): Promise<void>;
   schemaExists(name: string): Promise<boolean>;
   schemaNames(): Promise<string[]>;
   currentSchema(): Promise<string>;

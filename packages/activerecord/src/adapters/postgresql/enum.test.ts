@@ -37,7 +37,7 @@ async function withTestSchema(
   try {
     await fn();
   } finally {
-    if (drop) await adapter.dropSchema(name, { cascade: true });
+    if (drop) await adapter.dropSchema(name, {});
     await adapter.setSchemaSearchPath(oldSearchPath);
     adapter.schemaCache.clear();
   }
@@ -296,7 +296,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(output).not.toContain("other_schema.mood_in_other_schema");
         });
       } finally {
-        await adapter.dropSchema("other_schema", { cascade: true });
+        await adapter.dropSchema("other_schema", {});
       }
     });
 
@@ -309,7 +309,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             await Schema.define(adapter, async (schema) => {
               await schema.createEnum("mood_in_test_schema", ["sad", "ok", "happy"]);
               await schema.createEnum("public.mood", ["sad", "ok", "happy"]);
-              // Torn down by `dropSchema("test_schema", { cascade: true })` in the
+              // Torn down by `dropSchema("test_schema", {})` in the
               // outer finally — the table lives in the non-default schema.
               // eslint-disable-next-line blazetrails/require-table-teardown
               await schema.createTable(
@@ -337,7 +337,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(col).toBeDefined();
         expect(col!.sqlType).toBe("test_schema.mood_in_test_schema");
       } finally {
-        await adapter.dropSchema("test_schema", { cascade: true });
+        await adapter.dropSchema("test_schema", {});
       }
     });
   });
