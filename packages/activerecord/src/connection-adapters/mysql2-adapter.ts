@@ -31,6 +31,10 @@ import { Result } from "../result.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
+import {
+  castResult as mysql2CastResult,
+  type Mysql2RawResult,
+} from "./mysql2/database-statements.js";
 import { typeCastedBinds, transactionIsolationLevels } from "./abstract/database-statements.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
@@ -915,11 +919,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
   // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
   // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  // Returns the raw {rows, fields, affectedRows} so internalExecQuery's `castResult`
+  // (and execUpdate/execDelete's affectedRows) can build a Result — the Rails-faithful
+  // query_value/update path. Transaction-control callers ignore the return.
   override async internalExecute(
     sql: string,
     name: string = "SQL",
     { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
-  ): Promise<unknown> {
+  ): Promise<Mysql2RawResult> {
     sql = this.preprocessQuery(sql);
     if (materializeTransactions) {
       this._syncDatabaseTimezone();
@@ -939,8 +946,32 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const conn = await this.getConn();
-        await conn.query(driverSql);
-        return 0;
+        const [rawResult, rawFields] = await conn.query(driverSql);
+        // Unwrap nested result sets from CALL (see execQuery for the full comment).
+        let result = rawResult as mysql.RowDataPacket[] | mysql.ResultSetHeader;
+        let fields = rawFields as mysql.FieldPacket[] | undefined;
+        if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
+          result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
+          fields = rawFields[0] as mysql.FieldPacket[];
+        } else if (
+          Array.isArray(rawFields) &&
+          rawFields[0] === undefined &&
+          Array.isArray(rawResult)
+        ) {
+          result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
+        }
+        if (Array.isArray(result)) {
+          const rows = result as Record<string, unknown>[];
+          payload.row_count = rows.length;
+          return {
+            rows,
+            fields: (fields ?? []) as Array<{ name: string }>,
+            affectedRows: rows.length,
+          };
+        }
+        const affected = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+        payload.row_count = affected;
+        return { rows: null, fields: [], affectedRows: affected };
       } catch (e: any) {
         const translated = await this._translateAndEnrich(e, driverSql, []);
         payload.exception = translated;
@@ -1780,4 +1811,10 @@ function initializeTypeMap(m: any): never {
 // overridden `execQuery`), so dirtying it clears the query cache on writes and
 // schema changes — the trails analogue of Rails' `dirties_query_cache base,
 // :execute` for the write side.
+// Mirrors: Mysql2::DatabaseStatements#cast_result — builds an ActiveRecord::Result
+// from the raw {rows, fields} internalExecute returns, replacing the abstract
+// throwing stub so internalExecQuery/query_value work on MySQL.
+(Mysql2Adapter.prototype as unknown as { castResult: typeof mysql2CastResult }).castResult =
+  mysql2CastResult;
+
 dirtiesQueryCache(Mysql2Adapter, "executeMutation");
