@@ -906,7 +906,8 @@ describe("DefaultScopingTest", () => {
     await SubConditionalStiPost.create({ body: "" });
     await SubConditionalStiPost.create({ title: "Hello world", body: "" });
     expect(await ConditionalStiPost.count()).toBe(2);
-    expect(await ConditionalStiPost.unscope({ where: "title" }).count()).toBe(3);
+    expect((await ConditionalStiPost.all().toArray()).length).toBe(2);
+    expect((await ConditionalStiPost.unscope({ where: "title" }).toArray()).length).toBe(3);
   });
 
   it("default scope include with count", async () => {
