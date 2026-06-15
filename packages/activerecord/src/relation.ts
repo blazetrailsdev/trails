@@ -479,6 +479,10 @@ export class Relation<T extends Base> {
   // build_join_dependencies so every node in the chain carries its base_klass
   // and shares Rails' AliasTracker self-join aliasing.
   private _namedInnerJoins: AssociationSpec[] = [];
+  // Pre-built InnerJoin JoinDependencies from a cross-klass `merge` (Rails
+  // merge_joins builds these against `other.klass` since the association names
+  // can't resolve on the receiver's model).
+  private _namedInnerJoinDeps: JoinDependency[] = [];
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
@@ -726,7 +730,11 @@ export class Relation<T extends Base> {
    *
    * @internal
    */
-  private _namedInnerJoinClauses(): Array<{ table: string; on: string | Nodes.Node; assoc: string }> {
+  private _namedInnerJoinClauses(): Array<{
+    table: string;
+    on: string | Nodes.Node;
+    assoc: string;
+  }> {
     const out: Array<{ table: string; on: string | Nodes.Node; assoc: string }> = [];
     for (const v of this._namedInnerJoins) {
       if (typeof v !== "string") continue;
@@ -3034,7 +3042,8 @@ export class Relation<T extends Base> {
       manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
       this._leftOuterJoinsValues.length > 0 ||
-      this._namedInnerJoins.length > 0;
+      this._namedInnerJoins.length > 0 ||
+      this._namedInnerJoinDeps.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
     for (const v of this._joinValues) {
@@ -3087,6 +3096,11 @@ export class Relation<T extends Base> {
         this._namedInnerJoins,
         Nodes.InnerJoin,
       );
+      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+    }
+    // Cross-klass merged JoinDependencies (Rails merge_joins): already built
+    // against the source relation's klass, so emit their constraints directly.
+    for (const jd of this._namedInnerJoinDeps) {
       for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
     }
     for (const node of joinNodes) manager.appendJoinNode(node);
@@ -5706,6 +5720,7 @@ export class Relation<T extends Base> {
     this._joinValues = [...source._joinValues];
     this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
     this._namedInnerJoins = [...source._namedInnerJoins];
+    this._namedInnerJoinDeps = [...source._namedInnerJoinDeps];
     this._includesAssociations = [...source._includesAssociations];
     this._preloadAssociations = [...source._preloadAssociations];
     this._eagerLoadAssociations = [...source._eagerLoadAssociations];

@@ -7588,4 +7588,22 @@ describe("CalculationsTest", () => {
     expect(await CanonicalAccount.joins("firm").count("companies.id")).toBe(5);
     expect(await CanonicalAccount.joins("firm").distinct().count("companies.id")).toBe(4);
   });
+
+  // A plain `joins(:assoc)` now feeds buildJoinDependencies (via _namedInnerJoins),
+  // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type
+  // through the join-dependency walk — no `_joinClauses`-klass fallback. Replaces
+  // the unit tests that asserted the (removed) `_joinClauses.klass` recovery.
+  it("resolves joined column cast type through the join-dependency walk", () => {
+    const rel = CalcAuthor.joins("topics");
+    // `written_on` is a datetime attribute that lives only on the joined Topic;
+    // it resolves to Topic's Time cast type via the join-dependency walk (the
+    // base CalcAuthor has no such attribute).
+    const castType = lookupCastTypeFromJoinDependencies(rel as any, "written_on") as {
+      constructor: { name: string };
+    } | null;
+    expect(castType).toBeTruthy();
+    // The joined Topic's concrete datetime type (e.g. SQLiteDateTimeType), not
+    // the default ValueType the base CalcAuthor returns for unknown columns.
+    expect(castType?.constructor.name).not.toBe("ValueType");
+  });
 });

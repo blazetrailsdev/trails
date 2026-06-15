@@ -151,6 +151,10 @@ interface QueryMethodsHost {
   _joinValues: (string | Nodes.Join)[];
   _leftOuterJoinsValues: AssociationSpec[];
   _namedInnerJoins: AssociationSpec[];
+  // Pre-built InnerJoin JoinDependencies from a cross-klass merge (Rails
+  // merge_joins builds these against `other.klass`); emitted via joinConstraints
+  // and walked for klass lookups alongside _namedInnerJoins.
+  _namedInnerJoinDeps: JoinDependency[];
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
   _eagerLoadAssociations: AssociationSpec[];
@@ -1477,7 +1481,8 @@ function addTreeToJoinDependency(
   }
 }
 
-function constructJoinDependency(
+/** @internal */
+export function constructJoinDependency(
   this: QueryMethodsHost,
   associations: string | AssociationSpec[],
   joinType?: unknown,
@@ -2370,6 +2375,9 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
   const named = selectNamedJoins.call(this, joinNames, stashedJoins);
   const jd = constructJoinDependency.call(this, named as AssociationSpec[], null);
   stashedJoins.unshift(jd);
+  // Cross-klass merged dependencies carry their own nodes (built on the source
+  // relation's klass); include them so table-klass / cast-type lookups see them.
+  if (this._namedInnerJoinDeps.length > 0) stashedJoins.push(...this._namedInnerJoinDeps);
   return stashedJoins;
 }
 
@@ -2548,7 +2556,8 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   const hasEagerAssocs =
     this._eagerLoadAssociations.length > 0 ||
     this._leftOuterJoinsValues.length > 0 ||
-    this._namedInnerJoins.length > 0;
+    this._namedInnerJoins.length > 0 ||
+    this._namedInnerJoinDeps.length > 0;
   if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;
 
   const buckets = buildJoinBuckets.call(this);
@@ -2594,6 +2603,12 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // (mirrors Rails joins_values → named_join with InnerJoin).
   if (this._namedInnerJoins.length > 0) {
     const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
+    for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
+  }
+
+  // Cross-klass merged JoinDependencies (Rails merge_joins): already built
+  // against the source relation's klass, so emit their constraints directly.
+  for (const jd of this._namedInnerJoinDeps) {
     for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
   }
 

@@ -1,5 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
 
+import { constructJoinDependency } from "./query-methods.js";
+
 /**
  * Merges two Relations together, combining their conditions,
  * joins, and other clauses.
@@ -79,24 +81,26 @@ export class Merger {
     for (const v of this.other._leftOuterJoinsValues ?? []) {
       if (!rel._leftOuterJoinsValues.includes(v)) rel._leftOuterJoinsValues.push(v);
     }
-    // Rails merge_joins: when other.klass == relation.klass the association names
-    // union directly into joins_values; otherwise they resolve against other.klass
-    // (Merger builds a JoinDependency there). Same-klass names fold into
-    // _namedInnerJoins (resolved via buildJoinDependencies on the receiver);
-    // cross-klass names are resolved against the source relation into pre-built
-    // SQL join clauses, since they cannot be looked up on the receiver's model.
+    // Rails merge_joins (merger.rb): when other.klass == relation.klass the
+    // association names union directly into joins_values; otherwise Merger builds
+    // a single InnerJoin JoinDependency against other.klass and stashes it. We
+    // mirror both: same-klass names fold into _namedInnerJoins (resolved on the
+    // receiver); cross-klass names (Hash | Symbol/String | Array — every shape
+    // Rails treats as an association) build a JoinDependency on `other` whose
+    // AliasTracker handles nested-through / HABTM correctly.
     const sameKlass = this.other._modelClass === rel._modelClass;
-    for (const v of this.other._namedInnerJoins ?? []) {
-      if (sameKlass) {
+    const otherNamed: unknown[] = this.other._namedInnerJoins ?? [];
+    if (sameKlass) {
+      for (const v of otherNamed) {
         if (!rel._namedInnerJoins.includes(v)) rel._namedInnerJoins.push(v);
-      } else if (typeof v === "string") {
-        const resolved = this.other._resolveAssociationJoin(v);
-        for (const j of resolved ? (Array.isArray(resolved) ? resolved : [resolved]) : []) {
-          rel._joinClauses.push({ type: "inner", table: j.table, on: j.on, quoted: true });
-        }
       }
+    } else if (otherNamed.length > 0) {
+      rel._namedInnerJoinDeps.push(
+        constructJoinDependency.call(this.other, otherNamed as any, Nodes.InnerJoin),
+      );
     }
-    void Nodes.InnerJoin;
+    // Carry forward any cross-klass dependencies the source already accumulated.
+    rel._namedInnerJoinDeps.push(...(this.other._namedInnerJoinDeps ?? []));
   }
 
   private mergeOuterJoins(_rel: any): void {
