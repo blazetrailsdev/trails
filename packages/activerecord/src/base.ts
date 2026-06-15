@@ -851,12 +851,9 @@ export class Base extends Model {
   }
 
   static get primaryKey(): string | string[] {
-    // getPrimaryKeyAttr honestly returns null for a key-less data source (a
-    // view), mirroring Rails' dynamically-nil `primary_key`. The public getter
-    // deliberately narrows to the non-null contract: every model you can
-    // persist or query has a primary key, so hot paths reading `primaryKey`
-    // are not forced to null-guard. Views surface the runtime null through this
-    // accepted, single-point narrowing (see getPrimaryKeyAttr).
+    // Single-point narrowing of getPrimaryKeyAttr's honest nullable result to
+    // the non-null contract every persistable model satisfies — see that
+    // accessor for why. A view still returns null at runtime.
     return _getPrimaryKeyAttr.call(this) as string | string[];
   }
 
