@@ -8,7 +8,7 @@
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
 
-import { Visitors, Nodes } from "@blazetrails/arel";
+import { Nodes } from "@blazetrails/arel";
 
 export class WhereClause {
   private _predicates: Nodes.Node[];
@@ -102,23 +102,16 @@ export class WhereClause {
     return wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
   }
 
-  toSql(): string {
+  // Renders the predicates as inlined SQL for human-readable `Relation#inspect`.
+  // Rails has no `WhereClause#to_sql`; inlined where-SQL is produced via the
+  // connection (`conn.to_sql(arel)` under `unprepared_statement`), so route
+  // through the connection's visitor here rather than re-quoting bind values
+  // with a bespoke renderer.
+  toSql(connection: { toSql(arel: unknown): string }): string {
     const wrapped = predicatesWithWrappedSqlLiterals(this.predicates);
     if (wrapped.length === 0) return "";
     const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
-    const [sql, rawBinds] = visitor.compileWithBinds(node);
-    if (rawBinds.length === 0) return sql;
-    // Substitute bind values inline for human-readable inspect output.
-    // Handles both ? (SQLite/MySQL) and $N (PostgreSQL) placeholders.
-    return Visitors.substituteBoundValues(sql, (_placeholder, i) => {
-      let val: unknown = rawBinds[i];
-      if (val !== null && typeof val === "object" && "valueForDatabase" in val) {
-        val = (val as { valueForDatabase: unknown }).valueForDatabase;
-      }
-      if (val === null || val === undefined) return "NULL";
-      if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
-      return String(val);
-    });
+    return connection.toSql(node);
   }
 
   isContradiction(): boolean {
@@ -341,5 +334,3 @@ function isEqualityNode(node: Nodes.Node): boolean {
   if (typeof (node as any).isEquality === "function") return (node as any).isEquality();
   return false;
 }
-
-const visitor = new Visitors.ToSql();

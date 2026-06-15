@@ -1198,7 +1198,7 @@ export class Relation<T extends Base> {
     const parts: string[] = [];
     parts.push(`${this._modelClass.name}.all`);
     if (!this._whereClause.isEmpty()) {
-      const sql = this._whereClause.toSql();
+      const sql = this._whereClause.toSql((this._modelClass as any).connection);
       if (sql) parts.push(`.where(${JSON.stringify(sql)})`);
     }
     if (this._orderClauses.length > 0) {
