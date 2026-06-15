@@ -70,6 +70,16 @@ export function acceptsNestedAttributesFor(
     throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
   }
 
+  // Rails sets `reflection.autosave = true` for every nested-attributes
+  // association (nested_attributes.rb:359), so the parent's save cascades into
+  // the in-memory target. trails checks `options.autosave` dynamically at save
+  // time, so flipping the flag on the association definition is sufficient — and
+  // is what makes the synchronous in-memory target population in
+  // `assignNestedAttributesForCollectionAssociation` reachable for plain
+  // `acceptsNestedAttributesFor(Model, "assoc")` callers, not only those who
+  // also pass `{ autosave: true }` to `hasMany`.
+  assocExists.options = { ...assocExists.options, autosave: true };
+
   // Rails does NOT reject polymorphic belongs_to at declaration time — the
   // check is deferred to build time (the writer raises when it tries to build
   // a new record and finds no `build_#{association_name}` method). See
@@ -614,19 +624,139 @@ export function assignNestedAttributesForCollectionAssociation(
   // Rails-style immediate in-memory build: new records (no `id`) are built on
   // the association at assign time so the collection is readable right after
   // assignment (`part.trinkets[0].name`); autosave persists them on save.
-  // Records with an `id` are existing-record updates/destroys whose loader is
-  // async, so they stay in the pending map for the post-save flush.
+  //
+  // Existing records (with an `id`): when the association is autosave-backed
+  // (which all `accepts_nested_attributes_for` collections are in Rails), the
+  // in-memory `@target` is populated synchronously — find the record in the
+  // loaded target or instantiate a persisted stub by id, add it to the target,
+  // and assign the nested attributes in place. Autosave then persists it (and
+  // any grandchildren) on save, mirroring Rails'
+  // `assign_nested_attributes_for_collection_association`. This also makes the
+  // record readable right after assignment and lets a grandchild save reuse the
+  // in-memory record without a DB reload.
+  //
+  // For non-autosave associations there is no autosave cascade to persist the
+  // change, so existing records stay in the pending map for the trails-specific
+  // post-save flush (`processNestedAttributes`).
+  const associations: any[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a: any) => a.name === associationName);
+  const isAutosave = assocDef?.options?.autosave === true;
+
   const deferred: Record<string, unknown>[] = [];
   for (const a of attrs) {
-    if (hasNestedId(a)) {
+    if (!hasNestedId(a)) {
+      if (!isRejectNewRecord(record, associationName, a)) {
+        collectionProxyFor(record, associationName).build(assignableNestedAttributes(a));
+      }
+    } else if (isAutosave) {
+      populateInMemoryExistingRecord(record, associationName, a);
+    } else {
       deferred.push(a);
-    } else if (!isRejectNewRecord(record, associationName, a)) {
-      collectionProxyFor(record, associationName).build(assignableNestedAttributes(a));
     }
   }
   if (deferred.length > 0) {
     storePendingNestedAttributes(record, associationName, deferred);
   }
+}
+
+/**
+ * Populate the in-memory collection target with an existing (id-bearing) nested
+ * record so autosave persists it — and any grandchildren — on save without a DB
+ * reload. Mirrors the `existing_record` branch of Rails'
+ * `assign_nested_attributes_for_collection_association` (nested_attributes.rb:
+ * 527-540): locate the record in the target, add it if absent, then
+ * `assign_to_or_mark_for_destruction`. Reject-if and allow-destroy semantics
+ * match Rails' existing-record path (`call_reject_if`, not `reject_new_record?`).
+ *
+ * Rails' `existing_records` set is the loaded target when loaded, else a
+ * `scope.where(primary_key => attribute_ids)` SELECT (nested_attributes.rb:
+ * 510-516); an id found in neither raises `raise_nested_attributes_record_not_found!`
+ * (nested_attributes.rb:542). trails honors that exactly when the association is
+ * loaded — `existing_records` is the target, so a missing id raises here. When
+ * the association is NOT loaded, trails has no synchronous DB read to materialize
+ * Rails' `scope.where(...)` SELECT, so it instantiates a persisted stub keyed by
+ * the id instead. Two consequences of that sync-writer constraint, both
+ * deviations from Rails:
+ *   1. A non-existent id is not rejected at assign time (Rails would raise); the
+ *      stub's autosave UPDATE simply matches zero rows.
+ *   2. The stub carries only the primary key plus the foreign key back to the
+ *      owner (so the child's `belongs_to` — and any `touch: true` on it —
+ *      resolves the owner like the DB-loaded record would). Other persisted
+ *      column values Rails' SELECT would load are absent — fine for the assigned
+ *      attributes, but an autosave callback reading some other column sees a
+ *      default, not the DB value.
+ * @internal
+ */
+function populateInMemoryExistingRecord(
+  record: Base,
+  associationName: string,
+  attrs: Record<string, unknown>,
+): void {
+  const ctor = record.constructor as typeof Base;
+  const associations: any[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a: any) => a.name === associationName);
+  const targetModel = resolveCollectionTargetModel(record, associationName);
+  if (!targetModel || !assocDef) return;
+
+  // Rails' ordering (nested_attributes.rb:527→543→528): find the record in
+  // `existing_records` first — raise RecordNotFound if absent — and only then
+  // consult `call_reject_if`. A non-existent id therefore raises even when the
+  // attributes would otherwise satisfy `reject_if`.
+  const proxy = collectionProxyFor(record, associationName);
+  const id = (attrs as any).id;
+  let existing = findRecordById(targetModel, proxy.target as Base[], id);
+  let isNewStub = false;
+  if (!existing) {
+    if (proxy.loaded) {
+      // Loaded association: the target IS Rails' authoritative `existing_records`
+      // set, so an id absent from it is a not-found (nested_attributes.rb:542).
+      raiseNestedAttributesRecordNotFoundBang(record, associationName, id);
+    }
+    const pk = (targetModel as any).primaryKey;
+    const pkCol = Array.isArray(pk) ? pk[0] : (pk ?? "id");
+    // Seed the foreign key (and polymorphic type) back to the owner so the
+    // stub's `belongs_to` resolves — mirrors the FK seeding in
+    // `CollectionProxy#_buildRaw`. Instantiated as part of the persisted
+    // baseline (not assigned), so it is not dirtied and never enters the
+    // child's UPDATE; it only lets owner-touch / inverse reads find the owner.
+    const row: Record<string, unknown> = { [pkCol]: id, ...stubOwnerForeignKey(record, assocDef) };
+    existing = (targetModel as any)._instantiate(row);
+    isNewStub = true;
+  }
+
+  // Rails adds the record to the target and assigns inside the
+  // `unless call_reject_if(...)` block (nested_attributes.rb:528-539), so a
+  // rejected existing record never enters `@target`. Defer the stub's
+  // `add_to_target` until after the reject check to avoid leaving a partial
+  // (PK-only) stub in the in-memory collection.
+  if (callRejectIf(record, associationName, attrs)) return;
+  if (isNewStub) (proxy as any).addExistingRecord(existing);
+  assignToOrMarkForDestruction(existing!, attrs, isAllowDestroy(record, associationName));
+}
+
+/**
+ * Foreign-key (and polymorphic type) attributes pointing a freshly-instantiated
+ * collection stub back at its owner, mirroring the FK seeding in
+ * `CollectionProxy#_buildRaw`. Only meaningful for direct (non-through)
+ * has_many: a has_many :through / HABTM keeps the FK on the join row, not on the
+ * target, so seeding a `${owner}_id` column there would be wrong (and may not
+ * exist) — return nothing in that case.
+ * @internal
+ */
+function stubOwnerForeignKey(record: Base, assocDef: any): Record<string, unknown> {
+  if (assocDef.options?.through || assocDef.type === "hasAndBelongsToMany") return {};
+  const ctor = record.constructor as typeof Base;
+  const asName: string | undefined = assocDef.options?.as;
+  const foreignKey: string =
+    assocDef.options?.foreignKey ??
+    (asName ? `${underscore(asName)}_id` : `${underscore(ctor.name)}_id`);
+  const parentPk = assocDef.options?.primaryKey ?? (ctor as any).primaryKey;
+  const parentPkCol = Array.isArray(parentPk) ? parentPk[0] : parentPk;
+  const out: Record<string, unknown> = {
+    [foreignKey]: (record as any)._readAttribute(parentPkCol),
+  };
+  if (asName) out[`${underscore(asName)}_type`] = ctor.name;
+  return out;
 }
 
 /**
