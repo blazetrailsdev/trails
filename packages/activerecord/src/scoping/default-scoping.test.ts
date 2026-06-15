@@ -60,6 +60,10 @@ import { Lion } from "../test-helpers/models/cat.js";
 // (Developer's `projects` HABTM is dereferenced in the eager_load/preload ports).
 registerModel(Developer);
 registerModel(Project);
+registerModel(Comment);
+registerModel(CommentWithDefaultScopeReferencesAssociation);
+registerModel(Post);
+registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
 
 const names = (rows: any[]) => rows.map((r) => r.name);
 const salaries = (rows: any[]) => rows.map((r) => r.salary);
@@ -71,9 +75,9 @@ const capSql = (fn: () => unknown) =>
 
 describe("DefaultScopingTest", () => {
   // Only `developers` is seeded: every active test reads developers fixtures (or
-  // builds SQL without hitting the DB). The `posts`/`comments`-backed cases are
-  // all `it.skip`, so seeding those shared tables here would only risk the known
-  // parallel-fork `posts` collision without exercising anything.
+  // builds SQL without hitting the DB). The `posts`/`comments`-backed
+  // "references works ..." cases create their own rows, so seeding those shared
+  // tables here would only risk the known parallel-fork `posts` collision.
   const { developers } = useHandlerFixtures(["developers"], {
     schema: canonicalSchema,
   });
@@ -883,46 +887,39 @@ describe("DefaultScopingTest", () => {
     expect(await DeveloperWithIncludes.where({ auditLogs: { message: "foo" } }).count()).toBe(1);
   });
 
-  // `references`/`includes` through a collection association is unimplemented.
-  it.skip("default scope with references works through collection association", async () => {
+  it("default scope with references works through collection association", async () => {
     const post = (await PostWithCommentWithDefaultScopeReferencesAssociation.create({
       title: "Hello World",
       body: "Here we go.",
     })) as any;
-    const comment = await (
-      await post.commentWithDefaultScopeReferencesAssociations
-    ).create({
+    const comment = await post.commentWithDefaultScopeReferencesAssociations.create({
       body: "Great post.",
       developer_id: 1,
     });
-    const first = (await (await post.commentWithDefaultScopeReferencesAssociations).toArray())[0];
+    const first = (await post.commentWithDefaultScopeReferencesAssociations.toArray())[0];
     expect((first as any).id).toBe((comment as any).id);
   });
 
-  // `references`/`includes` through a singular association is unimplemented.
-  it.skip("default scope with references works through association", async () => {
+  // `post.first_comment` lazy-loads the singular association; the trails idiom
+  // for a lazy has_one load is the async `loadHasOne` accessor.
+  it("default scope with references works through association", async () => {
     const post = (await PostWithCommentWithDefaultScopeReferencesAssociation.create({
       title: "Hello World",
       body: "Here we go.",
     })) as any;
-    const comment = await (
-      await post.commentWithDefaultScopeReferencesAssociations
-    ).create({
+    const comment = await post.commentWithDefaultScopeReferencesAssociations.create({
       body: "Great post.",
       developer_id: 1,
     });
-    expect((await post.firstComment).id).toBe((comment as any).id);
+    expect((await post.loadHasOne("firstComment")).id).toBe((comment as any).id);
   });
 
-  // `references` default scope with `find_by` is unimplemented.
-  it.skip("default scope with references works with find by", async () => {
+  it("default scope with references works with find by", async () => {
     const post = (await PostWithCommentWithDefaultScopeReferencesAssociation.create({
       title: "Hello World",
       body: "Here we go.",
     })) as any;
-    const comment = await (
-      await post.commentWithDefaultScopeReferencesAssociations
-    ).create({
+    const comment = await post.commentWithDefaultScopeReferencesAssociations.create({
       body: "Great post.",
       developer_id: 1,
     });

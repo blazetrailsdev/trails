@@ -2423,11 +2423,22 @@ export async function updateCounterCaches(
     }
     const targetModel = resolveAssocClass(record, assoc.name, className);
 
-    // Counter column name
+    // Counter column name. Mirrors Rails' BelongsToAssociation#update_counters,
+    // which reads the column off the belongs_to reflection's
+    // `counter_cache_column` — derived from the class that *declared* the
+    // belongs_to (`active_record.name`), not the record's runtime class. For an
+    // STI subtype (e.g. a `CommentWithDefaultScopeReferencesAssociation` whose
+    // `belongs_to :post, counter_cache: true` is inherited from `Comment`) this
+    // yields `comments_count`, not a subclass-name-derived column.
+    const reflection = ctor._reflectOnAssociation?.(assoc.name) as
+      | { counterCacheColumn?: () => string | null }
+      | null
+      | undefined;
     const counterCol =
-      typeof assoc.options.counterCache === "string"
+      reflection?.counterCacheColumn?.() ??
+      (typeof assoc.options.counterCache === "string"
         ? assoc.options.counterCache
-        : `${pluralize(underscore(ctor.name))}_count`;
+        : `${pluralize(underscore(ctor.name))}_count`);
 
     // Mirrors Rails' BelongsToAssociation#update_counters: if the target owner
     // is already loaded in memory (wired via inverse-of from a collection proxy
