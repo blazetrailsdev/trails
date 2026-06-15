@@ -8,7 +8,14 @@
  *   custom types and rejects them with a clear error (per PR 6).
  */
 
-import { sql as arelSql, Nodes, Visitors, Table, InsertManager } from "@blazetrails/arel";
+import {
+  sql as arelSql,
+  Nodes,
+  Visitors,
+  Collectors,
+  Table,
+  InsertManager,
+} from "@blazetrails/arel";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Notifications, BigDecimal } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -152,23 +159,21 @@ export class DatabaseStatementsBase {
 
 /**
  * Compile an Arel node to a SQL string with its bind values inlined via the
- * host's quoter. Raw Arel `ToSql#compile` now emits `?` for BindParams (Rails
- * parity); any path that produces a standalone SQL string with no companion
- * bind array (display SQL, statement-cache fallbacks) must substitute them
- * here, the same way `Relation#toSql` does, or an unbound `?` leaks into
- * executable SQL.
+ * connection's own `quote`. Mirrors Rails' `to_sql` under
+ * `unprepared_statement`, which compiles through a `SubstituteBinds` collector
+ * (`abstract_adapter.rb#collector` when `!prepared_statements`):
+ * `SubstituteBinds#add_bind` quotes each value during traversal via the
+ * connection, so there is never a finished placeholder string to regex over.
+ * Any path that produces a standalone SQL string with no companion bind array
+ * (display SQL, statement-cache fallbacks) inlines this way, or an unbound `?`
+ * would leak into executable SQL.
  */
 function compileInlined(visitor: Visitors.ToSql, node: Nodes.Node, host: unknown): string {
-  const [sql, binds] = visitor.compileWithBinds(node);
-  if (binds.length === 0) return sql;
-  const quote = (host as any)?.quote?.bind(host) as ((v: unknown) => string) | undefined;
-  let i = 0;
-  return sql.replace(/\?|\$\d+/g, (match) => {
-    const raw = binds[i++];
-    if (raw === undefined) return match;
-    const val = raw instanceof ModelAttribute ? raw.valueForDatabase : raw;
-    return quote ? quote(val) : String(val);
-  });
+  const collector = new Collectors.SubstituteBinds(
+    host as { quote(value: unknown): string },
+    new Collectors.SQLString(),
+  );
+  return visitor.compile(node, collector);
 }
 
 /**

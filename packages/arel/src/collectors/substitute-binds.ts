@@ -6,13 +6,12 @@ function extractValue(bind: unknown): unknown {
   // `compileWithBinds` unwraps it). When inlining, unwrap to the value so it
   // can be quoted directly — matching Rails' `add_bind(o.value)`.
   if (bind instanceof BindParam) return extractValue(bind.value);
-  if (
-    bind &&
-    typeof bind === "object" &&
-    "valueForDatabase" in bind &&
-    typeof (bind as Record<string, unknown>).valueForDatabase === "function"
-  ) {
-    return (bind as { valueForDatabase(): unknown }).valueForDatabase();
+  if (bind && typeof bind === "object" && "valueForDatabase" in bind) {
+    // `valueForDatabase` is a method on a raw Arel attribute but a getter on
+    // ActiveModel::Attribute (`get valueForDatabase()`); read the property and
+    // only invoke it when it resolves to a function so both shapes unwrap.
+    const v = (bind as Record<string, unknown>).valueForDatabase;
+    return typeof v === "function" ? (v as () => unknown).call(bind) : v;
   }
   return bind;
 }
