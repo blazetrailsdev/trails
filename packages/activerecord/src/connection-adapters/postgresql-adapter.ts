@@ -2040,7 +2040,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.execute("SET standard_conforming_strings = on");
   }
 
-  // Mirrors: PostgreSQLAdapter#enum_types (postgresql_adapter.rb:518)
   async enumTypes(): Promise<[string, string[]][]> {
     return this.pgSchemaStatements().enumTypes();
   }
