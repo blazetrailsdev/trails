@@ -4345,25 +4345,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    const scope = this.quotedScope(tableName);
-    const rows = await this.schemaQuery(
-      `SELECT conname, pg_get_constraintdef(c.oid, true) AS constraintdef, c.convalidated AS valid
-       FROM pg_constraint c
-       JOIN pg_class t ON c.conrelid = t.oid
-       JOIN pg_namespace n ON n.oid = c.connamespace
-       WHERE c.contype = 'c'
-         AND t.relname = ${scope.name!}
-         AND n.nspname = ${scope.schema}`,
-    );
-    return rows.map((row) => {
-      const expression = (row.constraintdef as string).match(/CHECK \((.+)\)/s)?.[1] ?? "";
-      return new CheckConstraintDefinition(
-        tableName,
-        expression,
-        row.conname as string,
-        row.valid as boolean,
-      );
-    });
+    return this.pgSchemaStatements().checkConstraints(tableName);
   }
 
   exclusionConstraintOptions(
@@ -4371,12 +4353,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     expression: string,
     options: Record<string, unknown>,
   ): Record<string, unknown> {
-    this.assertValidDeferrable(options.deferrable);
-    const opts = { ...options };
-    if (!opts.name) {
-      opts.name = this.exclusionConstraintName(tableName, { expression, ...opts });
-    }
-    return opts;
+    return this.pgSchemaStatements().exclusionConstraintOptions(tableName, expression, options);
   }
 
   async addExclusionConstraint(
@@ -4384,14 +4361,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     expression: string,
     options: ExclusionConstraintOptions = {},
   ): Promise<void> {
-    const opts = this.exclusionConstraintOptions(tableName, expression, options);
-    const name = this.quoteIdentifier(opts.name as string);
-    const using = opts.using ? ` USING ${opts.using}` : "";
-    const where = opts.where ? ` WHERE (${opts.where})` : "";
-    const deferParts = this.deferrable(opts.deferrable as "immediate" | "deferred" | undefined);
-    await this.exec(
-      `ALTER TABLE ${this.quoteTableName(tableName)} ADD CONSTRAINT ${name} EXCLUDE${using} (${expression})${where}${deferParts}`,
-    );
+    return this.pgSchemaStatements().addExclusionConstraint(tableName, expression, options);
   }
 
   async removeExclusionConstraint(
@@ -4399,22 +4369,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     expressionOrOptions?: string | Record<string, unknown> | null,
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    const expression =
-      typeof expressionOrOptions === "string" || expressionOrOptions == null
-        ? expressionOrOptions
-        : null;
-    const opts =
-      typeof expressionOrOptions === "object" && expressionOrOptions !== null
-        ? expressionOrOptions
-        : options;
-    if (!expression && !opts.name) {
-      throw new ArgumentError(
-        "Either expression or `name` option must be provided for removeExclusionConstraint.",
-      );
-    }
-    const excl = await this.exclusionConstraintForBang(tableName, expression ?? null, opts);
-    await this.exec(
-      `ALTER TABLE ${this.quoteTableName(tableName)} DROP CONSTRAINT ${this.quoteIdentifier(excl.name!)}`,
+    return this.pgSchemaStatements().removeExclusionConstraint(
+      tableName,
+      expressionOrOptions,
+      options,
     );
   }
 
@@ -4693,45 +4651,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]> {
-    const scope = this.quotedScope(tableName);
-    const rows = await this.schemaQuery(`
-      SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef, c.condeferrable, c.condeferred
-      FROM pg_constraint c
-      JOIN pg_class t ON c.conrelid = t.oid
-      JOIN pg_namespace n ON n.oid = c.connamespace
-      WHERE c.contype = 'x'
-        AND t.relname = ${scope.name}
-        AND n.nspname = ${scope.schema}
-    `);
-    return rows.map((row) => {
-      const r = row as Record<string, unknown>;
-      const constraintdef = r.constraintdef as string;
-      const whereIdx = constraintdef.search(/ WHERE /i);
-      let predicate: string | undefined;
-      let excludePart = constraintdef;
-      if (whereIdx !== -1) {
-        predicate = constraintdef.slice(whereIdx + 7);
-        excludePart = constraintdef.slice(0, whereIdx);
-        predicate = predicate.replace(/ DEFERRABLE(?: INITIALLY (?:IMMEDIATE|DEFERRED))?/i, "");
-        // strip outer parentheses added by pg_get_constraintdef
-        if (predicate.startsWith("((") && predicate.endsWith("))")) {
-          predicate = predicate.slice(1, -1);
-        }
-      }
-      const parts = excludePart.match(/EXCLUDE(?:\s+USING\s+(\S+))?\s+\((.+)\)/s);
-      const using = parts?.[1];
-      const expression = parts?.[2] ?? "";
-      const deferrable = this.extractConstraintDeferrable(
-        r.condeferrable as boolean,
-        r.condeferred as boolean,
-      );
-      return new ExclusionConstraintDefinition(tableName, expression, {
-        name: r.conname as string,
-        using: using as string | undefined,
-        where: predicate,
-        deferrable: deferrable || undefined,
-      });
-    });
+    return this.pgSchemaStatements().exclusionConstraints(tableName);
   }
 
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
@@ -4769,11 +4689,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /** @internal */
   exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
-    if (options.name) return options.name as string;
-    const expression = (options.expression as string | undefined) ?? "";
-    const identifier = `${tableName}_${expression}_excl`;
-    const hashed = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
-    return `excl_rails_${hashed}`;
+    return this.pgSchemaStatements().exclusionConstraintName(tableName, options);
   }
 
   /** @internal */
@@ -4781,20 +4697,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     tableName: string,
     options: Record<string, unknown> = {},
   ): Promise<ExclusionConstraintDefinition | undefined> {
-    const name = this.exclusionConstraintName(tableName, options);
-    const scope = this.quotedScope(tableName);
-    const rows = await this.schemaQuery(
-      `SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef FROM pg_constraint c
-       JOIN pg_class t ON c.conrelid = t.oid JOIN pg_namespace n ON n.oid = c.connamespace
-       WHERE c.contype = 'x' AND c.conname = $1 AND t.relname = ${scope.name} AND n.nspname = ${scope.schema}`,
-      [name],
-    );
-    if (rows.length === 0) return undefined;
-    const row = rows[0] as Record<string, string>;
-    // Split on WHERE first (Rails approach), then extract expression from EXCLUDE clause.
-    const [excludePart] = (row.constraintdef as string).split(/ WHERE /i);
-    const parts = excludePart.match(/EXCLUDE(?:\s+USING\s+\w+)?\s+\((.+)\)/s);
-    return new ExclusionConstraintDefinition(tableName, parts?.[1] ?? "", { name });
+    return this.pgSchemaStatements().exclusionConstraintFor(tableName, options);
   }
 
   /** @internal */
@@ -4803,15 +4706,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     expression?: string | null,
     options: Record<string, unknown> = {},
   ): Promise<ExclusionConstraintDefinition> {
-    const result = await this.exclusionConstraintFor(tableName, {
-      ...options,
-      expression: expression ?? undefined,
-    });
-    if (!result)
-      throw new ArgumentError(
-        `Table '${tableName}' has no exclusion constraint for ${expression ?? JSON.stringify(options)}`,
-      );
-    return result;
+    return this.pgSchemaStatements().exclusionConstraintForBang(tableName, expression, options);
   }
 
   /** @internal */
