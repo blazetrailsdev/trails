@@ -267,6 +267,7 @@ import {
 import {
   Default as DefaultScoping,
   defaultScope as _defaultScope,
+  hasDefaultScopeOverride,
   unscoped as _unscoped,
 } from "./scoping/default.js";
 import * as NamedScoping from "./scoping/named.js";
@@ -536,17 +537,18 @@ function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   // (scoping/default.rb): `super || default_scopes.any? || respond_to?(:default_scope)`,
   // where `super` is `Scoping::ClassMethods#scope_attributes?` (`current_scope`).
   // A default scope seeds its `where` equalities onto new records too, not only
-  // an explicit current scope. We drop the third term: in Rails every model
-  // `respond_to?(:default_scope)` (the inherited DSL method), so that term is
-  // always true and `scope_attributes?` is effectively always true — the no-op
-  // case is gated downstream by `attributes.any?`. This port has no proc-based
-  // `def self.default_scope` override (default scopes register into
-  // `defaultScopes` via the macro), so `currentScope || defaultScopes.any?` is
-  // equivalent. The all_queries flag is irrelevant here — `all` (and thus
+  // an explicit current scope. The third term — `respond_to?(:default_scope)` —
+  // is true for a model that defines its own `default_scope` method (the
+  // proc/method form, `def self.default_scope`) rather than registering via the
+  // `default_scope { }` macro (which appends to `defaultScopes`). The macro is
+  // private in Rails, so `respond_to?` is false for ordinary models; only the
+  // method-form override flips it true. `hasDefaultScopeOverride` mirrors that
+  // by walking the static chain for a `defaultScope` that isn't the inherited
+  // macro. The all_queries flag is irrelevant here — `all` (and thus
   // `scope_for_create`) applies every default scope, so both all_queries and
   // non-all_queries `where` conditions propagate on create.
   const c = ctor as any;
-  return !!c.currentScope || (c.defaultScopes?.length ?? 0) > 0;
+  return !!c.currentScope || (c.defaultScopes?.length ?? 0) > 0 || hasDefaultScopeOverride(ctor);
 }
 
 function _applyScopeAttributes(

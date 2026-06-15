@@ -94,6 +94,16 @@ describe("DefaultScopingTest", () => {
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
+  // Regression: a method-form `default_scope` override (not the macro registry)
+  // must make `scope_attributes?` true so `new`/`create` seed its where
+  // equalities, matching `Scoping::Default::ClassMethods#scope_attributes?`'s
+  // `respond_to?(:default_scope)` clause.
+  it("default scope as class method runs on create", async () => {
+    expect((ClassMethodDeveloperCalledDavid.new() as any).name).toBe("David");
+    const dev = (await ClassMethodDeveloperCalledDavid.create()) as any;
+    expect(dev.name).toBe("David");
+  });
+
   it("default scope as block referencing scope", async () => {
     const all = await LazyBlockReferencingScopeDeveloperCalledDavid.all().toArray();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
