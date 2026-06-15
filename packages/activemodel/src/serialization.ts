@@ -17,6 +17,16 @@ export interface SerializationRecord {
 export type SerializableHash = Record<string, unknown> & PromiseLike<Record<string, unknown>>;
 
 /**
+ * Module-private channel marking the synchronous re-entry of `serializableHash`.
+ * A Symbol (never a string key) so it cannot collide with any caller-supplied
+ * option, even one literally named `__sync`.
+ */
+const syncChannel = Symbol("serializableHash.sync");
+
+/** Internal view of options carrying the re-entry marker. */
+type SyncOptions = SerializeOptions & { [syncChannel]?: boolean };
+
+/**
  * Serialize a model's attributes to a (possibly awaitable) hash.
  *
  * Mirrors: ActiveModel::Serialization#serializable_hash
@@ -29,16 +39,6 @@ export type SerializableHash = Record<string, unknown> & PromiseLike<Record<stri
  * lazy-loads it first. A call with no `:include` returns a plain hash like Rails
  * (no awaitable contract), so promise assimilation can't trigger a spurious load.
  */
-/**
- * Module-private channel marking the synchronous re-entry of `serializableHash`.
- * A Symbol (never a string key) so it cannot collide with any caller-supplied
- * option, even one literally named `__sync`.
- */
-const syncChannel = Symbol("serializableHash.sync");
-
-/** Internal view of options carrying the re-entry marker. */
-type SyncOptions = SerializeOptions & { [syncChannel]?: boolean };
-
 export function serializableHash(
   record: SerializationRecord,
   options: SerializeOptions = {},
