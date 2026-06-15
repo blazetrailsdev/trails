@@ -3754,10 +3754,17 @@ describe("FinderTest", () => {
   beforeAll(async () => {
     registerModel("Company", Company);
     registerModel("Account", Account);
-    await defineSchema({
-      companies: canonicalSchema.companies,
-      accounts: canonicalSchema.accounts,
-    });
+    // `dropExisting` bypasses the signature cache and rebuilds these tables:
+    // several other suites define `accounts` without `firm_id`, and under
+    // parallel forks sharing a DB the first writer wins, poisoning the
+    // canonical `accounts.firm_id` column this suite's associations need.
+    await defineSchema(
+      {
+        companies: canonicalSchema.companies,
+        accounts: canonicalSchema.accounts,
+      },
+      { dropExisting: true },
+    );
   });
 
   // Rails: test_find_by_with_alias
