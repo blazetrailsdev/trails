@@ -1,17 +1,21 @@
 import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, Visitors } from "@blazetrails/arel";
+import { singularize, underscore } from "@blazetrails/activesupport";
 import { SchemaStatements, type JoinTableOptions } from "../abstract/schema-statements.js";
 import {
   AlterTable,
   ChangeColumnDefinition,
   ColumnDefinition,
+  ForeignKeyDefinition,
   TableDefinition as AbstractTableDefinition,
   type ColumnOptions,
   type ColumnType,
+  type ReferentialAction,
 } from "../abstract/schema-definitions.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
+import { unquoteIdentifier } from "./utils.js";
 import { splitPgDefault } from "../postgresql-adapter.js";
 import { joinTableName as deriveJoinTableName } from "../../migration/join-table.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
@@ -34,6 +38,12 @@ interface PgSchemaAdapter {
   supportsIndexInclude(): boolean;
   pgQuotedScope(name: string, type: "BASE TABLE" | null): { schema: string; name: string | null };
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
+  quotedScope(
+    name?: string | null,
+    options?: { type?: string },
+  ): { schema: string; name: string | null; type: string | null };
+  deferrable(deferrable: "immediate" | "deferred" | undefined): string;
+  readonly schemaCreation: { actionSql(action: string, dependency: string): string };
   readonly typeMap: HashLookupTypeMap;
   readonly visitor: Visitors.ToSql;
   loadAdditionalTypes(oids?: number[]): Promise<void>;
@@ -959,5 +969,235 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     await this.adapter.executeMutation(
       `COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`,
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Foreign keys / constraints
+  // ---------------------------------------------------------------------------
+
+  /** @internal */
+  async validateConstraint(tableName: string, constraintName: string): Promise<void> {
+    await this.pg.exec(
+      `ALTER TABLE ${this._qt(tableName)} VALIDATE CONSTRAINT ${this.pg.quoteIdentifier(constraintName)}`,
+    );
+  }
+
+  async validateCheckConstraint(
+    tableName: string,
+    nameOrOptions: string | { name: string },
+  ): Promise<void> {
+    const name = typeof nameOrOptions === "string" ? nameOrOptions : nameOrOptions.name;
+    await this.validateConstraint(tableName, name);
+  }
+
+  async validateForeignKey(
+    fromTable: string,
+    toTable?: string,
+    options?: { name?: string },
+  ): Promise<void> {
+    if (options?.name) {
+      await this.validateConstraint(fromTable, options.name);
+      return;
+    }
+    if (!toTable) throw new ArgumentError("validateForeignKey requires toTable or options.name");
+    const fks = await this.foreignKeys(fromTable);
+    const { schema: toSchema, table: toTbl } = this.pg.parseSchemaQualifiedName(toTable);
+    const fk = (fks as any[]).find((f) => {
+      const { schema: fSchema, table: fTbl } = this.pg.parseSchemaQualifiedName(String(f.toTable));
+      if (fTbl !== toTbl) return false;
+      // When the FK record has no schema prefix (PostgreSQL omits "public." when it
+      // is on the search_path), treat it as matching any schema lookup or "public".
+      if (!fSchema) return !toSchema || toSchema === "public";
+      return fSchema === toSchema;
+    });
+    if (!fk) throw new ArgumentError(`No foreign key found from ${fromTable} to ${toTable}`);
+    await this.validateConstraint(fromTable, fk.name);
+  }
+
+  override foreignKeyColumnFor(tableName: string, columnName = "id"): string {
+    const { table } = this.pg.parseSchemaQualifiedName(tableName);
+    return `${singularize(table)}_${columnName}`;
+  }
+
+  /** @internal */
+  assertValidDeferrable(deferrable: unknown): void {
+    if (
+      deferrable == null ||
+      deferrable === false ||
+      deferrable === "immediate" ||
+      deferrable === "deferred"
+    )
+      return;
+    throw new ArgumentError(
+      `deferrable must be \`"immediate"\` or \`"deferred"\`, got: \`${JSON.stringify(deferrable)}\``,
+    );
+  }
+
+  /** @internal */
+  override extractForeignKeyAction(
+    specifier: string,
+  ): "cascade" | "nullify" | "restrict" | undefined {
+    switch (specifier) {
+      case "c":
+        return "cascade";
+      case "n":
+        return "nullify";
+      case "r":
+        return "restrict";
+      default:
+        return undefined;
+    }
+  }
+
+  /** @internal */
+  extractConstraintDeferrable(
+    deferrable: boolean,
+    deferred: boolean,
+  ): "deferred" | "immediate" | false {
+    return deferrable && (deferred ? "deferred" : "immediate");
+  }
+
+  override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
+    const scope = this.pg.quotedScope(tableName);
+    const rows = await this.pg.schemaQuery(`
+      SELECT t2.oid::regclass::text AS to_table, a1.attname AS column, a2.attname AS primary_key,
+             c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete,
+             c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred,
+             c.conkey, c.confkey, c.conrelid, c.confrelid
+      FROM pg_constraint c
+      JOIN pg_class t1 ON c.conrelid = t1.oid
+      JOIN pg_class t2 ON c.confrelid = t2.oid
+      JOIN pg_attribute a1 ON a1.attnum = c.conkey[1] AND a1.attrelid = t1.oid
+      JOIN pg_attribute a2 ON a2.attnum = c.confkey[1] AND a2.attrelid = t2.oid
+      JOIN pg_namespace t3 ON c.connamespace = t3.oid
+      WHERE c.contype = 'f'
+        AND t1.relname = ${scope.name!}
+        AND t3.nspname = ${scope.schema}
+      ORDER BY c.conname
+    `);
+    return Promise.all(
+      rows.map(async (row) => {
+        const toTable = unquoteIdentifier(row.to_table as string);
+        const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
+        const confkey = String(row.confkey).replace(/[{}]/g, "").split(",").map(Number);
+        let column: string;
+        let primaryKey: string;
+        if (conkey.length > 1) {
+          const cols = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
+          const pks = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
+          column = cols.join(",");
+          primaryKey = pks.join(",");
+        } else {
+          column = unquoteIdentifier(row.column as string);
+          primaryKey = row.primary_key as string;
+        }
+        return new ForeignKeyDefinition(
+          tableName,
+          toTable,
+          column,
+          primaryKey,
+          row.name as string,
+          this.extractForeignKeyAction(row.on_delete as string),
+          this.extractForeignKeyAction(row.on_update as string),
+          this.extractConstraintDeferrable(row.deferrable as boolean, row.deferred as boolean),
+          (row.valid as boolean) ?? true,
+        );
+      }),
+    );
+  }
+
+  override async addForeignKey(
+    fromTable: string,
+    toTable: string,
+    options: {
+      column?: string;
+      primaryKey?: string;
+      name?: string;
+      onDelete?: ReferentialAction;
+      onUpdate?: ReferentialAction;
+      deferrable?: "immediate" | "deferred";
+      validate?: boolean;
+      ifNotExists?: boolean;
+    } = {},
+  ): Promise<void> {
+    // Rails: assert_valid_deferrable runs before `super` (the abstract
+    // add_foreign_key, where the if_not_exists short-circuit lives).
+    this.assertValidDeferrable(options.deferrable);
+    if (options.ifNotExists === true) {
+      const fks = await this.foreignKeys(fromTable);
+      if (
+        fks.some(
+          (fk) =>
+            fk.toTable === toTable && (options.column == null || fk.column === options.column),
+        )
+      ) {
+        return;
+      }
+    }
+    const { schema: fromSchema, table: fromTbl } = this.pg.parseSchemaQualifiedName(fromTable);
+    const { schema: toSchema, table: toTbl } = this.pg.parseSchemaQualifiedName(toTable);
+
+    const column = options.column ?? `${underscore(singularize(toTbl))}_id`;
+    const pk = options.primaryKey ?? "id";
+    const name = options.name ?? `fk_rails_${fromTbl}_${column}`;
+
+    const qi = (s: string) => this.pg.quoteIdentifier(s);
+    const qualifiedFrom = fromSchema ? `${qi(fromSchema)}.${qi(fromTbl)}` : qi(fromTbl);
+    const qualifiedTo = toSchema ? `${qi(toSchema)}.${qi(toTbl)}` : qi(toTbl);
+    const sc = this.pg.schemaCreation;
+
+    let sql = `ALTER TABLE ${qualifiedFrom} ADD CONSTRAINT ${qi(name)} FOREIGN KEY (${qi(column)}) REFERENCES ${qualifiedTo} (${qi(pk)})`;
+    if (options.onDelete) sql += ` ${sc.actionSql("DELETE", options.onDelete)}`;
+    if (options.onUpdate) sql += ` ${sc.actionSql("UPDATE", options.onUpdate)}`;
+    sql += this.pg.deferrable(options.deferrable);
+    if (options.validate === false) sql += " NOT VALID";
+
+    await this.pg.exec(sql);
+  }
+
+  override async foreignKeyExists(fromTable: string, toTable: string): Promise<boolean> {
+    const { schema: fromSchema, table: fromTbl } = this.pg.parseSchemaQualifiedName(fromTable);
+    const { schema: toSchema, table: toTbl } = this.pg.parseSchemaQualifiedName(toTable);
+
+    let fromSchemaCondition: string;
+    let toSchemaCondition: string;
+    const binds: unknown[] = [fromTbl];
+    let idx = 1;
+
+    if (fromSchema) {
+      idx++;
+      fromSchemaCondition = `tc.table_schema = $${idx}`;
+      binds.push(fromSchema);
+    } else {
+      fromSchemaCondition = `tc.table_schema = ANY(current_schemas(false))`;
+    }
+
+    binds.push(toTbl);
+    idx = binds.length;
+
+    if (toSchema) {
+      binds.push(toSchema);
+      toSchemaCondition = `tc2.table_schema = $${binds.length}`;
+    } else {
+      toSchemaCondition = `tc2.table_schema = ANY(current_schemas(false))`;
+    }
+
+    const rows = await this.pg.schemaQuery(
+      `SELECT COUNT(*) AS count
+       FROM information_schema.table_constraints tc
+       JOIN information_schema.referential_constraints rc
+         ON tc.constraint_name = rc.constraint_name
+         AND tc.constraint_schema = rc.constraint_schema
+       JOIN information_schema.table_constraints tc2
+         ON rc.unique_constraint_name = tc2.constraint_name
+         AND rc.unique_constraint_schema = tc2.constraint_schema
+       WHERE tc.constraint_type = 'FOREIGN KEY'
+         AND tc.table_name = $1
+         AND ${fromSchemaCondition}
+         AND tc2.table_name = $${idx}
+         AND ${toSchemaCondition}`,
+      binds,
+    );
+    return Number(rows[0].count) > 0;
   }
 }
