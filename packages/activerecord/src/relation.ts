@@ -3090,7 +3090,8 @@ export class Relation<T extends Base> {
       // build_joins → join_constraints(stashed, alias_tracker, references_values).
       // Collisions-only: a first/only-occurrence join keeps its real table name,
       // because our where-hash keys resolve to the real table (not the reference
-      // alias), so re-aliasing it would desync the WHERE from the JOIN.
+      // alias), so re-aliasing it would desync the WHERE from the JOIN. Deviation
+      // tracked for convergence: RFC 0030 where-hash-keys-resolve-to-join-alias.
       for (const node of jd.joinConstraints([], undefined, this._referencesValues, true))
         manager.appendJoinNode(node);
     }

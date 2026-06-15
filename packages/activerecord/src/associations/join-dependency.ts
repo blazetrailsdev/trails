@@ -135,6 +135,11 @@ export class JoinDependency {
    * would desync the WHERE from the JOIN. The eager-load/references path leaves it
    * false to preserve Rails' `includes(:author).references(:author)` → `authors
    * AS author` aliasing, where the eager SELECT/WHERE already follow the alias.
+   *
+   * Deviation from Rails (which re-aliases first-occurrence joins too, because it
+   * builds the WHERE against the aliased table). Tracked for convergence: RFC 0030
+   * story where-hash-keys-resolve-to-join-alias — remove this flag once where-hash
+   * keys resolve to the join's aliased name.
    */
   private _referencedAliasCollisionsOnly = false;
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {

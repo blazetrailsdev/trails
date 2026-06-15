@@ -2612,6 +2612,7 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     // aliases that join's table to the referenced name (Rails build_joins:1896).
     // Collisions-only (see relation.ts _applyJoinsToManager): a first/only-
     // occurrence join keeps its real table name so the WHERE stays in sync.
+    // Deviation tracked: RFC 0030 where-hash-keys-resolve-to-join-alias.
     for (const node of jd.joinConstraints([], aliases, this._referencesValues, true))
       arel.source.right.push(node);
   }
