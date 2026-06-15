@@ -23,13 +23,15 @@ import {
 const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
 
 let pgAvailable = false;
+let pgServerVersionNum = 0;
 
 // Quick connectivity check
 async function checkPg(): Promise<boolean> {
   try {
     const client = new pg.Client({ connectionString: PG_TEST_URL });
     await client.connect();
-    await client.query("SELECT 1");
+    const res = await client.query("SHOW server_version_num");
+    pgServerVersionNum = Number(res.rows[0].server_version_num);
     await client.end();
     return true;
   } catch {
@@ -38,6 +40,9 @@ async function checkPg(): Promise<boolean> {
 }
 
 pgAvailable = await checkPg();
+
+// Native declarative partitioning requires PostgreSQL 10+.
+const pgSupportsNativePartitioning = pgServerVersionNum >= 100000;
 
 const describeIfPg = pgAvailable ? describe : describe.skip;
 
@@ -663,6 +668,27 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.exec('DROP MATERIALIZED VIEW IF EXISTS "widget_totals" CASCADE');
       }
     });
+
+    it.skipIf(!pgSupportsNativePartitioning)(
+      "tables() includes partitioned tables (Rails relkind 'p')",
+      async () => {
+        // Rails' PG data_source_sql maps BASE TABLE -> relkind IN ('r','p'),
+        // so a partitioned table (relkind 'p') shows up in tables() alongside
+        // ordinary tables. Plain pg_tables lists only relkind 'r' and would
+        // miss it — the pg_class-based dataSourceSql query catches both.
+        await adapter.exec('DROP TABLE IF EXISTS "partitioned_widgets" CASCADE');
+        await adapter.exec(
+          `CREATE TABLE "partitioned_widgets" ("id" SERIAL, "logdate" date NOT NULL) PARTITION BY RANGE ("logdate")`,
+        );
+        try {
+          const tables = await adapter.tables();
+          expect(tables).toContain("partitioned_widgets");
+          expect(tables).toContain("widgets");
+        } finally {
+          await adapter.exec('DROP TABLE IF EXISTS "partitioned_widgets" CASCADE');
+        }
+      },
+    );
 
     it("SchemaCache.addAll populates from PostgreSQL", async () => {
       // Integration with Phase 5's dumpSchemaCache path — PG now
