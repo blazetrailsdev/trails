@@ -292,6 +292,22 @@ describe("PostgreSQLAdapter#sqlKey", () => {
     expect(preparedNameFor(fakeClient, "SELECT * FROM widgets")).toBe(nameA);
     expect(pool.length).toBe(2);
   });
+
+  it("setSchemaSearchPath re-scopes the key so no stale statement is reused", async () => {
+    // Drive the real setSchemaSearchPath path (which issues SET search_path and
+    // updates the memo) and confirm sqlKey tracks the active path end-to-end.
+    vi.spyOn(adapter, "execute").mockResolvedValue(undefined as never);
+
+    await adapter.setSchemaSearchPath("schema_a, public");
+    const keyA = sqlKey("SELECT * FROM widgets");
+
+    await adapter.setSchemaSearchPath("schema_b, public");
+    const keyB = sqlKey("SELECT * FROM widgets");
+
+    expect(keyA).toBe("schema_a, public-SELECT * FROM widgets");
+    expect(keyB).toBe("schema_b, public-SELECT * FROM widgets");
+    expect(keyA).not.toBe(keyB);
+  });
 });
 
 describe("PostgreSQLAdapter#executeMutation", () => {
