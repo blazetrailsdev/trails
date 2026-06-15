@@ -172,18 +172,82 @@ function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | 
   return `${y}${mo}${d}${h}${mi}${s}${us}`;
 }
 
+/** Structural equality for a join ON: Arel nodes compare by `eql`, raw SQL by string. */
+function _onEquals(a: string | Nodes.Node, b: string | Nodes.Node): boolean {
+  if (a instanceof Nodes.Node && b instanceof Nodes.Node) return a.eql(b);
+  return a === b;
+}
+
+/**
+ * Rebind a self-joined target `Table` to its alias inside an ON predicate AST.
+ * Walks the node tree and, for every attribute referencing the un-aliased
+ * target table `fromName`, swaps its relation to a `Table(alias)` — the
+ * node-level equivalent of the legacy `"#{table}." → "#{alias}."` string
+ * substitution. Other operands (the owner-side attribute, a `Casted` STI-type
+ * literal, raw values) are left untouched.
+ *
+ * Two faithful limitations carried over verbatim from the string path this
+ * replaces (so executed SQL is unchanged — both are matched on the target
+ * table NAME, exactly as the old `quoteTable(join.table)` substitution was):
+ *
+ * - **True self-association** (e.g. `Employee has_many :subordinates,
+ *   foreign_key: :manager_id`): owner and target are the SAME table, so an ON
+ *   like `employees.manager_id = employees.id` rebinds BOTH sides to the alias.
+ *   Rails' AliasTracker aliases only the target table object, leaving the owner
+ *   unaliased; matching by name can't distinguish them. This is a pre-existing
+ *   latent deviation (identical under the old string substitution), not changed
+ *   here — converging it needs identity-based (target `Table` instance)
+ *   rebinding at the builder, out of scope for this string→AST conversion.
+ * - **`SqlLiteral` operand** (e.g. a raw `where("table.col = ?")` scope folded
+ *   into the ON): opaque text with no walkable attribute, so it falls through
+ *   unrebound. The builder call sites here emit purely Arel-node predicates, so
+ *   this never fires today; a top-level raw-SQL `on` string still takes the
+ *   `typeof join.on === "string"` substitution path in `_addAssocJoin`.
+ */
+function _rebindOperand(value: unknown, fromName: string, alias: string): unknown {
+  return value instanceof Nodes.Node ? _rebindTableInNode(value, fromName, alias) : value;
+}
+
+function _rebindTableInNode(node: Nodes.Node, fromName: string, alias: string): Nodes.Node {
+  if (node instanceof Nodes.Attribute) {
+    const rel = node.relation;
+    if (rel instanceof Table && !rel.tableAlias && rel.name === fromName) {
+      return new Nodes.Attribute(new Table(alias), node.name, node.caster);
+    }
+    return node;
+  }
+  const clone: any = Object.create(Object.getPrototypeOf(node));
+  if (node instanceof Nodes.Nary) {
+    return Object.assign(clone, node, {
+      children: node.children.map((c) => _rebindTableInNode(c, fromName, alias)),
+    });
+  }
+  if (node instanceof Nodes.Binary) {
+    return Object.assign(clone, node, {
+      left: _rebindOperand((node as Nodes.Binary).left, fromName, alias),
+      right: _rebindOperand((node as Nodes.Binary).right, fromName, alias),
+    });
+  }
+  if (node instanceof Nodes.Grouping || node instanceof Nodes.Unary) {
+    return Object.assign(clone, node, {
+      expr: _rebindOperand((node as { expr: unknown }).expr, fromName, alias),
+    });
+  }
+  return node;
+}
+
 function _addAssocJoin(
   clauses: Array<{
     type: "inner" | "left";
     table: string;
-    on: string;
+    on: string | Nodes.Node;
     quoted?: boolean;
     as?: string;
     aliasBase?: string;
     assoc?: string;
   }>,
   type: "inner" | "left",
-  join: { table: string; on: string },
+  join: { table: string; on: string | Nodes.Node },
   assocName: string,
   modelClass: any,
   leftOuterJoinsValues: ReadonlyArray<unknown> | undefined,
@@ -203,14 +267,18 @@ function _addAssocJoin(
   if (sameAssoc) return sameAssoc.as;
   const sameTableJoins = clauses.filter((j) => j.table === join.table);
   if (sameTableJoins.length > 0) {
-    if (sameTableJoins.every((j) => j.on === join.on)) return undefined; // all compatible — skip
+    if (sameTableJoins.every((j) => _onEquals(j.on, join.on))) return undefined; // all compatible — skip
     // Two sibling associations target the same table under different ON
     // conditions — alias the later join per Rails' AliasTracker (see below).
     const { alias, base } = _selfJoinAlias(assocName, ownerTable, clauses, aliasLength);
-    const qTable = quoteTable(join.table);
-    const qAlias = quoteTable(alias);
-    // ON references the target as `<quotedTable>.<col>`; rebind to the alias.
-    const reboundOn = join.on.split(`${qTable}.`).join(`${qAlias}.`);
+    // Rebind the target reference to the alias. An Arel predicate node is
+    // rebound at the AST level (swap the target `Table` inside its attributes);
+    // a raw-SQL ON string still references the target as `<quotedTable>.<col>`,
+    // so fall back to the string substitution for that legacy form.
+    const reboundOn =
+      typeof join.on === "string"
+        ? join.on.split(`${quoteTable(join.table)}.`).join(`${quoteTable(alias)}.`)
+        : _rebindTableInNode(join.on, join.table, alias);
     clauses.push({
       type,
       table: join.table,
@@ -356,7 +424,7 @@ const StrictLoadingScope = {
  * table name (mirroring Rails' lookup_table_klass_from_join_dependencies)
  * without scanning the global model registry.
  */
-type JoinClauseSpec = { table: string; on: string; klass?: unknown };
+type JoinClauseSpec = { table: string; on: string | Nodes.Node; klass?: unknown };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
@@ -384,7 +452,7 @@ export class Relation<T extends Base> {
   private _joinClauses: Array<{
     type: "inner" | "left";
     table: string;
-    on: string;
+    on: string | Nodes.Node;
     quoted?: boolean;
     as?: string;
     // The association this join was derived from (when added via
@@ -663,9 +731,11 @@ export class Relation<T extends Base> {
    *   and a JOIN ON is built from association options.
    * - through/HABTM: returns null (caller throws).
    */
-  private _resolveAssociationTarget(
-    assocName: string,
-  ): { joins: Array<{ table: string; on: string }>; table: string; pks: string[] } | null {
+  private _resolveAssociationTarget(assocName: string): {
+    joins: Array<{ table: string; on: string | Nodes.Node }>;
+    table: string;
+    pks: string[];
+  } | null {
     const modelClass = this._modelClass as any;
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === assocName);
@@ -735,8 +805,7 @@ export class Relation<T extends Base> {
         const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
         onPredicates.push(tgt.get(typeCol).eq(modelClass.name));
       }
-      const onNode = onPredicates.length === 1 ? onPredicates[0] : new Nodes.And(onPredicates);
-      const on = this._compileArelNode(onNode);
+      const on = onPredicates.length === 1 ? onPredicates[0] : new Nodes.And(onPredicates);
       return { joins: [{ table: targetTable, on }], table: targetTable, pks: ["id"] };
     }
     return null;
@@ -1752,9 +1821,7 @@ export class Relation<T extends Base> {
       this._appendAssociationScope(predicates, assocDef, targetModel);
       return {
         table: targetTable,
-        on: this._compileArelNode(
-          predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
-        ),
+        on: predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         klass: targetModel,
       };
     }
@@ -1799,9 +1866,7 @@ export class Relation<T extends Base> {
       this._appendAssociationScope(predicates, assocDef, targetModel);
       return {
         table: targetTable,
-        on: this._compileArelNode(
-          predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
-        ),
+        on: predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         klass: targetModel,
       };
     }
@@ -1890,11 +1955,10 @@ export class Relation<T extends Base> {
       throughJoins = [
         {
           table: throughTable,
-          on: this._compileArelNode(
+          on:
             throughPredicates.length === 1
               ? throughPredicates[0]
               : new Nodes.And(throughPredicates),
-          ),
           klass: throughModel,
         },
       ];
@@ -1970,9 +2034,7 @@ export class Relation<T extends Base> {
       ...throughJoins,
       {
         table: targetTable,
-        on: this._compileArelNode(
-          targetPredicates.length === 1 ? targetPredicates[0] : new Nodes.And(targetPredicates),
-        ),
+        on: targetPredicates.length === 1 ? targetPredicates[0] : new Nodes.And(targetPredicates),
         klass: targetModel,
       },
     ];
@@ -2014,11 +2076,11 @@ export class Relation<T extends Base> {
     return [
       {
         table: joinTable,
-        on: this._compileArelNode(joinT.get(ownerFk).eq(srcT.get(sourcePk))),
+        on: joinT.get(ownerFk).eq(srcT.get(sourcePk)),
       },
       {
         table: targetTable,
-        on: this._compileArelNode(tgtT.get(targetPk as string).eq(joinT.get(targetFk))),
+        on: tgtT.get(targetPk as string).eq(joinT.get(targetFk)),
         klass: targetModel,
       },
     ];
@@ -3024,7 +3086,7 @@ export class Relation<T extends Base> {
           ? new Table(join.table, { as: join.as })
           : new Table(join.table)
         : join.table;
-      const onNode = new Nodes.SqlLiteral(join.on);
+      const onNode = typeof join.on === "string" ? new Nodes.SqlLiteral(join.on) : join.on;
       if (join.type === "inner") {
         manager.join(tableNode, onNode);
       } else {
@@ -4441,7 +4503,10 @@ export class Relation<T extends Base> {
    */
   private _distinctSelectForLimitedIds(basePk: string): string {
     const table = this._modelClass.arelTable;
-    const pkSql = this._compileArelNode(table.get(basePk));
+    // Bind-free column ref — compile straight through the visitor (no bind
+    // inlining needed) and hand the rendered text to the adapter's string
+    // `columns_for_distinct`.
+    const pkSql = this._arelVisitor().compile(table.get(basePk));
     const adapter = this._modelClass.connection as unknown as {
       columnsForDistinct?: (cols: string, orders: (string | Nodes.Node)[]) => string | string[];
     };
@@ -4640,33 +4705,6 @@ export class Relation<T extends Base> {
     this._lastSelectRetryable = retryable;
     this._lastSelectBinds = this._typeCastBinds(binds);
     return sql;
-  }
-
-  // Compile a node to an embedded SQL string with bind values inlined. The
-  // result is spliced into a larger query as raw text with no separate bind
-  // array, so any BindParam must be substituted here — raw Arel `compile` now
-  // emits `?` (Rails parity), which would leak an unbound placeholder into
-  // executable SQL. Inlines via the adapter quoter, matching `Relation#toSql` /
-  // `connection.toSql`.
-  //
-  // The order/select fragment call sites now attach their Arel nodes to the
-  // outer manager so binds thread through the one collector (Rails parity).
-  // Two clusters still inline here: (1) the JOIN ON predicates, whose `on`
-  // string is consumed by string-based self-join alias rebinding
-  // (`_appendQualifiedJoin`) — converging them needs node-level table
-  // rebinding (tracked by the `compile-arel-node-join-on-threading` story);
-  // (2) `_distinctSelectForLimitedIds`, a genuinely standalone bind-free
-  // column ref rendered to text for the adapter's string `columnsForDistinct`.
-  private _compileArelNode(node: Nodes.Node): string {
-    const [sql, binds] = this._arelVisitor().compileWithBinds(node);
-    if (binds.length === 0) return sql;
-    const adapter = this._resolveAdapter();
-    return Visitors.substituteBoundValues(sql, (match, i) => {
-      const raw = binds[i];
-      if (raw === undefined) return match;
-      const val = raw instanceof ModelAttribute ? raw.valueForDatabase : raw;
-      return adapter ? adapter.quote(val) : String(val);
-    });
   }
 
   /**

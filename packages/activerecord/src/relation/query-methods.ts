@@ -138,7 +138,7 @@ interface QueryMethodsHost {
   _joinClauses: Array<{
     type: "inner" | "left";
     table: string;
-    on: string;
+    on: string | Nodes.Node;
     quoted?: boolean;
     // The target model a `.joins(:assoc)` resolved to. Rails keeps the join
     // dependency (joins_values feed build_join_dependencies), so
@@ -2593,7 +2593,9 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // for the named_join + stashed_join buckets.
   for (const j of this._joinClauses) {
     const tableNode = j.quoted ? new ArelTable(j.table) : j.table;
-    const onNode = arelSql(j.on) as any;
+    // `on` is an Arel predicate node (whose binds thread through the collector)
+    // or, for raw-SQL joins, an inlined fragment string wrapped as SqlLiteral.
+    const onNode = (typeof j.on === "string" ? arelSql(j.on) : j.on) as any;
     if (j.type === "inner") {
       arel.join(tableNode, onNode);
     } else {
