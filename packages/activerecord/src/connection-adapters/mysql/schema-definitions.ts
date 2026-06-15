@@ -162,7 +162,7 @@ export class TableDefinition extends AbstractTableDefinition {
       (options as any).limit = (options as any).limit ?? 8;
       (options as any).primaryKey = true;
     } else if (resolvedType === "virtual") {
-      resolvedType = (options as any).type ?? resolvedType;
+      resolvedType = options.type ?? resolvedType;
     } else {
       const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
       if (unsignedMatch) {
