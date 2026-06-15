@@ -1,0 +1,29 @@
+name: Cache workspace build
+description: Restores the per-package dist/ + tsc --build incremental state so pnpm build no-ops on a warm cache.
+
+# `pnpm build` (the full `tsc --build` workspace compile, ~30-45s cold) runs in
+# six jobs on every full run, each recompiling from scratch. This step restores
+# the per-package `dist/` outputs and the `tsconfig.tsbuildinfo` incremental
+# state so `tsc --build` short-circuits to a ~1.5s no-op on a cache hit.
+#
+# Key on a content hash of every package src/, the tsconfigs, and the lockfile.
+# Exact-match only (no restore-keys): any source change misses and rebuilds, so
+# a stale dist can never be restored onto changed source and mask a failure.
+# tsc treats the restored tsconfig.tsbuildinfo as authoritative — if dist and
+# the buildinfo agree with the source hashes it records, it skips compilation;
+# otherwise it rebuilds the affected references.
+#
+# Place AFTER `pnpm install` and BEFORE `pnpm build`. The build step stays in
+# the job unchanged; it simply becomes near-instant on a hit. The first of the
+# parallel jobs to finish populates the cache; the rest restore it. No
+# `needs:` edge is introduced, so job parallelism is preserved.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: |
+          packages/*/dist
+          packages/*/tsconfig.tsbuildinfo
+        key: build-v1-${{ runner.os }}-${{ hashFiles('packages/**/src/**', 'tsconfig*.json', 'pnpm-lock.yaml') }}
