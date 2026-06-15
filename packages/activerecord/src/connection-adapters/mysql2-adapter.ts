@@ -33,6 +33,8 @@ import { Column } from "./column.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   castResult as mysql2CastResult,
+  performQuery as mysql2PerformQuery,
+  unwrapMultiResult,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import { typeCastedBinds, transactionIsolationLevels } from "./abstract/database-statements.js";
@@ -496,33 +498,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
                 driverBinds as any[],
               )
             : await mysqlConn.query({ sql: driverSql, rowsAsArray: true } as any, driverBinds);
-          // CALL sets _resultIndex > 0 in mysql2, wrapping rows AND fields in
-          // parallel nested arrays. Mirror Rails' abandon_results! + cast_result:
-          // take the first result set and use rawFields[0] (field-descriptor array,
-          // or undefined for DML) — the same as Rails' fields.empty? check at
-          // database_statements.rb:116. For a plain non-CALL query rawFields is a
-          // flat FieldPacket[], so rawFields[0] is a FieldPacket object (not an
-          // array) and neither branch fires.
-          let result: mysql.RowDataPacket[] | mysql.ResultSetHeader = rawResult as
-            | mysql.RowDataPacket[]
-            | mysql.ResultSetHeader;
-          // Field descriptors for the result set whose rows we return. Mirrors
-          // the `result.fields` Rails' `cast_result` reads: present whenever a
-          // SELECT projected columns, even when it matched zero rows.
-          let fields = rawFields as mysql.FieldPacket[] | undefined;
-          if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
-            // Multi-result CALL w/ SELECT: rawFields[0] is a FieldPacket[].
-            result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
-            fields = rawFields[0] as mysql.FieldPacket[];
-          } else if (
-            Array.isArray(rawFields) &&
-            rawFields[0] === undefined &&
-            Array.isArray(rawResult)
-          ) {
-            // Multi-result CALL w/ DML-only: rawFields[0] is undefined.
-            // Unwrap so !Array.isArray(result) below returns empty Result.
-            result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
-          }
+          // Unwrap mysql2's nested CALL/multi-result sets to the single result
+          // set Rails' cast_result reads (the same seam internalExecute uses).
+          // `fields` are the field descriptors for the returned rows — present
+          // whenever a SELECT projected columns, even at zero rows matched.
+          const { result, fields } = unwrapMultiResult(
+            rawResult,
+            rawFields as mysql.FieldPacket[] | undefined,
+          );
           // DML results in a ResultSetHeader (no rows array); SELECT results
           // in an array of positional row arrays. Return empty Result for DML
           // to avoid throwing on INSERT/UPDATE/DELETE passed to execQuery.
@@ -953,33 +936,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
+        // Route the read path through the shared array-mode performQuery seam
+        // (rowsAsArray + single CALL/multi-result unwrap), mirroring Rails'
+        // internal_execute → raw_execute → cast_result. Array-mode rows keep
+        // duplicate column names that the old hash-keyed conn.query collapsed.
         const conn = await this.getConn();
-        const [rawResult, rawFields] = await conn.query(driverSql);
-        // Unwrap nested result sets from CALL (see execQuery for the full comment).
-        let result = rawResult as mysql.RowDataPacket[] | mysql.ResultSetHeader;
-        let fields = rawFields as mysql.FieldPacket[] | undefined;
-        if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
-          result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
-          fields = rawFields[0] as mysql.FieldPacket[];
-        } else if (
-          Array.isArray(rawFields) &&
-          rawFields[0] === undefined &&
-          Array.isArray(rawResult)
-        ) {
-          result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
-        }
-        if (Array.isArray(result)) {
-          const rows = result as Record<string, unknown>[];
-          payload.row_count = rows.length;
-          return {
-            rows,
-            fields: (fields ?? []) as Array<{ name: string }>,
-            affectedRows: rows.length,
-          };
-        }
-        const affected = (result as mysql.ResultSetHeader).affectedRows ?? 0;
-        payload.row_count = affected;
-        return { rows: null, fields: [], affectedRows: affected };
+        const rawResult = await mysql2PerformQuery.call(this as any, conn, driverSql, [], []);
+        payload.row_count = rawResult.affectedRows;
+        return rawResult;
       } catch (e: any) {
         const translated = await this._translateAndEnrich(e, driverSql, []);
         payload.exception = translated;
