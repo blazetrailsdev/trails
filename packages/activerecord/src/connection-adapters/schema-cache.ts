@@ -477,6 +477,29 @@ export class SchemaReflection {
    */
   static lazilyLoadSchemaCache = false;
 
+  /**
+   * Eagerly warm the schema cache by DB introspection at connection/boot,
+   * even when no `schema_cache.json` exists on disk. When true,
+   * ConnectionPool.newConnection kicks off a fire-and-forget
+   * `loadAllBang(pool)` on the first connection: it introspects every table's
+   * columns/primary-keys/indexes (Rails' `schema_cache.addAll(pool)`) so a
+   * synchronous `Model.columnNames()` / `columnsHash()` on a connected model
+   * takes the warm, DB-sourced branch — and therefore excludes virtual
+   * `attribute()` declarations — without a prior `await ensureSchemaLoaded()`.
+   *
+   * Distinct from {@link lazilyLoadSchemaCache}, which only loads a committed
+   * dump file. Eager warming subsumes it: `loadAllBang` first consults the
+   * on-disk cache (if any) as a base, then tops it up by introspection.
+   *
+   * Off by default — the boot-time introspection cost is opt-in, mirroring how
+   * Rails apps choose between a committed dump and live reflection. Note the
+   * documented async limitation: after `resetColumnInformation` clears a
+   * table's entry, the warm is NOT synchronously re-established (the adapter
+   * data-source cache cannot reload without awaiting); the model stays cold for
+   * that table until the next async schema load or a fresh connection.
+   */
+  static eagerLoadSchemaCache = false;
+
   private _cache: SchemaCache | null;
   private _cachePath: string | null;
   private _cachePromise: Promise<SchemaCache> | null = null;
@@ -493,6 +516,18 @@ export class SchemaReflection {
 
   async loadBang(pool: unknown): Promise<this> {
     await this.cache(pool);
+    return this;
+  }
+
+  /**
+   * Eagerly warm the cache by full DB introspection (Rails' `addAll(pool)`).
+   * First resolves the base cache via {@link cache} — which consults the
+   * on-disk dump when present — then introspects every data source to top it
+   * up, so a synchronous read sees real DB columns even with no dump file.
+   */
+  async loadAllBang(pool: unknown): Promise<this> {
+    const cache = await this.cache(pool);
+    await cache.addAll(pool);
     return this;
   }
 
@@ -682,6 +717,11 @@ export class BoundSchemaReflection {
 
   async loadBang(): Promise<this> {
     await this._schemaReflection.loadBang(this._pool);
+    return this;
+  }
+
+  async loadAllBang(): Promise<this> {
+    await this._schemaReflection.loadAllBang(this._pool);
     return this;
   }
 
