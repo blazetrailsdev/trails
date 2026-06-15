@@ -25,15 +25,21 @@ describe("JoinDependency referenced-table aliasing", () => {
       this.attribute("authorId", "integer");
     }
   }
+  class Award extends Base {
+    static {
+      this.attribute("authorId", "integer");
+    }
+  }
 
   beforeEach(() => {
     const adapter = createTestAdapter();
-    for (const m of [Author, Post]) {
+    for (const m of [Author, Post, Award]) {
       (m as any).adapter = adapter;
       (m as any)._associations = [];
       registerModel(m);
     }
     Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "authorId" });
+    Associations.hasMany.call(Author, "awards", { className: "Award", foreignKey: "authorId" });
   });
 
   const joinTableName = (join: Nodes.Join): string => {
@@ -42,15 +48,24 @@ describe("JoinDependency referenced-table aliasing", () => {
   };
 
   // Collect every table name referenced by an Attribute anywhere in a node.
-  const tablesInPredicate = (node: Nodes.Node): Set<string> => {
+  // (Node#fetchAttribute returns only the first attribute — Rails' bind-param
+  // semantics — so walk the AST manually to see both sides of an equality.)
+  const tablesInPredicate = (node: unknown): Set<string> => {
     const tables = new Set<string>();
-    node.fetchAttribute((attr: Nodes.Node) => {
-      if (attr instanceof Nodes.Attribute) {
-        const rel = attr.relation as any;
+    const visit = (n: unknown): void => {
+      if (!n || typeof n !== "object") return;
+      if (n instanceof Nodes.Attribute) {
+        const rel = n.relation as any;
         tables.add(rel.tableAlias ?? rel.name);
+        return;
       }
-      return true;
-    });
+      for (const key of ["left", "right", "expr"]) {
+        if (key in (n as any)) visit((n as any)[key]);
+      }
+      const children = (n as any).children;
+      if (Array.isArray(children)) for (const c of children) visit(c);
+    };
+    visit(node);
     return tables;
   };
 
@@ -85,6 +100,22 @@ describe("JoinDependency referenced-table aliasing", () => {
     const joins = jd.joinConstraints([]);
     expect(joins).toHaveLength(1);
     expect(joinTableName(joins[0])).toBe("authors");
+  });
+
+  it("rebinds a nested child's ON predicate when its parent is re-aliased", () => {
+    // includes(author: :awards).references(:author): re-aliasing the `author`
+    // join to `author` must rebind the grandchild `awards` join's ON
+    // (`authors.id = awards.author_id`) to the alias (`author.id = ...`), not
+    // leave it pointing at the real `authors` table.
+    const jd = new JoinDependency(Post);
+    jd.addAssociationSpec({ author: "awards" });
+    const joins = jd.joinConstraints([], undefined, ["author"]);
+    expect(joins).toHaveLength(2);
+
+    const awardsJoin = joins.find((j) => joinTableName(j) === "awards")!;
+    const tables = tablesInPredicate(((awardsJoin as any).right as Nodes.On).expr as Nodes.Node);
+    expect(tables.has("author")).toBe(true);
+    expect(tables.has("authors")).toBe(false);
   });
 
   it("falls back to the reflection alias_candidate when the reference name is taken", () => {

@@ -712,12 +712,17 @@ export class JoinDependency {
       const on = arelJoin.right;
       if (!(on instanceof Nodes.On)) return;
       const rebound = rebindTableReferences(on.expr as Nodes.Node, fromName, aliased);
-      if (rebound !== on.expr) {
+      // The referenced node's own JOIN left side must always move to the alias
+      // (so the SELECT projection and the JOIN clause name the same table), even
+      // when its ON had no rebindable Attribute (e.g. a SqlLiteral condition). A
+      // grandchild is only rewritten when its ON actually referenced the parent's
+      // old table name.
+      if (part === child) {
         const JoinClass = arelJoin.constructor as new (l: Nodes.Node, r: Nodes.Node) => Nodes.Join;
-        part.arelJoin = new JoinClass(
-          part === child ? aliased : arelJoin.left,
-          new Nodes.On(rebound),
-        );
+        part.arelJoin = new JoinClass(aliased, new Nodes.On(rebound));
+      } else if (rebound !== on.expr) {
+        const JoinClass = arelJoin.constructor as new (l: Nodes.Node, r: Nodes.Node) => Nodes.Join;
+        part.arelJoin = new JoinClass(arelJoin.left, new Nodes.On(rebound));
       }
     };
     rebindOn(child);
