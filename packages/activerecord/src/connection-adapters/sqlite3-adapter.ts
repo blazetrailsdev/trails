@@ -19,7 +19,11 @@ import {
   extractValueFromDefault as sqliteExtractValueFromDefault,
   indexes as sqliteIndexes,
 } from "./sqlite3/schema-statements.js";
-import { indexNameForRemoveFrom, indexExistsForRemoveFrom } from "./abstract/schema-statements.js";
+import {
+  indexNameForRemoveFrom,
+  indexExistsForRemoveFrom,
+  canRemoveIndexByName,
+} from "./abstract/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -1223,7 +1227,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
     // A bare `{ name }` resolves without introspection (Rails
     // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
-    const canRemoveByName = columnName == null && opts.name != null && opts.column == null;
+    const canRemoveByName = canRemoveIndexByName(columnName, opts);
     const all =
       opts.ifExists || !canRemoveByName
         ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)

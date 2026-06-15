@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { SchemaStatements } from "./schema-statements.js";
+import {
+  SchemaStatements,
+  canRemoveIndexByName,
+  indexNameForRemoveFrom,
+} from "./schema-statements.js";
 
 function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
   return new SchemaStatements({
@@ -319,5 +323,54 @@ describe("SchemaStatements#quotedColumnsForIndex", () => {
     expect(ss.quotedColumnsForIndex(["id", "name"], { order: { id: "desc" } })).toBe(
       '"id", "name"',
     );
+  });
+});
+
+describe("canRemoveIndexByName (module-level)", () => {
+  it("is true for a bare name", () => {
+    expect(canRemoveIndexByName(null, { name: "idx" })).toBe(true);
+  });
+
+  it("tolerates an algorithm key", () => {
+    expect(canRemoveIndexByName(null, { name: "idx", algorithm: "concurrently" })).toBe(true);
+  });
+
+  it("rejects extra keys other than name/algorithm", () => {
+    expect(canRemoveIndexByName(null, { name: "idx", unique: true })).toBe(false);
+  });
+
+  it("rejects a given column name", () => {
+    expect(canRemoveIndexByName("email", { name: "idx" })).toBe(false);
+  });
+});
+
+describe("indexNameForRemoveFrom early return", () => {
+  const genName = (t: string, c: string | string[]) =>
+    `index_${t}_on_${Array.isArray(c) ? c.join("_and_") : c}`;
+
+  it("returns options.name without introspection for a bare name", () => {
+    expect(indexNameForRemoveFrom(genName, [], "users", undefined, { name: "idx" })).toBe("idx");
+  });
+
+  it("returns options.name when an algorithm key is present", () => {
+    expect(
+      indexNameForRemoveFrom(genName, [], "users", undefined, {
+        name: "idx",
+        algorithm: "concurrently",
+      } as any),
+    ).toBe("idx");
+  });
+
+  it("does not early-return when an extra key forces introspection", () => {
+    const all = [{ name: "idx", columns: ["email"] }];
+    expect(
+      indexNameForRemoveFrom(genName, all, "users", undefined, {
+        name: "idx",
+        unique: true,
+      } as any),
+    ).toBe("idx");
+    expect(() =>
+      indexNameForRemoveFrom(genName, [], "users", undefined, { name: "idx", unique: true } as any),
+    ).toThrow();
   });
 });
