@@ -3711,13 +3711,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // verbatim. The guard also keeps such values out of columnExists, whose
       // SQL interpolates the name unescaped. Rails' parameterized column_exists?
       // simply returns false for those, so this matches its result.
-      const ss = this.pgSchemaStatements();
-      const where =
-        /^\w+$/.test(options.where) &&
-        (await ss.tableExists(tableName)) &&
-        (await ss.columnExists(tableName, options.where))
-          ? this.quoteColumnName(options.where)
-          : options.where;
+      let where = options.where;
+      if (/^\w+$/.test(options.where)) {
+        const ss = this.pgSchemaStatements();
+        if (
+          (await ss.tableExists(tableName)) &&
+          (await ss.columnExists(tableName, options.where))
+        ) {
+          where = this.quoteColumnName(options.where);
+        }
+      }
       sql += ` WHERE ${where}`;
     }
 
