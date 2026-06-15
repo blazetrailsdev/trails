@@ -7346,36 +7346,6 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     ] as unknown as JoinDependency[]);
     expect(result).toBe(type);
   });
-
-  // A plain `.joins(:assoc)` is pre-resolved to a SQL clause, not a join
-  // dependency, but retains its target klass; the lookup must fall through to
-  // `_joinClauses` so an aggregate over the joined column still resolves its
-  // cast type without a global registry scan.
-  it("returns cast type from a joins(:assoc) clause's retained klass", () => {
-    const dtType = { cast: (v: unknown) => v };
-    const rel = {
-      _joinClauses: [
-        { table: "topics", on: "", klass: { attributeTypes: () => ({ written_on: dtType }) } },
-      ],
-    };
-    const result = lookupCastTypeFromJoinDependencies(rel as any, "written_on", []);
-    expect(result).toBe(dtType);
-  });
-
-  // A has_many :through join emits an intermediate clause (the through model)
-  // plus the final target; the intermediate entry must also carry its klass so
-  // an aggregate over a column on the through table resolves its cast type.
-  it("returns cast type from an intermediate through-join clause's retained klass", () => {
-    const dtType = { cast: (v: unknown) => v };
-    const rel = {
-      _joinClauses: [
-        { table: "taggings", on: "", klass: { attributeTypes: () => ({ created_at: dtType }) } },
-        { table: "tags", on: "", klass: { attributeTypes: () => ({ name: {} }) } },
-      ],
-    };
-    const result = lookupCastTypeFromJoinDependencies(rel as any, "created_at", []);
-    expect(result).toBe(dtType);
-  });
 });
 
 // ==========================================================================
@@ -7617,5 +7587,23 @@ describe("CalculationsTest", () => {
   it("should count field in joined table", async () => {
     expect(await CanonicalAccount.joins("firm").count("companies.id")).toBe(5);
     expect(await CanonicalAccount.joins("firm").distinct().count("companies.id")).toBe(4);
+  });
+
+  // A plain `joins(:assoc)` now feeds buildJoinDependencies (via _namedInnerJoins),
+  // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type
+  // through the join-dependency walk — no `_joinClauses`-klass fallback. Replaces
+  // the unit tests that asserted the (removed) `_joinClauses.klass` recovery.
+  it("resolves joined column cast type through the join-dependency walk", () => {
+    const rel = CalcAuthor.joins("topics");
+    // `written_on` is a datetime attribute that lives only on the joined Topic;
+    // it resolves to Topic's Time cast type via the join-dependency walk (the
+    // base CalcAuthor has no such attribute).
+    const castType = lookupCastTypeFromJoinDependencies(rel as any, "written_on") as {
+      constructor: { name: string };
+    } | null;
+    expect(castType).toBeTruthy();
+    // The joined Topic's concrete datetime type (e.g. SQLiteDateTimeType), not
+    // the default ValueType the base CalcAuthor returns for unknown columns.
+    expect(castType?.constructor.name).not.toBe("ValueType");
   });
 });

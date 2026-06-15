@@ -151,6 +151,10 @@ interface QueryMethodsHost {
   _joinValues: (string | Nodes.Join)[];
   _leftOuterJoinsValues: AssociationSpec[];
   _namedInnerJoins: AssociationSpec[];
+  // Pre-built InnerJoin JoinDependencies from a cross-klass merge (Rails
+  // merge_joins builds these against `other.klass`); emitted via joinConstraints
+  // and walked for klass lookups alongside _namedInnerJoins.
+  _namedInnerJoinDeps: JoinDependency[];
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
   _eagerLoadAssociations: AssociationSpec[];
@@ -1477,7 +1481,8 @@ function addTreeToJoinDependency(
   }
 }
 
-function constructJoinDependency(
+/** @internal */
+export function constructJoinDependency(
   this: QueryMethodsHost,
   associations: string | AssociationSpec[],
   joinType?: unknown,
@@ -2332,13 +2337,6 @@ export function lookupTableKlassFromJoinDependencies(
   eachJoinDependencies.call(this, undefined, (join: any) => {
     if (tableName === join.tableName) found = join.baseKlass;
   });
-  if (found) return found;
-  // A plain `.joins(:assoc)` is pre-resolved to a SQL clause that retains its
-  // target klass; recover it by table name so cast-type / where lookups don't
-  // fall back to a global registry scan (which mis-resolves shared table names).
-  for (const j of this._joinClauses) {
-    if (j.klass && j.table === tableName) return j.klass;
-  }
   return found;
 }
 
@@ -2356,50 +2354,31 @@ export function eachJoinDependencies(
 
 /** @internal */
 export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
-  // Mirror Rails build_join_dependencies (query_methods.rb:1735-1745):
-  // joins | left_outer_joins | eager_load | includes association specs.
-  // _joinClauses store pre-resolved SQL (table name + ON string), not association
-  // names, so only _leftOuterJoinsValues, eagerLoad, and includes contribute here.
+  // Mirror Rails build_join_dependencies (query_methods.rb):
+  //   joins = joins_values | left_outer_joins_values | eager_load | includes
+  //   join_dependencies.unshift construct_join_dependency(select_named_joins(joins, …), nil)
+  // i.e. ALL named association joins fold into a single JoinDependency (nil join
+  // type, since this set is consulted for table-klass / cast-type lookups, not
+  // SQL emission). _namedInnerJoins is our joins_values and so leads the union;
+  // _joinClauses hold pre-resolved raw SQL (table + ON), not association names,
+  // and do not contribute here.
   const joinNames: AssociationSpec[] = [];
-
-  if (this._leftOuterJoinsValues.length > 0) {
-    for (const a of this._leftOuterJoinsValues) {
-      if (!joinNames.includes(a)) joinNames.push(a);
-    }
-  }
-  if (this._eagerLoadAssociations.length > 0) {
-    for (const a of this._eagerLoadAssociations) {
-      if (!joinNames.includes(a)) joinNames.push(a);
-    }
-  }
-  if (this._includesAssociations.length > 0) {
-    for (const a of this._includesAssociations) {
-      if (!joinNames.includes(a)) joinNames.push(a);
-    }
-  }
+  const addNames = (specs: ReadonlyArray<AssociationSpec>) => {
+    for (const a of specs) if (!joinNames.includes(a)) joinNames.push(a);
+  };
+  addNames(this._namedInnerJoins);
+  addNames(this._leftOuterJoinsValues);
+  addNames(this._eagerLoadAssociations);
+  addNames(this._includesAssociations);
 
   const stashedJoins: JoinDependency[] = [];
   const named = selectNamedJoins.call(this, joinNames, stashedJoins);
   const jd = constructJoinDependency.call(this, named as AssociationSpec[], null);
   stashedJoins.unshift(jd);
+  // Cross-klass merged dependencies carry their own nodes (built on the source
+  // relation's klass); include them so table-klass / cast-type lookups see them.
+  if (this._namedInnerJoinDeps.length > 0) stashedJoins.push(...this._namedInnerJoinDeps);
   return stashedJoins;
-}
-
-/**
- * Join dependencies consulted when resolving a column's cast type: the eager /
- * includes / left-outer set built by `buildJoinDependencies`, plus the named
- * INNER-join associations (`.joins(:assoc)`). Rails' `arel_column` resolves a
- * joined column's type through all of `joins_values`; our inner-join specs are
- * routed separately (buildJoins), so they are folded back in here.
- *
- * @internal
- */
-export function joinDependenciesForTypeLookup(this: QueryMethodsHost): JoinDependency[] {
-  const deps = buildJoinDependencies.call(this);
-  if (this._namedInnerJoins.length > 0) {
-    deps.push(constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin));
-  }
-  return deps;
 }
 
 /** @internal */
@@ -2577,7 +2556,8 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   const hasEagerAssocs =
     this._eagerLoadAssociations.length > 0 ||
     this._leftOuterJoinsValues.length > 0 ||
-    this._namedInnerJoins.length > 0;
+    this._namedInnerJoins.length > 0 ||
+    this._namedInnerJoinDeps.length > 0;
   if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;
 
   const buckets = buildJoinBuckets.call(this);
@@ -2623,6 +2603,12 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // (mirrors Rails joins_values → named_join with InnerJoin).
   if (this._namedInnerJoins.length > 0) {
     const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
+    for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
+  }
+
+  // Cross-klass merged JoinDependencies (Rails merge_joins): already built
+  // against the source relation's klass, so emit their constraints directly.
+  for (const jd of this._namedInnerJoinDeps) {
     for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
   }
 

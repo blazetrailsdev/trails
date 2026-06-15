@@ -254,23 +254,32 @@ function _addAssocJoin(
   ownerTable: string,
   quoteTable: (name: string) => string,
   aliasLength: number,
+  // Joins already emitted via JoinDependency (_namedInnerJoins from a prior
+  // `joins(:assoc)`), resolved to comparable table/ON specs. Considered for
+  // collision/alias detection (so a sibling association on the same table is
+  // aliased) but never themselves re-emitted; JoinDependency owns their SQL.
+  existingJdJoins: ReadonlyArray<{ table: string; on: string | Nodes.Node; assoc?: string }> = [],
 ): string | undefined {
-  // If the association is already covered by _leftOuterJoinsValues (deferred
-  // LEFT OUTER JOIN path), skip — the join will be emitted when the manager
-  // is built, so adding a second join here would cause ambiguous column names.
+  // If the association is already covered by the deferred LEFT OUTER JOIN path,
+  // skip — that join is emitted when the manager is built, so adding a second
+  // join here would cause ambiguous column names.
   if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return undefined;
+  // Read-side view unions the JoinDependency joins so collision/alias detection
+  // sees a `joins(:assoc)` that lives outside _joinClauses; writes still target
+  // _joinClauses only.
+  const visible = existingJdJoins.length > 0 ? [...existingJdJoins, ...clauses] : clauses;
   // Association-level dedup (Rails `left_outer_joins_values |= args`,
   // query_methods.rb:124-128) must run BEFORE the table/ON collision check: an
   // already-aliased sibling join's ON references the alias, so it no longer
   // equals a repeat call's freshly-derived ON and would mint a second alias.
-  const sameAssoc = clauses.find((j) => j.assoc === assocName && j.table === join.table);
-  if (sameAssoc) return sameAssoc.as;
-  const sameTableJoins = clauses.filter((j) => j.table === join.table);
+  const sameAssoc = visible.find((j) => j.assoc === assocName && j.table === join.table);
+  if (sameAssoc) return (sameAssoc as { as?: string }).as;
+  const sameTableJoins = visible.filter((j) => j.table === join.table);
   if (sameTableJoins.length > 0) {
     if (sameTableJoins.every((j) => _onEquals(j.on, join.on))) return undefined; // all compatible — skip
     // Two sibling associations target the same table under different ON
     // conditions — alias the later join per Rails' AliasTracker (see below).
-    const { alias, base } = _selfJoinAlias(assocName, ownerTable, clauses, aliasLength);
+    const { alias, base } = _selfJoinAlias(assocName, ownerTable, visible, aliasLength);
     // Rebind the target reference to the alias. An Arel predicate node is
     // rebound at the AST level (swap the target `Table` inside its attributes);
     // a raw-SQL ON string still references the target as `<quotedTable>.<col>`,
@@ -419,10 +428,10 @@ const StrictLoadingScope = {
 } as const;
 
 /**
- * One pre-resolved association JOIN: the SQL table + ON predicate, plus the
- * target model so cast-type / where lookups can recover the joined klass by
- * table name (mirroring Rails' lookup_table_klass_from_join_dependencies)
- * without scanning the global model registry.
+ * One pre-resolved association JOIN: the SQL table + ON predicate. The resolved
+ * target model is retained here (consumed by whereAssociated/whereMissing); it
+ * is no longer copied onto `_joinClauses`, since a plain `.joins(:assoc)` now
+ * resolves its klass through the join-dependency walk.
  */
 type JoinClauseSpec = { table: string; on: string | Nodes.Node; klass?: unknown };
 
@@ -462,19 +471,18 @@ export class Relation<T extends Base> {
     // The base alias candidate a self-join alias was minted from (see
     // _selfJoinAlias) — used to attribute repeat counts to the right candidate.
     aliasBase?: string;
-    // The target model a `.joins(:assoc)` resolved to, retained so cast-type /
-    // where table-klass lookups recover the joined model by table name without a
-    // global registry scan (mirrors Rails keeping the join dependency).
-    klass?: unknown;
   }> = [];
   private _joinValues: (string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
-  // INNER `joins()` association names that must be resolved through
-  // JoinDependency (rather than the flat `_resolveAssociationJoin` path)
-  // because the chain references a table more than once and needs Rails'
-  // AliasTracker self-join aliasing — e.g. a nested `:through` whose source
-  // reflection is itself a `:through` (`Author.joins(:similar_posts)`).
+  // INNER `joins(:assoc)` association names (and nested hash/through specs),
+  // resolved through JoinDependency — mirroring Rails' joins_values, which feed
+  // build_join_dependencies so every node in the chain carries its base_klass
+  // and shares Rails' AliasTracker self-join aliasing.
   private _namedInnerJoins: AssociationSpec[] = [];
+  // Pre-built InnerJoin JoinDependencies from a cross-klass `merge` (Rails
+  // merge_joins builds these against `other.klass` since the association names
+  // can't resolve on the receiver's model).
+  private _namedInnerJoinDeps: JoinDependency[] = [];
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
@@ -629,6 +637,7 @@ export class Relation<T extends Base> {
       const ownerTable = (rel._modelClass as any).tableName;
       const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
       const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
+      const jdJoins = cloned._namedInnerJoinClauses();
       let effectiveTable = target.table;
       for (const join of target.joins) {
         const alias = _addAssocJoin(
@@ -641,6 +650,7 @@ export class Relation<T extends Base> {
           ownerTable,
           quoteTable,
           aliasLength,
+          jdJoins,
         );
         if (alias && join.table === target.table) effectiveTable = alias;
       }
@@ -675,6 +685,7 @@ export class Relation<T extends Base> {
       const ownerTable = (rel._modelClass as any).tableName;
       const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
       const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
+      const jdJoins = cloned._namedInnerJoinClauses();
       let effectiveTable = target.table;
       for (const join of target.joins) {
         const alias = _addAssocJoin(
@@ -687,6 +698,7 @@ export class Relation<T extends Base> {
           ownerTable,
           quoteTable,
           aliasLength,
+          jdJoins,
         );
         if (alias && join.table === target.table) effectiveTable = alias;
       }
@@ -707,6 +719,31 @@ export class Relation<T extends Base> {
         `Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`,
       );
     }
+  }
+
+  /**
+   * Resolve simple `joins(:assoc)` names (stored in _namedInnerJoins and emitted
+   * via JoinDependency) to comparable table/ON specs, so whereAssociated /
+   * whereMissing can detect a sibling join on the same table and alias it rather
+   * than minting a colliding bare-table join. Nested-through names that the flat
+   * resolver can't express are skipped (no comparable single ON).
+   *
+   * @internal
+   */
+  private _namedInnerJoinClauses(): Array<{
+    table: string;
+    on: string | Nodes.Node;
+    assoc: string;
+  }> {
+    const out: Array<{ table: string; on: string | Nodes.Node; assoc: string }> = [];
+    for (const v of this._namedInnerJoins) {
+      if (typeof v !== "string") continue;
+      const resolved = this._resolveAssociationJoin(v);
+      for (const j of resolved ? (Array.isArray(resolved) ? resolved : [resolved]) : []) {
+        out.push({ table: j.table, on: j.on, assoc: v });
+      }
+    }
+    return out;
   }
 
   /**
@@ -1572,30 +1609,17 @@ export class Relation<T extends Base> {
         rel._namedInnerJoins.push(arg as AssociationSpec);
         continue;
       }
-      // Nested-through chains that reference a table more than once (e.g. a
-      // `:through` whose source is itself a `:through`) can't be expressed by
-      // the flat `_resolveAssociationJoin` path — it emits unaliased duplicate
-      // JOINs. Route them through JoinDependency (InnerJoin), which applies
-      // Rails' AliasTracker self-join aliasing (`taggings_authors_join`, …).
-      if (typeof arg === "string" && rel._joinNeedsJoinDependency(arg)) {
+      // Named association joins — both simple `joins(:assoc)` and nested-through
+      // chains route through JoinDependency (InnerJoin), matching Rails:
+      // joins_values feeds build_join_dependencies, so every node in the chain
+      // (base, through, target) is represented with its base_klass. This unifies
+      // AliasTracker self-join aliasing and table-klass lookups across simple and
+      // through joins; a non-association string falls through to a raw SQL join.
+      if (typeof arg === "string" && rel._isAssociationName(arg)) {
         if (!rel._namedInnerJoins.includes(arg)) rel._namedInnerJoins.push(arg);
         continue;
       }
-      const resolved = rel._resolveAssociationJoin(arg as string);
-      if (resolved) {
-        const entries = Array.isArray(resolved) ? resolved : [resolved];
-        for (const j of entries) {
-          rel._joinClauses.push({
-            type: "inner",
-            table: j.table,
-            on: j.on,
-            quoted: true,
-            klass: j.klass,
-          });
-        }
-      } else {
-        if (!rel._joinValues.includes(arg as string)) rel._joinValues.push(arg as string);
-      }
+      if (!rel._joinValues.includes(arg as string)) rel._joinValues.push(arg as string);
     }
     return rel;
   }
@@ -1717,65 +1741,16 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * True when an INNER `joins(name)` must be routed through JoinDependency
-   * rather than the flat `_resolveAssociationJoin` path. This is the case for
-   * a `:through` association whose chain references a table more than once —
-   * specifically when the through reflection OR the source reflection (at any
-   * nesting level) is itself a `:through`/HABTM. The flat resolver emits an
-   * unaliased duplicate JOIN there; JoinDependency applies AliasTracker.
+   * True when `name` is a declared association on this relation's model. A
+   * named `joins(:assoc)` routes through JoinDependency (mirroring Rails'
+   * joins_values → build_join_dependencies); anything else is a raw SQL join
+   * fragment stored verbatim in joins_values.
    *
    * @internal
    */
-  private _joinNeedsJoinDependency(name: string): boolean {
+  private _isAssociationName(name: string): boolean {
     const modelClass = this._modelClass as any;
-    const assocDef = (modelClass._associations ?? []).find((a: any) => a.name === name);
-    if (!assocDef) return false;
-    return this._throughChainHasNestedSource(modelClass, assocDef);
-  }
-
-  /** @internal */
-  private _isThroughLike(assocDef: any): boolean {
-    return (
-      assocDef.options?.through != null ||
-      assocDef.type === "hasAndBelongsToMany" ||
-      (assocDef.type as string) === "hasManyThrough" ||
-      (assocDef.type as string) === "hasOneThrough"
-    );
-  }
-
-  /**
-   * Walk a `:through` chain and report whether it is a nested-through that the
-   * flat `_resolveThroughJoin` path mis-joins — i.e. either the through
-   * reflection is itself a `:through`/HABTM (so an intermediate table is joined
-   * more than once) OR the source reflection is itself a `:through`/HABTM. Both
-   * shapes need JoinDependency's AliasTracker.
-   *
-   * @internal
-   */
-  private _throughChainHasNestedSource(modelClass: any, assocDef: any): boolean {
-    const throughName = assocDef.options?.through;
-    if (!throughName) return false;
-    const throughAssoc = (modelClass._associations ?? []).find((a: any) => a.name === throughName);
-    if (!throughAssoc) return false;
-    const throughClassName =
-      throughAssoc.options?.className ??
-      _camelize(throughAssoc.type === "hasMany" ? _singularize(throughName) : throughName);
-    const throughModel = modelRegistry.get(throughClassName);
-    if (!throughModel) return false;
-
-    // The through reflection is itself a :through/HABTM — a nested-through
-    // chain (e.g. Hotel → chefs[through departments] → cake_designers). The
-    // intermediate tables are joined more than once, which the flat resolver
-    // emits unaliased; route it through JoinDependency.
-    if (this._isThroughLike(throughAssoc)) return true;
-
-    // The source reflection on the through model is itself a through/HABTM.
-    const sourceName = assocDef.options?.source ?? _singularize(assocDef.name);
-    const throughAssocs: any[] = (throughModel as any)._associations ?? [];
-    const sourceAssoc =
-      throughAssocs.find((a: any) => a.name === sourceName) ??
-      throughAssocs.find((a: any) => a.name === _pluralize(sourceName));
-    return !!sourceAssoc && this._isThroughLike(sourceAssoc);
+    return (modelClass._associations ?? []).some((a: any) => a.name === name);
   }
 
   /**
@@ -3067,7 +3042,8 @@ export class Relation<T extends Base> {
       manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
       this._leftOuterJoinsValues.length > 0 ||
-      this._namedInnerJoins.length > 0;
+      this._namedInnerJoins.length > 0 ||
+      this._namedInnerJoinDeps.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
     for (const v of this._joinValues) {
@@ -3120,6 +3096,11 @@ export class Relation<T extends Base> {
         this._namedInnerJoins,
         Nodes.InnerJoin,
       );
+      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+    }
+    // Cross-klass merged JoinDependencies (Rails merge_joins): already built
+    // against the source relation's klass, so emit their constraints directly.
+    for (const jd of this._namedInnerJoinDeps) {
       for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
     }
     for (const node of joinNodes) manager.appendJoinNode(node);
@@ -5739,6 +5720,7 @@ export class Relation<T extends Base> {
     this._joinValues = [...source._joinValues];
     this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
     this._namedInnerJoins = [...source._namedInnerJoins];
+    this._namedInnerJoinDeps = [...source._namedInnerJoinDeps];
     this._includesAssociations = [...source._includesAssociations];
     this._preloadAssociations = [...source._preloadAssociations];
     this._eagerLoadAssociations = [...source._eagerLoadAssociations];
