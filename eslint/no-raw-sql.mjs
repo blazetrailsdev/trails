@@ -8,8 +8,10 @@
  * Two report patterns, both high-precision (anchored keyword + a restricted set
  * of execution sinks / receivers) so incidental SQL-looking text doesn't drown
  * the report:
- *   - noRawSql: a string/template literal starting with a SQL verb, passed to a
- *     call whose callee property is an execution sink (execute, query, …).
+ *   - noRawSql: a string/template literal starting with a SQL verb in the SQL
+ *     (first) argument of a call whose callee property is an execution sink
+ *     (execute, query, …). Later arguments are op-name labels / binds and are
+ *     not inspected.
  *       ✗ connection.execute("SELECT …")   ✓ throw new Error("SELECT failed")
  *   - noSqlSurgery: `.replace(`/`.concat(` on a variable named `sql` (RFC-0022).
  *
@@ -142,13 +144,18 @@ const rule = {
           return;
         }
 
-        // noRawSql: sink(...) with a SQL-looking string/template argument.
+        // noRawSql: sink(...) with a SQL-looking string/template as its SQL
+        // argument. Across every AR sink (execute, execQuery, selectAll, …) the
+        // SQL/arel text is the FIRST argument; later arguments are op-name
+        // labels and binds. Inspect only arg 0 so a label that happens to start
+        // with a SQL verb (e.g. a "DELETE Foo" instrumentation name) isn't
+        // misreported as raw SQL.
         if (!SINKS.has(prop)) return;
-        for (const arg of node.arguments) {
-          const text = leadingText(arg);
-          if (text !== null && SQL_RE.test(text)) {
-            context.report({ node: arg, messageId: "noRawSql", data: { sink: prop } });
-          }
+        const sqlArg = node.arguments[0];
+        if (!sqlArg) return;
+        const text = leadingText(sqlArg);
+        if (text !== null && SQL_RE.test(text)) {
+          context.report({ node: sqlArg, messageId: "noRawSql", data: { sink: prop } });
         }
       },
     };
