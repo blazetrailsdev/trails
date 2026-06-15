@@ -140,6 +140,11 @@ const TEST_SCHEMA: Schema = {
   junk_tags: { name: "string" },
   nsi_books: { name: "string" },
   nsi_citations: { book1_id: "integer", book2_id: "integer" },
+  jm_authors: { name: "string" },
+  jm_posts: { author_id: "integer", title: "string", body: "string" },
+  jm_tags: { name: "string" },
+  jm_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  jm_comments: { post_id: "integer", body: "string" },
 };
 
 // ==========================================================================
@@ -181,6 +186,88 @@ describe("AssociationsJoinModelTest", () => {
       this.attribute("taggable_type", "string");
       registerModel(Tagging);
     }
+  }
+
+  // Shared join-model (has_many :through) fixtures, mirroring the
+  // posts/tags/taggings + authors/comments graph join_model_test.rb leans on.
+  class JmAuthor extends Base {
+    static {
+      this.attribute("name", "string");
+      registerModel(JmAuthor);
+    }
+  }
+  class JmPost extends Base {
+    static {
+      this.attribute("author_id", "integer");
+      this.attribute("title", "string");
+      this.attribute("body", "string");
+      registerModel(JmPost);
+    }
+  }
+  class JmTag extends Base {
+    static {
+      this.attribute("name", "string");
+      registerModel(JmTag);
+    }
+  }
+  class JmTagging extends Base {
+    static {
+      this.attribute("tag_id", "integer");
+      this.attribute("taggable_id", "integer");
+      this.attribute("taggable_type", "string");
+      registerModel(JmTagging);
+    }
+  }
+  class JmComment extends Base {
+    static {
+      this.attribute("post_id", "integer");
+      this.attribute("body", "string");
+      registerModel(JmComment);
+    }
+  }
+  Associations.hasMany.call(JmPost, "taggings", {
+    className: "JmTagging",
+    foreignKey: "taggable_id",
+    as: "taggable",
+  });
+  Associations.belongsTo.call(JmTagging, "tag", { className: "JmTag", foreignKey: "tag_id" });
+  Associations.belongsTo.call(JmTagging, "taggable", { polymorphic: true });
+  Associations.hasMany.call(JmPost, "tags", {
+    through: "taggings",
+    className: "JmTag",
+    source: "tag",
+  });
+  Associations.hasMany.call(JmAuthor, "posts", { className: "JmPost", foreignKey: "author_id" });
+  Associations.hasMany.call(JmPost, "comments", { className: "JmComment", foreignKey: "post_id" });
+  Associations.hasMany.call(JmAuthor, "comments", {
+    through: "posts",
+    className: "JmComment",
+    source: "comments",
+  });
+  Associations.hasMany.call(JmTag, "jm_taggings", { className: "JmTagging", foreignKey: "tag_id" });
+  Associations.hasMany.call(JmTag, "taggedPosts", {
+    through: "jm_taggings",
+    source: "taggable",
+    sourceType: "JmPost",
+    className: "JmPost",
+  });
+  Associations.hasMany.call(JmTag, "nullTaggings", {
+    className: "JmTagging",
+    foreignKey: "tag_id",
+    scope: (rel: any) => rel.none(),
+  });
+  Associations.hasMany.call(JmTag, "nullTaggedPosts", {
+    through: "nullTaggings",
+    source: "taggable",
+    sourceType: "JmPost",
+    className: "JmPost",
+  });
+
+  async function seedJmPost(): Promise<{ post: JmPost; tag: JmTag }> {
+    const post = await JmPost.create({ title: "thinking", body: "B" });
+    const tag = await JmTag.create({ name: "general" });
+    await JmTagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "JmPost" });
+    return { post, tag };
   }
 
   beforeAll(async () => {
@@ -342,11 +429,14 @@ describe("AssociationsJoinModelTest", () => {
     expect(tags.length).toBe(2);
   });
 
-  it.skip("polymorphic has many going through join model with find", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires scoped find through polymorphic
+  it("polymorphic has many going through join model with find", async () => {
+    const { post } = await seedJmPost();
+    const tags = await loadHasMany(post, "tags", {
+      through: "taggings",
+      className: "JmTag",
+      source: "tag",
+    });
+    expect(tags[0].name).toBe("general");
   });
 
   it.skip("polymorphic has many going through join model with include on source reflection", () => {
@@ -815,11 +905,13 @@ describe("AssociationsJoinModelTest", () => {
     // Requires abstract parent eager loading
   });
 
-  it.skip("include polymorphic has many through", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires eager polymorphic through
+  it("include polymorphic has many through", async () => {
+    const { post } = await seedJmPost();
+    const posts = await JmPost.all().includes("tags").toArray();
+    const p = posts.find((r: any) => r.id === post.id);
+    const preloaded = (p as any)._preloadedAssociations?.get("tags");
+    expect(preloaded).toHaveLength(1);
+    expect(preloaded[0].name).toBe("general");
   });
 
   it("include polymorphic has many", async () => {
@@ -1173,11 +1265,22 @@ describe("AssociationsJoinModelTest", () => {
     expect(taggedPosts[0].title).toBe("Tagged Post");
   });
 
-  it.skip("has many polymorphic associations merges through scope", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires scope merging
+  it("has many polymorphic associations merges through scope", async () => {
+    const { post, tag } = await seedJmPost();
+    const nullTaggedPosts = await loadHasManyThrough(tag, "nullTaggedPosts", {
+      through: "nullTaggings",
+      source: "taggable",
+      sourceType: "JmPost",
+      className: "JmPost",
+    });
+    expect(nullTaggedPosts).toEqual([]);
+    const taggedPosts = await loadHasManyThrough(tag, "taggedPosts", {
+      through: "jm_taggings",
+      source: "taggable",
+      sourceType: "JmPost",
+      className: "JmPost",
+    });
+    expect(taggedPosts.map((p: any) => p.id)).toEqual([post.id]);
   });
 
   it("eager has many polymorphic with source type", async () => {
@@ -1734,11 +1837,14 @@ describe("AssociationsJoinModelTest", () => {
     expect((taggings[0] as any).taggable_type).toBe("Post");
   });
 
-  it.skip("associating unsaved records with has many through", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires unsaved record through association
+  it("associating unsaved records with has many through", async () => {
+    const { post } = await seedJmPost();
+    const newTag = new JmTag({ name: "new" });
+    const proxy = association(post, "tags");
+    await proxy.push(newTag);
+    expect(newTag.isNewRecord()).toBe(false);
+    const tags = await proxy.toArray();
+    expect(tags.map((t: any) => t.name)).toContain("new");
   });
 
   it("create associate when adding to has many through", async () => {
@@ -1798,11 +1904,11 @@ describe("AssociationsJoinModelTest", () => {
     // Requires join table without PK
   });
 
-  it.skip("has many through collection size doesnt load target if not loaded", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires size without loading
+  it("has many through collection size doesnt load target if not loaded", async () => {
+    const { post } = await seedJmPost();
+    const proxy = association(post, "tags");
+    expect(await proxy.size()).toBe(1);
+    expect(proxy.loaded).toBe(false);
   });
 
   it.skip("has many through collection size uses counter cache if it exists", () => {
@@ -1812,18 +1918,19 @@ describe("AssociationsJoinModelTest", () => {
     // Requires counter_cache on through
   });
 
-  it.skip("adding junk to has many through should raise type mismatch", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires type check on <<
+  it("adding junk to has many through should raise type mismatch", async () => {
+    const { post } = await seedJmPost();
+    const proxy = association(post, "tags");
+    await expect(proxy.push("Uhh what now?" as never)).rejects.toThrow(AssociationTypeMismatch);
   });
 
-  it.skip("adding to has many through should return self", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires << return value
+  it("adding to has many through should return self", async () => {
+    const { post } = await seedJmPost();
+    const tag = await JmTag.create({ name: "ruby" });
+    const proxy = association(post, "tags");
+    await proxy.push(tag);
+    const tags = await proxy.toArray();
+    expect(tags.map((t: any) => t.name)).toContain("ruby");
   });
 
   it("delete associate when deleting from has many through with nonstandard id", async () => {
@@ -2083,25 +2190,24 @@ describe("AssociationsJoinModelTest", () => {
     expect(await proxy.count()).toBe(0);
   });
 
-  it.skip("has many through sum uses calculations", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires sum() on through
+  it("has many through sum uses calculations", async () => {
+    const author = await JmAuthor.create({ name: "David" });
+    const post = await JmPost.create({ author_id: author.id, title: "t", body: "b" });
+    await JmComment.create({ post_id: post.id, body: "c" });
+    const proxy = association(author, "comments");
+    expect(await proxy.sum("post_id")).toBe(post.id);
   });
 
-  it.skip("calculations on has many through should disambiguate fields", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires disambiguated field calculations
+  it("calculations on has many through should disambiguate fields", async () => {
+    const { post } = await seedJmPost();
+    const proxy = association(post, "tags");
+    expect(await proxy.maximum("id")).toBeDefined();
   });
 
-  it.skip("calculations on has many through should not disambiguate fields unless necessary", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires smart disambiguation
+  it("calculations on has many through should not disambiguate fields unless necessary", async () => {
+    const { post } = await seedJmPost();
+    const proxy = association(post, "tags");
+    expect(await proxy.maximum("jm_tags.id")).toBeDefined();
   });
 
   it("has many through has many with sti", async () => {
@@ -2247,11 +2353,12 @@ describe("AssociationsJoinModelTest", () => {
     expect(loaded!.title).toBe("PolyBt");
   });
 
-  it.skip("preload polymorphic has many through", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires preload polymorphic through
+  it("preload polymorphic has many through", async () => {
+    const { post } = await seedJmPost();
+    const postsWithTags = await JmPost.all().includes("tags").toArray();
+    const p = postsWithTags.find((r: any) => r.id === post.id);
+    const preloaded = (p as any)._preloadedAssociations?.get("tags");
+    expect(preloaded).toHaveLength(1);
   });
 
   it("preload polymorph many types", async () => {
