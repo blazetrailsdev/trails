@@ -2821,6 +2821,15 @@ describe("RelationTest", () => {
     });
     const a1Row = rows.find((r) => r.name === "a1");
     expect(a1Row?.posts.map((p: any) => p.title).sort()).toEqual(["p1", "p2"]);
+    // The compound runs through `selectAll`/`execQuery` (Rails' find_with_associations
+    // feed). On PostgreSQL that pre-casts values via its type_map, so assert the
+    // integer `t0_r*`/`t1_r*` aliased columns instantiate to typed values — a
+    // double-cast on the parent id or the FK would break association grouping or
+    // surface a wrong type here (CI exercises this on PG).
+    expect(typeof a1Row.id).toBe("number");
+    expect(a1Row.id).toBe((a1 as any).id);
+    expect(a1Row.posts.every((p: any) => typeof p.id === "number")).toBe(true);
+    expect(a1Row.posts.every((p: any) => p.eager_setop_author_id === (a1 as any).id)).toBe(true);
   });
 
   it("unionAll includes duplicates", async () => {
