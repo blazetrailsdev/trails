@@ -217,13 +217,17 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   }
   const cache = adapter?.schemaCache as
     | {
-        isCached?: (t: string) => boolean;
         getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined;
       }
     | undefined;
   const table = stiTarget.tableName;
-  if (cache && typeof cache.isCached === "function" && cache.isCached(table)) {
-    const cached = cache.getCachedColumnsHash?.(table);
+  // Gate on the same map we read (`_columnsHash` via getCachedColumnsHash),
+  // not `isCached` (which checks `_columns`): a populated `_columns` without a
+  // matching `_columnsHash` entry would otherwise pass the guard, return
+  // undefined here, and fall through to the synthesized branch — re-leaking
+  // virtual attributes the warm was meant to exclude.
+  if (cache && typeof cache.getCachedColumnsHash === "function") {
+    const cached = cache.getCachedColumnsHash(table);
     if (cached) {
       const ignored = new Set(this.ignoredColumns ?? []);
       const filtered: Record<string, ColumnLike> = {};
@@ -1133,13 +1137,11 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   }
   if (!adapter) return false;
   const cache = adapter.schemaCache;
-  if (!cache || typeof cache.isCached !== "function") return false;
+  if (!cache || typeof cache.getCachedColumnsHash !== "function") return false;
   const table = schemaHost.tableName;
-  if (!cache.isCached(table)) return false;
-  const hash =
-    typeof cache.getCachedColumnsHash === "function"
-      ? cache.getCachedColumnsHash(table)
-      : undefined;
+  // Gate on `_columnsHash` (the map we read) rather than `isCached`/`_columns`,
+  // so an out-of-sync `_columns` entry can't pass the guard and yield undefined.
+  const hash = cache.getCachedColumnsHash(table);
   if (!hash) return false;
   applyColumnsHash(schemaHost, adapter, hash, host);
   return true;

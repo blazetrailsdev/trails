@@ -43,11 +43,12 @@ export class Connection {
     // triggering cache-miss paths that call async adapter methods.
     const adapter = this._klass?.connection;
     const schemaCache = adapter?.schemaCache;
-    if (schemaCache?.isCached(this._tableName)) {
-      const hash = schemaCache.getCachedColumnsHash(this._tableName);
-      const column = hash?.[attrName];
-      if (column) return column;
-    }
+    // Gate on the same map we read (`_columnsHash` via getCachedColumnsHash),
+    // not `isCached` (`_columns`); getCachedColumnsHash is a sync map read and
+    // never triggers an async cache-miss path. Returns undefined when unwarmed.
+    const hash = schemaCache?.getCachedColumnsHash?.(this._tableName);
+    const column = hash?.[attrName];
+    if (column) return column;
 
     // Fallback: klass.columnsHash (works when schema cache isn't populated)
     const columnsHash =
