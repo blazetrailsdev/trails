@@ -33,6 +33,7 @@ interface PgSchemaAdapter {
   getDatabaseVersion(): Promise<number>;
   supportsIndexInclude(): boolean;
   pgQuotedScope(name: string, type: "BASE TABLE" | null): { schema: string; name: string | null };
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
   readonly typeMap: HashLookupTypeMap;
   readonly visitor: Visitors.ToSql;
   loadAdditionalTypes(oids?: number[]): Promise<void>;
@@ -223,11 +224,18 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // Tables / views
   // ---------------------------------------------------------------------------
 
+  /**
+   * List ordinary and partitioned tables visible on the current
+   * search_path. Mirrors Rails'
+   * `ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#tables`
+   * which uses `data_source_sql(type: "BASE TABLE")` — relkind IN ('r','p').
+   * Plain `pg_tables` lists only ordinary tables (relkind 'r') and would
+   * miss partitioned tables (relkind 'p'); querying `pg_class` via
+   * dataSourceSql catches both.
+   */
   async tables(): Promise<string[]> {
-    const rows = await this.pg.schemaQuery(
-      `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false)) ORDER BY tablename`,
-    );
-    return rows.map((r) => r.tablename as string);
+    const rows = await this.pg.schemaQuery(this.pg.dataSourceSql(null, { type: "BASE TABLE" }));
+    return rows.map((r) => r.relname as string);
   }
 
   /**
