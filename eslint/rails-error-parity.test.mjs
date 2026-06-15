@@ -31,6 +31,14 @@ const manifest = {
         parent: "NoMethodError",
         rubyFile: "active_support/delegation.rb",
       },
+      // Nested scattered class: Ruby's snake_case path maps to our kebab-case
+      // source file (core_ext/string/output_safety.rb → core-ext/string/
+      // output-safety.ts).
+      {
+        name: "SafeConcatError",
+        parent: "StandardError",
+        rubyFile: "active_support/core_ext/string/output_safety.rb",
+      },
     ],
   },
 };
@@ -58,6 +66,12 @@ const asErrorsFile = path.join(REPO_ROOT, "packages/activesupport/src/errors.ts"
 const asBaseFile = path.join(REPO_ROOT, "packages/activesupport/src/duration.ts");
 // Scattered (non-errors.ts) file: DelegationError maps here via delegation.rb.
 const asScatteredFile = path.join(REPO_ROOT, "packages/activesupport/src/delegation.ts");
+// Nested scattered file: the manifest's snake_case Ruby path must map onto
+// this kebab-case source path for the parity check to match it.
+const asNestedFile = path.join(
+  REPO_ROOT,
+  "packages/activesupport/src/core-ext/string/output-safety.ts",
+);
 
 // Class declarations for synthetic errors.ts files; `nl` joins into a file.
 const AD = "export class AdapterError extends ActiveRecordError {}";
@@ -91,6 +105,11 @@ tester.run("rails-error-parity", rule, {
     {
       filename: asScatteredFile,
       code: `export class DelegationError extends Error {}\n`,
+    },
+    // Nested snake_case→kebab-case path is matched and mirrored.
+    {
+      filename: asNestedFile,
+      code: `export class SafeConcatError extends Error {}\n`,
     },
   ],
   invalid: [
@@ -142,6 +161,12 @@ tester.run("rails-error-parity", rule, {
       filename: asScatteredFile,
       code: `export class DelegationError {}\n`,
       errors: [{ messageId: "rootExtends" }],
+    },
+    // Nested snake_case→kebab-case path is matched: missing class is flagged.
+    {
+      filename: asNestedFile,
+      code: `export class SomethingElse extends Error {}\n`,
+      errors: [{ messageId: "missingClass" }],
     },
   ],
 });

@@ -88,11 +88,17 @@ function repoRel(filename) {
   return m ? { rel: m[1], pkg: m[2] } : null;
 }
 
-/** `active_record/errors.rb` → `errors.ts` (drop namespace segment, .rb→.ts). */
+/**
+ * `active_record/errors.rb` → `errors.ts` (drop namespace segment, .rb→.ts).
+ * Ruby's snake_case path segments map to our kebab-case source files, so
+ * `active_record/attribute_methods/serialization.rb` →
+ * `attribute-methods/serialization.ts` — without the `_`→`-` step the parity
+ * check would silently match nothing for any nested scattered error file.
+ */
 function rubyToSrcRel(rubyFile) {
   const parts = rubyFile.split("/");
   const tail = parts.slice(1).join("/");
-  return tail.replace(/\.rb$/, ".ts");
+  return tail.replace(/\.rb$/, ".ts").replace(/_/g, "-");
 }
 
 /** Last identifier of a class's superClass node (`globalThis.Error` → `Error`). */
