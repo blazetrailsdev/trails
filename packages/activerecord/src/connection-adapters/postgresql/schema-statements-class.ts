@@ -1210,7 +1210,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     return Number(rows[0].count) > 0;
   }
 
-  async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
+  override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     const scope = this.pg.quotedScope(tableName);
     const rows = await this.pg.schemaQuery(
       `SELECT conname, pg_get_constraintdef(c.oid, true) AS constraintdef, c.convalidated AS valid
