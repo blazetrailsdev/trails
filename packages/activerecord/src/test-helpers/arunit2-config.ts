@@ -71,6 +71,13 @@ export interface ResolvedSecondDatabase {
  * `arunit` / `arunit2` split); on Postgres/MySQL the config points at the
  * derived `arunit2` database on the shared server.
  *
+ * Status: the sole runtime caller (`setupSecondPool`) only runs on the sqlite
+ * lane today — `MultipleDbTest` is `describe.skipIf(!isSqliteRun())` because no
+ * one provisions a second named database on the PG/MySQL servers yet. The
+ * Postgres/MySQL branches here are therefore groundwork: exercised by this
+ * file's unit tests and ready for the un-gating + `CREATE DATABASE`
+ * provisioning tracked in its own story, not yet live on a PG/MySQL run.
+ *
  * `read` is injectable so tests can exercise each adapter branch without
  * mutating the ambient environment; it defaults to activesupport's `getEnv`.
  */

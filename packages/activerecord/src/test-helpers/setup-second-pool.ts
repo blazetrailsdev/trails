@@ -25,6 +25,17 @@ import { resolveSecondDatabaseConfig } from "./arunit2-config.js";
  *
  * Fixture data is seeded separately via `useFixtures` in the test file.
  *
+ * Provisioning note: on sqlite the `arunit2` config is an in-memory pool that
+ * `establishConnection` materializes on the spot, so no caller setup is needed
+ * — which is why `MultipleDbTest` is currently sqlite-gated and this is the
+ * only lane that runs. On Postgres/MySQL the resolved config points at a
+ * derived `arunit2` *named database* that must already exist; like Rails'
+ * `ARTest.connect` (which assumes `db:create` ran against `config.yml`), this
+ * helper does NOT issue `CREATE DATABASE`. Un-gating `MultipleDbTest` for
+ * PG/MySQL therefore requires a caller-side `CREATE DATABASE arunit2` step
+ * (as `adapter.test.ts` does for the cross-database-select probe); that work
+ * is tracked as a separate story.
+ *
  * @internal
  */
 const ARUNIT2_SCHEMA: Schema = {
