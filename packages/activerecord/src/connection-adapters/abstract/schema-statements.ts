@@ -1574,6 +1574,7 @@ export class SchemaStatements {
     reselect?: (...cols: unknown[]) => unknown;
     distinctBang?: () => unknown;
     noneBang?: () => void;
+    whereBang?: (conditions: Record<string, unknown>) => unknown;
     where?: (conditions: Record<string, unknown>) => unknown;
     limitValue?: number | null;
     offsetValue?: number | null;
@@ -1582,37 +1583,60 @@ export class SchemaStatements {
     const pk = relation.primaryKey;
     if (!pk) return relation;
 
-    const pkColumns = Array.isArray(pk) ? pk : [pk];
+    const pkNames = Array.isArray(pk) ? pk : [pk];
+    // Rails: primary_key_columns = Array(primary_key).map { |c| visitor.compile(relation.table[c]) }
+    // — table-qualified, quoted columns so a bare `id` stays unambiguous when the
+    // relation joins another table (the whole reason this path exists).
+    const tableName = (relation.table as { name?: string } | undefined)?.name;
+    const quoteCol = (c: string): string =>
+      typeof this.adapter.quoteColumnName === "function" ? this.adapter.quoteColumnName(c) : c;
+    const pkColumns = pkNames.map((c) =>
+      tableName != null ? `${this.adapter.quoteTableName(tableName)}.${quoteCol(c)}` : quoteCol(c),
+    );
     const values = this.columnsForDistinct(pkColumns, (relation.orderValues as string[]) ?? []);
 
+    // Rails: limited = relation.reselect(values).distinct! — reselect always
+    // spawns a clone, so distinct! never touches the passed relation. Keep the
+    // distinctBang coupled to the reselect spawn so a missing reselect can't
+    // mutate the original.
     let limited: any = relation;
     const selectValues = Array.isArray(values) ? values : [values];
-    if (limited.reselect) limited = limited.reselect(...selectValues);
-    if (limited.distinctBang) limited.distinctBang();
+    if (limited.reselect) {
+      limited = limited.reselect(...selectValues);
+      if (limited.distinctBang) limited.distinctBang();
+    }
 
-    // Execute the limited distinct query to get IDs
+    // Rails: select_rows(limited.arel, "SQL").map { |r| r.last(primary_key.length) }
+    // — selectRows yields positional column arrays, so the trailing pk values
+    // survive the leading order columns PG/MySQL prepend in columns_for_distinct.
     const arel = typeof limited.arel === "function" ? limited.arel() : limited;
     const sql = typeof arel === "string" ? arel : (arel?.toSql?.() ?? String(arel));
-    const rows = await this.adapter.execute(sql);
-    const pkLen = pkColumns.length;
-
-    const limitedIds: unknown[][] = rows.map((row: Record<string, unknown>) => {
-      const vals = Object.values(row);
-      return vals.slice(-pkLen);
-    });
+    const pkLen = pkNames.length;
+    const adapter = this.adapter as any;
+    const rows: unknown[][] =
+      typeof adapter.selectRows === "function"
+        ? ((await adapter.selectRows(sql, "SQL")) as unknown[][])
+        : (await adapter.execute(sql)).map((row: Record<string, unknown>) => Object.values(row));
+    const limitedIds: unknown[][] = rows.map((row) => row.slice(-pkLen));
 
     if (limitedIds.length === 0) {
       if (typeof (relation as any).noneBang === "function") {
         (relation as any).noneBang();
       }
     } else {
-      // Build {pk_col => [id1, id2, ...]} conditions
-      const transposed: unknown[][] = pkColumns.map((_, i) => limitedIds.map((row) => row[i]));
+      // Rails: relation.where!(**Array(primary_key).zip(limited_ids.transpose).to_h)
+      // — keyed on the bare pk attribute names, not the quoted/qualified columns.
+      // Use whereBang (in-place mutation of the passed relation) to match `where!`;
+      // plain `where` returns a clone, which would strand the limit/offset reset
+      // below on a different object than the caller holds.
+      const transposed: unknown[][] = pkNames.map((_, i) => limitedIds.map((row) => row[i]));
       const conditions: Record<string, unknown> = {};
-      for (let i = 0; i < pkColumns.length; i++) {
-        conditions[pkColumns[i]] = transposed[i];
+      for (let i = 0; i < pkNames.length; i++) {
+        conditions[pkNames[i]] = transposed[i];
       }
-      if (typeof (relation as any).where === "function") {
+      if (typeof (relation as any).whereBang === "function") {
+        (relation as any).whereBang(conditions);
+      } else if (typeof (relation as any).where === "function") {
         relation = (relation as any).where(conditions);
       }
     }

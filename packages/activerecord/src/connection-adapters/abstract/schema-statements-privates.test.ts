@@ -374,3 +374,81 @@ describe("indexNameForRemoveFrom early return", () => {
     ).toThrow();
   });
 });
+
+describe("distinctRelationForPrimaryKey", () => {
+  function makeRelation(over: Record<string, unknown> = {}) {
+    const calls = { reselect: [] as unknown[], where: [] as Record<string, unknown>[] };
+    const rel: any = {
+      _calls: calls,
+      primaryKey: "id",
+      table: { name: "posts" },
+      orderValues: [],
+      _limitValue: 5,
+      _offsetValue: 2,
+      reselect(...cols: unknown[]) {
+        calls.reselect = cols;
+        // Rails reselect spawns a clone; return a distinct object so a stray
+        // distinctBang on the original would be observable.
+        return { ...this, distinctBang: () => {}, arel: this.arel };
+      },
+      arel: () => ({ toSql: () => "SELECT DISTINCT ..." }),
+      // Rails uses where! (in-place); mirror that with whereBang.
+      whereBang(c: Record<string, unknown>) {
+        calls.where.push(c);
+        return this;
+      },
+      limitBang(v: unknown) {
+        this._limitValue = v;
+      },
+      offsetBang(v: unknown) {
+        this._offsetValue = v;
+      },
+      ...over,
+    };
+    return rel;
+  }
+
+  it("reselects the table-qualified pk and materializes ids via selectRows", async () => {
+    const selectRows = vi.fn().mockResolvedValue([[10], [20]]);
+    const ss = makeStatements({ quoteColumnName: (n: string) => `"${n}"`, selectRows });
+    const rel = makeRelation();
+
+    const result = await ss.distinctRelationForPrimaryKey(rel);
+
+    expect(rel._calls.reselect).toEqual(['"posts"."id"']);
+    expect(selectRows).toHaveBeenCalledWith("SELECT DISTINCT ...", "SQL");
+    expect(rel._calls.where).toEqual([{ id: [10, 20] }]);
+    expect(rel._limitValue).toBeNull();
+    expect(rel._offsetValue).toBeNull();
+    expect(result).toBe(rel);
+  });
+
+  it("keeps only the trailing pk value when columns_for_distinct prepends order columns", async () => {
+    // PG/MySQL prepend `order AS alias_n` columns; Rails takes results.last(pk.length).
+    const selectRows = vi.fn().mockResolvedValue([
+      ["2026-01-01", 10],
+      ["2026-01-02", 20],
+    ]);
+    const ss = makeStatements({ quoteColumnName: (n: string) => `"${n}"`, selectRows });
+    const rel = makeRelation();
+
+    await ss.distinctRelationForPrimaryKey(rel);
+
+    expect(rel._calls.where).toEqual([{ id: [10, 20] }]);
+  });
+
+  it("calls noneBang when no ids materialize", async () => {
+    const noneBang = vi.fn();
+    const whereBang = vi.fn();
+    const ss = makeStatements({
+      quoteColumnName: (n: string) => `"${n}"`,
+      selectRows: vi.fn().mockResolvedValue([]),
+    });
+    const rel = makeRelation({ noneBang, whereBang });
+
+    await ss.distinctRelationForPrimaryKey(rel);
+
+    expect(noneBang).toHaveBeenCalledTimes(1);
+    expect(whereBang).not.toHaveBeenCalled();
+  });
+});
