@@ -203,8 +203,9 @@ export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): str
     setPrimaryKeyAttr.call(this, value);
     return value;
   }
-  // Same narrowing as Base.primaryKey: getPrimaryKeyAttr is the one honest
-  // nullable accessor; public callers see the non-null contract.
+  // Same type-level assertion as Base.primaryKey (not a runtime guarantee):
+  // getPrimaryKeyAttr is the one honest nullable accessor, but public callers
+  // see the non-null contract. A view still returns null at runtime.
   return getPrimaryKeyAttr.call(this) as string | string[];
 }
 
