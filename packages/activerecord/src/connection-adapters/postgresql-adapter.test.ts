@@ -1082,7 +1082,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("extracts :to from an object with a to key", async () => {
+      // Rails' extract_new_default_value only unwraps a {from:, to:} change
+      // hash when BOTH keys are present (abstract/schema_statements.rb:1820);
+      // otherwise the argument is treated as a literal default.
       const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", {
+        from: 0,
         to: 99,
       });
       expect(def!.default).toBe(99);
