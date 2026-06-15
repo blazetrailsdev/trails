@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
+import { Associations, loadBelongsTo } from "../associations.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -42,11 +42,21 @@ describe("BidirectionalDestroyDependenciesTest", () => {
     return { Content, ContentPosition };
   }
 
-  it.skip("bidirectional dependence when destroying item with belongs to association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/bidirectional-destroy-dependencies.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in bidirectional-destroy-dependencies.test.ts
-    /* needs dependent: destroy on belongs_to to cascade to parent */
+  it("bidirectional dependence when destroying item with belongs to association", async () => {
+    const { Content, ContentPosition } = makeModels();
+    const content = await Content.create({ title: "article" });
+    const contentPosition = await ContentPosition.create({ content_id: content.id, position: 1 });
+
+    const loadedContent = await loadBelongsTo(contentPosition, "content", {
+      className: "Content",
+      foreignKey: "content_id",
+    });
+    expect(loadedContent).not.toBeNull();
+
+    await contentPosition.destroy();
+
+    expect(await ContentPosition.count()).toBe(0);
+    expect(await Content.count()).toBe(0);
   });
 
   it("bidirectional dependence when destroying item with has one association", async () => {
