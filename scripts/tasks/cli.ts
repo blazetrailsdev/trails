@@ -1632,6 +1632,25 @@ blocked-by: null
 ${body}`;
 }
 
+// A body is "effectively empty" when it carries no substance beyond the
+// section scaffold — i.e. a blank/whitespace-only file, or just the
+// `## Context` / `## Acceptance criteria` headings (optionally with empty
+// checkbox bullets) and no prose under them. This is what the empty-stub guard
+// must reject: otherwise `--body-file <blank>` (or a file containing only the
+// skeleton) reintroduces the exact title-only stub the guard exists to stop.
+export function isEffectivelyEmptyBody(body: string): boolean {
+  const substantive = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(
+      (line) =>
+        line.length > 0 && // blank lines
+        !/^#{1,6}\s/.test(line) && // markdown headings (## Context, …)
+        !/^[-*]\s*(\[[ xX]\])?\s*$/.test(line), // empty bullets / empty checkboxes
+    );
+  return substantive.length === 0;
+}
+
 export function newStory(
   rfcSlug: string,
   storySlug: string,
@@ -1708,11 +1727,15 @@ export function newStory(
   // context in hand right now (the trails/Rails file:line it just read); a
   // bare-title skeleton throws that away and forces a later, more expensive
   // re-derivation pass. Require a real body, or an explicit opt-in to a stub.
-  if (body == null && !opts.allowEmpty) {
+  // `body == null` is the default-skeleton path; the content check also catches
+  // a `--body-file` that is blank or carries only the empty section headings.
+  if ((body == null || isEffectivelyEmptyBody(body)) && !opts.allowEmpty) {
+    const via = body == null ? "an empty body" : "a skeleton-only body";
     console.error(
-      `error: refusing to create "${storySlug}" with an empty body.\n` +
+      `error: refusing to create "${storySlug}" with ${via}.\n` +
         `  A title-only stub loses the context you have right now. Provide:\n` +
-        `    --body-file <path>   a markdown body (## Context + ## Acceptance criteria)\n` +
+        `    --body-file <path>   a markdown body with real prose under\n` +
+        `                         ## Context and ## Acceptance criteria\n` +
         `  or, to scaffold a bare stub on purpose:\n` +
         `    --allow-empty`,
     );
@@ -2392,7 +2415,7 @@ function main(): void {
           : [],
         priority: priorityRaw !== undefined ? Number(priorityRaw) : null,
         bodyFile: stringFlag(flags, "body-file"),
-        allowEmpty: flags["allow-empty"] === true || flags.force === true,
+        allowEmpty: flags["allow-empty"] === true,
       });
       break;
     }
