@@ -702,6 +702,7 @@ export type UnscopeType =
   | "offset"
   | "joins"
   | "leftOuterJoins"
+  | "leftJoins"
   | "includes"
   | "preload"
   | "eagerLoad"
@@ -723,6 +724,7 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
   "offset",
   "joins",
   "leftOuterJoins",
+  "leftJoins",
   "includes",
   "preload",
   "eagerLoad",
@@ -783,6 +785,7 @@ function unscopeBang(
           this._namedInnerJoins = [];
           break;
         case "leftOuterJoins":
+        case "leftJoins":
           this._joinClauses = this._joinClauses.filter((j) => j.type !== "left");
           this._leftOuterJoinsValues = [];
           break;
