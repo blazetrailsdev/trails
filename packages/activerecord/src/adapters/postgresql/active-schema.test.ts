@@ -68,10 +68,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
       {
-        const [idx] = await adapter.indexes("people");
-        expect(idx.unique).toBe(true);
-        expect(idx.columns).toEqual(["last_name"]);
-        expect(idx.where).toContain("state");
+        const indexes = await adapter.indexes("people");
+        const idx = indexes.find((i) => i.name === "index_people_on_last_name");
+        expect(idx).toBeDefined();
+        expect(idx!.unique).toBe(true);
+        expect(idx!.columns).toEqual(["last_name"]);
+        expect(idx!.where).toContain("state");
       }
       await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
 
