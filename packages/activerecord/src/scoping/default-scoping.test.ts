@@ -73,9 +73,6 @@ registerModel(SpecialPostWithDefaultScope);
 registerModel(ConditionalStiPost);
 registerModel(SubConditionalStiPost);
 registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
-// SpecialComment is the STI target of `Post#specialComments`, resolved by the
-// "sti association with unscoped not affected by default scope" port.
-registerModel(SpecialComment);
 
 const names = (rows: any[]) => rows.map((r) => r.name);
 const salaries = (rows: any[]) => rows.map((r) => r.salary);
@@ -878,23 +875,15 @@ describe("DefaultScopingTest", () => {
     await expect(Post.joins("specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
     expect(await (await (post.specialComments as any).reload()).toArray()).toEqual([]);
 
+    const specialCommentIds = async (rel: any) =>
+      (await (await rel.find(post.id)).specialComments.toArray()).map((c: any) => c.id);
+
     await (SpecialComment as any).unscoped(async () => {
-      const joined = await Post.joins("specialComments").find(post.id);
-      expect((joined as any).id).toBe(post.id);
-      const viaJoins = await (joined as any).specialComments.toArray();
-      expect(viaJoins.map((c: any) => c.id)).toEqual(expected);
-      const eager = (await (
-        (await Post.eagerLoad("specialComments").find(post.id)) as any
-      ).specialComments.toArray()) as any[];
-      expect(eager.map((c) => c.id)).toEqual(expected);
-      const inc = (await (
-        (await Post.includes("specialComments").find(post.id)) as any
-      ).specialComments.toArray()) as any[];
-      expect(inc.map((c) => c.id)).toEqual(expected);
-      const pre = (await (
-        (await Post.preload("specialComments").find(post.id)) as any
-      ).specialComments.toArray()) as any[];
-      expect(pre.map((c) => c.id)).toEqual(expected);
+      expect((await Post.joins("specialComments").find(post.id)).id).toBe(post.id);
+      expect(await specialCommentIds(Post.joins("specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.eagerLoad("specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.includes("specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.preload("specialComments"))).toEqual(expected);
     });
   });
 
