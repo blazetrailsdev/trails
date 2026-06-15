@@ -27,6 +27,7 @@ import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { ActiveModelRangeError } from "@blazetrails/activemodel";
+import { hasDefaultScopeOverride } from "./scoping/default.js";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -831,7 +832,16 @@ async function findByThroughCache(
   this: CoreHost,
   conditions: Record<string, unknown>,
 ): Promise<any> {
-  if ((this as any).currentScope) return this.all().findBy(conditions);
+  // Mirrors Rails core.rb#find_by: `return super if scope_attributes?`, where
+  // `scope_attributes?` (scoping/default.rb) is
+  // `current_scope || default_scopes.any? || respond_to?(:default_scope)`. A
+  // default scope can add includes/references/order the StatementCache fast path
+  // can't reproduce (it builds a bare `where(...).limit(1)`), so defer the whole
+  // lookup to the relation path, which applies the default scope's eager joins.
+  const ctor = this as any;
+  if (ctor.currentScope || (ctor.defaultScopes?.length ?? 0) > 0 || hasDefaultScopeOverride(this)) {
+    return this.all().findBy(conditions);
+  }
   const keys = Object.keys(conditions);
   if (keys.length === 0) return this.all().findBy(conditions);
   await this.ensureSchemaLoaded();
