@@ -614,19 +614,71 @@ export function assignNestedAttributesForCollectionAssociation(
   // Rails-style immediate in-memory build: new records (no `id`) are built on
   // the association at assign time so the collection is readable right after
   // assignment (`part.trinkets[0].name`); autosave persists them on save.
-  // Records with an `id` are existing-record updates/destroys whose loader is
-  // async, so they stay in the pending map for the post-save flush.
+  //
+  // Existing records (with an `id`): when the association is autosave-backed
+  // (which all `accepts_nested_attributes_for` collections are in Rails), the
+  // in-memory `@target` is populated synchronously — find the record in the
+  // loaded target or instantiate a persisted stub by id, add it to the target,
+  // and assign the nested attributes in place. Autosave then persists it (and
+  // any grandchildren) on save, mirroring Rails'
+  // `assign_nested_attributes_for_collection_association`. This also makes the
+  // record readable right after assignment and lets a grandchild save reuse the
+  // in-memory record without a DB reload.
+  //
+  // For non-autosave associations there is no autosave cascade to persist the
+  // change, so existing records stay in the pending map for the trails-specific
+  // post-save flush (`processNestedAttributes`).
+  const associations: any[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a: any) => a.name === associationName);
+  const isAutosave = assocDef?.options?.autosave === true;
+
   const deferred: Record<string, unknown>[] = [];
   for (const a of attrs) {
-    if (hasNestedId(a)) {
+    if (!hasNestedId(a)) {
+      if (!isRejectNewRecord(record, associationName, a)) {
+        collectionProxyFor(record, associationName).build(assignableNestedAttributes(a));
+      }
+    } else if (isAutosave) {
+      populateInMemoryExistingRecord(record, associationName, a);
+    } else {
       deferred.push(a);
-    } else if (!isRejectNewRecord(record, associationName, a)) {
-      collectionProxyFor(record, associationName).build(assignableNestedAttributes(a));
     }
   }
   if (deferred.length > 0) {
     storePendingNestedAttributes(record, associationName, deferred);
   }
+}
+
+/**
+ * Populate the in-memory collection target with an existing (id-bearing) nested
+ * record so autosave persists it — and any grandchildren — on save without a DB
+ * reload. Mirrors the `existing_record` branch of Rails'
+ * `assign_nested_attributes_for_collection_association`: locate the record in the
+ * loaded target (or instantiate a persisted stub keyed by its primary key when
+ * the association is not loaded), add it to the target, then
+ * `assign_to_or_mark_for_destruction`. Reject-if and allow-destroy semantics
+ * match Rails' existing-record path (`call_reject_if`, not `reject_new_record?`).
+ * @internal
+ */
+function populateInMemoryExistingRecord(
+  record: Base,
+  associationName: string,
+  attrs: Record<string, unknown>,
+): void {
+  if (callRejectIf(record, associationName, attrs)) return;
+  const targetModel = resolveCollectionTargetModel(record, associationName);
+  if (!targetModel) return;
+
+  const proxy = collectionProxyFor(record, associationName);
+  const id = (attrs as any).id;
+  let existing = findRecordById(targetModel, proxy.target as Base[], id);
+  if (!existing) {
+    const pk = (targetModel as any).primaryKey;
+    const pkCol = Array.isArray(pk) ? pk[0] : (pk ?? "id");
+    existing = (targetModel as any)._instantiate({ [pkCol]: id });
+    (proxy as any).addExistingRecord(existing);
+  }
+  assignToOrMarkForDestruction(existing!, attrs, isAllowDestroy(record, associationName));
 }
 
 /**

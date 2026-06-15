@@ -21,6 +21,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -2946,14 +2947,47 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     return { Pirate, Ship, Part };
   }
 
-  it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => {
-    // BLOCKED: Phase G — `partsAttributes=` must populate the in-memory association
-    // target synchronously; trails defers nested attribute processing to save.
+  it("if association is not loaded and association record is saved and then in memory record attributes should be saved", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    acceptsNestedAttributesFor(Pirate, "ships");
+    acceptsNestedAttributesFor(Ship, "parts");
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const part = await Part.create({ name: "Stern", ship_id: ship.id });
+
+    // ships is not loaded; assigning nested attributes must populate the
+    // in-memory target synchronously, including the grandchild parts.
+    (pirate as any).shipsAttributes = [
+      { id: ship.id, partsAttributes: [{ id: part.id, name: "Mizzen Top" }] },
+    ];
+
+    const inMemoryShip = (pirate.association("ships") as any).target[0];
+    const inMemoryPart = (inMemoryShip.association("parts") as any).target[0];
+    expect(inMemoryPart.name).toBe("Mizzen Top");
+
+    expect(await pirate.save()).toBe(true);
+    const reloaded = await Part.find(part.id!);
+    expect(reloaded.name).toBe("Mizzen Top");
   });
 
-  it.skip("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", () => {
-    // BLOCKED: Phase G — `partsAttributes=` must populate the in-memory association
-    // target synchronously; trails defers nested attribute processing to save.
+  it("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    acceptsNestedAttributesFor(Pirate, "ships");
+    acceptsNestedAttributesFor(Ship, "parts");
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const part = await Part.create({ name: "Stern", ship_id: ship.id });
+
+    (pirate as any).shipsAttributes = [
+      { id: ship.id, partsAttributes: [{ id: part.id, name: "Mizzen Top" }] },
+    ];
+
+    // The in-memory grandchild is used; reading it fires no DB query.
+    await assertNoQueries(false, () => {
+      const grandchildShip = (pirate.association("ships") as any).target[0];
+      const grandchild = (grandchildShip.association("parts") as any).target[0];
+      expect(grandchild.name).toBe("Mizzen Top");
+    });
   });
 
   it("when grandchild changed in memory, saving parent should save grandchild", async () => {

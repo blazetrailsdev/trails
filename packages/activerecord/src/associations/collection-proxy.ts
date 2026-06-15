@@ -717,6 +717,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return record;
   }
 
+  /**
+   * Add an already-persisted record to the in-memory target, mirroring Rails'
+   * `association.send(:add_to_target, existing_record)` in
+   * `assign_nested_attributes_for_collection_association`. Used by nested
+   * attributes when an unloaded collection is assigned an existing record by
+   * id: the in-memory `@target` is populated synchronously so subsequent reads
+   * and autosave/grandchild cascades use it without a DB reload. `replace: true`
+   * dedups against any equal record already buffered.
+   * @internal
+   */
+  addExistingRecord(record: T): void {
+    this._replaceOnTarget(record, { replace: true });
+  }
+
   private _buildRaw(attrs: Record<string, unknown> = {}): Base {
     const ctor = this._record.constructor as typeof Base;
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
