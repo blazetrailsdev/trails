@@ -176,6 +176,7 @@ interface QueryMethodsHost {
   _manualReferences: string[];
   _fromClause: FromClause;
   _createWithAttrs: Record<string, unknown>;
+  _unscopeValues: Array<string | { where: string | string[] }>;
   _extending: Array<Record<string, (...args: any[]) => any>>;
   _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _skipPreloading: boolean;
@@ -739,6 +740,9 @@ function unscopeBang(
   this: QueryMethodsHost,
   ...types: Array<string | { where: string | string[] }>
 ): any {
+  // Rails unscope! records each scope in unscope_values so a later merge of
+  // this relation re-applies the reset (query_methods.rb / merger.rb).
+  this._unscopeValues.push(...types);
   for (const rawScope of types) {
     if (typeof rawScope === "string") {
       // Rails: `scope = :left_outer_joins if scope == :left_joins` — the
