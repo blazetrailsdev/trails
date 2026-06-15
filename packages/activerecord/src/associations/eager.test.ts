@@ -117,7 +117,10 @@ const TEST_SCHEMA: Schema = {
   eager_hm_lce_posts: { title: "string" },
   eager_hm_limit_comments: { body: "string", eager_hm_limit_post_id: "integer" },
   eager_hm_limit_posts: { title: "string" },
-  eager_hm_no_pk_children: { value: "string", eager_hm_no_pk_parent_id: "integer" },
+  eager_hm_no_pk_children: {
+    columns: { value: "string", eager_hm_no_pk_parent_id: "integer" },
+    primaryKey: false,
+  },
   eager_hm_no_pk_parents: { name: "string" },
   eager_hmi_authors: { name: "string" },
   eager_hmi_posts: { title: "string", type: "string", eager_hmi_author_id: "integer" },
@@ -164,7 +167,10 @@ const TEST_SCHEMA: Schema = {
   },
   eager_hmt_top_books: { title: "string" },
   eager_ho_children: { value: "string", eager_ho_parent_id: "integer" },
-  eager_ho_no_pk_children: { value: "string", eager_ho_no_pk_parent_id: "integer" },
+  eager_ho_no_pk_children: {
+    columns: { value: "string", eager_ho_no_pk_parent_id: "integer" },
+    primaryKey: false,
+  },
   eager_ho_no_pk_parents: { name: "string" },
   eager_ho_parents: { name: "string" },
   eager_ho_ref_children: { value: "string", eager_ho_ref_parent_id: "integer" },
@@ -726,6 +732,9 @@ describe("EagerAssociationTest", () => {
       }
     }
     class EagerHoNoPkChild extends Base {
+      // No primary key (mirrors Rails' `Matey`, whose table is `id: false`),
+      // so JoinDependency#construct must key identity off join_primary_key.
+      static _primaryKey = "";
       static {
         this.attribute("value", "string");
         this.attribute("eager_ho_no_pk_parent_id", "integer");
@@ -744,10 +753,10 @@ describe("EagerAssociationTest", () => {
       eager_ho_no_pk_parent_id: parent.id,
     });
 
-    const parents = await EagerHoNoPkParent.all().includes("eagerHoNoPkChild").toArray();
+    const parents = await EagerHoNoPkParent.all().eagerLoad("eagerHoNoPkChild").toArray();
     expect(parents).toHaveLength(1);
-    const preloaded = (parents[0] as any)._preloadedAssociations.get("eagerHoNoPkChild");
-    expect(preloaded?.value).toBe("C");
+    const child = (parents[0] as any).association("eagerHoNoPkChild").target;
+    expect(child?.value).toBe("C");
   });
   it("eager loaded has many association without primary key", async () => {
     class EagerHmNoPkParent extends Base {
@@ -756,6 +765,10 @@ describe("EagerAssociationTest", () => {
       }
     }
     class EagerHmNoPkChild extends Base {
+      // No primary key (mirrors Rails' `Matey`, whose table is `id: false`),
+      // so JoinDependency#construct keys off join_primary_key and must not
+      // collapse distinct rows into one via id-based model caching.
+      static _primaryKey = "";
       static {
         this.attribute("value", "string");
         this.attribute("eager_hm_no_pk_parent_id", "integer");
@@ -769,14 +782,17 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerHmNoPkChild", EagerHmNoPkChild);
 
     const parent = await EagerHmNoPkParent.create({ name: "P" });
-    await EagerHmNoPkChild.create({
-      value: "C1",
-      eager_hm_no_pk_parent_id: parent.id,
-    });
+    await EagerHmNoPkChild.create({ value: "C1", eager_hm_no_pk_parent_id: parent.id });
+    await EagerHmNoPkChild.create({ value: "C2", eager_hm_no_pk_parent_id: parent.id });
 
-    const parents = await EagerHmNoPkParent.all().includes("eagerHmNoPkChildren").toArray();
+    const parents = await EagerHmNoPkParent.all().eagerLoad("eagerHmNoPkChildren").toArray();
     expect(parents).toHaveLength(1);
-    const children = (parents[0] as any)._preloadedAssociations.get("eagerHmNoPkChildren");
+    // Rails keys a no-PK node on the constant `[nil]` (`id = keys.map { nil }`),
+    // so every matching row for one parent collapses to a single cached model —
+    // the eager-loaded collection holds one child even though two rows match.
+    // (Rails' own `mateys.yml` has one Matey per Pirate, so its mirror test
+    // never surfaces the collapse.)
+    const children = (parents[0] as any).association("eagerHmNoPkChildren").target;
     expect(children).toHaveLength(1);
   });
   it.skip("type cast in where references association name", () => {
