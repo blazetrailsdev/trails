@@ -107,9 +107,11 @@ export function indexNameForRemoveFrom(
   columnName: string | string[] | undefined,
   options: RemoveIndexOptions,
 ): string {
-  // can_remove_index_by_name?: a bare `{ name }` needs no introspection.
-  if (canRemoveIndexByName(columnName, options) && options.name != null) {
-    return options.name;
+  // can_remove_index_by_name?: a bare `{ name }` needs no introspection. Rails
+  // gates purely on key presence (`options.key?(:name)`) and returns the value
+  // as-is, so `{ name: undefined }` returns undefined here (Rails: nil).
+  if (canRemoveIndexByName(columnName, options)) {
+    return options.name as string;
   }
   const { name, columnNames } = removeIndexSpec(generateIndexName, tableName, columnName, options);
   const checks: Array<(i: IndexInfo) => boolean> = [];
