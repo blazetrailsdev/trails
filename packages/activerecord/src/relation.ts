@@ -2610,8 +2610,13 @@ export class Relation<T extends Base> {
   ): AssociationSpec[] {
     const fallbackAssocs: AssociationSpec[] = [];
     for (const spec of specs) {
-      if (!jd.addAssociationSpec(spec, references)) fallbackAssocs.push(spec);
+      if (!jd.addAssociationSpec(spec)) fallbackAssocs.push(spec);
     }
+    // Consume references lazily, mirroring Rails' join_constraints → make_constraints
+    // (join_dependency.rb:88–92, :202): re-alias each joined node whose reflection
+    // name is referenced (`authors AS author`). The mutation lands on the tree
+    // nodes, so the downstream SELECT projection and `arelJoin` reads pick it up.
+    if (references.length > 0) jd.joinConstraints([], undefined, references);
     return fallbackAssocs;
   }
 

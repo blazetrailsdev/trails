@@ -720,7 +720,10 @@ describe("EagerAssociationTest", () => {
       eager_ho_ref_parent_id: parent.id,
     });
 
-    const results = await EagerHoRefParent.all().includes("eagerHoRefChild").toArray();
+    const results = await EagerHoRefParent.all()
+      .includes("eagerHoRefChild")
+      .references("eagerHoRefChild")
+      .toArray();
     expect(results).toHaveLength(1);
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerHoRefChild");
     expect(preloaded?.value).toBe("C");
