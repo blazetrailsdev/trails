@@ -25,9 +25,15 @@ export class RelationHandler {
   // (predicate_builder/relation_handler.rb:7): normalize an eager-loading
   // subquery so its eager_load/includes become regular (OUTER) joins before the
   // PK select + `value.arel`, rather than being dropped.
+  //
+  // Pass `group_values.empty?` for apply_join_dependency's
+  // `eager_loading: group_values.empty?` default (finder_methods.rb:457): a
+  // grouped subquery is eager_loading: false, which skips the
+  // distinct_relation_for_primary_key materialization branch
+  // (finder_methods.rb:463). Matches relation.ts's own call site (~L3542).
   private applyJoinDependency(value: any): any {
     return typeof value?.applyJoinDependencyForArel === "function"
-      ? value.applyJoinDependencyForArel()
+      ? value.applyJoinDependencyForArel(value._groupColumns?.length === 0)
       : value;
   }
 
