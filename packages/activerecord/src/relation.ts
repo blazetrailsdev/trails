@@ -4218,13 +4218,17 @@ export class Relation<T extends Base> {
 
   /**
    * Render an Arel node to inlined display SQL through the connection, mirroring
-   * Rails' `conn.unprepared_statement { conn.to_sql(arel) }`. `unpreparedStatement`
-   * forces prepared statements off so `connection.toSql` compiles through the
-   * SubstituteBinds collector; the toggle is applied synchronously (the async
-   * `unpreparedStatement` exists for EXPLAIN, but `toSql` is sync). When no
-   * connection is established (HABTM join models), fall back to a default ANSI
-   * visitor inlining binds through the shared `defaultQuoter` — debug-only
-   * output, as in Rails' connection-less `Node#to_sql`.
+   * Rails' `conn.unprepared_statement { conn.to_sql(arel) }`. The
+   * prepared-statements toggle mirrors Rails' `unprepared_statement`
+   * (abstract_adapter.rb) structurally — applied synchronously (the async
+   * `unpreparedStatement` exists for EXPLAIN, but `toSql` is sync). It is a
+   * no-op for the current output: `connection.toSql` already inlines every bind
+   * through a SubstituteBinds collector unconditionally (it never branches on
+   * `preparedStatements`), so the scope is kept only for parity should `toSql`
+   * later adopt Rails' flag-driven `collector` dispatch. When no connection is
+   * established (HABTM join models), fall back to a default ANSI visitor
+   * inlining binds through the shared `defaultQuoter` — debug-only output, as in
+   * Rails' connection-less `Node#to_sql`.
    */
   private _toSqlViaConnection(node: Nodes.Node): string {
     const adapter = this._resolveAdapter();
