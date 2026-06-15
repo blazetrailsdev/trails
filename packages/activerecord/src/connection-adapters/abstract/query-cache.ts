@@ -2,6 +2,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import {
   typeCastedBinds,
   toSqlAndBinds,
+  arelFromRelation,
   type DatabaseStatementsHost,
 } from "./database-statements.js";
 import { Result } from "../../result.js";
@@ -434,9 +435,11 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     binds?: unknown[],
     opts?: { allowRetry?: boolean },
   ): Promise<Result> {
-    // Rails' select_all converts an Arel node (or relation) to SQL + binds via
-    // `to_sql_and_binds` before consulting the cache (query_cache.rb:236). A
-    // SQL string passes through unchanged with its binds intact.
+    // Rails' QueryCache#select_all first unwraps a Relation to its Arel AST
+    // (`arel = arel_from_relation(arel)`), then converts the Arel node to
+    // SQL + binds via `to_sql_and_binds` before consulting the cache. A SQL
+    // string passes through both steps unchanged with its binds intact.
+    arel = arelFromRelation(arel);
     const [sql, resolvedBinds] = toSqlAndBinds.call(
       this as DatabaseStatementsHost,
       arel,

@@ -362,6 +362,23 @@ describe("QueryCacheTest", () => {
     });
   });
 
+  it("select all with cache", async () => {
+    const { cached, Task } = await setup();
+    await Task.create({ title: "cached" });
+    const queries = trackQueries(cached);
+    await cached.cache(async () => {
+      queries.reset();
+      // Pass a Relation directly to the adapter, like Rails'
+      // `select_all(Post.all)` — it is unwrapped to its Arel AST and the cache
+      // serves the second call, so only one query reaches the database.
+      const r1 = await cached.selectAll(Task.all());
+      const r2 = await cached.selectAll(Task.all());
+      expect(r1.length).toBe(1);
+      expect(r2.length).toBe(1);
+    });
+    expect(queries.count).toBe(1);
+  });
+
   it("find queries", async () => {
     const { cached, Task } = await setup();
     const t = await Task.create({ title: "findme" });
