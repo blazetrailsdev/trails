@@ -550,6 +550,42 @@ describeIfMysql("Mysql2Adapter", () => {
     });
   });
 
+  describe("query_value / update via internal_exec_query", () => {
+    it("query_value returns a single scalar without throwing cast_result", async () => {
+      const value = await adapter.queryValue("SELECT 7 AS num");
+      expect(Number(value)).toBe(7);
+    });
+
+    it("query_value reads a session variable (disable_referential_integrity path)", async () => {
+      const value = await adapter.queryValue("SELECT @@FOREIGN_KEY_CHECKS");
+      expect(Number(value)).toBe(1);
+    });
+
+    it("query_values returns the first column of each row", async () => {
+      await adapter.exec("CREATE TABLE `items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `n` INT)");
+      await adapter.executeMutation("INSERT INTO `items` (`n`) VALUES (1), (2), (3)");
+      const values = await adapter.queryValues("SELECT `n` FROM `items` ORDER BY `n`");
+      expect(values.map(Number)).toEqual([1, 2, 3]);
+    });
+
+    it("update returns the count of affected rows", async () => {
+      await adapter.exec("CREATE TABLE `items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `n` INT)");
+      await adapter.executeMutation("INSERT INTO `items` (`n`) VALUES (1), (2), (3)");
+      const affected = await adapter.update("UPDATE `items` SET `n` = `n` + 1");
+      expect(affected).toBe(3);
+    });
+
+    it("disableReferentialIntegrity restores FOREIGN_KEY_CHECKS", async () => {
+      let inside: unknown;
+      await adapter.disableReferentialIntegrity(async () => {
+        inside = await adapter.queryValue("SELECT @@FOREIGN_KEY_CHECKS");
+      });
+      expect(Number(inside)).toBe(0);
+      const after = await adapter.queryValue("SELECT @@FOREIGN_KEY_CHECKS");
+      expect(Number(after)).toBe(1);
+    });
+  });
+
   describe("schema introspection", () => {
     beforeEach(async () => {
       await adapter.exec("DROP VIEW IF EXISTS `recent_widgets`");
