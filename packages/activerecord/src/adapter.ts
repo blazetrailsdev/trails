@@ -80,6 +80,15 @@ export interface DatabaseAdapter {
   toSqlAndBinds(arel: unknown, binds?: unknown[]): [string, unknown[]];
 
   /**
+   * Whether this connection prepares statements. `Relation#toSql` toggles it
+   * off for the render (mirroring `unprepared_statement`) so `toSql` inlines
+   * binds through the SubstituteBinds collector.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#prepared_statements
+   */
+  preparedStatements: boolean;
+
+  /**
    * Sanitize a string so it is safe to embed inside a `/* … *\/` SQL comment
    * (e.g. for `annotate`). Routed through the connection so an adapter can
    * override the comment-escaping rules.
