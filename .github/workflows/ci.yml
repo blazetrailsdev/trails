@@ -814,6 +814,25 @@ jobs:
             exit 1
           fi
           echo "No forbidden Claude attribution found in PR body."
+      - name: Forbid Claude attribution in commit messages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Scan every commit message on the PR via the API, not just the PR
+          # body. The body check above misses `Co-authored-by:` trailers that
+          # live in commits — and GitHub's squash-merge auto-aggregates those
+          # branch-commit trailers into the merge commit on `main`, which is
+          # exactly how a Claude attribution reached main past the body check.
+          # --paginate covers PRs with more than one page of commits.
+          messages=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
+          if printf '%s' "$messages" | grep -qiE 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'; then
+            echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
+            exit 1
+          fi
+          echo "No forbidden Claude attribution found in commit messages."
 
   docs-activerecord-freeze:
     name: Docs ActiveRecord Freeze
