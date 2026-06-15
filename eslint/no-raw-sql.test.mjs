@@ -61,6 +61,12 @@ tester.run("no-raw-sql", rule, {
     { code: 'sql.replaceAll("x", "y");', filename: IN },
     // Surgery API on a member, not a bare `sql` variable.
     { code: 'this.sql.replace(/x/, "");', filename: IN },
+    // Op-name label in a non-SQL argument position is NOT flagged, even when it
+    // starts with a SQL verb — only the first (SQL) argument is inspected.
+    { code: 'connection.execute(arel.toSql(), [], "DELETE Posts");', filename: IN },
+    // A SQL-looking string only reachable as a later (label/bind) argument is
+    // out of scope; the SQL argument here is non-literal.
+    { code: 'connection.selectValue(arel.toSql(), "SELECT count");', filename: IN },
   ],
   invalid: [
     // String literal passed to an execution sink.
@@ -105,9 +111,10 @@ tester.run("no-raw-sql", rule, {
       filename: IN,
       errors: [{ messageId: "noRawSql", data: { sink: "query" } }],
     },
-    // SQL string in a non-leading argument position is still flagged.
+    // SQL string in the first (SQL) argument position is flagged; a second
+    // SQL-looking arg (the op-name label) is not double-reported.
     {
-      code: 'connection.selectValue(binds, "SELECT COUNT(*) FROM posts");',
+      code: 'connection.selectValue("SELECT COUNT(*) FROM posts", "DELETE label");',
       filename: IN,
       errors: [{ messageId: "noRawSql", data: { sink: "selectValue" } }],
     },
