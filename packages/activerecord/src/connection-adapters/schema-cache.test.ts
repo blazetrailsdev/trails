@@ -364,6 +364,22 @@ describe("SchemaCacheTest", () => {
     expect(cache.isColumnsHashCached(null, "users")).toBe(false);
   });
 
+  it("keeps _columns and _columnsHash in sync across set and clear", () => {
+    // Sync readers (model-schema columnsHash/syncLoad, type-caster) gate on
+    // the same map they read. That only stays safe if the two column maps are
+    // populated and cleared together: setColumns must warm both, and
+    // clearDataSourceCacheBang must drop both, so isCached and
+    // isColumnsHashCached never disagree for a given table.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+    expect(cache.isCached("users")).toBe(cache.isColumnsHashCached(null, "users"));
+    expect(cache.isCached("users")).toBe(true);
+
+    cache.clearDataSourceCacheBang(null, "users");
+    expect(cache.isCached("users")).toBe(cache.isColumnsHashCached(null, "users"));
+    expect(cache.isCached("users")).toBe(false);
+  });
+
   it("when lazily load schema cache is set cache is lazily populated when est connection", async () => {
     // Rails: when ActiveRecord.lazily_load_schema_cache is on, the
     // SchemaReflection's @cache stays nil until first access and is
