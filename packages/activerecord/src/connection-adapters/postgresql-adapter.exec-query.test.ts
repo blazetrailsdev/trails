@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Result } from "../result.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
-import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
 
 const UUID_OID = 2950;
 
@@ -234,6 +234,79 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
     } finally {
       Notifications.unsubscribe(sub);
     }
+  });
+});
+
+describe("PostgreSQLAdapter#sqlKey", () => {
+  let adapter: PostgreSQLAdapter;
+
+  beforeEach(() => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (adapter) await adapter.close().catch(() => undefined);
+  });
+
+  const sqlKey = (sql: string): string =>
+    (adapter as unknown as { sqlKey: (s: string) => string }).sqlKey(sql);
+  const setMemo = (path: string | null): void => {
+    (adapter as unknown as { _schemaSearchPathMemo: string | null })._schemaSearchPathMemo = path;
+  };
+  const poolFor = (client: unknown): StatementPool =>
+    (adapter as unknown as { _poolFor: (c: unknown) => StatementPool })._poolFor(client);
+  const preparedNameFor = (client: unknown, sql: string): string =>
+    (
+      adapter as unknown as { _preparedNameFor: (c: unknown, s: string) => string }
+    )._preparedNameFor(client, sql);
+
+  it("scopes the pool key to the current schema_search_path", () => {
+    setMemo("schema_a, public");
+    expect(sqlKey("SELECT * FROM widgets")).toBe("schema_a, public-SELECT * FROM widgets");
+    setMemo("schema_b, public");
+    expect(sqlKey("SELECT * FROM widgets")).toBe("schema_b, public-SELECT * FROM widgets");
+  });
+
+  it("keys to the empty prefix before the search path is read", () => {
+    setMemo(null);
+    expect(sqlKey("SELECT 1")).toBe("-SELECT 1");
+  });
+
+  it("preparing the same SQL under two different search paths yields two pool entries", () => {
+    const fakeClient = { query: async () => undefined, release: () => {} };
+    const pool = poolFor(fakeClient);
+
+    setMemo("schema_a, public");
+    const nameA = preparedNameFor(fakeClient, "SELECT * FROM widgets");
+    setMemo("schema_b, public");
+    const nameB = preparedNameFor(fakeClient, "SELECT * FROM widgets");
+
+    expect(nameA).not.toBe(nameB);
+    expect(pool.keys).toContain("schema_a, public-SELECT * FROM widgets");
+    expect(pool.keys).toContain("schema_b, public-SELECT * FROM widgets");
+    expect(pool.length).toBe(2);
+
+    // Re-keying under the original path reuses the original entry — no stale leak.
+    setMemo("schema_a, public");
+    expect(preparedNameFor(fakeClient, "SELECT * FROM widgets")).toBe(nameA);
+    expect(pool.length).toBe(2);
+  });
+
+  it("setSchemaSearchPath re-scopes the key so no stale statement is reused", async () => {
+    // Drive the real setSchemaSearchPath path (which issues SET search_path and
+    // updates the memo) and confirm sqlKey tracks the active path end-to-end.
+    vi.spyOn(adapter, "execute").mockResolvedValue(undefined as never);
+
+    await adapter.setSchemaSearchPath("schema_a, public");
+    const keyA = sqlKey("SELECT * FROM widgets");
+
+    await adapter.setSchemaSearchPath("schema_b, public");
+    const keyB = sqlKey("SELECT * FROM widgets");
+
+    expect(keyA).toBe("schema_a, public-SELECT * FROM widgets");
+    expect(keyB).toBe("schema_b, public-SELECT * FROM widgets");
+    expect(keyA).not.toBe(keyB);
   });
 });
 

@@ -1248,7 +1248,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         return await attempt();
       } catch (e) {
         if (prepare && this._isInvalidCachedPlan(e)) {
-          this._poolFor(client).delete(sql);
+          this._poolFor(client).delete(this.sqlKey(sql));
           if (this._inTransaction) {
             throw new PreparedStatementCacheExpired(
               (e as { message?: string })?.message ?? "cached plan expired",
@@ -1273,10 +1273,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private _preparedNameFor(client: pg.Client, sql: string): string {
     const pool = this._poolFor(client);
-    const existing = pool.get(sql);
+    const key = this.sqlKey(sql);
+    const existing = pool.get(key);
     if (existing) return existing.name;
     const name = pool.nextKey();
-    pool.set(sql, { name });
+    pool.set(key, { name });
     return name;
   }
 
@@ -4748,13 +4749,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Statement-pool key. Rails scopes this to schema_search_path; here we
-   * use a fixed prefix because search_path is set once per connection.
+   * Statement-pool key, scoped to the current schema_search_path so a
+   * statement prepared under one path is not reused under another (the
+   * same SQL resolves to different tables across paths). Reads the
+   * connection-scoped memo synchronously; setSchemaSearchPath() updates it,
+   * so a mid-connection path change re-scopes the key and never reuses a
+   * statement bound to the old path. Until the memo is set the prefix is
+   * empty (`-sql`), matching the prior fixed-prefix behavior; the real path
+   * is only resolved lazily (Rails' sql_key calls the schema_search_path
+   * getter, which we cannot do from this synchronous hot path).
    * Mirrors: PostgreSQLAdapter#sql_key
    * @internal
    */
   sqlKey(sql: string): string {
-    return `-${sql}`;
+    return `${this._schemaSearchPathMemo ?? ""}-${sql}`;
   }
 
   /**
@@ -4766,13 +4774,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const pool = this._poolFor(client);
     // Use same cache key as _preparedNameFor so prepared statements created here
     // are visible to / deduped with the internal query path.
-    const existing = pool.get(sql);
+    const key = this.sqlKey(sql);
+    const existing = pool.get(key);
     if (existing) return existing.name;
     const name = pool.nextKey();
     // PREPARE ... AS avoids executing the statement (node-pg's { name, text } form
     // both prepares and executes in a single roundtrip).
     await client.query(`PREPARE ${pgQuoteColumnName(name)} AS ${sql}`);
-    pool.set(sql, { name });
+    pool.set(key, { name });
     return name;
   }
 
