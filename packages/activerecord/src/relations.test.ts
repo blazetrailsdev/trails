@@ -2114,7 +2114,7 @@ describe("RelationTest", () => {
   });
 
   // -- select --
-  it.skip("select returns records with projected columns in SQL", () => {
+  it("select returns records with projected columns in SQL", () => {
     const sql = Widget.all().select("name", "color").toSql();
     expect(sql).toContain('"name"');
     expect(sql).toContain('"color"');
@@ -4217,7 +4217,7 @@ describe("RelationTest", () => {
 
   // -- select --
 
-  it.skip("select limits returned columns", async () => {
+  it("select limits returned columns", async () => {
     const sql = Product.all().select("name", "price").toSql();
     expect(sql).toContain('"name"');
     expect(sql).toContain('"price"');
@@ -4240,13 +4240,13 @@ describe("RelationTest", () => {
 
   // -- reverseOrder --
 
-  it.skip("reverseOrder flips ASC to DESC", () => {
+  it("reverseOrder flips ASC to DESC", () => {
     const rel = Product.all().order("name").reverseOrder();
     const sql = rel.toSql();
     expect(sql).toContain('"name" DESC');
   });
 
-  it.skip("reverseOrder flips DESC to ASC", () => {
+  it("reverseOrder flips DESC to ASC", () => {
     const rel = Product.all().order({ price: "desc" }).reverseOrder();
     const sql = rel.toSql();
     expect(sql).toContain('"price" ASC');
@@ -5228,7 +5228,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("LIMIT");
   });
 
-  it.skip("finding with arel sql order", () => {
+  it("finding with arel sql order", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");

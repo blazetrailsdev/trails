@@ -2607,7 +2607,11 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // (mirrors Rails joins_values → named_join with InnerJoin).
   if (this._namedInnerJoins.length > 0) {
     const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
-    for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
+    // Thread references_values so a per-join hash select key (e.g.
+    // `select(comments_with_extend: { body: :x })` on a second `comments` join)
+    // aliases that join's table to the referenced name (Rails build_joins:1896).
+    for (const node of jd.joinConstraints([], aliases, this._referencesValues))
+      arel.source.right.push(node);
   }
 
   // Cross-klass merged JoinDependencies (Rails merge_joins): already built

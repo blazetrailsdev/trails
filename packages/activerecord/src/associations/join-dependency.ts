@@ -1423,7 +1423,11 @@ function rebindTableReferences(
 ): Nodes.Node {
   if (node instanceof Nodes.Attribute) {
     const rel = node.relation;
-    if (rel instanceof Table && rel.name === fromTableName && !rel.tableAlias) {
+    // Match by the table's *effective* SQL name: an unaliased table uses its
+    // real name; a join whose table was already aliased (a second join onto the
+    // same table) is identified by its alias. Both must rebind when the
+    // referenced-alias pass renames the table.
+    if (rel instanceof Table && (rel.tableAlias ?? rel.name) === fromTableName) {
       return toTable.get(node.name);
     }
     return node;

@@ -3084,7 +3084,12 @@ export class Relation<T extends Base> {
         this._namedInnerJoins,
         Nodes.InnerJoin,
       );
-      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+      // Thread references_values so a per-join hash select key (e.g.
+      // `select(comments_with_extend: { body: :x })` on a second `comments`
+      // join) aliases that join's table to the referenced name, mirroring Rails
+      // build_joins → join_constraints(stashed, alias_tracker, references_values).
+      for (const node of jd.joinConstraints([], undefined, this._referencesValues))
+        manager.appendJoinNode(node);
     }
     // Cross-klass merged JoinDependencies (Rails merge_joins): already built
     // against the source relation's klass, so emit their constraints directly.

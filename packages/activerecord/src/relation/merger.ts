@@ -1,6 +1,6 @@
 import { Nodes } from "@blazetrails/arel";
 
-import { constructJoinDependency } from "./query-methods.js";
+import { arelColumns, constructJoinDependency } from "./query-methods.js";
 
 /**
  * Merges two Relations together, combining their conditions,
@@ -40,9 +40,18 @@ export class Merger {
   }
 
   private mergeSelectValues(rel: any): void {
-    if (this.other._selectColumns != null) {
-      rel._selectColumns = [...this.other._selectColumns];
-    }
+    // Mirrors Rails' Merger#merge_select_values: union (`|=`) the other
+    // relation's select_values into ours rather than replacing. When the two
+    // relations target different models, the other side's bare columns are
+    // first resolved against *its own* table via arel_columns so a symbol like
+    // `:body` qualifies to `comments.body` instead of the receiver's table.
+    const otherSelect = this.other._selectColumns;
+    if (otherSelect == null || otherSelect.length === 0) return;
+    const columns =
+      this.other._modelClass === rel._modelClass
+        ? otherSelect
+        : arelColumns.call(this.other, otherSelect);
+    rel._selectBang(...columns);
   }
 
   private mergePreloads(rel: any): void {
