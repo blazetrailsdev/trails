@@ -1928,9 +1928,11 @@ describe("AssociationsJoinModelTest", () => {
     const { post } = await seedJmPost();
     const tag = await JmTag.create({ name: "ruby" });
     const proxy = association(post, "tags");
-    await proxy.push(tag);
-    const tags = await proxy.toArray();
-    expect(tags.map((t: any) => t.name)).toContain("ruby");
+    // Rails: posts(:thinking).tags.push(...) returns the collection (self).
+    // The proxy is thenable, so awaiting the returned self yields the loaded
+    // collection contents — verifying push returns the collection, not void.
+    const result = await proxy.push(tag);
+    expect(result.map((t: any) => t.name).sort()).toEqual(["general", "ruby"]);
   });
 
   it("delete associate when deleting from has many through with nonstandard id", async () => {

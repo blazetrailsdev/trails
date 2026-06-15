@@ -1498,13 +1498,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<<
    */
-  async push(...records: T[]): Promise<void> {
+  async push(...records: T[]): Promise<this> {
     this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
     // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
-      return;
+      return this;
     }
 
     const ctor = this._record.constructor as typeof Base;
@@ -1567,6 +1567,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         this._record.isNewRecord() ? Promise.resolve(true) : insertRecord(record),
       );
     }
+    // Rails' CollectionProxy#<< / #push / #concat return the collection (self).
+    return this;
   }
 
   /**
@@ -1914,7 +1916,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Alias for push.
    */
-  async concat(...records: T[]): Promise<void> {
+  async concat(...records: T[]): Promise<this> {
     return this.push(...records);
   }
 
@@ -3041,7 +3043,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#append
    */
-  async append(...records: T[]): Promise<void> {
+  async append(...records: T[]): Promise<this> {
     return this.push(...records);
   }
 
