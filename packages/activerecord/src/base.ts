@@ -2899,8 +2899,18 @@ export class Base extends Model {
       im.insert(insertValues);
       sql = ctor.connection.toSql(im);
     }
+    // A custom-named serial/identity PK (e.g. `owner_id`) needs its column name
+    // threaded through so the adapter emits `RETURNING <pk>` and the DB-generated
+    // value reads back into the right attribute. The default `id` PK is read back
+    // via executeMutation's auto-appended `RETURNING id`, so leave it `undefined`.
+    // Mirrors Rails' _returning_columns_for_insert.
+    const insertPk = ctor.primaryKey;
+    const namedReturning =
+      !Array.isArray(insertPk) && typeof insertPk === "string" && insertPk && insertPk !== "id"
+        ? [insertPk]
+        : undefined;
     this._pendingOperation = ctor.connection
-      .execInsert(sql, `${ctor.name} Create`)
+      .execInsert(sql, `${ctor.name} Create`, [], namedReturning?.[0], undefined, namedReturning)
       .then((rawId) => {
         // Adapters with RETURNING support (PG) may return a Result-like object
         // instead of the bare id — extract via adapter.lastInsertedId when available.

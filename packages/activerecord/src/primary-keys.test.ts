@@ -124,16 +124,18 @@ describe("PrimaryKeysTest", () => {
 
   it("customized primary key auto assigns on save", async () => {
     await Keyboard.deleteAll();
+    // Advance the serial sequence past 1 before the asserted create. On PG the
+    // sequence is non-transactional, so a stale in-memory PK only diverges from
+    // the DB-generated value once the sequence has moved off 1 — without this a
+    // bug that left `keyboard.id` at 1 would be masked.
+    await (new Keyboard({ name: "seed" }) as Keyboard).saveBang();
     const keyboard = new Keyboard({ name: "HHKB" });
     await keyboard.saveBang();
     const found = (await Keyboard.findBy({ name: "HHKB" })) as Keyboard;
     // Rails: assert_equal keyboard.id, Keyboard.find_by_name("HHKB").id
-    // PG gap: executeMutation falls back from RETURNING id (no id col) to INSERT
-    // without RETURNING, returning rowCount (1) as the inserted id. keyboard.id
-    // gets 1; found.id gets the actual SERIAL value. Verify the record was saved
-    // and auto-assigned a non-null primary key.
-    expect(found).not.toBeNull();
-    expect(found.id).not.toBeNull();
+    expect(keyboard.id).toBe(found.id);
+    const refound = (await Keyboard.find(keyboard.id)) as Keyboard;
+    expect(refound.id).toBe(keyboard.id);
   });
 
   it("customized primary key can be get before saving", () => {
