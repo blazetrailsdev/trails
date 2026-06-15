@@ -197,15 +197,14 @@ export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key,
  * primary_key=
  */
-export function primaryKey(
-  this: PrimaryKeyHost,
-  value?: string | string[],
-): string | string[] | null {
+export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): string | string[] {
   if (value !== undefined) {
     setPrimaryKeyAttr.call(this, value);
     return value;
   }
-  return getPrimaryKeyAttr.call(this);
+  // Same single-point narrowing as Base.primaryKey: getPrimaryKeyAttr is the
+  // one honest nullable accessor; public callers see the non-null contract.
+  return getPrimaryKeyAttr.call(this) as string | string[];
 }
 
 /**
