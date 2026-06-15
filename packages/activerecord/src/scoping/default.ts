@@ -51,7 +51,10 @@ export class Default {
         const prev = ScopeRegistry.currentScope(modelClass);
         ScopeRegistry.setCurrentScope(modelClass, base);
         try {
-          return override.call(modelClass) ?? base;
+          // Return the override's value unchanged (nullish included), mirroring
+          // Rails' `relation.scoping { default_scope }`; the `|| scope` fallback
+          // lives at the call site (`?? buildBase()` / `?? rel`).
+          return override.call(modelClass);
         } finally {
           ScopeRegistry.setCurrentScope(modelClass, prev);
         }
