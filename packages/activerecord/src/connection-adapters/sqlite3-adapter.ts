@@ -814,6 +814,24 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
+   * Pool-teardown drain hook. After `disconnectBang()` fires an async-only
+   * `driver.close()`, the underlying handle is still closing even though the
+   * synchronous teardown returned. The pool awaits this so no async close is
+   * left in flight before it reports teardown complete (e.g. before a test
+   * re-opens the same in-memory/file DB and races the prior handle).
+   *
+   * Sync drivers (better-sqlite3) close synchronously inside `disconnectBang()`
+   * and leave `_closingDriver` null, so this resolves immediately — a no-op.
+   *
+   * Rails' `disconnect!` is synchronous; this drain is a TypeScript-async
+   * necessity for promise-returning drivers, not a divergence in observable
+   * teardown behavior.
+   */
+  whenClosed(): Promise<void> {
+    return this._closingDriver ?? Promise.resolve();
+  }
+
+  /**
    * Check if the database is open.
    */
   get isOpen(): boolean {

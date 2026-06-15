@@ -809,9 +809,23 @@ export class ConnectionPool implements ReapablePool {
   // --- Lifecycle ---
 
   disconnect(raiseOnAcquisitionTimeout: boolean = true): void {
+    this._disconnect(raiseOnAcquisitionTimeout);
+  }
+
+  /**
+   * Synchronous teardown shared by `disconnect`/`disconnectAsync`. Returns the
+   * pending async-close drains surfaced by adapters whose `driver.close()` is
+   * promise-returning (async-only SQLite drivers); sync drivers contribute
+   * nothing. `disconnect` ignores them (Rails-synchronous behavior);
+   * `disconnectAsync` awaits them so no close is left in flight.
+   */
+  private _disconnect(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
+    const draining: Array<Promise<void>> = [];
     withExclusivelyAcquiredAllConnections(this, raiseOnAcquisitionTimeout, () => {
       for (const conn of this._connections ?? []) {
         (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+        const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
+        if (drain) draining.push(drain);
       }
       this._pinnedConnections.clear();
       this._fixturePin = null;
@@ -824,6 +838,17 @@ export class ConnectionPool implements ReapablePool {
       this._leases?.clear();
       this._lastCheckinAt.clear();
     });
+    return draining;
+  }
+
+  /**
+   * Async-draining variant of `disconnect`: tears down synchronously, then
+   * awaits each adapter's pending async `driver.close()` before resolving, so
+   * an async-only driver's handle is fully closed before the caller proceeds
+   * (e.g. re-opens the same DB). For sync drivers this resolves immediately.
+   */
+  async disconnectAsync(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
+    await Promise.all(this._disconnect(raiseOnAcquisitionTimeout));
   }
 
   disconnectBang(): void {
