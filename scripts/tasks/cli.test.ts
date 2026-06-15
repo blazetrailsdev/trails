@@ -1371,7 +1371,7 @@ describe("buildStoryContent", () => {
   it("generates minimal story with defaults", () => {
     const content = buildStoryContent("0005-gaps", "my-story", { date: "2026-06-08" });
     expect(content).toContain(`title: "my-story"`);
-    expect(content).toContain(`status: ready`);
+    expect(content).toContain(`status: draft`);
     expect(content).toContain(`rfc: "0005-gaps"`);
     expect(content).toContain(`cluster: null`);
     expect(content).toContain(`deps: []`);
@@ -1666,7 +1666,14 @@ describe("newStory status default", () => {
     }) as never);
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "log").mockImplementation(() => {});
-    execFileSyncMock.mockImplementation(() => "" as never);
+    // symbolic-ref must report a branch ("main"); returning "" reads as a
+    // detached HEAD and makes commitAndPush exit 1 on the non-symlink push path
+    // (which CI takes, where TASKS_DIR is not a symlink).
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
     return dir;
   }
 

@@ -1646,9 +1646,14 @@ export function buildStoryContent(
     opts.body != null
       ? `\n${opts.body.replace(/^\n+/, "").replace(/\n+$/, "")}\n`
       : "\n## Context\n\n## Acceptance criteria\n";
+  // Default to `draft` here, not `ready`: this pure generator has no view of the
+  // parent RFC's status, and an unguarded `ready` would let a direct caller
+  // produce an immediately-claimable story under a still-draft RFC. `newStory`
+  // is the single source of the `ready` default — it gates on an active RFC
+  // before passing an explicit status through (see effectiveStatus above).
   return `---
 title: ${qs(title)}
-status: ${opts.status ?? "ready"}
+status: ${opts.status ?? "draft"}
 updated: ${opts.date}
 rfc: ${qs(rfcSlug)}
 cluster: ${opts.cluster != null ? opts.cluster : "null"}
