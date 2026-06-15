@@ -41,7 +41,6 @@ import {
 } from "./postgresql/type-map-init.js";
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { isLogOnlyBinds } from "./log-only-binds.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
@@ -866,10 +865,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // through `_bindForPg` for Temporal / BinaryData normalization before
     // pg sees them.
     const bindArray = typeCastedBinds(binds).map((v) => this._bindForPg(v));
-    // Log-only binds (unprepared StatementCache) are already inlined into the
-    // SQL, so the driver receives none — but the payload still logs them.
-    const driverBinds = isLogOnlyBinds(binds) ? [] : bindArray;
-    const rewritten = this.rewriteBinds(sql, driverBinds);
+    const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
     const txPublicQuery = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
@@ -895,7 +891,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
                 // duplicate column names and matching the field-index order.
                 // Delegates to `_runQuery` so prepared-statement caching and
                 // in-txn / out-of-txn cached-plan handling stay in one place.
-                return await this._runQuery<ArrayQueryResult>(client, rewritten, driverBinds, {
+                return await this._runQuery<ArrayQueryResult>(client, rewritten, bindArray, {
                   rowMode: "array",
                   prepareOverride: options?.prepare,
                   onPrepared: (stmtName) => {

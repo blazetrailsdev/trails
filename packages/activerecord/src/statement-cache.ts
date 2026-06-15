@@ -13,7 +13,6 @@
 import { Attribute } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { markLogOnlyBinds } from "./connection-adapters/log-only-binds.js";
 
 /**
  * Placeholder for bind values in cached statements.
@@ -244,13 +243,14 @@ export class StatementCache {
     const bindValues = this._bindMap.bind(params);
     const sql = this._queryBuilder.sqlFor(bindValues, connection);
     const allowRetry = opts.allowRetry ?? this._queryBuilder.retryable;
-    // PartialQuery inlines values into the SQL string, so the driver must not
-    // re-bind them. Rails still hands the bind values to find_by_sql so the
-    // query log shows them (statement_cache.rb#execute); we tag them log-only
-    // so adapters log them in the sql.active_record payload but send the driver
-    // an empty bind list.
+    // PartialQuery inlines values into the SQL string — pass empty binds
+    // to avoid findBySql trying to re-substitute them. This matches Rails:
+    // PartialQuery#sql_for drains the bind_values array in place via
+    // `binds.shift` (statement_cache.rb:51-61), so by the time it reaches
+    // find_by_sql the array is empty and the unprepared query log carries no
+    // bind payload. (Our sqlFor copies the array, so we drop it explicitly.)
     if (this._queryBuilder instanceof PartialQuery) {
-      return this._model.findBySql(sql, markLogOnlyBinds(bindValues), { allowRetry });
+      return this._model.findBySql(sql, [], { allowRetry });
     }
     // Type-cast bind objects to primitives for the adapter
     const castedBinds = bindValues.map((b) => (b instanceof Attribute ? b.valueForDatabase : b));

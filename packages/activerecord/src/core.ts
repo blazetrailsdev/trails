@@ -690,10 +690,10 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   }
   // Rails Core#find fast-path: a single supported scalar id on a simple
   // primary key (no scope, no block) goes through the cached StatementCache.
-  // Both prepared and unprepared connections use it (bucketed by
+  // Both prepared and unprepared connections use it (Rails buckets the cache by
   // prepared_statements in cachedFindByStatement); the unprepared PartialQuery
-  // path inlines its binds into the SQL and tags them log-only so the
-  // sql.active_record payload still carries them (see StatementCache#execute).
+  // path inlines its binds into the SQL and runs with an empty bind list,
+  // matching Rails' unprepared query-log shape (see StatementCache#execute).
   if (
     ids.length === 1 &&
     !(this as any).currentScope &&

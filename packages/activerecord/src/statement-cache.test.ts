@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
 import { Attribute, ValueType } from "@blazetrails/activemodel";
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import {
@@ -303,10 +304,10 @@ describe("StatementCacheTest", () => {
 
   it("find and find_by stay correct under an unprepared connection", async () => {
     // find/find_by use the statement cache for both prepared and unprepared
-    // connections (bucketed by prepared_statements). With preparedStatements:
-    // false (the mysql default) the PartialQuery path inlines binds into the
-    // SQL and tags them log-only. Verify the unprepared connection still
-    // returns the right records.
+    // connections (Rails buckets by prepared_statements). With
+    // preparedStatements: false (the mysql default) the PartialQuery path
+    // inlines binds into the SQL and runs with an empty bind list. Verify the
+    // unprepared connection still returns the right records.
     await import("./relation.js");
     const { BetterSQLite3Adapter } =
       await import("./connection-adapters/better-sqlite3-adapter.js");
@@ -326,9 +327,28 @@ describe("StatementCacheTest", () => {
       }
 
       expect((await Book.findBy({ name: "Ruby" }))!.readAttribute("name")).toBe("Ruby");
-      expect((await Book.find(1)).readAttribute("name")).toBe("Ruby");
-      // String id must coerce through the bind path (no pre-cast).
-      expect((await Book.find("1" as any)).readAttribute("name")).toBe("Ruby");
+
+      // Pin the Rails-faithful log shape: Rails' PartialQuery#sql_for drains the
+      // bind_values array in place (binds.shift), so the unprepared find runs
+      // find_by_sql with no binds and the sql.active_record payload carries an
+      // empty bind list (the values are inlined into the SQL string instead).
+      const loadEvents: Record<string, unknown>[] = [];
+      const sub = Notifications.subscribe("sql.active_record", (e) => {
+        if ((e.payload.name as string)?.endsWith("Load")) loadEvents.push(e.payload);
+      });
+      try {
+        expect((await Book.find(1)).readAttribute("name")).toBe("Ruby");
+        // String id must coerce through the bind path (no pre-cast).
+        expect((await Book.find("1" as any)).readAttribute("name")).toBe("Ruby");
+      } finally {
+        Notifications.unsubscribe(sub);
+      }
+      expect(loadEvents.length).toBeGreaterThan(0);
+      for (const payload of loadEvents) {
+        expect(payload.binds).toEqual([]);
+        expect(payload.type_casted_binds).toEqual([]);
+        expect(payload.sql).toMatch(/= 1\b/);
+      }
     } finally {
       conn.disconnectBang();
     }

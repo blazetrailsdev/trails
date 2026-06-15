@@ -16,7 +16,6 @@ import {
 } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
-import { isLogOnlyBinds } from "./log-only-binds.js";
 import {
   ActiveRecordError,
   AdapterTimeout,
@@ -471,9 +470,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
-    // Log-only binds (unprepared StatementCache) are already inlined into the
-    // SQL, so the driver gets none — but the payload still logs them.
-    const queryBinds = isLogOnlyBinds(binds) ? [] : driverBinds;
     const txPublicQuery = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: driverSql,
@@ -488,7 +484,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       try {
         return await this.withRawConnection(async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          const prepare = options?.prepare ?? this._shouldPrepare(queryBinds);
+          const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
           if (prepare) this._trackPrepared(mysqlConn, driverSql);
           // Request array-mode rows so duplicate column names
           // (e.g. `SELECT 1 AS a, 2 AS a`) survive: object-keyed rows would
@@ -499,9 +495,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           const [rawResult, rawFields] = prepare
             ? await mysqlConn.execute(
                 { sql: driverSql, rowsAsArray: true } as any,
-                queryBinds as any[],
+                driverBinds as any[],
               )
-            : await mysqlConn.query({ sql: driverSql, rowsAsArray: true } as any, queryBinds);
+            : await mysqlConn.query({ sql: driverSql, rowsAsArray: true } as any, driverBinds);
           // Unwrap mysql2's nested CALL/multi-result sets to the single result
           // set Rails' cast_result reads (the same seam internalExecute uses).
           // `fields` are the field descriptors for the returned rows — present
