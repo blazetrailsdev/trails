@@ -86,7 +86,10 @@ describe("JoinDependency extra columns in instantiate", () => {
     ];
 
     const { parents, associations } = jd.instantiateFromRows(rows);
-    const children = associations.get(parents[0]._readAttribute("id"))?.get("comments") ?? [];
+    // The associations map is keyed by the RAW aliased PK value (the same key the
+    // parents dedup map uses), not the model-cast `_readAttribute` value — look it
+    // up by the raw row value (`t0_r0`) accordingly.
+    const children = associations.get(1)?.get("comments") ?? [];
 
     expect(children).toHaveLength(1);
     expect(children[0]._readAttribute("extra_col")).toBeNull();
