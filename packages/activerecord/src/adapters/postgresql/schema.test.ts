@@ -471,6 +471,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(indexes[4].using).toBe("gin");
     });
 
+    it("indexes report their validity", async () => {
+      // Rails selects d.indisvalid and threads it into IndexDefinition#valid.
+      // Normally-built indexes are valid; SchemaCache uses this flag to skip
+      // invalid ones for uniqueness validation.
+      await adapter.setSchemaSearchPath(SCHEMA_NAME);
+      const indexes = await adapter.indexes(TABLE_NAME);
+      expect(indexes.length).toBeGreaterThan(0);
+      expect(indexes.every((i) => i.valid === true)).toBe(true);
+    });
+
     it("dump indexes for schema two", async () => {
       await adapter.setSchemaSearchPath(SCHEMA2_NAME);
       const indexes = (await adapter.indexes(TABLE_NAME)).sort((a, b) =>

@@ -3211,6 +3211,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
+    this.pgSchemaStatements().validateIndexLengthBang(tableName, newName);
     const { schema } = this.parseSchemaQualifiedName(tableName);
     const qualifiedOld = schema
       ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(oldName)}`
@@ -3699,7 +3700,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       sql += " NULLS NOT DISTINCT";
     }
     if (options.where) {
-      sql += ` WHERE ${options.where}`;
+      // Mirrors Rails PG#add_index_options: when `:where` is itself a bare
+      // column name, quote it as an identifier (`WHERE "deleted"` for a boolean
+      // column) rather than emitting it verbatim as an expression.
+      const ss = this.pgSchemaStatements();
+      const where =
+        (await ss.tableExists(tableName)) && (await ss.columnExists(tableName, options.where))
+          ? this.quoteColumnName(options.where)
+          : options.where;
+      sql += ` WHERE ${where}`;
     }
 
     await this.exec(sql);
