@@ -81,6 +81,7 @@ import type {
   TableDefinition,
   Table,
   ForeignKeyDefinition,
+  IndexDefinition,
   AddForeignKeyOptions,
   AddIndexOptions,
   ColumnType,
@@ -258,6 +259,11 @@ export interface AbstractAdapter {
   ): Promise<void>;
   removeColumns(tableName: string, ...columns: string[]): Promise<void>;
   addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
+  addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
+    options?: Record<string, unknown>,
+  ): Promise<[IndexDefinition, string | undefined, boolean]>;
   removeIndex(
     tableName: string,
     columnOrOptions?:

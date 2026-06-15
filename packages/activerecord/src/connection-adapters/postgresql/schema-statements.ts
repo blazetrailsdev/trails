@@ -9,6 +9,7 @@ import type {
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
   ForeignKeyDefinition,
+  IndexDefinition,
 } from "../abstract/schema-definitions.js";
 import type {
   ExclusionConstraintDefinition,
@@ -268,7 +269,7 @@ export interface SchemaStatements {
     tableName: string,
     columnName: string | string[],
     options?: Record<string, unknown>,
-  ): unknown;
+  ): Promise<[IndexDefinition, string | undefined, boolean]>;
   /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string;
   /** @internal */

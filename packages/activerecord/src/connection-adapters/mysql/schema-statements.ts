@@ -51,7 +51,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     columnName: string | string[],
     options: AddIndexOptions = {},
   ): Promise<void> {
-    const [idx, algorithmClause, ifNotExists] = this.addIndexOptions(
+    const [idx, algorithmClause, ifNotExists] = await this.addIndexOptions(
       tableName,
       columnName,
       options as Record<string, unknown>,

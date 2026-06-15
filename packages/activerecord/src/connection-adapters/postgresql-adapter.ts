@@ -114,6 +114,7 @@ import {
   ChangeColumnDefaultDefinition,
   ColumnDefinition,
   ForeignKeyDefinition,
+  IndexDefinition as AbstractIndexDefinition,
   TableDefinition as AbstractTableDefinition,
   type ColumnOptions,
   type ColumnType,
@@ -3593,6 +3594,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       throw new Error("CREATE INDEX CONCURRENTLY cannot run inside a transaction");
     }
 
+    // Route through addIndexOptions (Rails' add_index_options) so the
+    // bare-column-name `:where` quoting lives there, matching Rails' structure.
+    const [idx] = await this.addIndexOptions(tableName, columns, options);
+
     const unique = options.unique ? "UNIQUE " : "";
     const concurrently = options.algorithm === "concurrently" ? "CONCURRENTLY " : "";
     const ifNotExists = options.ifNotExists ? "IF NOT EXISTS " : "";
@@ -3624,29 +3629,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (options.nullsNotDistinct) {
       sql += " NULLS NOT DISTINCT";
     }
-    if (options.where) {
-      // Mirrors Rails PG#add_index_options: when `:where` is itself a bare
-      // column name, quote it as an identifier (`WHERE "deleted"` for a boolean
-      // column) rather than emitting it verbatim as an expression. Rails houses
-      // this in `add_index_options`, but that method is sync here (and unused on
-      // the PG path, which builds SQL inline) while `tableExists`/`columnExists`
-      // are async — so the check lives here at the only async PG add-index site.
-      // Only a bare identifier can name a column; anything with spaces, quotes,
-      // or operators (e.g. `state = 'active'`) is an expression and is left
-      // verbatim. The guard also keeps such values out of columnExists, whose
-      // SQL interpolates the name unescaped. Rails' parameterized column_exists?
-      // simply returns false for those, so this matches its result.
-      let where = options.where;
-      if (/^\w+$/.test(options.where)) {
-        const ss = this.pgSchemaStatements();
-        if (
-          (await ss.tableExists(tableName)) &&
-          (await ss.columnExists(tableName, options.where))
-        ) {
-          where = this.quoteColumnName(options.where);
-        }
-      }
-      sql += ` WHERE ${where}`;
+    if (idx.where) {
+      sql += ` WHERE ${idx.where}`;
     }
 
     await this.exec(sql);
@@ -4519,12 +4503,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     throw new ArgumentError("You must specify the index name");
   }
 
-  addIndexOptions(
-    _tableName: string,
-    _columnName: string | string[],
+  // Mirrors Rails PostgreSQL#add_index_options (schema_statements.rb:937-942):
+  // when `:where` is a bare column name, quote it as an identifier
+  // (`WHERE "deleted"` for a boolean column) rather than emitting it verbatim.
+  // Anything with spaces, quotes, or operators (e.g. `state = 'active'`) is an
+  // expression and passes through unchanged. The `/^\w+$/` guard also keeps
+  // such values out of columnExists, whose SQL interpolates the name unescaped;
+  // Rails' parameterized column_exists? simply returns false for those.
+  async addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
     options: Record<string, unknown> = {},
-  ): Record<string, unknown> {
-    return { ...options };
+  ): Promise<[AbstractIndexDefinition, string | undefined, boolean]> {
+    const opts = { ...options };
+    if (typeof opts.where === "string" && /^\w+$/.test(opts.where)) {
+      const ss = this.pgSchemaStatements();
+      if ((await ss.tableExists(tableName)) && (await ss.columnExists(tableName, opts.where))) {
+        opts.where = this.quoteColumnName(opts.where);
+      }
+    }
+    return super.addIndexOptions(tableName, columnName, opts);
   }
 
   get schemaCreation(): PgSchemaCreation {

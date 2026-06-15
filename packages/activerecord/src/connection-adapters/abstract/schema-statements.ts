@@ -377,7 +377,7 @@ export class SchemaStatements {
     options: AddIndexOptions = {},
   ): Promise<void> {
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    const createIndex = this.buildCreateIndexDefinition(
+    const createIndex = await this.buildCreateIndexDefinition(
       tableName,
       columns,
       options as Record<string, unknown>,
@@ -1367,7 +1367,7 @@ export class SchemaStatements {
     return at;
   }
 
-  buildCreateIndexDefinition(
+  async buildCreateIndexDefinition(
     tableName: string,
     columnName: string | string[],
     options: {
@@ -1380,8 +1380,12 @@ export class SchemaStatements {
       ifNotExists?: boolean;
       [key: string]: unknown;
     } = {},
-  ): CreateIndexDefinition {
-    const [idx, algorithm, ifNotExists] = this.addIndexOptions(tableName, columnName, options);
+  ): Promise<CreateIndexDefinition> {
+    const [idx, algorithm, ifNotExists] = await this.addIndexOptions(
+      tableName,
+      columnName,
+      options,
+    );
     return new CreateIndexDefinition(idx, ifNotExists, algorithm);
   }
 
@@ -1616,7 +1620,7 @@ export class SchemaStatements {
     return new Table(tableName, (base ?? this) as SchemaStatements);
   }
 
-  addIndexOptions(
+  async addIndexOptions(
     tableName: string,
     columnName: string | string[],
     options: {
@@ -1630,7 +1634,7 @@ export class SchemaStatements {
       algorithm?: string;
       [key: string]: unknown;
     } = {},
-  ): [IndexDefinition, string | undefined, boolean] {
+  ): Promise<[IndexDefinition, string | undefined, boolean]> {
     const columnNames = Array.isArray(columnName) ? columnName : [columnName];
     const indexName =
       options.name?.toString() ?? this.indexName(tableName, { column: columnNames });
