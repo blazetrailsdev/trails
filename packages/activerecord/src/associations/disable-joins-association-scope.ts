@@ -131,13 +131,21 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         resolveJoinPrimaryKey(lastReflection, (lastReflection as { klass?: typeof Base }).klass),
         "joinPrimaryKey",
       );
-      const relation = this._addConstraintsDj(
+      let relation = this._addConstraintsDj(
         lastReflection,
         keyCols,
         lastJoinIds,
         owner,
         lastOrdered,
       ) as Relation<Base>;
+      // When an upstream step plucked no ids, the final step's
+      // `where(key IN [])` is a provably-empty relation. Mirror Rails'
+      // `where(id: [])` null-relation short-circuit so the final SELECT is
+      // skipped entirely (the intermediate pluck already ran), matching the
+      // query count Rails emits for an empty through chain.
+      if (lastJoinIds.length === 0) {
+        relation = (relation as unknown as { none: () => Relation<Base> }).none();
+      }
       return { relation };
     });
   }

@@ -93,8 +93,18 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
 
   it("nil on disable joins through", async () => {
     const blarpy = members("blarpy_winkup") as Member;
-    expect(await blarpy.loadHasOne("organization")).toBeNull();
-    expect(await blarpy.loadHasOne("organizationWithoutJoins")).toBeNull();
+    let org: unknown;
+    let orgNoJoins: unknown;
+    const joins = await captureSql(async () => {
+      org = await blarpy.loadHasOne("organization");
+    });
+    const noJoins = await captureSql(async () => {
+      orgNoJoins = await blarpy.loadHasOne("organizationWithoutJoins");
+    });
+    expect(org).toBeNull();
+    expect(orgNoJoins).toBeNull();
+    expect(joins.length).toBe(1);
+    expect(noJoins.length).toBe(1);
   });
 
   it("preload on disable joins through", async () => {
