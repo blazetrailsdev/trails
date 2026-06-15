@@ -928,7 +928,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     options: Record<string, unknown> = {},
   ): Promise<CreateIndexDefinition | undefined> {
     const ss = this.schemaStatements();
-    const [idx, algorithmClause, ifNotExists] = ss.addIndexOptions(tableName, columnName, options);
+    const [idx, algorithmClause, ifNotExists] = await ss.addIndexOptions(
+      tableName,
+      columnName,
+      options,
+    );
     if (ifNotExists && (await ss.indexExists(tableName, idx.columns, { name: idx.name }))) {
       return undefined;
     }
