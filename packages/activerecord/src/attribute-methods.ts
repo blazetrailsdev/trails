@@ -203,12 +203,6 @@ export function dangerousAttributeMethods(): Set<string> {
   return _dangerousMethodsCache;
 }
 
-export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  if (!this._attributeMethodsGenerated) {
-    this._attributeMethodsGenerated = false;
-  }
-}
-
 /**
  * Delegates to ActiveModel::AttributeMethods#alias_attribute which
  * handles aliases, getter/setter generation, and pattern-based methods.
