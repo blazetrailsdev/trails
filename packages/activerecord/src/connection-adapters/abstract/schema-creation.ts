@@ -240,9 +240,15 @@ export class SchemaCreation {
   }
 
   protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
+    const quotedColumns = (Array.isArray(o.column) ? o.column : [o.column])
+      .map((c) => this.adapter.quoteIdentifier(c))
+      .join(", ");
+    const quotedPrimaryKeys = (Array.isArray(o.primaryKey) ? o.primaryKey : [o.primaryKey])
+      .map((c) => this.adapter.quoteIdentifier(c))
+      .join(", ");
     let sql = `CONSTRAINT ${this.adapter.quoteIdentifier(o.name)} `;
-    sql += `FOREIGN KEY (${this.adapter.quoteIdentifier(o.column)}) `;
-    sql += `REFERENCES ${this.adapter.quoteTableName(o.toTable)} (${this.adapter.quoteIdentifier(o.primaryKey)})`;
+    sql += `FOREIGN KEY (${quotedColumns}) `;
+    sql += `REFERENCES ${this.adapter.quoteTableName(o.toTable)} (${quotedPrimaryKeys})`;
     if (o.onDelete) sql += ` ${this.actionSql("DELETE", o.onDelete)}`;
     if (o.onUpdate) sql += ` ${this.actionSql("UPDATE", o.onUpdate)}`;
     return sql;

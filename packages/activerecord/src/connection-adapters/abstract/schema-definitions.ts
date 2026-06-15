@@ -99,8 +99,8 @@ export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
 export class ForeignKeyDefinition {
   readonly fromTable: string;
   readonly toTable: string;
-  readonly column: string;
-  readonly primaryKey: string;
+  readonly column: string | string[];
+  readonly primaryKey: string | string[];
   readonly name: string;
   readonly onDelete?: ReferentialAction;
   readonly onUpdate?: ReferentialAction;
@@ -110,8 +110,8 @@ export class ForeignKeyDefinition {
   constructor(
     fromTable: string,
     toTable: string,
-    column: string,
-    primaryKey: string,
+    column: string | string[],
+    primaryKey: string | string[],
     name: string,
     onDelete?: ReferentialAction,
     onUpdate?: ReferentialAction,

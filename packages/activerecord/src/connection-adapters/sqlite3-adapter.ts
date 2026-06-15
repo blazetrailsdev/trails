@@ -2095,13 +2095,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const fkNames = await this._parseForeignKeyNames(tableName);
 
     for (const fk of fks) {
-      const cols = fk.column.includes(",")
-        ? fk.column.split(",").map((c) => c.trim())
-        : [fk.column];
+      const cols = Array.isArray(fk.column)
+        ? fk.column
+        : fk.column.includes(",")
+          ? fk.column.split(",").map((c) => c.trim())
+          : [fk.column];
       if (!cols.every((c) => colNames.includes(c))) continue;
-      const pks = fk.primaryKey.includes(",")
-        ? fk.primaryKey.split(",").map((c) => c.trim())
-        : [fk.primaryKey];
+      const pks = Array.isArray(fk.primaryKey)
+        ? fk.primaryKey
+        : fk.primaryKey.includes(",")
+          ? fk.primaryKey.split(",").map((c) => c.trim())
+          : [fk.primaryKey];
       const colList = cols.map((c) => quoteColumnName(c)).join(", ");
       const pkList = pks.map((c) => quoteColumnName(c)).join(", ");
       let fkSql = "";
@@ -2135,7 +2139,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       for (const fkDef of tmpDef.foreignKeys) {
         let fkSql = "";
         if (fkDef.name) fkSql += `CONSTRAINT ${quoteColumnName(fkDef.name)} `;
-        fkSql += `FOREIGN KEY(${quoteColumnName(fkDef.column)}) REFERENCES ${quoteTableName(fkDef.toTable)}(${quoteColumnName(fkDef.primaryKey)})`;
+        const fkDefCols = (Array.isArray(fkDef.column) ? fkDef.column : [fkDef.column])
+          .map((c) => quoteColumnName(c))
+          .join(", ");
+        const fkDefPks = (Array.isArray(fkDef.primaryKey) ? fkDef.primaryKey : [fkDef.primaryKey])
+          .map((c) => quoteColumnName(c))
+          .join(", ");
+        fkSql += `FOREIGN KEY(${fkDefCols}) REFERENCES ${quoteTableName(fkDef.toTable)}(${fkDefPks})`;
         if (fkDef.onDelete) fkSql += ` ON DELETE ${normalizeReferentialAction(fkDef.onDelete)}`;
         if (fkDef.onUpdate) fkSql += ` ON UPDATE ${normalizeReferentialAction(fkDef.onUpdate)}`;
         colDefs.push(fkSql);
