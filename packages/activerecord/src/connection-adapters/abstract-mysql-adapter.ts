@@ -47,6 +47,7 @@ import {
 } from "./mysql/schema-creation.js";
 import {
   quote as mysqlQuote,
+  quotedDate as mysqlQuotedDate,
   typeCast as mysqlTypeCast,
   castBoundValue as mysqlCastBoundValue,
   quotedBinary as mysqlQuotedBinary,
@@ -304,10 +305,27 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * of falling through to the abstract SQL-92 defaults (booleans →
    * `TRUE/FALSE`, plain `''` string escaping).
    *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#quote
+   * Rails' `mysql/quoting.rb` has no `quote` override — MySQL inherits the
+   * abstract `quote` and its MySQL-specific behaviour flows in through the
+   * dispatched helpers (`quoted_binary`, `quote_string`, `quoted_date`/`quoted_time`).
+   * `mysqlQuote` keeps only the branches the abstract `quote` can't thread through
+   * `this` and delegates the rest; see its JSDoc.
    */
   override quote(value: unknown): string {
-    return mysqlQuote(value);
+    // `.call(this)` so `mysqlQuote`'s delegation to the abstract `quote`
+    // dispatches `quoted_date`/`quoted_time` onto this adapter's overrides.
+    return mysqlQuote.call(this, value);
+  }
+
+  /**
+   * Trails-specific microsecond cap on date/time literals. Rails' MySQL adapter
+   * has no `quoted_date` override (Ruby's `usec` is already µs-bounded), but
+   * trails' Temporal-backed abstract helper can emit nanoseconds. The inherited
+   * abstract `quote` / `quotedTime` date dispatch resolves through here so MySQL
+   * never emits the 7–9th fractional digits its column types reject in strict mode.
+   */
+  quotedDate(value: Parameters<typeof mysqlQuotedDate>[0]): string {
+    return mysqlQuotedDate(value);
   }
 
   /**
