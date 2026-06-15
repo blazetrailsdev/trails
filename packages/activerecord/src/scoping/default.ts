@@ -40,6 +40,24 @@ export class Default {
   ): any {
     if (modelClass.abstractClass) return undefined;
 
+    // Rails: when the model defines its own `default_scope` method (the
+    // proc/method form, `def self.default_scope`) rather than registering via
+    // the `default_scope { }` macro, call that method with the base relation
+    // installed as the current scope (`relation.scoping { default_scope }`).
+    const override = defaultScopeOverride(modelClass);
+    if (override) {
+      return evaluateDefaultScope(modelClass, () => {
+        const base = buildRelation();
+        const prev = ScopeRegistry.currentScope(modelClass);
+        ScopeRegistry.setCurrentScope(modelClass, base);
+        try {
+          return override.call(modelClass) ?? base;
+        } finally {
+          ScopeRegistry.setCurrentScope(modelClass, prev);
+        }
+      });
+    }
+
     const scopes: DefaultScope[] = modelClass.defaultScopes ?? [];
     if (scopes.length === 0) return undefined;
 
@@ -59,6 +77,38 @@ export class Default {
   static unscoped(modelClass: any, buildRelation: () => any): any {
     return buildRelation();
   }
+}
+
+/**
+ * Return the model's own `default_scope` method override, or undefined when it
+ * only inherits the `default_scope { }` macro from Base.
+ *
+ * Mirrors Rails' `default_scope_override` check
+ * (`!Base.is_a?(method(:default_scope).owner)`): walk the static prototype
+ * chain and find the class that owns `defaultScope`; if that owner is Base
+ * (i.e. the inherited macro), there is no override.
+ * @internal
+ */
+function defaultScopeOverride(modelClass: any): ((this: any) => any) | undefined {
+  let klass = modelClass;
+  while (typeof klass === "function") {
+    if (Object.prototype.hasOwnProperty.call(klass, "defaultScope")) {
+      return klass.defaultScope === defaultScope ? undefined : klass.defaultScope;
+    }
+    klass = Object.getPrototypeOf(klass);
+  }
+  return undefined;
+}
+
+/**
+ * Whether the model defines its own `default_scope` method override.
+ *
+ * Mirrors the `respond_to?(:default_scope)` clause of
+ * `Scoping::Default::ClassMethods#scope_attributes?`.
+ * @internal
+ */
+export function hasDefaultScopeOverride(modelClass: any): boolean {
+  return defaultScopeOverride(modelClass) !== undefined;
 }
 
 /**

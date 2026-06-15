@@ -378,7 +378,12 @@ export class CallableDeveloperCalledDavid extends Base {
 export class ClassMethodDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ name: "David" }));
+  }
+
+  // Method-form `default_scope` override (Rails: `def self.default_scope`),
+  // not the `default_scope { }` macro registry.
+  static defaultScope(this: any): any {
+    return this.where({ name: "David" });
   }
 }
 
@@ -388,7 +393,11 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
     this.scope("david", (q: any) => q.where({ name: "David" }));
-    this.defaultScope((q: any) => (ClassMethodReferencingScopeDeveloperCalledDavid as any).david());
+  }
+
+  // Method-form override referencing a named scope (Rails: `def self.default_scope; david; end`).
+  static defaultScope(this: any): any {
+    return this.david();
   }
 }
 
