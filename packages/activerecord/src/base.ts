@@ -153,6 +153,7 @@ import {
   isAttributeMethod as _isAttributeMethod,
   isDangerousAttributeMethod as _isDangerousAttributeMethod,
   defineAttributeMethods as _defineAttributeMethods,
+  generateAliasAttributes as _generateAliasAttributes,
   attributesWithValues as _attributesWithValues,
   formatForInspect as _formatForInspect,
   pkAttribute as _pkAttribute,
@@ -3807,6 +3808,7 @@ extend(Base, ModelSchema.ClassMethods);
 extend(Base, {
   defineAttribute: _defineAttribute,
   defineAttributeMethods: _defineAttributeMethods,
+  generateAliasAttributes: _generateAliasAttributes,
   _defaultAttributes: _arDefaultAttributes,
 });
 // AttributeMethods class method — gates association/attribute names that would

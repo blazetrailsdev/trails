@@ -148,6 +148,11 @@ interface AttributeMethodsHost {
   _dangerousAttributeMethods?: Set<string>;
   _ignoredColumns?: string[];
   prototype: any;
+  isBaseClass?(): boolean;
+  abstractClass?: boolean;
+  aliasAttribute?(newName: string, oldName: string): void;
+  defineAttributeMethods?(): boolean;
+  generateAliasAttributes?(): void;
 }
 
 const RESTRICTED_CLASS_METHODS = new Set(["allocate", "new", "name", "parent", "superclass"]);
@@ -276,6 +281,15 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   ) {
     return false;
   }
+  // Rails: `superclass.define_attribute_methods unless base_class?` — a parent's
+  // methods must exist before the subclass generates its own. The own-flag check
+  // above keeps the cascade idempotent (each class generates once).
+  if (typeof this.isBaseClass === "function" && !this.isBaseClass()) {
+    const superclass = Object.getPrototypeOf(this) as AttributeMethodsHost | null;
+    if (superclass && typeof superclass.defineAttributeMethods === "function") {
+      superclass.defineAttributeMethods();
+    }
+  }
   // Generate getter/setter for each attribute definition that doesn't
   // already have one on the prototype (mirrors Rails' define_attribute_methods).
   // This is the single generation path: the declaration sites
@@ -342,14 +356,43 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
       });
     }
   }
+  // Rails: `alias_attribute :id_value, :id if _has_attribute?("id")` (skipped for
+  // abstract classes). Routed through aliasAttribute so it composes with
+  // generateAliasAttributes and the alias getter reads the (CPK-aware) id column.
+  if (
+    this.abstractClass !== true &&
+    this._attributeDefinitions.has("id") &&
+    typeof this.aliasAttribute === "function"
+  ) {
+    this.aliasAttribute("idValue", "id");
+  }
+  generateAliasAttributes.call(this);
   this._attributeMethodsGenerated = true;
   return true;
 }
 
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
-  if (!this._attributeAliases) return;
-  for (const [newName, oldName] of Object.entries(this._attributeAliases)) {
-    aliasAttributeMethodDefinition.call(this, newName, oldName);
+  // Rails: `superclass.generate_alias_attributes unless superclass == Base`.
+  const superclass = Object.getPrototypeOf(this) as AttributeMethodsHost | null;
+  if (
+    superclass &&
+    !Object.prototype.hasOwnProperty.call(superclass, "_isActiveRecordBase") &&
+    typeof superclass.generateAliasAttributes === "function"
+  ) {
+    superclass.generateAliasAttributes();
+  }
+  // Rails guards on the per-class @alias_attributes_mass_generated ivar; JS
+  // properties inherit, so only an *own* truthy flag counts as done.
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_aliasAttributesMassGenerated") &&
+    this._aliasAttributesMassGenerated
+  ) {
+    return;
+  }
+  if (this._attributeAliases) {
+    for (const [newName, oldName] of Object.entries(this._attributeAliases)) {
+      aliasAttributeMethodDefinition.call(this, newName, oldName);
+    }
   }
   this._aliasAttributesMassGenerated = true;
 }

@@ -241,22 +241,25 @@ describe("AttributeMethodsTest", () => {
   it("#id_value alias is defined if id column exist", async () => {
     class Post extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
       }
     }
-    const p = new Post({ title: "test" });
-    // id should be accessible
-    expect(typeof p.id).not.toBe("undefined");
+    (Post as any).defineAttributeMethods();
+    expect(Post.attributeNames()).toContain("id");
+    expect(Object.keys((Post as any)._attributeAliases ?? {})).toContain("idValue");
   });
 
   it("aliasing `id` attribute allows reading the column value", async () => {
     class Post extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
       }
     }
-    const p = await Post.create({ title: "hello" });
-    expect(p.id).not.toBeNull();
+    (Post as any).defineAttributeMethods();
+    const p = new Post({ id: 123_456, title: "title" });
+    expect((p as any).idValue).toBe(123_456);
   });
 
   it("case-sensitive attributes hash", async () => {
@@ -372,20 +375,51 @@ describe("AttributeMethodsTest", () => {
     }
     return { Post };
   }
+
+  it("defineAttributeMethods cascades to the superclass", async () => {
+    class Animal extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Dog extends Animal {
+      static {
+        this.attribute("breed", "string");
+      }
+    }
+    // Generating the subclass drives the parent's generation first, so the
+    // parent's own flag is set even though it was never generated directly.
+    (Dog as any).defineAttributeMethods();
+    expect(Object.prototype.hasOwnProperty.call(Animal, "_attributeMethodsGenerated")).toBe(true);
+    expect((Animal as any)._attributeMethodsGenerated).toBe(true);
+    expect((Dog as any)._attributeMethodsGenerated).toBe(true);
+  });
   it("aliasing `id` attribute allows reading the column value for a CPK model", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_id" });
     expect(p.id).toBeDefined();
   });
   it("#id_value alias is not defined if id column doesn't exist", async () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "no_id" });
-    expect(p.id).toBeNull();
+    class Keyboard extends Base {
+      static {
+        this.primaryKey = "key_number";
+        this.attribute("key_number", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    (Keyboard as any).defineAttributeMethods();
+    expect(Object.keys((Keyboard as any)._attributeAliases ?? {})).not.toContain("idValue");
   });
   it("#id_value alias returns id column only for composite primary key models", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "cpk" });
-    expect(p.id).not.toBeNull();
+    class Order extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+      }
+    }
+    (Order as any).defineAttributeMethods();
+    const o = new Order({ shop_id: 1, id: 2 });
+    expect((o as any).idValue).toBe(2);
   });
   it("attribute_for_inspect with a date", async () => {
     const { Post } = makeModel();
@@ -666,10 +700,18 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("#id_value alias returns the value in the id column, when id column exists", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "id_value_test" });
-    expect(p.id).toBeDefined();
-    expect(p.id).not.toBeNull();
+    class Post extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    (Post as any).defineAttributeMethods();
+    const fresh = new Post({ title: "id_value_new" });
+    expect((fresh as any).idValue).toBeNull();
+
+    const p = new Post({ id: 1, title: "id_value_test" });
+    expect((p as any).idValue).toBe(1);
   });
   it("attribute_for_inspect with a string", () => {
     const { Post } = makeModel();
