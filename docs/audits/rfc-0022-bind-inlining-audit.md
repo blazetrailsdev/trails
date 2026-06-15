@@ -102,7 +102,7 @@ merge — relocate its intent into the visitor).
 
 - **Type:** missing (extra TS surface) + bespoke quoter
 - **Rails source:** `relation/where_clause.rb` — methods are `+ - | merge except
-  or to_h ast == …`; **no `to_sql`**. Inlined where-SQL is produced only via
+or to_h ast == …`; **no `to_sql`**. Inlined where-SQL is produced only via
   `Relation#to_sql` → `conn.to_sql(arel)`.
 - **TS counterpart:** `where-clause.ts:105` `toSql()` — recompiles the AST and
   inline-substitutes binds with a bespoke string quoter.
