@@ -1018,12 +1018,6 @@ describe("CalculationsTest", () => {
     const names = await Account.pluck("name");
     expect(names).toContain("alias");
   });
-  it("pluck not auto table name prefix if column joined", async () => {
-    const { Account } = makeModel();
-    await Account.create({ name: "prefix" });
-    const names = await Account.pluck("name");
-    expect(names).toContain("prefix");
-  });
   it("pluck with hash argument", async () => {
     const { Account } = makeModel();
     await Account.create({ name: "hash" });
@@ -1095,12 +1089,6 @@ describe("CalculationsTest", () => {
     await Account.create({ name: "ja" });
     const names = await Account.pluck("name");
     expect(names).toContain("ja");
-  });
-  it("pluck not auto table name prefix if column included", async () => {
-    const { Account } = makeModel();
-    await Account.create({ name: "ntap" });
-    const names = await Account.pluck("name");
-    expect(names).toContain("ntap");
   });
   it("pluck functions with alias", async () => {
     const { Account } = makeModel();
@@ -7222,6 +7210,7 @@ describe("CalculationsTest", () => {
     static {
       this.attribute("pj_company_id", "integer");
       this.attribute("body", "string");
+      this.attribute("developer_id", "integer");
     }
   }
   class PjCompany extends Base {
@@ -7235,7 +7224,7 @@ describe("CalculationsTest", () => {
     await defineSchema(
       {
         pj_companies: { name: "string" },
-        pj_contracts: { pj_company_id: "integer", body: "string" },
+        pj_contracts: { pj_company_id: "integer", body: "string", developer_id: "integer" },
       },
       { dropExisting: true },
     );
@@ -7274,6 +7263,32 @@ describe("CalculationsTest", () => {
       ["test", "x"],
     ]);
     void c1;
+  });
+
+  it("pluck not auto table name prefix if column joined", async () => {
+    // Rails: Company.create!(name: "test", contracts: [Contract.new(developer_id: 7)])
+    //        ids = Company.joins(:contracts).pluck(:developer_id); [7] == ids.sort
+    // A bare column absent from the base model's columns_hash must NOT be
+    // auto-prefixed with the base table; it stays unqualified so the database
+    // resolves it against the joined table.
+    const c = await PjCompany.create({ name: "test" });
+    await PjContract.create({ pj_company_id: c.id, developer_id: 7 });
+    const ids = (await PjCompany.joins("pjContracts").pluck("developer_id")) as number[];
+    expect(ids.sort()).toEqual([7]);
+  });
+
+  it("pluck not auto table name prefix if column included", async () => {
+    // Rails: Company.create!(name: "test", contracts: [Contract.new(developer_id: 7)])
+    //        ids = Company.includes(:contracts).pluck(:developer_id)
+    //        Company.count == ids.length; [7] == ids.compact
+    const c = await PjCompany.create({ name: "test" });
+    await PjContract.create({ pj_company_id: c.id, developer_id: 7 });
+    const ids = (await PjCompany.includes("pjContracts").pluck("developer_id")) as (
+      | number
+      | null
+    )[];
+    expect(ids.length).toBe(await PjCompany.count());
+    expect(ids.filter((v) => v != null)).toEqual([7]);
   });
 
   it("pluck with includes limit and empty result", async () => {
