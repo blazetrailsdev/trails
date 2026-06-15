@@ -14,6 +14,11 @@ import {
   formatPlainDateForSql,
   formatPlainTimeForSql,
 } from "../abstract/sql-datetime.js";
+import {
+  quote as abstractQuote,
+  quotedDate as abstractQuotedDate,
+  type QuotingDispatchHost,
+} from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -61,42 +66,37 @@ export function quoteString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-export function quote(value: unknown): string {
-  if (value === null || value === undefined) return "NULL";
-  if (typeof value === "string") return quoteString(value);
+/**
+ * Mirrors: SQLite3::Quoting#quote. Rails only special-cases non-finite
+ * Numerics (`"'#{value}'"`) and otherwise calls `super`, letting the abstract
+ * quoter dispatch date/time literals back through `self.quoted_time` /
+ * `self.quoted_date` — which SQLite overrides to keep a `2000-01-01` prefix on
+ * times. We thread `this` (the adapter) so that dispatch lands on SQLite's
+ * `quotedTime`; bare calls fall back to {@link SQLITE_QUOTING_HOST} so the
+ * prefix is still applied.
+ *
+ * The boolean, symbol, string, and binary branches stay inline because our
+ * abstract `quote` renders those through module-level helpers (TRUE/FALSE,
+ * backslash-escaping `quoteString`) rather than dispatching through `this`, so
+ * delegating would lose SQLite's overrides (1/0, `''`-only escaping, `x'..'`
+ * hex). These are exactly the quoting primitives SQLite3::Quoting overrides.
+ */
+export function quote(this: QuotingDispatchHost | void, value: unknown): string {
+  if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) return quoteString(String(value));
-    return String(value);
-  }
-  if (typeof value === "bigint") return String(value);
-  // Rails: `when BigDecimal then value.to_s("F")` — bare, fixed-form literal.
-  if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "symbol") {
     if (value.description === undefined) {
       throw new TypeError("can't quote a Symbol without a description");
     }
     return quoteString(value.description);
   }
-  if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
-  if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
-  if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
-  if (value instanceof Temporal.PlainTime) return `'2000-01-01 ${formatPlainTimeForSql(value)}'`;
-  if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
-  if (value instanceof Date)
-    throw new TypeError(
-      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
-    );
-  if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
-    return quotedBinary(value);
-  }
+  if (typeof value === "string") return quoteString(value);
+  if (value instanceof Uint8Array || value instanceof ArrayBuffer) return quotedBinary(value);
   // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
   // BinaryData wraps raw bytes from serialize() (e.g. encryption ciphertext for binary columns).
   if (value instanceof BinaryData) return quotedBinary(value.bytes);
-  if (typeof value === "function" && value.name) {
-    return quoteString(value.name);
-  }
-  throw new TypeError(`can't quote ${Object.prototype.toString.call(value)}`);
+  const host = this && typeof this === "object" ? this : SQLITE_QUOTING_HOST;
+  return abstractQuote.call(host, value);
 }
 
 export function quoteTableNameForAssignment(_table: string, attr: string): string {
@@ -104,13 +104,54 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
 }
 
 /**
- * Mirrors: SQLite3::Quoting#quoted_time. Stores time values with the fixed
- * date 2000-01-01 so SQLite can round-trip them as datetime strings.
+ * Mirrors: SQLite3::Quoting#quoted_date — identical to the abstract quoter; the
+ * override exists so the inherited dispatch has a `self.quoted_date` to land on.
  * @internal
  */
-export function quotedTime(value: Temporal.PlainTime): string {
-  return `'2000-01-01 ${formatPlainTimeForSql(value)}'`;
+export function quotedDate(
+  value:
+    | Temporal.Instant
+    | Temporal.ZonedDateTime
+    | Temporal.PlainDateTime
+    | Temporal.PlainDate
+    | Temporal.PlainTime,
+): string {
+  return abstractQuotedDate(value);
 }
+
+/**
+ * Mirrors: SQLite3::Quoting#quoted_time —
+ * `value.change(year: 2000, ...); quoted_date(value).sub(/\A\d\d\d\d-\d\d-\d\d /, "2000-01-01 ")`.
+ * Unlike the abstract `quoted_time` (which strips the date to a bare
+ * `HH:MM:SS`), SQLite normalises the date to 2000-01-01, routes through
+ * `quoted_date`, then re-prefixes — so SQLite can round-trip times as datetime
+ * strings. Returns the bare literal (no surrounding quotes); the inherited
+ * `quote` wraps it.
+ * @internal
+ */
+export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
+  const dt =
+    value instanceof Temporal.PlainTime
+      ? new Temporal.PlainDateTime(
+          2000,
+          1,
+          1,
+          value.hour,
+          value.minute,
+          value.second,
+          value.millisecond,
+          value.microsecond,
+          value.nanosecond,
+        )
+      : value.with({ year: 2000, month: 1, day: 1 });
+  return quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
+}
+
+/**
+ * Default dispatch host for bare `quote(value)` calls (no adapter `this`), so
+ * date/time literals still reach SQLite's `quotedDate` / `quotedTime` overrides.
+ */
+const SQLITE_QUOTING_HOST: QuotingDispatchHost = { quotedDate, quotedTime };
 
 export function quotedBinary(value: Uint8Array | ArrayBuffer): string {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
