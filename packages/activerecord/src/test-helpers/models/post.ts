@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/post.rb
 import { Base } from "../../base.js";
+import { registerSubclass } from "../../inheritance.js";
 
 export class CategoryPost extends Base {
   static {
@@ -587,4 +588,22 @@ export class PostRecord extends Base {
   static {
     this.hasMany("comments");
   }
+}
+
+// Track the STI subtree on the `posts` table so registry-safe row-path
+// resolution (Base.instantiate → discriminateClassForRecord) finds these
+// classes through Post's own subtree rather than the global model registry.
+for (const klass of [
+  SpecialPost,
+  StiPost,
+  AbstractStiPost,
+  SubStiPost,
+  SubAbstractStiPost,
+  NullPost,
+  TaggedPost,
+  PostWithSpecialCategorization,
+  ConditionalStiPost,
+  SubConditionalStiPost,
+]) {
+  registerSubclass(klass);
 }

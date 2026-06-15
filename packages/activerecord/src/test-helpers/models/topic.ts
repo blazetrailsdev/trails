@@ -7,6 +7,7 @@ import type { WebReply } from "./reply.js";
 // vendor/rails/activerecord/test/models/topic.rb
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "../../base.js";
+import { registerSubclass } from "../../inheritance.js";
 
 export class Topic extends Base {
   declare static base: () => Relation<Topic>;
@@ -193,4 +194,11 @@ export class WebTopic extends Base {
       className: "WebReply",
     });
   }
+}
+
+// Track the STI subtree on the `topics` table so registry-safe row-path
+// resolution finds these through Topic's own subtree. Reply and its descendants
+// register themselves from reply.ts.
+for (const klass of [DefaultRejectedTopic, BlankTopic, TitlePrimaryKeyTopic]) {
+  registerSubclass(klass);
 }

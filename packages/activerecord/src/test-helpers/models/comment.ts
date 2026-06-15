@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/comment.rb
 import { Base } from "../../base.js";
+import { registerSubclass } from "../../inheritance.js";
 
 export class Comment extends Base {
   static {
@@ -86,4 +87,17 @@ export class CommentWithAfterCreateUpdate extends Comment {
       await this.update({ body: "bar" });
     });
   }
+}
+
+// Track the STI subtree on the `comments` table so registry-safe row-path
+// resolution finds these through Comment's own subtree.
+for (const klass of [
+  SpecialComment,
+  SubSpecialComment,
+  VerySpecialComment,
+  CommentThatAutomaticallyAltersPostBody,
+  CommentWithDefaultScopeReferencesAssociation,
+  CommentWithAfterCreateUpdate,
+]) {
+  registerSubclass(klass);
 }

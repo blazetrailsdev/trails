@@ -390,20 +390,36 @@ export function narrowToProjectedColumns(
  * Directly instantiate a record without STI delegation (avoids recursion).
  */
 function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Base {
-  (klass as any)._skipEncryption = true;
   const hadOwnSuppress = Object.prototype.hasOwnProperty.call(klass, "_suppressInitializeCallback");
   const prevSuppress = klass._suppressInitializeCallback;
   klass._suppressInitializeCallback = true;
+  const hadOwnAbstractSuppress = Object.prototype.hasOwnProperty.call(
+    klass,
+    "_suppressAbstractCheck",
+  );
+  const prevAbstractSuppress = (klass as any)._suppressAbstractCheck;
+  (klass as any)._suppressAbstractCheck = true;
   let record: Base;
   try {
-    record = new klass(row);
+    record = new klass();
   } finally {
     if (hadOwnSuppress) {
       klass._suppressInitializeCallback = prevSuppress;
     } else {
       delete (klass as any)._suppressInitializeCallback;
     }
-    (klass as any)._skipEncryption = false;
+    if (hadOwnAbstractSuppress) {
+      (klass as any)._suppressAbstractCheck = prevAbstractSuppress;
+    } else {
+      delete (klass as any)._suppressAbstractCheck;
+    }
+  }
+  // Load DB values through deserialize (not the user cast) so encrypted types
+  // decrypt and raw DB representations (e.g. an enum's integer `0`) are accepted
+  // — mirrors the non-STI Base._instantiate path. Building via `new klass(row)`
+  // instead ran every column through the user cast, which rejects raw DB values.
+  for (const [key, value] of Object.entries(row)) {
+    record._attributes.writeFromDatabase(key, value);
   }
   narrowToProjectedColumns(klass, record, row);
   record._newRecord = false;
@@ -577,7 +593,7 @@ export function discriminateClassForRecord(
     // (EnumType#cast's `value.presence` fallback) so find_sti_class still
     // raises SubclassNotFound rather than masking it as the base class.
     const typeName = (castValue as string | null) ?? String(record[inheritCol]);
-    return findStiClass(modelClass, typeName);
+    return findStiClassForRow(modelClass, typeName);
   }
   return modelClass;
 }
@@ -593,13 +609,12 @@ function usingSingleTableInheritance(
   modelClass: typeof Base,
   record: Record<string, unknown>,
 ): boolean {
-  // `inheritance_column` defaults to "type" for every model now, so the column's
-  // presence no longer signals STI. The database-row dispatch path resolves
-  // through the ambiguous global registry, so restrict it to explicitly-modeled
-  // STI hierarchies — a plain model with a reflected `type` column stays itself.
-  if (!stiEnabled(modelClass)) return false;
+  // Mirrors Rails exactly: `record[inheritance_column].present? &&
+  // _has_attribute?(inheritance_column)` — no `stiEnabled` short-circuit. A plain
+  // model with a reflected `type` column still passes this gate, but resolves to
+  // itself in {@link findStiClassForRow} because its subtree tracks no subclass
+  // and STI was never explicitly enabled, so dispatch is a no-op there.
   const inheritCol = getInheritanceColumn(modelClass);
-  // Rails: record[inheritance_column].present? && _has_attribute?(inheritance_column)
   if (!isPresent(record[inheritCol])) return false;
   return stiColumnIsAttribute(modelClass, inheritCol, record);
 }
@@ -734,6 +749,38 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
     if (stiName(klass) === typeName) return klass;
   }
   return null;
+}
+
+/**
+ * Registry-safe row-path resolver: the database-row analogue of
+ * {@link findStiClassInHierarchy} used by {@link discriminateClassForRecord}.
+ *
+ * Like the `new`-path resolver it matches `typeName` against `baseClass`'s own
+ * tracked subtree rather than the ambiguous global `modelRegistry`, where a bare
+ * name like `"Client"` collides across test files. It differs in the no-match
+ * case: a non-match on an *explicitly modeled* hierarchy (STI enabled, or the
+ * base tracks at least one subclass) is a genuinely bad type and raises
+ * `SubclassNotFound`, mirroring Rails' `find_sti_class`. A non-match on a plain
+ * model that merely reflects a `type` column (no STI, no tracked subclasses)
+ * builds the receiver as-is — that model is not really STI, so its stray `type`
+ * value must not raise.
+ *
+ * @internal
+ */
+function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Base {
+  const found = findStiClassInHierarchy(baseClass, typeName);
+  if (found) return found;
+  // The tracked subtree didn't name a match. On an explicitly-modeled hierarchy
+  // (STI enabled, or the base tracks at least one subclass) defer to the global
+  // registry-backed {@link findStiClass} — Rails' autoloader analog — which
+  // resolves a uniquely-named subclass registered via `registerModel` (e.g. the
+  // custom-column Parrot/Vegetable trees) or raises `SubclassNotFound` for a
+  // genuinely bad type. A plain model that merely reflects a `type` column (no
+  // STI, no tracked subclasses) is not STI and builds the receiver as-is.
+  if (stiEnabled(baseClass) || descendants(baseClass).length > 0) {
+    return findStiClass(baseClass, typeName);
+  }
+  return baseClass;
 }
 
 /**

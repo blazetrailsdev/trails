@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/category.rb
 import { Base } from "../../base.js";
+import { registerSubclass } from "../../inheritance.js";
 
 export class Category extends Base {
   static {
@@ -55,3 +56,6 @@ export class Category extends Base {
 }
 
 export class SpecialCategory extends Category {}
+
+// Track the STI subtree on the `categories` table.
+registerSubclass(SpecialCategory);
