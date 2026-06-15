@@ -377,6 +377,40 @@ describe("AssociationScope", () => {
     expect(sql).toMatch(/["`]commentable_type["`]\s*=\s*'AsOwner'/);
   });
 
+  it("hasMany :as polymorphic type WHERE uses base class polymorphic_name for STI subclass owner", () => {
+    // Rails' AssociationScope builds the type filter from
+    // `owner.class.polymorphic_name` (= base_class.name), so an STI subclass
+    // owner stores the base class name in the *_type column, not the subclass.
+    class StiAsOwner extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("type", "string");
+      }
+    }
+    class StiAsSubOwner extends StiAsOwner {}
+    enableSti(StiAsOwner);
+    registerSubclass(StiAsSubOwner);
+    class StiAsComment extends Base {
+      static {
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+      }
+    }
+    registerModel(StiAsOwner);
+    registerModel(StiAsSubOwner);
+    registerModel(StiAsComment);
+    Associations.hasMany.call(StiAsSubOwner, "as_comments", {
+      className: "StiAsComment",
+      as: "commentable",
+    });
+    const owner = new StiAsSubOwner({ id: 7 });
+    const reflection = (StiAsSubOwner as any)._reflectOnAssociation("as_comments");
+    const sql = (
+      AssociationScope.scope({ owner, reflection, klass: reflection.klass }) as any
+    ).toSql();
+    expect(sql).toMatch(/["`]commentable_type["`]\s*=\s*'StiAsOwner'/);
+  });
+
   it("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
     class AsOneOwner extends Base {
       static {
