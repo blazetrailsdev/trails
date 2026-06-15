@@ -299,6 +299,22 @@ describe("OptimisticLockingTest", () => {
     await expect(Person.find(1)).rejects.toBeInstanceOf(RecordNotFound);
   });
 
+  it("touch with dirty primary key", async () => {
+    const before = await Person.find(1);
+    const beforeLockVersion = before.lock_version as number;
+
+    const person = await Person.find(1);
+    person.id = 42;
+    expect(await person.touch()).toBe(true);
+
+    // Touch routes through _query_constraints_hash → id_in_database, so the row
+    // last loaded from the DB (id 1) is the one updated; the in-memory PK 42
+    // never persists, mirroring the update/delete/destroy dirty-PK behavior.
+    const persisted = await Person.find(1);
+    expect(persisted.lock_version).toBe(beforeLockVersion + 1);
+    await expect(Person.find(42)).rejects.toBeInstanceOf(RecordNotFound);
+  });
+
   it("explicit update lock column raise error", async () => {
     const person = await Person.find(people("michael").id);
     person.first_name = "Douglas Adams";
