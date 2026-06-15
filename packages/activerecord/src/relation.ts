@@ -4519,9 +4519,24 @@ export class Relation<T extends Base> {
     const adapter = this._modelClass.connection as unknown as {
       columnsForDistinct?: (cols: string, orders: (string | Nodes.Node)[]) => string | string[];
     };
-    const orders = this.orderValues.map((clause) =>
-      Array.isArray(clause) ? new Nodes.SqlLiteral(`${clause[0]} ${clause[1]}`) : clause,
-    );
+    // Qualify a bare known-column order to the base table (mirroring
+    // `_applyOrderToManager` and Rails' order_values, which are qualified Arel
+    // attributes). columns_for_distinct projects the order columns into the
+    // SELECT list, so an unqualified `id` would be ambiguous under the eager
+    // LEFT OUTER JOIN (e.g. a self-referential `Topic.replies` join on the same
+    // `topics` table). Arel order nodes pass through untouched; dotted/quoted/
+    // expression orders stay raw SQL (strip ASC/DESC before testing).
+    const orders = this.orderValues.map((clause) => {
+      if (clause instanceof Nodes.Node) return clause;
+      const raw = Array.isArray(clause) ? `${clause[0]} ${clause[1]}` : clause;
+      const bare = raw
+        .trim()
+        .replace(/\s+(?:ASC|DESC)\b.*$/i, "")
+        .trim();
+      return /^[A-Za-z_$][\w$]*$/.test(bare) && this._isKnownColumn(bare)
+        ? table.get(bare)
+        : new Nodes.SqlLiteral(raw);
+    });
     const values = adapter.columnsForDistinct ? adapter.columnsForDistinct(pkSql, orders) : pkSql;
     return Array.isArray(values) ? values.join(", ") : values;
   }
