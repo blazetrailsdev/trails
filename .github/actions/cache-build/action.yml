@@ -1,0 +1,40 @@
+name: Cache workspace build
+description: Restores the per-package dist/ + tsc --build incremental state so pnpm build no-ops on a warm cache.
+
+# `pnpm build` (the full `tsc --build` workspace compile, ~30-45s cold) runs in
+# six jobs on every full run, each recompiling from scratch. This step restores
+# the per-package `dist/` outputs and the `tsconfig.tsbuildinfo` incremental
+# state so `tsc --build` short-circuits to a ~1.5s no-op on a cache hit.
+# NOTE: with `rootDir: "src"` set per package, tsc writes the buildinfo to the
+# package ROOT (`packages/*/tsconfig.tsbuildinfo`), NOT inside `outDir`/dist —
+# verified empirically — so that path is load-bearing, not redundant with dist.
+#
+# Key on a content hash of every package src/, the root + per-package tsconfigs,
+# and the lockfile.
+# Exact-match only (no restore-keys): any source change misses and rebuilds, so
+# a stale dist can never be restored onto changed source and mask a failure.
+# tsc treats the restored tsconfig.tsbuildinfo as authoritative — if dist and
+# the buildinfo agree with the source hashes it records, it skips compilation;
+# otherwise it rebuilds the affected references.
+#
+# Place AFTER `pnpm install` and BEFORE `pnpm build`. The build step stays in
+# the job unchanged; it simply becomes near-instant on a hit. The first of the
+# parallel jobs to finish populates the cache; the rest restore it. No
+# `needs:` edge is introduced, so job parallelism is preserved.
+#
+# USE ONLY IN JOBS THAT RUN A FULL-WORKSPACE `pnpm build` (`tsc --build`).
+# `actions/cache` saves only on a key miss, so the first job to finish wins
+# the save. A job that builds just a SUBSET of packages (e.g. a `--filter`
+# parity dump) would save an incomplete `dist/` under this shared key and
+# poison it for every full-build consumer until the source hash changes —
+# so the partial-build parity jobs intentionally do NOT use this action.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: |
+          packages/*/dist
+          packages/*/tsconfig.tsbuildinfo
+        key: build-v1-${{ runner.os }}-${{ hashFiles('packages/**/src/**', 'tsconfig*.json', 'packages/*/tsconfig.json', 'pnpm-lock.yaml') }}

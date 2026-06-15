@@ -330,6 +330,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       - run: pnpm typecheck
   lint:
@@ -388,6 +389,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       - run: pnpm guides:typecheck
 
@@ -525,6 +527,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
@@ -580,6 +583,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
@@ -637,6 +641,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
@@ -692,6 +697,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
@@ -856,6 +862,7 @@ jobs:
         with:
           ruby-version: "3.3"
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       - name: Cache vendored upstream Ruby sources
         uses: actions/cache@v4
