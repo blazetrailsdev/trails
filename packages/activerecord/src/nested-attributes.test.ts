@@ -11,7 +11,7 @@ import {
   assignNestedAttributes,
   TooManyRecords,
 } from "./index.js";
-import { Associations } from "./associations.js";
+import { Associations, association as collectionProxyFor } from "./associations.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Notifications } from "@blazetrails/activesupport";
@@ -120,6 +120,8 @@ const TEST_SCHEMA = {
   num_posts: { title: "string", score: "integer" },
   nupd_articles: { title: "string" },
   nupd_tags: { name: "string", nupd_article_id: "integer" },
+  mol_pirates: { catchphrase: "string" },
+  mol_birds: { name: "string", mol_pirate_id: "integer" },
   ov_pirates: { catchphrase: "string" },
   ov_ships: { name: "string", ov_pirate_id: "integer" },
   parts: { name: "string", ship_id: "integer" },
@@ -140,6 +142,43 @@ const TEST_SCHEMA = {
   uahm_articles: { title: "string" },
   uahm_tags: { name: "string", uahm_article_id: "integer" },
 } as const;
+
+// Shared models for the "merge unsaved nested updates with DB rows on load"
+// tests (Rails: NestedAttributesOnACollectionAssociationTests). The collection
+// loader must merge the in-memory target (unsaved nested updates / scheduled
+// destroys, populated synchronously by the `*Attributes=` writer) with the DB
+// rows rather than overwriting them — mirroring CollectionAssociation#load_target
+// (target_records_from_association / merge_target_lists).
+class MolBird extends Base {
+  static {
+    this._tableName = "mol_birds";
+    this.attribute("name", "string");
+    this.attribute("mol_pirate_id", "integer");
+  }
+}
+class MolPirate extends Base {
+  static {
+    this._tableName = "mol_pirates";
+    this.attribute("catchphrase", "string");
+  }
+}
+Associations.hasMany.call(MolPirate, "molBirds", {
+  className: "MolBird",
+  foreignKey: "mol_pirate_id",
+});
+acceptsNestedAttributesFor(MolPirate, "molBirds", { allowDestroy: true });
+registerModel(MolBird);
+registerModel(MolPirate);
+
+// Seed a fresh, unloaded pirate with two persisted birds (mirrors the
+// @pirate / @child_1 / @child_2 fixtures Rails reloads before each test).
+async function seedMolPirate(): Promise<{ pirate: MolPirate; child1: MolBird; child2: MolBird }> {
+  const created = await MolPirate.create({ catchphrase: "Arrr" });
+  const child1 = await MolBird.create({ name: "Posideons Killer", mol_pirate_id: created.id });
+  const child2 = await MolBird.create({ name: "Killer bird", mol_pirate_id: created.id });
+  const pirate = await MolPirate.find(created.id);
+  return { pirate, child1, child2 };
+}
 
 // ==========================================================================
 // NestedAttributesTest — targets nested_attributes_test.rb
@@ -2070,23 +2109,46 @@ describe("should not load association when updating existing records", () => {
 });
 
 describe("should not overwrite unsaved updates when loading association", () => {
-  it.skip("should not overwrite unsaved updates when loading association", () => {
-    // BLOCKED: Phase G — loading the association must merge pending attrs with
-    // DB rows; trails defers nested attribute processing to save.
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+  it("should not overwrite unsaved updates when loading association", async () => {
+    const { pirate, child1 } = await seedMolPirate();
+    (pirate as any).molBirdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
+    const target = await collectionProxyFor(pirate, "molBirds").loadTarget();
+    const found = target.find((r: MolBird) => String(r.id) === String(child1.id));
+    expect(found!.name).toBe("Grace OMalley");
   });
 });
 
 describe("should not remove scheduled destroys when loading association", () => {
-  it.skip("should not remove scheduled destroys when loading association", () => {
-    // BLOCKED: Phase G — loading the association must preserve in-memory destroy
-    // marks from pending attrs; trails defers nested attribute processing to save.
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+  it("should not remove scheduled destroys when loading association", async () => {
+    const { pirate, child1 } = await seedMolPirate();
+    (pirate as any).molBirdsAttributes = [{ id: child1.id, _destroy: "1" }];
+    const target = await collectionProxyFor(pirate, "molBirds").loadTarget();
+    const found = target.find((r: MolBird) => String(r.id) === String(child1.id));
+    expect(isMarkedForDestruction(found!)).toBe(true);
   });
 });
 
 describe("should preserve order when not overwriting unsaved updates", () => {
-  it.skip("should preserve order when not overwriting unsaved updates", () => {
-    // BLOCKED: Phase G — loaded association must preserve pending attr order;
-    // trails defers nested attribute processing to save.
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+  it("should preserve order when not overwriting unsaved updates", async () => {
+    const { pirate, child1 } = await seedMolPirate();
+    (pirate as any).molBirdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
+    const target = await collectionProxyFor(pirate, "molBirds").loadTarget();
+    expect(String(target[0].id)).toBe(String(child1.id));
   });
 });
 
@@ -2192,9 +2254,22 @@ describe("should raise an argument error if something else than a hash is passed
 });
 
 describe("should refresh saved records when not overwriting unsaved updates", () => {
-  it.skip("should refresh saved records when not overwriting unsaved updates", () => {
-    // BLOCKED: Phase G — refreshing saved association records while merging
-    // pending attrs requires in-memory target update; trails defers to save.
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+  it("should refresh saved records when not overwriting unsaved updates", async () => {
+    const { pirate } = await seedMolPirate();
+    const proxy = collectionProxyFor(pirate, "molBirds") as any;
+    const record = new MolBird({ name: "Grace OMalley", mol_pirate_id: pirate.id });
+    await proxy.push(record);
+    await record.save();
+    const loaded = await proxy.loadTarget();
+    const last = loaded[loaded.length - 1];
+    await last.update({ name: "Polly" });
+    const target = await proxy.loadTarget();
+    expect(target[target.length - 1].name).toBe("Polly");
   });
 });
 
