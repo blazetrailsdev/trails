@@ -4868,10 +4868,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Statement-pool key, scoped to the current schema_search_path so a
    * statement prepared under one path is not reused under another (the
    * same SQL resolves to different tables across paths). Reads the
-   * connection-scoped memo synchronously — it is populated by
-   * schemaSearchPath()/setSchemaSearchPath(); an unread memo keys to the
-   * empty prefix, matching Rails before its first SHOW search_path.
-   * Mirrors: PostgreSQLAdapter#sql_key
+   * connection-scoped memo synchronously; setSchemaSearchPath() updates it,
+   * so a mid-connection path change re-scopes the key and never reuses a
+   * statement bound to the old path. Until the memo is set the prefix is
+   * empty (`-sql`) — equivalent to the prior fixed-prefix behavior and
+   * harmless, since trails resolves all unscoped SQL under one default path
+   * per connection. Mirrors: PostgreSQLAdapter#sql_key
    * @internal
    */
   sqlKey(sql: string): string {
