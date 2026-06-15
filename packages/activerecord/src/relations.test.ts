@@ -2778,6 +2778,51 @@ describe("RelationTest", () => {
     expect(rightRows.every((p) => p.author?.name === "alice")).toBe(true);
   });
 
+  it("union with a limited collection eager-load operand materializes IDs instead of an inline LIMIT subquery", async () => {
+    const { Associations, registerModel } = await import("./associations.js");
+    const { assertNoQueriesMatch } = await import("./testing/query-assertions.js");
+    class LimAuthor extends Base {
+      static {
+        this._tableName = "eager_setop_authors";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("LimAuthor", LimAuthor);
+    class LimPost extends Base {
+      static {
+        this._tableName = "eager_setop_posts";
+        this.attribute("title", "string");
+        this.attribute("eager_setop_author_id", "integer");
+      }
+    }
+    registerModel("LimPost", LimPost);
+    Associations.hasMany.call(LimAuthor, "posts", {
+      className: "LimPost",
+      foreignKey: "eager_setop_author_id",
+    });
+    const a1 = await LimAuthor.create({ name: "a1" });
+    const a2 = await LimAuthor.create({ name: "a2" });
+    await LimPost.create({ title: "p1", eager_setop_author_id: (a1 as any).id });
+    await LimPost.create({ title: "p2", eager_setop_author_id: (a1 as any).id });
+    await LimPost.create({ title: "p3", eager_setop_author_id: (a2 as any).id });
+
+    // A hasMany eager load with LIMIT on the operand must NOT emit an inline
+    // `IN (SELECT ... LIMIT n)` subquery (which MariaDB/MySQL reject): the
+    // limited parent IDs are materialized in a separate query first, exactly as
+    // the plain execution path does.
+    const rel = LimAuthor.where({ name: "a1" })
+      .includes("posts")
+      .references("eager_setop_posts")
+      .limit(1)
+      .union(LimAuthor.where({ name: "a2" }));
+    let rows: any[] = [];
+    await assertNoQueriesMatch(/IN \(SELECT/i, false, async () => {
+      rows = (await rel.toArray()) as any[];
+    });
+    const a1Row = rows.find((r) => r.name === "a1");
+    expect(a1Row?.posts.map((p: any) => p.title).sort()).toEqual(["p1", "p2"]);
+  });
+
   it("unionAll includes duplicates", async () => {
     class User extends Base {
       static {

@@ -2759,7 +2759,14 @@ export class Relation<T extends Base> {
     token: number,
   ): Promise<void> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    const node = this._buildSetOperationNodeWith(jd);
+    // For a collection (hasMany) eager load with LIMIT/OFFSET, materialize the
+    // limited parent IDs per operand first (mirrors the plain execution path /
+    // Rails' distinct_relation_for_primary_key), so each operand embeds a literal
+    // `pk IN (ids)` instead of an inline `IN (SELECT … LIMIT n)` subquery, which
+    // MariaDB/MySQL reject (ER_NOT_SUPPORTED_YET).
+    const leftLimitedIds = await this._materializeSetOpLimitedIds(jd, basePk);
+    const rightLimitedIds = await this._setOperation!.other._materializeSetOpLimitedIds(jd, basePk);
+    const node = this._buildSetOperationNodeWith(jd, leftLimitedIds, rightLimitedIds);
     const v = this._arelVisitor();
     const [raw, binds, retryable] = v.compileWithBinds(node);
     this._lastSelectRetryable = retryable;
@@ -4408,9 +4415,16 @@ export class Relation<T extends Base> {
    * each operand keeps its plain projection.
    * @internal
    */
-  private _buildSetOperationNodeWith(jd: JoinDependency | null): Nodes.Node {
-    const leftManager = this._buildSetOperationOperandManager(jd);
-    const rightManager = this._setOperation!.other._buildSetOperationOperandManager(jd);
+  private _buildSetOperationNodeWith(
+    jd: JoinDependency | null,
+    leftLimitedIds?: unknown[],
+    rightLimitedIds?: unknown[],
+  ): Nodes.Node {
+    const leftManager = this._buildSetOperationOperandManager(jd, leftLimitedIds);
+    const rightManager = this._setOperation!.other._buildSetOperationOperandManager(
+      jd,
+      rightLimitedIds,
+    );
     return leftManager[this._setOperation!.type](rightManager) as unknown as Nodes.Node;
   }
 
@@ -4462,9 +4476,16 @@ export class Relation<T extends Base> {
    * (associations populated from the JOINed columns) rather than preloaded.
    * Each operand still applies its own WHERE/ORDER/LIMIT via `_buildEagerJoinManager`.
    */
-  private _buildSetOperationOperandManager(sharedJd?: JoinDependency | null): SelectManager {
+  private _buildSetOperationOperandManager(
+    sharedJd?: JoinDependency | null,
+    limitedIds?: unknown[],
+  ): SelectManager {
     const manager = sharedJd
-      ? this._buildEagerJoinManager(sharedJd, (this._modelClass as any).primaryKey ?? "id")
+      ? this._buildEagerJoinManager(
+          sharedJd,
+          (this._modelClass as any).primaryKey ?? "id",
+          limitedIds,
+        )
       : this._buildSelectManager();
     this._applyCtesAndAnnotationsToManager(manager);
     return manager;
@@ -4599,6 +4620,24 @@ export class Relation<T extends Base> {
     return (idRows as Record<string, unknown>[]).map(
       (row) => row[basePk] ?? Object.values(row).pop(),
     );
+  }
+
+  /**
+   * Materialize this operand's limited parent IDs for a set-operation eager
+   * load, but only when it actually carries a LIMIT/OFFSET over a collection
+   * (hasMany) JOIN — the same condition under which `_executeEagerLoad`
+   * materializes IDs. Returns `undefined` otherwise, so the operand keeps its
+   * direct LIMIT/OFFSET (limitable belongsTo/hasOne) or no limit at all.
+   * @internal
+   */
+  private async _materializeSetOpLimitedIds(
+    jd: JoinDependency,
+    basePk: string,
+  ): Promise<unknown[] | undefined> {
+    const hasLimit = this._limitValue !== null || this._offsetValue !== null;
+    if (!hasLimit) return undefined;
+    if (!jd.nodes.some((n) => n.assocType === "hasMany")) return undefined;
+    return this._materializeLimitedIds(jd, basePk);
   }
 
   /**
