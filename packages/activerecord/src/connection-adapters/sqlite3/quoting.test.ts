@@ -169,6 +169,11 @@ describe("SQLite3::Quoting", () => {
       expect(() => quote({})).toThrow(TypeError);
       expect(() => quote([])).toThrow(TypeError);
     });
+
+    it("dispatches PlainTime through the host quotedTime override", () => {
+      const host = { quotedTime: () => "DISPATCHED" };
+      expect(quote.call(host, Temporal.PlainTime.from("14:23:55"))).toBe("'DISPATCHED'");
+    });
   });
 
   describe("quotedBinary", () => {

@@ -82,6 +82,8 @@ import {
   quotedFalse as sqliteQuotedFalse,
   unquotedFalse as sqliteUnquotedFalse,
   quotedBinary as sqliteQuotedBinary,
+  quotedDate as sqliteQuotedDate,
+  quotedTime as sqliteQuotedTime,
 } from "./sqlite3/quoting.js";
 import {
   CheckConstraintDefinition,
@@ -720,7 +722,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::Quoting#quote
    */
   override quote(value: unknown): string {
-    return sqliteQuote(value);
+    // Thread `this` so date/time literals dispatch through quotedDate /
+    // quotedTime (mirrors Rails' `super` call in SQLite3::Quoting#quote).
+    return sqliteQuote.call(this, value);
+  }
+
+  // Exposed so the inherited abstract `quote` dispatch reaches SQLite's
+  // overrides. `quotedTime` keeps the 2000-01-01 date prefix; `quotedDate`
+  // matches the abstract. Mirrors: SQLite3::Quoting#quoted_date / #quoted_time.
+  quotedDate(value: Parameters<typeof sqliteQuotedDate>[0]): string {
+    return sqliteQuotedDate(value);
+  }
+
+  quotedTime(value: Parameters<typeof sqliteQuotedTime>[0]): string {
+    return sqliteQuotedTime(value);
   }
 
   override typeCast(value: unknown): unknown {
