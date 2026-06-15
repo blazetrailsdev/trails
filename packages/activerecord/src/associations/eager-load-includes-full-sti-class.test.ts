@@ -1,42 +1,47 @@
-import { it } from "vitest";
+/**
+ * Mirrors Rails
+ * activerecord/test/cases/associations/eager_load_includes_full_sti_class_test.rb
+ *
+ * All four classes (FullStiClassNamesTest / NonFullStiClassNamesTest /
+ * PolymorphicFullClassNamesTest / PolymorphicNonFullClassNamesTest) toggle
+ * `ActiveRecord::Base.store_full_sti_class` / `store_full_class_name` and assert
+ * that a polymorphic `taggable` association resolves (or does not resolve)
+ * depending on whether the stored type column holds the namespaced or
+ * demodulized class name. trails does not implement `storeFullStiClass` /
+ * `storeFullClassName`, so these cannot be ported faithfully yet — see the
+ * upstream-fix story below.
+ */
+import { describe, it } from "vitest";
 
-it.skip("class names", () => {
-  // BLOCKED: associations — eager-loading feature gap
-  // ROOT-CAUSE: associations/eager-load-includes-full-sti-class.ts or preloader.ts missing eager-loading semantics
-  // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager-load-includes-full-sti-class.test.ts
+// BLOCKED: missing config — Base.storeFullStiClass / Base.storeFullClassName.
+// ROOT-CAUSE: trails has no store_full_sti_class / store_full_class_name
+//   support; the tests toggle these flags and assert that the polymorphic
+//   taggable_type column resolution changes accordingly. Tracked upstream as
+//   story `store-full-sti-class-name` (RFC 0030).
+describe("FullStiClassNamesTest", () => {
+  it.skip("class names", () => {});
+  it.skip("class names with includes", () => {});
+  it.skip("class names with eager load", () => {});
+  it.skip("class names with find by", () => {});
 });
-it.skip("class names with includes", () => {
-  // BLOCKED: associations — eager-loading feature gap
-  // ROOT-CAUSE: associations/eager-load-includes-full-sti-class.ts or preloader.ts missing eager-loading semantics
-  // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager-load-includes-full-sti-class.test.ts
+
+describe("NonFullStiClassNamesTest", () => {
+  it.skip("class names", () => {});
+  it.skip("class names with includes", () => {});
+  it.skip("class names with eager load", () => {});
+  it.skip("class names with find by", () => {});
 });
-it.skip("class names with eager load", () => {
-  // BLOCKED: associations — eager-loading feature gap
-  // ROOT-CAUSE: associations/eager-load-includes-full-sti-class.ts or preloader.ts missing eager-loading semantics
-  // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager-load-includes-full-sti-class.test.ts
+
+describe("PolymorphicFullClassNamesTest", () => {
+  it.skip("class names", () => {});
+  it.skip("class names with includes", () => {});
+  it.skip("class names with eager load", () => {});
+  it.skip("class names with find by", () => {});
 });
-it.skip("class names with find by", () => {
-  // BLOCKED: associations — eager-loading feature gap
-  // ROOT-CAUSE: associations/eager-load-includes-full-sti-class.ts or preloader.ts missing eager-loading semantics
-  // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager-load-includes-full-sti-class.test.ts
-});
-it.skip("class names", () => {
-  // BLOCKED: associations — eager-loading feature gap
-  // ROOT-CAUSE: associations/eager-load-includes-full-sti-class.ts or preloader.ts missing eager-loading semantics
-  // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager-load-includes-full-sti-class.test.ts
-});
-it.skip("class names with includes", () => {
-  // BLOCKED: associations — eager-loading feature gap
-  // ROOT-CAUSE: associations/eager-load-includes-full-sti-class.ts or preloader.ts missing eager-loading semantics
-  // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager-load-includes-full-sti-class.test.ts
-});
-it.skip("class names with eager load", () => {
-  // BLOCKED: associations — eager-loading feature gap
-  // ROOT-CAUSE: associations/eager-load-includes-full-sti-class.ts or preloader.ts missing eager-loading semantics
-  // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager-load-includes-full-sti-class.test.ts
-});
-it.skip("class names with find by", () => {
-  // BLOCKED: associations — eager-loading feature gap
-  // ROOT-CAUSE: associations/eager-load-includes-full-sti-class.ts or preloader.ts missing eager-loading semantics
-  // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager-load-includes-full-sti-class.test.ts
+
+describe("PolymorphicNonFullClassNamesTest", () => {
+  it.skip("class names", () => {});
+  it.skip("class names with includes", () => {});
+  it.skip("class names with eager load", () => {});
+  it.skip("class names with find by", () => {});
 });
