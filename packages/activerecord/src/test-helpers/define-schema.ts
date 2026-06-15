@@ -111,19 +111,36 @@ function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
 }
 
 /**
- * True for a plain `integer` column spec. Deliberately excludes `big_integer`:
- * the serial-PK path routes through `createTable({ primaryKey })`, whose
- * `primary_key` type emits `SERIAL` (INT4) on PG — not `BIGSERIAL` — so a
- * `big_integer` PK would silently narrow to INT4. No canonical schema declares
- * a `big_integer` custom PK; if one is added it needs an explicit BIGSERIAL
- * branch rather than this fast path.
+ * True for an `integer` or `big_integer` column spec — the two types that map
+ * to an auto-increment serial/identity PK when declared `primaryKey: ["col"]`.
+ * Use {@link serialIdType} to pick the per-adapter id type that preserves the
+ * declared width (INT4 vs INT8) instead of letting `primary_key` widen to
+ * BIGINT everywhere.
  *
  * @internal
  */
 function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
   if (spec === undefined) return false;
   const type = typeof spec === "string" ? spec : spec.type;
-  return type === "integer";
+  return type === "integer" || type === "big_integer";
+}
+
+/**
+ * The `createTable({ id: { type } })` value for a single-column serial PK,
+ * preserving the declared INTEGER width across adapters:
+ *   - PG: `integer` → `serial` (INT4), `big_integer` → `bigserial` (INT8).
+ *   - MySQL: `integer` → INT, `big_integer` → BIGINT (both AUTO_INCREMENT).
+ *   - SQLite: always `integer` — only `INTEGER PRIMARY KEY` aliases the rowid,
+ *     so a `bigint` declaration would lose auto-increment.
+ *
+ * @internal
+ */
+function serialIdType(spec: ColumnSpec | undefined, adapterName: string): string {
+  const type = typeof spec === "string" ? spec : spec?.type;
+  const isBig = type === "big_integer";
+  if (adapterName === "postgres") return isBig ? "bigserial" : "serial";
+  if (adapterName === "sqlite") return "integer";
+  return isBig ? "bigint" : "integer";
 }
 
 /** @internal */
@@ -693,9 +710,10 @@ async function _defineSchemaImpl(
       // Preserve the declared INTEGER width across adapters. The default
       // `primary_key` type widens to BIGINT on MySQL, which breaks integer FK
       // references (e.g. fk_test_has_fk.fk_id → fk_test_has_pk.pk_id, errno 150).
-      // PG `serial` → INT4 serial; MySQL/SQLite `integer` → INT auto-increment.
-      // (`integer` does NOT auto-increment on PG, hence the per-adapter split.)
-      createOpts.id = { type: adapter.adapterName === "postgres" ? "serial" : "integer" };
+      // PG `serial`/`bigserial` → INT4/INT8 serial; MySQL `integer`/`bigint` and
+      // SQLite `integer` → auto-increment. (`integer` does NOT auto-increment on
+      // PG, hence the per-adapter split.)
+      createOpts.id = { type: serialIdType(columns[serialPkName], adapter.adapterName) };
     } else if (Array.isArray(pk)) {
       createOpts.primaryKey = pk;
       createOpts.id = false;
