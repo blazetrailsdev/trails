@@ -2,6 +2,7 @@ import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { SchemaStatements, type JoinTableOptions } from "../abstract/schema-statements.js";
 import {
+  AlterTable,
   ChangeColumnDefinition,
   ColumnDefinition,
   TableDefinition as AbstractTableDefinition,
@@ -47,6 +48,8 @@ interface PgSchemaAdapter {
     defaultFunction: string | null,
   ): boolean;
   nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
+  createTableDefinition(name: string, options?: Record<string, unknown>): AbstractTableDefinition;
+  createAlterTable(name: string): AlterTable;
 }
 
 export class PostgreSQLSchemaStatements extends SchemaStatements {
@@ -718,6 +721,23 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
   // Alter table
   // ---------------------------------------------------------------------------
+
+  // Route the schema-definition factories back through the adapter so that
+  // base SchemaStatements methods invoked here (e.g. `super.addColumn` →
+  // `buildAddColumnDefinition` → `createAlterTable` → `createTableDefinition`)
+  // build PG-specific definitions. Without these, `this` resolves to the
+  // generic base factories and PG column normalization (virtual → underlying
+  // type, etc.) is silently dropped.
+  override createTableDefinition(
+    name: string,
+    options: Record<string, unknown> = {},
+  ): AbstractTableDefinition {
+    return this.pg.createTableDefinition(name, options);
+  }
+
+  override createAlterTable(name: string): AlterTable {
+    return this.pg.createAlterTable(name);
+  }
 
   override async changeColumn(
     tableName: string,
