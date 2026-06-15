@@ -775,6 +775,7 @@ export class JoinDependency {
     const joinRoot = this._joinRoot;
     const aliases = this.aliases();
     const basePk = (this._baseModel as any).primaryKey ?? "id";
+    const basePkCols: string[] = Array.isArray(basePk) ? basePk : [basePk];
     const baseColumns = getModelColumns(this._baseModel);
     const aliasSet = new Set(aliases.columns().map((a) => a.alias));
 
@@ -794,7 +795,7 @@ export class JoinDependency {
         if (!aliasSet.has(key)) parentAttrs[key] = row[key];
       }
 
-      const parentKey = this._rowKey(basePk, parentAttrs);
+      const parentKey = this._nodeKey(joinRoot, basePkCols, row, aliases);
       let parent = parents.get(parentKey);
       if (!parent) {
         parent = (this._baseModel as any)._instantiate(parentAttrs);
@@ -808,7 +809,7 @@ export class JoinDependency {
     }
 
     const parentList = [...parents.values()];
-    return { parents: parentList, associations: this._collectAssociations(parentList, basePk) };
+    return { parents: parentList, associations: this._collectAssociations(parents) };
   }
 
   /**
@@ -854,7 +855,7 @@ export class JoinDependency {
         this._markAssociationLoaded(arParent, node);
         continue;
       }
-      const id = idVals.length === 1 ? idVals[0] : idVals.join(" ");
+      const id = this._nodeKey(node, pkCols, row, aliases);
 
       let parentSeen = seen.get(arParent);
       if (!parentSeen) {
@@ -877,20 +878,37 @@ export class JoinDependency {
   }
 
   /**
-   * Build the parent-key → assoc-name → children map from the wired proxies.
-   * A trails affordance with no Rails analogue (Rails returns only
-   * `parents.values`); keyed by each parent's read primary key.
+   * Read a node's (possibly composite) primary key out of the aliased row, exactly
+   * as Rails reads `row_hash[aliases.column_alias(node, col)]` (join_dependency.rb:144,
+   * :256): the RAW aliased column value, never the model-cast value. This is the one
+   * accessor used to seed AND look up every dedup key — the parents map, the per-node
+   * `seen`/modelCache identity, and the returned associations map — so a key can never
+   * be written one way (raw) and read another (cast / `_readAttribute`), which would
+   * silently split or collide parents. Composite keys join on NUL (a separator that
+   * can't appear in a column value), matching Rails' single uniform read.
    * @internal
    */
-  private _collectAssociations(
-    parents: any[],
-    basePk: string | string[],
-  ): Map<unknown, Map<string, any[]>> {
+  private _nodeKey(
+    node: JoinPart,
+    pkCols: string[],
+    row: Record<string, unknown>,
+    aliases: Aliases,
+  ): unknown {
+    const vals = pkCols.map((c) => row[aliases.columnAlias(node, c)!]);
+    return vals.length === 1 ? vals[0] : vals.join("\u0000");
+  }
+
+  /**
+   * Build the parent-key → assoc-name → children map from the wired proxies.
+   * A trails affordance with no Rails analogue (Rails returns only
+   * `parents.values`). Keyed by the SAME raw aliased dedup key the `parents` map
+   * uses (`_nodeKey`), so an entry seeded during instantiation is found again with
+   * the identical key — no raw-vs-cast / `_readAttribute` divergence on the key path.
+   * @internal
+   */
+  private _collectAssociations(parents: Map<unknown, any>): Map<unknown, Map<string, any[]>> {
     const associations = new Map<unknown, Map<string, any[]>>();
-    for (const parent of parents) {
-      const key = Array.isArray(basePk)
-        ? basePk.map((k) => parent._readAttribute(k)).join(" ")
-        : parent._readAttribute(basePk);
+    for (const [key, parent] of parents) {
       const assocs = new Map<string, any[]>();
       for (const child of this._joinRoot.children) {
         if (child.tableIndex < 0 || child.isThroughNode) continue;
@@ -904,12 +922,6 @@ export class JoinDependency {
       associations.set(key, assocs);
     }
     return associations;
-  }
-
-  /** @internal Compute a parent dedup key from its (possibly composite) PK. */
-  private _rowKey(pk: string | string[], attrs: Record<string, unknown>): unknown {
-    if (Array.isArray(pk)) return pk.map((k) => attrs[k]).join(" ");
-    return attrs[pk];
   }
 
   /**
