@@ -653,11 +653,26 @@ export function assignNestedAttributesForCollectionAssociation(
  * Populate the in-memory collection target with an existing (id-bearing) nested
  * record so autosave persists it — and any grandchildren — on save without a DB
  * reload. Mirrors the `existing_record` branch of Rails'
- * `assign_nested_attributes_for_collection_association`: locate the record in the
- * loaded target (or instantiate a persisted stub keyed by its primary key when
- * the association is not loaded), add it to the target, then
+ * `assign_nested_attributes_for_collection_association` (nested_attributes.rb:
+ * 527-540): locate the record in the target, add it if absent, then
  * `assign_to_or_mark_for_destruction`. Reject-if and allow-destroy semantics
  * match Rails' existing-record path (`call_reject_if`, not `reject_new_record?`).
+ *
+ * Rails' `existing_records` set is the loaded target when loaded, else a
+ * `scope.where(primary_key => attribute_ids)` SELECT (nested_attributes.rb:
+ * 510-516); an id found in neither raises `raise_nested_attributes_record_not_found!`
+ * (nested_attributes.rb:542). trails honors that exactly when the association is
+ * loaded — `existing_records` is the target, so a missing id raises here. When
+ * the association is NOT loaded, trails has no synchronous DB read to materialize
+ * Rails' `scope.where(...)` SELECT, so it instantiates a persisted stub keyed by
+ * the id instead. Two consequences of that sync-writer constraint, both
+ * deviations from Rails:
+ *   1. A non-existent id is not rejected at assign time (Rails would raise); the
+ *      stub's autosave UPDATE simply matches zero rows.
+ *   2. The stub carries only the primary key, not the other persisted column
+ *      values Rails' SELECT would load — fine for the assigned attributes, but an
+ *      autosave callback reading an unassigned column sees a default, not the DB
+ *      value.
  * @internal
  */
 function populateInMemoryExistingRecord(
@@ -673,6 +688,11 @@ function populateInMemoryExistingRecord(
   const id = (attrs as any).id;
   let existing = findRecordById(targetModel, proxy.target as Base[], id);
   if (!existing) {
+    if (proxy.loaded) {
+      // Loaded association: the target IS Rails' authoritative `existing_records`
+      // set, so an id absent from it is a not-found (nested_attributes.rb:542).
+      raiseNestedAttributesRecordNotFoundBang(record, associationName, id);
+    }
     const pk = (targetModel as any).primaryKey;
     const pkCol = Array.isArray(pk) ? pk[0] : (pk ?? "id");
     existing = (targetModel as any)._instantiate({ [pkCol]: id });

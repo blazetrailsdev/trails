@@ -403,12 +403,12 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
     // Rails' `associated_records_to_validate_or_save` selects records via
     // `changed_for_autosave?`, not bare `changed?` — so a persisted child whose
     // own columns are unchanged but which has a changed (auto)saved grandchild
-    // still cascades (autosave_association.rb:377). `changed` alone would skip it.
-    const childChanged =
-      typeof (child as any).changedForAutosave === "function"
-        ? (child as any).changedForAutosave()
-        : (child as any).changed;
-    if (newRecordBeforeSave || child.isNewRecord() || childChanged) {
+    // still cascades (autosave_association.rb:302). `changed` alone would skip it.
+    if (
+      newRecordBeforeSave ||
+      child.isNewRecord() ||
+      ((child as any).changedForAutosave?.() ?? false)
+    ) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
         propagateErrors(record, child, assoc.name);
@@ -848,12 +848,12 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
     // Rails' `associated_records_to_validate_or_save` selects records via
     // `changed_for_autosave?`, not bare `changed?` — so a persisted child whose
     // own columns are unchanged but which has a changed (auto)saved grandchild
-    // still cascades (autosave_association.rb:377). `changed` alone would skip it.
-    const childChanged =
-      typeof (child as any).changedForAutosave === "function"
-        ? (child as any).changedForAutosave()
-        : (child as any).changed;
-    if (newRecordBeforeSave || child.isNewRecord() || childChanged) {
+    // still cascades (autosave_association.rb:302). `changed` alone would skip it.
+    if (
+      newRecordBeforeSave ||
+      child.isNewRecord() ||
+      ((child as any).changedForAutosave?.() ?? false)
+    ) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
         propagateErrors(record, child, assoc.name);
