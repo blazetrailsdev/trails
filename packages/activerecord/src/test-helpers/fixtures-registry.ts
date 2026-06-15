@@ -543,7 +543,13 @@ export const fixtureRegistry = {
     data: FixtureData.taskFixtureData,
   },
   topics: {
-    model: () => import("./models/topic.js").then((m) => m.Topic),
+    // Reply (and its descendants) share Topic's `topics` table via STI; their
+    // module must load so they register into Topic's tracked subtree before the
+    // base reload dispatches `type: "Reply"` rows to the concrete subclass.
+    model: () =>
+      Promise.all([import("./models/topic.js"), import("./models/reply.js")]).then(
+        ([m]) => m.Topic,
+      ),
     data: FixtureData.topicFixtureData,
   },
   toys: {

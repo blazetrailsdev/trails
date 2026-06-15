@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/reply.rb
 import { Topic, WebTopic } from "./topic.js";
+import { registerSubclass } from "../../inheritance.js";
 
 export class Reply extends Topic {
   static {
@@ -107,4 +108,11 @@ export class WebReply extends WebTopic {
   static {
     this.belongsTo("topic", { foreignKey: "parent_id", counterCache: true, className: "WebTopic" });
   }
+}
+
+// Track the STI subtree on the `topics` table (Reply and friends share Topic's
+// table). WebReply rides WebTopic's separate hierarchy but the same `topics`
+// table; register it under WebTopic for descendants tracking.
+for (const klass of [Reply, SillyReply, UniqueReply, SillyUniqueReply, WrongReply, WebReply]) {
+  registerSubclass(klass);
 }

@@ -67,7 +67,6 @@ import {
   ensureProperType as _ensureProperType,
   narrowToProjectedColumns,
   subclassFromAttributesForNew,
-  stiEnabled,
 } from "./inheritance.js";
 import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
 import {
@@ -2340,13 +2339,16 @@ export class Base extends Model {
     this: T,
     row: Record<string, unknown>,
   ): InstanceType<T> {
-    // If STI is enabled, delegate to the correct subclass. `inheritance_column`
-    // always resolves to a name now (default "type"), so gate on explicit STI
-    // enablement: the row-dispatch path resolves through the global registry and
-    // must stay scoped to explicitly-modeled hierarchies.
+    // Delegate to the correct STI subclass when the row carries a present
+    // inheritance-column value that names a different class. `inheritance_column`
+    // always resolves to a name now (default "type"); a present `row[inheritanceCol]`
+    // key proves the column is a real attribute (Rails' `_has_attribute?`), so no
+    // `stiEnabled` short-circuit is needed — instantiateSti resolves within the
+    // base's own tracked subtree and is a no-op for plain models with a stray
+    // `type` column.
     const stiBase = getStiBase(this);
     const inheritanceCol = getInheritanceColumn(stiBase);
-    if (stiEnabled(stiBase) && row[inheritanceCol] && row[inheritanceCol] !== this.name) {
+    if (row[inheritanceCol] && row[inheritanceCol] !== this.name) {
       return instantiateSti(stiBase, row) as InstanceType<T>;
     }
 
