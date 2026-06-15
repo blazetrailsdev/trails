@@ -1334,9 +1334,11 @@ function reverseOrderBang(this: QueryMethodsHost): any {
         return [col, dir] as [string, "asc" | "desc"];
       }
       // Multi-column comma-joined order ("salary DESC, name ASC"): mirror Rails'
-      // reverse_sql_order String branch — split on comma and flip each term. Skip
-      // when a term carries a function/CASE expression, which stays irreversible.
-      if (clause.includes(",") && !/[()]/.test(clause) && !/\bCASE\b/i.test(clause)) {
+      // reverse_sql_order String branch — split on comma and flip each term.
+      // reverseSqlOrder calls isDoesNotSupportReverse (the faithful port of
+      // does_not_support_reverse?), so unbalanced-paren sections and "nulls
+      // first/last" still raise, while balanced expressions reverse.
+      if (clause.includes(",")) {
         const reversed = reverseSqlOrder.call(this, [clause]) as string[];
         return { raw: reversed.join(", ") };
       }
