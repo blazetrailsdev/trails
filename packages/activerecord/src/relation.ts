@@ -102,7 +102,6 @@ import {
   typeCastCalculatedValue as _typeCastCalculatedValue,
   selectForCount as _selectForCount,
   isBuildCountSubquery as _isBuildCountSubquery,
-  buildCountSubquery as _buildCountSubquery,
 } from "./relation/calculations.js";
 import * as _fm from "./relation/finder-methods.js";
 import { FinderMethods } from "./relation/finder-methods.js";
@@ -6180,11 +6179,6 @@ export class Relation<T extends Base> {
   /** @internal */
   private isBuildCountSubquery(operation: string, columnName: string, distinct: boolean): boolean {
     return _isBuildCountSubquery(operation, columnName, distinct);
-  }
-
-  /** @internal */
-  private buildCountSubquery(columnName: string, distinct: boolean): string {
-    return _buildCountSubquery(this as any, columnName, distinct);
   }
 
   // ---------------------------------------------------------------------------
