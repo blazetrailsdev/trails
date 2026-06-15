@@ -71,6 +71,43 @@ describe("JoinDependency Arel node construction", () => {
     expect((eq.left as any).name).toBe("owner_id");
   });
 
+  it("emits polymorphic :as type predicate using base class polymorphic_name for STI subclass owner", () => {
+    class StiOwner extends Base {
+      static {
+        this.attribute("type", "string");
+        this.attribute("name", "string");
+      }
+    }
+    class StiSubOwner extends StiOwner {}
+    enableSti(StiOwner);
+    registerSubclass(StiSubOwner);
+    StiOwner.adapter = adapter;
+    StiSubOwner.adapter = adapter;
+    (StiOwner as any)._associations = [];
+    (StiSubOwner as any)._associations = [];
+    registerModel(StiOwner);
+    registerModel(StiSubOwner);
+
+    Associations.hasMany.call(StiSubOwner, "assets", { className: "Asset", as: "owner" });
+
+    const jd = new JoinDependency(StiSubOwner);
+    const node = jd.addAssociation("assets");
+    expect(node).not.toBeNull();
+
+    const outerJoin = node!.arelJoin as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const and = on.expr as Nodes.And;
+    expect(and).toBeInstanceOf(Nodes.And);
+
+    const typeEq = and.children[0] as Nodes.Equality;
+    expect((typeEq.left as any).name).toBe("owner_type");
+    const typeVal = typeEq.right as any;
+    const resolvedType = typeVal?.value?._valueBeforeTypeCast ?? typeVal?.value ?? typeVal?.val;
+    // Rails join_scope uses foreign_klass.polymorphic_name (= base_class.name),
+    // so an STI subclass owner stores the base class name, not "StiSubOwner".
+    expect(resolvedType).toBe("StiOwner");
+  });
+
   it("emits OuterJoin with STI subclass IN-list predicate", () => {
     class Vehicle extends Base {
       static {
