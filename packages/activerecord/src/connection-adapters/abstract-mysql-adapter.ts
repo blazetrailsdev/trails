@@ -305,7 +305,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * of falling through to the abstract SQL-92 defaults (booleans →
    * `TRUE/FALSE`, plain `''` string escaping).
    *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#quote
+   * Rails' `mysql/quoting.rb` has no `quote` override — MySQL inherits the
+   * abstract `quote` and its MySQL-specific behaviour flows in through the
+   * dispatched helpers (`quoted_binary`, `quote_string`, `quoted_date`/`quoted_time`).
+   * `mysqlQuote` keeps only the branches the abstract `quote` can't thread through
+   * `this` and delegates the rest; see its JSDoc.
    */
   override quote(value: unknown): string {
     // `.call(this)` so `mysqlQuote`'s delegation to the abstract `quote`
