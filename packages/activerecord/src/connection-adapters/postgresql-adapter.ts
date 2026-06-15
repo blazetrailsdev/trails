@@ -89,6 +89,7 @@ const OID_INTERVAL_ARRAY = 1187;
 const OID_MONEY = 790;
 import {
   READ_QUERY,
+  buildTruncateStatements as pgBuildTruncateStatements,
   executeBatch as pgExecuteBatch,
   suppressCompositePrimaryKey,
   castResult,
@@ -1813,6 +1814,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Mirrors: PostgreSQL::DatabaseStatements#execute_batch (database_statements.rb)
   /** @internal */
   executeBatch = pgExecuteBatch;
+
+  // Mirrors: PostgreSQL::DatabaseStatements#build_truncate_statements
+  // Emits a single combined TRUNCATE TABLE a, b, c statement.
+  /** @internal */
+  buildTruncateStatements = pgBuildTruncateStatements;
 
   // Mirrors: DatabaseStatements#high_precision_current_timestamp (database_statements.rb:92)
   // Rails: HIGH_PRECISION_CURRENT_TIMESTAMP = Arel.sql("CURRENT_TIMESTAMP")
