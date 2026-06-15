@@ -794,12 +794,16 @@ jobs:
     timeout-minutes: 20
     permissions:
       pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      # Single source of truth for the forbidden-attribution markers, shared by
+      # the PR-body and commit-message scans below so the two can't drift apart.
+      # Matched case-insensitively (grep -iE).
+      ATTRIBUTION_RE: 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'
     steps:
       - name: Forbid Claude attribution in PR body
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           # Fetch the *live* body rather than reading the event payload. The
@@ -808,27 +812,32 @@ jobs:
           # fix. Reading the payload would replay the stale original body and
           # leave the check permanently red.
           body=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
-          # Case-insensitive scan for Claude/Anthropic attribution markers.
-          if printf '%s' "$body" | grep -qiE 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'; then
+          if printf '%s' "$body" | grep -qiE "$ATTRIBUTION_RE"; then
             echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
             exit 1
           fi
           echo "No forbidden Claude attribution found in PR body."
       - name: Forbid Claude attribution in commit messages
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          # Scan every commit message on the PR via the API, not just the PR
-          # body. The body check above misses `Co-authored-by:` trailers that
-          # live in commits — and GitHub's squash-merge auto-aggregates those
-          # branch-commit trailers into the merge commit on `main`, which is
-          # exactly how a Claude attribution reached main past the body check.
-          # --paginate covers PRs with more than one page of commits.
+          # Scan every commit message on the PR, not just the PR body. The body
+          # check above misses `Co-authored-by:` trailers that live in commits —
+          # and GitHub's squash-merge auto-aggregates those branch-commit
+          # trailers into the merge commit on `main`, which is exactly how a
+          # Claude attribution reached main past the body check.
+          #
+          # The pulls/{n}/commits endpoint caps at 250 commits even with
+          # --paginate, so a >250-commit PR would leave its tail unscanned. Fail
+          # closed in that case rather than passing on a partial scan — this repo
+          # squashes and has a 500-LOC ceiling, so 250 commits never happens
+          # legitimately; if it does, squash/rebase before re-running.
+          count=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
+          if [ "$count" -gt 250 ]; then
+            echo "::error::PR has $count commits, exceeding the 250-commit API scan cap. Squash or rebase the branch so commit messages can be fully scanned, then re-run this job."
+            exit 1
+          fi
           messages=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
-          if printf '%s' "$messages" | grep -qiE 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'; then
+          if printf '%s' "$messages" | grep -qiE "$ATTRIBUTION_RE"; then
             echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
             exit 1
           fi
