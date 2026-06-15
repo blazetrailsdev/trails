@@ -83,7 +83,9 @@ async function readPhysicalColumns(
   const byTable = new Map<string, Set<string>>();
   for (const row of rows) {
     // The SQL aliases to tbl/col; a driver may upper-case the alias keys.
-    const tbl = String((row.tbl ?? row.TBL) as string);
+    // Lowercase the table name too (not just columns) so lookups against the
+    // lowercase canonical schema keys match regardless of driver name-casing.
+    const tbl = String((row.tbl ?? row.TBL) as string).toLowerCase();
     const col = String((row.col ?? row.COL) as string);
     if (!tbl || !col) continue;
     let set = byTable.get(tbl);
@@ -102,7 +104,11 @@ export function driftedTables(physical: Map<string, Set<string>>, canonical: Sch
   const drifted: string[] = [];
   for (const [table, spec] of Object.entries(canonical)) {
     if (PROTECTED_TABLES.has(table)) continue;
-    const actual = physical.get(table);
+    // Look up case-insensitively: TEST_SCHEMA has a mixed-case table name
+    // (CamelCase) and drivers report names in their own case, while
+    // readPhysicalColumns lowercases the keys. The repaired name returned is the
+    // original canonical key so callers can index `canonical[table]`.
+    const actual = physical.get(table.toLowerCase());
     if (!actual) {
       drifted.push(table);
       continue;
