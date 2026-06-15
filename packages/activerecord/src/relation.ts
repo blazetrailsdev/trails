@@ -5,7 +5,6 @@ import {
   SelectManager,
   Nodes,
   Visitors,
-  Collectors,
   UpdateManager,
   DeleteManager,
 } from "@blazetrails/arel";
@@ -4270,26 +4269,21 @@ export class Relation<T extends Base> {
 
   /**
    * Render an Arel node to inlined display SQL through the connection, mirroring
-   * Rails' `conn.unprepared_statement { conn.to_sql(arel) }`. The
-   * prepared-statements toggle mirrors Rails' `unprepared_statement`
-   * (abstract_adapter.rb) structurally — applied synchronously (the async
-   * `unpreparedStatement` exists for EXPLAIN, but `toSql` is sync). It is a
-   * no-op for the current output: `connection.toSql` already inlines every bind
-   * through a SubstituteBinds collector unconditionally (it never branches on
-   * `preparedStatements`), so the scope is kept only for parity should `toSql`
-   * later adopt Rails' flag-driven `collector` dispatch. When no connection is
-   * established (HABTM join models), fall back to a default ANSI visitor
-   * inlining binds through the shared `defaultQuoter` — debug-only output, as in
-   * Rails' connection-less `Node#to_sql`.
+   * Rails' `model.with_connection { |c| c.unprepared_statement { c.to_sql(arel) } }`
+   * (relation.rb:1217-1218). The prepared-statements toggle mirrors Rails'
+   * `unprepared_statement` (abstract_adapter.rb) structurally — applied
+   * synchronously (the async `unpreparedStatement` exists for EXPLAIN, but
+   * `toSql` is sync). It is a no-op for the current output: `connection.toSql`
+   * already inlines every bind through a SubstituteBinds collector
+   * unconditionally (it never branches on `preparedStatements`), so the scope is
+   * kept only for parity should `toSql` later adopt Rails' flag-driven
+   * `collector` dispatch. There is exactly one render path: like Rails'
+   * `with_connection`, `_modelClass.connection` always yields a real connection
+   * (raising `ConnectionNotEstablished` when none is configured, as Rails does),
+   * never a quoter stand-in.
    */
   private _toSqlViaConnection(node: Nodes.Node): string {
-    const adapter = this._resolveAdapter();
-    if (adapter === null) {
-      return new Visitors.ToSql().compile(
-        node,
-        new Collectors.SubstituteBinds(Visitors.defaultQuoter, new Collectors.SQLString()),
-      );
-    }
+    const adapter = this._modelClass.connection;
     const wasPrepared = adapter.preparedStatements;
     adapter.preparedStatements = false;
     try {
