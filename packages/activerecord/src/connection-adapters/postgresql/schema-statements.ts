@@ -128,8 +128,15 @@ export interface SchemaStatements {
     nullable: boolean,
     defaultValue?: unknown,
   ): Promise<void>;
-  changeColumnComment(tableName: string, columnName: string, comment: string | null): Promise<void>;
-  changeTableComment(tableName: string, comment: string | null): Promise<void>;
+  changeColumnComment(
+    tableName: string,
+    columnName: string,
+    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+  ): Promise<void>;
+  changeTableComment(
+    tableName: string,
+    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+  ): Promise<void>;
   renameTable(tableName: string, newName: string): Promise<void>;
   changeColumn(
     tableName: string,

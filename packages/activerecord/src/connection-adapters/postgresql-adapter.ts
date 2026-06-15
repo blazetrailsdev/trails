@@ -112,7 +112,6 @@ import {
   CheckConstraintDefinition,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
-  ColumnDefinition,
   ForeignKeyDefinition,
   IndexDefinition as AbstractIndexDefinition,
   TableDefinition as AbstractTableDefinition,
@@ -3299,18 +3298,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition | undefined> {
-    const col = (await this.columns(tableName)).find((c) => c.name === columnName);
-    if (!col) return undefined;
-    const defaultValue =
-      defaultOrChanges !== null &&
-      typeof defaultOrChanges === "object" &&
-      "to" in (defaultOrChanges as object)
-        ? (defaultOrChanges as { to: unknown }).to
-        : defaultOrChanges;
-    const semanticType = (col.type ?? "string") as ColumnType;
-    const cd = new ColumnDefinition(columnName, semanticType, { array: col.array || undefined });
-    cd.sqlType = col.sqlType ?? undefined;
-    return new ChangeColumnDefaultDefinition(cd, defaultValue);
+    return this.pgSchemaStatements().buildChangeColumnDefaultDefinition(
+      tableName,
+      columnName,
+      defaultOrChanges,
+    );
   }
 
   async changeColumnNull(
@@ -3325,13 +3317,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async changeColumnComment(
     tableName: string,
     columnName: string,
-    comment: string | null,
+    commentOrChanges: string | null | { from?: string | null; to?: string | null },
   ): Promise<void> {
-    await this.pgSchemaStatements().changeColumnComment(tableName, columnName, comment);
+    await this.pgSchemaStatements().changeColumnComment(tableName, columnName, commentOrChanges);
   }
 
-  async changeTableComment(tableName: string, comment: string | null): Promise<void> {
-    await this.pgSchemaStatements().changeTableComment(tableName, comment);
+  async changeTableComment(
+    tableName: string,
+    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+  ): Promise<void> {
+    await this.pgSchemaStatements().changeTableComment(tableName, commentOrChanges);
   }
 
   /** @internal */

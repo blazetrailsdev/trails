@@ -20,6 +20,7 @@ import {
   IndexDefinition,
   ColumnDefinition,
   AddColumnDefinition,
+  ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
   ForeignKeyDefinition,
   CheckConstraintDefinition,
@@ -1347,24 +1348,16 @@ export class SchemaStatements {
     return at;
   }
 
+  // Mirrors AbstractAdapter::SchemaStatements#build_change_column_default_definition,
+  // which raises NotImplementedError; each adapter that supports it (PostgreSQL,
+  // MySQL) overrides with its own column-aware ChangeColumnDefaultDefinition.
   buildChangeColumnDefaultDefinition(
-    tableName: string,
-    columnName: string,
-    defaultOrChanges: unknown,
-  ): AlterTable {
-    let newDefault: unknown;
-    if (
-      defaultOrChanges != null &&
-      typeof defaultOrChanges === "object" &&
-      "to" in (defaultOrChanges as Record<string, unknown>)
-    ) {
-      newDefault = (defaultOrChanges as { to: unknown }).to;
-    } else {
-      newDefault = defaultOrChanges;
-    }
-    const at = new AlterTable(tableName);
-    at.changeColumnDefault(columnName, newDefault);
-    return at;
+    _tableName: string,
+    _columnName: string,
+    _defaultOrChanges: unknown,
+  ): Promise<ChangeColumnDefaultDefinition | undefined> {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:738
+    throw new NotImplementedError("build_change_column_default_definition is not implemented");
   }
 
   async buildCreateIndexDefinition(
