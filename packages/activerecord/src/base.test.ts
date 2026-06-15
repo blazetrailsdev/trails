@@ -2331,6 +2331,9 @@ describe("BasicsTest", () => {
         .toZonedDateTime(Temporal.Now.timeZoneId())
         .toInstant();
       expect(ft.epochNanoseconds).toBe(expected.epochNanoseconds);
+      // Rails' PostgreSQL-only branch also asserts on `fixed_time_with_time_zone`
+      // (timestamptz, time-zone-aware); omitted until time_zone_aware_attributes
+      // defaults are wired — tracked under RFC 0016.
     });
   });
   it("connection in utc time", async () => {
@@ -2359,6 +2362,9 @@ describe("BasicsTest", () => {
       expect(ft.epochNanoseconds).toBe(
         Temporal.Instant.from("2004-01-01T00:00:00Z").epochNanoseconds,
       );
+      // Rails' PostgreSQL-only branch also asserts on `fixed_time_with_time_zone`
+      // (timestamptz, time-zone-aware); omitted until time_zone_aware_attributes
+      // defaults are wired — tracked under RFC 0016.
     });
   });
   it("column name properly quoted", () => {
