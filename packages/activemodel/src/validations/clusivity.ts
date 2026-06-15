@@ -16,6 +16,7 @@
  * method-lookup semantics.
  */
 import { resolveValue } from "./resolve-value.js";
+import { rangeIncludesValue, type RangeExt as Range } from "@blazetrails/activesupport";
 
 export { resolveValue };
 
@@ -82,7 +83,8 @@ export function checkValidityBang(this: ClusivityHost): void {
       d !== null &&
       typeof (d as Record<symbol, unknown>)[Symbol.iterator] === "function");
   const isCallable = typeof d === "function";
-  if (!isString && !hasIncludeMethod && !isIterable && !isCallable) {
+  // ActiveSupport Range responds to #cover? / #include? — accept it like Rails.
+  if (!isString && !hasIncludeMethod && !isIterable && !isCallable && !isRange(d)) {
     throw new Error(ERROR_MESSAGE);
   }
 }
@@ -167,21 +169,36 @@ export function delimiter(this: ClusivityHost): unknown {
  *     end
  *   end
  *
- * TS has no first-class Range; iterables are treated uniformly as
- * `include?`. If a Range-like type lands later, the cover-vs-include
- * branch slots in here.
+ * ActiveSupport's `Range` (range-ext.ts) is the first-class Range type
+ * here: a numeric/date range dispatches to `cover?` (endpoint check),
+ * everything else to `include?`.
  *
  * @internal
  */
-export function inclusionMethod(_enumerable: unknown): "include?" | "cover?" {
+export function inclusionMethod(enumerable: unknown): "include?" | "cover?" {
+  if (isRange(enumerable)) {
+    const endpoint = enumerable.begin ?? enumerable.end;
+    // boundary: range-ext's comparators (rangeIncludesValue) accept JS Date
+    // alongside number, coercing to epoch for ordering — mirror that here.
+    if (typeof endpoint === "number" || endpoint instanceof Date) return "cover?";
+  }
   return "include?";
 }
 
+function isRange(members: unknown): members is Range<number | Date> {
+  return (
+    typeof members === "object" &&
+    members !== null &&
+    "begin" in members &&
+    "end" in members &&
+    "excludeEnd" in members
+  );
+}
+
 function testMembership(members: unknown, value: unknown, method: "include?" | "cover?"): boolean {
-  if (method === "cover?") {
-    // Range#cover? semantics — start/end endpoint check. No first-class
-    // Range type in TS yet; if/when it lands, dispatch goes here.
-    return isMemberOf(members, value);
+  if (method === "cover?" && isRange(members)) {
+    // Range#cover? semantics — endpoint check against the range bounds.
+    return rangeIncludesValue(members, value as number | Date);
   }
   return isMemberOf(members, value);
 }

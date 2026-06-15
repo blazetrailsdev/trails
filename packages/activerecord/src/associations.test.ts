@@ -19,6 +19,7 @@ import {
   ConfigurationError,
   touchBelongsToParents,
 } from "./index.js";
+import { makeRange } from "@blazetrails/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -7548,6 +7549,9 @@ describe("AssociationProxyTest", () => {
         this._tableName = "ap_developers";
         this.attribute("name", "string");
         this.attribute("salary", "integer");
+        // Mirrors developer.rb:97-98.
+        this.validates("salary", { inclusion: { in: makeRange(50_000, 200_000) } });
+        this.validates("name", { length: { in: [3, 20] } });
         this.beforeCreate((developer: any) => {
           association(developer, "apAuditLogs").build({ message: "Computer created" });
         });
