@@ -618,10 +618,8 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
     const dm = new DeleteManager()
       .from(ctor.arelTable)
       .where(ctor._buildQueryConstraintsWhereNode(_queryConstraintsHash.call(this as any)));
-    // The SQL is arel-built via `connection.toSql(dm)`; the flagged string is
-    // the "Delete" operation-name label (Rails' log subscriber name), which the
-    // rule's leading-verb heuristic false-matches as a DELETE statement.
-
+    // The SQL is arel-built via `connection.toSql(dm)`; the "Delete" string is
+    // the operation-name label (Rails' log subscriber name), not raw SQL.
     await ctor.connection.execDelete(ctor.connection.toSql(dm), "Delete");
   }
   this._destroyed = true;
@@ -1101,10 +1099,8 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     await adapter.update(um);
   } else {
     const sql = adapter.toSql(um);
-    // The SQL is arel-built via `adapter.toSql(um)`; the flagged string is the
-    // "Update Columns" operation-name label (Rails' log subscriber name), which
-    // the rule's leading-verb heuristic false-matches as an UPDATE statement.
-
+    // The SQL is arel-built via `adapter.toSql(um)`; the "Update Columns" string
+    // is the operation-name label (Rails' log subscriber name), not raw SQL.
     await adapter.execUpdate(sql, "Update Columns");
   }
 

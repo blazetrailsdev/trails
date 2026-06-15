@@ -41,6 +41,12 @@ describe("reload — association owner re-point", () => {
     expect(proxy.owner).toBe(second);
   });
 
+  // The preloaded-only path (`_findRecord` populates only the `preloaded`
+  // facet) leaves the `instances`/`proxies` facets empty, so reload's owner
+  // re-point loops are a no-op here by design — they are future-proofing for a
+  // fetch that adopts owner-bound holders. This asserts the path stays correct
+  // (associations re-resolve against the reloaded record); the setter itself is
+  // covered directly above.
   it("resolves associations against the reloaded record after reload", async () => {
     const author = await Author.create({ name: "Dev" });
     await Post.create({ title: "a", body: "a", author_id: author.id as number });
