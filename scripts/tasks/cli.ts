@@ -1279,10 +1279,10 @@ function rfc(
 // before anything is committed. The pre-edit graph is acyclic (validate.mjs
 // enforces it), so any new cycle must pass through `id` — visiting from `id`
 // alone is sufficient. This restates the traversal now shared as
-// `checkDepGraph` in the tasks repo's `scripts/validate-lib.mjs` (which accepts
-// a `seeds` override for exactly this post-edit, single-node case). Wiring this
-// to import it is deferred: `cli.ts` runs in trails CI, where the tasks repo —
-// and thus `validate-lib.mjs` — is gitignored and absent, so an unconditional
+// `checkDepGraph` in the tasks repo's `scripts/validate-lib.mjs`, whose `seeds`
+// parameter takes exactly this single-node, post-edit start set. Wiring this to
+// import it is deferred: `cli.ts` runs in trails CI, where the tasks repo — and
+// thus `validate-lib.mjs` — is gitignored and absent, so an unconditional
 // import would break these unit tests. The tasks pre-commit hook runs the
 // shared check via `validate.mjs` regardless, so the two can't silently drift.
 export function depCyclePath(index: Index, id: string, newDeps: string[]): string[] | null {
