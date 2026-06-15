@@ -15,7 +15,6 @@ import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors
 // here so api:compare finds it where Rails defines it.
 export { UnsupportedVisitError };
 import { defaultQuoter } from "./default-quoter.js";
-import { substituteBoundValues } from "./substitute-bound-values.js";
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
@@ -105,23 +104,12 @@ export class ToSql extends Visitor {
       }
       return collector.value;
     }
+    // Mirrors Rails `compile` defaulting to a plain `SQLString` (to_sql.rb:17):
+    // Casted/Quoted inline their quoted literal in the visitor, BindParam emits
+    // `?` (BIND_BLOCK = proc { "?" }). No post-hoc inlining needed.
     const sqlCollector = new SQLString();
-    const bindCollector = new Bind();
-    const composite = new Composite(sqlCollector, bindCollector);
-    this.visit(node as Node, composite as unknown as SQLString);
-    const sql = sqlCollector.value;
-    const binds = bindCollector.value;
-    if (binds.length === 0) return sql;
-    return substituteBoundValues(sql, (match, i) => {
-      const raw = binds[i];
-      // BindParam collects a placeholder rather than inlining its value —
-      // mirrors Rails `visit_Arel_Nodes_BindParam` (`BIND_BLOCK = proc { "?" }`),
-      // so `Nodes::BindParam.new(v).to_sql` is always `?`. Casted/Quoted/date
-      // values still inline below (Rails inlines those via `quote`).
-      if (raw instanceof Nodes.BindParam || raw === undefined) return match;
-      const val = resolveValueForDatabase(raw);
-      return this.quote(val);
-    });
+    this.visit(node as Node, sqlCollector);
+    return sqlCollector.value;
   }
 
   protected visitArelNodesDeleteStatement(
@@ -241,10 +229,12 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesCasted(node: Nodes.Casted, collector: SQLString): SQLString {
-    // Mirrors Rails to_sql.rb `visit_Arel_Nodes_Casted`: collector.add_bind(o, &bind_block).
-    // Quoted nodes (null comparisons, hard-coded literals) inline via visitQuoted.
+    // Mirrors Rails to_sql.rb:87-88 `visit_Arel_Nodes_Casted`:
+    // collector << quote(o.value_for_database).to_s — the quoted literal is
+    // appended directly (visit_Arel_Nodes_Quoted is an alias). Only BindParam
+    // uses add_bind. Inlines exactly like visitQuoted.
     const value = resolveValueForDatabase(node.valueForDatabase());
-    collector.addBind(value, this.bindBlock());
+    collector.append(this.quote(value));
     return collector;
   }
 
@@ -1873,8 +1863,9 @@ export class ToSql extends Visitor {
   }
 
   private visitQuoted(node: Nodes.Quoted, collector: SQLString): SQLString {
-    // Mirrors Rails to_sql.rb `visit_Arel_Nodes_Quoted`: collector << quote(o.value_for_database).
-    // Quoted nodes (null, hard-coded literals) are always inlined; only Casted uses add_bind.
+    // Mirrors Rails to_sql.rb `visit_Arel_Nodes_Quoted` (aliased to Casted at :90):
+    // collector << quote(o.value_for_database). Quoted and Casted both inline their
+    // quoted literal; only BindParam uses add_bind.
     const value = resolveValueForDatabase(node.valueForDatabase());
     collector.append(this.quote(value));
     return collector;
