@@ -670,26 +670,40 @@ export class JoinDependency {
   /**
    * Lazily resolve a referenced-table alias for `child`, mirroring Rails
    * `make_constraints` reading `table_name = @references[reflection.name]` and
-   * feeding it to `alias_tracker.aliased_table_for` (join_dependency.rb:202).
+   * feeding it to `alias_tracker.aliased_table_for(klass.arel_table, table_name)
+   * { reflection.alias_candidate(parent.table_name) }` (join_dependency.rb:202,
+   * alias_tracker.rb).
    *
    * `includes(:author).references(:author)` records `author` in `@references`;
-   * when the join for `:author` is emitted, its table is re-aliased to that
-   * referenced name (`authors AS author`). The node's table was already
-   * collision-registered eagerly in `addAssociation`, so `aliasedTableFor` takes
-   * its candidate branch and yields the referenced name; the node's
-   * `effectiveSqlName`/`arelTable` and the join's (and its children's) ON
-   * predicates are rebound so the SELECT projection and SQL stay consistent.
-   * Idempotent: once the node already carries the referenced name, it no-ops.
+   * when the join for `:author` is emitted, `aliased_table_for` uses the
+   * referenced name on its first use (`authors AS author`), and otherwise — when
+   * that name is already taken — the reflection's `alias_candidate`
+   * (`{plural}_{parent}`, with `_N` on repeat), NOT a numeric suffix of the
+   * referenced name. The node's `effectiveSqlName`/`arelTable` and the join's
+   * (and its children's) ON predicates are rebound so the SELECT projection and
+   * SQL stay consistent. Idempotent: once the node already carries the resolved
+   * name, it no-ops.
    * @internal
    */
-  private _applyReferencedAlias(child: JoinPart): void {
+  private _applyReferencedAlias(parent: JoinPart, child: JoinPart): void {
     if (this._references.size === 0 || !(child instanceof JoinAssociation)) return;
     const referenced = this._references.get(child.immediateAssocName);
     if (!referenced || referenced === child.effectiveSqlName) return;
 
     const tableName = child.tableName;
-    const aliased = this._aliasTracker.aliasedTableFor(new Table(tableName), referenced);
-    const newName = aliased.tableAlias ?? aliased.name;
+    // Inline of aliased_table_for(klass.arel_table, table_name) { candidate }:
+    // the referenced name on first use, else the reflection's alias_candidate.
+    let newName: string;
+    if ((this._aliasTracker.aliases.get(referenced) ?? 0) === 0) {
+      this._aliasTracker.aliases.set(referenced, 1);
+      newName = referenced;
+    } else {
+      const parentTableName = (parent.baseKlass as any)?.tableName ?? parent.table;
+      newName = this._aliasTracker.aliasNameFor(child.reflection.aliasCandidate(parentTableName));
+    }
+    if (newName === child.effectiveSqlName) return;
+    const aliased =
+      newName === tableName ? new Table(tableName) : new Table(tableName, { as: newName });
 
     const fromName = child.effectiveSqlName || tableName;
     const rebindOn = (part: JoinPart): void => {
@@ -716,11 +730,11 @@ export class JoinDependency {
 
   /** @internal */
   private makeConstraints(
-    _parent: JoinPart,
+    parent: JoinPart,
     child: JoinPart,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
-    this._applyReferencedAlias(child);
+    this._applyReferencedAlias(parent, child);
     const joins: Nodes.Join[] = [];
     const arelJoin = child.arelJoin;
     if (arelJoin) {

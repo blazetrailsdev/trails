@@ -12,6 +12,7 @@ import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
+import { AliasTracker } from "./alias-tracker.js";
 
 describe("JoinDependency referenced-table aliasing", () => {
   class Author extends Base {
@@ -84,5 +85,24 @@ describe("JoinDependency referenced-table aliasing", () => {
     const joins = jd.joinConstraints([]);
     expect(joins).toHaveLength(1);
     expect(joinTableName(joins[0])).toBe("authors");
+  });
+
+  it("falls back to the reflection alias_candidate when the reference name is taken", () => {
+    // Mirrors Rails aliased_table_for's collision branch: when the referenced
+    // name is already occupied, the reflection's alias_candidate
+    // (`{plural}_{parent}`) is used — NOT a numeric suffix of the reference name.
+    const jd = new JoinDependency(Post);
+    jd.addAssociation("author");
+    const tracker = new AliasTracker(
+      undefined,
+      new Map([
+        ["posts", 1],
+        ["authors", 1],
+        ["author", 1],
+      ]),
+    );
+    const joins = jd.joinConstraints([], tracker, ["author"]);
+    expect(joins).toHaveLength(1);
+    expect(joinTableName(joins[0])).toBe("authors_posts");
   });
 });
