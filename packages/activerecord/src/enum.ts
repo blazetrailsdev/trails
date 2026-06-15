@@ -9,15 +9,28 @@ import { ArgumentError, ValueType } from "@blazetrails/activemodel";
  */
 
 /**
- * Build an EnumType for the deserialize/serialize helpers below from the
- * canonical `_enums` mapping. The subtype only governs the integer/string
- * coercion fallback, so infer it from the mapping's value types — uniform
- * numbers mean an integer-backed column, anything else a string-backed one.
+ * EnumType cache keyed on the `_enums` mapping object. Each enum stores one
+ * stable mapping Record in `_enums`, so keying on its identity lets the
+ * read/serialize helpers reuse a single EnumType instead of reallocating one
+ * per call.
+ */
+const enumTypeCache = new WeakMap<object, EnumType>();
+
+/**
+ * Build (and cache) an EnumType for the deserialize/serialize helpers below
+ * from the canonical `_enums` mapping. The subtype only governs the
+ * integer/string coercion fallback, so infer it from the mapping's value
+ * types — uniform numbers mean an integer-backed column, anything else a
+ * string-backed one.
  */
 export function enumTypeFor(name: string, mapping: Record<string, number | string>): EnumType {
+  const cached = enumTypeCache.get(mapping);
+  if (cached) return cached;
   const entries = Object.entries(mapping);
   const subtype = entries.every(([, v]) => typeof v === "number") ? "integer" : "string";
-  return new EnumType(name, new Map(entries), subtype);
+  const enumType = new EnumType(name, new Map(entries), subtype);
+  enumTypeCache.set(mapping, enumType);
+  return enumType;
 }
 
 /**
