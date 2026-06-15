@@ -213,7 +213,6 @@ describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
         { authorFavorites: "favoriteAuthor" },
       )
       .where({ authors: { name: (daveyMcdave as unknown as { name: string }).name } })
-      .references("categorizations")
       .order("categories.name")
       .toArray();
   });
