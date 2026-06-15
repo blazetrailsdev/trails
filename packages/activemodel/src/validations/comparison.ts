@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { isBlank } from "@blazetrails/activesupport";
@@ -80,12 +81,12 @@ export class ComparisonValidator extends EachValidator {
         : x === undefined
           ? "NilClass"
           : ((x as object).constructor?.name ?? typeof x);
-    throw new TypeError(`comparison of ${nameOf(a)} with ${nameOf(b)} failed`);
+    throw new ArgumentError(`comparison of ${nameOf(a)} with ${nameOf(b)} failed`);
   }
 
   override checkValidity(): void {
     if (!COMPARE_CHECKS.some((k) => (this.options as Record<string, unknown>)[k] !== undefined)) {
-      throw new Error(
+      throw new ArgumentError(
         "One of :greater_than, :greater_than_or_equal_to, :less_than, :less_than_or_equal_to, :equal_to, or :other_than must be supplied",
       );
     }

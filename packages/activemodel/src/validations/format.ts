@@ -1,3 +1,4 @@
+import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { resolveValue } from "./resolve-value.js";
@@ -59,7 +60,7 @@ export class FormatValidator extends EachValidator {
     const hasWith = Object.hasOwn(this.options, "with");
     const hasWithout = Object.hasOwn(this.options, "without");
     if (hasWith === hasWithout) {
-      throw new Error("Either :with or :without must be supplied (but not both)");
+      throw new ArgumentError("Either :with or :without must be supplied (but not both)");
     }
     this.checkOptionsValidity("with");
     this.checkOptionsValidity("without");
@@ -120,14 +121,16 @@ export function checkOptionsValidity(
   if (option === undefined || option === null || option === false) return;
   if (option instanceof RegExp) {
     if (this.options.multiline !== true && this.regexpUsingMultilineAnchors(option)) {
-      throw new Error(
+      throw new ArgumentError(
         "The provided regular expression is using multiline anchors (^ or $), " +
           "which may present a security risk. Did you mean to use \\A and \\z, " +
           "or forgot to add the :multiline => true option?",
       );
     }
   } else if (typeof option !== "function") {
-    throw new Error(`A regular expression or a proc or lambda must be supplied as :${name}`);
+    throw new ArgumentError(
+      `A regular expression or a proc or lambda must be supplied as :${name}`,
+    );
   }
 }
 
