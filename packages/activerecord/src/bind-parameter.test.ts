@@ -67,10 +67,12 @@ function logBinds(binds: unknown[], sql = "select * from topics where id = ?"): 
 // Rails wraps the entire class in `if Base.lease_connection.prepared_statements`
 // (bind_parameter_test.rb:9), so on adapters with prepared statements off (MySQL/
 // MariaDB default) NONE of these run. Deliberate deviation: we keep the
-// prepared-statement-INDEPENDENT cases (too many binds, find one uses binds, the
-// log-render tests — all adapter-agnostic) running on every backend for broader
-// coverage, and gate only the one prepared-statement-SPECIFIC case
-// (`nested unprepared statements`) via ctx.skip below.
+// prepared-statement-INDEPENDENT cases (too many binds, the log-render tests —
+// all adapter-agnostic) running on every backend for broader coverage, and gate
+// the prepared-statement-SPECIFIC cases (`find one uses binds`, `bind from join
+// in subquery`, `nested unprepared statements`) via ctx.skip below — the first
+// because `find` now routes through the inlined StatementCache path when
+// unprepared, logging no binds (matching Rails).
 describe("BindParameterTest", () => {
   // Rails: `fixtures :topics, :authors, :author_addresses, :posts`.
   useHandlerFixtures(["topics", "authors", "authorAddresses", "posts"], {
@@ -189,7 +191,16 @@ describe("BindParameterTest", () => {
     // tracked in the follow-up story.
   });
 
-  it("find one uses binds", async () => {
+  it("find one uses binds", async (ctx) => {
+    // Rails gates the whole BindParameterTest on `if prepared_statements`
+    // (bind_parameter_test.rb:9). Under an unprepared connection (MySQL/MariaDB
+    // default), `find` routes through the StatementCache PartialQuery path,
+    // which inlines its bind values into the SQL and logs no bind payload —
+    // the same shape Rails emits — so there is no `[1]` to assert. Mirror the
+    // Rails guard.
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+
     const subscriber = new LogListener();
     const sub = Notifications.subscribe("sql.active_record", (e: Event) => subscriber.call(e));
     try {

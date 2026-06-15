@@ -690,14 +690,12 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   }
   // Rails Core#find fast-path: a single supported scalar id on a simple
   // primary key (no scope, no block) goes through the cached StatementCache.
-  // Gated on preparedStatements: the unprepared StatementCache path inlines
-  // bind values into the SQL (PartialQuery) and so drops the bind payload the
-  // relation path logs; Rails buckets the cache by prepared_statements, but our
-  // relation path is result-equivalent unprepared and keeps the instrumentation
-  // (full log-only-bind plumbing through every adapter is deferred work).
+  // Both prepared and unprepared connections use it (Rails buckets the cache by
+  // prepared_statements in cachedFindByStatement); the unprepared PartialQuery
+  // path inlines its binds into the SQL and runs with an empty bind list,
+  // matching Rails' unprepared query-log shape (see StatementCache#execute).
   if (
     ids.length === 1 &&
-    (this as any).connection?.preparedStatements &&
     !(this as any).currentScope &&
     this.primaryKey != null &&
     !this.compositePrimaryKey &&
@@ -837,11 +835,6 @@ async function findByThroughCache(
   const keys = Object.keys(conditions);
   if (keys.length === 0) return this.all().findBy(conditions);
   await this.ensureSchemaLoaded();
-  // See find(): only use the statement cache under prepared statements, so the
-  // unprepared (PartialQuery) inlining path doesn't drop the bind payload the
-  // relation path logs.
-  if (!(this as any).connection?.preparedStatements) return this.all().findBy(conditions);
-
   const aliases: Record<string, string> = (this as any)._attributeAliases ?? {};
   const columns = columnsHash.call(this as any);
   const resolvedKeys: string[] = [];

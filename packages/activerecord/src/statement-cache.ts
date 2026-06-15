@@ -244,7 +244,11 @@ export class StatementCache {
     const sql = this._queryBuilder.sqlFor(bindValues, connection);
     const allowRetry = opts.allowRetry ?? this._queryBuilder.retryable;
     // PartialQuery inlines values into the SQL string — pass empty binds
-    // to avoid findBySql trying to re-substitute them.
+    // to avoid findBySql trying to re-substitute them. This matches Rails:
+    // PartialQuery#sql_for drains the bind_values array in place via
+    // `binds.shift` (statement_cache.rb:51-61), so by the time it reaches
+    // find_by_sql the array is empty and the unprepared query log carries no
+    // bind payload. (Our sqlFor copies the array, so we drop it explicitly.)
     if (this._queryBuilder instanceof PartialQuery) {
       return this._model.findBySql(sql, [], { allowRetry });
     }
