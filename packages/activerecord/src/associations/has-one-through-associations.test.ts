@@ -921,11 +921,13 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
-    // N/A: Ruby private-method visibility (NoMethodError on private) has no TS equivalent
+    // PERMANENT-SKIP: Ruby private-method visibility (NoMethodError when a private
+    // method is called publicly) has no TypeScript runtime equivalent.
   });
 
   it.skip("has one through proxy should respond to private methods via send", () => {
-    // N/A: Ruby private-method dispatch via send has no TS equivalent
+    // PERMANENT-SKIP: Ruby private-method dispatch via `send` has no TypeScript
+    // runtime equivalent.
   });
 
   it("assigning to has one through preserves decorated join record", async () => {
