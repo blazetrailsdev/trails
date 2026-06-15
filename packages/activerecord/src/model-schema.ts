@@ -382,7 +382,7 @@ interface SchemaHost {
   _tableNamePrefix: string;
   _tableNameSuffix: string;
   _sequenceName: string | null;
-  _inheritanceColumn?: string;
+  _inheritanceColumn?: string | null;
   _abstractClass?: boolean;
   _ignoredColumns?: string[];
   _protectedEnvironments?: string[];
@@ -437,7 +437,7 @@ export function fullTableNameSuffix(this: SchemaHost): string {
   return this._tableNameSuffix ?? "";
 }
 
-export function realInheritanceColumn(this: SchemaHost, value: string): void {
+export function realInheritanceColumn(this: SchemaHost, value: string | null): void {
   this._inheritanceColumn = value;
 }
 
@@ -1136,8 +1136,12 @@ export function protectedEnvironments(this: SchemaHost, value?: string[]): strin
   return this._protectedEnvironments ?? ["production"];
 }
 
-export function inheritanceColumn(this: SchemaHost, value?: string | null): string {
-  if (value !== undefined) this._inheritanceColumn = value ?? undefined;
+export function inheritanceColumn(this: SchemaHost, value?: string | null): string | null {
+  // An explicit `null` disables STI (Rails: `self.inheritance_column = nil`) and
+  // must stay distinguishable from "unset". Store it verbatim — `undefined` alone
+  // means unset and falls through to the "type" default below.
+  if (value !== undefined) this._inheritanceColumn = value;
+  if (this._inheritanceColumn === null) return null;
   // Rails defaults `inheritance_column` to "type" for every model.
   return this._inheritanceColumn ?? "type";
 }

@@ -1515,6 +1515,33 @@ describe("InheritanceComputeTypeTest", () => {
     const c = await Car.create({ name: "subcar" });
     expect(c.type).toBe("Car");
   });
+
+  it("inheritance_column = nil disables STI dispatch on new and find", async () => {
+    // Mirrors Rails' PostWithErrorDestroying (table "posts", a real `type`
+    // column, `self.inheritance_column = nil`): the column holds ordinary data,
+    // so neither `new` nor `find` may route through an STI subclass.
+    class DisabledStiPost extends Base {
+      static override tableName = "posts";
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "text");
+        this.attribute("type", "string");
+        this.inheritanceColumn = null;
+      }
+    }
+    registerModel("DisabledStiPost", DisabledStiPost);
+
+    // `new` keeps a class-like `type` value as plain data instead of dispatching.
+    const built = new (DisabledStiPost as any)({ title: "t", body: "b", type: "Firm" });
+    expect(built).toBeInstanceOf(DisabledStiPost);
+    expect(built.type).toBe("Firm");
+
+    // `find` re-instantiates as the base model, not an STI subclass.
+    const created = await DisabledStiPost.create({ title: "t", body: "b", type: "Firm" });
+    const found = await DisabledStiPost.find((created as any).id);
+    expect(found).toBeInstanceOf(DisabledStiPost);
+    expect((found as any).type).toBe("Firm");
+  });
 });
 
 describe("InheritanceAttributeMappingTest", () => {
@@ -1791,6 +1818,20 @@ describe("Base.inheritanceColumn", () => {
     // The test name is left verbatim per the test-name-stability rule — only the
     // assertion is corrected.
     expect(User.inheritanceColumn).toBe("type");
+  });
+
+  it("inheritance_column = nil reads back as null, distinct from the unset default", () => {
+    class WithType extends Base {
+      static {
+        this.attribute("type", "string");
+      }
+    }
+    // Unset still defaults to "type" (Rails parity, preserved from #3302).
+    expect(WithType.inheritanceColumn).toBe("type");
+
+    // An explicit nil disables STI and must read back as null, not the default.
+    WithType.inheritanceColumn = null;
+    expect(WithType.inheritanceColumn).toBeNull();
   });
 });
 

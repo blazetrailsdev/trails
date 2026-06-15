@@ -227,6 +227,22 @@ export function classHasAttribute(modelClass: typeof Base, name: string): boolea
 }
 
 /**
+ * True when STI is explicitly disabled for this model — Rails'
+ * `self.inheritance_column = nil`. trails stores an explicit `null` in
+ * `_inheritanceColumn` (distinct from the `undefined` "unset" state, which still
+ * defaults to "type"). A disabled model never dispatches STI even when its table
+ * carries a real `type` column used for non-inheritance data, so every dispatch
+ * gate short-circuits on this. {@link getInheritanceColumn} still resolves to the
+ * column *name* "type" — disabling is about *whether* dispatch happens, not where
+ * the column lives.
+ *
+ * @internal
+ */
+export function inheritanceColumnDisabled(modelClass: object): boolean {
+  return (modelClass as any)._inheritanceColumn === null;
+}
+
+/**
  * True when STI was explicitly enabled on this class or an ancestor (the
  * inherited `_inheritanceColumn` sentinel). Distinct from {@link getInheritanceColumn},
  * which now always resolves to a name (default "type"): the column merely names
@@ -565,6 +581,7 @@ export function initializeInternalsCallback(this: Base): void {
  */
 export function ensureProperType(this: Base): void {
   const klass = this.constructor as typeof Base;
+  if (inheritanceColumnDisabled(klass)) return;
   if (!isFinderNeedsTypeCondition(klass)) return;
   const inheritCol = getInheritanceColumn(klass);
   // Only write when the column is a declared attribute — otherwise the value
@@ -614,6 +631,8 @@ function usingSingleTableInheritance(
   // model with a reflected `type` column still passes this gate, but resolves to
   // itself in {@link findStiClassForRow} because its subtree tracks no subclass
   // and STI was never explicitly enabled, so dispatch is a no-op there.
+  // `inheritance_column = nil` opts out entirely, even with a real `type` column.
+  if (inheritanceColumnDisabled(modelClass)) return false;
   const inheritCol = getInheritanceColumn(modelClass);
   if (!isPresent(record[inheritCol])) return false;
   return stiColumnIsAttribute(modelClass, inheritCol, record);
@@ -697,6 +716,8 @@ export function subclassFromAttributes(
 
   if (!attrsHash || typeof attrsHash !== "object") return null;
 
+  // `inheritance_column = nil` disables STI even when a real `type` column exists.
+  if (inheritanceColumnDisabled(modelClass)) return null;
   const inheritCol = getInheritanceColumn(modelClass);
   // Rails gates STI dispatch on `_has_attribute?(inheritance_column)` — only
   // models that actually carry the column dispatch.
@@ -826,6 +847,8 @@ export function subclassFromAttributesForNew(
   // `findStiClassInHierarchy` could resolve. A plain model with neither can never
   // dispatch (it has no in-subtree match), so short-circuit the source probing —
   // including the non-memoized columnDefaults build — on the hot path.
+  // `inheritance_column = nil` disables STI even when a real `type` column exists.
+  if (inheritanceColumnDisabled(modelClass)) return null;
   const col = getInheritanceColumn(modelClass);
   if (!classHasAttribute(modelClass, col) && descendants(modelClass).length === 0) return null;
 
