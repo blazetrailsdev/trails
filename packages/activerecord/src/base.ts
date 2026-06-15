@@ -48,6 +48,7 @@ import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import type { Relation } from "./relation.js";
 import {
   getInheritanceColumn,
+  inheritanceColumnDisabled,
   isStiSubclass,
   getStiBase,
   instantiateSti,
@@ -1233,7 +1234,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.inheritance_column
    */
-  static get inheritanceColumn(): string {
+  static get inheritanceColumn(): string | null {
     return ModelSchema.inheritanceColumn.call(this);
   }
 
@@ -2354,7 +2355,11 @@ export class Base extends Model {
     // `type` column.
     const stiBase = getStiBase(this);
     const inheritanceCol = getInheritanceColumn(stiBase);
-    if (row[inheritanceCol] && row[inheritanceCol] !== this.name) {
+    if (
+      !inheritanceColumnDisabled(stiBase) &&
+      row[inheritanceCol] &&
+      row[inheritanceCol] !== this.name
+    ) {
       return instantiateSti(stiBase, row) as InstanceType<T>;
     }
 

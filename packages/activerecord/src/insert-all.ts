@@ -311,7 +311,9 @@ export class InsertAll {
     // `inheritance_column` now always resolves to a name (default "type"), so gate
     // on the structural check rather than the column's presence.
     if (isDescendsFromActiveRecord(this.model)) return;
-    const inheritanceCol = this.model.inheritanceColumn;
+    // STI is active on this path (not descends_from), so the column resolves to a
+    // name; `?? "type"` only satisfies the now-nullable getter's type.
+    const inheritanceCol = this.model.inheritanceColumn ?? "type";
     const type = stiName(this.model);
     for (const insert of this.inserts) {
       if (!(inheritanceCol in insert)) {
