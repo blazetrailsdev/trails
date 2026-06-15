@@ -1632,6 +1632,25 @@ blocked-by: null
 ${body}`;
 }
 
+// A body is "effectively empty" when it carries no substance beyond the
+// section scaffold — i.e. a blank/whitespace-only file, or just the
+// `## Context` / `## Acceptance criteria` headings (optionally with empty
+// checkbox bullets) and no prose under them. This is what the empty-stub guard
+// must reject: otherwise `--body-file <blank>` (or a file containing only the
+// skeleton) reintroduces the exact title-only stub the guard exists to stop.
+export function isEffectivelyEmptyBody(body: string): boolean {
+  const substantive = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(
+      (line) =>
+        line.length > 0 && // blank lines
+        !/^#{1,6}\s/.test(line) && // markdown headings (## Context, …)
+        !/^[-*]\s*(\[[ xX]\])?\s*$/.test(line), // empty bullets / empty checkboxes
+    );
+  return substantive.length === 0;
+}
+
 export function newStory(
   rfcSlug: string,
   storySlug: string,
@@ -1643,6 +1662,7 @@ export function newStory(
     deps?: string[];
     priority?: number | null;
     bodyFile?: string;
+    allowEmpty?: boolean;
   },
   tasksDir = TASKS_DIR,
 ): void {
@@ -1701,6 +1721,24 @@ export function newStory(
   const storyFile = join(storiesDir, `${storySlug}.md`);
   if (existsSync(storyFile)) {
     console.error(`error: story "${storySlug}" already exists at ${storyFile}`);
+    process.exit(1);
+  }
+  // Resist title-only stubs. The agent filing this story has the deviation
+  // context in hand right now (the trails/Rails file:line it just read); a
+  // bare-title skeleton throws that away and forces a later, more expensive
+  // re-derivation pass. Require a real body, or an explicit opt-in to a stub.
+  // `body == null` is the default-skeleton path; the content check also catches
+  // a `--body-file` that is blank or carries only the empty section headings.
+  if ((body == null || isEffectivelyEmptyBody(body)) && !opts.allowEmpty) {
+    const via = body == null ? "an empty body" : "a skeleton-only body";
+    console.error(
+      `error: refusing to create "${storySlug}" with ${via}.\n` +
+        `  A title-only stub loses the context you have right now. Provide:\n` +
+        `    --body-file <path>   a markdown body with real prose under\n` +
+        `                         ## Context and ## Acceptance criteria\n` +
+        `  or, to scaffold a bare stub on purpose:\n` +
+        `    --allow-empty`,
+    );
     process.exit(1);
   }
   commitAndPush({
@@ -2208,7 +2246,7 @@ export function stringFlag(
 // Known boolean flags. Everything else with a non-`--` following token
 // is treated as `--key value`. Boolean flags never consume the next
 // token, removing the `--json <id>` ambiguity.
-const BOOLEAN_FLAGS = new Set(["json", "clear", "force", "dry-run"]);
+const BOOLEAN_FLAGS = new Set(["json", "clear", "force", "dry-run", "allow-empty"]);
 
 export function parseFlags(
   args: string[],
@@ -2377,6 +2415,7 @@ function main(): void {
           : [],
         priority: priorityRaw !== undefined ? Number(priorityRaw) : null,
         bodyFile: stringFlag(flags, "body-file"),
+        allowEmpty: flags["allow-empty"] === true,
       });
       break;
     }
@@ -2511,7 +2550,7 @@ function usage(): never {
   rfc <slug> [--status <s>] [--supersede <other-slug>] [--relate <csv>] [--clusters <csv>] [--packages <csv>]
   set-deps <id> <csv>                          (replace deps; checks references + cycles; empty csv clears)
   set-deps-rfc <id> <csv>                      (replace deps-rfc; checks references; empty csv clears)
-  new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>]
+  new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>] [--allow-empty]
   finalize <0000-slug> [--dry-run]             (assign the next RFC number: rename dir, rewrite refs, rebuild index)
   new-rfc <slug> [--title "text"] [--owner @handle] [--packages <csv>] [--clusters <csv>] [--related <csv>] [--body-file <path>]
   reindex | build                              (rebuild the index in place)

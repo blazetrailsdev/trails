@@ -24,6 +24,7 @@ import {
   acquireTasksLock,
   buildRfcContent,
   buildStoryContent,
+  isEffectivelyEmptyBody,
   checkCheckboxesDone,
   checkPrNotOpen,
   claimState,
@@ -1787,7 +1788,9 @@ describe("newStory cluster validation", () => {
     });
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
     makeRfcDir(dir, "0005-gaps", ["scaffold", "conversion"]);
-    expect(() => newStory("0005-gaps", "my-story", { cluster: "scaffold" }, dir)).not.toThrow();
+    expect(() =>
+      newStory("0005-gaps", "my-story", { cluster: "scaffold", allowEmpty: true }, dir),
+    ).not.toThrow();
   });
 
   it("exits 1 for an undeclared cluster and lists the valid clusters", () => {
@@ -1856,6 +1859,89 @@ describe("newStory --status / --body-file (one-call authoring)", () => {
       newStory("0005-gaps", "my-story", { bodyFile: join(dir, "nope.md") }, dir),
     ).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/--body-file.*not found/));
+  });
+
+  it("refuses an empty-body story without --allow-empty", () => {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const dir = makeRepo();
+    expect(() => newStory("0005-gaps", "my-story", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/empty body[\s\S]*--allow-empty/),
+    );
+    // No file is written when creation is refused.
+    expect(existsSync(join(dir, "rfcs", "0005-gaps", "stories", "my-story.md"))).toBe(false);
+  });
+
+  it("refuses a --body-file that is blank or only the section skeleton", () => {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const dir = makeRepo();
+    // Blank file.
+    const blank = join(dir, "blank.md");
+    writeFileSync(blank, "   \n\n\t\n");
+    expect(() => newStory("0005-gaps", "blank-story", { bodyFile: blank }, dir)).toThrow(/exit 1/);
+    // Skeleton-only file (the exact default scaffold + an empty checkbox) — the
+    // bypass this guard must close.
+    const skeleton = join(dir, "skeleton.md");
+    writeFileSync(skeleton, "## Context\n\n## Acceptance criteria\n\n- [ ]\n");
+    expect(() => newStory("0005-gaps", "skeleton-story", { bodyFile: skeleton }, dir)).toThrow(
+      /exit 1/,
+    );
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/skeleton-only body/));
+    expect(existsSync(join(dir, "rfcs", "0005-gaps", "stories", "skeleton-story.md"))).toBe(false);
+  });
+
+  it("accepts a --body-file with real prose under the skeleton", () => {
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
+    const dir = makeRepo();
+    const bodyFile = join(dir, "real.md");
+    writeFileSync(
+      bodyFile,
+      "## Context\n\nA real deviation.\n\n## Acceptance criteria\n\n- [ ] fix\n",
+    );
+    expect(() => newStory("0005-gaps", "real-story", { bodyFile }, dir)).not.toThrow();
+    expect(existsSync(join(dir, "rfcs", "0005-gaps", "stories", "real-story.md"))).toBe(true);
+  });
+
+  it("scaffolds an empty-skeleton story when --allow-empty is passed", () => {
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
+    const dir = makeRepo();
+    newStory("0005-gaps", "my-story", { allowEmpty: true }, dir);
+    const out = readFileSync(join(dir, "rfcs", "0005-gaps", "stories", "my-story.md"), "utf8");
+    expect(out).toContain("## Context");
+    expect(out).toContain("## Acceptance criteria");
+  });
+});
+
+describe("isEffectivelyEmptyBody", () => {
+  it("treats blank / whitespace-only bodies as empty", () => {
+    expect(isEffectivelyEmptyBody("")).toBe(true);
+    expect(isEffectivelyEmptyBody("   \n\n\t\n")).toBe(true);
+  });
+
+  it("treats heading-only / empty-checkbox skeletons as empty", () => {
+    expect(isEffectivelyEmptyBody("## Context\n\n## Acceptance criteria\n")).toBe(true);
+    expect(isEffectivelyEmptyBody("## Context\n\n## Acceptance criteria\n\n- [ ]\n")).toBe(true);
+    expect(isEffectivelyEmptyBody("# A\n## B\n### C\n")).toBe(true);
+  });
+
+  it("treats any real prose or a filled checkbox as non-empty", () => {
+    expect(isEffectivelyEmptyBody("## Context\n\nReal context.\n")).toBe(false);
+    expect(isEffectivelyEmptyBody("## Acceptance criteria\n\n- [ ] do the thing\n")).toBe(false);
+    expect(isEffectivelyEmptyBody("just a sentence, no headings")).toBe(false);
   });
 });
 
