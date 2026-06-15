@@ -520,10 +520,17 @@ export class SchemaReflection {
   }
 
   /**
-   * Eagerly warm the cache by full DB introspection (Rails' `addAll(pool)`).
-   * First resolves the base cache via {@link cache} — which consults the
-   * on-disk dump when present — then introspects every data source to top it
-   * up, so a synchronous read sees real DB columns even with no dump file.
+   * Eagerly warm the cache by full DB introspection. First resolves the base
+   * cache via {@link cache} — which consults the on-disk dump when present —
+   * then introspects every data source via {@link SchemaCache#addAll} to top
+   * it up, so a synchronous read sees real DB columns even with no dump file.
+   *
+   * @internal trails-only composite — NOT a Rails method. Rails'
+   * `SchemaReflection#load!(pool)` is just `cache(pool)`; the introspection
+   * top-up is `SchemaCache#add_all(pool)`. There is no `load_all!` in Rails;
+   * this pairs the two so the eager-warm pool path has a single entry point
+   * that also routes through the lone-connection `FakePool`. Don't grep Rails
+   * for it.
    */
   async loadAllBang(pool: unknown): Promise<this> {
     const cache = await this.cache(pool);
@@ -720,6 +727,11 @@ export class BoundSchemaReflection {
     return this;
   }
 
+  /**
+   * @internal trails-only composite — NOT a Rails method. Bound counterpart of
+   * {@link SchemaReflection#loadAllBang}; see that note. Rails has `load!` and
+   * `add(name)` on BoundSchemaReflection but no `load_all!`.
+   */
   async loadAllBang(): Promise<this> {
     await this._schemaReflection.loadAllBang(this._pool);
     return this;
