@@ -18,6 +18,8 @@ import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { Post } from "../test-helpers/models/post.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Comment } from "../test-helpers/models/comment.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
@@ -4526,11 +4528,6 @@ describe("EagerAssociationTest", () => {
     });
   });
 
-  it.skip("preloading does not cache has many association subset when preloaded with a through association", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("preloading a through association twice does not reset it", async () => {
     class EagerTwiceOwner extends Base {
       static {
@@ -4586,11 +4583,6 @@ describe("EagerAssociationTest", () => {
       className: "EagerTwiceTarget",
     });
     expect(targets2).toHaveLength(1);
-  });
-  it.skip("works in combination with order(:symbol) and reorder(:symbol)", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
   it.skip("preloading with a polymorphic association and using the existential predicate but also using a select", () => {
     // BLOCKED: associations — eager-loading feature gap
@@ -5155,16 +5147,6 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("loading with one association with non preload", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("loading with multiple associations", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("including duplicate objects from has many", async () => {
     // Rails: car_post belongs to 2 categories via habtm; includes({ posts: :comments })
     // on categories should yield the SAME comment object for each category's posts[0].
@@ -5329,11 +5311,6 @@ describe("EagerAssociationTest", () => {
       expect((posts[0] as any)._preloadedAssociations.has("alarComments")).toBe(true);
     }
   });
-  it.skip("loading from an association that has a hash of conditions", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("loading with no associations", async () => {
     // Rails: Post.includes(:author).find(authorless post).author is nil
     class LnaPost extends Base {
@@ -5395,16 +5372,6 @@ describe("EagerAssociationTest", () => {
     expect(titles).toContain("Other");
   });
   it.skip("eager with has one dependent does not destroy dependent", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("preconfigured includes with belongs to", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("preconfigured includes with has many", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
@@ -5722,6 +5689,121 @@ describe("EagerAssociationTest", () => {
       .limit(5)
       .toArray();
     expect(developers).toHaveLength(3);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Post/Author/Comment/Category fixtures) — ports
+// of eager_test.rb cases that exercise plain preloading/eager-loading over the
+// real Post/Author/Comment/Category models + their fixtures. Same describe name
+// as the other EagerAssociationTest blocks so test:compare matches the Rails
+// `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { authors, posts, comments } = useHandlerFixtures([
+    "authors",
+    "posts",
+    "comments",
+    "categories",
+    "categoriesPosts",
+  ]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+        categories: canonicalSchema.categories,
+        categories_posts: canonicalSchema.categories_posts,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Post);
+  registerModel(Author);
+  registerModel(Comment);
+  registerModel(Category);
+  registerModel(Categorization);
+
+  it("loading with multiple associations", async () => {
+    const loaded = await Post.all()
+      .includes("comments", "author", "categories")
+      .order("posts.id")
+      .toArray();
+    const first = loaded[0];
+    expect((first.association("comments").target as Base[]).length).toBe(2);
+    expect((first.association("categories").target as Base[]).length).toBe(2);
+    const commentIds = (first.association("comments").target as Base[]).map((c) => c.id);
+    expect(commentIds).toContain(comments("greetings").id);
+  });
+
+  it("loading from an association that has a hash of conditions", async () => {
+    const author = (await Author.all()
+      .includes("helloPostsWithHashConditions")
+      .find(authors("david").id)) as Author;
+    const helloPosts = (await author.association("helloPosts").loadTarget()) as Base[];
+    expect(helloPosts.length).toBeGreaterThan(0);
+  });
+
+  it("preloading does not cache has many association subset when preloaded with a through association", async () => {
+    const author = (await Author.all()
+      .includes("commentsWithOrderAndConditions", "posts")
+      .order("authors.id")
+      .first()) as Author;
+    await assertNoQueries(false, () => {
+      expect((author.association("commentsWithOrderAndConditions").target as Base[]).length).toBe(
+        2,
+      );
+    });
+    await assertNoQueries(false, () => {
+      expect((author.association("posts").target as Base[]).length).toBe(5);
+    });
+  });
+
+  it("works in combination with order(:symbol) and reorder(:symbol)", async () => {
+    let author = (await Author.all()
+      .includes("posts")
+      .references("posts")
+      .order("name")
+      .where("posts.title IS NOT NULL")
+      .first()) as Author;
+    expect(author.id).toBe(authors("bob").id);
+
+    author = (await Author.all()
+      .includes("posts")
+      .references("posts")
+      .reorder("name")
+      .where("posts.title IS NOT NULL")
+      .first()) as Author;
+    expect(author.id).toBe(authors("bob").id);
+  });
+
+  it("loading with one association with non preload", async () => {
+    const loaded = await Post.all().includes("lastComment").order("comments.id DESC").toArray();
+    const post = loaded.find((p) => p.id === posts("welcome").id)!;
+    const fresh = (await Post.find(posts("welcome").id)) as Post;
+    const expected = (await fresh.association("lastComment").loadTarget()) as Base | null;
+    const actual = post.association("lastComment").target as Base | null;
+    expect(actual?.id).toBe(expected?.id);
+  });
+
+  it("preconfigured includes with belongs to", async () => {
+    const post = (await Post.find(posts("welcome").id)) as Post;
+    const author = (await post.association("authorWithPosts").loadTarget()) as Author;
+    await assertNoQueries(false, () => {
+      expect((author.association("posts").target as Base[]).length).toBe(5);
+    });
+  });
+
+  it("preconfigured includes with has many", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const loaded = (await david.association("postsWithComments").loadTarget()) as Base[];
+    await assertNoQueries(false, () => {
+      expect(loaded.length).toBe(5);
+      const one = loaded.find((p) => p.id === posts("welcome").id)!;
+      expect((one.association("comments").target as Base[]).length).toBe(2);
+    });
   });
 });
 
