@@ -3702,7 +3702,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (options.where) {
       // Mirrors Rails PG#add_index_options: when `:where` is itself a bare
       // column name, quote it as an identifier (`WHERE "deleted"` for a boolean
-      // column) rather than emitting it verbatim as an expression.
+      // column) rather than emitting it verbatim as an expression. Rails houses
+      // this in `add_index_options`, but that method is sync here (and unused on
+      // the PG path, which builds SQL inline) while `tableExists`/`columnExists`
+      // are async — so the check lives here at the only async PG add-index site.
       const ss = this.pgSchemaStatements();
       const where =
         (await ss.tableExists(tableName)) && (await ss.columnExists(tableName, options.where))
