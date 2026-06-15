@@ -1262,13 +1262,47 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(ships.length).toBe(0);
   });
 
-  it.skip("reuse already built new record", () => {
-    // BLOCKED: Phase G — assignment must update the in-memory association target
-    // synchronously; trails defers nested attribute processing to save.
+  it("reuse already built new record", () => {
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+      }
+    }
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+      }
+    }
+    Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
+    registerModel("Ship", Ship);
+    registerModel("Pirate", Pirate);
+    acceptsNestedAttributesFor(Pirate, "ship");
+    const pirate = new Pirate();
+    const shipBuiltFirst = (pirate.association("ship") as any).build();
+    (pirate as any).shipAttributes = { name: "Ship 1" };
+    expect((pirate.association("ship") as any).target).toBe(shipBuiltFirst);
   });
-  it.skip("do not allow assigning foreign key when reusing existing new record", () => {
-    // BLOCKED: Phase G — assignment must update the in-memory association target
-    // synchronously; trails defers nested attribute processing to save.
+  it("do not allow assigning foreign key when reusing existing new record", async () => {
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+      }
+    }
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+      }
+    }
+    Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
+    registerModel("Ship", Ship);
+    registerModel("Pirate", Pirate);
+    acceptsNestedAttributesFor(Pirate, "ship");
+    const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
+    (pirate.association("ship") as any).build();
+    (pirate as any).shipAttributes = { name: "Ship 1", pirate_id: (pirate.id as number) + 1 };
+    expect((pirate.association("ship") as any).target.pirate_id).toBe(pirate.id);
   });
 
   it("reject if with a proc which returns true always for has many", async () => {
