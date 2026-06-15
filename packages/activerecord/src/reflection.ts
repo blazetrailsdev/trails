@@ -250,8 +250,13 @@ export class AbstractReflection {
     return [this];
   }
 
-  buildScope(_table?: Table, _predicateBuilder?: any, klass?: typeof Base): any {
-    return ((klass ?? this.klass) as any).all();
+  buildScope(table?: Table, _predicateBuilder?: any, klass?: typeof Base): any {
+    // Rails: `Relation.create(klass, table:, predicate_builder:)` — a genuinely
+    // bare relation. Default scope and the STI `type_condition` are layered on
+    // later by `klassJoinScope` (scope_for_association) and `joinScope`, so the
+    // chain scopes built here never carry a wrong-table STI predicate.
+    const target = (klass ?? this.klass) as any;
+    return target._buildBareRelation?.(table) ?? target.all();
   }
 
   joinScope(table: Table, foreignTable: Table, foreignKlass: typeof Base): any {
@@ -306,7 +311,7 @@ export class AbstractReflection {
     // `build_scope` is a bare relation (no default scope, no STI); the STI
     // `type_condition` is added by `joinScope`, qualified by the join's table.
     const klass = this.klass as any;
-    const bare = klass._buildBareRelation?.(table) ?? this.buildScope(table, predicateBuilder);
+    const bare = this.buildScope(table, predicateBuilder);
     return klass.scopeForAssociation ? klass.scopeForAssociation(bare) : bare;
   }
 
