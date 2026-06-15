@@ -56,7 +56,15 @@ if ((adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive |
 // (a no-op when none were). Gated by AR_DISABLE_SCHEMA_REPAIR as an escape hatch.
 if (process.env.AR_DISABLE_SCHEMA_REPAIR === undefined) {
   const { repairWorkerSchema } = await import("./test-helpers/schema-repair.js");
-  await repairWorkerSchema(Base.connection, TEST_SCHEMA);
+  const repaired = await repairWorkerSchema(Base.connection, TEST_SCHEMA);
+  // When repair actually fires, a prior file in this worker drifted these
+  // canonical tables — the exact shared-DB flake source. Surface it with a
+  // stable, greppable prefix so CI logs become an RFC-0019 burndown signal:
+  // which canonical tables drift (and how often) ranks the convergence work.
+  // Silence with AR_QUIET_SCHEMA_REPAIR once a table is known/tracked.
+  if (repaired.length > 0 && process.env.AR_QUIET_SCHEMA_REPAIR === undefined) {
+    console.warn(`[schema-repair] restored drifted canonical tables: ${repaired.join(", ")}`);
+  }
 }
 
 // Permanent worker-startup assertion: key canonical tables must exist after
