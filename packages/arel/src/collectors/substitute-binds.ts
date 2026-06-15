@@ -6,13 +6,12 @@ function extractValue(bind: unknown): unknown {
   // `compileWithBinds` unwraps it). When inlining, unwrap to the value so it
   // can be quoted directly — matching Rails' `add_bind(o.value)`.
   if (bind instanceof BindParam) return extractValue(bind.value);
-  if (
-    bind &&
-    typeof bind === "object" &&
-    "valueForDatabase" in bind &&
-    typeof (bind as Record<string, unknown>).valueForDatabase === "function"
-  ) {
-    return (bind as { valueForDatabase(): unknown }).valueForDatabase();
+  if (bind && typeof bind === "object" && "valueForDatabase" in bind) {
+    // `valueForDatabase` is a method on a raw Arel attribute but a getter on
+    // ActiveModel::Attribute (`get valueForDatabase()`); read the property and
+    // only invoke it when it resolves to a function so both shapes unwrap.
+    const v = (bind as Record<string, unknown>).valueForDatabase;
+    return typeof v === "function" ? (v as () => unknown).call(bind) : v;
   }
   return bind;
 }
@@ -35,12 +34,13 @@ export class SubstituteBinds {
     return this.append(this.quoter.quote(extractValue(bind)));
   }
 
-  addBinds(binds: unknown[], procForBinds?: ((v: unknown) => unknown) | null): this {
-    const quoted = binds.map((bind) => {
-      const value = procForBinds ? procForBinds(bind) : bind;
-      return this.quoter.quote(extractValue(value));
-    });
-    this.append(quoted.join(", "));
+  // Mirrors Rails `SubstituteBinds#add_binds` (substitute_binds.rb:23-25):
+  // it keeps the `proc_for_binds` parameter for caller-signature parity but
+  // ignores it, and quotes each bind directly with NO `value_for_database`
+  // unwrapping (unlike `add_bind`). The callers pass already-cast values
+  // (`HomogeneousIn#casted_values`), so no further transformation is needed.
+  addBinds(binds: unknown[], _procForBinds?: ((v: unknown) => unknown) | null): this {
+    this.append(binds.map((bind) => this.quoter.quote(bind)).join(", "));
     return this;
   }
 
