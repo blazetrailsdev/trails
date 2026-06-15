@@ -1121,8 +1121,12 @@ export class SchemaStatements {
         );
         return (rows as any[]).map((r: any) => r.name);
       case "postgres":
+        // Mirror Rails #tables (data_source_sql type: "BASE TABLE" →
+        // relkind IN ('r','p')). pg_tables omits partitioned tables
+        // (relkind 'p') and hardcodes 'public'; pg_class scoped via
+        // current_schemas(false) honors the search_path like Rails.
         rows = await this.adapter.execute(
-          `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
+          `SELECT c.relname AS name FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = ANY (current_schemas(false)) AND c.relkind IN ('r', 'p') ORDER BY c.relname`,
         );
         return (rows as any[]).map((r: any) => r.name);
       case "mysql":
