@@ -17,6 +17,7 @@ import {
   limitToSize,
   integerToSql,
   foreignKeys,
+  indexes,
 } from "./schema-statements.js";
 import { quote } from "./quoting.js";
 
@@ -415,5 +416,68 @@ describe("MySQL::SchemaStatements", () => {
     );
     expect(fks[0]!.column).toBe("rocket_id");
     expect(fks[0]!.toTable).toBe("roc`kets");
+  });
+
+  // Minimal IndexesHost: indexes() reads via schemaQuery and quotes the table
+  // name. Stub schemaQuery to return the `SHOW KEYS FROM` rows MySQL yields.
+  const indexHost = (rows: Record<string, unknown>[]) => ({
+    schemaQuery: async () => rows,
+    quoteTableName: (n: string) => `\`${n}\``,
+  });
+
+  it("indexes: surfaces per-column prefix lengths from Sub_part", async () => {
+    const idx = await indexes.call(
+      indexHost([
+        {
+          Key_name: "index_pages_on_title",
+          Column_name: "title",
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: 10,
+          Collation: "A",
+        },
+      ]),
+      "pages",
+    );
+    expect(idx).toHaveLength(1);
+    expect(idx[0]!.lengths).toEqual({ title: 10 });
+    expect(idx[0]!.orders).toBeUndefined();
+  });
+
+  it("indexes: surfaces desc orders when Collation is D", async () => {
+    const idx = await indexes.call(
+      indexHost([
+        {
+          Key_name: "index_pages_on_title",
+          Column_name: "title",
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: null,
+          Collation: "D",
+        },
+      ]),
+      "pages",
+    );
+    expect(idx[0]!.orders).toEqual({ title: "desc" });
+    expect(idx[0]!.lengths).toBeUndefined();
+  });
+
+  it("indexes: surfaces desc orders for descending functional indexes", async () => {
+    const idx = await indexes.call(
+      indexHost([
+        {
+          Key_name: "index_pages_on_lower_title",
+          Column_name: null,
+          Expression: "lower(`title`)",
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: null,
+          Collation: "D",
+        },
+      ]),
+      "pages",
+    );
+    expect(idx[0]!.columns).toEqual(["(lower(`title`))"]);
+    expect(idx[0]!.orders).toEqual({ "(lower(`title`))": "desc" });
   });
 });

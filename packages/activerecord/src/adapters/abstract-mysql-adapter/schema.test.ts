@@ -137,6 +137,35 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
 
+    it("indexes surface prefix lengths and desc orders", async () => {
+      await adapter.dropTable("key_tests", { ifExists: true });
+      try {
+        await adapter.createTable("key_tests", { force: true }, (t: any) => {
+          t.string("title");
+          t.string("body");
+        });
+        await adapter.addIndex("key_tests", ["title"], {
+          name: "index_key_tests_on_title",
+          length: 10,
+        });
+        // Descending indexes are MySQL 8+; MariaDB stores DESC but reports the
+        // column ascending (Collation != "D"), so only assert orders off MariaDB.
+        const supportsDesc = !isMariaDb;
+        await adapter.addIndex("key_tests", ["body"], {
+          name: "index_key_tests_on_body",
+          order: { body: "desc" },
+        });
+        const indexes = await adapter.indexes("key_tests");
+        const byName = (n: string) => indexes.find((i) => i.name === n)!;
+        expect(byName("index_key_tests_on_title").lengths).toEqual({ title: 10 });
+        if (supportsDesc) {
+          expect(byName("index_key_tests_on_body").orders).toEqual({ body: "desc" });
+        }
+      } finally {
+        await adapter.dropTable("key_tests", { ifExists: true });
+      }
+    });
+
     it("drop temporary table", async () => {
       await adapter.transaction(async () => {
         await adapter.createTable("temp_table", { temporary: true });
