@@ -28,6 +28,14 @@ import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js
 import { ConfigurationError } from "../errors.js";
 import { AliasTracker } from "./alias-tracker.js";
 
+/**
+ * Identity-cache key for a no-primary-key node. Rails uses `id = keys.map { nil }`
+ * — a `[nil]` array, which is truthy in Ruby and compares equal across rows — so
+ * every no-PK row for a given parent+node collapses to one cached model. A single
+ * shared sentinel reproduces that constant-key behavior.
+ */
+const NO_PRIMARY_KEY_ID = Symbol("JoinDependency.noPrimaryKeyId");
+
 /** Mirrors: ActiveRecord::Associations::JoinDependency::Aliases::Column (name, alias). */
 export interface AliasMap {
   column: string;
@@ -47,13 +55,15 @@ function getModelColumns(modelClass: any): string[] {
     }
   }
   const cols: string[] = ch ? Object.keys(ch) : (modelClass.columnNames?.() ?? []);
-  const pk = modelClass.primaryKey ?? "id";
+  // A falsy primaryKey ("" / null) marks a no-primary-key model — there is no
+  // PK column to fold into the SELECT list, so leave the columns as-is.
+  const pk = modelClass.primaryKey;
   if (Array.isArray(pk)) {
     for (const k of pk) {
-      if (!cols.includes(k)) cols.unshift(k);
+      if (k && !cols.includes(k)) cols.unshift(k);
     }
-  } else {
-    if (!cols.includes(pk)) cols.unshift(pk);
+  } else if (pk && !cols.includes(pk)) {
+    cols.unshift(pk);
   }
   return cols;
 }
@@ -851,14 +861,32 @@ export class JoinDependency {
         continue;
       }
 
-      const pk = (node.baseKlass as any).primaryKey ?? "id";
-      const pkCols: string[] = Array.isArray(pk) ? pk : [pk];
-      const idVals = pkCols.map((c) => row[aliases.columnAlias(node, c)!]);
-      if (idVals.some((v) => v === null || v === undefined)) {
+      // Mirrors Rails' two-branch identity-key derivation in
+      // JoinDependency#construct. A node whose model has a primary key keys its
+      // identity off the aliased PK columns; one without (a join/HABTM record
+      // or a view) keys the nil-check off `reflection.join_primary_key`. trails
+      // marks "no primary key" with a falsy primaryKey ("" / null), matching
+      // Rails' nil `node.primary_key`.
+      const nodePk = (node.baseKlass as any).primaryKey;
+      let keyCols: string[];
+      if (nodePk) {
+        keyCols = Array.isArray(nodePk) ? nodePk : [nodePk];
+      } else {
+        const jpk = ((node as JoinAssociation).reflection as any).joinPrimaryKey as
+          | string
+          | string[];
+        keyCols = Array.isArray(jpk) ? jpk : [jpk];
+      }
+      const keyVals = keyCols.map((c) => row[aliases.columnAlias(node, String(c))!]);
+      if (keyVals.some((v) => v === null || v === undefined)) {
         this._markAssociationLoaded(arParent, node);
         continue;
       }
-      const id = this._keyFor(idVals);
+      // Rails: PK nodes key on the real id values; no-PK nodes use the constant
+      // `[nil]` sentinel (see NO_PRIMARY_KEY_ID). Both are truthy, so the row is
+      // always inserted into `seen` / `model_cache` (`seen[...][id] = model if id`),
+      // and multiple no-PK rows for one parent+node collapse to a single model.
+      const id = nodePk ? this._keyFor(keyVals) : NO_PRIMARY_KEY_ID;
 
       let parentSeen = seen.get(arParent);
       if (!parentSeen) {
