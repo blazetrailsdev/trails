@@ -206,12 +206,13 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
 
 /**
  * Format a date/time value for SQL without surrounding quotes, capping
- * fractional seconds at 6 digits (microseconds) — MySQL TIME/DATETIME/TIMESTAMP
- * reject 7–9 nanosecond digits in strict mode. Exposed on the adapter so the
- * inherited abstract `quote` / `quoted_time` dispatch lands here instead of the
- * nanosecond-precision abstract helper.
- *
- * Mirrors: the `self.quoted_date` dispatch target for AbstractMysqlAdapter.
+ * fractional seconds at 6 digits (microseconds). Mirrors Rails' MySQL
+ * `quoted_date` (`mysql/quoting.rb`), which returns `super` (the abstract
+ * `quoted_date`) for precision-capable MySQL — and Ruby's `usec` already bounds
+ * that at 6 digits. Trails' abstract helper emits up to nanoseconds, so we
+ * route through the MySQL-safe formatters here (the 7–9th digits are rejected by
+ * TIME/DATETIME/TIMESTAMP in strict mode). Exposed on the adapter so the
+ * inherited abstract `quote` / `quotedTime` date dispatch lands here.
  *
  * @internal
  */
@@ -227,7 +228,22 @@ export function quotedDate(
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
-  if (value instanceof Temporal.PlainTime) return formatPlainTimeForSql(value);
+  if (value instanceof Temporal.PlainTime) {
+    // Abstract quotedDate normalises a bare time onto 2000-01-01; mirror that so
+    // direct quotedDate(time) calls match the abstract helper's shape.
+    const dt = new Temporal.PlainDateTime(
+      2000,
+      1,
+      1,
+      value.hour,
+      value.minute,
+      value.second,
+      value.millisecond,
+      value.microsecond,
+      value.nanosecond,
+    );
+    return formatPlainDateTimeForSql(dt);
+  }
   throw new TypeError(
     `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
   );
