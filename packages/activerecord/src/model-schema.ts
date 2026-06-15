@@ -106,6 +106,38 @@ export function buildPkWhereNode(
   return attr.eq(idValue);
 }
 
+/**
+ * Build an Arel node for a WHERE condition from a `_query_constraints_hash`
+ * (column name → value). A single entry yields a bare predicate node and
+ * multiple entries an `And` of predicates — for the simple single-PK and
+ * composite-PK cases this reproduces the non-null `buildPkWhereNode` output,
+ * while a `query_constraints` model maps each declared constraint column to its
+ * value.
+ *
+ * A null/undefined value produces an `IS NULL` predicate (not a dead `1=0`),
+ * mirroring Rails' `_update_record`/`_delete_record`, which route every
+ * `{name, value}` pair through `predicate_builder[name, value]` — and
+ * `predicate_builder[name, nil]` builds `name IS NULL`. This matters for
+ * `query_constraints` columns that are legitimately null in the DB: a `1=0`
+ * predicate would silently update/delete zero rows.
+ *
+ * Mirrors: how `ActiveRecord::Persistence#_update_record` / `#_delete_record`
+ * turn `_query_constraints_hash` into the predicate WHERE.
+ */
+export function buildWhereNodeFromConstraints(
+  this: typeof Base,
+  constraints: Record<string, unknown>,
+): InstanceType<typeof Nodes.Node> {
+  const table = this.arelTable;
+  const conditions: InstanceType<typeof Nodes.Node>[] = [];
+  for (const [col, value] of Object.entries(constraints)) {
+    const attr = table.get(col);
+    conditions.push(value === undefined || value === null ? attr.isNull() : attr.eq(value));
+  }
+  if (conditions.length === 1) return conditions[0];
+  return new Nodes.And(conditions);
+}
+
 // ---------------------------------------------------------------------------
 // Column introspection
 // ---------------------------------------------------------------------------

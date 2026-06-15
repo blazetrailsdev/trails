@@ -19,6 +19,8 @@ import { Base, RecordNotFound, RecordInvalid } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { captureSql } from "./testing/sql-capture.js";
+import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 
 // ==========================================================================
 // PersistenceTest — targets persistence_test.rb
@@ -32,6 +34,13 @@ describe("PersistenceTest", () => {
       topics: { title: "string", body: "string", replies_count: "integer" },
       minimals: {},
       cm_items: { title: "string" },
+      clothing_items: {
+        clothing_type: "string",
+        color: "string",
+        type: "string",
+        size: "string",
+        description: "text",
+      },
     });
   });
 
@@ -421,6 +430,51 @@ describe("PersistenceTest", () => {
     // Invoke through `any` to bypass the overloads — we're verifying the
     // runtime guard rejects a Base instance, not testing a supported form.
     await expect((Topic as any).update(t, { title: "x" })).rejects.toThrow(/ActiveRecord::Base/);
+  });
+
+  // query_constraints route update/delete/destroy WHERE through
+  // _query_constraints_hash, keying each declared constraint column to its
+  // attribute_in_database value (not the single primary key).
+  it("update uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    const sqls = await captureSql(async () => {
+      await (clothingItem as any).update({ description: "Lovely green t-shirt" });
+    });
+    const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("destroy uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    const sqls = await captureSql(async () => {
+      await (clothingItem as any).destroy();
+    });
+    const sql = sqls.find((s) => /^DELETE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("delete uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    const sqls = await captureSql(async () => {
+      await (clothingItem as any).delete();
+    });
+    const sql = sqls.find((s) => /^DELETE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
   });
 });
 
@@ -1063,12 +1117,6 @@ describe("PersistenceTest", () => {
     expect(true).toBe(true);
   });
   it("reload uses query constraints config", () => {
-    expect(true).toBe(true);
-  });
-  it("destroy uses query constraints config", () => {
-    expect(true).toBe(true);
-  });
-  it("delete uses query constraints config", () => {
     expect(true).toBe(true);
   });
   it("update attribute uses query constraints config", () => {
@@ -2123,18 +2171,6 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "test" });
     await Topic.delete(t.id);
     expect(await Topic.count()).toBe(0);
-  });
-
-  it("update uses query constraints config", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "old" });
-    await t.update({ title: "new" });
-    const found = await Topic.find(t.id);
-    expect(found.title).toBe("new");
   });
 
   describe("QueryConstraintsTest", () => {
