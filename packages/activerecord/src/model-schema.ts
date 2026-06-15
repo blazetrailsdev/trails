@@ -106,6 +106,30 @@ export function buildPkWhereNode(
   return attr.eq(idValue);
 }
 
+/**
+ * Build an Arel node for a WHERE condition from a `_query_constraints_hash`
+ * (column name → value). A single entry yields a bare `attr.eq(value)` node and
+ * multiple entries an `And` of `eq` nodes — byte-for-byte identical to
+ * `buildPkWhereNode` for the simple single-PK and composite-PK cases, while a
+ * `query_constraints` model maps each declared constraint column to its value.
+ *
+ * Mirrors: how `ActiveRecord::Persistence#_update_record` / `#_delete_record`
+ * turn `_query_constraints_hash` into the predicate WHERE.
+ */
+export function buildWhereNodeFromConstraints(
+  this: typeof Base,
+  constraints: Record<string, unknown>,
+): InstanceType<typeof Nodes.Node> {
+  const table = this.arelTable;
+  const conditions: InstanceType<typeof Nodes.Node>[] = [];
+  for (const [col, value] of Object.entries(constraints)) {
+    if (value === undefined || value === null) return arelSql("1=0");
+    conditions.push(table.get(col).eq(value));
+  }
+  if (conditions.length === 1) return conditions[0];
+  return new Nodes.And(conditions);
+}
+
 // ---------------------------------------------------------------------------
 // Column introspection
 // ---------------------------------------------------------------------------

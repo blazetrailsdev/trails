@@ -889,6 +889,12 @@ export class Base extends Model {
     return ModelSchema.buildPkWhereNode.call(this, idValue);
   }
 
+  static _buildQueryConstraintsWhereNode(
+    constraints: Record<string, unknown>,
+  ): InstanceType<typeof Nodes.Node> {
+    return ModelSchema.buildWhereNodeFromConstraints.call(this, constraints);
+  }
+
   /**
    * Override attribute() to prevent generating an accessor for "id"
    * (Base defines id getter/setter with CPK support) and to apply
@@ -3040,9 +3046,13 @@ export class Base extends Model {
       .table(table)
       .set(updateValues)
       // Mirrors Rails _update_record(_query_constraints_hash): WHERE targets
-      // `id_in_database`, so a dirty primary key updates the original row (and
-      // can write a new PK value into it).
-      .where(ctor._buildPkWhereNode((this as any).idInDatabase()));
+      // each query-constraint column's `*_in_database` value (just the primary
+      // key keyed to `id_in_database` when no query_constraints are declared),
+      // so a dirty primary key updates the original row (and can write a new PK
+      // value into it).
+      .where(
+        ctor._buildQueryConstraintsWhereNode(_Persistence._queryConstraintsHash.call(this as any)),
+      );
     if (ctor.lockingEnabled) {
       if (lockWhereValue == null) {
         um.where(table.get(lockCol).isNull());
@@ -3104,11 +3114,17 @@ export class Base extends Model {
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
         // Mirrors Rails Persistence#destroy → _delete_record(_query_constraints_hash):
-        // WHERE targets `id_in_database`, so destroying a record whose primary key
-        // was mutated in memory still removes the originally loaded row.
+        // WHERE targets each query-constraint column's `*_in_database` value (the
+        // primary key keyed to `id_in_database` when no query_constraints are
+        // declared), so destroying a record whose primary key was mutated in
+        // memory still removes the originally loaded row.
         const dm = new DeleteManager()
           .from(table)
-          .where(ctor._buildPkWhereNode((this as any).idInDatabase()));
+          .where(
+            ctor._buildQueryConstraintsWhereNode(
+              _Persistence._queryConstraintsHash.call(this as any),
+            ),
+          );
         const lockCol = ctor.lockingColumn;
         if (ctor.lockingEnabled) {
           // Mirrors Rails _lock_value_for_database: if user explicitly changed lock_version,

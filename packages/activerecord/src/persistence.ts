@@ -590,7 +590,9 @@ interface DeleteRecord {
   freeze(): unknown;
   constructor: {
     arelTable: InstanceType<typeof ArelTable>;
-    _buildPkWhereNode(id: unknown): Parameters<DeleteManager["where"]>[0];
+    _buildQueryConstraintsWhereNode(
+      constraints: Record<string, unknown>,
+    ): Parameters<DeleteManager["where"]>[0];
     connection: {
       execDelete(sql: string, name: string): Promise<number>;
       toSql(arel: unknown): string;
@@ -609,11 +611,13 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   const ctor = this.constructor;
   if (this.isPersisted()) {
     // Mirrors Rails Persistence#delete → _delete_record(_query_constraints_hash):
-    // the WHERE targets `id_in_database`, so a dirty (in-memory mutated) primary
-    // key still deletes the row identified by the value last loaded from the DB.
+    // the WHERE targets each query-constraint column's `*_in_database` value (the
+    // primary key keyed to `id_in_database` when no query_constraints are
+    // declared), so a dirty (in-memory mutated) primary key still deletes the row
+    // identified by the value last loaded from the DB.
     const dm = new DeleteManager()
       .from(ctor.arelTable)
-      .where(ctor._buildPkWhereNode(this.idInDatabase()));
+      .where(ctor._buildQueryConstraintsWhereNode(_queryConstraintsHash.call(this as any)));
     // The SQL is arel-built via `connection.toSql(dm)`; the flagged string is
     // the "Delete" operation-name label (Rails' log subscriber name), which the
     // rule's leading-verb heuristic false-matches as a DELETE statement.
@@ -1430,7 +1434,7 @@ export function isApplyScoping(
 }
 
 /** @internal */
-function _queryConstraintsHash(this: PersistencePrivateHost): Record<string, unknown> {
+export function _queryConstraintsHash(this: PersistencePrivateHost): Record<string, unknown> {
   const constraintsList = queryConstraintsList.call(this.constructor as any);
   if (!constraintsList) {
     const pk = this.constructor.primaryKey as string;
