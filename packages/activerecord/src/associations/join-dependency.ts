@@ -775,6 +775,7 @@ export class JoinDependency {
     const joinRoot = this._joinRoot;
     const aliases = this.aliases();
     const basePk = (this._baseModel as any).primaryKey ?? "id";
+    const basePkCols: string[] = Array.isArray(basePk) ? basePk : [basePk];
     const baseColumns = getModelColumns(this._baseModel);
     const aliasSet = new Set(aliases.columns().map((a) => a.alias));
 
@@ -794,7 +795,10 @@ export class JoinDependency {
         if (!aliasSet.has(key)) parentAttrs[key] = row[key];
       }
 
-      const parentKey = this._rowKey(basePk, parentAttrs);
+      // The base key is read out of the aliased row exactly as the child keys are
+      // in `construct` (raw `row[aliases.columnAlias(node, col)]`), reusing the
+      // values already pulled into parentAttrs — one accessor, never the cast value.
+      const parentKey = this._keyFor(basePkCols.map((c) => parentAttrs[c]));
       let parent = parents.get(parentKey);
       if (!parent) {
         parent = (this._baseModel as any)._instantiate(parentAttrs);
@@ -808,7 +812,7 @@ export class JoinDependency {
     }
 
     const parentList = [...parents.values()];
-    return { parents: parentList, associations: this._collectAssociations(parentList, basePk) };
+    return { parents: parentList, associations: this._collectAssociations(parents) };
   }
 
   /**
@@ -854,7 +858,7 @@ export class JoinDependency {
         this._markAssociationLoaded(arParent, node);
         continue;
       }
-      const id = idVals.length === 1 ? idVals[0] : idVals.join(" ");
+      const id = this._keyFor(idVals);
 
       let parentSeen = seen.get(arParent);
       if (!parentSeen) {
@@ -877,20 +881,33 @@ export class JoinDependency {
   }
 
   /**
-   * Build the parent-key → assoc-name → children map from the wired proxies.
-   * A trails affordance with no Rails analogue (Rails returns only
-   * `parents.values`); keyed by each parent's read primary key.
+   * Derive a dedup key from a node's (possibly composite) primary-key VALUES.
+   *
+   * Callers always supply the RAW aliased column values pulled straight out of the
+   * row (`row[aliases.column_alias(node, col)]`, per Rails join_dependency.rb:144,
+   * :256) — never the model-cast value. Routing every key through this one helper
+   * (the parents map, the per-node `seen`/modelCache identity, and the returned
+   * associations map) guarantees a key can't be written one way and read another,
+   * which would silently split or collide parents. Single-column keys pass the bare
+   * value through (a JS Map keys primitives by value); composite keys join on NUL,
+   * a separator that can't appear in a column value, mirroring Rails' array id.
    * @internal
    */
-  private _collectAssociations(
-    parents: any[],
-    basePk: string | string[],
-  ): Map<unknown, Map<string, any[]>> {
+  private _keyFor(vals: unknown[]): unknown {
+    return vals.length === 1 ? vals[0] : vals.join("\u0000");
+  }
+
+  /**
+   * Build the parent-key → assoc-name → children map from the wired proxies.
+   * A trails affordance with no Rails analogue (Rails returns only
+   * `parents.values`). Keyed by the SAME raw aliased dedup key the `parents` map
+   * uses (`_keyFor`), so an entry seeded during instantiation is found again with
+   * the identical key — no raw-vs-cast / `_readAttribute` divergence on the key path.
+   * @internal
+   */
+  private _collectAssociations(parents: Map<unknown, any>): Map<unknown, Map<string, any[]>> {
     const associations = new Map<unknown, Map<string, any[]>>();
-    for (const parent of parents) {
-      const key = Array.isArray(basePk)
-        ? basePk.map((k) => parent._readAttribute(k)).join(" ")
-        : parent._readAttribute(basePk);
+    for (const [key, parent] of parents) {
       const assocs = new Map<string, any[]>();
       for (const child of this._joinRoot.children) {
         if (child.tableIndex < 0 || child.isThroughNode) continue;
@@ -904,12 +921,6 @@ export class JoinDependency {
       associations.set(key, assocs);
     }
     return associations;
-  }
-
-  /** @internal Compute a parent dedup key from its (possibly composite) PK. */
-  private _rowKey(pk: string | string[], attrs: Record<string, unknown>): unknown {
-    if (Array.isArray(pk)) return pk.map((k) => attrs[k]).join(" ");
-    return attrs[pk];
   }
 
   /**
