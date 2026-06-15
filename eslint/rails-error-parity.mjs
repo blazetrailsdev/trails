@@ -169,7 +169,7 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Mirror Rails' error-class hierarchy in errors.ts and ban bare `throw new Error` in Rails-mirroring source.",
+        "Mirror Rails' error-class hierarchy in every in-scope file (not just errors.ts) and ban bare `throw new Error` in Rails-mirroring source.",
     },
     schema: [],
     messages: {
