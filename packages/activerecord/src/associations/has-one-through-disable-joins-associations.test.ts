@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_one_through_disable_joins_associations_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { registerModel, enableSti } from "../index.js";
 import { Member } from "../test-helpers/models/member.js";
@@ -70,8 +70,6 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     await member.reload();
   });
 
-  afterEach(() => Notifications.unsubscribeAll());
-
   it("counting on disable joins through", async () => {
     let withoutJoins: unknown;
     let withJoins: unknown;
@@ -110,6 +108,11 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   it("preload on disable joins through", async () => {
     const loaded = await Member.preload("organization", "organizationWithoutJoins").toArray();
     const first = loaded[0] as Member;
+    // preload must have populated both holders — assert they read as loaded so the
+    // zero-query checks below actually exercise the preload path (a sync `.target`
+    // read never queries regardless of whether preload ran).
+    expect(first.association("organization").isLoaded()).toBe(true);
+    expect(first.association("organizationWithoutJoins").isLoaded()).toBe(true);
     const queriedOrg = await captureSql(async () => {
       void first.association("organization").target;
     });

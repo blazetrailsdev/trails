@@ -179,13 +179,22 @@ export class DisableJoinsAssociationScope extends AssociationScope {
 
     for (const nextReflection of work) {
       const [reflection, ordered, joinIds] = acc;
+      const foreignKey = (nextReflection as { joinForeignKey: string | string[] }).joinForeignKey;
+      const foreignKeyCols = keyColumns(foreignKey, "joinForeignKey");
+      // Empty join_ids → `where(key => [])` is a null relation, so Rails'
+      // `pluck` runs no query (disable_joins_association_scope.rb:21-28). Skip
+      // the pluck at every intermediate step (not just the tail) so a chain
+      // whose middle step plucks empty emits no extra query — and the final
+      // step below is short-circuited via `none()` for the same reason.
+      if (joinIds.length === 0) {
+        acc = [nextReflection, false, []];
+        continue;
+      }
       const keyCols = keyColumns(
         resolveJoinPrimaryKey(reflection, (reflection as { klass?: typeof Base }).klass),
         "joinPrimaryKey",
       );
       const records = this._addConstraintsDj(reflection, keyCols, joinIds, owner, ordered);
-      const foreignKey = (nextReflection as { joinForeignKey: string | string[] }).joinForeignKey;
-      const foreignKeyCols = keyColumns(foreignKey, "joinForeignKey");
       // Pluck single column → `[v, v, ...]`; pluck multiple →
       // `[[v1a, v1b], ...]`. Forward as-is into the next iteration.
       const recordIds = (await (
