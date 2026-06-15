@@ -739,8 +739,12 @@ function unscopeBang(
   this: QueryMethodsHost,
   ...types: Array<string | { where: string | string[] }>
 ): any {
-  for (const scope of types) {
-    if (typeof scope === "string") {
+  for (const rawScope of types) {
+    if (typeof rawScope === "string") {
+      // Rails: `scope = :left_outer_joins if scope == :left_joins` — the
+      // `leftJoins` alias is normalized before the validity check, so it is
+      // not itself a member of VALID_UNSCOPING_VALUES.
+      const scope = rawScope === "leftJoins" ? "leftOuterJoins" : rawScope;
       if (!VALID_UNSCOPING_VALUES.has(scope as UnscopeType)) {
         throw argumentError(
           `Called unscope() with invalid unscoping argument '${scope}'. Valid arguments are: ${[...VALID_UNSCOPING_VALUES].join(", ")}.`,
@@ -812,8 +816,8 @@ function unscopeBang(
           this._ctes = [];
           break;
       }
-    } else if (scope && typeof scope === "object") {
-      for (const [key, target] of Object.entries(scope)) {
+    } else if (rawScope && typeof rawScope === "object") {
+      for (const [key, target] of Object.entries(rawScope)) {
         if (key !== "where") {
           throw argumentError(
             `Object arguments to unscope() must use "where" as the key, e.g. unscope({ where: "column_name" }).`,
@@ -824,7 +828,7 @@ function unscopeBang(
       }
     } else {
       throw argumentError(
-        `Unrecognized scoping: ${JSON.stringify(scope)}. Use unscope({ where: "column_name" }) or one of: ${[...VALID_UNSCOPING_VALUES].join(", ")}.`,
+        `Unrecognized scoping: ${JSON.stringify(rawScope)}. Use unscope({ where: "column_name" }) or one of: ${[...VALID_UNSCOPING_VALUES].join(", ")}.`,
       );
     }
   }

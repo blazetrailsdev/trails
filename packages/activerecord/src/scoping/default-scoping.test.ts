@@ -803,8 +803,7 @@ describe("DefaultScopingTest", () => {
     expect(() => Developer.select("id").unscope(5 as any)).toThrow();
   });
 
-  // `unscope(:left_joins)` is not a recognized unscope key yet.
-  it.skip("unscope left joins", async () => {
+  it("unscope left joins", async () => {
     const expected = names(await Developer.all().toArray());
     const received = names(
       await (Developer.leftJoins("projects") as any)
