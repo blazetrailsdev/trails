@@ -818,8 +818,7 @@ describe("DefaultScopingTest", () => {
     expect((merged.where({ name: "Jon" }) as any)._whereClause.isEmpty()).toBe(false);
   });
 
-  // Reversing a multi-column order is not yet supported (IrreversibleOrderError).
-  it.skip("order to unscope reordering", () => {
+  it("order to unscope reordering", () => {
     const scope = DeveloperOrderedBySalary.order("salary DESC, name ASC")
       .reverseOrder()
       .unscope("order");

@@ -1333,6 +1333,15 @@ function reverseOrderBang(this: QueryMethodsHost): any {
         const dir = match[2].toUpperCase() === "ASC" ? "desc" : "asc";
         return [col, dir] as [string, "asc" | "desc"];
       }
+      // Multi-column comma-joined order ("salary DESC, name ASC"): mirror Rails'
+      // reverse_sql_order String branch — split on comma and flip each term.
+      // reverseSqlOrder calls isDoesNotSupportReverse (the faithful port of
+      // does_not_support_reverse?), so unbalanced-paren sections and "nulls
+      // first/last" still raise, while balanced expressions reverse.
+      if (clause.includes(",")) {
+        const reversed = reverseSqlOrder.call(this, [clause]) as string[];
+        return { raw: reversed.join(", ") };
+      }
       if (/[(),]/.test(clause) || /\bCASE\b/i.test(clause)) {
         throw new IrreversibleOrderError(
           `Relation has a non-reversible order and cannot be reversed: ${clause}`,
