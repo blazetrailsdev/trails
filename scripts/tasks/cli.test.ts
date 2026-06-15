@@ -1877,6 +1877,26 @@ describe("buildRfcContent", () => {
     expect(content).not.toContain("related-rfcs");
   });
 
+  it("default body includes the full 0000-template sections", () => {
+    const content = buildRfcContent("my-rfc", { date: "2026-06-13" });
+    expect(content).toContain("## Alternatives considered");
+    expect(content).toContain("## Rollout");
+    expect(content).toContain("## Open questions");
+    // Sections appear in the same order as the 0000-template README.
+    const order = [
+      "## Summary",
+      "## Motivation",
+      "## Design",
+      "## Alternatives considered",
+      "## Rollout",
+      "## Open questions",
+      "## Stories",
+      "## Changelog",
+    ].map((h) => content.indexOf(h));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(order.every((i) => i >= 0)).toBe(true);
+  });
+
   it("applies title, owner, packages, and clusters", () => {
     const content = buildRfcContent("my-rfc", {
       title: "My prose title",
