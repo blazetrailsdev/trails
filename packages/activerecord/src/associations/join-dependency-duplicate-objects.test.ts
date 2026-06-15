@@ -4,12 +4,15 @@ import { createTestAdapter } from "../test-adapter.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 
-// Mirrors Rails' eager_test.rb dedup tests verbatim: a join that multiplies rows
-// (one parent repeated across children, or one child repeated across parents)
-// must collapse to exactly one instance per logical record. Exercised at the
-// instantiateFromRows level so the parent-key accessor (raw aliased value, seeded
-// and looked up through the single _nodeKey path) is the only thing under test.
-describe("JoinDependency including duplicate objects", () => {
+// Row-level proof of the unified parent-key accessor (`_nodeKey`): a join that
+// multiplies rows — one parent repeated across children, or one child repeated
+// across parents — must collapse to exactly one instance per logical record.
+// The end-to-end equivalents are eager.test.ts "including duplicate objects from
+// {has many,belongs to}" (Rails eager_test.rb #test_including_duplicate_objects_*);
+// these exercise the dedup at the instantiateFromRows boundary this story changes,
+// so the raw-aliased key (seeded and looked up through the single `_nodeKey` path)
+// is the only thing under test.
+describe("JoinDependency dedupes duplicate join rows", () => {
   let adapter: any;
 
   class Comment extends Base {
@@ -45,7 +48,7 @@ describe("JoinDependency including duplicate objects", () => {
     Associations.belongsTo.call(Reader, "post", { className: "Post" });
   });
 
-  it("test_including_duplicate_objects_from_has_many", () => {
+  it("collapses repeated child join rows to one instance for a single parent", () => {
     const jd = new JoinDependency(Post);
     jd.addAssociation("comments");
 
@@ -63,7 +66,7 @@ describe("JoinDependency including duplicate objects", () => {
     expect(comments[0]._readAttribute("id")).toBe(10);
   });
 
-  it("test_including_duplicate_objects_from_belongs_to", () => {
+  it("shares one child instance across distinct parents joined to the same record", () => {
     const jd = new JoinDependency(Reader);
     jd.addNestedAssociation("post.comments");
 

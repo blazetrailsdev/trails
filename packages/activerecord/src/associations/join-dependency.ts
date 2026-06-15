@@ -795,7 +795,10 @@ export class JoinDependency {
         if (!aliasSet.has(key)) parentAttrs[key] = row[key];
       }
 
-      const parentKey = this._nodeKey(joinRoot, basePkCols, row, aliases);
+      // The base key is read out of the aliased row exactly as the child keys are
+      // in `construct` (raw `row[aliases.columnAlias(node, col)]`), reusing the
+      // values already pulled into parentAttrs — one accessor, never the cast value.
+      const parentKey = this._keyFor(basePkCols.map((c) => parentAttrs[c]));
       let parent = parents.get(parentKey);
       if (!parent) {
         parent = (this._baseModel as any)._instantiate(parentAttrs);
@@ -855,7 +858,7 @@ export class JoinDependency {
         this._markAssociationLoaded(arParent, node);
         continue;
       }
-      const id = this._nodeKey(node, pkCols, row, aliases);
+      const id = this._keyFor(idVals);
 
       let parentSeen = seen.get(arParent);
       if (!parentSeen) {
@@ -878,23 +881,19 @@ export class JoinDependency {
   }
 
   /**
-   * Read a node's (possibly composite) primary key out of the aliased row, exactly
-   * as Rails reads `row_hash[aliases.column_alias(node, col)]` (join_dependency.rb:144,
-   * :256): the RAW aliased column value, never the model-cast value. This is the one
-   * accessor used to seed AND look up every dedup key — the parents map, the per-node
-   * `seen`/modelCache identity, and the returned associations map — so a key can never
-   * be written one way (raw) and read another (cast / `_readAttribute`), which would
-   * silently split or collide parents. Composite keys join on NUL (a separator that
-   * can't appear in a column value), matching Rails' single uniform read.
+   * Derive a dedup key from a node's (possibly composite) primary-key VALUES.
+   *
+   * Callers always supply the RAW aliased column values pulled straight out of the
+   * row (`row[aliases.column_alias(node, col)]`, per Rails join_dependency.rb:144,
+   * :256) — never the model-cast value. Routing every key through this one helper
+   * (the parents map, the per-node `seen`/modelCache identity, and the returned
+   * associations map) guarantees a key can't be written one way and read another,
+   * which would silently split or collide parents. Single-column keys pass the bare
+   * value through (a JS Map keys primitives by value); composite keys join on NUL,
+   * a separator that can't appear in a column value, mirroring Rails' array id.
    * @internal
    */
-  private _nodeKey(
-    node: JoinPart,
-    pkCols: string[],
-    row: Record<string, unknown>,
-    aliases: Aliases,
-  ): unknown {
-    const vals = pkCols.map((c) => row[aliases.columnAlias(node, c)!]);
+  private _keyFor(vals: unknown[]): unknown {
     return vals.length === 1 ? vals[0] : vals.join("\u0000");
   }
 
@@ -902,7 +901,7 @@ export class JoinDependency {
    * Build the parent-key → assoc-name → children map from the wired proxies.
    * A trails affordance with no Rails analogue (Rails returns only
    * `parents.values`). Keyed by the SAME raw aliased dedup key the `parents` map
-   * uses (`_nodeKey`), so an entry seeded during instantiation is found again with
+   * uses (`_keyFor`), so an entry seeded during instantiation is found again with
    * the identical key — no raw-vs-cast / `_readAttribute` divergence on the key path.
    * @internal
    */
