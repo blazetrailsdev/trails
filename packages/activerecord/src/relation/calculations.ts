@@ -1172,22 +1172,3 @@ export function isBuildCountSubquery(
 ): boolean {
   return operation === "count" && distinct && columnName !== "*";
 }
-
-/** @internal */
-export function buildCountSubquery(
-  rel: CalculationRelation,
-  columnName: string,
-  distinct: boolean,
-): string {
-  const table = rel._modelClass.arelTable;
-  const col =
-    columnName === "*"
-      ? new Nodes.SqlLiteral("*")
-      : (aggregateColumn(rel, columnName) as Nodes.Node);
-  const countNode = distinct
-    ? new Nodes.NamedFunction("COUNT", [col], undefined, true)
-    : new Nodes.NamedFunction("COUNT", [col]);
-  const manager = table.project(countNode.as("count_column"));
-  rel._applyWheresToManager(manager, table);
-  return rel._modelClass.connection.toSql(manager);
-}
