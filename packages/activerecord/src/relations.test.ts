@@ -4736,13 +4736,20 @@ describe("RelationTest", () => {
     expect(result).toHaveLength(2);
   });
   it("do not double quote string id", () => {
-    class Post extends Base {
+    // Rails: assert_equal van.id, Minivan.where(minivan_id: van).to_a.first.minivan_id
+    // Passing an Active Record instance where a scalar id is expected derefs the
+    // record to its id (predicate_builder.rb:58 `value = value.id if value.respond_to?(:id)`).
+    class Minivan extends Base {
       static {
-        this.attribute("title", "string");
+        this.tableName = "minivans";
+        this.primaryKey = "minivan_id";
+        this.attribute("minivan_id", "string");
+        this.attribute("name", "string");
       }
     }
-    const sql = Post.where({ id: "abc" }).toSql();
-    expect(sql).toContain("abc");
+    const van = Minivan.new({ minivan_id: "m1", name: "cool" });
+    const sql = Minivan.where({ minivan_id: van }).toSql();
+    expect(sql).toContain("m1");
   });
 
   it("do not double quote string id with array", () => {

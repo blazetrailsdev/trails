@@ -210,6 +210,13 @@ export class PredicateBuilder {
   }
 
   buildNegated(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+    // Mirror build()'s deref (predicate_builder.rb:58). In Rails the deref lives in
+    // build() and negation is the inversion of a positively-built predicate, so
+    // `value = value.id if value.respond_to?(:id)` always applies — `where.not(col: record)`
+    // must compare against record.id, not the whole record object.
+    if (respondsToId(value)) {
+      value = (value as { id: unknown }).id;
+    }
     if (value === null || value === undefined) {
       return attribute.isNotNull();
     }
@@ -274,6 +281,15 @@ export class PredicateBuilder {
   }
 
   build(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+    // Rails predicate_builder.rb:58 — `value = value.id if value.respond_to?(:id)`,
+    // the first thing build does. A bare `where(col: record)` for a scalar column
+    // dereferences the record to its id before any handler dispatch. The
+    // association/polymorphic hash-expansion path already coerces records via
+    // AssociationQueryValue and never reaches this scalar entry point, so this does
+    // not double-handle those values.
+    if (respondsToId(value)) {
+      value = (value as { id: unknown }).id;
+    }
     if (value === null || value === undefined) {
       return attribute.isNull();
     }
@@ -568,6 +584,13 @@ export class PredicateBuilder {
     if (object instanceof Array) return this.arrayHandler;
     return this.basicObjectHandler;
   }
+}
+
+// Rails: `value.respond_to?(:id)`. In Ruby only Active Record records (and things
+// defining #id) respond, since Object#id was removed in 1.9. The TS mirror: an
+// object that carries an `id` property — matching the array handler's record detection.
+function respondsToId(value: unknown): value is { id: unknown } {
+  return value != null && typeof value === "object" && "id" in value;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
