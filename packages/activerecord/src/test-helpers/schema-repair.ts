@@ -79,16 +79,16 @@ async function readPhysicalColumns(
       return null;
   }
 
-  const rows = (await adapter.execute(sql)) as Array<Record<string, unknown>>;
+  const rows = await adapter.execute(sql);
   const byTable = new Map<string, Set<string>>();
   for (const row of rows) {
-    // Row keys can arrive as tbl/col or TBL/COL depending on the driver.
-    const tbl = String((row.tbl ?? row.TBL ?? row.table_name ?? row.TABLE_NAME) as string);
-    const col = String((row.col ?? row.COL ?? row.column_name ?? row.COLUMN_NAME) as string);
+    // The SQL aliases to tbl/col; a driver may upper-case the alias keys.
+    const tbl = String((row.tbl ?? row.TBL) as string);
+    const col = String((row.col ?? row.COL) as string);
     if (!tbl || !col) continue;
     let set = byTable.get(tbl);
     if (!set) byTable.set(tbl, (set = new Set()));
-    set.add(col.toLowerCase());
+    set.add(col);
   }
   return byTable;
 }
@@ -107,8 +107,12 @@ export function driftedTables(physical: Map<string, Set<string>>, canonical: Sch
       drifted.push(table);
       continue;
     }
+    // Case-insensitive both ways: PG/MySQL information_schema and driver row
+    // keys vary in case, so normalize the physical set here rather than relying
+    // on the caller to pre-lowercase.
+    const actualLc = new Set([...actual].map((c) => c.toLowerCase()));
     const declared = Object.keys(columnsOf(spec)).map((c) => c.toLowerCase());
-    if (declared.some((c) => !actual.has(c))) drifted.push(table);
+    if (declared.some((c) => !actualLc.has(c))) drifted.push(table);
   }
   return drifted;
 }
