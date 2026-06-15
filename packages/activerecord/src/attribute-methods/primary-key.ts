@@ -151,11 +151,12 @@ interface PrimaryKeyHost {
  * is query-free — it reads only what `loadSchema` already warmed — so a cold
  * cache falls back to "id". The `null` it can return matches Rails'
  * dynamically-nil `primary_key` for a key-less data source (a view); this is
- * the one accessor that surfaces that case honestly. The public `Base.primaryKey`
- * getter and the model-typed `PrimaryKeyHost` deliberately narrow to the non-null
- * `string | string[]` contract — never null for a persistable model — so hot
- * paths that read `primary_key` are not forced to null-guard. That single
- * narrowing is the accepted deviation; this function is where the truth lives.
+ * the one accessor that surfaces that case honestly. The public boundaries
+ * (`Base.primaryKey`, the `primaryKey()` class method) and the model-typed
+ * `PrimaryKeyHost` deliberately narrow to the non-null `string | string[]`
+ * contract — never null for a persistable model — so hot paths that read
+ * `primary_key` are not forced to null-guard. That narrowing is the accepted
+ * deviation; this function is where the truth lives.
  * @internal
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
@@ -164,7 +165,7 @@ export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | nul
   try {
     const table = this.tableName;
     const cached = table ? this.connection?.schemaCache?.getCachedPrimaryKeys?.(table) : undefined;
-    if (cached !== undefined) return cached ?? null;
+    if (cached !== undefined) return cached;
   } catch {
     // No connection/schema configured — fall through to the convention.
   }
@@ -202,8 +203,8 @@ export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): str
     setPrimaryKeyAttr.call(this, value);
     return value;
   }
-  // Same single-point narrowing as Base.primaryKey: getPrimaryKeyAttr is the
-  // one honest nullable accessor; public callers see the non-null contract.
+  // Same narrowing as Base.primaryKey: getPrimaryKeyAttr is the one honest
+  // nullable accessor; public callers see the non-null contract.
   return getPrimaryKeyAttr.call(this) as string | string[];
 }
 

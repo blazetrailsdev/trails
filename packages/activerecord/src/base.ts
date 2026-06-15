@@ -851,9 +851,9 @@ export class Base extends Model {
   }
 
   static get primaryKey(): string | string[] {
-    // Single-point narrowing of getPrimaryKeyAttr's honest nullable result to
-    // the non-null contract every persistable model satisfies — see that
-    // accessor for why. A view still returns null at runtime.
+    // Narrow getPrimaryKeyAttr's honest nullable result to the non-null
+    // contract every persistable model satisfies — see that accessor for why.
+    // A view still returns null at runtime.
     return _getPrimaryKeyAttr.call(this) as string | string[];
   }
 
