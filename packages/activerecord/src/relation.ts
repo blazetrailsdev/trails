@@ -4165,21 +4165,28 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Mirror Rails `using_limitable_reflections?` (finder_methods.rb:487):
-   * `reflections.none?(&:collection?)`. A non-string (nested-hash) or
-   * unresolvable spec is treated conservatively as non-limitable.
+   * Resolve eager-load specs to reflections then apply the Rails limitable
+   * rule. A non-string (nested-hash) or unresolvable spec is treated
+   * conservatively as non-limitable, so it short-circuits to `false` before
+   * `usingLimitableReflections` (which only sees resolved reflections).
    */
   private _eagerReflectionsAreLimitable(specs: AssociationSpec[]): boolean {
-    return specs.every((spec) => {
+    const reflections: Array<{ isCollection(): boolean }> = [];
+    for (const spec of specs) {
       if (typeof spec !== "string") return false;
       const refl = (this._modelClass as any)._reflectOnAssociation?.(spec);
-      return refl ? !refl.isCollection() : false;
-    });
+      if (!refl) return false;
+      reflections.push(refl);
+    }
+    return this.usingLimitableReflections(reflections);
   }
 
   /**
-   * Rails `using_limitable_reflections?` (finder_methods.rb): a set of
-   * reflections is limitable when none of them is a collection association.
+   * Mirror Rails `using_limitable_reflections?` (finder_methods.rb:487):
+   * `reflections.none?(&:collection?)` — a set of reflections is limitable
+   * when none of them is a collection association.
+   *
+   * @internal
    */
   usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean {
     return reflections.every((r) => !r.isCollection());

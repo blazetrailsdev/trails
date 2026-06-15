@@ -594,8 +594,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     await assoc.loadTarget();
     expect(assoc.isLoaded()).toBe(true);
     const ids = await assoc.idsReader();
-    expect(ids).toContain(p1.id);
-    expect(ids).toContain(p2.id);
+    expect(ids).toEqual([p1.id, p2.id]);
   });
 
   it("blank custom primary key on new record should not run queries", async () => {
