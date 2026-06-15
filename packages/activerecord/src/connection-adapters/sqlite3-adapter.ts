@@ -58,6 +58,7 @@ import {
 } from "@blazetrails/activemodel";
 import { getFs, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
+import { isLogOnlyBinds } from "./log-only-binds.js";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -326,8 +327,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // Type-cast binds to driver-compatible primitives. Phase 2 threads
     // bind values through the visitor rather than inlining them, so the
     // `execute` path now receives non-empty bind arrays where it received
-    // empty ones before.
-    const driverBinds = binds.map(_driverBind) as SqliteBinds;
+    // empty ones before. Log-only binds (unprepared StatementCache) are
+    // already inlined into the SQL, so the driver gets none of them.
+    const driverBinds = (isLogOnlyBinds(binds) ? [] : binds).map(_driverBind) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const stmt = await this._cachedStatement(sql);
@@ -569,7 +571,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<Result> {
     const processed = this.preprocessQuery(sql);
     await this.materializeTransactions();
-    const driverBinds = (binds ?? []).map(_driverBind) as SqliteBinds;
+    // Log-only binds (unprepared StatementCache) are already inlined into the
+    // SQL, so the driver gets none — but the payload still logs them.
+    const driverBinds = (isLogOnlyBinds(binds) ? [] : (binds ?? [])).map(
+      _driverBind,
+    ) as SqliteBinds;
     // Rails' SQLite `perform_query` pools the statement only when `prepare` is
     // true (`@statements[sql] ||= ...`) and otherwise prepares a fresh one. The
     // `exec_query` keyword defaults to `false` (database_statements.rb), so we
