@@ -7518,13 +7518,37 @@ describe("CalculationsTest", () => {
       number
     >;
     // Keys are the loaded CpkOrder records, looked up by the composite FK.
+    // byRecord can't be reused here: a composite-PK record's `.id` returns the
+    // [shop_id, id] array, so reference equality never matches; key on shop_id.
     expect([...c.keys()].every((k) => k instanceof CpkOrder)).toBe(true);
-    const byShop = (shopId: number): number | undefined => {
-      for (const [key, value] of c) if (key && key.shop_id === shopId) return value;
+    const byShop = (
+      result: Map<InstanceType<typeof CpkOrder> | null, unknown>,
+      shopId: number,
+    ): unknown => {
+      for (const [key, value] of result) if (key && key.shop_id === shopId) return value;
       return undefined;
     };
-    expect(byShop(1)).toBe(2);
-    expect(byShop(2)).toBe(1);
+    expect(byShop(c, 1)).toBe(2);
+    expect(byShop(c, 2)).toBe(1);
+
+    // sum/average/minimum/maximum over the composite-FK grouping exercise the
+    // buildAggNode paths in groupedCompositeAssoc, not just count.
+    const sums = (await CpkBook.group("order").sum("id")) as typeof c;
+    expect(sums.size).toBe(2);
+    expect(byShop(sums, 1)).toBe(3);
+    expect(byShop(sums, 2)).toBe(3);
+
+    const averages = (await CpkBook.group("order").average("id")) as typeof c;
+    expect(Number(byShop(averages, 1))).toBeCloseTo(1.5);
+    expect(Number(byShop(averages, 2))).toBeCloseTo(3);
+
+    const minimums = (await CpkBook.group("order").minimum("id")) as typeof c;
+    expect(byShop(minimums, 1)).toBe(1);
+    expect(byShop(minimums, 2)).toBe(3);
+
+    const maximums = (await CpkBook.group("order").maximum("id")) as typeof c;
+    expect(byShop(maximums, 1)).toBe(2);
+    expect(byShop(maximums, 2)).toBe(3);
   });
 
   it("ids with includes offset", async () => {
