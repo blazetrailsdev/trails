@@ -1213,7 +1213,8 @@ describe("EnumTest", () => {
 
     const post = new Post({ status: 0 });
     expect((post as any).isDraft()).toBe(true);
-    (post as any).published();
+    // Rails enum has no plain in-memory setter; assign through the attribute.
+    post.writeAttribute("status", "published");
     expect((post as any).isPublished()).toBe(true);
     expect(post.readAttribute("status")).toBe("published");
   });
@@ -1410,8 +1411,10 @@ describe("EnumTest", () => {
     }
     defineEnum(Task, "status", ["pending", "active", "completed"]);
 
+    // Rails enum generates only the persisting bang setter (`active!`), not a
+    // plain in-memory setter; we mirror that — `activeBang()` runs `update!`.
     const task = await Task.create({ status: 0 });
-    (task as any).active();
+    await (task as any).activeBang();
     expect(task.readAttribute("status")).toBe("active");
   });
 
@@ -1553,7 +1556,8 @@ describe("EnumTest", () => {
 
     const conv = new Conversation({ status: 0 });
     expect((conv as any).isActive()).toBe(true);
-    (conv as any).archived();
+    // Rails enum has no plain in-memory setter; assign through the attribute.
+    conv.writeAttribute("status", "archived");
     expect((conv as any).isArchived()).toBe(true);
     expect(conv.readAttribute("status")).toBe("archived");
   });
@@ -1634,8 +1638,9 @@ describe("EnumTest", () => {
       }
       defineEnum(Post, "status", ["draft", "published"]);
 
+      // Rails enum has no plain in-memory setter; assign through the attribute.
       const p = new Post({});
-      (p as any).published();
+      p.writeAttribute("status", "published");
       expect(p.readAttribute("status")).toBe("published");
       expect((p as any).isPublished()).toBe(true);
     });
@@ -1757,7 +1762,7 @@ describe("EnumTest", () => {
 
       const t = new Task({});
       t.writeAttribute("status", 0);
-      expect((t as any).isStatus_active()).toBe(true);
+      expect((t as any).isStatusActive()).toBe(true);
     });
   });
 

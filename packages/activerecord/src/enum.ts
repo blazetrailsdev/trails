@@ -8,31 +8,22 @@ import { ArgumentError, ValueType } from "@blazetrails/activemodel";
  * Mirrors: ActiveRecord::Enum
  */
 
-interface EnumDefinition {
-  attribute: string;
-  mapping: Map<string, number | string>;
-  type: EnumType;
-}
-
 /**
- * Registry of enum definitions per model class.
+ * Build an EnumType for the deserialize/serialize helpers below from the
+ * canonical `_enums` mapping. The subtype only governs the integer/string
+ * coercion fallback, so infer it from the mapping's value types — uniform
+ * numbers mean an integer-backed column, anything else a string-backed one.
  */
-const enumRegistry = new WeakMap<typeof Base, Map<string, EnumDefinition>>();
-
-/**
- * Get enum definitions for a model class.
- */
-export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDefinition> {
-  if (!enumRegistry.has(modelClass)) {
-    enumRegistry.set(modelClass, new Map());
-  }
-  return enumRegistry.get(modelClass)!;
+export function enumTypeFor(name: string, mapping: Record<string, number | string>): EnumType {
+  const entries = Object.entries(mapping);
+  const subtype = entries.every(([, v]) => typeof v === "number") ? "integer" : "string";
+  return new EnumType(name, new Map(entries), subtype);
 }
 
 /**
  * Register an EnumType in the attribute set and install the label-returning
- * accessor, the single Rails-faithful storage model shared by both the
- * `Base.enum` macro (`_enum`) and `defineEnum`. After this, the attribute
+ * accessor, the single Rails-faithful storage model used by the `Base.enum`
+ * macro (`_enum`). After this, the attribute
  * stores the label string (via EnumType.cast on write), the getter returns it,
  * and assignment runs `assertValidValue`.
  *
@@ -74,19 +65,11 @@ interface EnumInstanceHost {
 }
 
 /**
- * Define an enum on a model class.
- *
- * Supports:
- *   - Array form: enum('status', ['draft', 'published', 'archived'])
- *   - Object form: enum('status', { draft: 0, published: 1, archived: 2 })
- *
- * Generates:
- *   - Predicate methods: record.isDraft(), record.isPublished()
- *   - Setter methods: record.draft(), record.published()
- *   - Scopes: Model.draft(), Model.published()
- *   - The attribute getter returns the string name, setter accepts string or number
- *
- * Mirrors: ActiveRecord::Enum.enum
+ * Standalone `defineEnum(modelClass, …)` — retained as a thin re-export alias
+ * of the `Base.enum` / `_enum` macro so the historical call sites and the
+ * `declare` synthesize emitter keep one import. All enum surface generation,
+ * the EnumType registration, and the `_enums` registry now live in `_enum`;
+ * this just forwards with the class as the receiver.
  */
 export function defineEnum(
   modelClass: typeof Base,
@@ -94,189 +77,7 @@ export function defineEnum(
   valuesInput: string[] | Record<string, string | number>,
   options?: { prefix?: boolean | string; suffix?: boolean | string },
 ): void {
-  const mapping = new Map<string, string | number>();
-
-  if (Array.isArray(valuesInput)) {
-    valuesInput.forEach((name, index) => {
-      mapping.set(name, index);
-    });
-  } else {
-    for (const [name, value] of Object.entries(valuesInput)) {
-      mapping.set(name, value);
-    }
-  }
-
-  const defs = getEnumDefinitions(modelClass);
-  let subtype: string;
-  try {
-    const t = modelClass.typeForAttribute(attribute).type();
-    subtype = t === "value" || /integer/i.test(t) || t === "smallint" ? "integer" : t;
-  } catch {
-    subtype = "integer";
-  }
-  const enumType = new EnumType(attribute, mapping, subtype);
-  const def: EnumDefinition = { attribute, mapping, type: enumType };
-
-  // Converge onto the Rails-faithful `_enum` storage model: the attribute
-  // stores the label string (not the raw integer), the getter returns the
-  // label, and `assertValidValue` is enforced on assignment — identical to
-  // `Base.enum`.
-  installEnumAttribute(modelClass, attribute, enumType);
-
-  // Compute prefix/suffix for method names
-  const prefixStr =
-    options?.prefix === true
-      ? attribute
-      : typeof options?.prefix === "string"
-        ? options.prefix
-        : "";
-  const suffixStr =
-    options?.suffix === true
-      ? attribute
-      : typeof options?.suffix === "string"
-        ? options.suffix
-        : "";
-
-  const methodName = (name: string) => {
-    if (prefixStr && suffixStr) return `${prefixStr}_${name}_${suffixStr}`;
-    if (prefixStr) return `${prefixStr}_${name}`;
-    if (suffixStr) return `${name}_${suffixStr}`;
-    return name;
-  };
-
-  const toCamel = (s: string) => camelize(s, false);
-  const definedNames = new Set<string>();
-
-  for (const [name] of mapping) {
-    const fullName = toCamel(methodName(name));
-    const capitalizedFullName = camelize(methodName(name));
-    const predicateName = `is${capitalizedFullName}`;
-    const bangName = `${fullName}Bang`;
-    const notScopeName = `not${capitalizedFullName}`;
-    const friendlyName = toCamel(methodName(name).replace(/[^\w\x80-\uffff]+/g, "_"));
-
-    if (definedNames.has(predicateName))
-      raiseConflictError.call(modelClass, attribute, predicateName);
-    if (definedNames.has(bangName)) raiseConflictError.call(modelClass, attribute, bangName);
-    if (definedNames.has(fullName))
-      raiseConflictError.call(modelClass, attribute, fullName, { type: "class" });
-    if (definedNames.has(notScopeName))
-      raiseConflictError.call(modelClass, attribute, notScopeName, { type: "class" });
-    definedNames.add(predicateName);
-    definedNames.add(bangName);
-    definedNames.add(fullName);
-    definedNames.add(notScopeName);
-
-    if (predicateName in (modelClass.prototype as object))
-      raiseConflictError.call(modelClass, attribute, predicateName);
-    if (bangName in (modelClass.prototype as object))
-      raiseConflictError.call(modelClass, attribute, bangName);
-    if (fullName in (modelClass as object))
-      raiseConflictError.call(modelClass, attribute, fullName, { type: "class" });
-    if (notScopeName in (modelClass as object))
-      raiseConflictError.call(modelClass, attribute, notScopeName, { type: "class" });
-    if (friendlyName !== fullName) {
-      const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (fp in (modelClass.prototype as object))
-        raiseConflictError.call(modelClass, attribute, fp);
-      if (`${friendlyName}Bang` in (modelClass.prototype as object))
-        raiseConflictError.call(modelClass, attribute, `${friendlyName}Bang`);
-      if (friendlyName in (modelClass as object))
-        raiseConflictError.call(modelClass, attribute, friendlyName, { type: "class" });
-      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (notFriendlyName in (modelClass as object))
-        raiseConflictError.call(modelClass, attribute, notFriendlyName, { type: "class" });
-    }
-  }
-
-  defs.set(attribute, def);
-
-  for (const [name, value] of mapping) {
-    const fullName = toCamel(methodName(name));
-    const capitalizedFullName = camelize(methodName(name));
-    const predicateName = `is${capitalizedFullName}`;
-    const bangName = `${fullName}Bang`;
-    const notScopeName = `not${capitalizedFullName}`;
-    const friendlyName = toCamel(methodName(name).replace(/[^\w\x80-\uffff]+/g, "_"));
-
-    modelClass.scope(fullName, (rel: any) => rel.where({ [attribute]: value }));
-
-    if (friendlyName !== fullName) {
-      modelClass.scope(friendlyName, (rel: any) => rel.where({ [attribute]: value }));
-      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      modelClass.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attribute]: value }));
-      const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      Object.defineProperty(modelClass.prototype, fp, {
-        value: function (this: Base) {
-          return this.readAttribute(attribute) === name;
-        },
-        writable: true,
-        configurable: true,
-      });
-      Object.defineProperty(modelClass.prototype, `${friendlyName}Bang`, {
-        value: function (this: EnumInstanceHost) {
-          return this.updateBang({ [attribute]: value });
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-
-    Object.defineProperty(modelClass.prototype, predicateName, {
-      value: function (this: Base) {
-        return this.readAttribute(attribute) === name;
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    // Setter: record.draft() or record.statusDraft() — sets the value in memory
-    if (!(fullName in (modelClass.prototype as object))) {
-      Object.defineProperty(modelClass.prototype, fullName, {
-        value: function (this: Base) {
-          this.writeAttribute(attribute, value);
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-
-    // Bang setter: record.draftBang() or record.statusDraftBang().
-    // Mirrors Rails' `define_method("#{value}!") { update!(name => value) }` —
-    // runs validations/callbacks, inserts when the record is new, returns true.
-    Object.defineProperty(modelClass.prototype, bangName, {
-      value: function (this: EnumInstanceHost) {
-        return this.updateBang({ [attribute]: value });
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    // whereNot scope: Model.notDraft() or Model.notStatusDraft()
-    modelClass.scope(notScopeName, (rel: any) => rel.whereNot({ [attribute]: value }));
-
-    // Original-form predicate/bang for labels with special chars (spaces, hyphens).
-    // Rails: define_method("American Bobtail?") accessible only via bracket notation.
-    const originalName = methodName(name);
-    if (/[^\w\x80-\uffff]/.test(originalName)) {
-      const origPredicate = `is${originalName}`;
-      const origBang = `${originalName}Bang`;
-      Object.defineProperty(modelClass.prototype, origPredicate, {
-        value: function (this: Base) {
-          return this.readAttribute(attribute) === name;
-        },
-        writable: true,
-        configurable: true,
-      });
-      Object.defineProperty(modelClass.prototype, origBang, {
-        value: function (this: EnumInstanceHost) {
-          return this.updateBang({ [attribute]: value });
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-  }
+  _enum.call(modelClass, attribute, valuesInput, options);
 }
 
 /**
@@ -464,21 +265,13 @@ export class EnumMethods {
 }
 
 /**
- * Declare an enum attribute via `Base.enum(attribute, mapping, options)`.
- * Maps symbolic names to integer values; defines a getter/setter on the
- * prototype, `is{Name}()` predicates, `{name}Bang()` in-memory setters,
- * per-value scopes, and a static `pluralize(attribute)` accessor for the
- * mapping (e.g. `status` → `statuses`, `priority` → `priorities`).
- *
- * This is the simpler-semantics sibling to `defineEnum` — the bang setter
- * only mutates in-memory state (returns `this`), matching the historical
- * inline `Base.enum` behavior. Use `defineEnum(klass, ...)` for the
- * Rails-persisting variant with `not*` scopes.
- *
- * Mirrors: ActiveRecord::Enum.enum (the ClassMethods macro).
- */
-/**
  * Public `enum` macro. Validates then delegates to the private `_enum` impl.
+ *
+ * `_enum` is the single enum entry point: it defines `is{Name}()` predicates,
+ * persisting `{name}Bang()` setters, per-value scopes plus auto `not*` scopes,
+ * friendly-name/original-form variants for special-char labels, and a static
+ * `pluralize(attribute)` mapping accessor (e.g. `status` → `statuses`). The
+ * standalone `defineEnum(klass, …)` is a thin re-export alias of this.
  *
  * Mirrors: ActiveRecord::Enum.enum (the ClassMethods macro).
  */
@@ -530,18 +323,26 @@ export function _enum(
   }
   this._enums.set(attribute, mapping);
 
-  const prefix =
+  const prefixStr =
     options?.prefix === true
-      ? `${attribute}_`
+      ? attribute
       : typeof options?.prefix === "string"
-        ? `${options.prefix}_`
+        ? options.prefix
         : "";
-  const suffix =
+  const suffixStr =
     options?.suffix === true
-      ? `_${attribute}`
+      ? attribute
       : typeof options?.suffix === "string"
-        ? `_${options.suffix}`
+        ? options.suffix
         : "";
+
+  const methodName = (n: string) => {
+    if (prefixStr && suffixStr) return `${prefixStr}_${n}_${suffixStr}`;
+    if (prefixStr) return `${prefixStr}_${n}`;
+    if (suffixStr) return `${n}_${suffixStr}`;
+    return n;
+  };
+  const toCamel = (s: string) => camelize(s, false);
 
   const attrName = attribute;
 
@@ -562,53 +363,129 @@ export function _enum(
 
   // Register EnumType so typeForAttribute() returns it for predicate-builder
   // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
-  // install the label-returning accessor. Shared with `defineEnum` via
-  // installEnumAttribute so both macros use one Rails-faithful storage model.
+  // install the label-returning accessor via the shared installEnumAttribute.
   const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
   installEnumAttribute(this, attrName, enumType);
 
-  for (const [n, value] of Object.entries(mapping)) {
-    const methodBase = `${prefix}${n}${suffix}`;
+  // Conflict-detection pass, then the generation pass — both ported from the
+  // former standalone `defineEnum`, now folded in so `_enum` is the single enum
+  // entry point. Generates camelCase predicate (`isDraft`), bang setter
+  // (`draftBang`), per-value scope + auto `not*` scope, plus friendly-name and
+  // original-form variants for labels containing special characters. Rails has
+  // no plain in-memory setter, so none is generated.
+  const definedNames = new Set<string>();
+  for (const [n] of Object.entries(mapping)) {
+    const fullName = toCamel(methodName(n));
+    const capitalizedFullName = camelize(methodName(n));
+    const predicateName = `is${capitalizedFullName}`;
+    const bangName = `${fullName}Bang`;
+    const notScopeName = `not${capitalizedFullName}`;
+    const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
-    // Predicate: user.active? → user.isActive()
-    // Compare against the label (n) — EnumType.cast stores labels in _attributes.
-    Object.defineProperty(
-      this.prototype,
-      `is${methodBase.charAt(0).toUpperCase()}${methodBase.slice(1)}`,
-      {
+    if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
+    if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+    if (definedNames.has(fullName))
+      raiseConflictError.call(this, attribute, fullName, { type: "class" });
+    if (definedNames.has(notScopeName))
+      raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+    definedNames.add(predicateName);
+    definedNames.add(bangName);
+    definedNames.add(fullName);
+    definedNames.add(notScopeName);
+
+    if (predicateName in (this.prototype as object))
+      raiseConflictError.call(this, attribute, predicateName);
+    if (bangName in (this.prototype as object)) raiseConflictError.call(this, attribute, bangName);
+    if (fullName in (this as object))
+      raiseConflictError.call(this, attribute, fullName, { type: "class" });
+    if (notScopeName in (this as object))
+      raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+    if (friendlyName !== fullName) {
+      const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      if (fp in (this.prototype as object)) raiseConflictError.call(this, attribute, fp);
+      if (`${friendlyName}Bang` in (this.prototype as object))
+        raiseConflictError.call(this, attribute, `${friendlyName}Bang`);
+      if (friendlyName in (this as object))
+        raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
+      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      if (notFriendlyName in (this as object))
+        raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
+    }
+  }
+
+  for (const [n, value] of Object.entries(mapping)) {
+    const fullName = toCamel(methodName(n));
+    const capitalizedFullName = camelize(methodName(n));
+    const predicateName = `is${capitalizedFullName}`;
+    const bangName = `${fullName}Bang`;
+    const notScopeName = `not${capitalizedFullName}`;
+    const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
+
+    this.scope(fullName, (rel: any) => rel.where({ [attribute]: value }));
+
+    if (friendlyName !== fullName) {
+      this.scope(friendlyName, (rel: any) => rel.where({ [attribute]: value }));
+      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      this.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attribute]: value }));
+      const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      Object.defineProperty(this.prototype, fp, {
         value: function (this: Base) {
-          return this._attributes.get(attrName) === n;
+          return this.readAttribute(attribute) === n;
         },
         writable: true,
         configurable: true,
+      });
+      Object.defineProperty(this.prototype, `${friendlyName}Bang`, {
+        value: function (this: EnumInstanceHost) {
+          return this.updateBang({ [attribute]: value });
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    // Predicate: user.active? → user.isActive()
+    Object.defineProperty(this.prototype, predicateName, {
+      value: function (this: Base) {
+        return this.readAttribute(attribute) === n;
       },
-    );
+      writable: true,
+      configurable: true,
+    });
 
     // Bang setter: user.active! → user.activeBang() persists via update!.
     // Mirrors Rails: klass.define_method("#{value_method_name}!") { update!(name => value) }
-    // The block's value is update!'s return (true), so the bang returns it too.
-    Object.defineProperty(this.prototype, `${methodBase}Bang`, {
-      value: function (this: Base) {
-        return (this as unknown as EnumInstanceHost).updateBang({ [attrName]: value });
+    Object.defineProperty(this.prototype, bangName, {
+      value: function (this: EnumInstanceHost) {
+        return this.updateBang({ [attribute]: value });
       },
       writable: true,
       configurable: true,
     });
 
-    // Scope: User.active → User.where({ status: 0 })
-    if (!Object.prototype.hasOwnProperty.call(this, "_scopes")) {
-      this._scopes = new Map(this._scopes);
+    // whereNot scope: Model.notDraft()
+    this.scope(notScopeName, (rel: any) => rel.whereNot({ [attribute]: value }));
+
+    // Original-form predicate/bang for labels with special chars (spaces,
+    // hyphens). Rails: define_method("American Bobtail?"), reachable via
+    // bracket notation only.
+    const originalName = methodName(n);
+    if (/[^\w\x80-\uffff]/.test(originalName)) {
+      Object.defineProperty(this.prototype, `is${originalName}`, {
+        value: function (this: Base) {
+          return this.readAttribute(attribute) === n;
+        },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(this.prototype, `${originalName}Bang`, {
+        value: function (this: EnumInstanceHost) {
+          return this.updateBang({ [attribute]: value });
+        },
+        writable: true,
+        configurable: true,
+      });
     }
-    this._scopes.set(methodBase, (rel: any) => rel.where({ [attrName]: value }));
-
-    // Static method that delegates to the scope
-    Object.defineProperty(this, methodBase, {
-      value: function () {
-        return ((this as typeof Base).all() as any)[methodBase]();
-      },
-      writable: true,
-      configurable: true,
-    });
   }
 
   // Mapping accessor under the pluralized attribute name (e.g. User.statuses
@@ -689,16 +566,16 @@ export function raiseConflictError(
  */
 export function readEnumValue(record: Base, attribute: string): string | null {
   const ctor = record.constructor as typeof Base;
-  const defs = getEnumDefinitions(ctor);
-  const def = defs.get(attribute);
-  if (!def) return null;
+  const mapping = ctor._enums?.get(attribute);
+  if (!mapping) return null;
 
   // Storage is now label-based (EnumType cast runs on write), so the stored
   // value is usually the label string itself. Fall back to deserialize for any
   // raw storage value (e.g. an integer read straight off the database row).
   const stored = record.readAttribute(attribute);
-  if (typeof stored === "string" && def.mapping.has(stored)) return stored;
-  return def.type.deserialize(stored);
+  if (typeof stored === "string" && Object.prototype.hasOwnProperty.call(mapping, stored))
+    return stored;
+  return enumTypeFor(attribute, mapping).deserialize(stored);
 }
 
 /**
@@ -710,11 +587,10 @@ export function castEnumValue(
   attribute: string,
   value: unknown,
 ): number | string | null {
-  const defs = getEnumDefinitions(modelClass);
-  const def = defs.get(attribute);
-  if (!def) return null;
+  const mapping = modelClass._enums?.get(attribute);
+  if (!mapping) return null;
 
-  return def.type.serialize(value) as number | string | null;
+  return enumTypeFor(attribute, mapping).serialize(value) as number | string | null;
 }
 
 /**
