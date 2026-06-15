@@ -835,18 +835,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((projects[0] as any).id).toBeNull();
   });
 
-  it.skip("join middle table alias", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: habtm join query does not alias the intermediate join table when needed for disambiguation
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — join alias in SELECT/JOIN generation
-  });
-
-  it.skip("join table alias", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: join table is not aliased in the generated SQL; conflicts with same-named tables in self-joins
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — alias_for join table in Arel join node
-  });
-
   it("join with group", async () => {
     // group() + having() chained inside the scope lambda are forwarded into
     // the habtm join query. having("count(*) >= 1") only passes if GROUP BY
@@ -1837,7 +1825,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 // join table; Rails names the collision `developers_projects_projects_join`
 // (`{plural_name}_{owner_table}_join`) so a WHERE on that alias resolves.
 // ==========================================================================
-describe("HABTM join-table self-join aliasing", () => {
+// Shares the Rails class name `HasAndBelongsToManyAssociationsTest` (not a
+// bespoke describe) so test:compare matches the full ancestor path for
+// `join table alias` / `join middle table alias`; the bidirectional HABTM +
+// `joined_on` fixture setup is local to this block.
+describe("HasAndBelongsToManyAssociationsTest", () => {
   let adapter: DatabaseAdapter;
 
   class Developer extends Base {
@@ -1882,7 +1874,7 @@ describe("HABTM join-table self-join aliasing", () => {
     );
   });
 
-  it("test_join_table_alias", async () => {
+  it("join table alias", async () => {
     const records = await (Developer as any)
       .includes({ projects: "developers" })
       .whereNot({ "developers_projects_projects_join.joined_on": null })
@@ -1890,15 +1882,11 @@ describe("HABTM join-table self-join aliasing", () => {
     expect(records.length).toBe(3);
   });
 
-  it.skip("test_join_middle_table_alias", () => {
-    // CARVE-OUT (follow-up): `Project.includes(:developers_projects)` eager-loads
-    // the auto-generated HABTM join model directly. Two gaps block it, both
-    // outside join-dependency/alias-tracker:
-    //   1. The middle reflection is hidden behind its parent HABTM reflection
-    //      in `normalizedReflections`, so `reflectOnAssociation(Project,
-    //      "developers_projects")` returns null.
-    //   2. JoinDependency#addAssociation bails when the target's primaryKey is
-    //      composite (HABTM join models use `[ownerFk, targetFk]`), so the join
-    //      model can never be the JOIN target.
+  it("join middle table alias", async () => {
+    const records = await (Project as any)
+      .includes("developers_projects")
+      .whereNot({ "developers_projects.joined_on": null })
+      .toArray();
+    expect(records.length).toBe(2);
   });
 });

@@ -19,7 +19,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Table, Nodes } from "@blazetrails/arel";
 import { modelRegistry, isAssociationCached } from "../associations.js";
-import { reflectOnAssociation } from "../reflection.js";
+import { _reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
@@ -177,7 +177,11 @@ export class JoinDependency {
     const assocDef = associations.find((a: any) => a.name === assocName);
     if (!assocDef) return null;
 
-    const reflection = reflectOnAssociation(modelClass, assocName);
+    // Rails' JoinDependency#find_reflection uses `_reflect_on_association`
+    // (raw `_reflections`), not the normalized lookup — so the auto-generated
+    // HABTM middle reflection (hidden behind its parent in
+    // `normalizedReflections`) is still joinable by its own name.
+    const reflection = _reflectOnAssociation(modelClass, assocName);
     if (reflection) {
       // Mirrors: ActiveRecord::Associations::JoinDependency#build (join_dependency.rb:232)
       (reflection as any).checkEagerLoadableBang?.();
@@ -276,8 +280,16 @@ export class JoinDependency {
         : new Table(targetTable!, { as: effectiveName });
     const sourceArelTable = new Table(sourceAlias);
 
-    const targetModelPk = (targetModel as any).primaryKey ?? "id";
-    if (Array.isArray(targetModelPk)) return null;
+    // A has_many/has_one join keys off the target's foreign key against the
+    // source's primary key — the target model's own primary key is never used
+    // for the ON clause. A belongs_to join keys off `primaryKey` (already
+    // range-checked above). So a composite-PK target (e.g. the auto-generated
+    // HABTM middle join model, whose PK is `[ownerFk, targetFk]`) is still a
+    // valid join target and must not degrade to preloading.
+    if (isBelongsTo) {
+      const targetModelPk = (targetModel as any).primaryKey ?? "id";
+      if (Array.isArray(targetModelPk)) return null;
+    }
 
     const columns = getModelColumns(targetModel);
 
@@ -546,7 +558,7 @@ export class JoinDependency {
     const result: any[] = [];
     this._joinRoot.eachChildren((parent, child) => {
       if (child.tableIndex < 0) return;
-      const reflection = reflectOnAssociation(parent.baseKlass as any, child.immediateAssocName);
+      const reflection = _reflectOnAssociation(parent.baseKlass as any, child.immediateAssocName);
       if (reflection) result.push(reflection);
     });
     return result;
@@ -1034,7 +1046,7 @@ export class JoinDependency {
    * Mirrors: ActiveRecord::Associations::JoinDependency#find_reflection
    */
   private findReflection(klass: typeof Base, name: string): any {
-    const reflection = reflectOnAssociation(klass as any, name);
+    const reflection = _reflectOnAssociation(klass as any, name);
     if (!reflection) {
       throw new ConfigurationError(
         `Can't join '${(klass as any).name}' to association named '${name}'; perhaps you misspelled it?`,
