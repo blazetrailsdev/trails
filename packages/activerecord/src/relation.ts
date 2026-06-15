@@ -1146,11 +1146,11 @@ export class Relation<T extends Base> {
     }
     const orderNode = new Nodes.Ascending(caseNode);
 
-    // Push to _orderClauses (not _rawOrderClauses) so the CASE expression is
-    // appended in call-order relative to any existing order clauses.
-    // _applyOrderToManager detects CASE-style SQL via the "(" heuristic and
-    // a /\bcase\b/i check, then emits it as SqlLiteral.
-    rel._orderClauses.push(rel._compileArelNode(orderNode));
+    // Push the Arel CASE node directly (not pre-rendered SQL) so its embedded
+    // bind values thread through the outer collector when the statement is
+    // compiled, matching Rails' parameterized `build_case_for_value_position`.
+    // _applyOrderToManager emits an `instanceof Nodes.Node` clause verbatim.
+    rel._orderClauses.push(orderNode);
 
     // Add WHERE col IN (values) filter — mirrors Rails' arel_column.in(values.compact).
     // Attribute#in uses buildQuoted (no type-caster context); the values were already
@@ -4604,12 +4604,21 @@ export class Relation<T extends Base> {
     return sql;
   }
 
-  // Compile a node to an embedded SQL string (JOIN ON clauses, order/select
-  // fragments) with bind values inlined. The result is spliced into a larger
-  // query as raw text with no separate bind array, so any BindParam must be
-  // substituted here — raw Arel `compile` now emits `?` (Rails parity), which
-  // would leak an unbound placeholder into executable SQL. Inlines via the
-  // adapter quoter, matching `Relation#toSql` / `connection.toSql`.
+  // Compile a node to an embedded SQL string with bind values inlined. The
+  // result is spliced into a larger query as raw text with no separate bind
+  // array, so any BindParam must be substituted here — raw Arel `compile` now
+  // emits `?` (Rails parity), which would leak an unbound placeholder into
+  // executable SQL. Inlines via the adapter quoter, matching `Relation#toSql` /
+  // `connection.toSql`.
+  //
+  // The order/select fragment call sites now attach their Arel nodes to the
+  // outer manager so binds thread through the one collector (Rails parity).
+  // Two clusters still inline here: (1) the JOIN ON predicates, whose `on`
+  // string is consumed by string-based self-join alias rebinding
+  // (`_appendQualifiedJoin`) — converging them needs node-level table
+  // rebinding (tracked by the `compile-arel-node-join-on-threading` story);
+  // (2) `_distinctSelectForLimitedIds`, a genuinely standalone bind-free
+  // column ref rendered to text for the adapter's string `columnsForDistinct`.
   private _compileArelNode(node: Nodes.Node): string {
     const [sql, binds] = this._arelVisitor().compileWithBinds(node);
     if (binds.length === 0) return sql;
@@ -5533,11 +5542,9 @@ export class Relation<T extends Base> {
         // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
         const subqueryAlias = "subquery_for_cache_key";
         const inner = collection._clone();
-        inner._selectColumns = [
-          this._compileArelNode(tsColumn.as("collection_cache_key_timestamp")),
-        ];
+        inner._selectColumns = [tsColumn.as("collection_cache_key_timestamp")];
         if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
-          inner._selectColumns = [this._compileArelNode(this.table.star), ...inner._selectColumns!];
+          inner._selectColumns = [this.table.star, ...inner._selectColumns!];
         }
         // Build a proper Arel SelectManager for the outer COUNT/MAX query so
         // quoting and adapter differences are handled by the AST visitor.
@@ -5565,10 +5572,7 @@ export class Relation<T extends Base> {
         const query = collection._clone();
         query._orderClauses = [];
         query._rawOrderClauses = [];
-        query._selectColumns = [
-          this._compileArelNode(countStar.as("size")),
-          this._compileArelNode(maxNode.as("timestamp")),
-        ];
+        query._selectColumns = [countStar.as("size"), maxNode.as("timestamp")];
         const rows = await this._modelClass.connection.execute(
           query._toSql(),
           query._lastSelectBinds,
