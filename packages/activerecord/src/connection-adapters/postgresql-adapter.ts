@@ -88,6 +88,7 @@ const OID_INTERVAL_ARRAY = 1187;
 const OID_MONEY = 790;
 import {
   READ_QUERY,
+  buildTruncateStatements as pgBuildTruncateStatements,
   executeBatch as pgExecuteBatch,
   suppressCompositePrimaryKey,
   castResult,
@@ -5355,6 +5356,10 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
 (PostgreSQLAdapter.prototype as any).performQuery = performQuery;
 (PostgreSQLAdapter.prototype as any).castResult = castResult;
 (PostgreSQLAdapter.prototype as any).handleWarnings = handleWarnings;
+// Mirrors: PostgreSQL::DatabaseStatements#build_truncate_statements (database_statements.rb)
+// Combines all table names into a single TRUNCATE TABLE a, b, c statement, so
+// the abstract `truncateTables` emits Rails' combined form instead of N per-table ones.
+(PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
 
 // `executeMutation` is this adapter's write/DDL primitive (reads go through the
 // overridden `execQuery`), so dirtying it clears the query cache on writes and
