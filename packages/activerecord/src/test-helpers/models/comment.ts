@@ -38,6 +38,8 @@ export class Comment extends Base {
     return "a comment...";
   }
 
+  // Rails: `all.where("#{QUOTED_TYPE} = ?", q)`. QUOTED_TYPE is the inheritance
+  // column (`type`), so the hash form emits the identical `type = ?` predicate.
   static searchByType(q: string) {
     return this.all().where({ type: q });
   }
