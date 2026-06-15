@@ -160,6 +160,29 @@ describe("defineSchema", () => {
       expect("id" in rows[0]).toBe(false);
     });
 
+    it("single-element big_integer primaryKey array becomes a serial PK (auto-assigns on INSERT)", async () => {
+      // Same as the integer case but for `big_integer` — must route through the
+      // serial-PK fast path (BIGSERIAL on PG / BIGINT AUTO_INCREMENT on MySQL /
+      // INTEGER rowid on SQLite), not the sequence-less plain-array path.
+      await adapter.executeMutation(`DROP TABLE IF EXISTS "big_serial_pk"`).catch(() => {});
+      await defineSchema(adapter, {
+        big_serial_pk: {
+          columns: { thing_id: "big_integer", label: "string" },
+          primaryKey: ["thing_id"],
+        },
+      });
+      await adapter.executeMutation(`INSERT INTO "big_serial_pk" ("label") VALUES ('a')`);
+      await adapter.executeMutation(`INSERT INTO "big_serial_pk" ("label") VALUES ('b')`);
+      const rows = (await adapter.execute(
+        `SELECT * FROM "big_serial_pk" ORDER BY "thing_id"`,
+      )) as Array<Record<string, unknown>>;
+      expect(rows).toHaveLength(2);
+      expect(rows[0].thing_id).not.toBeNull();
+      expect(rows[1].thing_id).not.toBeNull();
+      expect(Number(rows[1].thing_id)).toBeGreaterThan(Number(rows[0].thing_id));
+      expect("id" in rows[0]).toBe(false);
+    });
+
     it("composite primary key columns are NOT NULL (matches Rails; SQLite quirk-proof)", async () => {
       await defineSchema(adapter, {
         cpk_nn: {

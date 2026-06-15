@@ -186,3 +186,33 @@ describe("generateSchemaFile single-column integer PK id type per adapter", () =
     fs.unlinkSync(filePath);
   });
 });
+
+describe("generateSchemaFile single-column big_integer PK id type per adapter", () => {
+  const SCHEMA: Schema = {
+    widgets: { columns: { widget_id: "big_integer", name: "string" }, primaryKey: ["widget_id"] },
+  };
+
+  it("uses bigserial on postgres (INT8 serial, not the plain bigint primary_key type)", async () => {
+    const filePath = await generateSchemaFile(SCHEMA, "postgres");
+    const fs = await getFsAsync();
+    const content = fs.readFileSync(filePath, "utf-8");
+    expect(content).toContain('primaryKey: "widget_id", id: { type: "bigserial" }');
+    fs.unlinkSync(filePath);
+  });
+
+  it("uses bigint (BIGINT auto-increment) on mysql", async () => {
+    const filePath = await generateSchemaFile(SCHEMA, "mysql");
+    const fs = await getFsAsync();
+    const content = fs.readFileSync(filePath, "utf-8");
+    expect(content).toContain('primaryKey: "widget_id", id: { type: "bigint" }');
+    fs.unlinkSync(filePath);
+  });
+
+  it("uses integer (rowid auto-increment) on sqlite", async () => {
+    const filePath = await generateSchemaFile(SCHEMA, "sqlite");
+    const fs = await getFsAsync();
+    const content = fs.readFileSync(filePath, "utf-8");
+    expect(content).toContain('primaryKey: "widget_id", id: { type: "integer" }');
+    fs.unlinkSync(filePath);
+  });
+});

@@ -49,13 +49,24 @@ function primaryKeyOf(t: TableSchema): string[] | false | undefined {
   return isWrapped(t) ? (t as { primaryKey: string[] | false }).primaryKey : undefined;
 }
 
-// Excludes `big_integer` on purpose: the serial-PK path emits a `primary_key`
-// column, which is `SERIAL` (INT4) on PG, not `BIGSERIAL`. Keep in sync with
-// define-schema.ts's isIntegerSpec.
+// `integer` and `big_integer` both map to an auto-increment serial/identity PK
+// when declared `primaryKey: ["col"]`. Keep in sync with define-schema.ts's
+// isIntegerSpec / serialIdType.
 function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
   if (spec === undefined) return false;
   const type = typeof spec === "string" ? spec : spec.type;
-  return type === "integer";
+  return type === "integer" || type === "big_integer";
+}
+
+// The `id: { type }` value preserving the declared INTEGER width per adapter:
+// PG `serial`/`bigserial`, MySQL `integer`/`bigint`, SQLite always `integer`
+// (only `INTEGER PRIMARY KEY` aliases the rowid).
+function serialIdType(spec: ColumnSpec | undefined, adapterName?: string): string {
+  const type = typeof spec === "string" ? spec : spec?.type;
+  const isBig = type === "big_integer";
+  if (adapterName === "postgres") return isBig ? "bigserial" : "serial";
+  if (adapterName === "sqlite") return "integer";
+  return isBig ? "bigint" : "integer";
 }
 
 function colOpts(
@@ -129,12 +140,12 @@ function generateCode(schema: Schema, adapterName?: string): string {
     if (pk === false) tOptsEntries.push(`id: false`);
     else if (serialPkName !== null) {
       tOptsEntries.push(`primaryKey: ${JSON.stringify(serialPkName)}`);
-      // Preserve INTEGER width: PG `serial` → INT4 serial; MySQL/SQLite
-      // `integer` → INT auto-increment. The default `primary_key` type widens to
-      // BIGINT on MySQL and breaks integer FK references. Keep in sync with
-      // define-schema.ts.
-      const serialIdType = adapterName === "postgres" ? "serial" : "integer";
-      tOptsEntries.push(`id: { type: ${JSON.stringify(serialIdType)} }`);
+      // Preserve INTEGER width per adapter (serialIdType). The default
+      // `primary_key` type widens to BIGINT on MySQL and breaks integer FK
+      // references. Keep in sync with define-schema.ts.
+      tOptsEntries.push(
+        `id: { type: ${JSON.stringify(serialIdType(cols[serialPkName], adapterName))} }`,
+      );
     } else if (Array.isArray(pk)) tOptsEntries.push(`primaryKey: ${JSON.stringify(pk)}`);
     if (needsForce) tOptsEntries.push(`force: "cascade"`);
     const tOpts = tOptsEntries.length === 0 ? `{}` : `{ ${tOptsEntries.join(", ")} }`;
