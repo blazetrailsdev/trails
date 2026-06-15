@@ -1004,8 +1004,14 @@ export class ConnectionPool implements ReapablePool {
     // defensive — it should never fire in practice. Callers can
     // observe the pending/resolved load via _lazyLoadPromise (used
     // by tests to await the actual completion instead of timing hacks).
+    // Skip the disk-only lazy load when eager warming is on: loadAllBang
+    // below already consults the on-disk dump as a base before introspecting,
+    // so eager warming subsumes the lazy path. Running both would double-load
+    // the dump and (because the lazy block sets _lazyLoadTriggered) would
+    // otherwise suppress the eager introspection top-up entirely.
     if (
       SchemaReflection.lazilyLoadSchemaCache &&
+      !SchemaReflection.eagerLoadSchemaCache &&
       !this._lazyLoadTriggered &&
       !this.poolConfig.schemaCache
     ) {
@@ -1059,15 +1065,17 @@ export class ConnectionPool implements ReapablePool {
     // prior `await ensureSchemaLoaded()`.
     //
     // loadAllBang first consults the on-disk dump (if any) as a base, so
-    // eager warming subsumes lazy loading; we therefore skip it when the lazy
-    // path already triggered for this connection adoption to avoid a redundant
-    // double introspection. Fire-and-forget for the same reason as the lazy
-    // path: newConnection is sync. Errors are swallowed by addAll's per-table
-    // best-effort reflection; the .catch is defensive.
+    // eager warming subsumes lazy loading — when this flag is on, the lazy
+    // block above is skipped so eager wins. Fire-and-forget for the same
+    // reason as the lazy path: newConnection is sync. The whole warm is
+    // best-effort, not per-table: addAll loops `add` without per-table
+    // rescue (mirroring Rails' SchemaCache#add_all), so a single table's
+    // reflection failure rejects the warm and abandons the rest — the .catch
+    // logs and swallows it, leaving any not-yet-reflected tables to fall back
+    // to the synthesized columnsHash branch on first access.
     if (
       SchemaReflection.eagerLoadSchemaCache &&
       !this._eagerWarmTriggered &&
-      !this._lazyLoadTriggered &&
       !this.poolConfig.schemaCache
     ) {
       this._eagerWarmTriggered = true;
