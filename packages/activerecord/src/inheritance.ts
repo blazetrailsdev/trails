@@ -736,17 +736,25 @@ function castStiValueFromAttrs(
 /**
  * Registry-safe variant of {@link findStiClass} that resolves a type name only
  * within `baseClass`'s own subtree (the class itself plus its tracked
- * descendants), matching by `stiName`. Unlike `findStiClass` it never consults
- * the global `modelRegistry`, where a bare class name like `"Client"` is
- * ambiguous across test files that each define their own STI tree. Returns null
- * when no descendant matches rather than raising — the `new()` dispatch path
- * (the only caller) treats a non-match as "build the receiver as-is".
+ * descendants). Unlike `findStiClass` it never trusts a bare global
+ * `modelRegistry` lookup, where a name like `"Client"` is ambiguous across test
+ * files that each define their own STI tree. Returns null when nothing in the
+ * subtree matches rather than raising — callers treat a non-match as "build the
+ * receiver as-is".
+ *
+ * A subtree class matches when either its `stiName` equals `typeName` (the
+ * common case), or the global registry maps `typeName` to that exact in-subtree
+ * class. The second arm resolves Ruby-qualified STI names like
+ * `"ClothingItem::Used"` (whose `stiName` is the unqualified `"ClothingItemUsed"`)
+ * registered via `registerModel`, without ambiguity: a registry entry pointing
+ * at a class in *another* tree is never `=== klass` here, so it is ignored.
  *
  * @internal
  */
 function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): typeof Base | null {
+  const registered = modelRegistry.get(typeName);
   for (const klass of [baseClass, ...descendants(baseClass)]) {
-    if (stiName(klass) === typeName) return klass;
+    if (stiName(klass) === typeName || klass === registered) return klass;
   }
   return null;
 }
@@ -755,10 +763,10 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
  * Registry-safe row-path resolver: the database-row analogue of
  * {@link findStiClassInHierarchy} used by {@link discriminateClassForRecord}.
  *
- * Like the `new`-path resolver it matches `typeName` against `baseClass`'s own
- * tracked subtree first, rather than the ambiguous global `modelRegistry` where a
- * bare name like `"Client"` collides across test files. The no-match handling
- * splits on whether STI was *explicitly enabled*:
+ * It matches `typeName` against `baseClass`'s own tracked subtree first (via the
+ * shared {@link findStiClassInHierarchy}, which also resolves Ruby-qualified
+ * registered names), rather than the ambiguous global `modelRegistry`. The
+ * no-match handling splits on whether STI was *explicitly enabled*:
  *
  *   - `stiEnabled(baseClass)` (an explicit `_inheritanceColumn` sentinel, e.g.
  *     the custom-column Parrot/Vegetable trees): defer to the global
@@ -766,8 +774,7 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
  *     uniquely-named subclass registered via `registerModel` or raises
  *     `SubclassNotFound` for a genuinely bad type, mirroring Rails' `find_sti_class`.
  *   - A canonical base that merely reflects a `type` column and tracks subclasses
- *     (no explicit `enableSti`): resolve a *loaded* subclass via the global
- *     registry when present, but DEGRADE to the base class on a miss rather than
+ *     (no explicit `enableSti`): DEGRADE to the base class on a miss rather than
  *     raise. trails has no autoloader, so an unloaded-but-valid subclass (e.g. a
  *     `type: "Reply"` row when `reply.ts` hasn't been imported) is
  *     indistinguishable from a genuinely bad type; raising would break unrelated
@@ -782,10 +789,6 @@ function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Ba
   const found = findStiClassInHierarchy(baseClass, typeName);
   if (found) return found;
   if (stiEnabled(baseClass)) return findStiClass(baseClass, typeName);
-  if (descendants(baseClass).length > 0) {
-    const klass = modelRegistry.get(typeName);
-    if (klass && (klass === baseClass || klass.prototype instanceof baseClass)) return klass;
-  }
   return baseClass;
 }
 
