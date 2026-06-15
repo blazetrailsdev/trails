@@ -28,21 +28,25 @@ export type SerializableHash = Record<string, unknown> & PromiseLike<Record<stri
  * returns a thenable: sync access fails loud on an unloaded include, `await`
  * lazy-loads it first. A call with no `:include` returns a plain hash like Rails
  * (no awaitable contract), so promise assimilation can't trigger a spurious load.
+ *
+ * `sync` is the module-private re-entry flag: a real parameter, not an option,
+ * so it travels outside the Rails-shaped `options` object and a caller cannot
+ * collide with it (even by casting past the type). When true, the body is built
+ * synchronously and nested includes build sync too rather than re-wrapping.
  */
 export function serializableHash(
   record: SerializationRecord,
   options: SerializeOptions = {},
+  sync = false,
 ): Record<string, unknown> {
-  // `__sync` is the internal re-entry that builds the body synchronously.
-  if (hasIncludes(options) && !(options as { __sync?: boolean }).__sync) {
-    const sync = { ...options, __sync: true } as SerializeOptions;
+  if (hasIncludes(options) && !sync) {
     return thenableHash(
-      () => serializableHash(record, sync),
+      () => serializableHash(record, options, true),
       async () => {
         // Await: lazy-load every unloaded include (Rails' `to_ary`), then the
         // sync build finds them all loaded.
         await preloadIncludes(record, options);
-        return serializableHash(record, sync);
+        return serializableHash(record, options, true);
       },
     );
   }
@@ -97,13 +101,12 @@ export function serializableHash(
         );
       }
       const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
-      // This callback only runs in the `__sync` build, so nested includes build
-      // sync too rather than returning their own thenables.
-      const nested = { ...opts, __sync: true } as SerializeOptions;
+      // This callback only runs in the sync build, so nested includes build
+      // sync too (pass `sync: true`) rather than returning their own thenables.
       safeSet(
         result,
         assocName,
-        items.map((r) => serializableHash(r as SerializationRecord, nested)),
+        items.map((r) => serializableHash(r as SerializationRecord, opts, true)),
       );
     } else if (
       records &&
@@ -113,13 +116,7 @@ export function serializableHash(
       safeSet(
         result,
         assocName,
-        serializableHash(
-          records as unknown as SerializationRecord,
-          {
-            ...opts,
-            __sync: true,
-          } as SerializeOptions,
-        ),
+        serializableHash(records as unknown as SerializationRecord, opts, true),
       );
     } else {
       safeSet(result, assocName, records);

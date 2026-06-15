@@ -61,6 +61,23 @@ describe("SerializationTest", () => {
     expect((hash["friends"] as Array<{ name: string }>)[0].name).toBe("Joe");
   });
 
+  it("a caller option named __sync does not hijack the internal sync re-entry", () => {
+    // The synchronous re-entry flag is a separate function parameter, not an
+    // option. A caller passing a castable option literally named `__sync` cannot
+    // reach it: the include-bearing call still returns the awaitable thenable
+    // (Rails' lazy `to_ary` contract) rather than building eagerly.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const p = new Person({ name: "Alice" });
+    setAssociationAccessors(p, { posts: [] });
+    const hash = p.serializableHash({ include: "posts", __sync: true } as never);
+    expect(typeof (hash as unknown as PromiseLike<unknown>).then).toBe("function");
+    expect(hash["posts"]).toEqual([]);
+  });
+
   it("only include", () => {
     class Person extends Model {
       static {
