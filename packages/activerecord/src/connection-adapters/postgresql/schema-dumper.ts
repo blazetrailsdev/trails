@@ -135,6 +135,28 @@ export class SchemaDumper extends AbstractSchemaDumper {
       : !!(column as any).virtual;
   }
 
+  /**
+   * Since `new_column_from_field` stores the raw default literal (Rails'
+   * extract_value_from_default), an array column's `column.default` arrives as a
+   * PG array literal string (`"{}"`, `"{1,2,3}"`). The inherited `schemaDefault`
+   * deserializes via `lookupCastTypeFromColumn`, but the dumper's `ColumnInfo`
+   * carries no OID, so the lookup resolves the scalar *element* type rather than
+   * the OID::Array wrapper and can't turn `"{}"` into `[]`. Parse the literal
+   * here so array defaults dump as `default: []` / `default: [1, 2, 3]`.
+   * @internal
+   */
+  protected override schemaDefault(column: Column): string | undefined {
+    if (column.array && typeof column.default === "string" && /^\{.*\}$/.test(column.default)) {
+      const elements = parsePgArrayLiteral(column.default);
+      const numeric = column.type === "integer" || column.type === "bigint";
+      const rendered = elements.map((el) =>
+        numeric && /^-?\d+$/.test(el) ? el : JSON.stringify(el),
+      );
+      return `[${rendered.join(", ")}]`;
+    }
+    return super.schemaDefault(column as any);
+  }
+
   /** @internal */
   protected override schemaExpression(column: Column): string | undefined {
     if (column.isSerial) return undefined;
@@ -286,4 +308,31 @@ export class SchemaDumper extends AbstractSchemaDumper {
   private pgAdapter(): any {
     return this._adapter();
   }
+}
+
+/**
+ * Parse a PG array literal (`"{}"`, `"{1,2,3}"`, `'{"a,b",c}'`) into its string
+ * elements, unwrapping double quotes and unescaping `\"` / `\\`.
+ */
+function parsePgArrayLiteral(literal: string): string[] {
+  const inner = literal.slice(1, -1);
+  if (inner === "") return [];
+  const elements: string[] = [];
+  let buf = "";
+  let inQuotes = false;
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (ch === "\\") {
+      buf += inner[++i] ?? "";
+    } else if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) {
+      elements.push(buf);
+      buf = "";
+    } else {
+      buf += ch;
+    }
+  }
+  elements.push(buf);
+  return elements;
 }

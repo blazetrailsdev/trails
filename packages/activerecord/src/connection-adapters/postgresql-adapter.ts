@@ -4717,16 +4717,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       string | null,
     ];
     const meta = await this.fetchTypeMetadata(col, type, Number(oid), Number(fmod));
-    const castType = this.lookupCastTypeFromColumn({
-      oid: Number(oid),
-      fmod: Number(fmod),
-      sqlType: type,
-    });
     const split = gen ? null : splitPgDefault(raw);
+    // Store the raw default literal verbatim (Rails' extract_value_from_default);
+    // deserialization is deferred to Attribute.from_database so
+    // *_before_type_cast for a column default returns the raw String.
     const rawLiteral = gen ? null : (split?.literal ?? null);
     return new Column(
       col,
-      rawLiteral !== null ? castType.deserialize(rawLiteral) : null,
+      rawLiteral,
       {
         sqlType: meta.sqlType,
         type: meta.type,

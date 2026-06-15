@@ -158,7 +158,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
       expect(column.type).toBe("text");
-      expect((column as any).default).toEqual([]);
+      // column.default holds the raw default literal (Rails' extract_value_from_default);
+      // the empty-array default reflects back as the PG array literal "{}".
+      expect((column as any).default).toBe("{}");
       expect((column as any).isArray()).toBe(true);
     });
     it("change column from non array to array", async () => {
@@ -171,7 +173,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
       expect(column.type).toBe("text");
-      expect((column as any).default).toEqual([]);
+      // column.default holds the raw default literal (Rails' extract_value_from_default);
+      // the empty-array default reflects back as the PG array literal "{}".
+      expect((column as any).default).toBe("{}");
       expect((column as any).isArray()).toBe(true);
     });
     it.skip("change column cant make non array column to array", async () => {

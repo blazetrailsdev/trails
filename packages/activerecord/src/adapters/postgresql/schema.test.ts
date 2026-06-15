@@ -2,7 +2,6 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
-import { BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, pgSupportsNativePartitioning, PostgreSQLAdapter } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
@@ -824,9 +823,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("defaults");
       const decimalCol = cols.find((c) => c.name === "decimal_col");
       expect(decimalCol).toBeDefined();
-      // column.default is the deserialized BigDecimal (trails' PG
-      // newColumnFromField pre-deserializes — see the raw-default follow-up).
-      expect((decimalCol!.default as BigDecimal).toString("F")).toMatch(/3\.14159265358979323846/);
+      // column.default holds the raw default literal (Rails' extract_value_from_default);
+      // deserialization is deferred to Attribute.from_database.
+      expect(decimalCol!.default).toMatch(/3\.14159265358979323846/);
     });
 
     it("bpchar defaults in new schema when overriding domain", async () => {
