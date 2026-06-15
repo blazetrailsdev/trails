@@ -4871,9 +4871,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * connection-scoped memo synchronously; setSchemaSearchPath() updates it,
    * so a mid-connection path change re-scopes the key and never reuses a
    * statement bound to the old path. Until the memo is set the prefix is
-   * empty (`-sql`) — equivalent to the prior fixed-prefix behavior and
-   * harmless, since trails resolves all unscoped SQL under one default path
-   * per connection. Mirrors: PostgreSQLAdapter#sql_key
+   * empty (`-sql`), matching the prior fixed-prefix behavior; the real path
+   * is only resolved lazily (Rails' sql_key calls the schema_search_path
+   * getter, which we cannot do from this synchronous hot path).
+   * Mirrors: PostgreSQLAdapter#sql_key
    * @internal
    */
   sqlKey(sql: string): string {

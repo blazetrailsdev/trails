@@ -12,9 +12,8 @@ import { Notifications } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Result } from "../result.js";
-import { StatementPool } from "./postgresql-adapter.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
-import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
 
 const UUID_OID = 2950;
 
@@ -246,6 +245,7 @@ describe("PostgreSQLAdapter#sqlKey", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     if (adapter) await adapter.close().catch(() => undefined);
   });
 
