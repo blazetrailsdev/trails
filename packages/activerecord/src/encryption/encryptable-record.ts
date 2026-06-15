@@ -357,27 +357,12 @@ export class EncryptableRecord {
   /** @internal */
   static async encryptAttributes(record: any): Promise<void> {
     this.validateEncryptionAllowed(record);
-    const klass = record.constructor as any;
-    // Rails: update_columns build_encrypt_attribute_assignments.
-    // buildEncryptAttributeAssignments returns plaintext values (Rails parity).
-    // updateColumns uses cast() not serialize(), so pre-serialize here so the
-    // DB write stores ciphertext. Mirrors encryption.ts#encryptRecord.
-    const plaintextValues = this.buildEncryptAttributeAssignments(record);
-    const assignments: Record<string, unknown> = {};
-    for (const [name, plaintext] of Object.entries(plaintextValues)) {
-      const type = getAttributeType(klass, name);
-      assignments[name] =
-        type instanceof EncryptedAttributeType ? type.serialize(plaintext) : plaintext;
-    }
-
-    await record.updateColumns(assignments);
-
-    // Restore plaintext as the in-memory cast value — updateColumns set the
-    // ciphertext as the live value via cast(), but callers expect to read plaintext.
-    for (const [name, plaintext] of Object.entries(plaintextValues)) {
-      record._attributes.writeCastValue(name, plaintext);
-    }
-    record.changesApplied();
+    // Mirrors Rails encrypt_attributes (encryptable_record.rb:187-191):
+    //   update_columns build_encrypt_attribute_assignments
+    // buildEncryptAttributeAssignments returns plaintext values; updateColumns
+    // writes them as the in-memory cast value and serializes each (via
+    // SerializeCastValue.serialize) to ciphertext for the DB write.
+    await record.updateColumns(this.buildEncryptAttributeAssignments(record));
   }
 
   /** @internal */

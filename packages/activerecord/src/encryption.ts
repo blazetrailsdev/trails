@@ -366,33 +366,17 @@ export async function encryptRecord(record: any): Promise<void> {
   // raises Errors::Configuration when the context is frozen (protected mode).
   EncryptableRecord.validateEncryptionAllowed(record);
 
-  // Save plaintext values before calling updateColumns, which would overwrite
-  // in-memory attributes with the ciphertext (since updateColumns uses cast()).
-  const plaintextValues: Record<string, unknown> = {};
+  // Mirrors Rails encrypt_attributes (encryptable_record.rb:187-191):
+  //   update_columns build_encrypt_attribute_assignments
+  // build_encrypt_attribute_assignments returns the *plaintext* attribute
+  // values (self[name]); update_columns writes them as the in-memory cast
+  // value and serializes each (via SerializeCastValue.serialize) to ciphertext
+  // for the DB write — encrypting exactly once. No pre-serialization here.
   const assignments: Record<string, unknown> = {};
   for (const attr of encryptedAttrs) {
-    const plaintext = record.readAttribute(attr);
-    plaintextValues[attr] = plaintext;
-    // Explicitly serialize via the type so updateColumns writes ciphertext —
-    // updateColumns uses cast() not serialize(), so we pre-serialize here.
-    const type = klass._attributeDefinitions?.get(attr)?.type;
-    assignments[attr] =
-      type instanceof EncryptedAttributeType ? type.serialize(plaintext) : plaintext;
+    assignments[attr] = record.readAttribute(attr);
   }
-
   await record.updateColumns(assignments);
-
-  // Restore plaintext as the in-memory cast value so record.attr still reads
-  // as plaintext, while preserving the ciphertext as valueBeforeTypeCast
-  // (used by encryptedAttribute? / ciphertextFor on this instance).
-  for (const [attr, plaintext] of Object.entries(plaintextValues)) {
-    record._attributes.writeCastValue(attr, plaintext);
-  }
-  // Re-snapshot the dirty tracker so it sees the restored plaintext as the
-  // clean state — updateColumns already called changesApplied() with the
-  // ciphertext values, which would make subsequent attribute writes appear
-  // to change "from" the ciphertext rather than the plaintext.
-  record.changesApplied();
 }
 
 /**

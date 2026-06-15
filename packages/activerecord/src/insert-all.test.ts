@@ -1372,3 +1372,62 @@ describe("InsertAll async uniqueIndexes regression", () => {
     },
   );
 });
+
+// ==========================================================================
+// Regression: insertAll/upsertAll must serialize the cast value to its DB
+// form for any type whose in-memory representation differs from its
+// serialized form, not just types that override serializeCastValue. A json
+// column overrides serialize (object → JSON string) but not
+// serializeCastValue; before routing through SerializeCastValue.serialize,
+// the bulk path wrote the in-memory object verbatim.
+// ==========================================================================
+describe("InsertAllTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      json_books: { title: "string", config: "json" },
+    });
+  });
+
+  function makeJsonBook() {
+    class JsonBook extends Base {
+      static _tableName = "json_books";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("config", "json");
+      }
+    }
+    return JsonBook;
+  }
+
+  it("insert_all serializes a mapped (json) attribute to its db value", async () => {
+    const JsonBook = makeJsonBook();
+    await JsonBook.insertAll([{ id: 1, title: "a", config: { a: 1 } }]);
+
+    const raw = await JsonBook.connection.selectValue("SELECT config FROM json_books WHERE id = 1");
+    expect(typeof raw).toBe("string");
+    expect(JSON.parse(raw as string)).toEqual({ a: 1 });
+
+    const found = await JsonBook.find(1);
+    expect(found.config).toEqual({ a: 1 });
+  });
+
+  it.skipIf(!supportsConflictTarget)(
+    "upsert_all serializes a mapped (json) attribute to its db value",
+    async () => {
+      const JsonBook = makeJsonBook();
+      await JsonBook.insertAll([{ id: 1, title: "a", config: { a: 1 } }]);
+      await JsonBook.upsertAll([{ id: 1, title: "a", config: { a: 2, b: ["x"] } }], {
+        uniqueBy: "id",
+      });
+
+      const raw = await JsonBook.connection.selectValue(
+        "SELECT config FROM json_books WHERE id = 1",
+      );
+      expect(typeof raw).toBe("string");
+      expect(JSON.parse(raw as string)).toEqual({ a: 2, b: ["x"] });
+    },
+  );
+});

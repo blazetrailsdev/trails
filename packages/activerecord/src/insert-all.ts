@@ -570,10 +570,16 @@ export class Builder implements InsertBuilder {
       const def = model._attributeDefinitions.get(key) as any;
       const type = def?.type ?? def;
       const castValue = type && typeof type.cast === "function" ? type.cast(value) : value;
-      if (type && typeof type.serializeCastValue === "function") {
+      // Faithful dispatch (ActiveModel::Type::SerializeCastValue.serialize):
+      // only short-circuit through serializeCastValue when the type declares
+      // it compatible, otherwise call full serialize. A type overriding
+      // serialize but not serializeCastValue (binary, json, serialized, the
+      // PG OID types) inherits identity serializeCastValue and would
+      // otherwise persist the in-memory cast value.
+      if (type && typeof type.serialize === "function") {
+        value = SerializeCastValue.serialize(type, castValue);
+      } else if (type && typeof type.serializeCastValue === "function") {
         value = type.serializeCastValue(castValue);
-      } else if (type && typeof type.serialize === "function") {
-        value = type.serialize(castValue);
       } else {
         value = SerializeCastValue.serializeCastValue(castValue);
       }

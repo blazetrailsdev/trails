@@ -31,6 +31,41 @@ export namespace SerializeCastValue {
   export function serializeCastValue(value: unknown): unknown {
     return value;
   }
+
+  /**
+   * Mirrors: ActiveModel::Type::SerializeCastValue.serialize
+   * (serialize_cast_value.rb:25-33)
+   *
+   *   def self.serialize(type, value)
+   *     # Using `type.equal?(type.itself_if_...)` is a performant way to also
+   *     # ensure that `type` is not just a DelegateClass instance ...
+   *     if type.equal?((type.itself_if_serialize_cast_value_compatible rescue nil))
+   *       type.serialize_cast_value(value)
+   *     else
+   *       type.serialize(value)
+   *     end
+   *   end
+   *
+   * The single faithful dispatcher for turning an already-cast value into its
+   * DB representation. Only takes the `serializeCastValue` fast-path when the
+   * type declares it compatible (serializeCastValue overridden at or above
+   * serialize); otherwise it must call full `serialize`, because a type that
+   * overrides `serialize` but not `serializeCastValue` inherits the identity
+   * `serializeCastValue` and would otherwise persist the in-memory value. The
+   * standalone `itselfIfSerializeCastValueCompatible` returns null when the
+   * method is absent — the analog of Rails' `rescue nil`.
+   */
+  export function serialize(
+    type: {
+      serializeCastValue(value: unknown): unknown;
+      serialize(value: unknown): unknown;
+    } & CompatibleType<unknown>,
+    value: unknown,
+  ): unknown {
+    return itselfIfSerializeCastValueCompatible(type) === type
+      ? type.serializeCastValue(value)
+      : type.serialize(value);
+  }
 }
 
 /**
