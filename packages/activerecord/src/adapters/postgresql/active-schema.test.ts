@@ -160,5 +160,31 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("remove index with wrong option", async () => {
       await expect(adapter.removeIndex("people", {} as any)).rejects.toThrow();
     });
+
+    it("add_index default name routes through generate_index_name length fallback", async () => {
+      // Regression: PG add_index must derive its default name via
+      // generate_index_name (length/hash fallback), so it agrees with
+      // remove_index for over-long table+column combinations rather than
+      // emitting a raw, truncated identifier.
+      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec(
+        "CREATE TABLE people (id serial primary key, very_long_column_name_one varchar, very_long_column_name_two varchar)",
+      );
+
+      const cols = ["very_long_column_name_one", "very_long_column_name_two"];
+      const expectedName = adapter.generateIndexName("people", cols);
+      // Sanity: this combination is long enough to trigger the hash fallback.
+      expect(expectedName).not.toBe(`index_people_on_${cols.join("_and_")}`);
+      expect(expectedName.length).toBeLessThanOrEqual(63);
+
+      await adapter.addIndex("people", cols);
+      expect(await adapter.indexNameExists("people", expectedName)).toBe(true);
+
+      // remove_index by column resolves the same default name and round-trips.
+      await adapter.removeIndex("people", { column: cols });
+      expect(await adapter.indexNameExists("people", expectedName)).toBe(false);
+
+      await adapter.exec("DROP TABLE IF EXISTS people");
+    });
   });
 });
