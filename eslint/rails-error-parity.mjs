@@ -5,10 +5,12 @@
  * `packages/{activerecord,activemodel,activesupport}/src/**\/*.ts` excluding
  * `*.test.ts`:
  *
- *   1. On `errors.ts`: every manifest error class whose Rails source maps to
- *      this TS file must have an exported class of the same name whose
- *      `extends` names the manifest parent (root classes must extend a global
- *      Error type). Missing/wrong-parent reports on line 1.
+ *   1. On any in-scope file: every manifest error class whose Rails source
+ *      maps to this TS file (not just `errors.ts` — ActiveSupport scatters
+ *      error classes across delegation.rb, notifications/fanout.rb, …) must
+ *      have an exported class of the same name whose `extends` names the
+ *      manifest parent (root classes must extend a global Error type).
+ *      Missing/wrong-parent reports on line 1.
  *   2. Everywhere in scope: `throw new Error(` (and TypeError/globalThis.Error/
  *      …) is flagged — keyed on the constructor only, so ported subclasses pass.
  *
@@ -186,7 +188,6 @@ const rule = {
     if (!scope) return {};
     if (loadExclude().has(scope.rel)) return {};
 
-    const isErrorsFile = path.basename(filename) === "errors.ts";
     const exportedClasses = new Map();
 
     return {
@@ -197,13 +198,15 @@ const rule = {
         if (!name || !NATIVE_ERRORS.has(name)) return;
         context.report({ node: arg, messageId: "bareThrow", data: { name } });
       },
-      // Collect exported classes for the errors.ts parity check.
+      // Collect exported classes for the parity check. Runs on every in-scope
+      // file, not just errors.ts — ActiveSupport scatters error classes across
+      // many files (delegation.ts, notifications/fanout.ts, …).
       "ExportNamedDeclaration > ClassDeclaration"(node) {
-        if (!isErrorsFile || node.id?.type !== "Identifier") return;
+        if (node.id?.type !== "Identifier") return;
         exportedClasses.set(node.id.name, { parent: superClassName(node) });
       },
       "Program:exit"() {
-        if (isErrorsFile) checkParity(context, exportedClasses);
+        checkParity(context, exportedClasses);
       },
     };
   },

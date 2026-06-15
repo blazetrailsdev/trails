@@ -25,6 +25,12 @@ const manifest = {
         parent: "StandardError",
         rubyFile: "active_support/errors.rb",
       },
+      // Scattered error class: lives in delegation.rb, not errors.rb.
+      {
+        name: "DelegationError",
+        parent: "NoMethodError",
+        rubyFile: "active_support/delegation.rb",
+      },
     ],
   },
 };
@@ -50,6 +56,8 @@ const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const excludedFile = path.join(REPO_ROOT, excludedRel);
 const asErrorsFile = path.join(REPO_ROOT, "packages/activesupport/src/errors.ts");
 const asBaseFile = path.join(REPO_ROOT, "packages/activesupport/src/duration.ts");
+// Scattered (non-errors.ts) file: DelegationError maps here via delegation.rb.
+const asScatteredFile = path.join(REPO_ROOT, "packages/activesupport/src/delegation.ts");
 
 // Class declarations for synthetic errors.ts files; `nl` joins into a file.
 const AD = "export class AdapterError extends ActiveRecordError {}";
@@ -78,6 +86,11 @@ tester.run("rails-error-parity", rule, {
     {
       filename: asErrorsFile,
       code: `export class MessageVerifierError extends Error {}\n`,
+    },
+    // Scattered file in scope: DelegationError mirrors its manifest class.
+    {
+      filename: asScatteredFile,
+      code: `export class DelegationError extends Error {}\n`,
     },
   ],
   invalid: [
@@ -117,6 +130,18 @@ tester.run("rails-error-parity", rule, {
       filename: asErrorsFile,
       code: `export class SomethingElse extends Error {}\n`,
       errors: [{ messageId: "missingClass" }],
+    },
+    // Scattered file in scope: delegation.ts omits DelegationError.
+    {
+      filename: asScatteredFile,
+      code: `export class SomethingElse extends Error {}\n`,
+      errors: [{ messageId: "missingClass" }],
+    },
+    // Scattered file in scope: DelegationError present but not an Error subtype.
+    {
+      filename: asScatteredFile,
+      code: `export class DelegationError {}\n`,
+      errors: [{ messageId: "rootExtends" }],
     },
   ],
 });

@@ -206,8 +206,10 @@ export default defineConfig(
     },
   },
 
-  // ── rails-error-parity: errors.ts must mirror Rails' error-class
-  //    hierarchy (name + parent), and Rails-mirroring source must throw
+  // ── rails-error-parity: every in-scope file must mirror Rails' error-class
+  //    hierarchy (name + parent) for the manifest classes mapped to it — not
+  //    just errors.ts, since ActiveSupport scatters error classes across many
+  //    files — and Rails-mirroring source must throw
   //    ported error classes rather than the bare global `Error`. Manifest:
   //    eslint/rails-error-classes.json (built by
   //    `pnpm tsx scripts/build-rails-error-manifest.ts`). Pre-existing
