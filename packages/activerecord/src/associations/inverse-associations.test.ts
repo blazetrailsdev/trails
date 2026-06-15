@@ -609,11 +609,7 @@ describe("InverseHasManyTests", () => {
     const m = await Man.create({ name: "Gordon" });
     const i1 = await Interest.create({ topic: "stamps" });
     const i2 = await Interest.create({ topic: "coins" });
-    await setHasMany(m, "interests", [i1, i2], {
-      inverseOf: "man",
-      foreignKey: "man_id",
-      className: "Interest",
-    });
+    await setHasMany(m, "interests", [i1, i2]);
     expect((i1 as any)._associationCache("man")?.target).toBe(m);
     expect((i2 as any)._associationCache("man")?.target).toBe(m);
   });
