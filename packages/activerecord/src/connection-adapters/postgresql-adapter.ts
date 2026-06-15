@@ -70,7 +70,11 @@ import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements, JoinTableOptions } from "./abstract/schema-statements.js";
-import { indexNameForRemoveFrom, indexExistsForRemoveFrom } from "./abstract/schema-statements.js";
+import {
+  indexNameForRemoveFrom,
+  indexExistsForRemoveFrom,
+  canRemoveIndexByName,
+} from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
@@ -3671,8 +3675,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
     // A bare `{ name }` resolves without introspection (Rails
     // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
-    const canRemoveByName =
-      columnName == null && resolveOpts.name != null && resolveOpts.column == null;
+    const canRemoveByName = canRemoveIndexByName(columnName, resolveOpts);
     const all =
       opts.ifExists || !canRemoveByName
         ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)

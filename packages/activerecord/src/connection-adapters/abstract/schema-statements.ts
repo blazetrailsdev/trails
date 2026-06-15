@@ -44,6 +44,25 @@ export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 type RemoveIndexOptions = { name?: string; column?: string | string[] };
 type IndexInfo = { name: string; columns: string[] };
 
+/**
+ * Rails: `can_remove_index_by_name?` (`schema_statements.rb`) —
+ * `column_name.nil? && options.key?(:name) && options.except(:name, :algorithm).empty?`.
+ * A bare `{ name }` (optionally with `:algorithm`) resolves without
+ * introspecting the table's indexes; any other extra key forces the lookup.
+ *
+ * @internal
+ */
+export function canRemoveIndexByName(
+  columnName: string | string[] | undefined | null,
+  options: Record<string, unknown>,
+): boolean {
+  return (
+    columnName == null &&
+    "name" in options &&
+    Object.keys(options).filter((k) => k !== "name" && k !== "algorithm").length === 0
+  );
+}
+
 // Rails: `expression_column_name?` — a String column carrying a non-word char
 // (e.g. `"lower(email)"`) is an expression index, not a plain column.
 /** @internal */
@@ -89,7 +108,7 @@ export function indexNameForRemoveFrom(
   options: RemoveIndexOptions,
 ): string {
   // can_remove_index_by_name?: a bare `{ name }` needs no introspection.
-  if (columnName == null && options.name != null && options.column == null) {
+  if (canRemoveIndexByName(columnName, options) && options.name != null) {
     return options.name;
   }
   const { name, columnNames } = removeIndexSpec(generateIndexName, tableName, columnName, options);
@@ -2225,11 +2244,7 @@ export class SchemaStatements {
     columnName: string | undefined | null,
     options: Record<string, unknown>,
   ): boolean {
-    return (
-      columnName == null &&
-      "name" in options &&
-      Object.keys(options).filter((k) => k !== "name" && k !== "algorithm").length === 0
-    );
+    return canRemoveIndexByName(columnName, options);
   }
 
   /** @internal */
