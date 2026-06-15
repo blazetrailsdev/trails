@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
+import { Table, star, SelectManager, Nodes, Visitors, relationName } from "../index.js";
 
 describe("AttributeTest", () => {
   const users = new Table("users");
@@ -1704,6 +1704,27 @@ describe("AttributeTest", () => {
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("id").notEqAny([1, 2]));
       expect(mgr.toSql()).toContain("OR");
+    });
+  });
+
+  describe("relationName", () => {
+    it("returns a plain string name unchanged", () => {
+      expect(relationName("users")).toBe("users");
+    });
+
+    it("unwraps a SqlLiteral name to its value", () => {
+      // Unlike Rails (where SqlLiteral < String), trails models SqlLiteral as a
+      // standalone Node, so a TableAlias derived-table alias must be unwrapped
+      // before it flows into any String-typed slot.
+      const alias = new Nodes.TableAlias(new Table("users"), new Nodes.SqlLiteral("derived"));
+      expect(relationName(alias.name)).toBe("derived");
+    });
+
+    it("coerces an attribute on a SqlLiteral-aliased relation to a string name", () => {
+      const alias = new Nodes.TableAlias(new Table("users"), new Nodes.SqlLiteral("derived"));
+      const attr = alias.get("id");
+      const qualified = `${relationName(attr.relation.name)}.${attr.name}`;
+      expect(qualified).toBe("derived.id");
     });
   });
 });

@@ -8,7 +8,7 @@
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
 
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, relationName } from "@blazetrails/arel";
 
 export class WhereClause {
   private _predicates: Nodes.Node[];
@@ -143,7 +143,7 @@ export class WhereClause {
     for (const node of equalities(this.predicates, opts.equalityOnly ?? false)) {
       const attr = fetchAttributeNode(node);
       if (attr === null) continue;
-      if (tableName !== undefined && attr.relation.name !== tableName) continue;
+      if (tableName !== undefined && relationName(attr.relation.name) !== tableName) continue;
       result[attr.name] = extractNodeValue((node as any).right);
     }
     return result;
@@ -236,7 +236,7 @@ function exceptPredicates(
       // Also register as qualified "table.column" so cross-model merges work
       // even when two Table instances for the same table have different klass/
       // typeCaster (and thus different stableSerialize outputs, breaking eql).
-      colStrings.add(`${c.relation.name}.${c.name}`);
+      colStrings.add(`${relationName(c.relation.name)}.${c.name}`);
     }
   }
   return predicates.filter((node) => {
@@ -245,7 +245,7 @@ function exceptPredicates(
     if (attrNodes.some((a) => a.eql(attr))) return false;
     if (colStrings.has(attr.name)) return false;
     // Match qualified "table.column" strings against the attribute's relation + name
-    const qualified = `${attr.relation.name}.${attr.name}`;
+    const qualified = `${relationName(attr.relation.name)}.${attr.name}`;
     if (colStrings.has(qualified)) return false;
     return true;
   });
@@ -322,7 +322,9 @@ function referencedColumns(predicates: Nodes.Node[]): Record<string, Nodes.Node>
   const hash: Record<string, Nodes.Node> = {};
   eachAttributes(predicates, (attr, node) => {
     const key =
-      attr instanceof Nodes.Attribute ? `${attr.relation.name}.${attr.name}` : String(attr);
+      attr instanceof Nodes.Attribute
+        ? `${relationName(attr.relation.name)}.${attr.name}`
+        : String(attr);
     hash[key] = node;
   });
   return hash;

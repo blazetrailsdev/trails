@@ -4,7 +4,7 @@ import { Association } from "./association.js";
 import { Preloader } from "../preloader.js";
 import { WhereClause } from "../../relation/where-clause.js";
 import { pluralize, singularize } from "@blazetrails/activesupport";
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, relationName } from "@blazetrails/arel";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -511,7 +511,7 @@ export class ThroughAssociation extends Association {
 function predicateReferencesTable(node: any, tableName: string): boolean {
   let found = false;
   node.fetchAttribute?.((attr: any) => {
-    if (attr instanceof Nodes.Attribute && attr.relation?.name === tableName) {
+    if (attr instanceof Nodes.Attribute && relationName(attr.relation.name) === tableName) {
       found = true;
       return false;
     }

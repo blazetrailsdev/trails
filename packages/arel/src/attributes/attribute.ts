@@ -85,6 +85,17 @@ export interface RelationLike {
   isAbleToTypeCast?: () => boolean;
 }
 
+/**
+ * Coerce a relation / table-alias `name` to a plain string, unwrapping a
+ * `SqlLiteral`. In Rails `Arel::Nodes::SqlLiteral < String`, so a SqlLiteral
+ * name is already a usable string; here `SqlLiteral` is a standalone `Node`, so
+ * every string consumer of `RelationLike.name` / `TableAlias.name` must unwrap
+ * via this helper rather than letting the object flow into a `String` slot.
+ */
+export function relationName(name: string | SqlLiteral): string {
+  return name instanceof SqlLiteral ? name.value : name;
+}
+
 export class Attribute extends Node {
   readonly [ATTRIBUTE_BRAND] = true;
   readonly relation: RelationLike;
