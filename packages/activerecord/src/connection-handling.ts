@@ -25,6 +25,7 @@ import {
   ActiveRecordError,
 } from "./errors.js";
 import { permanentConnectionCheckout } from "./ar-config.js";
+import { setDefaultTimezone } from "./type/internal/timezone.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   connectedToStack,
@@ -627,9 +628,32 @@ export async function establishConnection(
   if (config === undefined) {
     await autoConnect(modelClass);
   } else {
+    if (typeof config === "object") applyConfigDefaultTimezone(config);
     const resolved = resolveConfig(modelClass, config);
     await establishWithConfig(modelClass, resolved.adapterName, resolved.url, resolved.config);
   }
+}
+
+/**
+ * Honor a `default_timezone` entry in an `establish_connection` config.
+ *
+ * Rails threads the connection's `default_timezone` through the adapter
+ * (`AbstractAdapter#default_timezone`) so date/time casting for that
+ * connection interprets naive values in the connection's zone. Our casting
+ * resolves the zone from the process-wide `setDefaultTimezone`, so applying
+ * the config value here gives the same observable result: after
+ * `establish_connection(config.merge(default_timezone: "local"))` the next
+ * cast reads "local" until the connection is re-established.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter.validate_default_timezone
+ */
+function applyConfigDefaultTimezone(config: { [key: string]: unknown }): void {
+  const raw = config.default_timezone ?? config.defaultTimezone;
+  if (raw == null) return;
+  if (raw !== "utc" && raw !== "local") {
+    throw new ArgumentError("default_timezone must be either 'utc' or 'local'");
+  }
+  setDefaultTimezone(raw);
 }
 
 async function establishWithConfig(
