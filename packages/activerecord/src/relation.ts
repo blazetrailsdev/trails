@@ -3362,7 +3362,12 @@ export class Relation<T extends Base> {
         c.includes("`") ||
         c.includes("::") ||
         /\s+AS\s+/i.test(c);
-      return isComplex ? new Nodes.SqlLiteral(c) : table.get(c);
+      if (isComplex) return new Nodes.SqlLiteral(c);
+      // Mirrors Rails arel_column: only a column in the base model's
+      // columns_hash is qualified to the base table. A bare column absent
+      // from columns_hash stays unqualified so the database resolves it
+      // against a joined table (test_pluck_not_auto_table_name_prefix_if_column_*).
+      return isKnownColumn(c) ? table.get(c) : new Nodes.SqlLiteral(c);
     });
     // Rails' pluck spawns, sets select_values = columns, then executes the full
     // relation arel (calculations.rb), so build the same manager as a normal
