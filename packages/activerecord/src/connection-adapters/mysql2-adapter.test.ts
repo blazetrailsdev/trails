@@ -197,6 +197,19 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(result.columns).toEqual(["id", "name"]);
       expect(result.length).toBe(0);
     });
+
+    it("preserves duplicate column names on the internalExecQuery path", async () => {
+      // internalExecute now routes through the shared array-mode performQuery
+      // seam, so the internal_exec_query → cast_result path keeps duplicate
+      // columns just like execQuery (Rails' single internal_execute seam).
+      const result = await (
+        adapter as unknown as {
+          internalExecQuery(sql: string): Promise<{ columns: string[]; rows: unknown[][] }>;
+        }
+      ).internalExecQuery("SELECT 1 AS a, 2 AS a");
+      expect(result.columns).toEqual(["a", "a"]);
+      expect(result.rows[0]).toEqual([1, 2]);
+    });
   });
 
   // -- Transactions --

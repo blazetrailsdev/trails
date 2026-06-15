@@ -16,7 +16,10 @@ export interface DatabaseStatementsHost {
 
 /** @internal */
 export interface Mysql2RawResult {
-  rows: Record<string, unknown>[] | null;
+  // Array-mode (positional) rows, mirroring Rails' `query_options[:as] = :array`
+  // feeding `cast_result` from `result.to_a`. Positional rows keep duplicate
+  // column names (`SELECT 1 AS a, 2 AS a`) that hash-keyed rows would collapse.
+  rows: unknown[][] | null;
   fields: Array<{ name: string }>;
   affectedRows: number;
 }
@@ -90,8 +93,39 @@ export function multiStatementsEnabled(this: MultiStatementsHost): boolean {
 }
 
 /**
+ * Unwraps mysql2's nested result sets from a CALL / multi-statement query so
+ * callers see the single result set Rails' `cast_result` reads. For a plain
+ * non-CALL query `rawFields` is a flat `FieldPacket[]`, so `rawFields[0]` is a
+ * `FieldPacket` (not an array) and neither branch fires. CALL wraps rows AND
+ * fields in parallel nested arrays: take the first set (Rails' `abandon_results!`
+ * + first-result semantics), using `rawFields[0]` for the field descriptors
+ * (or undefined for DML-only, matching Rails' `fields.empty?` check).
+ * @internal
+ */
+export function unwrapMultiResult(
+  rawResult: unknown,
+  rawFields: mysql.FieldPacket[] | undefined,
+): {
+  result: mysql.RowDataPacket[] | mysql.ResultSetHeader;
+  fields: mysql.FieldPacket[] | undefined;
+} {
+  let result = rawResult as mysql.RowDataPacket[] | mysql.ResultSetHeader;
+  let fields = rawFields;
+  if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
+    result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
+    fields = rawFields[0] as mysql.FieldPacket[];
+  } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
+    result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
+  }
+  return { result, fields };
+}
+
+/**
  * Rails' `set_server_option` batch toggle is elided — node-mysql2 only supports
  * multi-statements as a connection-creation option, not at runtime.
+ *
+ * Requests array-mode rows (`rowsAsArray: true`) so duplicate column names
+ * survive, mirroring Rails' `configure_connection` `query_options[:as] = :array`.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#perform_query
  * @internal
@@ -111,52 +145,41 @@ export async function performQuery(
   const { prepare = false, notificationPayload } = options;
   const hasBinds = binds != null && binds.length > 0;
 
-  let rows: Record<string, unknown>[] | null = null;
-  let fields: Array<{ name: string }> = [];
-  let affectedRows = 0;
-
+  let rawResult: unknown;
+  let rawFields: mysql.FieldPacket[] | undefined;
   if (!hasBinds) {
     // Avoid #affected_rows when result exists — sidesteps gem 0.5.6 GVL race (brianmario/mysql2#1383).
-    const [result, resultFields] = (await rawConnection.query(sql)) as [
-      mysql.RowDataPacket[] | mysql.ResultSetHeader,
-      mysql.FieldPacket[],
-    ];
-    if (Array.isArray(result)) {
-      rows = result as Record<string, unknown>[];
-      fields = (resultFields ?? []) as Array<{ name: string }>;
-      affectedRows = rows.length;
-    } else {
-      affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
-    }
+    [rawResult, rawFields] = (await rawConnection.query({
+      sql,
+      rowsAsArray: true,
+    } as any)) as [unknown, mysql.FieldPacket[]];
   } else if (prepare) {
     try {
-      const [result, resultFields] = (await rawConnection.execute(
-        sql,
+      [rawResult, rawFields] = (await rawConnection.execute(
+        { sql, rowsAsArray: true } as any,
         typeCastedBinds as any[],
-      )) as [mysql.RowDataPacket[] | mysql.ResultSetHeader, mysql.FieldPacket[]];
-      if (Array.isArray(result)) {
-        rows = result as Record<string, unknown>[];
-        fields = (resultFields ?? []) as Array<{ name: string }>;
-        affectedRows = rows.length;
-      } else {
-        affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
-      }
+      )) as [unknown, mysql.FieldPacket[]];
     } catch (err) {
       this._statements?.delete(sql); // mirrors Rails' @statements.delete(sql) rescue
       throw err;
     }
   } else {
-    const [result, resultFields] = (await rawConnection.query(sql, typeCastedBinds as any[])) as [
-      mysql.RowDataPacket[] | mysql.ResultSetHeader,
-      mysql.FieldPacket[],
-    ];
-    if (Array.isArray(result)) {
-      rows = result as Record<string, unknown>[];
-      fields = (resultFields ?? []) as Array<{ name: string }>;
-      affectedRows = rows.length;
-    } else {
-      affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
-    }
+    [rawResult, rawFields] = (await rawConnection.query(
+      { sql, rowsAsArray: true } as any,
+      typeCastedBinds as any[],
+    )) as [unknown, mysql.FieldPacket[]];
+  }
+
+  const { result, fields } = unwrapMultiResult(rawResult, rawFields);
+  let rows: unknown[][] | null = null;
+  let fieldList: Array<{ name: string }> = [];
+  let affectedRows = 0;
+  if (Array.isArray(result)) {
+    rows = result as unknown[][];
+    fieldList = (fields ?? []) as Array<{ name: string }>;
+    affectedRows = rows.length;
+  } else {
+    affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
   }
 
   this._affectedRowsBeforeWarnings = affectedRows;
@@ -169,7 +192,7 @@ export async function performQuery(
   this.verified?.();
   this.handleWarnings?.(sql);
 
-  return { rows, fields, affectedRows };
+  return { rows, fields: fieldList, affectedRows };
 }
 
 /**
@@ -179,9 +202,11 @@ export async function performQuery(
 export function castResult(rawResult: Mysql2RawResult): Result {
   if (rawResult.rows == null) return Result.empty();
 
+  // Rows are already positional (array-mode), mirroring Rails' `result.to_a`,
+  // so build the Result directly from `result.fields` + rows — no row[col]
+  // re-keying, which would collapse duplicate column names.
   const columns = rawResult.fields.map((f) => f.name);
-  const rows = rawResult.rows.map((row) => columns.map((col) => row[col]));
-  const result = columns.length === 0 ? Result.empty() : new Result(columns, rows);
+  const result = columns.length === 0 ? Result.empty() : new Result(columns, rawResult.rows);
   freeRawResult(rawResult);
   return result;
 }
