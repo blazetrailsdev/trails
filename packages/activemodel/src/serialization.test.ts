@@ -249,6 +249,34 @@ describe("SerializationTest", () => {
     expect((result.comments as any[])[0].author).toBeUndefined();
   });
 
+  it("awaited nested include preloads through an attributes-less PORO", async () => {
+    // A singular `include` whose reader returns a plain PORO (no `_attributes`)
+    // that itself carries a nested, unloaded `include`. The `await` path must
+    // recurse through the PORO and lazy-load its nested collection (Rails'
+    // `to_ary`), even though the sync pass emits the PORO raw.
+    const comment = { _attributes: new Map([["text", "Nice"]]) };
+    const comments = {
+      loaded: false,
+      load(): Promise<void> {
+        this.loaded = true;
+        return Promise.resolve();
+      },
+      [Symbol.iterator](): Iterator<unknown> {
+        return [comment][Symbol.iterator]();
+      },
+    };
+    const author = { name: "Bob", comments };
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { author });
+
+    expect(comments.loaded).toBe(false);
+    const result = await p.serializableHash({
+      include: { author: { include: "comments" } },
+    });
+    expect(comments.loaded).toBe(true);
+    expect((result.author as { name: string }).name).toBe("Bob");
+  });
+
   it("method serializable hash should work with only option with order of given keys", () => {
     class Person extends Model {
       static {
