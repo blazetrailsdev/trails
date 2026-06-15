@@ -1,10 +1,11 @@
 import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { singularize, underscore, getCrypto } from "@blazetrails/activesupport";
-import { SchemaStatements, type JoinTableOptions } from "../abstract/schema-statements.js";
+import { SchemaStatements } from "../abstract/schema-statements.js";
 import {
   AlterTable,
   ChangeColumnDefinition,
+  ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
   ColumnDefinition,
   ForeignKeyDefinition,
@@ -18,7 +19,6 @@ import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { unquoteIdentifier } from "./utils.js";
 import { splitPgDefault } from "../postgresql-adapter.js";
-import { joinTableName as deriveJoinTableName } from "../../migration/join-table.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 import {
   ExclusionConstraintDefinition,
@@ -48,7 +48,10 @@ interface PgSchemaAdapter {
     options?: { type?: string },
   ): { schema: string; name: string | null; type: string | null };
   deferrable(deferrable: "immediate" | "deferred" | undefined): string;
-  readonly schemaCreation: { actionSql(action: string, dependency: string): string };
+  readonly schemaCreation: {
+    actionSql(action: string, dependency: string): string;
+    accept(o: unknown): string;
+  };
   readonly typeMap: HashLookupTypeMap;
   readonly visitor: Visitors.ToSql;
   loadAdditionalTypes(oids?: number[]): Promise<void>;
@@ -772,96 +775,23 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     tableName: string,
     columnName: string,
     type: string,
-    options: ColumnOptions & { using?: string; castAs?: string } = {},
+    options: ColumnOptions & { using?: string; castAs?: string; comment?: string | null } = {},
   ): Promise<void> {
+    // Mirrors PostgreSQL::SchemaStatements#change_column: clear the statement
+    // cache, then partition change_column_for_alter into SQL clauses and procs
+    // and issue a single ALTER TABLE with the comma-joined clauses before
+    // running the procs. The visitor (visit_ChangeColumnDefinition) emits the
+    // combined "ALTER COLUMN ... TYPE ..., ALTER COLUMN ... SET DEFAULT ..."
+    // string; the only proc Rails appends here is the :comment change.
     this.pg.clearCacheBang();
-    const quotedTable = this._qt(tableName);
-    const pgType = this.typeToSql(type, {
-      ...options,
-      precision: options.precision ?? undefined,
-    });
-
-    const quotedCol = this._qi(columnName);
-    let usingClause = "";
-    if (options.using) {
-      usingClause = ` USING ${options.using}`;
-    } else if (options.castAs) {
-      const castType = this.typeToSql(options.castAs, {
-        limit: options.limit,
-        precision: options.precision ?? undefined,
-        scale: options.scale,
-      });
-      if (options.array) {
-        usingClause = ` USING ARRAY[CAST(${quotedCol} AS ${castType})]`;
-      } else {
-        usingClause = ` USING CAST(${quotedCol} AS ${castType})`;
-      }
-    }
-
-    const collateSql = options.collation ? ` COLLATE ${this._qi(options.collation as string)}` : "";
+    const changeColDef = this.buildChangeColumnDefinition(tableName, columnName, type, options);
+    const clause = this.pg.schemaCreation.accept(changeColDef);
     // Route DDL through executeMutation (not the raw `exec`) so the
-    // dirties_query_cache wrapper clears the query cache on schema changes —
-    // mirrors what the base SchemaStatements DDL methods do and keeps the
-    // migration-path behavior the adapter previously inherited from the base.
-    await this.adapter.executeMutation(
-      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} TYPE ${pgType}${collateSql}${usingClause}`,
-    );
-
-    if (options.default !== undefined) {
-      if (options.default === null) {
-        await this.adapter.executeMutation(
-          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`,
-        );
-      } else {
-        const defaultExpr = this.adapter.quoteDefaultExpression(options.default, {
-          array: options.array,
-          sqlType: pgType,
-        });
-        // pgQuoteDefaultExpression returns " DEFAULT value" — strip the prefix
-        const defaultValue = defaultExpr.replace(/^ DEFAULT /, "");
-        await this.adapter.executeMutation(
-          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${defaultValue}`,
-        );
-      }
+    // dirties_query_cache wrapper clears the query cache on schema changes.
+    await this.adapter.executeMutation(`ALTER TABLE ${this._qt(tableName)} ${clause}`);
+    if ("comment" in options) {
+      await this.changeColumnComment(tableName, columnName, options.comment ?? null);
     }
-
-    if (options.null !== undefined) {
-      if (options.null) {
-        await this.adapter.executeMutation(
-          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP NOT NULL`,
-        );
-      } else {
-        await this.adapter.executeMutation(
-          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET NOT NULL`,
-        );
-      }
-    }
-  }
-
-  override async createJoinTable(
-    table1: string,
-    table2: string,
-    options?: JoinTableOptions | ((t: AbstractTableDefinition) => void),
-    fn?: (t: AbstractTableDefinition) => void,
-  ): Promise<void> {
-    let opts: JoinTableOptions = {};
-    let definer: ((t: AbstractTableDefinition) => void) | undefined;
-    if (typeof options === "function") {
-      definer = options;
-    } else if (options) {
-      opts = options;
-      definer = fn;
-    }
-    const joinName = opts.tableName ?? deriveJoinTableName(table1, table2);
-    const { columnOptions = {}, tableName: _t, ...tableOpts } = opts;
-    const mergedColOpts = { null: false, index: false, ...columnOptions };
-    const t1Ref = this.referenceNameForTable(table1);
-    const t2Ref = this.referenceNameForTable(table2);
-    await this.createTable(joinName, { ...tableOpts, id: false }, (td) => {
-      td.references(t1Ref, mergedColOpts);
-      td.references(t2Ref, mergedColOpts);
-      if (definer) definer(td);
-    });
   }
 
   override async addColumn(
@@ -876,9 +806,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#add_column: defer to the abstract
-    // implementation (which builds an AlterTable and accepts it through
-    // schema_creation), then propagate :comment via change_column_comment.
+    // Mirrors PostgreSQL::SchemaStatements#add_column: clear the statement
+    // cache, defer to the abstract implementation (which builds an AlterTable
+    // and accepts it through schema_creation), then propagate :comment via
+    // change_column_comment.
+    this.pg.clearCacheBang();
     await super.addColumn(tableName, columnName, type, options);
     if ("comment" in options) {
       await this.changeColumnComment(tableName, columnName, options.comment ?? null);
@@ -890,9 +822,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     columnName: string,
     newColumnName: string,
   ): Promise<void> {
+    // Mirrors PostgreSQL::SchemaStatements#rename_column: clear the statement
+    // cache, rename, then fix up index names that embed the column name.
+    this.pg.clearCacheBang();
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qt(tableName)} RENAME COLUMN ${this._qi(columnName)} TO ${this._qi(newColumnName)}`,
     );
+    await this.renameColumnIndexes(tableName, columnName, newColumnName);
   }
 
   override async changeColumnDefault(
@@ -941,21 +877,44 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     return new ChangeColumnDefinition(cd, columnName);
   }
 
+  override async buildChangeColumnDefaultDefinition(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<ChangeColumnDefaultDefinition | undefined> {
+    const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
+    if (!col) return undefined;
+    const defaultValue = this.extractNewDefaultValue(defaultOrChanges);
+    const cd = new ColumnDefinition(columnName, (col.type ?? "string") as ColumnType, {
+      array: col.array || undefined,
+    });
+    cd.sqlType = col.sqlType ?? undefined;
+    return new ChangeColumnDefaultDefinition(cd, defaultValue);
+  }
+
   override async changeColumnNull(
     tableName: string,
     columnName: string,
     nullable: boolean,
     defaultValue: unknown = null,
   ): Promise<void> {
+    // Mirrors PostgreSQL::SchemaStatements#change_column_null: validate the
+    // boolean argument and clear the statement cache before issuing DDL.
+    this.validateChangeColumnNullArgumentBang(nullable);
+    this.pg.clearCacheBang();
     const quotedTable = this._qt(tableName);
     const quotedCol = this._qi(columnName);
     if (!nullable && defaultValue != null) {
       const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
-      const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
-      const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
-      await this.adapter.executeMutation(
-        `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
-      );
+      // Rails guards the pre-ALTER UPDATE with `if column` — skip it when the
+      // column can't be found rather than quoting against an undefined column.
+      if (col) {
+        const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
+        const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
+        await this.adapter.executeMutation(
+          `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
+        );
+      }
     }
     await this.adapter.executeMutation(
       `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${nullable ? "DROP" : "SET"} NOT NULL`,
@@ -965,14 +924,25 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   override async changeColumnComment(
     tableName: string,
     columnName: string,
-    comment: string | null,
+    commentOrChanges: string | null | { from?: string | null; to?: string | null },
   ): Promise<void> {
+    // Mirrors PostgreSQL::SchemaStatements#change_column_comment: clear the
+    // statement cache and unwrap the {from:, to:} change hash before issuing
+    // the COMMENT ON statement.
+    this.pg.clearCacheBang();
+    const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
     await this.adapter.executeMutation(
       `COMMENT ON COLUMN ${this._qt(tableName)}.${this._qi(columnName)} IS ${this.pg.quote(comment)}`,
     );
   }
 
-  override async changeTableComment(tableName: string, comment: string | null): Promise<void> {
+  override async changeTableComment(
+    tableName: string,
+    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+  ): Promise<void> {
+    // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
+    this.pg.clearCacheBang();
+    const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
     await this.adapter.executeMutation(
       `COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`,
     );
