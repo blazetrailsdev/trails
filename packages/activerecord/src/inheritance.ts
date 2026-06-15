@@ -757,29 +757,34 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
  *
  * Like the `new`-path resolver it matches `typeName` against `baseClass`'s own
  * tracked subtree first, rather than the ambiguous global `modelRegistry` where a
- * bare name like `"Client"` collides across test files. It differs in the
- * no-match case: on an *explicitly modeled* hierarchy (STI enabled, or the base
- * tracks at least one subclass) it defers to the global {@link findStiClass} —
- * Rails' autoloader analog — which resolves a uniquely-named subclass or raises
- * `SubclassNotFound` for a genuinely bad type. A non-match on a plain model that
- * merely reflects a `type` column (no STI, no tracked subclasses) builds the
- * receiver as-is — that model is not really STI, so its stray `type` value must
- * not raise.
+ * bare name like `"Client"` collides across test files. The no-match handling
+ * splits on whether STI was *explicitly enabled*:
+ *
+ *   - `stiEnabled(baseClass)` (an explicit `_inheritanceColumn` sentinel, e.g.
+ *     the custom-column Parrot/Vegetable trees): defer to the global
+ *     {@link findStiClass} — Rails' autoloader analog — which resolves a
+ *     uniquely-named subclass registered via `registerModel` or raises
+ *     `SubclassNotFound` for a genuinely bad type, mirroring Rails' `find_sti_class`.
+ *   - A canonical base that merely reflects a `type` column and tracks subclasses
+ *     (no explicit `enableSti`): resolve a *loaded* subclass via the global
+ *     registry when present, but DEGRADE to the base class on a miss rather than
+ *     raise. trails has no autoloader, so an unloaded-but-valid subclass (e.g. a
+ *     `type: "Reply"` row when `reply.ts` hasn't been imported) is
+ *     indistinguishable from a genuinely bad type; raising would break unrelated
+ *     queries over a shared table (`Topic.all` seeing a `Reply` row). This is the
+ *     same graceful-degradation deviation the `new` path takes.
+ *   - A plain model with no STI and no tracked subclasses builds the receiver
+ *     as-is — its stray `type` value must not raise.
  *
  * @internal
  */
 function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Base {
   const found = findStiClassInHierarchy(baseClass, typeName);
   if (found) return found;
-  // The tracked subtree didn't name a match. On an explicitly-modeled hierarchy
-  // (STI enabled, or the base tracks at least one subclass) defer to the global
-  // registry-backed {@link findStiClass} — Rails' autoloader analog — which
-  // resolves a uniquely-named subclass registered via `registerModel` (e.g. the
-  // custom-column Parrot/Vegetable trees) or raises `SubclassNotFound` for a
-  // genuinely bad type. A plain model that merely reflects a `type` column (no
-  // STI, no tracked subclasses) is not STI and builds the receiver as-is.
-  if (stiEnabled(baseClass) || descendants(baseClass).length > 0) {
-    return findStiClass(baseClass, typeName);
+  if (stiEnabled(baseClass)) return findStiClass(baseClass, typeName);
+  if (descendants(baseClass).length > 0) {
+    const klass = modelRegistry.get(typeName);
+    if (klass && (klass === baseClass || klass.prototype instanceof baseClass)) return klass;
   }
   return baseClass;
 }
