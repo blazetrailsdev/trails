@@ -38,6 +38,10 @@ export class Comment extends Base {
     return "a comment...";
   }
 
+  static searchByType(q: string) {
+    return this.all().where({ type: q });
+  }
+
   toString() {
     return this.readAttribute("body") as string;
   }

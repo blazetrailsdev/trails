@@ -3,15 +3,45 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, Range, RecordNotFound } from "../index.js";
+import { Base, Range, RecordNotFound, registerModel } from "../index.js";
 
 import { adapterType } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { useFixtures } from "../test-helpers/use-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import {
+  Developer as CanonicalDeveloper,
+  DeveloperFilteredOnJoins,
+} from "../test-helpers/models/developer.js";
+import { Project } from "../test-helpers/models/project.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Person } from "../test-helpers/models/person.js";
+import { Reference, BadReference } from "../test-helpers/models/reference.js";
+
+registerModel(CanonicalDeveloper);
+registerModel(Project);
+registerModel(Post);
+registerModel(Comment);
+registerModel(Person);
+registerModel(Reference);
+registerModel(BadReference);
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
+
+// Canonical fixtures back the faithful Rails ports (developers/projects for the
+// default-scope-on-joins cases, posts/comments for the circular-join and
+// has-many forwarding cases, people/references for BadReference default scope).
+// The file's older bespoke tests ride prefixed throwaway tables (`rg_developers`,
+// `rg_posts`, `*_posts`) so seeded canonical rows never pollute their counts.
+const { developers, people } = useFixtures(
+  ["developers", "projects", "developersProjects", "posts", "comments", "people", "references"],
+  () => Base.connection as any,
+  { schema: canonicalSchema },
+);
 
 beforeAll(async () => {
   const postCols = {
@@ -21,8 +51,8 @@ beforeAll(async () => {
     author: "string" as const,
   };
   await defineSchema({
-    developers: { name: "string", salary: "integer" },
-    posts: { title: "string", author: "string", published: "boolean" },
+    rg_developers: { name: "string", salary: "integer" },
+    rg_posts: { title: "string", author: "string", published: "boolean" },
     ro_posts: postCols,
     dro_posts: postCols,
     sf_posts: postCols,
@@ -47,6 +77,7 @@ describe("RelationScopingTest", () => {
   function makeDeveloper() {
     class Developer extends Base {
       static {
+        this._tableName = "rg_developers";
         this.attribute("name", "string");
         this.attribute("salary", "integer");
       }
@@ -55,17 +86,14 @@ describe("RelationScopingTest", () => {
   }
 
   it.skip("unscoped breaks caching", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs query cache integration */
+    // BLOCKED: `FirstPost.unscoped { author.reload.first_post }` must invalidate
+    // the cached singular association so the default-scope-lifted read re-runs.
+    // trails returns the stale nil cache. Needs unscoped-block cache invalidation.
   });
 
   it.skip("scope breaks caching on collections", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs query cache integration */
+    // BLOCKED: same root cause — `SpecialPostWithDefaultScope.unscoped { ... }`
+    // must bust the cached collection so the unscoped reload re-queries.
   });
 
   it("reverse order", () => {
@@ -346,10 +374,9 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("scoped find include", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs includes() */
+    // BLOCKED: `Developer.includes(:projects).scoping { where("projects.id" => 2) }`
+    // requires the eager-load JOIN built by the scoped relation to be visible to
+    // the inner where referencing the included table. Needs includes-scoping parity.
   });
 
   it("scoped find joins", async () => {
@@ -431,17 +458,15 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("update all default scope filters on joins", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs joins + default_scope */
+    // BLOCKED: update_all/delete_all drop the default_scope's JOIN, so the
+    // WHERE on the joined table (`projects.name`) references a missing column
+    // ("no such column: projects.name"). Rails rewrites these as subqueries
+    // when the relation joins. Needs relation update_all/delete_all parity.
   });
 
   it.skip("delete all default scope filters on joins", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs joins + default_scope */
+    // BLOCKED: same root cause as "update all default scope filters on joins" —
+    // delete_all omits the default_scope JOIN, raising on `projects.name`.
   });
 
   it("current scope does not pollute sibling subclasses", async () => {
@@ -520,18 +545,20 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("circular joins with scoping does not crash", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs joins() */
+  it("circular joins with scoping does not crash", async () => {
+    const posts = await Post.joins({ comments: "post" }).scoping(async () =>
+      Post.joins({ comments: "post" }).limit(10).toArray(),
+    );
+    const expected = await Post.joins({ comments: "post" }).limit(10).toArray();
+    expect(posts.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
 
-  it.skip("circular left joins with scoping does not crash", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs left_joins() */
+  it("circular left joins with scoping does not crash", async () => {
+    const posts = await Post.leftJoins({ comments: "post" }).scoping(async () =>
+      Post.leftJoins({ comments: "post" }).limit(10).toArray(),
+    );
+    const expected = await Post.leftJoins({ comments: "post" }).limit(10).toArray();
+    expect(posts.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
 
   it("scoping applies to update with all queries", async () => {
@@ -562,10 +589,9 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("scoping applies to reload with all queries", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs reload() with scoping */
+    // BLOCKED: `Relation#scoping(all_queries: true)` is unsupported — the block
+    // variant takes no options, so reload() cannot pick up the class scope.
+    // Needs scoping(all_queries:) parity in scoping.ts.
   });
 
   it("nested scoping applies with all queries set", async () => {
@@ -587,25 +613,23 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("raises error if all queries is set to false while nested", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs all_queries option */
+    // BLOCKED: `Relation#scoping(all_queries:)` is unsupported, so the nested
+    // `all_queries: false` ArgumentError guard does not exist. Needs
+    // scoping(all_queries:) parity in scoping.ts.
   });
 
-  it.skip("default scope filters on joins", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs joins + default_scope */
+  it("default scope filters on joins", async () => {
+    expect(await DeveloperFilteredOnJoins.all().count()).toBe(1);
+    const first = (await DeveloperFilteredOnJoins.all().first()) as Base;
+    expect(first.id).toBe(developers("david").id);
   });
 
   describe("HasManyScopingTest", () => {
-    it.skip("should maintain default scope on associations", () => {
-      // BLOCKED: relation — relation scoping feature gap
-      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-      /* needs association + default_scope */
+    it("should maintain default scope on associations", async () => {
+      const magician = (await BadReference.find(1)) as Base;
+      const michael = (await Person.find(people("michael").id)) as Base;
+      const refs = await (michael as any).badReferences.toArray();
+      expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
     });
   });
 });
@@ -672,22 +696,27 @@ describe("NestedRelationScopingTest", () => {
     expect(total).toBe(2);
   });
 
-  it.skip("three level nested exclusive scoped find", async () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    const { Post } = makeModel();
-    await Post.create({ title: "A", author: "Alice" });
-    await Post.create({ title: "B", author: "Bob" });
-    await Post.create({ title: "C", author: "Charlie" });
-    await Post.scoping(Post.where({ author: "Alice" }), async () => {
-      await Post.scoping(Post.where({ author: "Bob" }), async () => {
-        await Post.scoping(Post.where({ author: "Charlie" }), async () => {
-          const all = await Post.all().toArray();
-          expect(all.length).toBe(1);
-          expect(all[0].author).toBe("Charlie");
+  it("three level nested exclusive scoped find", async () => {
+    await CanonicalDeveloper.where("name = 'Jamis'").scoping(async () => {
+      expect(((await CanonicalDeveloper.first()) as any).name).toBe("Jamis");
+
+      await CanonicalDeveloper.unscoped()
+        .where("name = 'David'")
+        .scoping(async () => {
+          expect(((await CanonicalDeveloper.first()) as any).name).toBe("David");
+
+          await CanonicalDeveloper.unscoped()
+            .where("name = 'Maiha'")
+            .scoping(async () => {
+              expect(await CanonicalDeveloper.first()).toBeNull();
+            });
+
+          // ensure that scoping is restored
+          expect(((await CanonicalDeveloper.first()) as any).name).toBe("David");
         });
-      });
+
+      // ensure that scoping is restored
+      expect(((await CanonicalDeveloper.first()) as any).name).toBe("Jamis");
     });
   });
 
@@ -717,6 +746,7 @@ describe("scoping()", () => {
   it("sets currentScope within the block", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -733,6 +763,7 @@ describe("scopeForCreate / whereValuesHash", () => {
   it("scopeForCreate returns attributes for new records", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
         this.attribute("author", "string");
       }
@@ -745,6 +776,7 @@ describe("scopeForCreate / whereValuesHash", () => {
   it("whereValuesHash returns the where conditions", () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
         this.attribute("author", "string");
       }
@@ -758,6 +790,7 @@ describe("scopeForCreate / whereValuesHash", () => {
   it("whereValuesHash exposes IN-array values (Rails: equality_only=false)", () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("author", "string");
       }
     }
@@ -769,6 +802,7 @@ describe("scopeForCreate / whereValuesHash", () => {
   it("scopeForCreate filters out IN-array values (Rails: equality_only=true)", () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("author", "string");
         this.attribute("title", "string");
       }
@@ -784,6 +818,7 @@ describe("Scoping block (Rails-guided)", () => {
   it("scoping sets currentScope within the block", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -800,6 +835,7 @@ describe("Static shorthands (Rails-guided)", () => {
   it("Base.where is shorthand for Base.all().where()", () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -811,6 +847,7 @@ describe("Static shorthands (Rails-guided)", () => {
   it("Base.all returns all records", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -823,6 +860,7 @@ describe("Static shorthands (Rails-guided)", () => {
   it("Base.first returns the first record", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -836,6 +874,7 @@ describe("Static shorthands (Rails-guided)", () => {
   it("Base.last returns the last record", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -849,6 +888,7 @@ describe("Static shorthands (Rails-guided)", () => {
   it("Base.count returns count", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -860,6 +900,7 @@ describe("Static shorthands (Rails-guided)", () => {
   it("Base.exists returns boolean", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -871,6 +912,7 @@ describe("Static shorthands (Rails-guided)", () => {
   it("Base.pluck extracts column values", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -884,6 +926,7 @@ describe("Static shorthands (Rails-guided)", () => {
   it("Base.ids returns primary keys", async () => {
     class Post extends Base {
       static {
+        this._tableName = "rg_posts";
         this.attribute("title", "string");
       }
     }
@@ -895,52 +938,51 @@ describe("Static shorthands (Rails-guided)", () => {
   });
 
   describe("HasManyScopingTest", () => {
-    it.skip("forwarding of static methods", () => {
-      // BLOCKED: relation — relation scoping feature gap
-      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-      /* needs association + scoping */
+    it("forwarding of static methods", async () => {
+      const welcome = (await Post.find(1)) as Base;
+      expect((Comment as any).whatAreYou()).toBe("a comment...");
+      expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
     });
 
     it.skip("nested scope finder", () => {
-      // BLOCKED: relation — relation scoping feature gap
-      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-      /* needs association + scoping */
+      // BLOCKED: has_many associations inherit the class-level current_scope.
+      // Rails keeps `current_scope` off association reads (only `all_queries`
+      // default scopes apply), so `@welcome.comments.count` stays 2 inside
+      // `Comment.where("1=0").scoping`. trails leaks the scope, yielding 0.
     });
 
     it.skip("none scoping", () => {
-      // BLOCKED: relation — relation scoping feature gap
-      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-      /* needs none() relation */
+      // BLOCKED: same root cause as "nested scope finder" — `Comment.none.scoping`
+      // leaks into `@welcome.comments`, returning 0 instead of 2.
     });
 
-    it.skip("forwarding to scoped", () => {
-      // BLOCKED: relation — relation scoping feature gap
-      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-      /* needs association + scoping */
+    it("forwarding to scoped", async () => {
+      const welcome = (await Post.find(1)) as Base;
+      expect(await (Comment as any).searchByType("Comment").size()).toBe(5);
+      expect(await (welcome as any).comments.searchByType("Comment").size()).toBe(2);
     });
 
-    it.skip("should default scope on associations is overridden by association conditions", () => {
-      // BLOCKED: relation — relation scoping feature gap
-      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-      /* needs association + default_scope */
+    it("should default scope on associations is overridden by association conditions", async () => {
+      const michael = (await Person.find(people("michael").id)) as Base;
+      const refs = await (michael as any).fixedBadReferences.toArray();
+      // references(:michael_unicyclist).becomes(BadReference) — favorite: true
+      expect(refs.map((r: any) => r.id)).toEqual([2]);
     });
 
-    it.skip("should maintain default scope on eager loaded associations", () => {
-      // BLOCKED: relation — relation scoping feature gap
-      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-      /* needs eager loading + default_scope */
+    it("should maintain default scope on eager loaded associations", async () => {
+      const michael = people("michael");
+      const loaded = (await Person.where({ id: michael.id })
+        .includes("badReferences")
+        .first()) as Base;
+      const magician = (await BadReference.find(1)) as Base;
+      const refs = await (loaded as any).badReferences.toArray();
+      expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
     });
+
     it.skip("scoping applies to all queries on has many when set", () => {
-      // BLOCKED: relation — relation scoping feature gap
-      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-      /* needs association + scoping */
+      // BLOCKED: `Relation#scoping(all_queries: true)` is unsupported — the
+      // block variant does not thread an `all_queries` flag, so association
+      // reads cannot opt into the class scope. Needs scoping.ts parity.
     });
   }); // HasManyScopingTest
 
