@@ -70,14 +70,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: assert_equal BigDecimal("150.55"), PostgresqlMoney.new.depth
       expect(((PostgresqlMoney.new() as any).depth as BigDecimal).toString("F")).toBe("150.55");
       // Rails: assert_equal "150.55", PostgresqlMoney.new.depth_before_type_cast (a String).
-      // trails' PG newColumnFromField pre-deserializes the column default
-      // (storing the cast value rather than the raw literal Rails keeps), so
-      // before_type_cast is the BigDecimal here — a pre-existing PG-only
-      // deviation surfaced (not caused) by decimals now casting to BigDecimal.
-      // Tracked by the newColumnFromField raw-default follow-up story.
-      expect(((PostgresqlMoney.new() as any).depthBeforeTypeCast as BigDecimal).toString("F")).toBe(
-        "150.55",
-      );
+      // newColumnFromField stores the raw default literal; deserialization is
+      // deferred to Attribute.from_database, so before_type_cast is the raw String.
+      expect((PostgresqlMoney.new() as any).depthBeforeTypeCast).toBe("150.55");
     });
 
     it("money values", async () => {

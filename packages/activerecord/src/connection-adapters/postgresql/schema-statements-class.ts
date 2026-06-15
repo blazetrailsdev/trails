@@ -589,10 +589,12 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       // Mirrors Rails new_column_from_field: generated columns store the
       // generation expression as defaultFunction; regular columns split into
       // literal default vs. default function (nextval, CURRENT_TIMESTAMP, etc.).
+      // The raw literal is stored verbatim (Rails' extract_value_from_default);
+      // deserialization is deferred to Attribute.from_database, so
+      // *_before_type_cast for a column default returns the raw String.
       const splitDefault = attgenerated ? null : splitPgDefault(rawDefault);
       const defaultFunction = attgenerated ? rawDefault : (splitDefault?.fn ?? null);
       const rawLiteral = attgenerated ? null : (splitDefault?.literal ?? null);
-      const literal = rawLiteral !== null ? castType.deserialize(rawLiteral) : null;
       const isSerial = this.pg.serialFromDefaultFunction(
         tableName,
         r.name as string,
@@ -601,7 +603,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
       return new Column(
         r.name as string,
-        literal,
+        rawLiteral,
         {
           sqlType,
           type: castType.type(),

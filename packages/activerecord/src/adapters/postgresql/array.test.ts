@@ -152,13 +152,40 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(ratingsLine).toMatch(/array: true/);
       expect(decimalsLine).toMatch(/array: true/);
     });
+    it("schema dump renders non-empty array defaults via the element type", async () => {
+      // Regression: newColumnFromField stores the raw PG array literal, so the
+      // dumper must run each element through the element cast type's
+      // deserialize + typeCastForSchema (integers bare, booleans true/false from
+      // PG's t/f, decimals quoted) rather than emitting raw strings.
+      await adapter.exec(`DROP TABLE IF EXISTS pg_array_defaults`);
+      await adapter.exec(`
+        CREATE TABLE pg_array_defaults (
+          id serial primary key,
+          ints integer[] DEFAULT '{4,4,2}',
+          flags boolean[] DEFAULT '{true,false}',
+          nums numeric(10,2)[] DEFAULT '{1.5,2.5}'
+        )
+      `);
+      await adapter.loadAdditionalTypes();
+      try {
+        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_array_defaults");
+        const line = (name: string) => output.split("\n").find((l) => l.includes(`"${name}"`))!;
+        expect(line("ints")).toMatch(/default: \[4, 4, 2\]/);
+        expect(line("flags")).toMatch(/default: \[true, false\]/);
+        expect(line("nums")).toMatch(/default: \["1\.5", "2\.5"\]/);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_array_defaults`).catch(() => {});
+      }
+    });
     it("change column with array", async () => {
       await adapter.addColumn("pg_arrays", "snippets", "string", { array: true, default: [] });
       await adapter.changeColumn("pg_arrays", "snippets", "text", { array: true, default: [] });
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
       expect(column.type).toBe("text");
-      expect((column as any).default).toEqual([]);
+      // column.default holds the raw default literal (Rails' extract_value_from_default);
+      // the empty-array default reflects back as the PG array literal "{}".
+      expect((column as any).default).toBe("{}");
       expect((column as any).isArray()).toBe(true);
     });
     it("change column from non array to array", async () => {
@@ -171,7 +198,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
       expect(column.type).toBe("text");
-      expect((column as any).default).toEqual([]);
+      // column.default holds the raw default literal (Rails' extract_value_from_default);
+      // the empty-array default reflects back as the PG array literal "{}".
+      expect((column as any).default).toBe("{}");
       expect((column as any).isArray()).toBe(true);
     });
     it.skip("change column cant make non array column to array", async () => {

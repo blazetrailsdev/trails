@@ -135,6 +135,37 @@ export class SchemaDumper extends AbstractSchemaDumper {
       : !!(column as any).virtual;
   }
 
+  /**
+   * Since `new_column_from_field` stores the raw default literal (Rails'
+   * extract_value_from_default), an array column's `column.default` arrives as a
+   * PG array literal string (`"{}"`, `"{1,2,3}"`, `"{t,f}"`). The inherited
+   * `schemaDefault` deserializes via `lookupCastTypeFromColumn`, but the dumper's
+   * `ColumnInfo` carries no OID, so the lookup resolves the *array* sqlType
+   * (`"integer[]"`) and can't turn `"{}"` into `[]`. Parse the literal, then run
+   * each element through the *element* cast type's `deserialize` +
+   * `typeCastForSchema` — exactly how Rails' OID::Array dumps array defaults
+   * (e.g. `t`/`f` → `true`/`false`, `1.5` → quoted decimal, `4` → bare integer).
+   * @internal
+   */
+  protected override schemaDefault(column: Column): string | undefined {
+    if (column.array && typeof column.default === "string" && /^\{.*\}$/.test(column.default)) {
+      const elements = parsePgArrayLiteral(column.default);
+      if (elements.length === 0) return "[]";
+      const elementType = this.pgAdapter()?.lookupCastTypeFromColumn?.({
+        sqlType: (column.sqlType ?? "").replace(/\[\]\s*$/, ""),
+        fmod: (column as any).fmod ?? -1,
+        name: column.name,
+      });
+      const rendered =
+        typeof elementType?.deserialize === "function" &&
+        typeof elementType?.typeCastForSchema === "function"
+          ? elements.map((el) => elementType.typeCastForSchema(elementType.deserialize(el)))
+          : elements.map((el) => JSON.stringify(el));
+      return `[${rendered.join(", ")}]`;
+    }
+    return super.schemaDefault(column as any);
+  }
+
   /** @internal */
   protected override schemaExpression(column: Column): string | undefined {
     if (column.isSerial) return undefined;
@@ -286,4 +317,31 @@ export class SchemaDumper extends AbstractSchemaDumper {
   private pgAdapter(): any {
     return this._adapter();
   }
+}
+
+/**
+ * Parse a PG array literal (`"{}"`, `"{1,2,3}"`, `'{"a,b",c}'`) into its string
+ * elements, unwrapping double quotes and unescaping `\"` / `\\`.
+ */
+function parsePgArrayLiteral(literal: string): string[] {
+  const inner = literal.slice(1, -1);
+  if (inner === "") return [];
+  const elements: string[] = [];
+  let buf = "";
+  let inQuotes = false;
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (ch === "\\") {
+      buf += inner[++i] ?? "";
+    } else if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) {
+      elements.push(buf);
+      buf = "";
+    } else {
+      buf += ch;
+    }
+  }
+  elements.push(buf);
+  return elements;
 }
