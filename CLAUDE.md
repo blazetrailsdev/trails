@@ -20,9 +20,8 @@ package list, and the `declare` / associations / enums / schema reference, see
 - Do NOT add "Co-Authored-By" lines to commits or "Generated with Claude
   Code" lines to PR descriptions.
 - After opening a PR, run the `/link` skill with the PR number so webhook
-  notifications (Copilot reviews, CI failures) are delivered to this pane.
-  Copilot auto-reviews every PR and push; reviews land at
-  `~/.btwhooks/data/github/blazetrailsdev/trails/$PR` — no need to request.
+  notifications (reviews, CI failures) are delivered to this pane. Reviews
+  land at `~/.btwhooks/data/github/blazetrailsdev/trails/$PR`.
 - **Do NOT run the whole test suite locally** (`pnpm test`, `pnpm -r test`,
   `pnpm --filter activerecord test`, etc.). CI runs the full suite on every
   push. Locally, run only the individual test files or small groups you
@@ -57,7 +56,7 @@ package list, and the `declare` / associations / enums / schema reference, see
 - **Do NOT stack PRs.** Each PR branches from `main` and stands alone.
   We don't have spare CI runners or review bandwidth — stacked branches
   (`<base>b` off `<base>`, `<base>c` off `<base>b`, etc.) re-run CI on
-  every parent rebase and force Copilot/the human to re-review the same
+  every parent rebase and force the reviewer to re-review the same
   diff multiple times. They also produce file-overlap conflicts with
   sibling agents working in parallel. If a feature needs splitting,
   open each split PR from `main` with **non-overlapping files**; if
