@@ -25,7 +25,7 @@ function transaction(
 
 /** @internal */
 function throughReflection(assoc: { owner: Base; reflection: any }): unknown {
-  let refl = assoc.reflection.throughReflection?.();
+  let refl = assoc.reflection.throughReflection ?? null;
   if (!refl) {
     const throughName = assoc.reflection.options.through;
     if (!throughName) return null;

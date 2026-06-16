@@ -91,15 +91,15 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("should property quote string primary keys", () => {
-    // BLOCKED: schema — Country/Treaty custom string primary key is declared in
-    //   schema.rb (`primary_key: :country_id`) but the canonical Country/Treaty
-    //   models do not inherit it into `Model.primaryKey` (still "id"), so the
-    //   countries_treaties HABTM join writes a null PK. Tracked for convergence.
+    // BLOCKED: associations — HABTM `push` derives the owner-side join FK from
+    //   the owner's `id` attribute, not its primary key, so a custom string-PK
+    //   owner (Country#country_id) writes a null countries_treaties.country_id.
+    //   Tracked for convergence.
   });
 
   it.skip("proper usage of primary keys and join table", () => {
-    // BLOCKED: schema — see "should property quote string primary keys"; relies
-    //   on Country.primaryKey == "country_id" inferred from the schema.
+    // BLOCKED: associations — see "should property quote string primary keys";
+    //   the `country.treaties << treaty` insert fails the same way.
   });
 
   it("has and belongs to many", async () => {
@@ -232,11 +232,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await association<Project>(devel, "projects").size()).toBe(2);
   });
 
-  it.skip("habtm collection size from params", () => {
-    // BLOCKED: nested-attributes — building a HABTM collection from
-    //   `projects_attributes` traverses the through-reflection
-    //   (`throughReflection is not a function`) before the join model is
-    //   materialized. Tracked for convergence.
+  it("habtm collection size from params", async () => {
+    const devel = new Developer({ projectsAttributes: { "0": {} } });
+    expect(await association<Project>(devel, "projects").size()).toBe(1);
   });
 
   it("build", async () => {
