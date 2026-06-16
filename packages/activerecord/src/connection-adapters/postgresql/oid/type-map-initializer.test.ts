@@ -139,6 +139,28 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     expect(multiRange.name).toBe("int4multirange");
   });
 
+  it("defers array and retries after element OID is loaded", () => {
+    const store = new TestStore();
+    // The base type map keys scalar types by name (e.g. "numeric"), not by OID.
+    store.registerType("numeric", integerSubtype);
+
+    // Process only the array row first (element OID 1700 not yet keyed in the
+    // store) — the shape of a targeted load_additional_types([arrayOid]).
+    const initializer = new TypeMapInitializer(store);
+    initializer.run([row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 })]);
+
+    // Not yet registered — element OID 1700 wasn't in the store.
+    expect(store.lookup(1231)).not.toBeInstanceOf(OidArray);
+    expect(initializer.deferredArrayOids).toContain(1700);
+
+    // Simulate the adapter loading the element type (aliases OID 1700 →
+    // "numeric"), then retrying the deferred array.
+    new TypeMapInitializer(store).run([row({ oid: 1700, typname: "numeric" })]);
+    initializer.retryDeferredArrays();
+
+    expect(store.lookup(1231)).toBeInstanceOf(OidArray);
+  });
+
   it("queryConditionsForKnownTypeTypes includes multirange typtype m", () => {
     const store = new TestStore();
     const initializer = new TypeMapInitializer(store);
