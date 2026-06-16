@@ -93,12 +93,12 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(await Post.leftOuterJoins("comments").count()).toBe(18);
   });
 
-  it.skip("merging left joins should be left joins", () => {
-    // BLOCKED: cross-model merge gap. Rails:
-    //   Author.left_joins(:posts).merge(Post.no_comments).count == 5
-    // The cross-model merge path in relation/merger.ts does not carry the merged
-    // WHERE/left-join across model classes the way merger.rb does (returns 15).
-    // Tracked: RFC 0030 story left-joins-cross-model-merge.
+  it("merging left joins should be left joins", async () => {
+    expect(
+      await Author.leftJoins("posts")
+        .merge((Post as any).noComments())
+        .count(),
+    ).toBe(5);
   });
 
   it("left joins aliases left outer joins", () => {

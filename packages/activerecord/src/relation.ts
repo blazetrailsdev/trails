@@ -482,6 +482,10 @@ export class Relation<T extends Base> {
   // merge_joins builds these against `other.klass` since the association names
   // can't resolve on the receiver's model).
   private _namedInnerJoinDeps: JoinDependency[] = [];
+  // Pre-built OuterJoin JoinDependencies from a cross-klass `merge` (Rails
+  // merge_outer_joins builds these against `other.klass` since the left-outer
+  // association names can't resolve on the receiver's model).
+  private _leftOuterJoinDeps: JoinDependency[] = [];
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
@@ -3041,7 +3045,8 @@ export class Relation<T extends Base> {
       this._eagerLoadAssociations.length > 0 ||
       this._leftOuterJoinsValues.length > 0 ||
       this._namedInnerJoins.length > 0 ||
-      this._namedInnerJoinDeps.length > 0;
+      this._namedInnerJoinDeps.length > 0 ||
+      this._leftOuterJoinDeps.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
     for (const v of this._joinValues) {
@@ -3117,6 +3122,11 @@ export class Relation<T extends Base> {
     // Cross-klass merged JoinDependencies (Rails merge_joins): already built
     // against the source relation's klass, so emit their constraints directly.
     for (const jd of this._namedInnerJoinDeps) {
+      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+    }
+    // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
+    // already built against the source relation's klass with OuterJoin type.
+    for (const jd of this._leftOuterJoinDeps) {
       for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
     }
     for (const node of joinNodes) manager.appendJoinNode(node);
@@ -5832,6 +5842,7 @@ export class Relation<T extends Base> {
     this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
     this._namedInnerJoins = [...source._namedInnerJoins];
     this._namedInnerJoinDeps = [...source._namedInnerJoinDeps];
+    this._leftOuterJoinDeps = [...source._leftOuterJoinDeps];
     this._includesAssociations = [...source._includesAssociations];
     this._preloadAssociations = [...source._preloadAssociations];
     this._eagerLoadAssociations = [...source._eagerLoadAssociations];
