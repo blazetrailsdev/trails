@@ -336,43 +336,6 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
   return result;
 }
 
-/** Render a non-finite JS number as the literal used in a schema dump. */
-function formatNonFinite(v: number): string {
-  if (Number.isNaN(v)) return "NaN";
-  return v > 0 ? "Infinity" : "-Infinity";
-}
-
-/**
- * Translate a PG infinity/NaN default string to its JS numeric literal, or
- * `undefined` when the string is an ordinary value. Mirrors Rails keying the
- * conversion on the column's type cast (`OID::Float#cast`,
- * `OID::Date`/`DateTime#cast_value`): only float/decimal/date/datetime columns
- * turn `'Infinity'`/`'-infinity'`/`'NaN'` into a numeric literal, so a string
- * column with `default: "Infinity"` keeps the quoted form. The decision is made
- * off the catalog cast suffix (`::double precision`, `::timestamp …`, etc.),
- * which is the column's SQL type. Float uses `Infinity`, timestamp/date use
- * `infinity` — match case-insensitively.
- */
-function mapNonFiniteDefault(content: string, cast: string): number | undefined {
-  if (!NON_FINITE_CAST.test(cast)) return undefined;
-  switch (content.toLowerCase()) {
-    case "infinity":
-      return Infinity;
-    case "-infinity":
-      return -Infinity;
-    case "nan":
-      return NaN;
-    default:
-      return undefined;
-  }
-}
-
-// SQL types whose values may legitimately be ±Infinity / NaN: floats
-// (real/double precision/float4/float8), decimal/numeric, and the
-// date/timestamp family. Anchored to the last `::cast` in the catalog default.
-const NON_FINITE_CAST =
-  /::\s*(?:real|double precision|float\d*|numeric|decimal|date|timestamp(?: with(?:out)? time zone)?|timestamptz)\b[^:]*$/i;
-
 /**
  * Strip a raw PG catalog default expression to a plain value.
  * E.g. `'happy'::mood` → `"happy"`, `'192.168.1.1'::inet` → `"192.168.1.1"`,
@@ -383,12 +346,9 @@ const NON_FINITE_CAST =
  * like `"00000011"`) use `cleanDefault` instead.
  */
 export function cleanRawPgExpression(raw: string): unknown {
-  const castMatch = raw.match(/^'((?:[^']|'')*)'((?:::[\w\s."[\](),]+)+)$/);
+  const castMatch = raw.match(/^'((?:[^']|'')*)'(::[\w\s."[\](),]+)+$/);
   if (castMatch) {
-    const content = castMatch[1].replace(/''/g, "'");
-    const nonFinite = mapNonFiniteDefault(content, castMatch[2]);
-    if (nonFinite !== undefined) return nonFinite;
-    return content;
+    return castMatch[1].replace(/''/g, "'");
   }
 
   const numericCastMatch = raw.match(/^\(?(-?\d+(?:\.\d+)?)\)?(::[\w\s."[\](),]+)+$/);
@@ -1287,12 +1247,6 @@ export class SchemaDumper {
         if (v && typeof v === "object" && !Array.isArray(v)) {
           const inner = this.formatColspec(v as Record<string, unknown>);
           return `${k}: ${inner ? `{ ${inner} }` : "{}"}`;
-        }
-        // JSON.stringify renders non-finite numbers as `null`; emit the JS
-        // literal so PG Infinity/NaN defaults round-trip (mirrors Rails'
-        // `Float::INFINITY` / `Float::NAN` schema output).
-        if (typeof v === "number" && !Number.isFinite(v)) {
-          return `${k}: ${formatNonFinite(v)}`;
         }
         return `${k}: ${JSON.stringify(v)}`;
       })

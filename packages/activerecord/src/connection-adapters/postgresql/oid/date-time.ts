@@ -62,10 +62,8 @@ export class DateTime extends DateTimeType {
   }
 
   override serialize(value: unknown): string | null {
-    // Rails passes `Float::INFINITY` as a datetime default; mirror that by
-    // accepting the JS non-finite numbers alongside our infinity sentinels.
-    if (value === DateInfinity || value === Infinity) return "infinity";
-    if (value === DateNegativeInfinity || value === -Infinity) return "-infinity";
+    if (value === DateInfinity) return "infinity";
+    if (value === DateNegativeInfinity) return "-infinity";
     const cast = this.cast(value);
     if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
     const instant = cast as Temporal.Instant;
