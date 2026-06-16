@@ -20,6 +20,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "./index.js";
 import { UnknownAttributeError } from "./errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -704,7 +705,7 @@ describe("InsertAllTest", () => {
   it("insert all has many through", async () => {
     const book = (await Book.first()) as any;
     await expect(book.subscribers.insertAllBang([{ nick: "Jimmy" }])).rejects.toThrow(
-      /has_many through/,
+      ArgumentError,
     );
   });
 
@@ -733,9 +734,7 @@ describe("InsertAllTest", () => {
 
   it("upsert all has many through", async () => {
     const book = (await Book.first()) as any;
-    await expect(book.subscribers.upsertAll([{ nick: "Jimmy" }])).rejects.toThrow(
-      /has_many through/,
-    );
+    await expect(book.subscribers.upsertAll([{ nick: "Jimmy" }])).rejects.toThrow(ArgumentError);
   });
 
   it("upsert all updates using provided sql", async () => {
