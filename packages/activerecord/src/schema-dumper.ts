@@ -1152,10 +1152,11 @@ export class SchemaDumper {
       parts.push(`opclass: ${this.formatIndexParts(index.opclasses)}`);
     if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
     if (index.using && index.using !== "btree") parts.push(`using: ${JSON.stringify(index.using)}`);
-    if (index.type) parts.push(`type: ${JSON.stringify(index.type)}`);
     if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
     if (index.include && index.include.length > 0)
       parts.push(`include: ${JSON.stringify(index.include)}`);
+    // Rails emits `type:` last before `comment:` (schema_dumper.rb#index_parts).
+    if (index.type) parts.push(`type: ${JSON.stringify(index.type)}`);
     if (index.comment) parts.push(`comment: ${JSON.stringify(index.comment)}`);
     return parts;
   }
