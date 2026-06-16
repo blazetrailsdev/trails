@@ -951,16 +951,30 @@ describe("Static shorthands (Rails-guided)", () => {
       expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
     });
 
-    it.skip("nested scope finder", () => {
-      // BLOCKED: has_many associations inherit the class-level current_scope.
-      // Rails keeps `current_scope` off association reads (only `all_queries`
-      // default scopes apply), so `@welcome.comments.count` stays 2 inside
-      // `Comment.where("1=0").scoping`. trails leaks the scope, yielding 0.
+    it("nested scope finder", async () => {
+      const welcome = (await Post.find(1)) as Base;
+      await Comment.where("1=0").scoping(async () => {
+        expect(await (welcome as any).comments.count()).toBe(2);
+        expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+      });
+
+      await Comment.where("1=1").scoping(async () => {
+        expect(await (welcome as any).comments.count()).toBe(2);
+        expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+      });
     });
 
-    it.skip("none scoping", () => {
-      // BLOCKED: same root cause as "nested scope finder" — `Comment.none.scoping`
-      // leaks into `@welcome.comments`, returning 0 instead of 2.
+    it("none scoping", async () => {
+      const welcome = (await Post.find(1)) as Base;
+      await Comment.none().scoping(async () => {
+        expect(await (welcome as any).comments.count()).toBe(2);
+        expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+      });
+
+      await Comment.where("1=1").scoping(async () => {
+        expect(await (welcome as any).comments.count()).toBe(2);
+        expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+      });
     });
 
     it("forwarding to scoped", async () => {

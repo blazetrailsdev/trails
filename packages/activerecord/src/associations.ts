@@ -1583,7 +1583,11 @@ export function buildHasManyRelation(
   if (conditions === null) return null;
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveAssocClass(record, assocName, className);
-  let rel = targetModel.all().where(conditions);
+  // `scopeForAssociation` (not `all()`) so an enclosing `Model.where(...).scoping`
+  // block doesn't leak the class `current_scope` into association reads. Rails'
+  // association readers build from `scope_for_association`, which applies only
+  // default scopes (unless flagged `all_queries: true`), never `current_scope`.
+  let rel = _scopeForAssociation(targetModel).where(conditions);
   rel = applyAssociationScope(rel, options.scope, record);
   return rel;
 }
