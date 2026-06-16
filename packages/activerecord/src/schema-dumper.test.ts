@@ -852,6 +852,13 @@ describe("SchemaDumperDefaultsTest", () => {
 
   it.skipIf(adapterType !== "postgres")("schema dump with column infinity default", async () => {
     const { adapter: testAdapter, ctx: testCtx } = freshSidecarCtx();
+    // Rails passes `Float::INFINITY` for the float columns and the string
+    // `"-infinity"` for the datetime/date ones. We use the JS non-finite numbers
+    // throughout: the OID `serialize` for date/datetime returns `null` for a
+    // value that *casts* to the infinity sentinel (only a value that already is
+    // the sentinel, or a raw JS ±Infinity, serializes to `'infinity'`), so the
+    // string form would create a NULL default. The numeric form mirrors Rails'
+    // `Float::INFINITY` and round-trips on the creation path.
     await testCtx.createTable("infinity_defaults", {}, (t) => {
       t.float("float_with_inf_default", { default: Infinity });
       t.float("float_with_nan_default", { default: NaN });

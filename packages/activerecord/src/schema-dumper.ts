@@ -336,28 +336,25 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
   return result;
 }
 
-/**
- * Strip a raw PG catalog default expression to a plain value.
- * E.g. `'happy'::mood` → `"happy"`, `'192.168.1.1'::inet` → `"192.168.1.1"`,
- * `nextval(...)` → kept as-is (expression default).
- *
- * Only call this with raw SQL strings from `column_default` /
- * `pg_attrdef.adbin`. For already-deserialized ORM values (e.g. bit-strings
- * like `"00000011"`) use `cleanDefault` instead.
- */
-/**
- * Translate a PG infinity/NaN default string to its JS numeric literal, or
- * `undefined` when the string is an ordinary value. Used by the dumper so
- * `'Infinity'`/`'-infinity'`/`'NaN'` catalog defaults round-trip through
- * schema dump as `Infinity`/`-Infinity`/`NaN`.
- */
 /** Render a non-finite JS number as the literal used in a schema dump. */
 function formatNonFinite(v: number): string {
   if (Number.isNaN(v)) return "NaN";
   return v > 0 ? "Infinity" : "-Infinity";
 }
 
-function mapNonFiniteDefault(content: string): number | undefined {
+/**
+ * Translate a PG infinity/NaN default string to its JS numeric literal, or
+ * `undefined` when the string is an ordinary value. Mirrors Rails keying the
+ * conversion on the column's type cast (`OID::Float#cast`,
+ * `OID::Date`/`DateTime#cast_value`): only float/decimal/date/datetime columns
+ * turn `'Infinity'`/`'-infinity'`/`'NaN'` into a numeric literal, so a string
+ * column with `default: "Infinity"` keeps the quoted form. The decision is made
+ * off the catalog cast suffix (`::double precision`, `::timestamp …`, etc.),
+ * which is the column's SQL type. Float uses `Infinity`, timestamp/date use
+ * `infinity` — match case-insensitively.
+ */
+function mapNonFiniteDefault(content: string, cast: string): number | undefined {
+  if (!NON_FINITE_CAST.test(cast)) return undefined;
   switch (content.toLowerCase()) {
     case "infinity":
       return Infinity;
@@ -370,16 +367,26 @@ function mapNonFiniteDefault(content: string): number | undefined {
   }
 }
 
+// SQL types whose values may legitimately be ±Infinity / NaN: floats
+// (real/double precision/float4/float8), decimal/numeric, and the
+// date/timestamp family. Anchored to the last `::cast` in the catalog default.
+const NON_FINITE_CAST =
+  /::\s*(?:real|double precision|float\d*|numeric|decimal|date|timestamp(?: with(?:out)? time zone)?|timestamptz)\b[^:]*$/i;
+
+/**
+ * Strip a raw PG catalog default expression to a plain value.
+ * E.g. `'happy'::mood` → `"happy"`, `'192.168.1.1'::inet` → `"192.168.1.1"`,
+ * `nextval(...)` → kept as-is (expression default).
+ *
+ * Only call this with raw SQL strings from `column_default` /
+ * `pg_attrdef.adbin`. For already-deserialized ORM values (e.g. bit-strings
+ * like `"00000011"`) use `cleanDefault` instead.
+ */
 export function cleanRawPgExpression(raw: string): unknown {
-  const castMatch = raw.match(/^'((?:[^']|'')*)'(::[\w\s."[\](),]+)+$/);
+  const castMatch = raw.match(/^'((?:[^']|'')*)'((?:::[\w\s."[\](),]+)+)$/);
   if (castMatch) {
     const content = castMatch[1].replace(/''/g, "'");
-    // PG renders Infinity/NaN float and date/timestamp defaults as quoted
-    // catalog strings (`'Infinity'`, `'-infinity'`, `'NaN'`). Rails translates
-    // these to the JS `Float::INFINITY`/`NAN` literals so they round-trip
-    // (schema dumper emits them unquoted, see formatColspec). Match
-    // case-insensitively: float uses `Infinity`, timestamp/date use `infinity`.
-    const nonFinite = mapNonFiniteDefault(content);
+    const nonFinite = mapNonFiniteDefault(content, castMatch[2]);
     if (nonFinite !== undefined) return nonFinite;
     return content;
   }
