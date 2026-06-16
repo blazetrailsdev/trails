@@ -17,7 +17,6 @@ import {
   Mysql2Adapter,
   MYSQL_TEST_URL,
   supportsDefaultExpression,
-  isMariaDb,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -81,29 +80,21 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
     await ctx.dropTable("datetime_defaults", { ifExists: true });
   });
 
-  // Gated to MySQL only (skipIf isMariaDb): on MariaDB the `uuid()`/`concat()`
-  // function defaults reflect as *literal* values (uuid as the bytes of "uuid()",
-  // concat as a literal string) rather than `default: () => "..."`, because
-  // newColumnFromField/columnDefinitions doesn't catch MariaDB's representation of
-  // arbitrary expression defaults (no MySQL-8 DEFAULT_GENERATED extra). MySQL 8's
-  // DEFAULT_GENERATED path works, so keep the assertions running there. The
-  // CURRENT_TIMESTAMP datetime/timestamp tests below pass on both. MariaDB gap
-  // tracked: RFC 0030 story c2-defaults-mariadb-expression-reflection.
-  itIfSupports.skipIf(isMariaDb)(
-    "default_expression",
-    "schema dump includes default expression",
-    async () => {
-      const output = await SchemaDumper.dumpTableSchema(
-        adapter as unknown as SchemaSource,
-        "defaults",
-      );
-      expect(output).toMatch(
-        /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
-      );
-    },
-  );
+  // The `uuid()`/`concat()` function defaults reflect on both MySQL 8 (via the
+  // DEFAULT_GENERATED extra) and MariaDB (via bare-expression detection in
+  // columns(); see mysql/schema-statements.ts), so the dumper emits
+  // `default: () => "..."` on both lanes.
+  itIfSupports("default_expression", "schema dump includes default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "defaults",
+    );
+    expect(output).toMatch(
+      /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
+    );
+  });
 
-  itIfSupports.skipIf(isMariaDb)(
+  itIfSupports(
     "default_expression",
     "schema dump includes default expression with single quotes reflected correctly",
     async () => {

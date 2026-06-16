@@ -573,9 +573,29 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
       def = null;
     } else if (extraRaw.toUpperCase().startsWith("DEFAULT_GENERATED")) {
       if (typeof def === "string") {
-        const wrapped = def.startsWith("(") ? def : `(${def})`;
+        // Unescape backslash-escaped single quotes the way newColumnFromField
+        // does, so an expression like concat(`c`,_utf8mb4\'-\') round-trips to
+        // concat(`c`,_utf8mb4'-') in the dumped `default: () => "..."`.
+        const wrapped = (def.startsWith("(") ? def : `(${def})`).replace(/\\'/g, "'");
         defFn = onUpdateMatch ? `${wrapped} ON UPDATE ${onUpdateMatch[1]}` : wrapped;
       }
+      def = null;
+    } else if (
+      this.isMariadb() &&
+      typeof def === "string" &&
+      !def.startsWith("'") &&
+      !/^\d/.test(def)
+    ) {
+      // MariaDB reports arbitrary expression/function defaults (e.g. uuid(),
+      // concat(`char2`, '-')) as bare unquoted expressions in
+      // information_schema.column_default — string literals come back
+      // single-quoted and numerics bare-numeric, so a non-quoted non-numeric
+      // token is unambiguously a function default. Unlike MySQL 8 (handled by
+      // the DEFAULT_GENERATED branch above), MariaDB does not tag these with an
+      // extra, so detect them from the default shape. The implicit `NULL` token
+      // was already coerced to a real null above. Mirrors Rails'
+      // MySQL::Column#has_default_function? populating default_function.
+      defFn = def;
       def = null;
     }
     const onUpdateForColumn =
