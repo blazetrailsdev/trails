@@ -620,9 +620,15 @@ export async function performCount(
         }
         const table = this._modelClass.arelTable;
         if (this._limitValue !== null || this._offsetValue !== null) {
-          // Rails finder_methods.rb:463-478: with limit/offset, apply_join_dependency
-          // wraps via distinct_relation_for_primary_key — a DISTINCT pk subquery that
-          // captures limit/offset, then counts distinct parent IDs outside the subquery.
+          // Rails finder_methods.rb apply_join_dependency: with a limit/offset on an
+          // eager-loaded count, Rails does NOT nest the limit inside the count. It first
+          // runs `limited_ids_for` — a standalone `SELECT DISTINCT pk ... LIMIT/OFFSET`
+          // query — to materialize the actual id values, then re-counts over a relation
+          // filtered by `pk IN (<literal ids>)` with the limit/offset removed
+          // (`relation.except(:limit, :offset).where!(primary_key => limited_ids)`).
+          // Running the id query separately (literal `IN`, not a nested subquery) honors
+          // any requested aggregate column AND avoids MariaDB's "doesn't yet support
+          // 'LIMIT & IN/ALL/ANY/SOME subquery'" restriction.
           const idSubquery = table.project(table.get(pk));
           idSubquery.distinct();
           if (specsForJd.length > 0) {
@@ -638,21 +644,36 @@ export async function performCount(
           applyFromToManager(this, idSubquery);
           if (this._limitValue !== null) idSubquery.take(this._limitValue);
           if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
-          const [innerSql, allIdBinds] = compileManagerWithBinds(this, idSubquery);
-          // Rails build_count_subquery (active_record/relation/calculations.rb): the
-          // limited/distinct subquery is wrapped as a derived table and counted from the
-          // outside — `SELECT COUNT(*) FROM (<subquery>) subquery_for_count`. Counting
-          // over a derived table (rather than `pk IN (<subquery>)`) avoids MariaDB's
-          // "doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'" restriction; the
-          // inner DISTINCT pk already collapses to the distinct-parent-id count.
-          //
-          // DIVERGENCE: a requested aggregate column (`count(:comments_id)`) is not
-          // honored here — this always counts distinct parent pks. Rails
-          // build_count_subquery rewrites the inner select to `aggregate_column(col)`
-          // for `column_name != :all` (calculations.rb:666-668). No limit-branch test
-          // exercises a non-`:all` column today; tracked for convergence.
-          const countSql = `SELECT COUNT(*) AS count FROM (${innerSql}) subquery_for_count`;
-          const [withCtes, ctedBinds] = prependCtes(this, countSql, [...allIdBinds]);
+          const [idSql, idBinds] = compileManagerWithBinds(this, idSubquery);
+          const [idWithCtes, idCtedBinds] = prependCtes(this, idSql, [...idBinds]);
+          const idResult = await this._modelClass.connection.selectAll(
+            idWithCtes,
+            `${this._modelClass.name} Ids`,
+            idCtedBinds,
+          );
+          const limitedIds = (idResult.toArray() as Record<string, unknown>[]).map(
+            (row) => row[pk],
+          );
+          // `pk IN ()` is invalid SQL — Rails' `where!(primary_key => [])` short-circuits
+          // to a no-match relation, so the count is 0.
+          if (limitedIds.length === 0) return 0;
+
+          const colForCount = column != null && column !== "*" ? column : pk;
+          const countManager = table.project(
+            (aggregateColumn(this, colForCount) as any).count(true).as("count"),
+          );
+          if (specsForJd.length > 0) {
+            const jdOuter = QueryMethodBangs.constructJoinDependency.call(
+              anyRel,
+              specsForJd,
+              Nodes.OuterJoin,
+            );
+            for (const node of jdOuter.joinConstraints([])) countManager.appendJoinNode(node);
+          }
+          this._applyJoinsToManager(countManager);
+          countManager.where(table.get(pk).in(limitedIds));
+          const [countSql, countBinds] = compileManagerWithBinds(this, countManager);
+          const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
           const limitedResult = await this._modelClass.connection.selectAll(
             withCtes,
             `${this._modelClass.name} Count`,
