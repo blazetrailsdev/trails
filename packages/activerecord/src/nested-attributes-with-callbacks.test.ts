@@ -6,7 +6,6 @@
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
-import { Associations } from "./associations.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -37,14 +36,14 @@ class NwcPirate extends Base {
   }
 }
 
-Associations.hasMany.call(NwcPirate, "birds", {
+NwcPirate.hasMany("birds", {
   className: "NwcBird",
   foreignKey: "pirate_id",
 });
 // Mirrors Rails' `before_add: proc { |p, b| @@add_callback_called << b;
 // p.birds_with_add_load.to_a }` — the proc both records the added bird and
 // loads the target.
-Associations.hasMany.call(NwcPirate, "birdsWithAddLoad", {
+NwcPirate.hasMany("birdsWithAddLoad", {
   className: "NwcBird",
   foreignKey: "pirate_id",
   beforeAdd: (p: any, b: any) => {
@@ -52,7 +51,7 @@ Associations.hasMany.call(NwcPirate, "birdsWithAddLoad", {
     void p.birdsWithAddLoad.toArray();
   },
 });
-Associations.hasMany.call(NwcPirate, "birdsWithAdd", {
+NwcPirate.hasMany("birdsWithAdd", {
   className: "NwcBird",
   foreignKey: "pirate_id",
   beforeAdd: (_p: any, b: any) => {
