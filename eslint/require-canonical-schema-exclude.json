@@ -29,7 +29,6 @@
   "packages/activerecord/src/associations/has-many-through-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-disable-joins-associations.test.ts",
   "packages/activerecord/src/associations/has-one-associations.test.ts",
-  "packages/activerecord/src/associations/inverse-associations.test.ts",
   "packages/activerecord/src/associations/nested-through-advanced.test.ts",
   "packages/activerecord/src/associations/nested-through-associations.test.ts",
   "packages/activerecord/src/associations/nested-through-preloader.test.ts",
