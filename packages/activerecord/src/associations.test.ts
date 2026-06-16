@@ -10191,6 +10191,17 @@ describe("AssociationsTest", () => {
     Project = (await import("./test-helpers/models/project.js")).Project as never;
   });
 
+  // Earlier describe blocks in this file create `companies` / `authors` with
+  // different column sets; recreating them here under the canonical schema
+  // changes the result type of any cached query plan PostgreSQL still holds,
+  // throwing "cached plan must not change result type" inside the fixtures
+  // transaction. Flush the prepared-statement cache once the canonical schema
+  // is in place (registered after useHandlerFixtures' own beforeAll, so the
+  // tables already exist). Mirrors CalculationsTest in calculations.test.ts.
+  beforeAll(() => {
+    (Base.connection as { clearCacheBang?: () => void }).clearCacheBang?.();
+  });
+
   beforeEach(() => {
     registerModel("Author", Author);
     registerModel("AuthorFavorite", AuthorFavorite);
