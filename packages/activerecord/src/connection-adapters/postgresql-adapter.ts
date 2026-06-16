@@ -168,13 +168,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return "postgres";
   }
 
-  /** Mirrors: ActiveRecord.db_warnings_action */
-  static dbWarningsAction: "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void) =
-    "ignore";
-
-  /** Mirrors: AbstractAdapter.db_warnings_ignore */
-  static dbWarningsIgnore: (string | RegExp)[] = [];
-
   static columnNameMatcher(): RegExp {
     return pgColumnNameMatcher();
   }

@@ -33,7 +33,6 @@ import {
   RangeError as ARRangeError,
   NotImplementedError,
   RecordNotUnique,
-  SQLWarning,
   StatementInvalid,
   StatementTimeout,
   ValueTooLong,
@@ -158,16 +157,6 @@ const QUOTE_STRING_MAP: Record<string, string> = {
 
 export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly Version = Version;
-
-  /**
-   * Behaviour when MySQL emits a warning. Mirrors `ActiveRecord.db_warnings_action`.
-   * One of "ignore" | "log" | "raise" | "report" | (warning) => void.
-   */
-  static dbWarningsAction: "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void) =
-    "ignore";
-
-  /** Allow-list of warning messages or codes to skip. Mirrors `ActiveRecord.db_warnings_ignore`. */
-  static dbWarningsIgnore: (string | RegExp)[] = [];
 
   /**
    * Return Column objects for a table. Mirrors Rails'
