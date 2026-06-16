@@ -2813,6 +2813,44 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * Whether the target should be read from the in-memory target rather than
+   * the database. Mirrors:
+   * ActiveRecord::Associations::CollectionAssociation#find_from_target?
+   */
+  private _findFromTarget(): boolean {
+    return (
+      this._targetLoaded ||
+      (!!(this._record as any)._strictLoading &&
+        (this._record as any)._strictLoadingMode === "all") ||
+      !!this._assocDef.options.strictLoading ||
+      this._record.isNewRecord() ||
+      this._target.some((r) => r.isNewRecord() || !!(r as any).changed)
+    );
+  }
+
+  /**
+   * Render the collection, loading the target (from memory when
+   * `find_from_target?`, otherwise via a bounded query) without forcing a
+   * premature reload. Mirrors
+   * ActiveRecord::Associations::CollectionProxy#inspect, which delegates to
+   * Relation#inspect after `load_target if find_from_target?`.
+   *
+   * Rails' proxy inspect is synchronous (blocking DB I/O inside `inspect`);
+   * JS has no blocking I/O, so loading the target here is async. This widens
+   * the return to `Promise<string>` vs Relation#inspect's `string`.
+   */
+  // @ts-expect-error async divergence from Relation#inspect — see doc comment.
+  async inspect(): Promise<string> {
+    if (this._findFromTarget()) await this.loadTarget();
+    const limitValue = (this as any)._limitValue as number | null;
+    const take = limitValue != null ? Math.min(limitValue, 11) : 11;
+    const subject = this._targetLoaded ? this._target : await this.limit(take).toArray();
+    const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
+    if (entries.length === 11) entries[10] = "...";
+    return `#<${this.constructor.name} [${entries.join(", ")}]>`;
+  }
+
+  /**
    * Build and save a new associated record, raising on validation failure.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#create!
