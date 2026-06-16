@@ -610,6 +610,25 @@ function _extractAssociationAttrs(
   return { rest, assocs };
 }
 
+/**
+ * Route a constructor-form composite primary key (`new Model({ id: [a, b] })`)
+ * through the `id=` setter so each key column is populated. Rails dispatches all
+ * `assign_attributes` keys through `public_send("#{k}=")`, but trails' Model
+ * constructor writes directly via `writeAttribute`, which would store the whole
+ * array in a single `id` column. Mirrors Rails' `Cpk::Book.new(id: [1, 2])`.
+ * @internal
+ */
+function _applyCompositePrimaryKey(
+  record: Base,
+  ctor: typeof Base,
+  attrs: Record<string, unknown>,
+): void {
+  const pk = (ctor as { primaryKey?: unknown }).primaryKey;
+  if (Array.isArray(pk) && Array.isArray((attrs as { id?: unknown }).id)) {
+    (record as unknown as { id: unknown }).id = (attrs as { id: unknown }).id;
+  }
+}
+
 /** @internal */
 function _dispatchAssociationAttrs(
   record: Base,
@@ -2657,6 +2676,7 @@ export class Base extends Model {
       // initialize_internals_callback and after_initialize, regardless of
       // callback suppression (found records run it via `new this()` too).
       _Core.initInternals.call(this as any);
+      _applyCompositePrimaryKey(this as unknown as Base, ctor2, attrs);
       if (!wasSuppressed2) {
         // Mirrors Rails' initialize_internals_callback chain order:
         //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)

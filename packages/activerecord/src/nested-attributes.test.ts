@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import {
   Base,
   RecordNotFound,
@@ -18,10 +18,16 @@ import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
+import { Owner } from "./test-helpers/models/owner.js";
+import { Pet } from "./test-helpers/models/pet.js";
+import { CpkBook } from "./test-helpers/models/cpk/book.js";
+import { CpkChapter } from "./test-helpers/models/cpk/chapter.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
-import { assertNoQueries } from "./testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -34,6 +40,16 @@ const TEST_SCHEMA = {
   tags: { name: "string", article_id: "integer" },
   ant_tags: { name: "string", ant_article_id: "integer" },
   birds: { name: "string", pirate_id: "integer" },
+  cid_pirates: { catchphrase: "string" },
+  cid_birds: { name: "string", cid_pirate_id: "integer" },
+  cr_ships: { name: "string" },
+  cr_parts: { name: "string", cr_ship_id: "integer" },
+  cr_treasures: {
+    name: "string",
+    cr_ship_id: "integer",
+    looter_id: "integer",
+    looter_type: "string",
+  },
   comments: { body: "string", post_id: "integer" },
   dt_comments: { body: "string" },
   dt_comments2: { body: "string", dt_entry2_id: "integer" },
@@ -705,8 +721,17 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     expect(updated.name).toBe("Updated");
   });
 
-  it.skip("should modify an existing record if there is a matching composite id", () => {
-    // BLOCKED: CPK — composite primary keys not supported in test adapter.
+  it("should modify an existing record if there is a matching composite id", async () => {
+    // Rails stubs `@ship.id` to a non-integer composite id ("ABC1X") and assigns
+    // an `id`-matching payload; the in-memory record is updated in place.
+    const { Pirate } = makeModels();
+    const pirate = await Pirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    const ship = await (pirate as any).createShip({ name: "Nights Dirty Lightning" });
+    vi.spyOn(ship, "id", "get").mockReturnValue("ABC1X" as any);
+    (pirate as any).shipAttributes = { id: ship.id, name: "Davy Jones Gold Dagger" };
+    expect((pirate.association("ship") as any).target.name).toBe("Davy Jones Gold Dagger");
   });
 
   it("should destroy an existing record if there is a matching id and destroy is truthy", async () => {
@@ -962,8 +987,17 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     expect(updated.catchphrase).toBe("StringKey");
   });
 
-  it.skip("should modify an existing record if there is a matching composite id", () => {
-    // BLOCKED: CPK — composite primary keys not supported in test adapter.
+  it("should modify an existing record if there is a matching composite id", async () => {
+    // Rails stubs `@pirate.id` to a non-integer composite id ("ABC1X") and
+    // assigns an `id`-matching payload; the in-memory record updates in place.
+    const { Ship } = makeModels();
+    const ship = await Ship.create({ name: "Nights Dirty Lightning" });
+    const pirate = await (ship as any).createPirate({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    vi.spyOn(pirate, "id", "get").mockReturnValue("ABC1X" as any);
+    (ship as any).pirateAttributes = { id: pirate.id, catchphrase: "Arr" };
+    expect((ship.association("pirate") as any).target.catchphrase).toBe("Arr");
   });
 
   it("should destroy an existing record if there is a matching id and destroy is truthy", async () => {
@@ -1394,9 +1428,17 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(comments.length).toBe(1);
   });
 
-  it.skip("first and array index zero methods return the same value when nested attributes are set to update existing record", () => {
-    // BLOCKED: Phase G — reading association.first() after assignment must reflect
-    // the pending attrs in memory; trails defers nested attribute processing to save.
+  it("first and array index zero methods return the same value when nested attributes are set to update existing record", async () => {
+    registerModel(Human);
+    registerModel(Interest);
+    acceptsNestedAttributesFor(Human, "interests");
+    const created = await Human.create({ name: "John" });
+    const interest = await Interest.create({ topic: "gardening", human_id: created.id });
+    const human = await Human.find(created.id);
+    (human as any).interestsAttributes = [{ id: interest.id, topic: "gardening" }];
+    const first = await (human as any).interests.first();
+    const zero = (human as any).interests[0];
+    expect((first as any).topic).toBe((zero as any).topic);
   });
   it("allows class to override setter and call super", async () => {
     class OvShip extends Base {
@@ -1482,8 +1524,17 @@ describe("TestNestedAttributesInGeneral", () => {
     }).findOrCreateByBang({ name: "Monkey D. Luffy" });
     expect(Number(await Interest.count()) - before).toBe(1);
   });
-  it.skip("updating models with cpk provided as strings", () => {
-    // BLOCKED: CPK — composite primary keys not supported in test adapter.
+  it("updating models with cpk provided as strings", async () => {
+    registerModel(CpkBook);
+    registerModel(CpkChapter);
+    const book = await CpkBook.createBang({ id: [1, 2], shop_id: 3 });
+    await (book.chapters as any).createBang({ id: [1, 3], title: "Title" });
+
+    await book.updateBang({ chaptersAttributes: { id: ["1", "3"], title: "New title" } });
+
+    const reloaded = (await CpkBook.find([1, 2])) as any;
+    expect(Number(await reloaded.chapters.count())).toBe(1);
+    expect(((await reloaded.chapters.first()) as any).title).toBe("New title");
   });
 
   it("should build a new record if reject all blank does not return false", async () => {
@@ -1627,11 +1678,36 @@ describe("TestNestedAttributesInGeneral", () => {
 });
 
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
-  it.skip("should update existing records with non standard primary key", () => {
-    // BLOCKED: non-standard PK — test adapter auto-assigns integer `id`; custom PK not supported.
+  const { owners, pets } = useHandlerFixtures(["owners", "pets"], { schema: canonicalSchema });
+
+  it("should update existing records with non standard primary key", async () => {
+    registerModel(Owner);
+    registerModel(Pet);
+    acceptsNestedAttributesFor(Owner, "pets", { allowDestroy: true });
+    const owner = owners("ashley");
+    const pet1 = pets("chew");
+    const pet2 = pets("mochi");
+    await owner.update({
+      petsAttributes: {
+        "0": { id: pet1.id, name: "Foo" },
+        "1": { id: pet2.id, name: "Bar" },
+      },
+    });
+    expect((await (owner as any).pets.toArray()).map((p: any) => p.name)).toEqual(["Foo", "Bar"]);
   });
-  it.skip("attr accessor of child should be value provided during update", () => {
-    // BLOCKED: non-standard PK — test adapter auto-assigns integer `id`; custom PK not supported.
+
+  it("attr accessor of child should be value provided during update", async () => {
+    registerModel(Owner);
+    registerModel(Pet);
+    acceptsNestedAttributesFor(Owner, "pets", { allowDestroy: true });
+    const owner = owners("ashley");
+    const pet1 = pets("chew");
+    await owner.update({
+      petsAttributes: {
+        "1": { id: pet1.id, name: "Foo2", current_user: "John", _destroy: true },
+      },
+    });
+    expect(Pet.afterDestroyOutput).toBe("John");
   });
 });
 
@@ -2388,8 +2464,50 @@ describe("should take a hash and assign the attributes to the associated models"
 });
 
 describe("should take a hash with composite id keys and assign the attributes to the associated models", () => {
-  it.skip("should take a hash with composite id keys and assign the attributes to the associated models", () => {
-    // BLOCKED: CPK — composite primary keys not supported in test adapter.
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+  it("should take a hash with composite id keys and assign the attributes to the associated models", async () => {
+    class CidBird extends Base {
+      static {
+        this._tableName = "cid_birds";
+        this.attribute("name", "string");
+        this.attribute("cid_pirate_id", "integer");
+      }
+    }
+    class CidPirate extends Base {
+      static {
+        this._tableName = "cid_pirates";
+        this.attribute("catchphrase", "string");
+      }
+    }
+    Associations.hasMany.call(CidPirate, "birds", {
+      className: "CidBird",
+      foreignKey: "cid_pirate_id",
+    });
+    acceptsNestedAttributesFor(CidPirate, "birds");
+    registerModel(CidBird);
+    registerModel(CidPirate);
+
+    const pirate = await CidPirate.create({ catchphrase: "Aye" });
+    await CidBird.create({ name: "Posideons Killer", cid_pirate_id: pirate.id });
+    await CidBird.create({ name: "Killer bird", cid_pirate_id: pirate.id });
+    await (pirate as any).birds.load();
+    const [child1, child2] = (pirate as any).birds.target as CidBird[];
+    // Rails stubs the children's `id` methods to non-integer composite ids
+    // (`@child_1.stub(:id, "ABC1X")`); mirror with a getter spy.
+    vi.spyOn(child1, "id", "get").mockReturnValue("ABC1X" as any);
+    vi.spyOn(child2, "id", "get").mockReturnValue("ABC2X" as any);
+    (pirate as any).birdsAttributes = [
+      { id: child1.id, name: "Grace OMalley" },
+      { id: child2.id, name: "Privateers Greed" },
+    ];
+    expect([(child1 as any).name, (child2 as any).name]).toEqual([
+      "Grace OMalley",
+      "Privateers Greed",
+    ]);
   });
 });
 
@@ -3212,10 +3330,47 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     expect(tags[0].name).toBe("new-grandchild");
   });
 
-  it.skip("circular references do not perform unnecessary queries", () => {
-    // BLOCKED: missing Treasure fixture model with polymorphic looter association;
-    // the Rails test uses ship.treasures.build(looter: part) which requires
-    // Ship has_many :treasures not present in makeModels().
+  it("circular references do not perform unnecessary queries", async () => {
+    class CrTreasure extends Base {
+      static {
+        this._tableName = "cr_treasures";
+        this.attribute("name", "string");
+        this.attribute("cr_ship_id", "integer");
+        this.belongsTo("looter", { polymorphic: true });
+        this.belongsTo("ship", { className: "CrShip", foreignKey: "cr_ship_id" });
+      }
+    }
+    class CrPart extends Base {
+      static {
+        this._tableName = "cr_parts";
+        this.attribute("name", "string");
+        this.attribute("cr_ship_id", "integer");
+        this.belongsTo("ship", { className: "CrShip", foreignKey: "cr_ship_id" });
+        this.validates("name", { presence: true });
+      }
+    }
+    class CrShip extends Base {
+      static {
+        this._tableName = "cr_ships";
+        this.attribute("name", "string");
+        this.hasMany("parts", { className: "CrPart", foreignKey: "cr_ship_id" });
+        this.hasMany("treasures", { className: "CrTreasure", foreignKey: "cr_ship_id" });
+        this.validates("name", { presence: true });
+      }
+    }
+    registerModel(CrTreasure);
+    registerModel(CrPart);
+    registerModel(CrShip);
+    acceptsNestedAttributesFor(CrShip, "parts");
+    acceptsNestedAttributesFor(CrShip, "treasures");
+
+    const ship = new CrShip({ name: "The Black Rock" });
+    const part = (ship.parts as any).build({ name: "Stern" });
+    (ship.treasures as any).build({ looter: part });
+
+    await assertQueriesCount(5, false, async () => {
+      await ship.saveBang();
+    });
   });
 
   it("nested singular associations are validated", async () => {
