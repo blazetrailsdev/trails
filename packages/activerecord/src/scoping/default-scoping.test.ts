@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../index.js";
-import { registerModel } from "../index.js";
+import { registerModel, RecordNotFound } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -39,6 +39,7 @@ import {
   DeveloperWithSelect,
   DeveloperWithIncludes,
   ThreadsafeDeveloper,
+  AuditLog,
 } from "../test-helpers/models/developer.js";
 import { Mentor } from "../test-helpers/models/mentor.js";
 import {
@@ -55,14 +56,22 @@ import {
 } from "../test-helpers/models/post.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Lion } from "../test-helpers/models/cat.js";
+import { inMemoryDb } from "../test-adapter.js";
 
 // Register the models whose associations are resolved by active tests
 // (Developer's `projects` HABTM is dereferenced in the eager_load/preload ports).
 registerModel(Developer);
 registerModel(Project);
+registerModel(AuditLog);
+registerModel(DeveloperWithIncludes);
+registerModel(Mentor);
 registerModel(Comment);
+registerModel(SpecialComment);
 registerModel(CommentWithDefaultScopeReferencesAssociation);
 registerModel(Post);
+registerModel(SpecialPostWithDefaultScope);
+registerModel(ConditionalStiPost);
+registerModel(SubConditionalStiPost);
 registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
 
 const names = (rows: any[]) => rows.map((r) => r.name);
@@ -74,11 +83,11 @@ const capSql = (fn: () => unknown) =>
   captureSql(fn as () => Promise<void>, { includeSchema: false });
 
 describe("DefaultScopingTest", () => {
-  // Only `developers` is seeded: every active test reads developers fixtures (or
-  // builds SQL without hitting the DB). The `posts`/`comments`-backed
-  // "references works ..." cases create their own rows, so seeding those shared
-  // tables here would only risk the known parallel-fork `posts` collision.
-  const { developers } = useHandlerFixtures(["developers"], {
+  // `developers` backs the default-scope/unscope cases; `posts`/`comments` back
+  // the join + STI-association ports (default scope through joins, `unscoped`
+  // joins, STI association with `unscoped`), which read the canonical posts and
+  // comments fixtures exactly as Rails does.
+  const { developers, posts, comments } = useHandlerFixtures(["developers", "posts", "comments"], {
     schema: canonicalSchema,
   });
 
@@ -723,12 +732,12 @@ describe("DefaultScopingTest", () => {
     expect(aaron.name).toBe("Aaron");
   });
 
-  // `create_with` + nested attributes inside a `scoping` block is unimplemented.
-  it.skip("create with nested attributes", async () => {
+  it("create with nested attributes", async () => {
+    const before = (await Project.count()) as number;
     await (Developer.createWith({ projectsAttributes: [{ name: "p1" }] }) as any).scoping(() =>
       Developer.create({ name: "Aaron" }),
     );
-    expect(await Project.count()).toBeGreaterThan(0);
+    expect(await Project.count()).toBe(before + 1);
   });
 
   it("default scope with all queries runs on update columns", async () => {
@@ -814,7 +823,10 @@ describe("DefaultScopingTest", () => {
     expect(received).toEqual(expected);
   });
 
-  // `merge` of an `unscope(:where)` relation does not clear the where clause yet.
+  // ROOT-CAUSE: merging an `unscope("where")` relation does not clear the
+  // accumulated where clause — `_whereClause.isEmpty()` stays false after the
+  // merge. Rails' WhereClause merge treats the unscoped side as resetting the
+  // predicates. Tracked by upstream-fix story b2-unscope-where-merge-reset.
   it.skip("unscope merging", () => {
     const merged = Developer.where({ name: "Jamis" }).merge(Developer.unscope("where"));
     expect((merged as any)._whereClause.isEmpty()).toBe(true);
@@ -828,20 +840,16 @@ describe("DefaultScopingTest", () => {
     expect(scope.toSql()).not.toMatch(/order/i);
   });
 
-  // A model's default scope is not yet applied through an association join.
-  it.skip("default scope with joins", async () => {
-    const ids = (await SpecialPostWithDefaultScope.all().toArray()).map((p: any) => p.id);
-    expect(await Comment.where({ post_id: ids }).count()).toBe(
-      await Comment.joins("specialPostWithDefaultScope").count(),
-    );
-    const postIds = (await Post.all().toArray()).map((p: any) => p.id);
-    expect(await Comment.where({ post_id: postIds }).count()).toBe(
+  it("default scope with joins", async () => {
+    expect(
+      await Comment.where({ post_id: await SpecialPostWithDefaultScope.pluck("id") }).count(),
+    ).toBe(await Comment.joins("specialPostWithDefaultScope").count());
+    expect(await Comment.where({ post_id: await Post.pluck("id") }).count()).toBe(
       await Comment.joins("post").count(),
     );
   });
 
-  // Scoping a join with `Post.where(...).scoping` is unimplemented.
-  it.skip("joins not affected by scope other than default or unscoped", async () => {
+  it("joins not affected by scope other than default or unscoped", async () => {
     const without = (await Comment.joins("post").toArray()).map((c: any) => c.id).sort();
     let withScope: any[] = [];
     await (Post.where({ id: [1, 5, 6] }) as any).scoping(async () => {
@@ -850,8 +858,7 @@ describe("DefaultScopingTest", () => {
     expect(withScope).toEqual(without);
   });
 
-  // Default scope through join inside `unscoped` block is unimplemented.
-  it.skip("unscoped with joins should not have default scope", async () => {
+  it("unscoped with joins should not have default scope", async () => {
     const expected = (await Comment.joins("post").toArray()).map((c: any) => c.id).sort();
     const received = await (SpecialPostWithDefaultScope as any).unscoped(async () =>
       (await Comment.joins("specialPostWithDefaultScope").toArray()).map((c: any) => c.id).sort(),
@@ -859,16 +866,44 @@ describe("DefaultScopingTest", () => {
     expect(received).toEqual(expected);
   });
 
-  // STI association behavior with `unscoped` default scope is unimplemented.
+  // ROOT-CAUSE: eager_load/includes/preload of the STI `specialComments` hasMany
+  // builds the wrong foreign key (`comments.special_post_id` instead of
+  // `comments.post_id`), so the faithful body raises `no such column`. Tracked by
+  // upstream-fix story b2-sti-hasmany-preload-foreign-key.
   it.skip("sti association with unscoped not affected by default scope", async () => {
-    const post = (await Post.first()) as any;
+    const post = posts("thinking") as any;
+    const expected = [comments("does_it_hurt").id];
+
+    await (post.specialComments as any).updateAll({ deleted_at: new Date() });
+
+    await expect(Post.joins("specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
+    expect(await (post.specialComments as any).reload().toArray()).toEqual([]);
+
     await (SpecialComment as any).unscoped(async () => {
-      const found = await Post.joins("specialComments").find(post.id);
-      expect(found.id).toBe(post.id);
+      const joined = await Post.joins("specialComments").find(post.id);
+      expect((joined as any).id).toBe(post.id);
+      const viaJoins = await (joined as any).specialComments.toArray();
+      expect(viaJoins.map((c: any) => c.id)).toEqual(expected);
+      const eager = (await (
+        (await Post.eagerLoad("specialComments").find(post.id)) as any
+      ).specialComments.toArray()) as any[];
+      expect(eager.map((c) => c.id)).toEqual(expected);
+      const inc = (await (
+        (await Post.includes("specialComments").find(post.id)) as any
+      ).specialComments.toArray()) as any[];
+      expect(inc.map((c) => c.id)).toEqual(expected);
+      const pre = (await (
+        (await Post.preload("specialComments").find(post.id)) as any
+      ).specialComments.toArray()) as any[];
+      expect(pre.map((c) => c.id)).toEqual(expected);
     });
   });
 
-  // STI default-scope conditions leaking through `unscope(:title)` is unimplemented.
+  // ROOT-CAUSE: `unscope({ where: "title" })` on an STI subclass strips the
+  // implicit STI `type IN (...)` predicate along with the `title` default-scope
+  // condition, so the count returns every row in `posts` instead of just the
+  // STI subtree. Rails keeps the STI type condition (it is not part of the
+  // default scope's where). Tracked by upstream-fix story b2-sti-type-survives-unscope.
   it.skip("sti conditions are not carried in default scope", async () => {
     await ConditionalStiPost.create({ body: "" });
     await SubConditionalStiPost.create({ body: "" });
@@ -877,10 +912,9 @@ describe("DefaultScopingTest", () => {
     expect(await ConditionalStiPost.unscope({ where: "title" }).count()).toBe(3);
   });
 
-  // `includes` + nested-table `where` count is unimplemented.
-  it.skip("default scope include with count", async () => {
+  it("default scope include with count", async () => {
     const d = (await DeveloperWithIncludes.create()) as any;
-    await (await d.auditLogs).create({ message: "foo" });
+    await d.auditLogs.create({ message: "foo" });
     expect(await DeveloperWithIncludes.where({ auditLogs: { message: "foo" } }).count()).toBe(1);
   });
 
@@ -891,7 +925,7 @@ describe("DefaultScopingTest", () => {
     })) as any;
     const comment = await post.commentWithDefaultScopeReferencesAssociations.create({
       body: "Great post.",
-      developer_id: 1,
+      developer_id: (await Developer.first())!.id,
     });
     const first = (await post.commentWithDefaultScopeReferencesAssociations.toArray())[0];
     expect((first as any).id).toBe((comment as any).id);
@@ -906,7 +940,7 @@ describe("DefaultScopingTest", () => {
     })) as any;
     const comment = await post.commentWithDefaultScopeReferencesAssociations.create({
       body: "Great post.",
-      developer_id: 1,
+      developer_id: (await Developer.first())!.id,
     });
     expect((await post.loadHasOne("firstComment")).id).toBe((comment as any).id);
   });
@@ -918,7 +952,7 @@ describe("DefaultScopingTest", () => {
     })) as any;
     const comment = await post.commentWithDefaultScopeReferencesAssociations.create({
       body: "Great post.",
-      developer_id: 1,
+      developer_id: (await Developer.first())!.id,
     });
     const found = await CommentWithDefaultScopeReferencesAssociation.findBy({
       id: (comment as any).id,
@@ -927,14 +961,20 @@ describe("DefaultScopingTest", () => {
   });
 });
 
-// `DefaultScopingWithThreadTest` is `unless in_memory_db?` in Rails; the suite
-// runs against in-memory sqlite, so these thread cases do not apply here. Kept
-// as `it.skip` to keep the Rails names tracked by test:compare.
-describe("DefaultScopingWithThreadTest", () => {
+// Rails defines `DefaultScopingWithThreadTest` `unless in_memory_db?`. Mirror
+// that gate with `describe.skipIf(inMemoryDb())` so the class is omitted on the
+// anonymous-`:memory:` sqlite lane exactly as upstream. On the file-backed
+// sqlite / pg / mysql lanes the gate is open, but the bodies still cannot run:
+// they require real OS threads (Thread.new / Concurrent::CyclicBarrier), which
+// JS lacks, so each case stays `it.skip` with that as the recorded reason.
+describe.skipIf(inMemoryDb())("DefaultScopingWithThreadTest", () => {
+  // PERMANENT-SKIP: needs real OS threads (Thread.new); not portable to JS.
   it.skip("default scoping with threads", () => {
     expect(DeveloperOrderedBySalary.all().toSql()).toContain("salary DESC");
   });
 
+  // PERMANENT-SKIP: needs real OS threads + Concurrent::CyclicBarrier; not
+  // portable to JS.
   it.skip("default scope is threadsafe", async () => {
     await ThreadsafeDeveloper.unscoped().create();
     await ThreadsafeDeveloper.unscoped().create();
