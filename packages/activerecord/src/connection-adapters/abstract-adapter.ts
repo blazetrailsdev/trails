@@ -1445,14 +1445,11 @@ export class AbstractAdapter implements Quoting {
    * materializes through an async path.
    */
   async rawConnection(): Promise<AbstractAdapter | null> {
-    return this.withRawConnection(
-      { allowRetry: false, materializeTransactions: true },
-      async (conn) => {
-        await this.disableLazyTransactionsBang();
-        this._rawConnectionDirty = true;
-        return conn;
-      },
-    );
+    return this.withRawConnection(async (conn) => {
+      await this.disableLazyTransactionsBang();
+      this._rawConnectionDirty = true;
+      return conn;
+    });
   }
 
   // --- Config accessors ---

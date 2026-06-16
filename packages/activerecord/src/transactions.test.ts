@@ -1799,26 +1799,32 @@ describe("TransactionTest", () => {
   });
   it("accessing raw connection materializes transaction", async () => {
     const { Topic, adapter } = makeSQLiteTopic();
-    await Topic.transaction(async () => {
-      expect(adapter.currentTransaction().isMaterialized()).toBe(false);
-      await adapter.rawConnection();
-      expect(adapter.currentTransaction().isMaterialized()).toBe(true);
+    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+      await Topic.transaction(async () => {
+        await adapter.rawConnection();
+      });
     });
   });
   it("accessing raw connection disables lazy transactions", async () => {
-    const { adapter } = makeSQLiteTopic();
-    expect(adapter.transactionManager.isLazyTransactionsEnabled()).toBe(true);
+    const { Topic, adapter } = makeSQLiteTopic();
     await adapter.rawConnection();
-    expect(adapter.transactionManager.isLazyTransactionsEnabled()).toBe(false);
+    // Lazy transactions disabled: the otherwise-empty transaction now
+    // eagerly materializes, emitting BEGIN/COMMIT.
+    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+      await Topic.transaction(async () => {});
+    });
   });
   it("checking in connection reenables lazy transactions", async () => {
-    const { adapter } = makeSQLiteTopic();
+    const { Topic, adapter } = makeSQLiteTopic();
     await adapter.rawConnection();
-    expect(adapter.transactionManager.isLazyTransactionsEnabled()).toBe(false);
     // Mirrors `Topic.connection_pool.checkin`: the pool runs the `:checkin`
     // callbacks (one of which is enable_lazy_transactions!) around `expire`.
+    // A standalone adapter has no pool, so drive the callbacks directly.
     adapter._runCheckinCallbacks(() => {});
-    expect(adapter.transactionManager.isLazyTransactionsEnabled()).toBe(true);
+    // Lazy transactions re-enabled: the empty transaction emits no queries.
+    await assertNoQueries(false, async () => {
+      await Topic.transaction(async () => {});
+    });
   });
 });
 
