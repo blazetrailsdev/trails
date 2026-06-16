@@ -14,10 +14,8 @@ import { Post } from "../../test-helpers/models/post.js";
 // `if supports_optimizer_hints?` (true only when the pg_hint_plan extension is
 // installed), so the examples never run on a server that lacks it. Mirror that
 // with a conditional describe.
-const describeOptimizerHints = pgSupportsOptimizerHints ? describe : describe.skip;
-
 describeIfPg("PostgreSQLAdapter", () => {
-  describeOptimizerHints("PostgresqlOptimizerHintsTest", () => {
+  describe.skipIf(!pgSupportsOptimizerHints)("PostgresqlOptimizerHintsTest", () => {
     // Mirrors Rails' `fixtures :posts`. Rails' posts.yml uses literal
     // `author_id: 1` (David); our ported posts fixture references the author by
     // label, so authors must be declared first for that ref to resolve to
