@@ -513,7 +513,7 @@ class AdapterSchemaSource implements SchemaSource {
       nullsNotDistinct: idx.nullsNotDistinct,
       using: idx.using,
       type: idx.type,
-      lengths: conciseIndexLengths(idx.columns, idx.lengths),
+      lengths: idx.lengths,
       opclasses: idx.opclasses,
       include: idx.include,
       comment: idx.comment,
@@ -1146,7 +1146,8 @@ export class SchemaDumper {
     const parts: string[] = [cols];
     if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
     if (index.unique) parts.push("unique: true");
-    if (index.lengths !== undefined) parts.push(`length: ${this.formatIndexParts(index.lengths)}`);
+    const lengths = conciseIndexLengths(index.columns, index.lengths);
+    if (lengths !== undefined) parts.push(`length: ${this.formatIndexParts(lengths)}`);
     if (index.orders !== undefined) parts.push(`order: ${this.formatIndexParts(index.orders)}`);
     if (index.opclasses !== undefined)
       parts.push(`opclass: ${this.formatIndexParts(index.opclasses)}`);
