@@ -94,6 +94,9 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaLimit(column: Column): string | undefined {
     if (column.bigint || column.type === "bigint") return undefined;
+    // `oid` has no schema_limit in Rails — introspection reports limit 8 but
+    // `t.oid` dumps bare (schema_dumper_test: test_schema_dump_oid_type).
+    if (this.schemaType(column) === "oid") return undefined;
     // Rails suppresses the serial/bigserial limit because it matches the native
     // database type's default (int4 limit = 4, int8 limit = 8). We don't have
     // the native_database_types comparison available here, so we guard explicitly

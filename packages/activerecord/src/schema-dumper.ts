@@ -243,6 +243,10 @@ const DSL_HELPER_METHODS = new Set([
   "daterange",
   "tsrange",
   "tstzrange",
+  // PG interval / oid — TableDefinition.interval / .oid helpers (Rails emits
+  // `t.interval`/`t.oid`, not the generic `t.column(name, "interval"|"oid")`).
+  "interval",
+  "oid",
   // PG geometric types — TableDefinition exposes a helper method for each.
   "point",
   "line",
@@ -1081,6 +1085,9 @@ export class SchemaDumper {
       if (col.array && !colspec.array) colspec.array = true;
       if (
         !col.isSerial &&
+        // `oid` has no schema_limit in Rails — introspection reports limit 8
+        // but `t.oid` must dump bare (schema_dumper_test: test_schema_dump_oid_type).
+        dslType !== "oid" &&
         col.limit !== undefined &&
         col.limit !== null &&
         extraOpts?.limit === undefined
