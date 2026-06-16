@@ -156,8 +156,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("hstore migration", async () => {
-      // BLOCKED: migration — Migration.current + change_table DSL; t.hstore(:keys) not wired.
-      // SCOPE: ~30 LOC in migration.ts; unblocked after Wave 8.
+      // BLOCKED: migration — change_table recording-mode proxy (RecorderTableProxy)
+      // lacks adapter column-type shorthands, so `t.hstore(:keys)` is not a function.
+      // The non-recording path (adapter.changeTable + t.column) already works.
+      // DEFERRED (RFC 0030): tracked by change-table-recorder-adapter-column-methods — converge then un-skip.
     });
 
     it("cast value on write", async () => {

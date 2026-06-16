@@ -211,6 +211,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       //   ("cannot be cast automatically") here, so `assert_raises StatementInvalid` fails.
       // SCOPE: adapter-wide — route schema-statement DDL through the translating path
       //   (or wrap `exec`). Belongs in a DDL exception-translation story, not array OID.
+      // DEFERRED (RFC 0030): tracked by pg-ddl-exec-exception-translation — converge then un-skip.
     });
     it("change column default with array", async () => {
       await adapter.changeColumnDefault("pg_arrays", "tags", []);
@@ -449,6 +450,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // hstore extension), and OID::HStore is not wired as an array element subtype, so
       // an `hstore[]` column would not deserialize to per-element hash objects. Both the
       // hstore-extension table setup and the array-of-hstore OID wiring are prerequisites.
+      // DEFERRED (RFC 0030): tracked by pg-array-oid-element-subtypes — converge then un-skip.
     });
     it.skip("datetime with timezone awareness", async () => {
       // BLOCKED: tz-aware timestamp[] DB round-trip — the in-memory cast already
@@ -458,8 +460,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // array element deserialize reads it back shifted by +4h while the scalar
       // datetime reads it back correctly. The array element subtype's read path
       // does not interpret the stored wall-clock the way the scalar DateTime does.
-      // SCOPE: array OID element deserialize — see follow-on p3-pg-array-oid-subtypes
-      //   (same family as the timestamp[] precision round-trip loss below).
+      // SCOPE: array OID element deserialize — same family as the timestamp[] precision
+      //   round-trip loss below.
+      // DEFERRED (RFC 0030): tracked by pg-array-oid-element-subtypes — converge then un-skip.
     });
     it("assigning non array value", async () => {
       class PgArrays extends Base {
@@ -543,8 +546,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // BLOCKED: adapter-pg — timestamp array microsecond precision survives the
       // in-memory create-time cast but is dropped on the DB round-trip: the
       // timestamp[] serialize/deserialize path truncates the usec component.
-      // SCOPE: array OID element serialize/deserialize — see follow-on story
-      //   p3-pg-array-oid-subtypes (also covers hstore[] and the precision plumb).
+      // SCOPE: array OID element serialize/deserialize (also covers hstore[] and the
+      //   precision plumb).
+      // DEFERRED (RFC 0030): tracked by pg-array-oid-element-subtypes — converge then un-skip.
     });
   });
 });

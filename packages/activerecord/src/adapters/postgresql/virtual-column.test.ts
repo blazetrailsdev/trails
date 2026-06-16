@@ -117,6 +117,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // (as/stored) is unreachable from emitTable's column rendering path.
       // ROOT-CAUSE: schema-dumper.ts emitTable bypasses connection-adapter
       // prepareColumnOptions for virtual columns. Affects schema_dumping mirror.
+      // DEFERRED (RFC 0030): tracked by schema-dumper-emittable-virtual-column-options — converge then un-skip.
     });
 
     itIfSupports("virtual_columns", "build fixture sql", async () => {
