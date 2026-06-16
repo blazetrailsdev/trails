@@ -203,7 +203,13 @@ export function registerSubclass(klass: typeof Base): void {
   if (!Object.prototype.hasOwnProperty.call(parent, "_subclasses")) {
     (parent as any)._subclasses = [];
   }
-  (parent as any)._subclasses.push(klass);
+  // Idempotent, mirroring Rails' DescendantsTracker (a Set): the `inherited`
+  // hook registers each subclass exactly once, so a repeat call (e.g. a model
+  // file self-registers at import, then registerModel([...]) routes it again)
+  // must not double-list it — descendants() would otherwise yield duplicates.
+  if (!(parent as any)._subclasses.includes(klass)) {
+    (parent as any)._subclasses.push(klass);
+  }
 }
 
 /**

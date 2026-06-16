@@ -23,6 +23,17 @@ describe("registerModel array form", () => {
     expect((SpecialComment as any)._subclasses).toContain(SubSpecialComment);
   });
 
+  it("registers each subclass at most once (idempotent, like Rails)", () => {
+    // Canonical model files self-register their subclasses at import, so the
+    // array form routes already-registered subclasses again — that must not
+    // produce duplicates in the parent's _subclasses.
+    registerModel([Comment, SpecialComment, SubSpecialComment]);
+    registerModel([Comment, SpecialComment, SubSpecialComment]);
+
+    const commentSubs = ((Comment as any)._subclasses ?? []) as unknown[];
+    expect(commentSubs.filter((s) => s === SpecialComment)).toHaveLength(1);
+  });
+
   it("does not treat a base model as a subclass", () => {
     registerModel([Author]);
 
