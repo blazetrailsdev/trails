@@ -5417,13 +5417,21 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager association loading with belongs to and order string with unquoted table name", async () => {
-    const loaded = await Comment.all().includes("post").order("posts.id").toArray();
+    const loaded = await Comment.all()
+      .includes("post")
+      .references("posts")
+      .order("posts.id")
+      .toArray();
     expect(loaded.map((c) => c.id)).toContain(comments("greetings").id);
   });
 
   it("eager association loading with belongs to and order string with quoted table name", async () => {
     const quotedPostsId = Comment.connection.quoteTableName("posts.id");
-    const loaded = await Comment.all().includes("post").order(quotedPostsId).toArray();
+    const loaded = await Comment.all()
+      .includes("post")
+      .references("posts")
+      .order(quotedPostsId)
+      .toArray();
     expect(loaded.map((c) => c.id)).toContain(comments("greetings").id);
   });
 
