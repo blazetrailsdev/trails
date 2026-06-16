@@ -1,16 +1,26 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+
+// Mirrors Rails' DatabaseStatementsTest. Each test leases a fresh in-memory
+// connection against the accounts table the corresponding Rails fixtures
+// materialize, created inline here so the suite stays self-contained.
+async function returnTheInsertedId(method: "insert" | "create"): Promise<unknown> {
+  const conn = new BetterSQLite3Adapter(":memory:");
+  try {
+    await conn.executeMutation(
+      "CREATE TABLE accounts (id integer PRIMARY KEY, firm_id integer, credit_limit integer)",
+    );
+    return await conn[method]("INSERT INTO accounts (firm_id,credit_limit) VALUES (42,5000)");
+  } finally {
+    await conn.close();
+  }
+}
 
 describe("DatabaseStatementsTest", () => {
-  it.skip("insert should return the inserted id", () => {
-    // BLOCKED: relation — database-statements feature gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for database_statements
-    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in database-statements.test.ts
-    /* needs adapter-level insert() that returns last inserted ID */
+  it("insert should return the inserted id", async () => {
+    expect(await returnTheInsertedId("insert")).not.toBeNull();
   });
-  it.skip("create should return the inserted id", () => {
-    // BLOCKED: relation — database-statements feature gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for database_statements
-    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in database-statements.test.ts
-    /* needs adapter-level insert() that returns last inserted ID */
+  it("create should return the inserted id", async () => {
+    expect(await returnTheInsertedId("create")).not.toBeNull();
   });
 });

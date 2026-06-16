@@ -10,7 +10,7 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
-import { Post } from "../test-helpers/models/post.js";
+import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
@@ -55,6 +55,14 @@ describe("SelectTest", () => {
       { posts: canonicalSchema.posts, comments: canonicalSchema.comments },
       { dropExisting: true },
     );
+    // Warm PostWithDefaultSelect's column cache up front. Its first lazy
+    // columnsHash() load otherwise lands mid-suite after a sibling test resolves
+    // an aliased-table hash select, a pre-existing interaction (reproduced with
+    // this PR's src changes reverted) that leaves a fresh same-table model load
+    // returning no columns and would un-qualify the `reselect with default scope
+    // select` projection. Tracked upstream: RFC 0030 story
+    // columnshash-empty-after-aliased-hash-select (remove this warm-up when fixed).
+    (PostWithDefaultSelect as unknown as { columnsHash(): unknown }).columnsHash();
   });
   const q = (name: string) => escapeRegExp(quoteTableName(name));
 
@@ -144,9 +152,18 @@ describe("SelectTest", () => {
     );
   });
 
-  it.skip("select with hash and table alias", () => {
-    // BLOCKED: relation — joins(:comments, :comments_with_extend) + per-join table
-    // aliasing not yet supported; selects aliased columns across three joined tables.
+  it("select with hash and table alias", async () => {
+    const post = (await Post.joins("comments", "commentsWithExtend")
+      .select("title", {
+        posts: { title: sym("post_title") },
+        comments: { body: sym("comment_body") },
+        commentsWithExtend: { body: sym("comment_body_2") },
+      } as never)
+      .take()) as never as { title: string; readAttribute(n: string): unknown };
+
+    expect(post.readAttribute("post_title")).toBe(post.title);
+    expect(post.readAttribute("comment_body")).not.toBeNull();
+    expect(post.readAttribute("comment_body_2")).not.toBeNull();
   });
 
   it("select with invalid nested field", async () => {
@@ -165,9 +182,17 @@ describe("SelectTest", () => {
     expect(post.readAttribute("post_title")).toBe("Welcome to the weblog");
   });
 
-  it.skip("select with hash argument with few tables", () => {
-    // BLOCKED: relation — joins(:comments) + cross-table hash select not yet supported.
-    // Rails: Post.joins(:comments).select(:title, posts: { title: :post_title }, comments: { body: :comment_body })
+  it("select with hash argument with few tables", async () => {
+    const post = (await Post.joins("comments")
+      .select("title", {
+        posts: { title: sym("post_title") },
+        comments: { body: sym("comment_body") },
+      } as never)
+      .take()) as never as { title: string; readAttribute(n: string): unknown };
+
+    expect(post.readAttribute("post_title")).toBe(post.title);
+    expect(post.readAttribute("comment_body")).not.toBeNull();
+    expect(post.readAttribute("post_title")).not.toBeNull();
   });
 
   it("reselect", () => {
@@ -175,8 +200,10 @@ describe("SelectTest", () => {
     expect(Post.select("title", "body").reselect("title").toSql()).toBe(expected);
   });
 
-  it.skip("reselect with default scope select", () => {
-    // BLOCKED: relation — default_scope with select not implemented (PostWithDefaultSelect).
+  it("reselect with default scope select", () => {
+    const expected = Post.select("title").toSql();
+    const actual = PostWithDefaultSelect.reselect("title").toSql();
+    expect(actual).toBe(expected);
   });
 
   it("reselect with hash argument", () => {
@@ -218,25 +245,64 @@ describe("SelectTest", () => {
     // assertion faithfully.
   });
 
-  it.skip("merging select from different model", () => {
-    // BLOCKED: relation — merge() does not carry over a select projection from a
-    // different model class across joins(:comments).
+  it("merging select from different model", async () => {
+    const posts = Post.select("id", "title").joins("comments");
+    const comments = Comment.where({ body: "Thank you for the welcome" });
+
+    for (const post of [
+      (await posts.merge(comments.select("body")).first()) as never as Record<string, unknown> & {
+        readAttribute(n: string): unknown;
+      },
+      (await posts.merge(comments.select("comments.body")).first()) as never as Record<
+        string,
+        unknown
+      > & { readAttribute(n: string): unknown },
+    ]) {
+      expect(post.readAttribute("id")).toBe(1);
+      expect(post.readAttribute("title")).toBe("Welcome to the weblog");
+      expect(post.readAttribute("body")).toBe("Thank you for the welcome");
+    }
   });
 
   it.skip("type casted extra select with eager loading", () => {
-    // BLOCKED: associations — eager_load attribute type-casting not yet supported.
+    // BLOCKED: associations — eager_load discards the relation's explicit extra
+    // `select` projection ("posts.id * 1.1 AS foo") in favor of the JoinDependency's
+    // own t0_r* column list, so the aliased/type-casted column never hydrates onto
+    // the base record. Same gap as the omitted `eager_load` branch in
+    // "non select columns wont be loaded" — honoring a custom select under eager
+    // loading spans the JoinDependency projection + row hydration. Tracked
+    // upstream: RFC 0030 story eager-load-extra-select-projection.
   });
 
-  it.skip("aliased select using as with joins and includes", () => {
-    // BLOCKED: associations — joins + includes attribute-key inspection not yet supported.
+  it("aliased select using as with joins and includes", async () => {
+    const posts = Post.select("posts.id AS field_alias").joins("comments").includes("comments");
+    const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
+    expect(Object.keys(post.attributes)).toEqual(["id", "field_alias"]);
   });
 
-  it.skip("aliased select not using as with joins and includes", () => {
-    // BLOCKED: associations — joins + includes attribute-key inspection not yet supported.
+  it("aliased select not using as with joins and includes", async () => {
+    const posts = Post.select("posts.id field_alias").joins("comments").includes("comments");
+    const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
+    expect(Object.keys(post.attributes)).toEqual(["id", "field_alias"]);
   });
 
-  it.skip("star select with joins and includes", () => {
-    // BLOCKED: associations — joins + includes attribute-key inspection not yet supported.
+  it("star select with joins and includes", async () => {
+    const posts = Post.select("posts.*").joins("comments").includes("comments");
+    const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
+    expect(Object.keys(post.attributes)).toEqual([
+      "id",
+      "author_id",
+      "title",
+      "body",
+      "type",
+      "legacy_comments_count",
+      "taggings_with_delete_all_count",
+      "taggings_with_destroy_count",
+      "tags_count",
+      "indestructible_tags_count",
+      "tags_with_destroy_count",
+      "tags_with_nullify_count",
+    ]);
   });
 
   it("enumerate columns in select statements", () => {

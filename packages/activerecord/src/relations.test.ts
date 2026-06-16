@@ -4,6 +4,7 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { adapterType } from "./test-adapter.js";
+import { quoteColumnName } from "./test-helpers/quote-regex.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
 // Ensure spies and mocks created inside individual tests don't leak
@@ -2114,10 +2115,10 @@ describe("RelationTest", () => {
   });
 
   // -- select --
-  it.skip("select returns records with projected columns in SQL", () => {
+  it("select returns records with projected columns in SQL", () => {
     const sql = Widget.all().select("name", "color").toSql();
-    expect(sql).toContain('"name"');
-    expect(sql).toContain('"color"');
+    expect(sql).toContain(quoteColumnName("name"));
+    expect(sql).toContain(quoteColumnName("color"));
     expect(sql).not.toContain("*");
   });
 
@@ -4217,10 +4218,10 @@ describe("RelationTest", () => {
 
   // -- select --
 
-  it.skip("select limits returned columns", async () => {
+  it("select limits returned columns", async () => {
     const sql = Product.all().select("name", "price").toSql();
-    expect(sql).toContain('"name"');
-    expect(sql).toContain('"price"');
+    expect(sql).toContain(quoteColumnName("name"));
+    expect(sql).toContain(quoteColumnName("price"));
     expect(sql).not.toContain("*");
   });
 
@@ -4240,16 +4241,16 @@ describe("RelationTest", () => {
 
   // -- reverseOrder --
 
-  it.skip("reverseOrder flips ASC to DESC", () => {
+  it("reverseOrder flips ASC to DESC", () => {
     const rel = Product.all().order("name").reverseOrder();
     const sql = rel.toSql();
-    expect(sql).toContain('"name" DESC');
+    expect(sql).toContain(`${quoteColumnName("name")} DESC`);
   });
 
-  it.skip("reverseOrder flips DESC to ASC", () => {
+  it("reverseOrder flips DESC to ASC", () => {
     const rel = Product.all().order({ price: "desc" }).reverseOrder();
     const sql = rel.toSql();
-    expect(sql).toContain('"price" ASC');
+    expect(sql).toContain(`${quoteColumnName("price")} ASC`);
   });
 
   // -- first / last --
@@ -5228,7 +5229,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("LIMIT");
   });
 
-  it.skip("finding with arel sql order", () => {
+  it("finding with arel sql order", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -5236,7 +5237,7 @@ describe("RelationTest", () => {
     }
     const sql = Post.order("title ASC").toSql();
     expect(sql).toContain("ORDER BY");
-    expect(sql).toContain('"title" ASC');
+    expect(sql).toContain(`${quoteColumnName("title")} ASC`);
   });
 
   it("finding with group", () => {

@@ -3084,7 +3084,16 @@ export class Relation<T extends Base> {
         this._namedInnerJoins,
         Nodes.InnerJoin,
       );
-      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+      // Thread references_values so a per-join hash select key (e.g.
+      // `select(comments_with_extend: { body: :x })` on a second `comments`
+      // join) aliases that join's table to the referenced name, mirroring Rails
+      // build_joins → join_constraints(stashed, alias_tracker, references_values).
+      // Collisions-only: a first/only-occurrence join keeps its real table name,
+      // because our where-hash keys resolve to the real table (not the reference
+      // alias), so re-aliasing it would desync the WHERE from the JOIN. Deviation
+      // tracked for convergence: RFC 0030 where-hash-keys-resolve-to-join-alias.
+      for (const node of jd.joinConstraints([], undefined, this._referencesValues, true))
+        manager.appendJoinNode(node);
     }
     // Cross-klass merged JoinDependencies (Rails merge_joins): already built
     // against the source relation's klass, so emit their constraints directly.
