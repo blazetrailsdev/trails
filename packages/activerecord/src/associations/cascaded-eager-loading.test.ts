@@ -192,8 +192,10 @@ describe("CascadedEagerLoadingTest", () => {
     // topics(:first).replies.size / topics(:second).replies.size — Topic#replies
     // is has_many Reply by parent_id, so query it directly to avoid loading the
     // fixture record's proxy (whose STI subtree drags in an unrelated inverse_of).
-    const firstSize = await Reply.where({ parent_id: (topics("first") as any).id }).count();
-    const secondSize = await Reply.where({ parent_id: (topics("second") as any).id }).count();
+    const firstSize = (await Reply.where({ parent_id: (topics("first") as any).id }).toArray())
+      .length;
+    const secondSize = (await Reply.where({ parent_id: (topics("second") as any).id }).toArray())
+      .length;
     await assertQueriesCount(0, false, () => {
       expect(targetArr(loaded[0], "replies")).toHaveLength(firstSize);
       expect(targetArr(loaded[1], "replies")).toHaveLength(secondSize);
