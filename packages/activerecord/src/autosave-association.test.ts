@@ -3752,16 +3752,14 @@ describe.skip("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     expect(valid).toBe(false);
   });
   it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs autosave association integration */
+    // BLOCKED: needs canonical Author/PublishedBook (this file's bespoke
+    // same-named classes collide) + two impl gaps: validates(attr,{uniqueness})
+    // routing and propagateErrors save-phase error-format convergence.
+    // Tracked: 0030/autosave-uniqueness-rollback-and-error-format.
   });
   it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs autosave association integration */
+    // BLOCKED: see above —
+    // 0030/autosave-uniqueness-rollback-and-error-format.
   });
   it("validations still fire on unchanged association with custom validation context", async () => {
     class Post extends Base {
