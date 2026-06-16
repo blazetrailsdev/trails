@@ -789,11 +789,8 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     const records = await this.all()
       .where({ [this.primaryKey as string]: castIds })
       .toArray();
-    // Match found records to requested ids by a numeric-agnostic key:
-    // a `bigint` PK (PG `bigserial` → JS BigInt) and a `number`/string id
-    // for the same row must compare equal, mirroring Ruby's `1 == 1`. A
-    // raw `Set`/`Map` keyed on the values would treat `1n` and `1` as
-    // distinct and spuriously raise RecordNotFound.
+    // Key by pkMatchKey so a BigInt PK matches the number/string id passed in
+    // (a raw-value Map would miss `1n` vs `1` and spuriously raise below).
     const idToRecord = new Map<unknown, any>();
     for (const r of records) idToRecord.set(pkMatchKey(r.id), r);
     if (records.length !== castIds.length) {
