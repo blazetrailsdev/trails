@@ -72,12 +72,9 @@ interface CoreRecord {
  * Mirrors: ActiveRecord::Core#inspect
  */
 export function inspect(this: CoreRecord): string {
-  const ctor = this.constructor as { name: string };
-  // Rails: inspect builds attribute strings via format_for_inspect (same as attribute_for_inspect)
-  const attrs = Array.from(this._attributes)
-    .map(([k, v]) => `${k}: ${formatForInspect.call(this, k, v)}`)
-    .join(", ");
-  return `#<${ctor.name} ${attrs}>`;
+  // Rails: inspect → inspect_with_attributes(attributes_for_inspect), which
+  // honors a per-model attributes_for_inspect override (defaults to :all).
+  return inspectWithAttributes.call(this as any, attributesForInspect.call(this));
 }
 
 /**
