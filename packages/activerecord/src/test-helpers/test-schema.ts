@@ -182,7 +182,10 @@ export const TEST_SCHEMA: Schema = {
     indexes: [
       { columns: ["author_id", "name"], unique: true },
       { columns: "isbn", unique: true, where: "published_on IS NOT NULL" },
-      { columns: "(lower(external_id))", unique: true },
+      // Explicit name matches Rails' default for this expression index; the
+      // schema-dump/reload path that builds the worker DB otherwise re-derives
+      // the name from the parenthesised SQL.
+      { columns: "(lower(external_id))", unique: true, name: "index_books_on_lower_external_id" },
     ],
   },
 

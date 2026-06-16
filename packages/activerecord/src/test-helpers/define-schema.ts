@@ -182,18 +182,23 @@ function indexesOf(table: TableSchema): IndexSpec[] {
 }
 
 /**
- * Whether the adapter supports expression indexes. Best-effort: MySQL's getter
- * reads `databaseVersion`, which can throw before it is primed in test setup —
- * treat that (and a missing getter) as unsupported so we skip the expression
- * index rather than emit invalid DDL.
+ * Whether the adapter supports expression indexes. The getter reads
+ * `databaseVersion` synchronously (SQLite ≥ 3.9, MySQL ≥ 8.0.13, never MariaDB),
+ * which throws before the version cache is populated — so prime it via the
+ * async `getDatabaseVersion()` first. A missing/throwing getter is treated as
+ * unsupported, so we skip the expression index rather than emit invalid DDL.
  *
  * @internal
  */
-function supportsExpressionIndex(adapter: DatabaseAdapter): boolean {
-  const fn = (adapter as { supportsExpressionIndex?: () => boolean }).supportsExpressionIndex;
-  if (typeof fn !== "function") return false;
+async function supportsExpressionIndex(adapter: DatabaseAdapter): Promise<boolean> {
+  const a = adapter as {
+    supportsExpressionIndex?: () => boolean;
+    getDatabaseVersion?: () => Promise<unknown>;
+  };
+  if (typeof a.supportsExpressionIndex !== "function") return false;
   try {
-    return fn.call(adapter);
+    if (typeof a.getDatabaseVersion === "function") await a.getDatabaseVersion();
+    return a.supportsExpressionIndex();
   } catch {
     return false;
   }
@@ -831,7 +836,7 @@ async function _defineSchemaImpl(
       // here — the SchemaCreation visitor drops it where unsupported, mirroring
       // Rails schema_creation.rb.)
       const isExpression = typeof index.columns === "string" && /\W/.test(index.columns);
-      if (isExpression && !supportsExpressionIndex(adapter)) continue;
+      if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
       await ss.addIndex(table, index.columns, {
         unique: index.unique,
         where: index.where,
