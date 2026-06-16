@@ -87,6 +87,9 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
 import * as Reflection from "./reflection.js";
+import type { AssociationReflection } from "./reflection.js";
+import { foreignKeyPresentFor } from "./associations/foreign-association.js";
+import { throughForeignKeyPresent } from "./associations/through-association.js";
 
 /**
  * Association options.
@@ -947,6 +950,54 @@ export function _violatesStrictLoading(record: Base, options: AssociationOptions
 }
 
 /**
+ * Whether a lazy load would actually reach `find_target` — and therefore
+ * `violates_strict_loading?`. Rails gates the strict-loading check inside
+ * `find_target`, which `find_target?` only enters when
+ * `!owner.new_record? || foreign_key_present?` (association.rb:320). So a *new*
+ * strict-loading owner WITHOUT the foreign key present never raises on a lazy
+ * load; it returns nil/[] silently. This returns false for exactly that case so
+ * callers can skip the violation, matching `find_target?` / `null_scope?`.
+ *
+ * `foreign_key_present?` has the same two-branch dispatch used by the OO
+ * association and `CollectionProxy._foreignKeyPresent`: a belongs_to reads the
+ * owner-side FK columns; a `:through` routes through its belongs_to
+ * (`ThroughAssociation#foreign_key_present?`); a vanilla has_one/has_many/habtm
+ * requires the owner's `active_record_primary_key`
+ * (`ForeignAssociation#foreign_key_present?`).
+ *
+ * @internal
+ */
+function _findTargetReachable(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+  kind: "belongsTo" | "foreign",
+): boolean {
+  if (!record.isNewRecord()) return true;
+  return _associationForeignKeyPresent(record, assocName, options, kind);
+}
+
+function _associationForeignKeyPresent(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+  kind: "belongsTo" | "foreign",
+): boolean {
+  const ctor = record.constructor as typeof Base;
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (options.through) {
+    return reflection ? throughForeignKeyPresent({ owner: record, reflection }) : false;
+  }
+  if (kind === "belongsTo") {
+    const fk = options.foreignKey ?? options.queryConstraints;
+    const fkNames =
+      typeof fk === "string" ? [fk] : Array.isArray(fk) ? fk : [`${underscore(assocName)}_id`];
+    return fkNames.every((name) => record._readAttribute(name) != null);
+  }
+  return reflection ? foreignKeyPresentFor(reflection as AssociationReflection, record) : false;
+}
+
+/**
  * Load a belongs_to association.
  */
 export async function loadBelongsTo(
@@ -1018,8 +1069,13 @@ export async function loadBelongsTo(
     }
   }
 
-  // Strict loading check: this is a lazy load
-  if (_violatesStrictLoading(record, options)) {
+  // Strict loading check: this is a lazy load. Gated by `find_target?` — a
+  // new-record owner without the FK present never reaches `find_target` and so
+  // never raises (it falls through to the null-FK short-circuit below).
+  if (
+    _violatesStrictLoading(record, options) &&
+    _findTargetReachable(record, assocName, options, "belongsTo")
+  ) {
     strictLoadingViolationBang(record, assocName, {
       polymorphic: options.polymorphic,
       className: options.className,
@@ -1137,8 +1193,12 @@ export async function loadHasOne(
     return loaded.value;
   }
 
-  // Strict loading check
-  if (_violatesStrictLoading(record, options)) {
+  // Strict loading check. Gated by `find_target?`: a new-record owner without
+  // the FK present never reaches `find_target` and so never raises.
+  if (
+    _violatesStrictLoading(record, options) &&
+    _findTargetReachable(record, assocName, options, "foreign")
+  ) {
     strictLoadingViolationBang(record, assocName, { className: options.className });
   }
 
@@ -1350,8 +1410,12 @@ export async function loadHasMany(
     }
   }
 
-  // Strict loading check
-  if (_violatesStrictLoading(record, options)) {
+  // Strict loading check. Gated by `find_target?`: a new-record owner without
+  // the FK present never reaches `find_target` and so never raises.
+  if (
+    _violatesStrictLoading(record, options) &&
+    _findTargetReachable(record, assocName, options, "foreign")
+  ) {
     strictLoadingViolationBang(record, assocName, {
       className: options.className ?? camelize(singularize(assocName)),
     });
@@ -2038,17 +2102,13 @@ export async function loadHabtm(
   }
 
   // Lazily loading a HABTM on a strict-loading owner (or a reflection marked
-  // `strictLoading: true`) is a violation, just like the other macros.
-  //
-  // Ordering matches the sibling collection loaders (loadHasMany guards before
-  // its null-FK return): the guard runs ahead of the unsaved-owner / null-PK
-  // short-circuit below. Rails instead reaches `violates_strict_loading?` only
-  // from inside `find_target`, which `find_target?` gates on
-  // `!owner.new_record? || foreign_key_present?` — so a *new* strict owner with
-  // a plain HABTM returns `[]` without raising. Replicating that requires a
-  // `find_target?`-style new-record check ahead of this guard across all
-  // collection loaders; deferred (see the new-record bucket in the PR).
-  if (_violatesStrictLoading(record, options)) {
+  // `strictLoading: true`) is a violation, just like the other macros. Gated by
+  // `find_target?`: a *new* strict owner without the FK present never reaches
+  // `find_target`, so it returns `[]` without raising.
+  if (
+    _violatesStrictLoading(record, options) &&
+    _findTargetReachable(record, assocName, options, "foreign")
+  ) {
     strictLoadingViolationBang(record, assocName, {
       className: options.className ?? camelize(singularize(assocName)),
     });
