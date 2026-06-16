@@ -2813,6 +2813,53 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * Whether find should read the in-memory target rather than querying the
+   * database. Canonical for the proxy path (the proxy owns `_target` and its
+   * loaded flag); the module-level `isFindFromTarget(proxy)` helper resolves
+   * here via `_association`. Mirrors
+   * ActiveRecord::Associations::CollectionAssociation#find_from_target?
+   * (collection_association.rb:308) — kept in clause-order parity with
+   * `CollectionAssociation#isFindFromTarget`.
+   *
+   * @internal
+   */
+  isFindFromTarget(): boolean {
+    return (
+      this._targetLoaded ||
+      (this._record.isStrictLoading() && this._record.isStrictLoadingAll()) ||
+      !!this._assocDef.options.strictLoading ||
+      this._record.isNewRecord() ||
+      this._target.some((r) => r.isNewRecord() || !!(r as any).changed)
+    );
+  }
+
+  /**
+   * Render the collection, loading the target (from memory when
+   * `find_from_target?`, otherwise via a bounded query) without forcing a
+   * premature reload. Mirrors
+   * ActiveRecord::Associations::CollectionProxy#inspect, which delegates to
+   * Relation#inspect after `load_target if find_from_target?`.
+   *
+   * Rails' proxy inspect is synchronous (blocking DB I/O inside `inspect`);
+   * JS has no blocking I/O, so loading the target here is async. This widens
+   * the return to `Promise<string>` vs Relation#inspect's `string`.
+   */
+  // @ts-expect-error async divergence from Relation#inspect — see doc comment.
+  async inspect(): Promise<string> {
+    if (this.isFindFromTarget()) await this.loadTarget();
+    const limitValue = (this as any)._limitValue as number | null;
+    const take = limitValue != null ? Math.min(limitValue, 11) : 11;
+    // Rails' unloaded branch is `annotate("loading for inspect").take(...)`
+    // (relation.rb:1291); carry the annotation onto the bounded query.
+    const subject = this._targetLoaded
+      ? this._target
+      : ((await this.annotate("loading for inspect").limit(take).toArray()) as T[]);
+    const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
+    if (entries.length === 11) entries[10] = "...";
+    return `#<${this.constructor.name} [${entries.join(", ")}]>`;
+  }
+
+  /**
    * Build and save a new associated record, raising on validation failure.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#create!
