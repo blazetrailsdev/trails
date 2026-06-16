@@ -74,6 +74,14 @@ export async function transaction<T>(
   fn: (tx: PublicTransaction) => Promise<T>,
   options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
 ): Promise<T | undefined> {
+  if (options) {
+    for (const key of Object.keys(options)) {
+      if (key !== "isolation" && key !== "requiresNew" && key !== "joinable") {
+        throw new ArgumentError(`unknown keyword: :${key}`);
+      }
+    }
+  }
+
   const adapter = modelClass.connection;
 
   const result = await dbTransaction.call(
