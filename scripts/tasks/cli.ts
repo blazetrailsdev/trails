@@ -1947,11 +1947,17 @@ export function migrateDuplicateRfcDir(tasksDir: string, dup: DuplicateRfcDir): 
   }
   for (const name of storyNames) {
     if (existsSync(join(toStories, name))) {
-      console.error(
-        `error: cannot reconcile duplicate RFC dir rfcs/${dup.draftSlug}: story ` +
+      // THROW, don't process.exit: this collision can fire inside
+      // commitAndPush's acquired tasks lock (reconcile runs after the mutator,
+      // before commit). process.exit would skip the lock's `finally` and leak
+      // the shared lock until stale-steal. Throwing instead unwinds through
+      // commitAndPush's mutator try/catch (rollback + re-throw) and out to the
+      // `finally { releaseTasksLock }`. The check is pre-flight — no fs mutation
+      // has happened yet — so the rollback stays clean.
+      throw new Error(
+        `cannot reconcile duplicate RFC dir rfcs/${dup.draftSlug}: story ` +
           `"${name}" already exists in rfcs/${dup.finalSlug}/stories. Resolve by hand.`,
       );
-      process.exit(1);
     }
   }
   if (storyNames.length > 0) mkdirSync(toStories, { recursive: true });

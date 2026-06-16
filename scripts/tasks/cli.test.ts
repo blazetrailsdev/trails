@@ -915,6 +915,36 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(moved).not.toContain("0000-foo");
   });
 
+  // A reconcile collision (a same-named story already in the finalized dir)
+  // fires inside the acquired lock. It must release the lock on the way out —
+  // migrateDuplicateRfcDir throws (rather than process.exit) so the throw
+  // unwinds through the mutator rollback and commitAndPush's `finally`.
+  it("releases the lock when a reconcile collision throws", () => {
+    const { lockDir } = setup();
+    const cwd = mkdtempSync(join(tmpdir(), "tasks-cap-collide-"));
+    for (const slug of ["0000-foo", "0031-foo"]) {
+      mkdirSync(join(cwd, "rfcs", slug, "stories"), { recursive: true });
+      writeFileSync(join(cwd, "rfcs", slug, "stories", "r1.md"), slug);
+    }
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
+    expect(() =>
+      commitAndPush({
+        message: "test",
+        fileToStage: "/some/file.md",
+        cwd,
+        mutator: () => {},
+        raceMessage: "no",
+        raceExitCode: 99,
+      }),
+    ).toThrow(/already exists/);
+    // The lock file is gone — `finally { releaseTasksLock }` ran, no leak.
+    expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
+  });
+
   // Mimic execFileSync's failure shape: attach .stderr to the error so
   // commitAndPush's race-vs-real-failure discriminator can inspect it.
   function pushError(stderr: string): Error {
@@ -2552,26 +2582,24 @@ describe("duplicate RFC-dir reconciliation", () => {
     expect(existsSync(join(dir, "rfcs", "0000-bar"))).toBe(true);
   });
 
-  it("refuses (exit 1) when a story of the same name already exists in the finalized dir", () => {
+  // Refuses by THROWING (not process.exit) so the shared tasks lock held by
+  // commitAndPush is released via its `finally` rather than leaked.
+  it("throws when a story of the same name already exists in the finalized dir", () => {
     const dir = makeTasks({
       "0000-foo": { stories: { "r1.md": "placeholder" } },
       "0031-foo": { readme: true, stories: { "r1.md": "finalized" } },
     });
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-      throw new Error(`exit ${code}`);
-    }) as never);
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() =>
       migrateDuplicateRfcDir(dir, {
         draftSlug: "0000-foo",
         finalSlug: "0031-foo",
         bareSlug: "foo",
       }),
-    ).toThrow(/exit 1/);
-    expect(errSpy.mock.calls.some((c) => /already exists/.test(String(c[0])))).toBe(true);
-    // Both dirs untouched — nothing migrated, nothing removed.
+    ).toThrow(/already exists/);
+    // Pre-flight refusal: both dirs untouched — nothing migrated, nothing removed.
     expect(readFileSync(join(dir, "rfcs", "0031-foo", "stories", "r1.md"), "utf8")).toBe(
       "finalized",
     );
+    expect(existsSync(join(dir, "rfcs", "0000-foo", "stories", "r1.md"))).toBe(true);
   });
 });
