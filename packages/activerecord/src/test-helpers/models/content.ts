@@ -9,8 +9,9 @@ export class Content extends Base {
   static {
     this.hasOne("contentPosition", { dependent: "destroy" });
     this.beforeDestroy(function (this: Content, record?: Content) {
-      // Dependent-destroy cascade dispatches with the record as the first
-      // argument; `this` may be unbound on that path.
+      // The callback runner (activesupport ProcCall) invokes function filters as
+      // `fn(record)` with `this` unbound, so read the record argument — matching
+      // the documented `beforeDestroy(fn: (record) => ...)` contract.
       const self = (record ?? this) as Content;
       Content.destroyedIds.push(self.id as number);
     });
@@ -42,6 +43,8 @@ export class ContentPosition extends Base {
   static {
     this.belongsTo("content", { dependent: "destroy" });
     this.beforeDestroy(function (this: ContentPosition, record?: ContentPosition) {
+      // See Content.beforeDestroy: `this` is unbound for function filters; the
+      // record arrives as the first argument.
       const self = (record ?? this) as ContentPosition;
       ContentPosition.destroyedIds.push(self.id as number);
     });
