@@ -306,6 +306,8 @@ the public `build()` is a sync Rails-parity API), but the collection load
 driver. A synchronous proc therefore cannot `await` the load, so the best
 the port can do is fire-and-forget:
 
+<!-- typecheck:skip -->
+
 ```ts
 NwcPirate.hasMany("birdsWithAddLoad", {
   beforeAdd: (p, b) => {
