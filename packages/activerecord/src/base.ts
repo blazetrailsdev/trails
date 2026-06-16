@@ -52,6 +52,7 @@ import {
   isStiSubclass,
   getStiBase,
   instantiateSti,
+  stiName,
   computeType as inheritanceComputeType,
   subclasses as inheritanceSubclasses,
   descendants as inheritanceDescendants,
@@ -1723,7 +1724,9 @@ export class Base extends Model {
     // by type. The column resolves on the subclass itself (default "type").
     if (isFinderNeedsTypeCondition(this)) {
       const col = getInheritanceColumn(this);
-      const stiNames = [this.name, ...this.descendants.map((d: typeof Base) => d.name)];
+      // Rails: `([self] + descendants).map(&:sti_name)` (inheritance.rb#type_condition)
+      // — `sti_name` honors `store_full_sti_class` / overrides, not the bare class name.
+      const stiNames = [stiName(this), ...this.descendants.map((d: typeof Base) => stiName(d))];
       return rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
     }
     return rel;

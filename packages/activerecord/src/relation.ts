@@ -5470,7 +5470,10 @@ export class Relation<T extends Base> {
     if (!klass.isFinderNeedsTypeCondition?.()) return false;
     const connection = klass.connection;
     if (!connection?.toSql) return false;
-    const baseline = klass._buildUnscopedRelation?.();
+    // Build the baseline against this relation's own table so an alias-qualified
+    // relation compares its type_condition against an identically-qualified one
+    // rather than the default arel_table.
+    const baseline = klass._buildUnscopedRelation?.(this._table ?? undefined);
     if (!baseline) return false;
     try {
       return this._whereClause.toSql(connection) === baseline._whereClause.toSql(connection);
