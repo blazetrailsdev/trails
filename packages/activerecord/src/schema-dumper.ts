@@ -345,10 +345,43 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
  * `pg_attrdef.adbin`. For already-deserialized ORM values (e.g. bit-strings
  * like `"00000011"`) use `cleanDefault` instead.
  */
+/**
+ * Translate a PG infinity/NaN default string to its JS numeric literal, or
+ * `undefined` when the string is an ordinary value. Used by the dumper so
+ * `'Infinity'`/`'-infinity'`/`'NaN'` catalog defaults round-trip through
+ * schema dump as `Infinity`/`-Infinity`/`NaN`.
+ */
+/** Render a non-finite JS number as the literal used in a schema dump. */
+function formatNonFinite(v: number): string {
+  if (Number.isNaN(v)) return "NaN";
+  return v > 0 ? "Infinity" : "-Infinity";
+}
+
+function mapNonFiniteDefault(content: string): number | undefined {
+  switch (content.toLowerCase()) {
+    case "infinity":
+      return Infinity;
+    case "-infinity":
+      return -Infinity;
+    case "nan":
+      return NaN;
+    default:
+      return undefined;
+  }
+}
+
 export function cleanRawPgExpression(raw: string): unknown {
   const castMatch = raw.match(/^'((?:[^']|'')*)'(::[\w\s."[\](),]+)+$/);
   if (castMatch) {
-    return castMatch[1].replace(/''/g, "'");
+    const content = castMatch[1].replace(/''/g, "'");
+    // PG renders Infinity/NaN float and date/timestamp defaults as quoted
+    // catalog strings (`'Infinity'`, `'-infinity'`, `'NaN'`). Rails translates
+    // these to the JS `Float::INFINITY`/`NAN` literals so they round-trip
+    // (schema dumper emits them unquoted, see formatColspec). Match
+    // case-insensitively: float uses `Infinity`, timestamp/date use `infinity`.
+    const nonFinite = mapNonFiniteDefault(content);
+    if (nonFinite !== undefined) return nonFinite;
+    return content;
   }
 
   const numericCastMatch = raw.match(/^\(?(-?\d+(?:\.\d+)?)\)?(::[\w\s."[\](),]+)+$/);
@@ -1247,6 +1280,12 @@ export class SchemaDumper {
         if (v && typeof v === "object" && !Array.isArray(v)) {
           const inner = this.formatColspec(v as Record<string, unknown>);
           return `${k}: ${inner ? `{ ${inner} }` : "{}"}`;
+        }
+        // JSON.stringify renders non-finite numbers as `null`; emit the JS
+        // literal so PG Infinity/NaN defaults round-trip (mirrors Rails'
+        // `Float::INFINITY` / `Float::NAN` schema output).
+        if (typeof v === "number" && !Number.isFinite(v)) {
+          return `${k}: ${formatNonFinite(v)}`;
         }
         return `${k}: ${JSON.stringify(v)}`;
       })

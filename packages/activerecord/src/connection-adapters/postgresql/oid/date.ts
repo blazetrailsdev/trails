@@ -51,8 +51,10 @@ export class Date extends DateType {
   }
 
   override serialize(value: unknown): string | null {
-    if (value === DateInfinity) return "infinity";
-    if (value === DateNegativeInfinity) return "-infinity";
+    // Rails passes `Float::INFINITY` as a date default; mirror that by
+    // accepting the JS non-finite numbers alongside our infinity sentinels.
+    if (value === DateInfinity || value === Infinity) return "infinity";
+    if (value === DateNegativeInfinity || value === -Infinity) return "-infinity";
     return super.serialize(value);
   }
 

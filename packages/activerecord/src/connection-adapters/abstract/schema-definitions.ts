@@ -429,6 +429,8 @@ export interface ColumnMethods {
   datetime(name: string, options?: ColumnOptions): unknown;
   timestamp(name: string, options?: ColumnOptions): unknown;
   binary(name: string, options?: ColumnOptions): unknown;
+  blob(name: string, options?: ColumnOptions): unknown;
+  numeric(name: string, options?: ColumnOptions): unknown;
   json(name: string, options?: ColumnOptions): unknown;
   virtual(
     name: string,
@@ -990,6 +992,17 @@ export class TableDefinition {
 
   binary(name: string, options: ColumnOptions = {}): this {
     return this.column(name, "binary", options);
+  }
+
+  // Mirrors Rails' `alias :blob :binary` / `alias :numeric :decimal` in
+  // abstract/schema_definitions.rb — `t.blob`/`t.numeric` create binary/decimal
+  // columns that introspect (and dump) back as `t.binary`/`t.decimal`.
+  blob(name: string, options: ColumnOptions = {}): this {
+    return this.binary(name, options);
+  }
+
+  numeric(name: string, options: ColumnOptions = {}): this {
+    return this.decimal(name, options);
   }
 
   json(name: string, options: ColumnOptions = {}): this {

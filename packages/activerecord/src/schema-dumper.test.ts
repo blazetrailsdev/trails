@@ -355,11 +355,14 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toMatch(/float.*"temperature".*limit/);
   });
 
-  it.skip("schema dump aliased types", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs type aliasing support */
+  it("schema dump aliased types", async () => {
+    await ctx.createTable("aliased_types", {}, (t) => {
+      t.blob("blob_data");
+      t.numeric("numeric_number");
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toMatch(/t\.binary\("blob_data"\)/);
+    expect(output).toMatch(/t\.decimal\("numeric_number"/);
   });
   itIfSupports("expression_index", "schema dump expression indices", async () => {
     await ctx.createTable("users", {}, (t) => {
@@ -847,11 +850,23 @@ describe("SchemaDumperDefaultsTest", () => {
     expect(output).toMatch(/text.*"text_with_default".*default: "John"/);
   });
 
-  it.skip("schema dump with column infinity default", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Infinity default handling */
+  it.skipIf(adapterType !== "postgres")("schema dump with column infinity default", async () => {
+    const { adapter: testAdapter, ctx: testCtx } = freshSidecarCtx();
+    await testCtx.createTable("infinity_defaults", {}, (t) => {
+      t.float("float_with_inf_default", { default: Infinity });
+      t.float("float_with_nan_default", { default: NaN });
+      t.datetime("beginning_of_time", { default: -Infinity });
+      t.datetime("end_of_time", { default: Infinity });
+      t.date("date_with_neg_inf_default", { default: -Infinity });
+      t.date("date_with_pos_inf_default", { default: Infinity });
+    });
+    const output = await SchemaDumper.dump(testAdapter);
+    expect(output).toMatch(/t\.float\("float_with_inf_default",\s*\{[^}]*default: Infinity/);
+    expect(output).toMatch(/t\.float\("float_with_nan_default",\s*\{[^}]*default: NaN/);
+    expect(output).toMatch(/t\.datetime\("beginning_of_time",\s*\{[^}]*default: -Infinity/);
+    expect(output).toMatch(/t\.datetime\("end_of_time",\s*\{[^}]*default: Infinity/);
+    expect(output).toMatch(/t\.date\("date_with_neg_inf_default",\s*\{[^}]*default: -Infinity/);
+    expect(output).toMatch(/t\.date\("date_with_pos_inf_default",\s*\{[^}]*default: Infinity/);
   });
 });
 
