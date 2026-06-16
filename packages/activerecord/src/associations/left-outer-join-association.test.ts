@@ -119,12 +119,12 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(true);
   });
 
-  it.skip("left outer joins is deduped when same association is joined", () => {
-    // BLOCKED: join dedup gap. Rails:
-    //   Author.joins(:posts).left_outer_joins(:posts)
-    // dedupes the duplicated association to a single INNER JOIN; trails emits
-    // BOTH an INNER JOIN and a LEFT OUTER JOIN for `posts`. Tracked: RFC 0030
-    // story left-outer-joins-inner-dedup.
+  it("left outer joins is deduped when same association is joined", async () => {
+    const queries = await captureSql(async () => {
+      await Author.joins("posts").leftOuterJoins("posts").toArray();
+    });
+    expect(queries.some((sql) => /INNER JOIN/i.test(sql))).toBe(true);
+    expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(false);
   });
 
   it("construct finder sql ignores empty left outer joins hash", async () => {
