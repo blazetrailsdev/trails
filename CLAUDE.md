@@ -82,8 +82,9 @@ package list, and the `declare` / associations / enums / schema reference, see
   default canonical tables (and the official models in
   `packages/activerecord/src/test-helpers/models/`) over `defineSchema`. Table,
   column, and model names must match Rails exactly. The
-  `blazetrails/require-canonical-schema` ESLint rule enforces this for every file
-  not grandfathered in `eslint/require-canonical-schema-exclude.json`; **when you
+  `blazetrails/require-canonical-schema` ESLint rule enforces this in every AR
+  `*.test.ts` (except `test-helpers/`, which exercises `defineSchema` itself) that
+  isn't grandfathered in `eslint/require-canonical-schema-exclude.json`; **when you
   touch a grandfathered file, convert it to canonical and drop its exclude entry
   in the same PR** (burning that list to zero is RFC 0019, which gates the RFC
   0030 un-skip campaign). If a test needs something the canonical schema lacks,
