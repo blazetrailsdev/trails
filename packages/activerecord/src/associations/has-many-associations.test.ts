@@ -469,15 +469,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     await Person.loadSchema();
   });
 
-  // BLOCKED (tracked-pending-convergence): a new-record owner with a custom
-  // primary key present should still fetch its has_many collection (Rails
-  // ForeignAssociation#foreign_key_present?), but the canonical reflection's
-  // association scope applies `none` (AND 1=0) for new-record owners because a
-  // second reflection in the scope chain resolves `activeRecordPrimaryKey` to
-  // undefined → falls back to `id` → reports the FK absent. `size()` returns
-  // the correct count via the proxy COUNT path, but `toArray()` returns []. See
-  // convergence story has-many-new-record-custom-pk-null-scope.
-  it.skip("custom primary key on new record should fetch with query", async () => {
+  it("custom primary key on new record should fetch with query", async () => {
     const subscriber = new Subscriber({ nick: "webster132" });
     const subscriptions = association(subscriber, "subscriptions");
     expect(subscriptions.loaded).toBe(false);
@@ -491,9 +483,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
-  // BLOCKED (tracked-pending-convergence): same root cause as above — see
-  // convergence story has-many-new-record-custom-pk-null-scope.
-  it.skip("association primary key on new record should fetch with query", async () => {
+  it("association primary key on new record should fetch with query", async () => {
     const author = new Author({ name: "David" });
     const essays = association(author, "essays");
     expect(essays.loaded).toBe(false);

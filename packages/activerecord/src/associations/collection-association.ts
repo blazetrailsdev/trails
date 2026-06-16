@@ -498,10 +498,23 @@ export class CollectionAssociation extends Association {
    * `CollectionProxy#_foreignKeyPresent` so the two never disagree.
    */
   protected override foreignKeyPresent(): boolean {
-    const reflection = this.reflection as unknown as AssociationReflection;
     if (this.reflection.options.through) {
-      return throughForeignKeyPresent({ owner: this.owner, reflection });
+      return throughForeignKeyPresent({
+        owner: this.owner,
+        reflection: this.reflection as unknown as AssociationReflection,
+      });
     }
+    // Resolve the *rich* reflection (the registered Reflection instance) the
+    // same way `Association#scope` does. `this.reflection` is the lightweight
+    // AssociationDefinition, which has no `activeRecordPrimaryKey` getter — so
+    // `foreignKeyPresentFor` would fall back to `"id"` and report a custom-PK
+    // owner's FK absent, wrongly nullifying the scope for a new-record owner
+    // whose custom PK is present (e.g. `Subscriber#subscriptions`).
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const reflection = (ctor._reflectOnAssociation?.(this.reflection.name) ??
+      this.reflection) as unknown as AssociationReflection;
     return foreignKeyPresentFor(reflection, this.owner);
   }
 
