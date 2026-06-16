@@ -150,29 +150,43 @@ export const TEST_SCHEMA: Schema = {
   // defineSchema currently emits the adapter-default PK type; fixture row
   // ids fit either width, so the override is dropped.
   books: {
-    author_id: "integer",
-    format: "string",
-    format_record_id: "integer",
-    format_record_type: "string",
-    name: "string",
-    status: { type: "integer", default: 0 },
-    last_read: { type: "integer", default: 0 },
-    nullable_status: "integer",
-    language: { type: "integer", default: 0 },
-    author_visibility: { type: "integer", default: 0 },
-    illustrator_visibility: { type: "integer", default: 0 },
-    font_size: { type: "integer", default: 0 },
-    difficulty: { type: "integer", default: 0 },
-    cover: { type: "string", default: "hard" },
-    isbn: "string",
-    external_id: "string",
-    original_name: "string",
-    published_on: "datetime",
-    boolean_status: "boolean",
-    tags_count: { type: "integer", default: 0 },
-    created_at: "datetime",
-    updated_at: "datetime",
-    updated_on: "date",
+    columns: {
+      author_id: "integer",
+      format: "string",
+      format_record_id: "integer",
+      format_record_type: "string",
+      name: "string",
+      status: { type: "integer", default: 0 },
+      last_read: { type: "integer", default: 0 },
+      nullable_status: "integer",
+      language: { type: "integer", default: 0 },
+      author_visibility: { type: "integer", default: 0 },
+      illustrator_visibility: { type: "integer", default: 0 },
+      font_size: { type: "integer", default: 0 },
+      difficulty: { type: "integer", default: 0 },
+      cover: { type: "string", default: "hard" },
+      isbn: "string",
+      external_id: "string",
+      original_name: "string",
+      published_on: "datetime",
+      boolean_status: "boolean",
+      tags_count: { type: "integer", default: 0 },
+      created_at: "datetime",
+      updated_at: "datetime",
+      updated_on: "date",
+    },
+    // Mirrors Rails schema.rb books indexes. The partial `where` is dropped on
+    // adapters without partial-index support (Rails schema_creation.rb:120), and
+    // the expression index is emitted only where supported (Rails' schema.rb
+    // `if supports_expression_index?`) — defineSchema applies both gates.
+    indexes: [
+      { columns: ["author_id", "name"], unique: true },
+      { columns: "isbn", unique: true, where: "published_on IS NOT NULL" },
+      // Explicit name matches Rails' default for this expression index; the
+      // schema-dump/reload path that builds the worker DB otherwise re-derives
+      // the name from the parenthesised SQL.
+      { columns: "(lower(external_id))", unique: true, name: "index_books_on_lower_external_id" },
+    ],
   },
 
   encrypted_books: {

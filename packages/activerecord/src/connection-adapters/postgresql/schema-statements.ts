@@ -20,7 +20,9 @@ export interface PgIndexDefinition {
   table: string;
   name: string;
   unique: boolean;
-  columns: string[];
+  // A string for expression indexes (the raw expression), an array of column
+  // names otherwise — mirrors Rails' IndexDefinition#columns.
+  columns: string | string[];
   using: string;
   orders?: Record<string, string> | string;
   opclasses?: Record<string, string> | string;

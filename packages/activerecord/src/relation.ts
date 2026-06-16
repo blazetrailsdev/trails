@@ -3727,6 +3727,9 @@ export class Relation<T extends Base> {
       recordTimestamps?: boolean;
     },
   ): Promise<Result> {
+    // Rails' Relation#insert_all always passes `on_duplicate: :skip` (regardless
+    // of unique_by); the conflict target is only narrowed when unique_by is
+    // given, otherwise `ON CONFLICT DO NOTHING` skips every constraint violation.
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
       onDuplicate: "skip",

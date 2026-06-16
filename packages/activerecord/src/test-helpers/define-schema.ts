@@ -52,6 +52,19 @@ export type ColumnSpec =
       array?: boolean;
     };
 
+/**
+ * A table-level index, mirroring Rails' `t.index`. `columns` is a column name,
+ * a list of names, or a raw expression string (e.g. `"(lower(external_id))"`)
+ * kept verbatim with the name derived from its `\w+` runs. Pass `where` for a
+ * partial index.
+ */
+export interface IndexSpec {
+  columns: string | string[];
+  unique?: boolean;
+  where?: string;
+  name?: string;
+}
+
 export interface WrappedTableSchema {
   columns: Record<string, ColumnSpec>;
   /**
@@ -60,15 +73,18 @@ export interface WrappedTableSchema {
    * Rails semantics — SQLite otherwise lets NULLs slip through composite
    * PKs). `false` builds the table without a PK. A single-string form is
    * intentionally not supported — pass `[name]` for a single-column
-   * non-`id` primary key.
+   * non-`id` primary key. Omit to keep the default auto-increment `id`.
    *
-   * Required: this is the disambiguator that separates the wrapper shape
-   * from the legacy `Record<colName, ColumnSpec>` shape. Without it, a
-   * legacy single-column table whose column happens to be named `columns`
-   * (with an object ColumnSpec) is structurally indistinguishable from a
-   * wrapper. If you don't need to override the PK, use the legacy shape.
+   * Together with {@link indexes}, this disambiguates the wrapper shape from
+   * the legacy `Record<colName, ColumnSpec>` shape: a wrapper carries `columns`
+   * plus at least one of `primaryKey` / `indexes`.
    */
-  primaryKey: string[] | false;
+  primaryKey?: string[] | false;
+  /**
+   * Table-level indexes, emitted via `add_index` after the table is created
+   * (mirrors Rails' `t.index`). Names default to Rails' `index_<table>_on_<cols>`.
+   */
+  indexes?: IndexSpec[];
 }
 export type TableSchema = Record<string, ColumnSpec> | WrappedTableSchema;
 export type Schema = Record<string, TableSchema>;
@@ -78,7 +94,7 @@ export interface DefineSchemaOpts {
 }
 
 /** @internal */
-const WRAPPER_KEYS = new Set(["columns", "primaryKey"]);
+const WRAPPER_KEYS = new Set(["columns", "primaryKey", "indexes"]);
 
 /** @internal */
 function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
@@ -92,18 +108,25 @@ function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
   // so it stays unambiguously legacy.
   //
   // Rule:
-  //   1. `primaryKey` is present.
-  //   2. `columns` is present and an object map.
-  //   3. No other top-level keys.
+  //   1. `columns` is present and an object map.
+  //   2. At least one of `primaryKey` / `indexes` is present (the
+  //      disambiguator from the legacy shape).
+  //   3. Any present `primaryKey` / `indexes` is wrapper-shaped.
+  //   4. No other top-level keys.
   if (!table || typeof table !== "object") return false;
-  if (!("primaryKey" in table)) return false;
-  const pk = (table as { primaryKey?: unknown }).primaryKey;
-  // Validate primaryKey is the wrapper-shaped value; otherwise this is a
-  // legacy table that happens to have a column called `primaryKey`.
-  if (pk !== false && !Array.isArray(pk)) return false;
-  if (Array.isArray(pk) && !pk.every((v) => typeof v === "string")) return false;
   const candidate = (table as { columns?: unknown }).columns;
   if (!candidate || typeof candidate !== "object") return false;
+  const hasPk = "primaryKey" in table;
+  const hasIndexes = "indexes" in table;
+  if (!hasPk && !hasIndexes) return false;
+  if (hasPk) {
+    const pk = (table as { primaryKey?: unknown }).primaryKey;
+    // Validate primaryKey is the wrapper-shaped value; otherwise this is a
+    // legacy table that happens to have a column called `primaryKey`.
+    if (pk !== false && !Array.isArray(pk)) return false;
+    if (Array.isArray(pk) && !pk.every((v) => typeof v === "string")) return false;
+  }
+  if (hasIndexes && !Array.isArray((table as { indexes?: unknown }).indexes)) return false;
   for (const key of Object.keys(table)) {
     if (!WRAPPER_KEYS.has(key)) return false;
   }
@@ -151,6 +174,34 @@ export function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
 /** @internal */
 function primaryKeyOf(table: TableSchema): string[] | false | undefined {
   return isWrappedSchema(table) ? table.primaryKey : undefined;
+}
+
+/** @internal */
+function indexesOf(table: TableSchema): IndexSpec[] {
+  return isWrappedSchema(table) ? (table.indexes ?? []) : [];
+}
+
+/**
+ * Whether the adapter supports expression indexes. The getter reads
+ * `databaseVersion` synchronously (SQLite ≥ 3.9, MySQL ≥ 8.0.13, never MariaDB),
+ * which throws before the version cache is populated — so prime it via the
+ * async `getDatabaseVersion()` first. A missing/throwing getter is treated as
+ * unsupported, so we skip the expression index rather than emit invalid DDL.
+ *
+ * @internal
+ */
+async function supportsExpressionIndex(adapter: DatabaseAdapter): Promise<boolean> {
+  const a = adapter as {
+    supportsExpressionIndex?: () => boolean;
+    getDatabaseVersion?: () => Promise<unknown>;
+  };
+  if (typeof a.supportsExpressionIndex !== "function") return false;
+  try {
+    if (typeof a.getDatabaseVersion === "function") await a.getDatabaseVersion();
+    return a.supportsExpressionIndex();
+  } catch {
+    return false;
+  }
 }
 
 /** @internal */
@@ -510,7 +561,7 @@ function tableSignature(table: TableSchema): string {
   const pk = primaryKeyOf(table);
   const sortedCols: Record<string, ColumnSpec> = {};
   for (const k of Object.keys(columns).sort()) sortedCols[k] = columns[k];
-  return JSON.stringify({ columns: sortedCols, primaryKey: pk ?? null });
+  return JSON.stringify({ columns: sortedCols, primaryKey: pk ?? null, indexes: indexesOf(table) });
 }
 
 /**
@@ -777,6 +828,21 @@ async function _defineSchemaImpl(
         t.column(colName, arType, options);
       }
     });
+    for (const index of indexesOf(raw)) {
+      // An expression index (Rails `t.index "(...)"`) is a string column with
+      // non-word characters. Rails' schema.rb gates these on
+      // `supports_expression_index?`, so skip them on adapters that lack it
+      // rather than emitting invalid DDL. (Partial-index `where` needs no gate
+      // here — the SchemaCreation visitor drops it where unsupported, mirroring
+      // Rails schema_creation.rb.)
+      const isExpression = typeof index.columns === "string" && /\W/.test(index.columns);
+      if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
+      await ss.addIndex(table, index.columns, {
+        unique: index.unique,
+        where: index.where,
+        name: index.name,
+      });
+    }
     cache.set(table, newSig);
     if (warm) await _warmSchemaCache(adapter, table);
   }

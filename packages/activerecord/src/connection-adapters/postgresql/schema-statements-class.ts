@@ -127,6 +127,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
                 ${includeFilter}
                 ORDER BY k
               ) AS columns,
+              (ix.indexprs IS NOT NULL) AS has_expressions,
               pg_get_indexdef(ix.indexrelid) AS definition,
               ix.indoption AS options,
               ix.indisvalid AS is_valid,
@@ -145,7 +146,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     );
 
     return rows.map((row) => {
-      const columns = row.columns as string[];
       const def = row.definition as string;
 
       // Extract the expressions, INCLUDE, NULLS NOT DISTINCT, and WHERE clauses.
@@ -164,17 +164,26 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       const where = whereStr?.trim();
       const nullsNotDistinct = nullsNotDistinctStr ? true : undefined;
 
-      // Parse opclasses and orders from the expressions string.
-      // Mirrors Rails regex: /(?<column>\w+)"?\s?(?<opclass>\w+_ops(_\w+)?)?\s?(?<desc>DESC)?\s?(?<nulls>NULLS (?:FIRST|LAST))?/
+      // Mirrors Rails (postgresql/schema_statements.rb:117-118): an expression
+      // index (`indkey.include?(0)`) stores `columns` as the raw expression
+      // string, so a conflict target / schema dump emits it verbatim rather
+      // than quoting it as a column name. Plain indexes keep the column array
+      // and parse opclasses/orders.
+      const hasExpressions = row.has_expressions as boolean;
+      const columns: string | string[] = hasExpressions ? expressions : (row.columns as string[]);
+
       const opclassesMap: Record<string, string> = {};
       const ordersMap: Record<string, string> = {};
-      const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
-      for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
-        if (opclass) opclassesMap[column] = opclass;
-        if (nulls) {
-          ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
-        } else if (desc) {
-          ordersMap[column] = "desc";
+      if (!hasExpressions) {
+        // Mirrors Rails regex: /(?<column>\w+)"?\s?(?<opclass>\w+_ops(_\w+)?)?\s?(?<desc>DESC)?\s?(?<nulls>NULLS (?:FIRST|LAST))?/
+        const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
+        for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
+          if (opclass) opclassesMap[column] = opclass;
+          if (nulls) {
+            ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
+          } else if (desc) {
+            ordersMap[column] = "desc";
+          }
         }
       }
 

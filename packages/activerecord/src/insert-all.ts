@@ -364,13 +364,6 @@ export class InsertAll {
     uniqueBy: string | string[] | IndexDefinition | undefined,
   ): Promise<IndexDefinition | undefined> {
     if (uniqueBy instanceof IndexDefinition) return uniqueBy;
-    // Rails returns nil here in the dominant nil-uniqueBy case (no matching
-    // unique index → line 163 returns nil since unique_by.nil?). Short-circuit
-    // before probing adapter capabilities so plain insertAll doesn't trigger
-    // lazy databaseVersion fetches on adapters whose supports_* getters read
-    // it synchronously (PG). Builder.conflictTarget falls back to primary
-    // keys when uniqueBy is undefined, matching Rails' nil path.
-    if (uniqueBy == null) return undefined;
     // Default to unsupported when the predicate is missing — matches Rails'
     // AbstractAdapter#supports_insert_conflict_target? returning false, so a
     // wrapper adapter that forgets to delegate doesn't silently fall through
@@ -392,18 +385,26 @@ export class InsertAll {
         ? conn.supportsInsertConflictTarget()
         : false;
     if (!supports) {
+      // Rails returns nil for a nil unique_by even when conflict targets are
+      // unsupported (plain insertAll on MySQL); a given unique_by raises.
       if (uniqueBy == null) return undefined;
       throw new ArgumentError(
         `${(conn as any).constructor?.name ?? "Adapter"} does not support :uniqueBy`,
       );
     }
+    // Rails: `name_or_columns = unique_by || model.primary_key`. The match runs
+    // against the model's configured primary key, while the primary-key branch
+    // below compares against the *database* primary keys (schema_cache), so a
+    // model whose configured PK lacks a backing unique index (e.g. Speedometer)
+    // raises rather than emitting a bogus conflict target.
     const nameOrCols =
       uniqueBy == null ? this.primaryKeys() : Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy];
-    const sortedMatch = [...nameOrCols].sort().join(",");
+    const match = nameOrCols.map(String);
+    const sortedMatch = [...match].sort().join(",");
     const tableName = this.model.arelTable.name;
     const idx = (await this.uniqueIndexes()).find(
       (i: any) =>
-        nameOrCols.includes(i.name) ||
+        match.includes(i.name) ||
         (Array.isArray(i.columns) && [...i.columns].sort().join(",") === sortedMatch),
     ) as { name: string; columns: string[]; where?: string } | undefined;
     if (idx) {
@@ -411,12 +412,22 @@ export class InsertAll {
         ? idx
         : new IndexDefinition(tableName, idx.name, true, idx.columns, { where: idx.where });
     }
-    if ([...nameOrCols].sort().join(",") === [...this.primaryKeys()].sort().join(",")) {
+    // The PK fallback is order-sensitive (Rails `match == primary_keys`,
+    // insert_all.rb:163) — unlike the index match above, which sorts. A
+    // composite PK supplied in a different column order falls through to the
+    // raise, matching Rails.
+    const dbPrimaryKeys = (await this.dbPrimaryKeys()).map(String);
+    if (match.join(",") === dbPrimaryKeys.join(",")) {
       return uniqueBy == null
         ? undefined
-        : new IndexDefinition(tableName, `${tableName}_primary_key`, true, [...nameOrCols]);
+        : new IndexDefinition(tableName, `${tableName}_primary_key`, true, [...match]);
     }
-    throw new Error(`No unique index found for ${JSON.stringify(uniqueBy)}`);
+    // Rails interpolates `name_or_columns` verbatim (insert_all.rb:165): a
+    // scalar renders bare, an array as a bracketed list.
+    const display = Array.isArray(uniqueBy)
+      ? `[${match.join(", ")}]`
+      : (uniqueBy ?? nameOrCols.join(", "));
+    throw new ArgumentError(`No unique index found for ${display}`);
   }
 
   /**
@@ -439,6 +450,29 @@ export class InsertAll {
       indexes = await cache.indexes(conn.pool ?? conn, tableName);
     }
     return (indexes as unknown[]).filter((i: any) => i.unique);
+  }
+
+  /**
+   * @internal
+   * Mirrors: ActiveRecord::InsertAll#primary_keys —
+   * `Array(model.schema_cache.primary_keys(table_name))`. This is the
+   * *database* primary key (empty for an id-less table), distinct from the
+   * model's configured `primary_key` used to build the conflict match.
+   */
+  private async dbPrimaryKeys(): Promise<string[]> {
+    const conn = this.connection as any;
+    const tableName = this.model.arelTable.name;
+    let pk: string | string[] | null | undefined;
+    const bound = conn.schemaCacheBound;
+    if (bound && typeof bound.primaryKeys === "function") {
+      pk = await bound.primaryKeys(tableName);
+    } else {
+      const cache = conn.schemaCache;
+      if (!cache || typeof cache.primaryKeys !== "function") return [];
+      pk = await cache.primaryKeys(conn.pool ?? conn, tableName);
+    }
+    if (pk == null) return [];
+    return Array.isArray(pk) ? pk : [pk];
   }
 
   /** @internal */
@@ -608,15 +642,27 @@ export class Builder implements InsertBuilder {
   }
 
   conflictTarget(): string {
+    // Mirrors ActiveRecord::InsertAll::Builder#conflict_target: a resolved
+    // unique index emits its columns (and partial WHERE); update_duplicates
+    // without a unique_by falls back to the primary keys; the skip path
+    // without a unique_by emits no target (`ON CONFLICT DO NOTHING` catches
+    // every constraint).
     const index = this._insertAll.uniqueBy;
     if (index instanceof IndexDefinition) {
-      const cols = index.columns.map((c) => `"${c}"`).join(", ");
+      // Expression indexes store `columns` as a raw SQL string (e.g.
+      // "(lower(external_id))"), kept verbatim like Rails' format_columns;
+      // ordinary column lists are quoted.
+      const rawCols = index.columns as unknown as string | string[];
+      const cols = Array.isArray(rawCols) ? rawCols.map((c) => `"${c}"`).join(", ") : rawCols;
       return index.where ? `(${cols}) WHERE ${index.where}` : `(${cols})`;
     }
-    // Pre-resolve fallback (skip path or update-without-uniqueBy): use PKs.
-    const cols =
-      index == null ? this._insertAll.primaryKeys() : Array.isArray(index) ? index : [index];
-    return `(${cols.map((c) => `"${c}"`).join(", ")})`;
+    if (this._insertAll.updateDuplicates()) {
+      return `(${this._insertAll
+        .primaryKeys()
+        .map((c) => `"${c}"`)
+        .join(", ")})`;
+    }
+    return "";
   }
 
   updatableColumns(): string[] {

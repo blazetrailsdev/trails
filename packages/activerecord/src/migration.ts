@@ -1148,7 +1148,9 @@ export abstract class Migration {
 
   async indexes(
     tableName: string,
-  ): Promise<Array<{ name: string; columns: string[]; unique: boolean }>> {
+    // `columns` is a string for expression indexes, an array otherwise —
+    // mirrors Rails' IndexDefinition#columns.
+  ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
     return this.schema.indexes(this._pt(tableName));
   }
 
