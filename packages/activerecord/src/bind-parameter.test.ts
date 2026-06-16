@@ -114,7 +114,8 @@ describe("BindParameterTest", () => {
   // `findBy` all leave `sqlite3Adapter._statementPool` empty even with
   // preparedStatements=true — `_cachedStatement` (sqlite3-adapter.ts:357) is the
   // only writer and the SELECT execution paths don't route through it. Compounded
-  // by `to_sql` inlining binds (database-statements.ts:184-211), so `to_sql_key`
+  // by `to_sql` inlining binds (connection-adapters/abstract/database-statements.ts:184-211),
+  // so `to_sql_key`
   // yields `id = 1` not the placeholder `id = ?` a pool would key by, and there
   // is no `sqlKey` accessor on the sqlite adapter (PG has one).
   it.skip("statement cache", () => {});
