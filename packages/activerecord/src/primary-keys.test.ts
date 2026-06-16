@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
+import { SchemaDumper } from "./schema-dumper.js";
 import { adapterType } from "./test-adapter.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
@@ -250,10 +251,17 @@ describe("PrimaryKeysTest", () => {
     expect(AnonDevelopers.primaryKey).toBe("id");
   });
 
-  it.skip("primary key returns nil if it does not exist", () => {
-    // Rails: anonymous class with table_name = "developers_projects" → primary_key nil
-    // TS: schema auto-detection of no-PK tables is not wired; returns "id" instead.
-    // Skip rather than assert the wrong value.
+  it("primary key returns nil if it does not exist", async () => {
+    class AnonDevelopersProjects extends Base {
+      static {
+        this._tableName = "developers_projects";
+      }
+    }
+    // Rails reflects the primary key lazily on first access; getPrimaryKeyAttr
+    // reads only the already-warmed schema cache, so warm it for the no-PK join
+    // table here (an explicit await stands in for Rails' implicit reflection).
+    await (Base.connection as any).schemaCache.primaryKeys(Base.connection, "developers_projects");
+    expect(AnonDevelopersProjects.primaryKey).toBeNull();
   });
 
   it("quoted primary key after set primary key", () => {
@@ -304,9 +312,11 @@ describe("PrimaryKeysTest", () => {
   });
 
   it.skip("assign id raises error if primary key doesnt exist", () => {
-    // Rails: anonymous class for dashboards (no id col) → id= raises MissingAttributeError
-    // TS: id= writes to the default "id" attribute without checking schema; no error raised
-    // until after schema is loaded. Skip rather than assert the opposite.
+    // BLOCKED: for a no-PK table (dashboards: primaryKey false) the class primaryKey
+    // resolves to null, but instance `id=` silently no-ops/writes instead of raising
+    // ActiveModel::MissingAttributeError. setId writes through to _writeAttribute with a
+    // null/absent column rather than validating the attribute exists.
+    // Tracked: RFC 0030 cc-id-setter-missing-attribute.
   });
 
   it("reconfiguring primary key resets composite primary key", () => {
@@ -459,16 +469,25 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 
   it.skip("schema dump primary key includes type and options", async () => {
-    // Rails: assert_match /create_table "barcodes", primary_key: "code", id: { type: :string, limit: 42 }/, schema
-    // TS schema dumper outputs TS-format ctx.createTable(...) — the exact options format
-    // differs from Rails and the assertion would always pass on the table name alone.
-    // Skip until the schema dumper emits a stable canonical format for custom-PK tables.
+    // BLOCKED: schema dumper renders a single non-"id" primary key as `id: false`
+    // plus a plain column (`t.string("code", { limit: 42 })`) instead of Rails'
+    // `primary_key: "code", id: { type: :string, limit: 42 }`. The dumper has no
+    // column_spec_for_primary_key equivalent for single custom-named keys.
+    // Tracked: RFC 0030 cc-schema-dumper-pk-rendering.
   });
 
-  it.skip("schema typed primary key column", async () => {
+  it.skipIf(adapterType !== "mysql")("schema typed primary key column", async () => {
     // Rails (:Mysql2Adapter/:TrilogyAdapter): assert_match /create_table "scheduled_logs", id: :timestamp.*/, schema
-    // TS schema dumper format differs from Rails — skip until aligned (same reason as
-    // the other schema dump skips in PrimaryKeyIntegerNilDefaultTest / PrimaryKeyIntegerTest).
+    // TS dumper emits the TS DSL form `id: "timestamp"`; assert the equivalent.
+    await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
+    await (Base.connection as any).createTable("scheduled_logs", {
+      id: "timestamp",
+      precision: 6,
+      force: true,
+    });
+    const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "scheduled_logs");
+    expect(schema).toMatch(/createTable\("scheduled_logs", \{ id: "timestamp"/);
+    await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
   });
 });
 
@@ -588,15 +607,21 @@ describe("CompositePrimaryKeyTest", () => {
     expect(AnonUberBarcodes.primaryKey).toEqual(["region", "code"]);
   });
 
-  it.skip("collectly dump composite primary key", async () => {
+  it("collectly dump composite primary key", async () => {
     // Rails: assert_match /create_table "uber_barcodes", primary_key: ["region", "code"]/, schema
-    // TS schema dumper uses ctx.createTable format; the exact primary_key array format
-    // is not yet verified. Skip until the dumper's composite-PK rendering is stable.
+    // TS dumper emits the TS DSL `ctx.createTable("uber_barcodes", { primaryKey: [...] })`
+    // form rather than Rails' Ruby `create_table` literal; assert the equivalent.
+    const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "uber_barcodes");
+    expect(schema).toMatch(/createTable\("uber_barcodes", \{ primaryKey: \["region","code"\]/);
   });
 
   it.skip("dumping composite primary key out of order", async () => {
-    // Rails: assert_match /create_table "barcodes_reverse", primary_key: ["code", "region"]/, schema
-    // Same gap as above.
+    // BLOCKED: schema dumper emits composite-PK columns in table declaration order,
+    // not primary-key definition order. barcodes_reverse declares (region, code) but
+    // its PK is (code, region); the dumper renders primaryKey: ["region","code"] where
+    // Rails renders ["code", "region"]. The adapter's primaryKeys() returns the correct
+    // order (see "composite primary key out of order" above) but the dumper's
+    // introspection path does not. Tracked: RFC 0030 cc-schema-dumper-pk-rendering.
   });
 
   it("model with a composite primary key", () => {
@@ -638,13 +663,17 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
   });
 
   it.skip("schema dump primary key integer with default nil", async () => {
-    // Rails: skip if SQLite3Adapter; assert_match /create_table "int_defaults", id: :integer, default: nil/
-    // TS schema dumper output format differs — skip until format is aligned.
+    // BLOCKED: Rails runs this on PG + MySQL (skip if SQLite3Adapter) and asserts the
+    // PK's `default: nil` survives the round trip. The MySQL dumper drops the default
+    // entirely (emits `id: "integer"` with no default), so the test cannot pass on the
+    // MySQL CI lane. Tracked: RFC 0030 cc-schema-dumper-pk-rendering.
   });
 
   it.skip("schema dump primary key bigint with default nil", async () => {
-    // Rails: assert_match /create_table "int_defaults", id: :bigint, default: nil/
-    // TS schema dumper output format differs — skip until format is aligned.
+    // BLOCKED: Rails runs this on every adapter (no skip). On SQLite the dumper drops the
+    // bigint id + default entirely (emits just `force: "cascade"`) and on MySQL it drops
+    // the default, so it fails on the default SQLite lane. Tracked: RFC 0030
+    // cc-schema-dumper-pk-rendering.
   });
 });
 
@@ -690,8 +719,10 @@ describe("PrimaryKeyIntegerTest", () => {
   );
 
   it.skip("schema dump primary key with serial/integer", async () => {
-    // Rails: assert_match /create_table "widgets", id: :#{@pk_type}, /, schema
-    // TS schema dumper format differs — skip until aligned.
+    // BLOCKED: Rails runs this on PG + MySQL. On PG the @pk_type is :serial and Rails
+    // emits `id: :serial`, but the TS dumper treats a serial id as the default and emits
+    // no `id:` option at all, so the test fails on the PG CI lane. (It would pass on
+    // MySQL, where @pk_type is :integer.) Tracked: RFC 0030 cc-schema-dumper-pk-rendering.
   });
 
   it.skipIf(adapterType !== "mysql")("primary key column type with options", async () => {
