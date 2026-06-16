@@ -3082,6 +3082,22 @@ describe("FinderTest", () => {
     expect(found[1].name).toBe("Charlie");
   });
 
+  it("find with multiple BigInt IDs matches number-typed primary keys", async () => {
+    // A `bigserial` PK (PostgreSQL default) deserializes to JS BigInt, so
+    // callers pass BigInt ids; find() must still match records whose stored
+    // PK is a plain number. Exercised here with explicit BigInt inputs so the
+    // number↔BigInt comparison is covered on every lane, independent of the
+    // column's native width.
+    const { alice, charlie } = await seedUsers();
+    const found = (await User.find([
+      BigInt(alice.id as number),
+      BigInt(charlie.id as number),
+    ])) as User[];
+    expect(found).toHaveLength(2);
+    expect(found[0].name).toBe("Alice");
+    expect(found[1].name).toBe("Charlie");
+  });
+
   it("find with empty array raises RecordNotFound", async () => {
     await expect(User.find([])).rejects.toThrow();
   });
