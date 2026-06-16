@@ -75,6 +75,19 @@ package list, and the `declare` / associations / enums / schema reference, see
   matches our tests to Rails tests. If a test fails or the behavior doesn't
   match the name, fix the implementation — not the name. Read the
   corresponding Rails test first.
+- **`defineSchema` is canonical-only — no bespoke tables.** In AR tests,
+  `defineSchema()` may pass **only** the canonical `TEST_SCHEMA`
+  (`test-helpers/test-schema.js`); never re-declare a table inline or invent a
+  free table name. Prefer `useHandlerFixtures` / `setupHandlerSuite` on the
+  default canonical tables (and the official models in
+  `packages/activerecord/src/test-helpers/models/`) over `defineSchema`. Table,
+  column, and model names must match Rails exactly. The
+  `blazetrails/require-canonical-schema` ESLint rule enforces this for every file
+  not grandfathered in `eslint/require-canonical-schema-exclude.json`; **when you
+  touch a grandfathered file, convert it to canonical and drop its exclude entry
+  in the same PR** (burning that list to zero is RFC 0019, which gates the RFC
+  0030 un-skip campaign). If a test needs something the canonical schema lacks,
+  add it to the canonical schema — do not reach for a bespoke schema.
 
 ## Module mixins (Ruby `include` → TypeScript)
 
