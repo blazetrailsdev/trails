@@ -130,18 +130,17 @@ describe("AutomaticInverseFindingTests", () => {
     // with_automatic_scope_inversing test helper + books(:tlg) author_visibility.
   });
 
-  it.skip("has one and belongs to automatic inverse shares objects", async () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Bulb create/load
-    // path raises `this.readAttribute is not a function` (Bulb custom accessor).
+  it("has one and belongs to automatic inverse shares objects", async () => {
     const car = (await Car.first())!;
-    const bulb = await Bulb.createBang({ car_id: (car as any).id });
+    const bulb = await Bulb.createBang({ car });
 
-    const carBulb = (await loadHasOne(car, "bulb", { inverseOf: "car" }))!;
-    expect((carBulb as any).id).toBe((bulb as any).id);
+    expect((car as any).bulb).toBe(bulb);
 
-    (carBulb as any).name = "Blue";
-    const reloaded = (await loadHasOne(car, "bulb", { inverseOf: "car" }))!;
-    expect((reloaded as any).name).toBe("Blue");
+    (car as any).bulb.color = "Blue";
+    expect((car as any).bulb.color).toBe((bulb as any).color);
+
+    (bulb as any).color = "Red";
+    expect((bulb as any).color).toBe((car as any).bulb.color);
   });
 
   it("has many and belongs to automatic inverse shares objects on rating", async () => {

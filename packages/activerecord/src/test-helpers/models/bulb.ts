@@ -18,9 +18,9 @@ export class Bulb extends Base {
     this.afterInitialize((record: Bulb) => {
       record.attributesAfterInitialize = { ...(record as any).attributes };
     });
-    this.afterCreate(async function (this: Bulb) {
-      const carId = this.readAttribute("car_id") as number | null;
-      this.countAfterCreate = carId
+    this.afterCreate(async (record: Bulb) => {
+      const carId = record.readAttribute("car_id") as number | null;
+      record.countAfterCreate = carId
         ? await Bulb.unscoped(async () => (Bulb as any).where({ car_id: carId }).count())
         : undefined;
     });
