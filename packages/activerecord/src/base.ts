@@ -610,6 +610,25 @@ function _extractAssociationAttrs(
   return { rest, assocs };
 }
 
+/**
+ * Route a constructor-form composite primary key (`new Model({ id: [a, b] })`)
+ * through the `id=` setter so each key column is populated. Rails dispatches all
+ * `assign_attributes` keys through `public_send("#{k}=")`, but trails' Model
+ * constructor writes directly via `writeAttribute`, which would store the whole
+ * array in a single `id` column. Mirrors Rails' `Cpk::Book.new(id: [1, 2])`.
+ * @internal
+ */
+function _applyCompositePrimaryKey(
+  record: Base,
+  ctor: typeof Base,
+  attrs: Record<string, unknown>,
+): void {
+  const pk = (ctor as { primaryKey?: unknown }).primaryKey;
+  if (Array.isArray(pk) && Array.isArray((attrs as { id?: unknown }).id)) {
+    (record as unknown as { id: unknown }).id = (attrs as { id: unknown }).id;
+  }
+}
+
 /** @internal */
 function _dispatchAssociationAttrs(
   record: Base,
@@ -2636,6 +2655,20 @@ export class Base extends Model {
           );
         }
       }
+      // A composite primary key passed as `id: [a, b]` must be routed solely
+      // through the `id=` setter (applied post-super by
+      // `_applyCompositePrimaryKey`). Drop it from `attrsForSuper` so super()'s
+      // raw `writeAttribute("id", …)` doesn't materialize a phantom `id`
+      // attribute for key columns not literally named `id` — Rails' dispatch
+      // (`public_send("id=")`) never creates one.
+      if (
+        Array.isArray((ctor2 as { primaryKey?: unknown }).primaryKey) &&
+        Array.isArray(attrs.id)
+      ) {
+        attrsForSuper = Object.fromEntries(
+          Object.entries(attrsForSuper).filter(([k]) => k !== "id"),
+        );
+      }
       const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };
       const hadOwn2 = Object.prototype.hasOwnProperty.call(
         suppressor2,
@@ -2657,6 +2690,7 @@ export class Base extends Model {
       // initialize_internals_callback and after_initialize, regardless of
       // callback suppression (found records run it via `new this()` too).
       _Core.initInternals.call(this as any);
+      _applyCompositePrimaryKey(this as unknown as Base, ctor2, attrs);
       if (!wasSuppressed2) {
         // Mirrors Rails' initialize_internals_callback chain order:
         //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)
