@@ -42,7 +42,13 @@ NwcPirate.hasMany("birds", {
 });
 // Mirrors Rails' `before_add: proc { |p, b| @@add_callback_called << b;
 // p.birds_with_add_load.to_a }` — the proc both records the added bird and
-// loads the target.
+// loads the target. The `.to_a` force-load is synchronous in Rails, but
+// trails fires before_add from the synchronous add path while the collection
+// load is async, so the proc can only fire-and-forget (`void`). The added
+// record still lands in the in-memory target via the sync build path, so the
+// observable assertions match Rails; only the proc's own side-effect load is
+// non-blocking. Tracked-pending-convergence deviation — see
+// packages/website/docs/guides/activerecord-rails-deviations.md §11.
 NwcPirate.hasMany("birdsWithAddLoad", {
   className: "NwcBird",
   foreignKey: "pirate_id",
