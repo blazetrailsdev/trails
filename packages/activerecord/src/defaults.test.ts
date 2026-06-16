@@ -314,7 +314,7 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
       expect((record as any).non_null_text).toBeNull();
       expect((record as any).non_null_blob).toBeNull();
 
-      await (record as any).save();
+      await (record as any).saveBang();
       await (record as any).reload();
 
       expect((record as any).non_null_integer).toBe(0);
