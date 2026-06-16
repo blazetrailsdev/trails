@@ -335,11 +335,18 @@ describe("TransactionInstrumentationTest", () => {
     expect(events).toHaveLength(0);
   });
 
-  it.skip("reconnecting after materialized transaction starts new event", () => {
-    // BLOCKED: transactions — transaction instrumentation / notification not fully wired
-    // ROOT-CAUSE: transactions.ts#instrumentTransaction or Notifications event not published on commit/rollback
-    // SCOPE: ~20 LOC fix in transactions.ts; affects ~2 tests in transaction-instrumentation.test.ts
-    // Requires reconnect!(restore_transactions: true) — not yet supported.
+  it("reconnecting after materialized transaction starts new event", async () => {
+    const events: any[] = [];
+    Notifications.subscribe("transaction.active_record", (event: any) => {
+      events.push(event);
+    });
+
+    await Topic.transaction(async () => {
+      await (sharedAdapter as any).materializeTransactions();
+      await (sharedAdapter as any).reconnectBang({ restoreTransactions: true });
+    });
+
+    expect(events).toHaveLength(2);
   });
 
   it("transaction instrumentation fires before after commit callbacks", async () => {
@@ -406,11 +413,11 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it.skip("transaction instrumentation on failed rollback", () => {
-    // BLOCKED: transactions — transaction instrumentation / notification not fully wired
-    // ROOT-CAUSE: transactions.ts#instrumentTransaction or Notifications event not published on commit/rollback
-    // SCOPE: ~20 LOC fix in transactions.ts; affects ~2 tests in transaction-instrumentation.test.ts
-    // Rails guards this with `unless in_memory_db?`. Our test adapter
-    // uses an in-memory SQLite database so this scenario does not apply.
+    // PERMANENT-SKIP: Rails gates this with `unless in_memory_db?`
+    // (transaction_instrumentation_test.rb:391). A failed DB rollback drives
+    // `@connection.throw_away!`, discarding the connection — for the in-memory
+    // SQLite database the canonical adapter uses, that destroys the schema and
+    // breaks per-test teardown, exactly as Rails skips it. See UNPORTED_FILES.
   });
 
   it("transaction instrumentation on failed rollback when unmaterialized", async () => {
