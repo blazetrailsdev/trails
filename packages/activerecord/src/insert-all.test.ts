@@ -40,7 +40,6 @@ import { Subscription } from "./test-helpers/models/subscription.js";
 // Adapter capability gates (mirror Rails' supports_* predicates / current_adapter?).
 // MySQL's ON DUPLICATE KEY UPDATE has no conflict-target syntax and no RETURNING.
 const supportsInsertConflictTarget = adapterType !== "mysql";
-const supportsInsertReturning = adapterType !== "mysql";
 const isMysql = adapterType === "mysql";
 
 // ReadonlyNameBook < Book with attr_readonly :name (insert_all_test.rb:14).
