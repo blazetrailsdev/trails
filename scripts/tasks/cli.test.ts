@@ -35,6 +35,10 @@ import {
   depCyclePath,
   editFrontmatter,
   finalize,
+  findDuplicateRfcDirs,
+  migrateDuplicateRfcDir,
+  reconcileDuplicateRfcDirs,
+  rewriteRfcRefs,
   parseCsv,
   setDepsError,
   formatFiles,
@@ -2434,5 +2438,102 @@ describe("tasks-CLI critical-section lock", () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-nogit-"));
     expect(acquireTasksLock(dir)).toBeNull();
     expect(() => releaseTasksLock(null)).not.toThrow();
+  });
+});
+
+describe("duplicate RFC-dir reconciliation", () => {
+  // Build a real rfcs/ tree: each entry is `dirName -> { readme?, stories }`.
+  function makeTasks(
+    layout: Record<string, { readme?: boolean; stories?: Record<string, string> }>,
+  ): string {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-dup-"));
+    for (const [name, spec] of Object.entries(layout)) {
+      const rfcDir = join(dir, "rfcs", name);
+      mkdirSync(rfcDir, { recursive: true });
+      if (spec.readme)
+        writeFileSync(join(rfcDir, "README.md"), `---\nstatus: active\n---\n# ${name}\n`);
+      for (const [story, body] of Object.entries(spec.stories ?? {})) {
+        mkdirSync(join(rfcDir, "stories"), { recursive: true });
+        writeFileSync(join(rfcDir, "stories", story), body);
+      }
+    }
+    return dir;
+  }
+
+  it("rewriteRfcRefs rewrites both frontmatter and body mentions", () => {
+    const text = `---\nrfc: "0000-foo"\n---\nSee rfcs/0000-foo/README.md for 0000-foo.\n`;
+    expect(rewriteRfcRefs(text, "0000-foo", "0031-foo")).toBe(
+      `---\nrfc: "0031-foo"\n---\nSee rfcs/0031-foo/README.md for 0031-foo.\n`,
+    );
+  });
+
+  it("findDuplicateRfcDirs flags only placeholder dirs with a finalized twin", () => {
+    const dir = makeTasks({
+      "0000-foo": { stories: { "r1.md": "x" } }, // duplicate: 0031-foo exists
+      "0031-foo": { readme: true },
+      "0000-bar": { readme: true }, // lone placeholder — no twin, NOT flagged
+      "0030-baz": { readme: true }, // finalized, no placeholder — NOT flagged
+    });
+    const dups = findDuplicateRfcDirs(dir);
+    expect(dups).toEqual([{ draftSlug: "0000-foo", finalSlug: "0031-foo", bareSlug: "foo" }]);
+  });
+
+  it("also matches legacy draft- placeholder prefix", () => {
+    const dir = makeTasks({
+      "draft-foo": { stories: { "r1.md": "x" } },
+      "0031-foo": { readme: true },
+    });
+    expect(findDuplicateRfcDirs(dir)).toEqual([
+      { draftSlug: "draft-foo", finalSlug: "0031-foo", bareSlug: "foo" },
+    ]);
+  });
+
+  // The race: a story added to 0000-<slug> survives a rebase onto a main that
+  // already finalized it to NNNN-<slug>, leaving two dirs for one RFC.
+  it("reconcile migrates stranded stories into the finalized dir and removes the placeholder", () => {
+    const dir = makeTasks({
+      "0000-schema-cache": {
+        stories: { "r1.md": `---\nrfc: "0000-schema-cache"\n---\nbody refs 0000-schema-cache\n` },
+      },
+      "0031-schema-cache": { readme: true },
+    });
+    expect(reconcileDuplicateRfcDirs(dir)).toBe(true);
+    // Single dir for the RFC: placeholder gone, story moved with corrected refs.
+    expect(existsSync(join(dir, "rfcs", "0000-schema-cache"))).toBe(false);
+    const moved = join(dir, "rfcs", "0031-schema-cache", "stories", "r1.md");
+    expect(existsSync(moved)).toBe(true);
+    const text = readFileSync(moved, "utf8");
+    expect(text).toContain(`rfc: "0031-schema-cache"`);
+    expect(text).toContain("body refs 0031-schema-cache");
+    expect(text).not.toContain("0000-schema-cache");
+  });
+
+  it("reconcile is a no-op (false) when there is no duplicate pair", () => {
+    const dir = makeTasks({ "0031-foo": { readme: true }, "0000-bar": { readme: true } });
+    expect(reconcileDuplicateRfcDirs(dir)).toBe(false);
+    expect(existsSync(join(dir, "rfcs", "0000-bar"))).toBe(true);
+  });
+
+  it("refuses (exit 1) when a story of the same name already exists in the finalized dir", () => {
+    const dir = makeTasks({
+      "0000-foo": { stories: { "r1.md": "placeholder" } },
+      "0031-foo": { readme: true, stories: { "r1.md": "finalized" } },
+    });
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() =>
+      migrateDuplicateRfcDir(dir, {
+        draftSlug: "0000-foo",
+        finalSlug: "0031-foo",
+        bareSlug: "foo",
+      }),
+    ).toThrow(/exit 1/);
+    expect(errSpy.mock.calls.some((c) => /already exists/.test(String(c[0])))).toBe(true);
+    // Both dirs untouched — nothing migrated, nothing removed.
+    expect(readFileSync(join(dir, "rfcs", "0031-foo", "stories", "r1.md"), "utf8")).toBe(
+      "finalized",
+    );
   });
 });
