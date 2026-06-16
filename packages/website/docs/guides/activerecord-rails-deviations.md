@@ -284,6 +284,53 @@ related records, etc.), they are almost always async. Always `await`
 them when composing manually; `save()` / `destroy()` / etc. do it for
 you.
 
+### Collection `before_add` cannot force-load the target (tracked pending convergence)
+
+Rails fires collection `before_add` callbacks from the **synchronous**
+`CollectionAssociation#add_to_target`, and because Rails' collection load
+is itself synchronous a `before_add` proc can force-load the association
+target as a side effect of the callback and observe it loaded before the
+proc returns:
+
+```ruby
+# activerecord/test/cases/nested_attributes_with_callbacks_test.rb
+has_many :birds_with_add_load,
+  before_add: proc { |p, b| @@add_callback_called << b; p.birds_with_add_load.to_a }
+```
+
+In trails the callback dispatch path is still synchronous (`addToTarget`
+→ `replaceOnTarget` → `callback` in
+`packages/activerecord/src/associations/collection-association.ts`, and
+the public `build()` is a sync Rails-parity API), but the collection load
+(`loadTarget` / `toArray`) is **async** — it goes through the async
+driver. A synchronous proc therefore cannot `await` the load, so the best
+the port can do is fire-and-forget:
+
+<!-- typecheck:skip -->
+
+```ts
+NwcPirate.hasMany("birdsWithAddLoad", {
+  beforeAdd: (p, b) => {
+    addCallbackCalled.push(b);
+    void p.birdsWithAddLoad.toArray(); // floating load — does NOT complete in-proc
+  },
+});
+```
+
+**Observable parity holds:** the added record is placed in the in-memory
+target by the synchronous build path regardless of the proc's floating
+load, so every assertion in `nested_attributes_with_callbacks_test.rb`
+matches Rails. The deviation is purely in the **callback's own
+semantics**: a `before_add` proc that depends on the target being loaded
+_as a side effect of the callback itself_ would not see it loaded in
+trails.
+
+Converging requires threading async through the add-callback path
+(`build` / `addToTarget` / `callback`) so a proc can be `async` and be
+awaited — a deeper change to a sync Rails-parity surface. Tracked for
+convergence; until then this is the one collection-callback semantic that
+trails' async-everywhere model cannot reproduce.
+
 ## 12. `Base.update(:all, ...)` sentinel is `":all"`
 
 Rails' `Model.update(id = :all, attributes)` uses Ruby's `:all` symbol
