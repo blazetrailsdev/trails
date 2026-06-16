@@ -208,7 +208,18 @@ export class SchemaCreation {
       `${this.adapter.quoteIdentifier(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
-    parts.push(`(${this.quotedColumnsForIndex(index)})`);
+    // Rails `quoted_columns`: a String column set is an expression, emitted
+    // verbatim (e.g. "remind_at, place_id", "(data->'foo')"); otherwise each
+    // column is quoted with its length/order/opclass decoration.
+    const columns =
+      typeof index.columns === "string"
+        ? index.columns
+        : this.quotedColumnsForIndex(index.columns, {
+            lengths: index.lengths,
+            orders: index.orders,
+            opclasses: index.opclasses,
+          });
+    parts.push(`(${columns})`);
     if (this.supportsIndexInclude() && index.include && index.include.length > 0) {
       const includeCols = index.include.map((c) => this.adapter.quoteIdentifier(c));
       parts.push(`INCLUDE (${includeCols.join(", ")})`);
@@ -219,32 +230,28 @@ export class SchemaCreation {
   }
 
   /**
-   * Mirrors Rails `quoted_columns`: a String column set is an expression —
-   * emitted verbatim, never quoted or split (e.g. "remind_at, place_id",
-   * "(data->'foo')"). An array is quoted per-column with length/order/opclass
-   * decorations.
+   * Mirrors Rails `quoted_columns_for_index`: quote each column name and append
+   * its length/order/opclass decoration.
    */
-  protected quotedColumnsForIndex(index: CreateIndexDefinition["index"]): string {
-    if (typeof index.columns === "string") return index.columns;
-    return index.columns
+  protected quotedColumnsForIndex(
+    columnNames: string[],
+    options: {
+      lengths: number | Record<string, number>;
+      orders: string | Record<string, string>;
+      opclasses: string | Record<string, string>;
+    },
+  ): string {
+    return columnNames
       .map((c) => {
         let col = this.adapter.quoteIdentifier(c);
-        const len =
-          typeof index.lengths === "number"
-            ? index.lengths
-            : (index.lengths as Record<string, number>)[c];
+        const len = typeof options.lengths === "number" ? options.lengths : options.lengths[c];
         if (len) col += `(${len})`;
         if (this.supportsIndexSortOrder()) {
-          const order =
-            typeof index.orders === "string"
-              ? index.orders
-              : (index.orders as Record<string, string>)[c];
+          const order = typeof options.orders === "string" ? options.orders : options.orders[c];
           if (order) col += ` ${order.toUpperCase()}`;
         }
         const opc =
-          typeof index.opclasses === "string"
-            ? index.opclasses
-            : (index.opclasses as Record<string, string>)[c];
+          typeof options.opclasses === "string" ? options.opclasses : options.opclasses[c];
         if (this.adapterName === "postgres" && opc) col += ` ${opc}`;
         return col;
       })

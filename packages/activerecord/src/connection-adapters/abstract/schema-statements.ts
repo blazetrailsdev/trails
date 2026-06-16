@@ -1224,9 +1224,14 @@ export class SchemaStatements {
     options?: { unique?: boolean; name?: string },
   ): Promise<boolean> {
     const allIndexes = await this.adapterIndexes(tableName);
-    // Rails: the column check only applies when a column is given — `index_exists?(:t, nil, name: ...)`
-    // matches on name alone (used to reverse a named expression index).
-    const hasColumn = columnName != null && !(Array.isArray(columnName) && columnName.length === 0);
+    // Rails `defined_for?`: the column check only applies when columns are
+    // present (`columns.blank?` — nil, "", and [] are all absent), so
+    // `index_exists?(:t, nil, name: ...)` matches on name alone (used to
+    // reverse a named expression index).
+    const hasColumn =
+      columnName != null &&
+      columnName !== "" &&
+      !(Array.isArray(columnName) && columnName.length === 0);
     const targetCols = hasColumn ? (Array.isArray(columnName) ? columnName : [columnName]) : null;
 
     return allIndexes.some((idx) => {
