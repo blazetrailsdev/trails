@@ -17,10 +17,12 @@ import {
   Mysql2Adapter,
   MYSQL_TEST_URL,
   supportsDefaultExpression,
+  isMariaDb,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -79,25 +81,41 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
     await ctx.dropTable("datetime_defaults", { ifExists: true });
   });
 
-  it.skip("schema dump includes default expression", () => {
-    // BLOCKED: adapter-mariadb — on the MariaDB CI lane the `defaults.uuid`
-    // (`default: -> { "(uuid())" }`) function default reflects as a *literal*
-    // binary value (the bytes of "uuid()"), so the dump emits a byte-array
-    // default instead of `default: () => "(uuid())"`.
-    // ROOT-CAUSE: newColumnFromField/columnDefinitions function-default detection
-    // does not catch MariaDB's representation of `uuid()`/`concat()` expression
-    // defaults (no MySQL-8 DEFAULT_GENERATED extra). The CURRENT_TIMESTAMP path
-    // (the datetime/timestamp tests below) works. Tracked: RFC 0030 story
-    // c2-defaults-mariadb-expression-reflection.
-  });
+  // Gated to MySQL only (skipIf isMariaDb): on MariaDB the `uuid()`/`concat()`
+  // function defaults reflect as *literal* values (uuid as the bytes of "uuid()",
+  // concat as a literal string) rather than `default: () => "..."`, because
+  // newColumnFromField/columnDefinitions doesn't catch MariaDB's representation of
+  // arbitrary expression defaults (no MySQL-8 DEFAULT_GENERATED extra). MySQL 8's
+  // DEFAULT_GENERATED path works, so keep the assertions running there. The
+  // CURRENT_TIMESTAMP datetime/timestamp tests below pass on both. MariaDB gap
+  // tracked: RFC 0030 story c2-defaults-mariadb-expression-reflection.
+  itIfSupports.skipIf(isMariaDb)(
+    "default_expression",
+    "schema dump includes default expression",
+    async () => {
+      const output = await SchemaDumper.dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "defaults",
+      );
+      expect(output).toMatch(
+        /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
+      );
+    },
+  );
 
-  it.skip("schema dump includes default expression with single quotes reflected correctly", () => {
-    // BLOCKED: adapter-mariadb — `defaults.char2_concatenated`
-    // (`default: -> { "(concat(`char2`, '-'))" }`) reflects as a literal string
-    // default on MariaDB, so the dump emits `default: "concat(...)"` instead of
-    // `default: () => "(concat(...))"`. Same ROOT-CAUSE and tracking story as the
-    // sibling above: c2-defaults-mariadb-expression-reflection.
-  });
+  itIfSupports.skipIf(isMariaDb)(
+    "default_expression",
+    "schema dump includes default expression with single quotes reflected correctly",
+    async () => {
+      const output = await SchemaDumper.dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "defaults",
+      );
+      expect(output).toMatch(
+        /t\.string\("char2_concatenated", \{ default: \(\) => "\(?concat\(`char2`,\s*(_utf8mb4)?'-'\)\)?" \}\)/i,
+      );
+    },
+  );
 
   it("schema dump datetime includes default expression", async () => {
     const output = await SchemaDumper.dumpTableSchema(
