@@ -1797,14 +1797,28 @@ describe("TransactionTest", () => {
       ).rejects.toThrow("Expected");
     });
   });
-  it.skip("accessing raw connection materializes transaction", () => {
-    // No rawConnection API exposed.
+  it("accessing raw connection materializes transaction", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    await Topic.transaction(async () => {
+      expect(adapter.currentTransaction().isMaterialized()).toBe(false);
+      await adapter.rawConnection();
+      expect(adapter.currentTransaction().isMaterialized()).toBe(true);
+    });
   });
-  it.skip("accessing raw connection disables lazy transactions", () => {
-    // No rawConnection API exposed.
+  it("accessing raw connection disables lazy transactions", async () => {
+    const { adapter } = makeSQLiteTopic();
+    expect(adapter.transactionManager.isLazyTransactionsEnabled()).toBe(true);
+    await adapter.rawConnection();
+    expect(adapter.transactionManager.isLazyTransactionsEnabled()).toBe(false);
   });
-  it.skip("checking in connection reenables lazy transactions", () => {
-    // No rawConnection / check-in API exposed at this level.
+  it("checking in connection reenables lazy transactions", async () => {
+    const { adapter } = makeSQLiteTopic();
+    await adapter.rawConnection();
+    expect(adapter.transactionManager.isLazyTransactionsEnabled()).toBe(false);
+    // Mirrors `Topic.connection_pool.checkin`: the pool runs the `:checkin`
+    // callbacks (one of which is enable_lazy_transactions!) around `expire`.
+    adapter._runCheckinCallbacks(() => {});
+    expect(adapter.transactionManager.isLazyTransactionsEnabled()).toBe(true);
   });
 });
 
