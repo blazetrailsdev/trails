@@ -1085,8 +1085,10 @@ export class SchemaDumper {
       if (col.array && !colspec.array) colspec.array = true;
       if (
         !col.isSerial &&
-        // `oid` has no schema_limit in Rails — introspection reports limit 8
-        // but `t.oid` must dump bare (schema_dumper_test: test_schema_dump_oid_type).
+        // Rails' oid column reports limit == nil, so `t.oid` dumps bare; our PG
+        // introspection diverges (surfaces limit 8). Suppress to match. See the
+        // schemaLimit note in abstract/schema-dumper.ts — root cause tracked in
+        // the c1-schema-dumper-residual-gaps story (RFC 0030).
         dslType !== "oid" &&
         col.limit !== undefined &&
         col.limit !== null &&
