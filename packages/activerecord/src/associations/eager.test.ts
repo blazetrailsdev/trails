@@ -65,8 +65,6 @@ const TEST_SCHEMA: Schema = {
   eager_bt_children: { value: "string", eager_bt_parent_id: "integer" },
   eager_bt_csq_clients: { name: "string", eager_bt_csq_firm_id: "integer" },
   eager_bt_csq_firms: { name: "string" },
-  eager_bt_csu_clients: { name: "string", eager_bt_csu_firm_id: "integer" },
-  eager_bt_csu_firms: { name: "string" },
   eager_bt_oq_clients: { name: "string", eager_bt_oq_firm_id: "integer" },
   eager_bt_oq_firms: { name: "string" },
   eager_bt_ou_clients: { name: "string", eager_bt_ou_firm_id: "integer" },
@@ -76,8 +74,6 @@ const TEST_SCHEMA: Schema = {
   eager_cnt_ho_comments: { body: "string", eager_cnt_ho_post_id: "integer" },
   eager_cnt_ho_posts: { title: "string" },
   eager_comments: { body: "string", eager_post_id: "integer" },
-  eager_cond_clients: { name: "string", eager_cond_company_id: "integer" },
-  eager_cond_companies: { name: "string" },
   eager_count_comments: { body: "string", eager_count_post_id: "integer" },
   eager_count_posts: { title: "string" },
   eager_dist_items: { label: "string" },
@@ -188,12 +184,8 @@ const TEST_SCHEMA: Schema = {
   eager_inh_companies: { name: "string", type: "string" },
   eager_inv_children: { value: "string", eager_inv_parent_id: "integer" },
   eager_inv_parents: { name: "string" },
-  eager_lc_clients: { name: "string", eager_lc_firm_id: "integer" },
-  eager_lc_firms: { name: "string" },
   eager_leo_comments: { body: "string", eager_leo_post_id: "integer" },
   eager_leo_posts: { title: "string" },
-  eager_limit_clients: { name: "string", eager_limit_firm_id: "integer" },
-  eager_limit_firms: { name: "string" },
   eager_lma_clients: { name: "string", eager_lma_firm_id: "integer", eager_lma_dept_id: "integer" },
   eager_lma_depts: { label: "string" },
   eager_lma_firms: { name: "string" },
@@ -201,12 +193,6 @@ const TEST_SCHEMA: Schema = {
   eager_lmo_posts: { title: "string", priority: "integer" },
   eager_ln_comments: { rating: "float", eager_ln_post_id: "integer" },
   eager_ln_posts: { title: "string" },
-  eager_lo_clients: { name: "string", eager_lo_firm_id: "integer" },
-  eager_lo_firms: { name: "string" },
-  eager_loc_clients: { name: "string", eager_loc_firm_id: "integer" },
-  eager_loc_firms: { name: "string" },
-  eager_loca_clients: { name: "string", eager_loca_firm_id: "integer" },
-  eager_loca_firms: { name: "string" },
   eager_lom_clients: { name: "string", eager_lom_firm_id: "integer", eager_lom_dept_id: "integer" },
   eager_lom_depts: { label: "string" },
   eager_lom_firms: { name: "string" },
@@ -1362,208 +1348,6 @@ describe("EagerAssociationTest", () => {
     expect((clients[0] as any)._preloadedAssociations.has("eagerFirm")).toBe(true);
   });
 
-  it("eager association loading with belongs to and limit", async () => {
-    class EagerLimitFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerLimitClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_limit_firm_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(EagerLimitClient, "eagerLimitFirm", {
-      className: "EagerLimitFirm",
-      foreignKey: "eager_limit_firm_id",
-    });
-    registerModel("EagerLimitFirm", EagerLimitFirm);
-    registerModel("EagerLimitClient", EagerLimitClient);
-
-    const firm = await EagerLimitFirm.create({ name: "Acme" });
-    await EagerLimitClient.create({ name: "C1", eager_limit_firm_id: firm.id });
-    await EagerLimitClient.create({ name: "C2", eager_limit_firm_id: firm.id });
-
-    // Load clients with includes and verify belongsTo is preloaded
-    const clients = await EagerLimitClient.all().includes("eagerLimitFirm").toArray();
-    expect(clients).toHaveLength(2);
-    for (const client of clients) {
-      const preloaded = (client as any)._preloadedAssociations.get("eagerLimitFirm");
-      expect(preloaded?.name).toBe("Acme");
-    }
-  });
-  it("eager association loading with belongs to and limit and conditions", async () => {
-    class EagerLCFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerLCClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_lc_firm_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(EagerLCClient, "eagerLCFirm", {
-      className: "EagerLCFirm",
-      foreignKey: "eager_lc_firm_id",
-    });
-    registerModel("EagerLCFirm", EagerLCFirm);
-    registerModel("EagerLCClient", EagerLCClient);
-
-    const firm = await EagerLCFirm.create({ name: "Acme" });
-    await EagerLCClient.create({ name: "C1", eager_lc_firm_id: firm.id });
-    await EagerLCClient.create({ name: "C2", eager_lc_firm_id: firm.id });
-
-    const clients = await EagerLCClient.all().includes("eagerLCFirm").toArray();
-    expect(clients).toHaveLength(2);
-    for (const client of clients) {
-      const preloaded = (client as any)._preloadedAssociations.get("eagerLCFirm");
-      expect(preloaded?.name).toBe("Acme");
-    }
-  });
-  it("eager association loading with belongs to and limit and offset", async () => {
-    class EagerLOFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerLOClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_lo_firm_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(EagerLOClient, "eagerLOFirm", {
-      className: "EagerLOFirm",
-      foreignKey: "eager_lo_firm_id",
-    });
-    registerModel("EagerLOFirm", EagerLOFirm);
-    registerModel("EagerLOClient", EagerLOClient);
-
-    const firm = await EagerLOFirm.create({ name: "Corp" });
-    await EagerLOClient.create({ name: "C1", eager_lo_firm_id: firm.id });
-    await EagerLOClient.create({ name: "C2", eager_lo_firm_id: firm.id });
-    await EagerLOClient.create({ name: "C3", eager_lo_firm_id: firm.id });
-
-    const clients = await EagerLOClient.all().includes("eagerLOFirm").toArray();
-    expect(clients).toHaveLength(3);
-    for (const client of clients) {
-      const preloaded = (client as any)._preloadedAssociations.get("eagerLOFirm");
-      expect(preloaded?.name).toBe("Corp");
-    }
-  });
-  it("eager association loading with belongs to and limit and offset and conditions", async () => {
-    class EagerLOCFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerLOCClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_loc_firm_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(EagerLOCClient, "eagerLOCFirm", {
-      className: "EagerLOCFirm",
-      foreignKey: "eager_loc_firm_id",
-    });
-    registerModel("EagerLOCFirm", EagerLOCFirm);
-    registerModel("EagerLOCClient", EagerLOCClient);
-
-    const firm = await EagerLOCFirm.create({ name: "BigCo" });
-    await EagerLOCClient.create({ name: "C1", eager_loc_firm_id: firm.id });
-
-    const clients = await EagerLOCClient.all().includes("eagerLOCFirm").toArray();
-    expect(clients).toHaveLength(1);
-    const preloaded = (clients[0] as any)._preloadedAssociations.get("eagerLOCFirm");
-    expect(preloaded?.name).toBe("BigCo");
-  });
-  it("eager association loading with belongs to and limit and offset and conditions array", async () => {
-    class EagerLOCAFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerLOCAClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_loca_firm_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(EagerLOCAClient, "eagerLOCAFirm", {
-      className: "EagerLOCAFirm",
-      foreignKey: "eager_loca_firm_id",
-    });
-    registerModel("EagerLOCAFirm", EagerLOCAFirm);
-    registerModel("EagerLOCAClient", EagerLOCAClient);
-
-    const firm = await EagerLOCAFirm.create({ name: "Acme" });
-    await EagerLOCAClient.create({ name: "C1", eager_loca_firm_id: firm.id });
-    await EagerLOCAClient.create({ name: "C2", eager_loca_firm_id: firm.id });
-
-    const clients = await EagerLOCAClient.all().includes("eagerLOCAFirm").toArray();
-    expect(clients).toHaveLength(2);
-    for (const client of clients) {
-      const preloaded = (client as any)._preloadedAssociations.get("eagerLOCAFirm");
-      expect(preloaded?.name).toBe("Acme");
-    }
-  });
-  it("eager association loading with belongs to and conditions string with unquoted table name", async () => {
-    class EagerBtCsuFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerBtCsuClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_bt_csu_firm_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(EagerBtCsuClient, "eagerBtCsuFirm", {
-      className: "EagerBtCsuFirm",
-      foreignKey: "eager_bt_csu_firm_id",
-    });
-    registerModel("EagerBtCsuFirm", EagerBtCsuFirm);
-    registerModel("EagerBtCsuClient", EagerBtCsuClient);
-    const firm = await EagerBtCsuFirm.create({ name: "Acme" });
-    await EagerBtCsuClient.create({ name: "C1", eager_bt_csu_firm_id: firm.id });
-    const clients = await EagerBtCsuClient.all().includes("eagerBtCsuFirm").toArray();
-    expect((clients[0] as any)._preloadedAssociations.get("eagerBtCsuFirm")?.name).toBe("Acme");
-  });
-  it("eager association loading with belongs to and conditions hash", async () => {
-    class EagerCondCompany extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerCondClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_cond_company_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(EagerCondClient, "eagerCondCompany", {
-      className: "EagerCondCompany",
-      foreignKey: "eager_cond_company_id",
-    });
-    registerModel("EagerCondCompany", EagerCondCompany);
-    registerModel("EagerCondClient", EagerCondClient);
-
-    const company = await EagerCondCompany.create({ name: "Acme" });
-    await EagerCondClient.create({
-      name: "Client1",
-      eager_cond_company_id: company.id,
-    });
-
-    const clients = await EagerCondClient.all().includes("eagerCondCompany").toArray();
-    expect(clients).toHaveLength(1);
-    const preloaded = (clients[0] as any)._preloadedAssociations.get("eagerCondCompany");
-    expect(preloaded?.name).toBe("Acme");
-  });
   it("eager association loading with belongs to and conditions string with quoted table name", async () => {
     class EagerBtCsqFirm extends Base {
       static {
@@ -5803,6 +5587,81 @@ describe("EagerAssociationTest", () => {
       expect(loaded.length).toBe(5);
       const one = loaded.find((p) => p.id === posts("welcome").id)!;
       expect((one.association("comments").target as Base[]).length).toBe(2);
+    });
+  });
+
+  it("eager association loading with belongs to and limit", async () => {
+    const loaded = await Comment.all().includes("post").limit(5).order("comments.id").toArray();
+    expect(loaded).toHaveLength(5);
+    expect(loaded.map((c) => c.id)).toEqual([1, 2, 3, 5, 6]);
+  });
+
+  it("eager association loading with belongs to and limit and conditions", async () => {
+    const loaded = await Comment.all()
+      .includes("post")
+      .where("post_id = 4")
+      .limit(3)
+      .order("comments.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(loaded.map((c) => c.id)).toEqual([5, 6, 7]);
+  });
+
+  it("eager association loading with belongs to and limit and offset", async () => {
+    const loaded = await Comment.all()
+      .includes("post")
+      .limit(3)
+      .offset(2)
+      .order("comments.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(loaded.map((c) => c.id)).toEqual([3, 5, 6]);
+  });
+
+  it("eager association loading with belongs to and limit and offset and conditions", async () => {
+    const loaded = await Comment.all()
+      .includes("post")
+      .where("post_id = 4")
+      .limit(3)
+      .offset(1)
+      .order("comments.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(loaded.map((c) => c.id)).toEqual([6, 7, 8]);
+  });
+
+  it("eager association loading with belongs to and limit and offset and conditions array", async () => {
+    const loaded = await Comment.all()
+      .includes("post")
+      .where("post_id = ?", 4)
+      .limit(3)
+      .offset(1)
+      .order("comments.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(loaded.map((c) => c.id)).toEqual([6, 7, 8]);
+  });
+
+  it("eager association loading with belongs to and conditions string with unquoted table name", async () => {
+    expect(() =>
+      Comment.all()
+        .includes("post")
+        .references("posts")
+        .where("posts.id = ?", posts("sti_comments").id),
+    ).not.toThrow();
+  });
+
+  it("eager association loading with belongs to and conditions hash", async () => {
+    const loaded = await Comment.all()
+      .includes("post")
+      .where({ posts: { id: 4 } })
+      .limit(3)
+      .order("comments.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(loaded.map((c) => c.id)).toEqual([5, 6, 7]);
+    await assertNoQueries(false, () => {
+      expect(loaded[0].association("post").target).toBeDefined();
     });
   });
 });
