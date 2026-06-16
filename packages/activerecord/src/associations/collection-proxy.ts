@@ -1570,7 +1570,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const ctor = this._record.constructor as typeof Base;
     const asName = this._assocDef.options.as;
-    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
+    let primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const foreignKey = asName
       ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
       : (this._assocDef.options.foreignKey ??
@@ -1578,6 +1578,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         (Array.isArray(primaryKey)
           ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
           : `${underscore(ctor.name)}_id`));
+    // A composite FK derived from the owner's query_constraints (e.g.
+    // Sharded::BlogPost `[blog_id, id]`) pairs each FK column with the owner's
+    // query-constraint key, not its scalar `id`. Rails resolves the owner key
+    // via `active_record_primary_key`, which is the query_constraints list.
+    if (!asName && Array.isArray(foreignKey) && !Array.isArray(primaryKey)) {
+      const qc = ownerQueryConstraintsList.call(ctor as never);
+      if (qc && qc.length === foreignKey.length) primaryKey = qc;
+    }
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     // insert_record: assign the owner's FK/type onto the record, then save.
     // Mirrors Rails' `CollectionAssociation#insert_record` →

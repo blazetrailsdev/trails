@@ -1454,12 +1454,20 @@ export function _queryConstraintsHash(this: PersistencePrivateHost): Record<stri
   const constraintsList = queryConstraintsList.call(this.constructor as any);
   if (!constraintsList) {
     const pk = this.constructor.primaryKey as string;
-    return { [pk]: this.idInDatabase?.() ?? this.id };
+    // Rails locates the row by `id_in_database`; only fall back to the live
+    // attribute when the in-database accessor is unavailable. A `??` here would
+    // wrongly use the new value whenever the persisted id is legitimately null.
+    return { [pk]: this.idInDatabase ? this.idInDatabase() : this.id };
   }
+  // Use each constraint column's persisted (`*_in_database`) value, not the live
+  // attribute — when a constraint column is itself changing (e.g. a CPK foreign
+  // key being assigned on append), the row must still be located by the value
+  // already in the DB. `??` would fall through a legitimately-null persisted
+  // value to the new, unsaved one and target a non-existent row.
   return Object.fromEntries(
     constraintsList.map((col: string) => [
       col,
-      this.attributeInDatabase?.(col) ?? this.readAttribute(col),
+      this.attributeInDatabase ? this.attributeInDatabase(col) : this.readAttribute(col),
     ]),
   );
 }

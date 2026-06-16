@@ -85,6 +85,7 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
 import * as Reflection from "./reflection.js";
+import { queryConstraintsList as ownerQueryConstraintsList } from "./persistence.js";
 
 /**
  * Association options.
@@ -1434,7 +1435,7 @@ export function computeHasManyWhere(
   options: AssociationOptions,
 ): Record<string, unknown> | null {
   const ctor = record.constructor as typeof Base;
-  const primaryKey = options.primaryKey ?? ctor.primaryKey;
+  let primaryKey = options.primaryKey ?? ctor.primaryKey;
 
   if (options.as) {
     const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
@@ -1463,6 +1464,14 @@ export function computeHasManyWhere(
         : `${underscore(ctor.name)}_id`);
 
   if (Array.isArray(foreignKey)) {
+    // A composite FK derived from the owner's query_constraints (e.g.
+    // Sharded::BlogPost `[blog_id, id]`) is keyed against those constraint
+    // columns, not the owner's scalar `id`. Rails resolves the owner key via
+    // `active_record_primary_key`, which is the query_constraints list.
+    if (!Array.isArray(primaryKey)) {
+      const qc = ownerQueryConstraintsList.call(ctor as never);
+      if (qc && qc.length === foreignKey.length) primaryKey = qc;
+    }
     // Composite FK requires a composite PK of matching length — otherwise
     // we'd silently readAttribute(undefined) and produce a bogus/empty
     // scope. Existing loaders throw CompositePrimaryKeyMismatchError; do
