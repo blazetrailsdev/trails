@@ -315,14 +315,15 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
   }
 
   it.skip("mysql not null defaults non strict", () => {
-    // BLOCKED: adapter-mysql — non-strict INSERT of explicit NULL into a NOT NULL
-    // column does not coerce to the implicit default on the CI MySQL-family lane.
-    // ROOT-CAUSE: the app runs `partial_inserts = false` (Rails 7.0 default,
-    // test-setup-ar.ts), so a `new` record INSERTs explicit NULLs; MariaDB (our
-    // MySQL-family CI lane) rejects explicit NULL into NOT NULL even in non-strict
-    // mode (ER_BAD_NULL_ERROR), unlike MySQL which coerces. The strict-mode sibling
-    // passes (both expect a raise). Tracked: RFC 0030 story
-    // c2-defaults-nonstrict-null-coercion.
+    // BLOCKED: harness — this test needs `partial_inserts = true` (Rails' test-env
+    // default, dirty.rb:50), but the trails harness loads `partial_inserts = false`
+    // (load_defaults 7.0, test-setup-ar.ts).
+    // ROOT-CAUSE: Rails' non-strict coercion to implicit defaults applies only to
+    // *omitted* columns. With partial_inserts=true, `klass.new` (no attrs) omits the
+    // NOT NULL columns, so the DB supplies 0/"". With partial_inserts=false every
+    // column is named and explicit NULLs are sent, which raises ER_BAD_NULL_ERROR on
+    // both MySQL and MariaDB regardless of strict mode. The strict-mode sibling passes
+    // (both expect a raise). Tracked: RFC 0030 story c2-defaults-nonstrict-null-coercion.
   });
 
   it("mysql not null defaults strict", async () => {
