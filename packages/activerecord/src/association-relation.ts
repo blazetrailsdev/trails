@@ -1,6 +1,5 @@
 import type { Base } from "./base.js";
 import { Relation } from "./relation.js";
-import { Result } from "./result.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import { _setAssociationRelationCtor } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
@@ -136,32 +135,40 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     }
   }
 
-  async insert(...args: Parameters<Relation<T>["insert"]>): Promise<Result> {
+  async insert(...args: Parameters<Relation<T>["insert"]>): ReturnType<Relation<T>["insert"]> {
     this._assertBulkInsertable();
     return super.insert(...args);
   }
 
-  async insertBang(...args: Parameters<Relation<T>["insertBang"]>): Promise<Result> {
+  async insertBang(
+    ...args: Parameters<Relation<T>["insertBang"]>
+  ): ReturnType<Relation<T>["insertBang"]> {
     this._assertBulkInsertable();
     return super.insertBang(...args);
   }
 
-  async insertAll(...args: Parameters<Relation<T>["insertAll"]>): Promise<Result> {
+  async insertAll(
+    ...args: Parameters<Relation<T>["insertAll"]>
+  ): ReturnType<Relation<T>["insertAll"]> {
     this._assertBulkInsertable();
     return super.insertAll(...args);
   }
 
-  async insertAllBang(...args: Parameters<Relation<T>["insertAllBang"]>): Promise<Result> {
+  async insertAllBang(
+    ...args: Parameters<Relation<T>["insertAllBang"]>
+  ): ReturnType<Relation<T>["insertAllBang"]> {
     this._assertBulkInsertable();
     return super.insertAllBang(...args);
   }
 
-  async upsert(...args: Parameters<Relation<T>["upsert"]>): Promise<Result> {
+  async upsert(...args: Parameters<Relation<T>["upsert"]>): ReturnType<Relation<T>["upsert"]> {
     this._assertBulkInsertable();
     return super.upsert(...args);
   }
 
-  async upsertAll(...args: Parameters<Relation<T>["upsertAll"]>): Promise<Result> {
+  async upsertAll(
+    ...args: Parameters<Relation<T>["upsertAll"]>
+  ): ReturnType<Relation<T>["upsertAll"]> {
     this._assertBulkInsertable();
     return super.upsertAll(...args);
   }

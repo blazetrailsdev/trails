@@ -105,29 +105,29 @@ describe("BindParameterTest", () => {
     Base.filterAttributes = [];
   });
 
-  it.skip("statement cache", () => {
-    // DEFERRED (story f9-statement-cache-pool-introspection): requires adapter-uniform `sql_key` + prepared-statement-pool
-    // introspection. sqlite keys a plain Map by SQL; PG/MySQL use a
-    // StatementPool with adapter-specific keying — there is no test-only
-    // accessor mirroring Rails' `@statements.send(:cache)` / `sql_key`.
-  });
-  it.skip("statement cache with query cache", () => {
-    // DEFERRED (story f9-statement-cache-pool-introspection): see "statement cache".
-  });
+  // BLOCKED: adapter — connection statement pool is never populated by query
+  // execution, so the `statement_cache`/`to_sql_key` assertions have nothing to
+  // observe. Tracked by RFC 0016 story
+  // `revisit-statement-cache-find-skips-after-cache-routing` (which supersedes
+  // the now-closed `f9-statement-cache-pool-introspection`).
+  // ROOT-CAUSE: empirically (e1-bind-parameter triage, 2026-06-16) `where`/`find`/
+  // `findBy` all leave `sqlite3Adapter._statementPool` empty even with
+  // preparedStatements=true — `_cachedStatement` (sqlite3-adapter.ts:357) is the
+  // only writer and the SELECT execution paths don't route through it. Compounded
+  // by `to_sql` inlining binds (connection-adapters/abstract/database-statements.ts:184-211),
+  // so `to_sql_key`
+  // yields `id = 1` not the placeholder `id = ?` a pool would key by, and there
+  // is no `sqlKey` accessor on the sqlite adapter (PG has one).
+  it.skip("statement cache", () => {});
+  it.skip("statement cache with query cache", () => {});
   it.skip("statement cache with find", () => {
-    // DEFERRED (story f9-statement-cache-pool-introspection): `cached_find_by_statement`
-    // exists (core.ts) but `find` does not route through it, so the per-class
-    // statement cache is never populated. Production wiring, separate story.
+    // The per-class `_findByStatementCache` half IS satisfiable now (find/findBy
+    // route through cachedFindByStatement, core.ts:707/905); the blocker is the
+    // `assert_includes statement_cache` half on the connection pool — see above.
   });
-  it.skip("statement cache with find by", () => {
-    // DEFERRED (story f9-statement-cache-pool-introspection): see "statement cache with find".
-  });
-  it.skip("statement cache with in clause", () => {
-    // DEFERRED (story f9-statement-cache-pool-introspection): see "statement cache".
-  });
-  it.skip("statement cache with sql string literal", () => {
-    // DEFERRED (story f9-statement-cache-pool-introspection): see "statement cache".
-  });
+  it.skip("statement cache with find by", () => {});
+  it.skip("statement cache with in clause", () => {});
+  it.skip("statement cache with sql string literal", () => {});
 
   it("too many binds", async () => {
     const conn = Topic.leaseConnection() as any;
@@ -176,7 +176,9 @@ describe("BindParameterTest", () => {
   });
 
   it.skip("binds are logged", () => {
-    // DEFERRED (story f9-statement-cache-pool-introspection): Rails builds
+    // BLOCKED: adapter — payload.binds carries primitives, not Attribute objects.
+    // ROOT-CAUSE / tracked by RFC 0016 story
+    // `preserve-queryattribute-binds-in-notification-payload`. Rails builds
     // `Relation::QueryAttribute.new("id", 1, Type::Value.new)`, passes it to
     // exec_query, and asserts the `sql.active_record` payload preserves the same
     // Attribute objects (bind_parameter_test.rb:137-145). trails type-casts binds
@@ -210,8 +212,8 @@ describe("BindParameterTest", () => {
       // in the relation layer, so the payload carries `[1]` rather than Attribute
       // objects — the `?? attr` fallback matches the primitive trails emits. (The
       // payload can't preserve Attribute objects without production changes; the
-      // stronger `binds are logged` assertion is deferred to
-      // f9-statement-cache-pool-introspection for exactly that reason.)
+      // stronger `binds are logged` assertion is deferred to RFC 0016 story
+      // `preserve-queryattribute-binds-in-notification-payload` for that reason.)
       const message = subscriber.events.find((e) =>
         (e.payload.binds as any[])?.some((attr) => (attr?.value ?? attr) === 1),
       );
