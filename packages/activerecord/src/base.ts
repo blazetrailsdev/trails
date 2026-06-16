@@ -2374,6 +2374,7 @@ export class Base extends Model {
   static _instantiate<T extends typeof Base>(
     this: T,
     row: Record<string, unknown>,
+    block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> {
     // Delegate to the correct STI subclass when the row carries a present
     // inheritance-column value that names a different class. `inheritance_column`
@@ -2389,7 +2390,11 @@ export class Base extends Model {
       row[inheritanceCol] &&
       row[inheritanceCol] !== this.name
     ) {
-      return instantiateSti(stiBase, row) as InstanceType<T>;
+      return instantiateSti(
+        stiBase,
+        row,
+        block as ((record: Base) => void) | undefined,
+      ) as InstanceType<T>;
     }
 
     // Ensure schema reflection has populated _attributeDefinitions with
@@ -2444,6 +2449,10 @@ export class Base extends Model {
     if (this._strictLoadingByDefault) {
       record._strictLoading = true;
     }
+    // Rails' `init_with_attributes` yields the record to the loader block
+    // (e.g. association inverse wiring) BEFORE running the find/initialize
+    // callbacks, so an `after_find` hook already sees the inverse set.
+    block?.(record);
     cbRunAfter(this.prototype, "find", record, { strict: "sync" });
     cbRunAfter(this.prototype, "initialize", record, { strict: "sync" });
     return record;

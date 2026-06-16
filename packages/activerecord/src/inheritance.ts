@@ -446,7 +446,11 @@ export function narrowToProjectedColumns(
 /**
  * Directly instantiate a record without STI delegation (avoids recursion).
  */
-function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Base {
+function directInstantiate(
+  klass: typeof Base,
+  row: Record<string, unknown>,
+  block?: (record: Base) => void,
+): Base {
   const hadOwnSuppress = Object.prototype.hasOwnProperty.call(klass, "_suppressInitializeCallback");
   const prevSuppress = klass._suppressInitializeCallback;
   klass._suppressInitializeCallback = true;
@@ -485,7 +489,9 @@ function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Ba
   if ((klass as any)._strictLoadingByDefault) {
     (record as any)._strictLoading = true;
   }
-  // Rails' init_with_attributes fires after_find then after_initialize
+  // Rails' init_with_attributes yields to the loader block (inverse wiring)
+  // before firing after_find then after_initialize.
+  block?.(record);
   runAfterCallbacksOnProto((klass as any).prototype, "find", record, { strict: "sync" });
   runAfterCallbacksOnProto((klass as any).prototype, "initialize", record, { strict: "sync" });
   return record;
@@ -499,8 +505,12 @@ function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Ba
  * entirely in {@link discriminateClassForRecord}; this wrapper only constructs
  * the resolved class.
  */
-export function instantiateSti(baseClass: typeof Base, row: Record<string, unknown>): Base {
-  return directInstantiate(discriminateClassForRecord(baseClass, row), row);
+export function instantiateSti(
+  baseClass: typeof Base,
+  row: Record<string, unknown>,
+  block?: (record: Base) => void,
+): Base {
+  return directInstantiate(discriminateClassForRecord(baseClass, row), row, block);
 }
 
 // ---------------------------------------------------------------------------

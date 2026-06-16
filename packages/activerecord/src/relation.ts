@@ -502,6 +502,16 @@ export class Relation<T extends Base> {
   private _skipQueryCache = false;
   private _loaded = false;
   private _records: T[] = [];
+  /**
+   * Per-record loader block, run on each freshly instantiated record BEFORE
+   * its find/initialize callbacks fire — the trails analog of the block Rails
+   * threads through `find_by_sql`/`init_with_attributes`. The collection load
+   * path (`loadHasMany`) sets this to wire `inverse_of` so an `after_find` hook
+   * already sees the inverse association loaded.
+   * Not copied across `spawn()`: it is set immediately before `toArray()` on
+   * the exact relation that will execute.
+   */
+  _instantiateBlock?: (record: T) => void;
   private _loadAsyncPromise?: Promise<T[]>;
   // Monotonic token bumped on reset()/reload() so an in-flight toArray()
   // that started before the reset can detect it lost the race and skip
@@ -4321,8 +4331,9 @@ export class Relation<T extends Base> {
   private _instrumentInstantiation(rows: Record<string, unknown>[]): T[] {
     if (rows.length === 0) return [];
     const payload = { record_count: rows.length, class_name: this._modelClass.name };
+    const block = this._instantiateBlock;
     return Notifications.instrument("instantiation.active_record", payload, () =>
-      rows.map((row) => this._modelClass._instantiate(row) as T),
+      rows.map((row) => this._modelClass._instantiate(row, block as never) as T),
     );
   }
 
