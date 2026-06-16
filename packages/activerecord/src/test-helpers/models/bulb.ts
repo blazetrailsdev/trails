@@ -65,7 +65,7 @@ export class FunkyBulb extends Bulb {
 export class FailedBulb extends Bulb {
   static {
     this.beforeDestroy(async function () {
-      throw "abort";
+      return false;
     });
   }
 }

@@ -1205,12 +1205,15 @@ describe("CallbacksTest", () => {
     }
 
     const g = await Guarded.create({ name: "protected" });
-    await g.destroy();
-    // Record should NOT be destroyed because before_destroy returned false
-    // (Note: In Rails, destroy would return false. Our implementation marks
-    // destroyed after callbacks, so before_destroy halting prevents the delete
-    // SQL but the record is still marked destroyed. This test verifies the
-    // callback did fire.)
+    // Rails halts the chain via `throw :abort`; the surrounding destroy returns
+    // false (no exception) and the row stays persisted. trails models the halt
+    // as the before-callback returning false (the canonical halt contract — cf.
+    // collection-association before_add/before_remove), with the same result.
+    const result = await g.destroy();
+    expect(result).toBe(false);
+    expect(g.isDestroyed()).toBe(false);
+    expect(g.isPersisted()).toBe(true);
+    expect(await Guarded.exists((g as any).id)).toBe(true);
   });
 
   it("after_save runs on both create and update", async () => {

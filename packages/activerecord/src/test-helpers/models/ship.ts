@@ -14,14 +14,14 @@ export class Ship extends Base {
 
     this.beforeSave(
       function (this: any) {
-        this.cancelSaveCallbackMethod();
+        return this.cancelSaveCallbackMethod();
       },
       { if: (r: any) => r.cancelSaveFromCallback },
     );
   }
 
   cancelSaveCallbackMethod() {
-    throw "abort";
+    return false;
   }
 }
 

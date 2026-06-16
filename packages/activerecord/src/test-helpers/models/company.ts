@@ -321,7 +321,7 @@ export class Client extends Company {
       if (this.raiseOnSave) throw new Client.RaisedOnSave();
     });
     this.beforeSave(async function (this: Client) {
-      if (this.throwOnSave) throw "abort";
+      if (this.throwOnSave) return false;
     });
     this.afterSave(async function (this: Client) {
       if (this.rollbackOnSave) throw new Rollback();

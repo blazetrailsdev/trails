@@ -257,13 +257,13 @@ export class Author extends Base {
     this.hasMany("postsWithThrownCallbacks", {
       className: "Post",
       beforeAdd: (_owner: any, _r: any) => {
-        throw "abort";
+        return false;
       },
       afterAdd: (_owner: any, _r: any) => {
         throw new Error("ensure_not_called");
       },
       beforeRemove: (_owner: any, _r: any) => {
-        throw "abort";
+        return false;
       },
       afterRemove: (_owner: any, _r: any) => {
         throw new Error("ensure_not_called");

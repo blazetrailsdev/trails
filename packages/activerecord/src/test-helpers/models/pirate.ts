@@ -76,7 +76,7 @@ export class Pirate extends Base {
   private _shipLog?: string[];
 
   cancelSaveCallbackMethod() {
-    throw "abort";
+    return false;
   }
 
   private log(record: any, callback: string) {
