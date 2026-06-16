@@ -125,6 +125,24 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(proxy.every((p) => p.title.length === 1)).toBe(true);
   });
 
+  it("delegates arbitrary Array methods to the loaded target (method_missing)", async () => {
+    // Mirrors Rails' CollectionProxy/Relation `delegate ... to: :records`
+    // (delegation.rb): Array methods not on the curated proxy surface route
+    // through the loaded records — e.g. `sort`, `reverse`, `join`.
+    const blog = await blogWithPosts();
+    const proxy = association<ApPost>(blog, "apPosts") as any;
+    expect(
+      (proxy.sort((a: ApPost, b: ApPost) => b.title.localeCompare(a.title)) as ApPost[]).map(
+        (p: ApPost) => p.title,
+      ),
+    ).toEqual(["c", "b", "a"]);
+    expect((proxy.reverse() as ApPost[]).map((p: ApPost) => p.title)).toEqual(["c", "b", "a"]);
+    expect(proxy.join(",")).toBe(proxy.target.join(","));
+    // Non-mutating: Ruby's `sort`/`reverse`, not `sort!`/`reverse!` — the
+    // loaded target order is untouched.
+    expect(proxy.target.map((p: ApPost) => p.title)).toEqual(["a", "b", "c"]);
+  });
+
   it("preserves Relation#includes (eager loading) — proxy.includes routes to Relation", async () => {
     const blog = await blogWithPosts();
     const proxy = association<ApPost>(blog, "apPosts") as any;

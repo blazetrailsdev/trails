@@ -153,6 +153,28 @@ export function name(): string {
   return "Delegation";
 }
 
+/**
+ * Array-method delegation — mirrors Rails' `delegate ... to: :records`
+ * (delegation.rb): once a property isn't an own/scope/model method,
+ * CollectionProxy/Relation route genuine `Array` methods through the loaded
+ * records (Ruby's method_missing → `to_a` → `Array#<method>`, e.g.
+ * `categories.sort`). JS has no blocking IO, so this reads already-loaded
+ * records — await the relation/proxy (or `load()`) first for a fresh load —
+ * and operates on a copy of the records so Ruby's non-mutating semantics hold
+ * (`sort`, not `sort!`).
+ *
+ * Returns a bound callable when `prop` names an `Array.prototype` method,
+ * otherwise `undefined` so the caller can fall through to its own default.
+ */
+export function delegateArrayMethod(
+  prop: string,
+  records: () => unknown[],
+): ((...args: any[]) => unknown) | undefined {
+  const arrayMethod = (Array.prototype as unknown as Record<string, unknown>)[prop];
+  if (typeof arrayMethod !== "function") return undefined;
+  return (...args: any[]) => (arrayMethod as (...a: any[]) => unknown).apply([...records()], args);
+}
+
 export function wrapWithScopeProxy<T extends object>(rel: T): T {
   return new Proxy(rel, {
     get(target: any, prop: string | symbol, receiver: any) {
@@ -188,6 +210,18 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
           }
           return result;
         };
+      }
+
+      // Array-method delegation (delegation.rb `delegate ... to: :records`).
+      // Only when the relation is already loaded — JS can't block on the DB,
+      // so an unloaded relation keeps its `undefined` default rather than
+      // delegating against records that aren't here yet.
+      if ((target as any)._loaded) {
+        const arrayDelegate = delegateArrayMethod(
+          prop as string,
+          () => (target as any)._records ?? [],
+        );
+        if (arrayDelegate) return arrayDelegate;
       }
       return value;
     },
