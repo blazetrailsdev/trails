@@ -80,6 +80,7 @@ import {
 import { wrapWithScopeProxy } from "./relation/delegation.js";
 import { resolveAliasedColumn } from "./reflection.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
+import type { Result } from "./result.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
@@ -3720,11 +3721,16 @@ export class Relation<T extends Base> {
    */
   async insertAll(
     records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[]; recordTimestamps?: boolean },
-  ): Promise<number> {
+    options?: {
+      uniqueBy?: string | string[];
+      returning?: InsertAllOptions["returning"];
+      recordTimestamps?: boolean;
+    },
+  ): Promise<Result> {
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
       onDuplicate: options?.uniqueBy ? "skip" : undefined,
+      returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });
   }
@@ -3740,13 +3746,15 @@ export class Relation<T extends Base> {
       uniqueBy?: string | string[];
       updateOnly?: string | string[];
       onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
+      returning?: InsertAllOptions["returning"];
       recordTimestamps?: boolean;
     },
-  ): Promise<number> {
+  ): Promise<Result> {
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
       updateOnly: options?.updateOnly,
       onDuplicate: options?.onDuplicate ?? "update",
+      returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });
   }
@@ -5130,8 +5138,8 @@ export class Relation<T extends Base> {
    */
   async insert(
     attrs: Record<string, unknown>,
-    options?: { uniqueBy?: string | string[] },
-  ): Promise<number> {
+    options?: { uniqueBy?: string | string[]; returning?: InsertAllOptions["returning"] },
+  ): Promise<Result> {
     return this.insertAll([attrs], options);
   }
 
@@ -5143,7 +5151,7 @@ export class Relation<T extends Base> {
   async insertBang(
     attrs: Record<string, unknown>,
     options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
-  ): Promise<number> {
+  ): Promise<Result> {
     return this.insertAllBang([attrs], options);
   }
 
@@ -5156,7 +5164,7 @@ export class Relation<T extends Base> {
   async insertAllBang(
     records: Record<string, unknown>[],
     options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
-  ): Promise<number> {
+  ): Promise<Result> {
     return InsertAll.execute(this, records, {
       returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
@@ -5170,8 +5178,8 @@ export class Relation<T extends Base> {
    */
   async upsert(
     attrs: Record<string, unknown>,
-    options?: { uniqueBy?: string | string[] },
-  ): Promise<number> {
+    options?: { uniqueBy?: string | string[]; returning?: InsertAllOptions["returning"] },
+  ): Promise<Result> {
     return this.upsertAll([attrs], options);
   }
 

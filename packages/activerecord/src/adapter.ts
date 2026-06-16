@@ -71,6 +71,14 @@ export interface DatabaseAdapter {
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
 
   /**
+   * Execute a bulk INSERT statement and return its result rows (the RETURNING
+   * clause output, when present) as an ActiveRecord::Result.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_insert_all
+   */
+  execInsertAll(sql: string, name?: string): Promise<Result>;
+
+  /**
    * Compile an Arel node/TreeManager to a SQL string via this connection's
    * visitor (dialect-correct quoting, etc.).
    *

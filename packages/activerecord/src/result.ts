@@ -153,6 +153,27 @@ export class Result {
     return this.#getHashRows();
   }
 
+  /**
+   * Extract one or more columns from each row.
+   *
+   * Mirrors: Enumerable#pluck (ActiveSupport) over the result's hash rows —
+   * a single key yields a flat array of values, multiple keys yield an array
+   * of value tuples. Reads positional `rows` via `columnIndexes` directly so
+   * no per-row hash is materialized; an unknown key resolves to `undefined`,
+   * matching `hashRow[key]`.
+   */
+  pluck(key: string): unknown[];
+  pluck(...keys: string[]): unknown[][];
+  pluck(...keys: string[]): unknown[] {
+    const indexes = this.columnIndexes;
+    if (keys.length === 1) {
+      const i = indexes[keys[0]];
+      return i === undefined ? this.rows.map(() => undefined) : this.rows.map((row) => row[i]);
+    }
+    const idxs = keys.map((k) => indexes[k]);
+    return this.rows.map((row) => idxs.map((i) => (i === undefined ? undefined : row[i])));
+  }
+
   at(idx: number): Record<string, unknown> | undefined {
     const rows = this.#getHashRows();
     return idx < 0 ? rows[rows.length + idx] : rows[idx];

@@ -380,6 +380,7 @@ export interface AbstractAdapter {
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result>;
+  execInsertAll(sql: string, name?: string): Promise<Result>;
   execInsert(
     sql: string,
     name?: string | null,
