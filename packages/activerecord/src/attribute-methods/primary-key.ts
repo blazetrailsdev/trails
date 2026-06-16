@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
 import { underscore } from "@blazetrails/activesupport";
+import { MissingAttributeError } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "../attribute-methods.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
@@ -112,7 +113,15 @@ export function getId(this: PrimaryKeyInstance): unknown {
  */
 export function setId(this: PrimaryKeyInstance, value: unknown): void {
   const ctor = this.constructor as any;
-  const pk = ctor.primaryKey as string | string[];
+  const pk = ctor.primaryKey as string | string[] | null;
+  if (pk == null) {
+    // Rails: `_write_attribute(self.class.primary_key, value)` with a nil
+    // primary key writes through to an unknown attribute, which the attribute
+    // set rejects. Mirror that for a key-less table (e.g. a view).
+    throw new MissingAttributeError(
+      `can't write unknown attribute 'id' for ${ctor.name ?? "unknown"}`,
+    );
+  }
   if (Array.isArray(pk)) {
     if (!Array.isArray(value)) {
       throw new TypeError(
