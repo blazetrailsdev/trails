@@ -52,10 +52,49 @@ describe("ConnectionHandlersMultiDbTest", () => {
   }
 
   it.skip("multiple connections works in a threaded environment", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
+    // PERMANENT-SKIP: Ruby-only — relies on real OS threads + Concurrent::CountDownLatch
+    // (Thread.new) to prove the connection lease is thread-local under the GVL. JS has
+    // no shared-memory threads; the async-context analogue is already covered by
+    // connection-handling.test.ts "connected_to stack is isolated per async context".
   });
-  it.skip("loading relations with multi db connections", () => {
-    // BLOCKED: connection-pool — needs AR model + lazy Relation loading across roles; Slot C-b
+
+  it("loading relations with multi db connections", async () => {
+    // We need to use a role for reading not named reading, otherwise we'll prevent
+    // writes and won't be able to write to the second connection.
+    class SecondaryBase extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    class MultiConnectionTestModel extends SecondaryBase {
+      declare connectionRole: string;
+      static {
+        this.tableName = "multi_connection_test_models";
+      }
+    }
+
+    SecondaryBase.connectsTo({
+      database: {
+        writing: { database: ":memory:", adapter: "sqlite3" },
+        secondary: { database: ":memory:", adapter: "sqlite3" },
+      },
+    });
+
+    // `connected_to` force-loads any Relation returned from the block so the
+    // lazy query doesn't escape to a different connection context. In JS an
+    // async block returning a thenable Relation auto-awaits it, so the relation
+    // is loaded within the :secondary scope and `connected_to` resolves to its
+    // records — equivalent to Rails' `relation.first` reading the loaded rows.
+    const records = await Base.connectedTo({ role: "secondary" }, async () => {
+      await MultiConnectionTestModel.leaseConnection().executeMutation(
+        "CREATE TABLE `multi_connection_test_models` (connection_role VARCHAR (255))",
+      );
+      await MultiConnectionTestModel.createBang({ connection_role: "reading" });
+      return MultiConnectionTestModel.where({ connection_role: "reading" });
+    });
+
+    expect(records[0].readAttribute("connection_role")).toBe("reading");
   });
 
   it("establish connection using 3 levels config", () => {

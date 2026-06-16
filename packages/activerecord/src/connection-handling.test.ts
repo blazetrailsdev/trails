@@ -158,7 +158,15 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it.skip("common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed", () => {
-    // BLOCKED: needs DB-backed model operations (Post.create/first/count) via withConnection path
+    // BLOCKED: internal query execution acquires its connection through the
+    // deprecated `Model.connection` getter (relation.ts `_modelClass.connection`,
+    // persistence's insert quoting), which calls `pool.leaseConnection()` and
+    // makes the lease sticky/permanent. Under `permanent_connection_checkout =
+    // :deprecated | :disallowed`, common APIs (create!/first/count) must instead
+    // run inside `with_connection` so the connection is released afterwards.
+    // ROOT-CAUSE: relation.ts read paths + persistence insert must wrap SQL
+    // execution in `withConnection` rather than reaching for the permanent
+    // `.connection` lease. Tracked: rfcs/0030 with-connection-query-path story.
   });
 
   it("connected_to switches role for block", () => {
