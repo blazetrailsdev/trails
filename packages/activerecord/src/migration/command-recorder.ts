@@ -104,11 +104,16 @@ export class CommandRecorder {
       typeof (this._delegate as any)?.supportsBulkAlter === "function" &&
       (this._delegate as any).supportsBulkAlter() === true;
 
-    const columnTypes = Object.keys(
-      (
-        this._delegate as { nativeDatabaseTypes?(): Record<string, unknown> }
-      )?.nativeDatabaseTypes?.() ?? {},
-    );
+    // Mirrors Rails: the adapter mixes its `ColumnMethods` module into the
+    // change_table proxy. `columnMethodNames()` exposes that explicit
+    // `define_column_methods` list (adapter-agnostic) — e.g. PG adds
+    // `serial`/`bigserial` beyond its native types.
+    const delegate = this._delegate as {
+      columnMethodNames?(): string[];
+      nativeDatabaseTypes?(): Record<string, unknown>;
+    };
+    const columnTypes =
+      delegate?.columnMethodNames?.() ?? Object.keys(delegate?.nativeDatabaseTypes?.() ?? {});
 
     if (options["bulk"] && supportsBulk) {
       // Bulk path: sub-recorder captures commands, parent stores a single
@@ -767,12 +772,11 @@ const NON_COLUMN_METHOD_TYPES = new Set(["primaryKey"]);
  * { column(name, :type, **options) }`. We reproduce that arity (multi-name,
  * raise-on-empty) and delegate to `#column`.
  *
- * The shorthand set is derived from the adapter's `nativeDatabaseTypes`, which
- * covers the adapter column types in scope (hstore, jsonb, uuid, inet, ...) and
- * keeps the proxy adapter-agnostic. NB this is a close-but-not-exact match for
- * Rails' explicit `define_column_methods` list (`postgresql/schema_definitions.rb:185`):
- * `serial`/`bigserial` are in PG's `ColumnMethods` but not in
- * `NATIVE_DATABASE_TYPES`, so they are not surfaced here.
+ * The shorthand set is the adapter's `columnMethodNames()` — its explicit
+ * `define_column_methods` list (`postgresql/schema_definitions.rb:185`), which
+ * for PG adds `serial`/`bigserial` (SERIAL/BIGSERIAL pseudo-types absent from
+ * `NATIVE_DATABASE_TYPES`) on top of the native types. This keeps the proxy
+ * adapter-agnostic while matching Rails' `ColumnMethods` mixin exactly.
  */
 export function withAdapterColumnMethods<T extends object>(
   proxy: T,

@@ -2048,6 +2048,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return (this.constructor as typeof PostgreSQLAdapter).nativeDatabaseTypes();
   }
 
+  // Mirrors PG's explicit `ColumnMethods` list (`postgresql/schema_definitions.rb`
+  // `define_column_methods`): `serial`/`bigserial` are SERIAL/BIGSERIAL
+  // pseudo-types exposed as column shorthands but absent from
+  // NATIVE_DATABASE_TYPES, so add them to the native-types approximation.
+  override columnMethodNames(): string[] {
+    return [...super.columnMethodNames(), "serial", "bigserial"];
+  }
+
   // Mirrors: PostgreSQLAdapter#set_standard_conforming_strings (postgresql_adapter.rb:412)
   async setStandardConformingStrings(): Promise<void> {
     await this.execute("SET standard_conforming_strings = on");
