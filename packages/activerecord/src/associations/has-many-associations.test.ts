@@ -7297,6 +7297,13 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.loadSchema();
     await HmTag.loadSchema();
     await HmTagging.loadSchema();
+    // The `{ schema: TEST_SCHEMA }` rebuild above DROP+CREATEs `posts` (other
+    // still-bespoke describes in this file leave it title-only on the shared
+    // worker DB). On PostgreSQL that invalidates any prepared-statement plan an
+    // earlier describe cached against the old `posts` shape, so the first query
+    // here raises `cached plan must not change result type`. Deallocate them now
+    // (Rails' clear_cache! after DDL) so the join below re-PREPAREs cleanly.
+    (Base.connection as { clearCacheBang?: () => void }).clearCacheBang?.();
   });
 
   it("sti subselect count", async () => {
