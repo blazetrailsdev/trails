@@ -226,10 +226,12 @@ describe("WithTest", () => {
     ).toEqual(POSTS_WITH_COMMENTS);
   });
 
-  it.skip("raises when using block", () => {
-    // PERMANENT-SKIP: TypeScript has no block/proc syntax, so `.with(...) { }`
-    // cannot be expressed — the Rails "does not accept a block" ArgumentError
-    // guard has no equivalent here.
+  it("raises when using block", () => {
+    // Rails passes a literal block (`Post.with(attributes_for_inspect: :id) { }`);
+    // the TS equivalent of a Ruby block is a trailing function argument.
+    expect(() => (Post as any).with({ attributes_for_inspect: "id" }, () => {})).toThrow(
+      /does not accept a block/,
+    );
   });
 
   it("unscoping", async () => {

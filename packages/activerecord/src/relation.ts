@@ -4996,6 +4996,12 @@ export class Relation<T extends Base> {
   with(
     ...ctes: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
   ): Relation<T> {
+    // Mirrors Rails `with` (query_methods.rb:493): `raise ArgumentError ... if
+    // block_given?`. A trailing function argument is the TS equivalent of a Ruby
+    // block — `with` takes CTE definition hashes, never a callback.
+    if (ctes.some((cte) => typeof cte === "function")) {
+      throw argumentError("ActiveRecord::Relation#with does not accept a block");
+    }
     return this._clone().withBang(...ctes);
   }
 
