@@ -404,12 +404,19 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("idx_users_full_name");
     expect(output).toContain("lower(first_name");
   });
-  it.skip("schema dump includes length for mysql binary fields", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs MySQL-specific handling */
-  });
+  it.skipIf(adapterType !== "mysql")(
+    "schema dump includes length for mysql binary fields",
+    async () => {
+      const { adapter, ctx: testCtx } = freshSidecarCtx();
+      await testCtx.createTable("binary_fields", {}, (t) => {
+        t.binary("var_binary", { limit: 255 });
+        t.binary("var_binary_large", { limit: 4095 });
+      });
+      const output = await SchemaDumper.dump(adapter);
+      expect(output).toMatch(/t\.binary\("var_binary", \{ limit: 255 \}\)/);
+      expect(output).toMatch(/t\.binary\("var_binary_large", \{ limit: 4095 \}\)/);
+    },
+  );
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql blob and text fields",
     async () => {
@@ -435,12 +442,17 @@ describe("SchemaDumperTest", () => {
       expect(output).toMatch(/t\.text\("long_text", \{ size: "long" \}\)/);
     },
   );
-  it.skip("schema does not include limit for emulated mysql boolean fields", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs MySQL-specific handling */
-  });
+  it.skipIf(adapterType !== "mysql")(
+    "schema does not include limit for emulated mysql boolean fields",
+    async () => {
+      const { adapter, ctx: testCtx } = freshSidecarCtx();
+      await testCtx.createTable("booleans", {}, (t) => {
+        t.boolean("has_fun", { default: false });
+      });
+      const output = await SchemaDumper.dump(adapter);
+      expect(output).not.toMatch(/t\.boolean\("has_fun",.+limit: 1/);
+    },
+  );
   it.skipIf(adapterType !== "mysql")("schema dumps index type", async () => {
     const { adapter: ktAdapter, ctx: ktCtx } = freshCtx();
     await ktCtx.createTable("key_tests", {}, (t) => {
@@ -559,15 +571,15 @@ describe("SchemaDumperTest", () => {
       indexes: () => [],
     };
     const output = TopLevelDumper.dump(source) as string;
-    // Regression guard for pre-existing behavior (these are all SQL_TYPE_MAP
-    // keys, unaffected by this PR's fallback change): they have no
-    // TableDefinition helper, so they round-trip through the generic
-    // `t.column(name, sqlType)` path — keeping their own type name rather than
-    // collapsing to the `enum` fallback.
+    // timestamptz/uuid have no TableDefinition helper, so they round-trip
+    // through the generic `t.column(name, sqlType)` path — keeping their own
+    // type name rather than collapsing to the `enum` fallback.
     expect(output).toContain('t.column("ts", "timestamptz"');
     expect(output).toContain('t.column("guid", "uuid"');
-    expect(output).toContain('t.column("span", "interval"');
-    expect(output).toContain('t.column("obj_id", "oid"');
+    // interval/oid resolve to their TableDefinition helpers (Rails emits
+    // `t.interval`/`t.oid`, not `t.column`).
+    expect(output).toContain('t.interval("span"');
+    expect(output).toContain('t.oid("obj_id"');
     expect(output).not.toContain("t.enum(");
   });
 
@@ -591,11 +603,13 @@ describe("SchemaDumperTest", () => {
     expect(parts.join(", ")).toContain(`order: "desc NULLS LAST"`);
   });
 
-  it.skip("schema dump includes limit on array type", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG array support */
+  it.skipIf(adapterType !== "postgres")("schema dump includes limit on array type", async () => {
+    const { adapter, ctx: testCtx } = freshSidecarCtx();
+    await testCtx.createTable("bigint_array", {}, (t) => {
+      (t as any).integer("big_int_data_points", { limit: 8, array: true });
+    });
+    const output = await SchemaDumper.dump(adapter);
+    expect(output).toMatch(/t\.bigint\("big_int_data_points", \{ array: true \}\)/);
   });
   it.skipIf(adapterType !== "postgres")(
     "schema dump allows array of decimal defaults",
@@ -613,42 +627,83 @@ describe("SchemaDumperTest", () => {
       );
     },
   );
-  it.skip("schema dump interval type", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG interval type */
+  it.skipIf(adapterType !== "postgres")("schema dump interval type", async () => {
+    const { adapter, ctx: testCtx } = freshSidecarCtx();
+    await testCtx.createTable("postgresql_times", {}, (t) => {
+      (t as any).interval("time_interval");
+      (t as any).interval("scaled_time_interval", { precision: 6 });
+    });
+    const output = await SchemaDumper.dump(adapter);
+    expect(output).toMatch(/t\.interval\("time_interval"\)/);
+    expect(output).toMatch(/t\.interval\("scaled_time_interval", \{ precision: 6 \}\)/);
   });
-  it.skip("schema dump oid type", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG oid type */
+  it.skipIf(adapterType !== "postgres")("schema dump oid type", async () => {
+    const { adapter, ctx: testCtx } = freshSidecarCtx();
+    await testCtx.createTable("postgresql_oids", {}, (t) => {
+      (t as any).oid("obj_id");
+    });
+    const output = await SchemaDumper.dump(adapter);
+    expect(output).toMatch(/t\.oid\("obj_id"\)/);
   });
-  it.skip("schema dump includes extensions", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG extension dumping */
+  it.skipIf(adapterType !== "postgres")("schema dump includes extensions", async () => {
+    const { SchemaDumper: PgSchemaDumper } =
+      await import("./connection-adapters/postgresql/schema-dumper.js");
+    const { adapter } = freshSidecarCtx();
+    const original = (adapter as any).extensions;
+    try {
+      (adapter as any).extensions = async () => ["hstore"];
+      let output = await PgSchemaDumper.dump(adapter);
+      expect(output).toContain("These are extensions that must be enabled");
+      expect(output).toMatch(/enableExtension\("hstore"\)/);
+
+      (adapter as any).extensions = async () => [];
+      output = await PgSchemaDumper.dump(adapter);
+      expect(output).not.toContain("These are extensions that must be enabled");
+      expect(output).not.toContain("enableExtension");
+    } finally {
+      (adapter as any).extensions = original;
+    }
   });
-  it.skip("schema dump includes extensions in alphabetic order", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG extension dumping */
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump includes extensions in alphabetic order",
+    async () => {
+      const { SchemaDumper: PgSchemaDumper } =
+        await import("./connection-adapters/postgresql/schema-dumper.js");
+      const { adapter } = freshSidecarCtx();
+      const original = (adapter as any).extensions;
+      try {
+        (adapter as any).extensions = async () => ["uuid-ossp", "xml2", "hstore"];
+        const output = await PgSchemaDumper.dump(adapter);
+        const enabled = [...output.matchAll(/enableExtension\("(.+?)"\)/g)].map((m) => m[1]);
+        expect(enabled).toEqual(["hstore", "uuid-ossp", "xml2"]);
+      } finally {
+        (adapter as any).extensions = original;
+      }
+    },
+  );
+  it.skipIf(adapterType !== "postgres")("schema dump include limit for float4 field", async () => {
+    const { adapter, ctx: testCtx } = freshSidecarCtx();
+    await testCtx.createTable("numeric_data", {}, (t) => {
+      t.float("temperature_with_limit", { limit: 24 });
+    });
+    const output = await SchemaDumper.dump(adapter);
+    expect(output).toMatch(/t\.float\("temperature_with_limit", \{ limit: 24 \}\)/);
   });
-  it.skip("schema dump include limit for float4 field", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG float4 specific handling */
-  });
-  it.skip("schema dump keeps enum intact if it contains comma", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG enum support */
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump keeps enum intact if it contains comma",
+    async () => {
+      const { adapter } = freshSidecarCtx();
+      await (adapter as any).createEnum("enum_with_comma", ["value1", "value,2", "value3"]);
+      try {
+        const output = await SchemaDumper.dump(adapter);
+        expect(output).toContain('createEnum("enum_with_comma", ["value1","value,2","value3"])');
+      } finally {
+        // drop-all-tables (per-test reset) does not drop enum types — clean up
+        // explicitly so the type does not leak onto the shared worker DB.
+        await (adapter as any).dropEnum("enum_with_comma", { ifExists: true });
+      }
+    },
+  );
   it("schema dump keeps large precision integer columns as decimal", async () => {
     await ctx.createTable("numeric_data", {}, (t) => {
       t.decimal("atoms_in_universe", { precision: 55 });
@@ -816,34 +871,34 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump with timestamptz datetime format", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG timestamptz support */
+    // BLOCKED: datetime_type-aware dump — the PG dumper does not rewrite
+    // timestamp/timestamptz columns based on PostgreSQLAdapter.datetimeType, and
+    // there is no `t.timestamptz` TableDefinition helper.
+    // ROOT-CAUSE: schema-dumper datetime_type mapping + missing timestamptz helper.
+    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    /* needs datetime_type-aware dump + timestamptz helper */
   });
   it.skip("timestamps schema dump before rails 7", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Rails version compat */
+    // BLOCKED: needs Migration version compatibility (Migration[6.1]).
+    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
   });
   it.skip("timestamps schema dump before rails 7 with timestamptz setting", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Rails version compat */
+    // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
+    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
   });
   it.skip("schema dump when changing datetime type for an existing app", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs datetime type migration */
+    // BLOCKED: datetime_type-aware dump — toggling PostgreSQLAdapter.datetimeType
+    // must flip which columns dump as datetime vs timestamp/timestamptz.
+    // ROOT-CAUSE: schema-dumper datetime_type mapping + missing timestamptz helper.
+    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    /* needs datetime_type-aware dump + timestamptz helper */
   });
   it.skip("schema dump with correct timestamp types via create table and t timestamptz", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG timestamptz support */
+    // BLOCKED: no `t.timestamptz` TableDefinition helper, and the dumper does not
+    // emit `t.timestamptz` for timestamptz columns under the default datetime_type.
+    // ROOT-CAUSE: missing timestamptz helper + schema-dumper mapping gap.
+    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    /* needs timestamptz helper + dump mapping */
   });
 
   it("schema dump with correct timestamp types via add column", async () => {
@@ -857,16 +912,12 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump with correct timestamp types via add column before rails 7", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Rails version compat */
+    // BLOCKED: needs Migration version compatibility (Migration[6.1]).
+    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
   });
   it.skip("schema dump with correct timestamp types via add column before rails 7 with timestamptz setting", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Rails version compat */
+    // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
+    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
   });
 
   it("schema dump with correct timestamp types via add column with type as string", async () => {
