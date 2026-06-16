@@ -369,7 +369,6 @@ describe("InsertAllTest", () => {
 
   it("upsert all passing both on duplicate and update only will raise an error", async () => {
     const { sql } = await import("@blazetrails/arel");
-    const { ArgumentError } = await import("@blazetrails/activemodel");
     await expect(
       Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7, isbn: "1974522598" }], {
         onDuplicate: sql("NAME=values(name)"),
