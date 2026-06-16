@@ -1069,6 +1069,20 @@ describe("InsertAllTest", () => {
     expect(result.pluck("title")).toEqual(["Rework"]);
   });
 
+  it.skipIf(!supportsReturning)("insert all returns nothing if returning is empty", async () => {
+    const Book = makeBookWithAdapter();
+    const result = await Book.insertAllBang([{ title: "Rework", author: "Y" }], { returning: [] });
+    expect(result.columns).toEqual([]);
+  });
+
+  it.skipIf(!supportsReturning)("insert all returns nothing if returning is false", async () => {
+    const Book = makeBookWithAdapter();
+    const result = await Book.insertAllBang([{ title: "Rework", author: "Y" }], {
+      returning: false,
+    });
+    expect(result.columns).toEqual([]);
+  });
+
   it.skip("insert all can skip duplicate records", async () => {
     // BLOCKED: relation — insert_all.rb: skip-duplicates strategy
     const Book = makeBookWithAdapter();

@@ -541,19 +541,18 @@ export async function execUpdate(
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_insert_all
  */
 export function execInsertAll(
-  this: DatabaseStatementsHost | void,
+  this: DatabaseStatementsHost & { execQuery(sql: string, name?: string | null): Promise<Result> },
   sql: string,
   name: string = "SQL",
 ): Promise<Result> {
-  // Route through the adapter's row-returning `execQuery` rather than
-  // `internalExecQuery`: adapters like SQLite implement row materialization in
-  // their `execQuery` override (and leave `castResult` as an unimplemented
-  // strategy hook), so the RETURNING rows surface only on that path.
-  const host = this as DatabaseStatementsHost & {
-    execQuery?: (sql: string, name?: string | null) => Promise<Result>;
-  };
-  if (host?.execQuery) return host.execQuery(sql, name);
-  return internalExecQuery.call(this as DatabaseStatementsHost, sql, name);
+  // Route through the adapter's row-returning `execQuery` rather than Rails'
+  // `internal_exec_query`: adapters like SQLite implement row materialization
+  // (and type-casting) in their `execQuery` override and leave `castResult` as
+  // an unimplemented strategy hook, so the RETURNING rows surface only on that
+  // path. `execQuery` is mixed into every adapter via the DatabaseStatements
+  // include; the base implementation itself delegates to `internalExecQuery`,
+  // so this stays equivalent on adapters that don't override it.
+  return this.execQuery(sql, name);
 }
 
 /**
