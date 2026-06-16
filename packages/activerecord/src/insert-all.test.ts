@@ -1437,6 +1437,17 @@ describe("InsertAllTest", () => {
     schema: canonicalSchema,
   });
 
+  // Speedometer has no fixtures, so useHandlerFixtures doesn't create its
+  // table — create it from the canonical schema for the no-key upsert test.
+  beforeAll(async () => {
+    await defineSchema({ speedometers: canonicalSchema.speedometers });
+    // The bespoke `books` describe above leaves PG prepared plans built
+    // against its `{ title, author, status }` shape; useHandlerFixtures here
+    // recreates `books` with the canonical shape, so flush the statement
+    // cache to avoid "cached plan must not change result type" on first query.
+    (Base.connection as unknown as { clearCache(): void }).clearCache();
+  });
+
   it("insert all has many through", async () => {
     const book = (await CanonicalBook.first()) as any;
     await expect(book.subscribers.insertAllBang([{ nick: "Jimmy" }])).rejects.toThrow(
