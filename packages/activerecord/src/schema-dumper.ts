@@ -78,11 +78,30 @@ export interface IndexInfo {
   opclasses?: string | Record<string, string>;
   where?: string;
   using?: string;
+  /** MySQL index access method (`"fulltext"` / `"spatial"`). */
+  type?: string;
   nullsNotDistinct?: boolean;
   /** PG covering index INCLUDE columns. */
   include?: string[];
   /** Index comment (MySQL `INDEX_COMMENT`, PG `pg_description`). */
   comment?: string;
+}
+
+/**
+ * Mirrors IndexDefinition#concise_options for index prefix lengths: when every
+ * column carries a length and all are identical, collapse the per-column map to
+ * a single scalar (`{name:10, description:10}` → `10`).
+ */
+function conciseIndexLengths(
+  columns: string[],
+  lengths: number | Record<string, number> | undefined,
+): number | Record<string, number> | undefined {
+  if (lengths == null || typeof lengths === "number") return lengths;
+  const values = Object.values(lengths);
+  if (columns.length === values.length && new Set(values).size === 1) {
+    return values[0];
+  }
+  return lengths;
 }
 
 /**
@@ -464,6 +483,7 @@ class AdapterSchemaSource implements SchemaSource {
       orders?: Record<string, string> | string;
       nullsNotDistinct?: boolean;
       using?: string;
+      type?: string;
       lengths?: number | Record<string, number>;
       opclasses?: string | Record<string, string>;
       include?: string[];
@@ -492,7 +512,11 @@ class AdapterSchemaSource implements SchemaSource {
           : idx.orders,
       nullsNotDistinct: idx.nullsNotDistinct,
       using: idx.using,
-      lengths: idx.lengths,
+      type: idx.type,
+      // Mirrors IndexDefinition#concise_options: when every column shares the
+      // same prefix length, collapse the per-column map to a scalar so the dump
+      // emits `length: 10` rather than `length: { name: 10, description: 10 }`.
+      lengths: conciseIndexLengths(idx.columns, idx.lengths),
       opclasses: idx.opclasses,
       include: idx.include,
       comment: idx.comment,
@@ -1131,6 +1155,7 @@ export class SchemaDumper {
       parts.push(`opclass: ${this.formatIndexParts(index.opclasses)}`);
     if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
     if (index.using && index.using !== "btree") parts.push(`using: ${JSON.stringify(index.using)}`);
+    if (index.type) parts.push(`type: ${JSON.stringify(index.type)}`);
     if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
     if (index.include && index.include.length > 0)
       parts.push(`include: ${JSON.stringify(index.include)}`);

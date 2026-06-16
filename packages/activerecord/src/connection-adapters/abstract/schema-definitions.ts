@@ -248,6 +248,9 @@ export interface ColumnOptions {
   ifNotExists?: boolean;
   autoIncrement?: boolean;
   unsigned?: boolean;
+  // MySQL blob/text sizing (Rails: `t.binary x, size: :tiny`). Maps to the
+  // tiny/medium/long type prefix; ignored on adapters without sized blobs.
+  size?: "tiny" | "medium" | "long";
   // Virtual/generated-column options (Rails: `t.virtual ..., type:, as:, stored:`).
   // `as`/`stored` are read by MySQL/PostgreSQL/SQLite `add_column_options!`;
   // `type` is the underlying type read by their `new_column_definition` when the

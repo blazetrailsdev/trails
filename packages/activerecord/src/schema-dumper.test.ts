@@ -222,11 +222,20 @@ describe("SchemaDumperTest", () => {
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain('order: { name: "desc" }');
   });
-  it.skip("schema dumps index length", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs index length tracking (MySQL) */
+  it("schema dumps index length", async () => {
+    const { adapter: lenAdapter, ctx: lenCtx } = freshCtx();
+    await lenCtx.createTable("companies", {}, (t) => {
+      t.string("name");
+      t.string("description");
+    });
+    await lenCtx.addIndex("companies", ["name", "description"], {
+      name: "index_companies_on_name_and_description",
+      length: 10,
+    });
+    const output = (await SchemaDumper.dump(lenAdapter)) as string;
+    const line = output.split(/\n/).find((l) => /index_companies_on_name_and_description/.test(l));
+    // Sub-part prefix lengths are MySQL-only; other adapters drop the option.
+    expect(line?.includes("length: 10")).toBe(adapterType === "mysql");
   });
   it.skipIf(adapterType !== "postgres")("schema dumps check constraints", async () => {
     const { SchemaStatements } =
@@ -392,23 +401,58 @@ describe("SchemaDumperTest", () => {
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs MySQL-specific handling */
   });
-  it.skip("schema dump includes length for mysql blob and text fields", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs MySQL-specific handling */
-  });
+  it.skipIf(adapterType !== "mysql")(
+    "schema dump includes length for mysql blob and text fields",
+    async () => {
+      const { adapter: bfAdapter, ctx: bfCtx } = freshCtx();
+      await bfCtx.createTable("binary_fields", {}, (t) => {
+        t.binary("tiny_blob", { size: "tiny" });
+        t.binary("normal_blob");
+        t.binary("medium_blob", { size: "medium" });
+        t.binary("long_blob", { size: "long" });
+        t.text("tiny_text", { size: "tiny" });
+        t.text("normal_text");
+        t.text("medium_text", { size: "medium" });
+        t.text("long_text", { size: "long" });
+      });
+      const output = (await SchemaDumper.dump(bfAdapter)) as string;
+      expect(output).toMatch(/t\.binary\("tiny_blob", \{ size: "tiny" \}\)/);
+      expect(output).toMatch(/t\.binary\("normal_blob"\)/);
+      expect(output).toMatch(/t\.binary\("medium_blob", \{ size: "medium" \}\)/);
+      expect(output).toMatch(/t\.binary\("long_blob", \{ size: "long" \}\)/);
+      expect(output).toMatch(/t\.text\("tiny_text", \{ size: "tiny" \}\)/);
+      expect(output).toMatch(/t\.text\("normal_text"\)/);
+      expect(output).toMatch(/t\.text\("medium_text", \{ size: "medium" \}\)/);
+      expect(output).toMatch(/t\.text\("long_text", \{ size: "long" \}\)/);
+    },
+  );
   it.skip("schema does not include limit for emulated mysql boolean fields", () => {
     // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
     // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs MySQL-specific handling */
   });
-  it.skip("schema dumps index type", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs index type tracking (btree/hash/gin/gist) */
+  it.skipIf(adapterType !== "mysql")("schema dumps index type", async () => {
+    const { adapter: ktAdapter, ctx: ktCtx } = freshCtx();
+    await ktCtx.createTable("key_tests", {}, (t) => {
+      t.string("awesome");
+      t.string("pizza");
+    });
+    await ktCtx.addIndex("key_tests", "awesome", {
+      type: "fulltext",
+      name: "index_key_tests_on_awesome",
+    });
+    await ktCtx.addIndex("key_tests", "pizza", {
+      using: "btree",
+      name: "index_key_tests_on_pizza",
+    });
+    const output = (await SchemaDumper.dump(ktAdapter)) as string;
+    expect(output).toContain(
+      'addIndex("key_tests", "awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',
+    );
+    expect(output).toContain(
+      'addIndex("key_tests", "pizza", { name: "index_key_tests_on_pizza" })',
+    );
   });
 
   it("schema dump includes decimal options", async () => {

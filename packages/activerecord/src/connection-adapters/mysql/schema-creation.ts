@@ -95,6 +95,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     }
     const limit = options.limit as number | null | undefined;
     const unsigned = options.unsigned;
+    const size = (options as { size?: string | null }).size ?? limitToSize(limit ?? null, type);
     let sql: string;
     switch (type) {
       case "float":
@@ -104,16 +105,16 @@ export class SchemaCreation extends AbstractSchemaCreation {
         sql = integerToSql(limit);
         break;
       case "text":
-        sql = typeWithSizeToSql("text", limitToSize(limit ?? null, "text"));
+        sql = typeWithSizeToSql("text", size);
         break;
       case "blob":
-        sql = typeWithSizeToSql("blob", limitToSize(limit ?? null, "blob"));
+        sql = typeWithSizeToSql("blob", size);
         break;
       case "binary":
         sql =
           limit != null && limit >= 0 && limit <= 0xfff
             ? `varbinary(${limit})`
-            : typeWithSizeToSql("blob", limitToSize(limit ?? null, "binary"));
+            : typeWithSizeToSql("blob", size);
         break;
       case "string":
         sql = `varchar(${limit ?? 255})`;
