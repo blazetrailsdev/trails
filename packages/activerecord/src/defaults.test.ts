@@ -304,6 +304,13 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
       });
       class TestMysqlNotNullDefault extends Base {
         static override tableName = "test_mysql_not_null_defaults";
+        // Rails' AR test suite runs with the framework default
+        // `partial_inserts = true` (dirty.rb:50), which the trails harness flips
+        // to false via `load_defaults 7.0` (test-setup-ar.ts). Restore the Rails
+        // test-env value here so `new` (no attrs) omits the NOT NULL columns from
+        // the INSERT — letting the DB apply implicit 0/"" defaults in non-strict
+        // mode — exactly as Rails exercises this test.
+        static override partialInserts = true;
       }
       TestMysqlNotNullDefault.adapter = adapter;
       await TestMysqlNotNullDefault.loadSchema();
@@ -314,16 +321,22 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
     }
   }
 
-  it.skip("mysql not null defaults non strict", () => {
-    // BLOCKED: harness — this test needs `partial_inserts = true` (Rails' test-env
-    // default, dirty.rb:50), but the trails harness loads `partial_inserts = false`
-    // (load_defaults 7.0, test-setup-ar.ts).
-    // ROOT-CAUSE: Rails' non-strict coercion to implicit defaults applies only to
-    // *omitted* columns. With partial_inserts=true, `klass.new` (no attrs) omits the
-    // NOT NULL columns, so the DB supplies 0/"". With partial_inserts=false every
-    // column is named and explicit NULLs are sent, which raises ER_BAD_NULL_ERROR on
-    // both MySQL and MariaDB regardless of strict mode. The strict-mode sibling passes
-    // (both expect a raise). Tracked: RFC 0030 story c2-defaults-nonstrict-null-coercion.
+  it("mysql not null defaults non strict", async () => {
+    await withMysqlNotNullTable(false, async (klass) => {
+      const record = new klass({});
+      expect((record as any).non_null_integer).toBeNull();
+      expect((record as any).non_null_string).toBeNull();
+      expect((record as any).non_null_text).toBeNull();
+      expect((record as any).non_null_blob).toBeNull();
+
+      await (record as any).saveBang();
+      await (record as any).reload();
+
+      expect((record as any).non_null_integer).toBe(0);
+      expect((record as any).non_null_string).toBe("");
+      expect((record as any).non_null_text).toBe("");
+      expect((record as any).non_null_blob).toBe("");
+    });
   });
 
   it("mysql not null defaults strict", async () => {
