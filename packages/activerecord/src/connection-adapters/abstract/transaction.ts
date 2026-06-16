@@ -290,6 +290,7 @@ export interface TransactionConnection extends DatabaseAdapter {
   addTransactionRecord?(record: unknown): void;
   active?: boolean;
   currentTransaction?(): Transaction | NullTransaction;
+  throwAwayBang?(): void;
 }
 
 /**
@@ -1198,46 +1199,54 @@ export class TransactionManager {
     options: { isolation?: string | null; joinable?: boolean },
     fn: (tx: UserTransaction) => Promise<T> | T,
   ): Promise<T> {
-    const transaction = await this.beginTransaction({
-      isolation: options.isolation,
-      joinable: options.joinable,
-    });
-    let result: T;
+    // `transaction` stays undefined if `beginTransaction` raises while
+    // materializing (e.g. `begin_db_transaction` fails after a successful
+    // begin) — the outer `finally` then evicts the connection from the pool,
+    // mirroring Rails' `transaction&.state&.completed?` nil-safe guard.
+    let transaction: Transaction | undefined;
     try {
-      result = await fn(transaction.userTransaction);
-    } catch (e) {
-      await this.rollbackTransaction();
-      // Rails' ordering (abstract/transaction.rb:627-631):
-      // `after_failure_actions` runs AFTER `rollback_transaction` so
-      // the ROLLBACK isn't delayed behind DEALLOCATE traffic on the
-      // same client (PG StatementPool fires DEALLOCATE per entry via
-      // `.clear()`), and so the server is in a non-aborted state when
-      // cache-clear work runs. PG's adapter retains a WeakRef to the
-      // just-released txn client so the post-rollback `clearCacheBang`
-      // can still reach the StatementPool (see `_lastReleasedTxnClient`).
-      this.afterFailureActions(transaction, e);
-      if (!transaction.state.isCompleted()) {
-        transaction.incompleteBang();
+      transaction = await this.beginTransaction({
+        isolation: options.isolation,
+        joinable: options.joinable,
+      });
+      let result: T;
+      try {
+        result = await fn(transaction.userTransaction);
+      } catch (e) {
+        await this.rollbackTransaction();
+        // Rails' ordering (abstract/transaction.rb:627-631):
+        // `after_failure_actions` runs AFTER `rollback_transaction` so
+        // the ROLLBACK isn't delayed behind DEALLOCATE traffic on the
+        // same client (PG StatementPool fires DEALLOCATE per entry via
+        // `.clear()`), and so the server is in a non-aborted state when
+        // cache-clear work runs. PG's adapter retains a WeakRef to the
+        // just-released txn client so the post-rollback `clearCacheBang`
+        // can still reach the StatementPool (see `_lastReleasedTxnClient`).
+        this.afterFailureActions(transaction, e);
+        throw e;
       }
-      throw e;
-    }
 
-    try {
-      await this.commitTransaction();
-    } catch (commitError) {
-      if (!transaction.state.isCompleted()) {
-        await this.rollbackTransaction(transaction);
+      try {
+        await this.commitTransaction();
+      } catch (commitError) {
+        if (!transaction.state.isCompleted()) {
+          await this.rollbackTransaction(transaction);
+        }
+        throw commitError;
       }
-      if (!transaction.state.isCompleted()) {
-        transaction.incompleteBang();
-      }
-      throw commitError;
-    }
 
-    if (!transaction.state.isCompleted()) {
-      transaction.incompleteBang();
+      return result;
+    } finally {
+      // Mirrors Rails' outer `ensure` (abstract/transaction.rb:646-651):
+      // an incomplete transaction means begin/commit/rollback raised before
+      // the state reached a terminal value, so the connection is in an unknown
+      // state — throw it away (evict from pool + disconnect) and mark the
+      // transaction incomplete.
+      if (!transaction || !transaction.state.isCompleted()) {
+        this._connection.throwAwayBang?.();
+        transaction?.incompleteBang();
+      }
     }
-    return result;
   }
 }
 

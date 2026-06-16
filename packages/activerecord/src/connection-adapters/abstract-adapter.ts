@@ -1679,6 +1679,11 @@ export class AbstractAdapter implements Quoting {
   // --- Connection lifecycle ---
 
   throwAwayBang(): void {
+    // Mirrors Rails AbstractAdapter#throw_away! (abstract_adapter.rb:733):
+    // `pool.remove self; disconnect!`. Removing from the pool is what evicts
+    // the connection so it can't be leased again after a transaction failure;
+    // standalone adapters (no pool) just disconnect.
+    (this.pool as { remove?: (conn: unknown) => void } | null)?.remove?.(this);
     this.disconnectBang();
   }
 

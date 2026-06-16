@@ -19,6 +19,9 @@ import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -1530,19 +1533,6 @@ describe("TransactionTest", () => {
     await defineSchema({ posts: { title: "string", approved: "boolean", content: "string" } });
   });
 
-  it.skip("rollback dirty changes even with raise during rollback removes from pool", () => {
-    // Requires pool-level connection eviction triggered by blocking I/O failure
-    // — no equivalent low-level pool API in this environment.
-  });
-  it.skip("rollback dirty changes even with raise during rollback doesnt commit transaction", () => {
-    // Same as above — pool internals not accessible.
-  });
-  it.skip("connection removed from pool when commit raises and rollback raises", () => {
-    // Pool connection eviction on dual raise — pool internals not accessible.
-  });
-  it.skip("connection removed from pool when begin raises after successfully beginning a transaction", () => {
-    // Pool connection eviction — pool internals not accessible.
-  });
   it.skip("connection removed from pool when thread killed in begin after successfully beginning a transaction", () => {
     // PERMANENT-SKIP: Ruby Thread semantics — Thread.kill aborts a thread
     // mid-transaction; JS is single-threaded with no equivalent kill primitive.
@@ -2111,6 +2101,115 @@ describe("TransactionTest", () => {
         await (Post as any).leaseConnection().materializeTransactions();
       }),
     ).resolves.not.toThrow();
+  });
+});
+
+// ==========================================================================
+// TransactionTest — pool eviction on begin/commit/rollback raise. Rails removes
+// a connection from the pool (`throw_away!` → `pool.remove self; disconnect!`)
+// whenever the outer `within_new_transaction` ensure sees a still-incomplete
+// transaction — i.e. begin, commit, or rollback raised before the state reached
+// a terminal value. The Ruby tests override `exec_rollback_db_transaction` /
+// `commit_transaction` / `rollback_transaction` / `begin_db_transaction`; we
+// override the corresponding trails seams on the leased connection. These run
+// OUTSIDE the shared fixture transaction (`usesTransaction`) because evicting
+// the connection mid-test would poison transactional-fixtures teardown.
+// ==========================================================================
+describe("TransactionTest", () => {
+  const { topics } = useHandlerFixtures(["topics"], {
+    schema: canonicalSchema,
+    usesTransaction: [
+      "rollback dirty changes even with raise during rollback removes from pool",
+      "rollback dirty changes even with raise during rollback doesnt commit transaction",
+      "connection removed from pool when commit raises and rollback raises",
+      "connection removed from pool when begin raises after successfully beginning a transaction",
+    ],
+  });
+  const Topic = CanonicalTopic;
+
+  it("rollback dirty changes even with raise during rollback removes from pool", async () => {
+    const topic = (await Topic.find((topics("fifth") as any).id)) as any;
+
+    const connection = (Topic as any).leaseConnection();
+    const pool = (Topic as any).connectionPool();
+    // A bare `raise` inside Rails' overridden `exec_rollback_db_transaction`
+    // re-raises the in-flight `ActiveRecord::Rollback`, which the public
+    // `transaction` swallows — so the rollback failure surfaces no error here.
+    connection.rollbackDbTransaction = async () => {
+      throw new Rollback();
+    };
+
+    await Topic.transaction(async () => {
+      topic.title = "Rails is broken";
+      await topic.save();
+      throw new Rollback();
+    });
+
+    expect(connection.active).toBe(false);
+    expect(pool.connections.includes(connection)).toBe(false);
+  });
+
+  it("rollback dirty changes even with raise during rollback doesnt commit transaction", async () => {
+    const topic = (await Topic.find((topics("fifth") as any).id)) as any;
+
+    const connection = (Topic as any).leaseConnection();
+    connection.rollbackDbTransaction = async () => {
+      throw new Rollback();
+    };
+
+    await Topic.transaction(async () => {
+      topic.title = "Rails is broken";
+      await topic.save();
+      throw new Rollback();
+    });
+
+    await topic.reload();
+
+    await Topic.transaction(async () => {
+      topic.content = "Ruby on Rails - modified";
+      await topic.save();
+    });
+
+    expect((await topic.reload()).title).toBe("The Fifth Topic of the day");
+  });
+
+  it("connection removed from pool when commit raises and rollback raises", async () => {
+    const topic = (await Topic.find((topics("fifth") as any).id)) as any;
+
+    const connection = (Topic as any).leaseConnection();
+    const pool = (Topic as any).connectionPool();
+    connection.transactionManager.commitTransaction = async () => {
+      throw new Error("commit failed");
+    };
+    connection.transactionManager.rollbackTransaction = async () => {
+      throw new Error("rollback failed");
+    };
+
+    await expect(
+      Topic.transaction(async () => {
+        topic.title = "Updated title";
+        await topic.save();
+      }),
+    ).rejects.toThrow("rollback failed");
+
+    expect(connection.active).toBe(false);
+    expect(pool.connections.includes(connection)).toBe(false);
+    expect((await topic.reload()).title).toBe("The Fifth Topic of the day");
+  });
+
+  it("connection removed from pool when begin raises after successfully beginning a transaction", async () => {
+    const connection = (Topic as any).leaseConnection();
+    const pool = (Topic as any).connectionPool();
+    // Disable lazy transactions so the begin happens eagerly, before any write.
+    await connection.disableLazyTransactionsBang();
+    connection.beginDbTransaction = async () => {
+      throw new Error("begin failed");
+    };
+
+    await expect(Topic.transaction(async () => {})).rejects.toThrow("begin failed");
+
+    expect(connection.active).toBe(false);
+    expect(pool.connections.includes(connection)).toBe(false);
   });
 });
 

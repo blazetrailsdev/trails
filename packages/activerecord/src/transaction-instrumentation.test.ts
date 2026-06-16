@@ -427,16 +427,26 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     const MyError = class extends Error {};
-    const tm = (sharedAdapter as any).transactionManager;
+    // Use an isolated throwaway adapter, not `sharedAdapter`: a raised
+    // `rollback_transaction` leaves the transaction incomplete, so the outer
+    // `within_new_transaction` ensure now drives `throw_away!` (eviction +
+    // disconnect) — discarding `sharedAdapter` would destroy the canonical
+    // :memory: schema and break the useFixtures teardown (see the skipped
+    // materialized sibling above).
+    const adapter = await freshIsolatedAdapter();
+    const { Topic: IsolatedTopic } = makeTopic(adapter);
+    const tm = (adapter as any).transactionManager;
     vi.spyOn(tm, "rollbackTransaction").mockImplementationOnce(async () => {
       throw new MyError("rollback failed");
     });
 
     await expect(
-      Topic.transaction(async () => {
+      IsolatedTopic.transaction(async () => {
         throw new Rollback();
       }),
     ).rejects.toThrow(MyError);
+
+    expect(adapter.active).toBe(false);
 
     expect(events).toHaveLength(0);
   });
