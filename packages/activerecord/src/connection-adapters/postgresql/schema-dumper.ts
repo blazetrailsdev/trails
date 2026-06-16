@@ -59,6 +59,12 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * @internal
    */
   protected override schemaLimit(column: Column): string | undefined {
+    // int4's limit (4) is the native default, so Rails `schema_limit` omits it
+    // (`limit != native_database_types[:integer][:limit]`; typeToSql("integer", {limit: 4})
+    // === "integer"). Without this an explicit `id: :integer` PK would dump
+    // `id: { type: "integer", limit: 4 }` instead of the flat `id: "integer"`.
+    // Mirrors the MySQL dumper's identical guard.
+    if (column.type === "integer" && column.limit === 4) return undefined;
     const base = super.schemaLimit(column);
     if (base !== undefined) return base;
     const sqlType = (column.sqlType ?? "").toLowerCase();

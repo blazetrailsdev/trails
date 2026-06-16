@@ -476,12 +476,14 @@ describe("PrimaryKeyAnyTypeTest", () => {
     await Barcode.loadSchema();
   });
 
-  it.skip("schema dump primary key includes type and options", async () => {
-    // BLOCKED: schema dumper renders a single non-"id" primary key as `id: false`
-    // plus a plain column (`t.string("code", { limit: 42 })`) instead of Rails'
-    // `primary_key: "code", id: { type: :string, limit: 42 }`. The dumper has no
-    // column_spec_for_primary_key equivalent for single custom-named keys.
-    // Tracked: RFC 0030 cc-schema-dumper-pk-rendering.
+  it("schema dump primary key includes type and options", async () => {
+    // Rails: assert_match %r/create_table "barcodes", primary_key: "code", id: { type: :string, limit: 42 }/
+    //        assert_no_match %r{t\.index \["code"\]}, schema
+    const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "barcodes");
+    expect(schema).toMatch(
+      /createTable\("barcodes", \{ primaryKey: "code", id: \{ type: "string", limit: 42 \}/,
+    );
+    expect(schema).not.toMatch(/addIndex\("barcodes", \["code"\]/);
   });
 
   it.skipIf(adapterType !== "mysql")("schema typed primary key column", async () => {
@@ -623,13 +625,10 @@ describe("CompositePrimaryKeyTest", () => {
     expect(schema).toMatch(/createTable\("uber_barcodes", \{ primaryKey: \["region","code"\]/);
   });
 
-  it.skip("dumping composite primary key out of order", async () => {
-    // BLOCKED: schema dumper emits composite-PK columns in table declaration order,
-    // not primary-key definition order. barcodes_reverse declares (region, code) but
-    // its PK is (code, region); the dumper renders primaryKey: ["region","code"] where
-    // Rails renders ["code", "region"]. The adapter's primaryKeys() returns the correct
-    // order (see "composite primary key out of order" above) but the dumper's
-    // introspection path does not. Tracked: RFC 0030 cc-schema-dumper-pk-rendering.
+  it("dumping composite primary key out of order", async () => {
+    // Rails: assert_match %r{create_table "barcodes_reverse", primary_key: \["code", "region"\]}
+    const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "barcodes_reverse");
+    expect(schema).toMatch(/createTable\("barcodes_reverse", \{ primaryKey: \["code","region"\]/);
   });
 
   it("model with a composite primary key", () => {
@@ -670,18 +669,29 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
     await (Base.connection as any).dropTable("int_defaults", { ifExists: true });
   });
 
-  it.skip("schema dump primary key integer with default nil", async () => {
-    // BLOCKED: Rails runs this on PG + MySQL (skip if SQLite3Adapter) and asserts the
-    // PK's `default: nil` survives the round trip. The MySQL dumper drops the default
-    // entirely (emits `id: "integer"` with no default), so the test cannot pass on the
-    // MySQL CI lane. Tracked: RFC 0030 cc-schema-dumper-pk-rendering.
-  });
+  it.skipIf(adapterType === "sqlite")(
+    "schema dump primary key integer with default nil",
+    async () => {
+      // Rails: skip if SQLite3Adapter; assert_match %r{create_table "int_defaults", id: :integer, default: nil}
+      await (Base.connection as any).createTable("int_defaults", {
+        id: "integer",
+        default: null,
+        force: true,
+      });
+      const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "int_defaults");
+      expect(schema).toMatch(/createTable\("int_defaults", \{ id: "integer", default: null/);
+    },
+  );
 
-  it.skip("schema dump primary key bigint with default nil", async () => {
-    // BLOCKED: Rails runs this on every adapter (no skip). On SQLite the dumper drops the
-    // bigint id + default entirely (emits just `force: "cascade"`) and on MySQL it drops
-    // the default, so it fails on the default SQLite lane. Tracked: RFC 0030
-    // cc-schema-dumper-pk-rendering.
+  it("schema dump primary key bigint with default nil", async () => {
+    // Rails: assert_match %r{create_table "int_defaults", id: :bigint, default: nil}
+    await (Base.connection as any).createTable("int_defaults", {
+      id: "bigint",
+      default: null,
+      force: true,
+    });
+    const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "int_defaults");
+    expect(schema).toMatch(/createTable\("int_defaults", \{ id: "bigint", default: null/);
   });
 });
 
@@ -727,10 +737,16 @@ describe("PrimaryKeyIntegerTest", () => {
   );
 
   it.skip("schema dump primary key with serial/integer", async () => {
-    // BLOCKED: Rails runs this on PG + MySQL. On PG the @pk_type is :serial and Rails
-    // emits `id: :serial`, but the TS dumper treats a serial id as the default and emits
-    // no `id:` option at all, so the test fails on the PG CI lane. (It would pass on
-    // MySQL, where @pk_type is :integer.) Tracked: RFC 0030 cc-schema-dumper-pk-rendering.
+    // BLOCKED (PG only): on PG @pk_type is :serial and Rails emits `id: :serial`. The
+    // root cause is upstream of the dumper: TS PG createTable emits SERIAL (int4) for the
+    // *default* primary key (NATIVE_DATABASE_TYPES says bigserial, but schema-creation
+    // overrides to SERIAL), so an explicit `id: :serial` is byte-identical to the default
+    // PK in the database — there is no introspection signal to tell them apart. The PG
+    // dumper's isDefaultPrimaryKey is deliberately widened to treat serial as default so
+    // every default-PK table round-trips; narrowing it to bigserial-only (matching Rails)
+    // would emit `id: :serial` on every default PG table. Converging requires changing the
+    // PG default PK to BIGSERIAL (a fixture-wide change). Tracked: RFC 0030
+    // cc-pg-default-pk-bigserial. (MySQL @pk_type is :integer and already passes.)
   });
 
   it.skipIf(adapterType !== "mysql")("primary key column type with options", async () => {

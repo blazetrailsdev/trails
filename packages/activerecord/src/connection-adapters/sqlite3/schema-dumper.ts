@@ -27,9 +27,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return this.schemaType(column) === "integer";
   }
 
-  /** @internal */
+  /** @internal Mirrors Rails sqlite `explicit_primary_key_default?` (`column.bigint?`). */
   protected override isExplicitPrimaryKeyDefault(column: Column): boolean {
-    return !!column.bigint;
+    return this.isBigint(column);
   }
 
   /** @internal */

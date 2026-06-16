@@ -127,8 +127,11 @@ describe("MySQL::SchemaDumper", () => {
       expect(
         (make() as any).isExplicitPrimaryKeyDefault(col({ type: "integer", autoIncrement: true })),
       ).toBe(false));
-    it("false when autoIncrement undefined (not explicitly set)", () =>
-      expect((make() as any).isExplicitPrimaryKeyDefault(col({ type: "integer" }))).toBe(false));
+    it("true when autoIncrement undefined (not auto_increment)", () =>
+      // Mirrors Rails `!column.auto_increment?`: an introspected non-auto-increment integer
+      // PK (e.g. `id: :integer, default: nil`) carries no autoIncrement flag, so it is an
+      // explicit-default PK and must dump `default: null`.
+      expect((make() as any).isExplicitPrimaryKeyDefault(col({ type: "integer" }))).toBe(true));
   });
 
   describe("prepareColumnOptions", () => {
@@ -284,7 +287,7 @@ describe("MySQL::SchemaDumper", () => {
   describe("orderPrimaryKeyColumns", () => {
     it("reorders composite PK columns by primaryKeyOrderCache", () => {
       const d = make();
-      d.primaryKeyOrderCache["t"] = ["b", "a"];
+      (d as any).primaryKeyOrderCache["t"] = ["b", "a"];
       const result = (d as any).orderPrimaryKeyColumns("t", [
         col({ name: "a" }),
         col({ name: "b" }),
@@ -303,7 +306,7 @@ describe("MySQL::SchemaDumper", () => {
 
     it("appends columns not present in cache", () => {
       const d = make();
-      d.primaryKeyOrderCache["t"] = ["b"];
+      (d as any).primaryKeyOrderCache["t"] = ["b"];
       const result = (d as any).orderPrimaryKeyColumns("t", [
         col({ name: "a" }),
         col({ name: "b" }),
