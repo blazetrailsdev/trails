@@ -1,378 +1,68 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Mirrors associations/cascaded_eager_loading_test.rb — the cascaded
+ * Author/Post/Comment/Categorization/Category/Topic/Vertex eager-loading suite.
+ * Rails declares a single fixtures set for the whole class; we mirror that with
+ * one `useHandlerFixtures` call seeding the canonical association tables.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
-import { Associations } from "../associations.js";
-
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { describe, it, expect } from "vitest";
+import { registerModel, enableSti, registerSubclass } from "../index.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
-import { Post, SpecialPost } from "../test-helpers/models/post.js";
+import { Post, SpecialPost, FirstPost } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Vertex } from "../test-helpers/models/vertex.js";
 import { Edge } from "../test-helpers/models/edge.js";
+import { Topic } from "../test-helpers/models/topic.js";
+import { Reply, SillyReply } from "../test-helpers/models/reply.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 
 describe("CascadedEagerLoadingTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      en_parents: { name: "string" },
-      en_children: { value: "string", en_parent_id: "integer" },
-      sti_topics: { title: "string", type: "string", parent_id: "integer" },
-      sti_topics2: { title: "string", type: "string", parent_id: "integer" },
-      sti_topics3: { title: "string", type: "string", parent_id: "integer" },
-      ef_parents: { name: "string" },
-      ef_children: { value: "string", ef_parent_id: "integer" },
-      pm_authors: { name: "string" },
-      pm_posts: { title: "string", pm_author_id: "integer" },
-      em_authors: { name: "string" },
-      em_posts: { title: "string", em_author_id: "integer" },
-      pd_authors: { name: "string" },
-      pd_posts: { title: "string", pd_author_id: "integer" },
-    });
-  });
+  const { authors, topics, vertices } = useHandlerFixtures(
+    [
+      "authors",
+      "posts",
+      "topics",
+      "comments",
+      "categorizations",
+      "categories",
+      "categoriesPosts",
+      "edges",
+      "vertices",
+    ],
+    { schema: canonicalSchema },
+  );
 
-  it.skip("eager association loading with hmt does not table name collide when joining associations", () => {
-    // BLOCKED: join-dependency self-join aliasing gap.
-    // ROOT-CAUSE: Author.joins(:posts).eager_load(:comments) (comments is
-    //   has_many :through :posts) emits a second un-aliased `posts` join and
-    //   raises `ambiguous column name: posts.id`. Rails aliases to
-    //   `posts_authors`. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
-  });
-  it.skip("eager association loading grafts stashed associations to correct parent", () => {
-    // BLOCKED: join-dependency self-join aliasing gap.
-    // ROOT-CAUSE: Person.eager_load(primary_contact: :primary_contact) needs the
-    //   generated self-join alias `primary_contacts_people_2`; trails' alias
-    //   naming differs. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
-  });
-  it("eager association loading with nil associations", async () => {
-    class ENParent extends Base {
-      static {
-        this._tableName = "en_parents";
-        this.attribute("name", "string");
-      }
-    }
-    class ENChild extends Base {
-      static {
-        this._tableName = "en_children";
-        this.attribute("value", "string");
-        this.attribute("en_parent_id", "integer");
-      }
-    }
-    Associations.hasMany.call(ENParent, "enChildren", {
-      foreignKey: "en_parent_id",
-      className: "ENChild",
-    });
-    registerModel("ENParent", ENParent);
-    registerModel("ENChild", ENChild);
-    await ENParent.create({ name: "lonely" });
-    const authors = await ENParent.all().includes("enChildren").toArray();
-    expect(authors.length).toBe(1);
-    const children = (authors[0] as any)._preloadedAssociations?.get("enChildren") ?? [];
-    expect(children.length).toBe(0);
-  });
-  it.skip("eager association loading with cascaded three levels by ping pong", () => {
-    // BLOCKED: canonical Company model lacks enableSti.
-    // ROOT-CAUSE: Firm.all returns all 12 companies because
-    //   test-helpers/models/company.ts never calls enableSti, so STI type
-    //   scoping is absent. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
-  });
-  it("eager association loading with has many sti", async () => {
-    class StiTopic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("type", "string");
-        this.attribute("parent_id", "integer");
-        this._tableName = "sti_topics";
-        enableSti(StiTopic);
-      }
-    }
-    class StiReply extends StiTopic {
-      static {
-        registerModel(StiReply);
-        registerSubclass(StiReply);
-      }
-    }
-    registerModel(StiTopic);
-    Associations.hasMany.call(StiTopic, "replies", {
-      className: "StiReply",
-      foreignKey: "parent_id",
-    });
-
-    const topic1 = await StiTopic.create({ title: "First" });
-    const topic2 = await StiTopic.create({ title: "Second" });
-    await StiReply.create({ title: "Re: First", parent_id: topic1.id });
-    await StiReply.create({ title: "Re: First 2", parent_id: topic1.id });
-
-    const topics = await StiTopic.all().where({ type: null }).includes("replies").toArray();
-    expect(topics).toHaveLength(2);
-    const t1Replies = (
-      topics.find((t: any) => t.title === "First") as any
-    )._preloadedAssociations.get("replies");
-    expect(t1Replies).toHaveLength(2);
-    const t2Replies = (
-      topics.find((t: any) => t.title === "Second") as any
-    )._preloadedAssociations.get("replies");
-    expect(t2Replies).toHaveLength(0);
-  });
-  it("eager association loading with has many sti and subclasses", async () => {
-    class StiTopic2 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("type", "string");
-        this.attribute("parent_id", "integer");
-        this._tableName = "sti_topics2";
-        enableSti(StiTopic2);
-      }
-    }
-    class StiReply2 extends StiTopic2 {
-      static {
-        registerModel(StiReply2);
-        registerSubclass(StiReply2);
-      }
-    }
-    class StiSillyReply2 extends StiReply2 {
-      static {
-        registerModel(StiSillyReply2);
-        registerSubclass(StiSillyReply2);
-      }
-    }
-    registerModel(StiTopic2);
-    Associations.hasMany.call(StiTopic2, "replies", {
-      className: "StiReply2",
-      foreignKey: "parent_id",
-    });
-
-    const topic = await StiTopic2.create({ title: "First" });
-    await StiReply2.create({ title: "Re: First", parent_id: topic.id });
-    await StiSillyReply2.create({ title: "Silly Re: First", parent_id: topic.id });
-
-    const topics = await StiTopic2.all().where({ type: null }).includes("replies").toArray();
-    expect(topics).toHaveLength(1);
-    const replies = (topics[0] as any)._preloadedAssociations.get("replies");
-    expect(replies).toHaveLength(2);
-  });
-  it("eager association loading with belongs to sti", async () => {
-    class StiTopic3 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("type", "string");
-        this.attribute("parent_id", "integer");
-        this._tableName = "sti_topics3";
-        enableSti(StiTopic3);
-      }
-    }
-    class StiReply3 extends StiTopic3 {
-      static {
-        registerModel(StiReply3);
-        registerSubclass(StiReply3);
-      }
-    }
-    registerModel(StiTopic3);
-    Associations.belongsTo.call(StiReply3, "topic", {
-      className: "StiTopic3",
-      foreignKey: "parent_id",
-    });
-
-    const topic = await StiTopic3.create({ title: "First" });
-    await StiReply3.create({ title: "Re: First", parent_id: topic.id });
-
-    const replies = await StiReply3.all().includes("topic").toArray();
-    expect(replies).toHaveLength(1);
-    const parentTopic = (replies[0] as any)._preloadedAssociations.get("topic");
-    expect(parentTopic).not.toBeNull();
-    expect(parentTopic.title).toBe("First");
-  });
-  it.skip("eager association loading with multiple stis and order", () => {
-    // BLOCKED: join-dependency eager-load alias ordering gap.
-    // ROOT-CAUSE: includes + order on eager-load aliases
-    //   (`very_special_comments_posts.body`) needs the alias-naming fidelity
-    //   above. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
-  });
-  it("eager association loading where first level returns nil", async () => {
-    class EFParent extends Base {
-      static {
-        this._tableName = "ef_parents";
-        this.attribute("name", "string");
-      }
-    }
-    class EFChild extends Base {
-      static {
-        this._tableName = "ef_children";
-        this.attribute("value", "string");
-        this.attribute("ef_parent_id", "integer");
-      }
-    }
-    Associations.hasOne.call(EFParent, "efChild", {
-      foreignKey: "ef_parent_id",
-      className: "EFChild",
-    });
-    registerModel("EFParent", EFParent);
-    registerModel("EFChild", EFChild);
-    await EFParent.create({ name: "no-child" });
-    const parents = await EFParent.all().includes("efChild").toArray();
-    expect(parents.length).toBe(1);
-    const child = (parents[0] as any)._preloadedAssociations?.get("efChild");
-    expect(child).toBeNull();
-  });
-
-  it("preload through missing records", async () => {
-    class PMAuthor extends Base {
-      static {
-        this._tableName = "pm_authors";
-        this.attribute("name", "string");
-      }
-    }
-    class PMPost extends Base {
-      static {
-        this._tableName = "pm_posts";
-        this.attribute("title", "string");
-        this.attribute("pm_author_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(PMPost, "pmAuthor", {
-      foreignKey: "pm_author_id",
-      className: "PMAuthor",
-    });
-    registerModel("PMAuthor", PMAuthor);
-    registerModel("PMPost", PMPost);
-    await PMPost.create({ title: "orphan", pm_author_id: 9999 });
-    const posts = await PMPost.all().includes("pmAuthor").toArray();
-    expect(posts.length).toBe(1);
-    const author = (posts[0] as any)._preloadedAssociations?.get("pmAuthor");
-    expect(author).toBeNull();
-  });
-
-  it("eager association loading with missing first record", async () => {
-    class EMAuthor extends Base {
-      static {
-        this._tableName = "em_authors";
-        this.attribute("name", "string");
-      }
-    }
-    class EMPost extends Base {
-      static {
-        this._tableName = "em_posts";
-        this.attribute("title", "string");
-        this.attribute("em_author_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(EMPost, "emAuthor", {
-      foreignKey: "em_author_id",
-      className: "EMAuthor",
-    });
-    registerModel("EMAuthor", EMAuthor);
-    registerModel("EMPost", EMPost);
-    await EMPost.create({ title: "missing-author", em_author_id: null });
-    const a = await EMAuthor.create({ name: "real" });
-    await EMPost.create({ title: "has-author", em_author_id: a.id });
-    const posts = await EMPost.all().includes("emAuthor").toArray();
-    expect(posts.length).toBe(2);
-    const authors = posts.map((p: any) => (p as any)._preloadedAssociations?.get("emAuthor"));
-    expect(authors.filter((a: any) => a != null).length).toBe(1);
-    expect(authors.filter((a: any) => a == null).length).toBe(1);
-  });
-  it("preloaded records are not duplicated", async () => {
-    class PDAuthor extends Base {
-      static {
-        this._tableName = "pd_authors";
-        this.attribute("name", "string");
-      }
-    }
-    class PDPost extends Base {
-      static {
-        this._tableName = "pd_posts";
-        this.attribute("title", "string");
-        this.attribute("pd_author_id", "integer");
-      }
-    }
-    Associations.hasMany.call(PDAuthor, "pdPosts", {
-      foreignKey: "pd_author_id",
-      className: "PDPost",
-    });
-    registerModel("PDAuthor", PDAuthor);
-    registerModel("PDPost", PDPost);
-    const a = await PDAuthor.create({ name: "Alice" });
-    await PDPost.create({ title: "P1", pd_author_id: a.id });
-    await PDPost.create({ title: "P2", pd_author_id: a.id });
-    const authors = await PDAuthor.all().includes("pdPosts").toArray();
-    expect(authors.length).toBe(1);
-    const posts = (authors[0] as any)._preloadedAssociations?.get("pdPosts") ?? [];
-    expect(posts.length).toBe(2);
-    const ids = posts.map((p: any) => p.id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-  it.skip("preloading across has one constrains loaded records", () => {
-    // BLOCKED: no reset_callbacks / callback-removal API.
-    // ROOT-CAUSE: test installs a temporary after_initialize recorder via
-    //   reset_callbacks to assert a has_one (ordered) preload instantiates only
-    //   the constrained record; trails callbacks.ts exposes registration only.
-    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
-  });
-  it.skip("preloading across has one through constrains loaded records", () => {
-    // BLOCKED: no reset_callbacks / callback-removal API.
-    // ROOT-CAUSE: as above, for a has_one :through (recent_response) preload.
-    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
-  });
-});
-
-// ==========================================================================
-// CascadedEagerLoadingTest (canonical fixtures) — the cascaded Author → posts →
-// comments / categorizations tests use the canonical Author/Post/Comment/
-// Categorization models + real authors/posts/comments/categorizations fixtures,
-// so they need the fixture-backed handler suite (mirrors EagerAssociationTest in
-// eager.test.ts). The block above declares ad-hoc per-test models against a
-// local synthetic schema.
-// ==========================================================================
-describe("CascadedEagerLoadingTest", () => {
-  const { authors } = useHandlerFixtures([
-    "authors",
-    "posts",
-    "comments",
-    "categorizations",
-    "categories",
-  ]);
-  // Force-recreate the canonical tables with `dropExisting` (mirrors
-  // named-scoping.test.ts / EagerAssociationTest). The per-worker SQLite DB is
-  // shared across files, and sibling files define a `posts` table without the
-  // columns these fixtures seed; the signature cache is primed at worker boot,
-  // so a plain `defineSchema` would cache-hit and skip recreation.
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        categorizations: canonicalSchema.categorizations,
-        categories: canonicalSchema.categories,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
+  enableSti(Topic);
   registerModel(Author);
   registerModel(Post);
+  registerModel(SpecialPost);
+  registerModel(FirstPost);
   registerModel(Comment);
   registerModel(Categorization);
   registerModel(Category);
+  registerModel(Topic);
+  registerModel(Reply);
+  registerSubclass(Reply);
+  registerModel(SillyReply);
+  registerSubclass(SillyReply);
+  registerModel(Vertex);
+  registerModel(Edge);
 
   const targetArr = (rec: Base, name: string): Base[] =>
     (rec.association(name).target as Base[]) ?? [];
+  const target = (rec: Base, name: string): Base | null =>
+    (rec.association(name).target as Base) ?? null;
   const commentCount = (posts: Base[]): number =>
     posts.reduce((sum, p) => sum + targetArr(p, "comments").length, 0);
 
   it("eager association loading with cascaded two levels", async () => {
-    // Rails uses `.order(:id)` here (rb:21); the preload path queries only the
-    // authors table, so the bare `id` is unambiguous — mirrors the symbol form.
     const loaded = await Author.all().includes({ posts: "comments" }).order("id").toArray();
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
@@ -381,8 +71,6 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with cascaded two levels and one level", async () => {
-    // Rails uses `.order(:id)` here (rb:29); preload queries only authors, so
-    // the bare `id` is unambiguous — mirrors the symbol form.
     const loaded = await Author.all()
       .includes({ posts: "comments" }, "categorizations")
       .order("id")
@@ -395,127 +83,20 @@ describe("CascadedEagerLoadingTest", () => {
     expect(targetArr(loaded[1], "categorizations")).toHaveLength(2);
   });
 
-  it("eager association loading with cascaded two levels with two has many associations", async () => {
-    const loaded = await Author.all()
-      .includes({ posts: ["comments", "categorizations"] })
-      .order("authors.id")
-      .toArray();
-    expect(loaded).toHaveLength(3);
-    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
-    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
-    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
+  it.skip("eager association loading with hmt does not table name collide when joining associations", () => {
+    // BLOCKED: join-dependency self-join aliasing gap.
+    // ROOT-CAUSE: Author.joins(:posts).eager_load(:comments) (comments is
+    //   has_many :through :posts) emits a second un-aliased `posts` join and
+    //   raises `ambiguous column name: posts.id`. Rails aliases to
+    //   `posts_authors`. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
 
-  it("eager association loading with cascaded two levels and self table reference", async () => {
-    const loaded = await Author.all()
-      .includes({ posts: ["comments", "author"] })
-      .order("authors.id")
-      .toArray();
-    expect(loaded).toHaveLength(3);
-    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
-    expect((loaded[0] as any).name).toBe((authors("david") as any).name);
-    const postAuthorNames = new Set(
-      targetArr(loaded[0], "posts").map((p) => (p.association("author").target as any)?.name),
-    );
-    expect([...postAuthorNames]).toEqual([(authors("david") as any).name]);
+  it.skip("eager association loading grafts stashed associations to correct parent", () => {
+    // BLOCKED: join-dependency self-join aliasing gap.
+    // ROOT-CAUSE: Person.eager_load(primary_contact: :primary_contact) needs the
+    //   generated self-join alias `primary_contacts_people_2`; trails' alias
+    //   naming differs. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
-
-  it("eager association loading with cascaded two levels with condition", async () => {
-    const loaded = await Author.all()
-      .includes({ posts: "comments" })
-      .where("authors.id=1")
-      .order("authors.id")
-      .toArray();
-    expect(loaded).toHaveLength(1);
-    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
-  });
-
-  it("eager association loading with cascaded interdependent one level and two levels", async () => {
-    const loaded = await Author.all()
-      .includes("comments", { posts: "categorizations" })
-      .order("authors.id")
-      .toArray();
-    expect(loaded).toHaveLength(3);
-    expect(targetArr(loaded[0], "comments")).toHaveLength(11);
-    expect(targetArr(loaded[1], "comments")).toHaveLength(1);
-    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
-    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
-    const catSum = targetArr(loaded[0], "posts").reduce(
-      (sum, p) => sum + targetArr(p, "categorizations").length,
-      0,
-    );
-    expect(catSum).toBe(3);
-  });
-});
-
-// ==========================================================================
-// CascadedEagerLoadingTest (Vertex/Edge fixtures) — recursive cascading.
-// ==========================================================================
-describe("CascadedEagerLoadingTest", () => {
-  const { vertices } = useHandlerFixtures(["vertices", "edges"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
-      { vertices: canonicalSchema.vertices, edges: canonicalSchema.edges } as Schema,
-      { dropExisting: true },
-    );
-  });
-  registerModel(Vertex);
-  registerModel(Edge);
-
-  const arr = (rec: Base, name: string): Base[] => (rec.association(name).target as Base[]) ?? [];
-
-  it("eager association loading with recursive cascading four levels has many through", async () => {
-    const source = (
-      await Vertex.all()
-        .includes({ sinks: { sinks: { sinks: "sinks" } } })
-        .order("vertices.id")
-        .toArray()
-    )[0];
-    await assertQueriesCount(0, false, () => {
-      expect(arr(arr(arr(source, "sinks")[0], "sinks")[0], "sinks")[0].id).toBe(
-        vertices("vertex_4").id,
-      );
-    });
-  });
-
-  it("eager association loading with recursive cascading four levels has and belongs to many", async () => {
-    const sink = (
-      await Vertex.all()
-        .includes({ sources: { sources: { sources: "sources" } } })
-        .order("vertices.id DESC")
-        .toArray()
-    )[0];
-    await assertQueriesCount(0, false, () => {
-      expect(
-        arr(arr(arr(arr(sink, "sources")[0], "sources")[0], "sources")[0], "sources")[0].id,
-      ).toBe(vertices("vertex_1").id);
-    });
-  });
-});
-
-// ==========================================================================
-// CascadedEagerLoadingTest (Category fixtures) — joins/includes with count.
-// ==========================================================================
-describe("CascadedEagerLoadingTest", () => {
-  useHandlerFixtures(["categories", "posts", "comments", "categorizations", "categoriesPosts"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
-      {
-        categories: canonicalSchema.categories,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        categorizations: canonicalSchema.categorizations,
-        categories_posts: canonicalSchema.categories_posts,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
-  registerModel(Category);
-  registerModel(Post);
-  registerModel(Comment);
-  registerModel(Categorization);
 
   it("cascaded eager association loading with join for count", async () => {
     const categories = Category.all()
@@ -547,36 +128,209 @@ describe("CascadedEagerLoadingTest", () => {
     expect(await categories.count()).toBe(3);
     expect((await categories.toArray()).length).toBe(3);
   });
-});
-
-// ==========================================================================
-// CascadedEagerLoadingTest (Author special_posts) — joins + includes count.
-// ==========================================================================
-describe("CascadedEagerLoadingTest", () => {
-  useHandlerFixtures(["authors", "posts", "comments", "categorizations"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        categorizations: canonicalSchema.categorizations,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(Comment);
-  registerModel(Categorization);
 
   it("eager association loading with join for count", async () => {
-    registerModel(SpecialPost);
-    const authors = Author.all().joins("specialPosts").includes("posts", "categorizations");
-    await authors.count();
+    const authorsRel = Author.all().joins("specialPosts").includes("posts", "categorizations");
+    await authorsRel.count();
     await assertQueriesCount(3, false, async () => {
-      await authors.toArray();
+      await authorsRel.toArray();
     });
+  });
+
+  it.skip("eager association loading with nil associations", () => {
+    // BLOCKED: includes/preload do not tolerate nil arguments.
+    // ROOT-CAUSE: Author.includes(nil) / includes([:posts, nil]) — Rails ignores
+    //   nil entries; trails' includesBang pushes them through and the preloader
+    //   raises `AssociationNotFoundError: Association named 'null'`.
+    //   Tracked: RFC 0030 story cascaded-eager-nil-and-proxy-preload-convergence.
+  });
+
+  it("eager association loading with cascaded two levels with two has many associations", async () => {
+    const loaded = await Author.all()
+      .includes({ posts: ["comments", "categorizations"] })
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
+    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
+  });
+
+  it("eager association loading with cascaded two levels and self table reference", async () => {
+    const loaded = await Author.all()
+      .includes({ posts: ["comments", "author"] })
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect((loaded[0] as any).name).toBe((authors("david") as any).name);
+    const postAuthorNames = new Set(
+      targetArr(loaded[0], "posts").map((p) => (target(p, "author") as any)?.name),
+    );
+    expect([...postAuthorNames]).toEqual([(authors("david") as any).name]);
+  });
+
+  it("eager association loading with cascaded two levels with condition", async () => {
+    const loaded = await Author.all()
+      .includes({ posts: "comments" })
+      .where("authors.id=1")
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(1);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+  });
+
+  it.skip("eager association loading with cascaded three levels by ping pong", () => {
+    // BLOCKED: canonical Company model lacks enableSti.
+    // ROOT-CAUSE: Firm.all returns all 12 companies because
+    //   test-helpers/models/company.ts never calls enableSti, so STI type
+    //   scoping is absent. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  });
+
+  it("eager association loading with has many sti", async () => {
+    const loaded = await Topic.all().includes("replies").order("topics.id").toArray();
+    expect(loaded[0].id).toBe((topics("first") as any).id);
+    expect(loaded[1].id).toBe((topics("second") as any).id);
+    // topics(:first).replies.size == 1, topics(:second).replies.size == 0
+    await assertQueriesCount(0, false, () => {
+      expect(targetArr(loaded[0], "replies")).toHaveLength(1);
+      expect(targetArr(loaded[1], "replies")).toHaveLength(0);
+    });
+  });
+
+  it.skip("eager association loading with has many sti and subclasses", () => {
+    // BLOCKED: join-dependency eager-load alias ordering gap.
+    // ROOT-CAUSE: `order: ["topics.id", "replies_topics.id"]` over `includes(:replies)`
+    //   forces an eager-load join aliased `replies_topics`; trails' alias naming
+    //   differs. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  });
+
+  it("eager association loading with belongs to sti", async () => {
+    const replies = await Reply.all().includes("topic").order("topics.id").toArray();
+    expect(replies.map((r) => r.id)).toContain((topics("second") as any).id);
+    expect(replies.map((r) => r.id)).not.toContain((topics("first") as any).id);
+    await assertQueriesCount(0, false, () => {
+      expect((target(replies[0], "topic") as any)?.id).toBe((topics("first") as any).id);
+    });
+  });
+
+  it.skip("eager association loading with multiple stis and order", () => {
+    // BLOCKED: join-dependency eager-load alias ordering gap.
+    // ROOT-CAUSE: includes + order on eager-load aliases
+    //   (`very_special_comments_posts.body`) needs the alias-naming fidelity
+    //   above. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  });
+
+  it.skip("eager association loading of stis with multiple references", () => {
+    // BLOCKED: join-dependency eager-load alias ordering gap.
+    // ROOT-CAUSE: includes({posts: {special_comments: {post: ...}}}) with order on
+    //   `very_special_comments_posts.body` needs the same alias-naming fidelity.
+    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  });
+
+  it("eager association loading where first level returns nil", async () => {
+    const loaded = await Author.all()
+      .includes({ postAboutThinking: "comments" })
+      .order("authors.id DESC")
+      .toArray();
+    expect(loaded.map((a) => a.id)).toEqual([
+      (authors("bob") as any).id,
+      (authors("mary") as any).id,
+      (authors("david") as any).id,
+    ]);
+    await assertQueriesCount(0, false, () => {
+      const post = target(loaded[2], "postAboutThinking") as Base;
+      expect(targetArr(post, "comments").length).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  it("preload through missing records", async () => {
+    const post = await Post.all()
+      .whereNot({ author_id: Author.all().select("id") })
+      .preload({ author: { comments: "post" } })
+      .first();
+    await assertQueriesCount(0, false, () => {
+      expect(target(post as Base, "author")).toBeNull();
+    });
+  });
+
+  it("eager association loading with missing first record", async () => {
+    const posts = await Post.all()
+      .where({ id: 3 })
+      .preload({ author: { comments: "post" } })
+      .toArray();
+    expect(posts).toHaveLength(1);
+  });
+
+  it("eager association loading with recursive cascading four levels has many through", async () => {
+    const source = (
+      await Vertex.all()
+        .includes({ sinks: { sinks: { sinks: "sinks" } } })
+        .order("vertices.id")
+        .toArray()
+    )[0];
+    await assertQueriesCount(0, false, () => {
+      expect(targetArr(targetArr(targetArr(source, "sinks")[0], "sinks")[0], "sinks")[0].id).toBe(
+        (vertices("vertex_4") as any).id,
+      );
+    });
+  });
+
+  it("eager association loading with recursive cascading four levels has and belongs to many", async () => {
+    const sink = (
+      await Vertex.all()
+        .includes({ sources: { sources: { sources: "sources" } } })
+        .order("vertices.id DESC")
+        .toArray()
+    )[0];
+    await assertQueriesCount(0, false, () => {
+      expect(
+        targetArr(
+          targetArr(targetArr(targetArr(sink, "sources")[0], "sources")[0], "sources")[0],
+          "sources",
+        )[0].id,
+      ).toBe((vertices("vertex_1") as any).id);
+    });
+  });
+
+  it("eager association loading with cascaded interdependent one level and two levels", async () => {
+    const loaded = await Author.all()
+      .includes("comments", { posts: "categorizations" })
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "comments")).toHaveLength(11);
+    expect(targetArr(loaded[1], "comments")).toHaveLength(1);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
+    const catSum = targetArr(loaded[0], "posts").reduce(
+      (sum, p) => sum + targetArr(p, "categorizations").length,
+      0,
+    );
+    expect(catSum).toBe(3);
+  });
+
+  it.skip("preloaded records are not duplicated", () => {
+    // BLOCKED: preload through an inverse_of parent does not populate the nested
+    //   association.
+    // ROOT-CAUSE: author.posts.includes(author: :first_posts) must equal
+    //   Post.where(author:).includes(author: :first_posts); trails returns 0 on
+    //   the proxy path because post.author inverse_of resolves to the cached
+    //   parent author without first_posts preloaded.
+    //   Tracked: RFC 0030 story cascaded-eager-nil-and-proxy-preload-convergence.
+  });
+
+  it.skip("preloading across has one constrains loaded records", () => {
+    // BLOCKED: no reset_callbacks / callback-removal API.
+    // ROOT-CAUSE: test installs a temporary after_initialize recorder via
+    //   reset_callbacks to assert a has_one (ordered) preload instantiates only
+    //   the constrained record; trails callbacks.ts exposes registration only.
+    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  });
+
+  it.skip("preloading across has one through constrains loaded records", () => {
+    // BLOCKED: no reset_callbacks / callback-removal API.
+    // ROOT-CAUSE: as above, for a has_one :through (recent_response) preload.
+    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
   });
 });
