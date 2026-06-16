@@ -2813,15 +2813,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Whether the target should be read from the in-memory target rather than
-   * the database. Mirrors:
+   * Whether find should read the in-memory target rather than querying the
+   * database. Canonical for the proxy path (the proxy owns `_target` and its
+   * loaded flag); the module-level `isFindFromTarget(proxy)` helper resolves
+   * here via `_association`. Mirrors
    * ActiveRecord::Associations::CollectionAssociation#find_from_target?
+   * (collection_association.rb:308) — kept in clause-order parity with
+   * `CollectionAssociation#isFindFromTarget`.
+   *
+   * @internal
    */
-  private _findFromTarget(): boolean {
+  isFindFromTarget(): boolean {
     return (
       this._targetLoaded ||
-      (!!(this._record as any)._strictLoading &&
-        (this._record as any)._strictLoadingMode === "all") ||
+      (this._record.isStrictLoading() && this._record.isStrictLoadingAll()) ||
       !!this._assocDef.options.strictLoading ||
       this._record.isNewRecord() ||
       this._target.some((r) => r.isNewRecord() || !!(r as any).changed)
@@ -2841,10 +2846,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   // @ts-expect-error async divergence from Relation#inspect — see doc comment.
   async inspect(): Promise<string> {
-    if (this._findFromTarget()) await this.loadTarget();
+    if (this.isFindFromTarget()) await this.loadTarget();
     const limitValue = (this as any)._limitValue as number | null;
     const take = limitValue != null ? Math.min(limitValue, 11) : 11;
-    const subject = this._targetLoaded ? this._target : await this.limit(take).toArray();
+    // Rails' unloaded branch is `annotate("loading for inspect").take(...)`
+    // (relation.rb:1291); carry the annotation onto the bounded query.
+    const subject = this._targetLoaded
+      ? this._target
+      : ((await this.annotate("loading for inspect").limit(take).toArray()) as T[]);
     const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
     if (entries.length === 11) entries[10] = "...";
     return `#<${this.constructor.name} [${entries.join(", ")}]>`;

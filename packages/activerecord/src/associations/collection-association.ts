@@ -515,13 +515,17 @@ export class CollectionAssociation extends Association {
 
   /**
    * Returns true if find should search the loaded target rather than
-   * going to the database. True when loaded, strict loading, new record,
-   * or any target record is new/changed.
+   * going to the database. Mirrors
+   * ActiveRecord::Associations::CollectionAssociation#find_from_target?
+   * (collection_association.rb:308): loaded, owner strict-loading-all,
+   * reflection strict-loading, owner new record, or any target record
+   * new/changed. Kept in clause-parity with `CollectionProxy#isFindFromTarget`.
    */
   isFindFromTarget(): boolean {
     return (
       this.isLoaded() ||
-      (this.owner as any)._strictLoading ||
+      (this.owner.isStrictLoading() && this.owner.isStrictLoadingAll()) ||
+      !!this.reflection.options.strictLoading ||
       this.owner.isNewRecord() ||
       this.target.some(
         (r) =>
