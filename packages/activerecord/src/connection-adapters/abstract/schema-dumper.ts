@@ -148,7 +148,10 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected schemaLimit(column: Column): string | undefined {
-    if (column.bigint || column.type === "bigint") return undefined;
+    // Mirrors Rails `schema_limit`: `limit = column.limit unless column.bigint?` — same
+    // predicate `schema_type` uses, so a column whose bigint-ness is only visible through
+    // sqlType is limit-suppressed too.
+    if (this.isBigint(column)) return undefined;
     // Rails dumps `t.oid` bare because its oid column reports `limit == nil`
     // (NATIVE_DATABASE_TYPES[:oid] carries no :limit, postgresql_adapter.rb:177)
     // and schema_limit only emits when the limit differs from the native type's
