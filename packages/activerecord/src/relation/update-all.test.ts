@@ -24,6 +24,7 @@ useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({
     posts: { title: "string", author: "string", views: "integer", updated_at: "datetime" },
+    developers: { name: "string", created_at: "datetime", updated_at: "datetime" },
   });
 });
 
@@ -268,11 +269,22 @@ describe("UpdateAllTest", () => {
     expect(epochMs(updatedAt)).toBeGreaterThan(past.epochMilliseconds);
   });
 
-  it.skip("touch all with custom timestamp", () => {
-    // BLOCKED: relation — Relation API gap in update-all
-    // ROOT-CAUSE: relation/update-all.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in update-all.test.ts
-    /* needs custom timestamp column name support in touchAll */
+  it("touch all with custom timestamp", async () => {
+    class Developer extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+    const past = instant("2020-01-01T00:00:00Z");
+    const developer = await Developer.create({ name: "David", created_at: past, updated_at: past });
+    const previouslyCreatedAt = developer.created_at;
+    const previouslyUpdatedAt = developer.updated_at;
+    await Developer.where({ name: "David" }).touchAll("created_at");
+    await developer.reload();
+    expect(epochMs(developer.created_at)).not.toBe(epochMs(previouslyCreatedAt));
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(previouslyUpdatedAt));
   });
 
   it("update all doesnt ignore order", async () => {

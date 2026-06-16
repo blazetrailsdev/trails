@@ -226,8 +226,12 @@ describe("WithTest", () => {
     ).toEqual(POSTS_WITH_COMMENTS);
   });
 
-  it.skip("raises when using block", () => {
-    // TypeScript has no block/proc syntax; this Rails constraint is not applicable.
+  it("raises when using block", () => {
+    // Rails passes a literal block (`Post.with(attributes_for_inspect: :id) { }`);
+    // the TS equivalent of a Ruby block is a trailing function argument.
+    expect(() => (Post as any).with({ attributes_for_inspect: "id" }, () => {})).toThrow(
+      /does not accept a block/,
+    );
   });
 
   it("unscoping", async () => {
@@ -241,7 +245,8 @@ describe("WithTest", () => {
   });
 
   it.skip("common table expressions are unsupported", () => {
-    // The test adapter (SQLite) supports CTEs. This branch only runs on
-    // adapters that don't, which aren't exercised in the test suite.
+    // PERMANENT-SKIP: Rails' `else` branch for adapters lacking CTE support.
+    // Every adapter trails exercises (SQLite/PG/MySQL) supports CTEs, so this
+    // branch is unreachable here.
   });
 });

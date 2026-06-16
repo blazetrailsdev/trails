@@ -12,10 +12,12 @@ import { association, registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Post } from "./test-helpers/models/post.js";
+import { Topic } from "./test-helpers/models/topic.js";
 
 registerModel(Developer);
 registerModel(Comment);
 registerModel(Post);
+registerModel(Topic);
 
 // ==========================================================================
 // NullRelationTest — targets null_relation_test.rb
@@ -38,12 +40,11 @@ describe("NullRelationTest", () => {
     });
   });
 
-  // Rails: test_none_chainable_to_existing_scope_extension_method exercises
-  // `Topic.anonymous_extension.none.one`, where `anonymous_extension` is a named
-  // scope carrying an instance-method block (`def one; 1; end`). trails' `scope`
-  // helper takes only a query lambda — scope-extension method blocks aren't
-  // modeled — so the `.one` extension call has no equivalent.
-  it.skip("none chainable to existing scope extension method", () => {});
+  it("none chainable to existing scope extension method", async () => {
+    await assertNoQueries(false, async () => {
+      expect((Topic.anonymousExtension().none() as any).one()).toEqual(1);
+    });
+  });
 
   it("async query on null relation", async () => {
     await assertNoQueries(false, async () => {

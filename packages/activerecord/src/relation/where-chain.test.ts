@@ -44,6 +44,9 @@ beforeAll(async () => {
     wc_books: { name: "string", last_read: "integer", wc_author_id: "integer" },
     cpk_authors: authorCols,
     cpk_shelf_books: { author_id: "integer", book_id: "integer", cpk_author_id: "integer" },
+    rwp_authors: { name: "string" },
+    rwp_humans: { name: "string" },
+    rwp_essays: { name: "string", writer_type: "string", writer_id: "string" },
   });
 });
 
@@ -751,11 +754,53 @@ describe("WhereChainTest", () => {
     );
   });
 
-  it.skip("rewhere with polymorphic association", async () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    // requires polymorphic association
+  it("rewhere with polymorphic association", async () => {
+    // Mirrors Rails Essay (belongs_to :writer, polymorphic: true, primary_key: :name)
+    // with Author and Human writers.
+    class RwpAuthor extends Base {
+      static {
+        this._tableName = "rwp_authors";
+        this.attribute("name", "string");
+      }
+    }
+    class RwpHuman extends Base {
+      static {
+        this._tableName = "rwp_humans";
+        this.attribute("name", "string");
+      }
+    }
+    class RwpEssay extends Base {
+      static {
+        this._tableName = "rwp_essays";
+        this.attribute("name", "string");
+        this.attribute("writer_type", "string");
+        this.attribute("writer_id", "string");
+        this.belongsTo("writer", { primaryKey: "name", polymorphic: true });
+      }
+    }
+    registerModel("RwpAuthor", RwpAuthor);
+    registerModel("RwpHuman", RwpHuman);
+    registerModel("RwpEssay", RwpEssay);
+    const david = await RwpAuthor.create({ name: "David" });
+    const steve = await RwpHuman.create({ name: "Steve" });
+    await RwpEssay.create({
+      name: "A Modest Proposal",
+      writer_type: "RwpAuthor",
+      writer_id: "David",
+    });
+    await RwpEssay.create({
+      name: "Connecting The Dots",
+      writer_type: "RwpHuman",
+      writer_id: "Steve",
+    });
+
+    const relation = RwpEssay.where({ writer: david }).rewhere({ writer: steve });
+    const expected = RwpEssay.where({ writer: steve });
+
+    const relationNames = (await relation.toArray()).map((e: any) => e.name);
+    const expectedNames = (await expected.toArray()).map((e: any) => e.name);
+    expect(relationNames).toEqual(expectedNames);
+    expect(relationNames).toEqual(["Connecting The Dots"]);
   });
 
   it("rewhere with range", async () => {

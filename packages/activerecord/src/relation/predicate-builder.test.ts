@@ -90,9 +90,14 @@ describe("PredicateBuilderTest", () => {
   });
 
   it.skip("registering new handlers for joins", () => {
-    // BLOCKED: relation — requires scoped belongs_to (lambda scope) evaluated against association's
-    // predicate builder; our scoped-association where-clause expansion doesn't yet propagate
-    // the custom handlers registered on the target model into the scope lambda context.
+    // BLOCKED: relation/join-dependency — custom-handler propagation into the
+    // scoped belongs_to lambda now works (emits `... ~ 'rails'`), but trails
+    // joins the target on its real table name (`topics`) where Rails aliases
+    // the join to the association name (`regexp_topic`). trails only aliases on
+    // name collision (Rails alias_candidate); aliasing a differently-named
+    // belongs_to join to its association name is a JoinDependency gap.
+    // ROOT-CAUSE: join-dependency does not alias non-colliding belongs_to joins
+    // to the association name. Tracked: RFC 0027 join-dependency-fidelity.
   });
 
   it("references with schema", () => {

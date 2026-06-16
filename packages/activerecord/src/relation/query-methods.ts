@@ -1557,7 +1557,7 @@ export function assertModifiableBang(this: QueryMethodsHost): void {
   }
 }
 
-function isBlankArgument(value: unknown): boolean {
+export function isBlankArgument(value: unknown): boolean {
   if (value === null || value === undefined || value === false) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
