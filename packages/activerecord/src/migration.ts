@@ -18,7 +18,7 @@ import {
   assertSchemaAdapter,
   type JoinTableOptions,
 } from "./connection-adapters/abstract/schema-statements.js";
-import { CommandRecorder } from "./migration/command-recorder.js";
+import { CommandRecorder, withAdapterColumnMethods } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
@@ -334,7 +334,9 @@ export abstract class Migration {
     } else {
       // Record operations from change(), then replay in reverse
       this._recording = true;
-      this._recorder = new CommandRecorder();
+      // Pass the connection as delegate so the change_table recorder proxy can
+      // surface adapter-specific column-type shorthands (t.hstore, t.jsonb, ...).
+      this._recorder = new CommandRecorder(this.connection);
       try {
         await this.change();
       } finally {
@@ -1071,8 +1073,15 @@ export abstract class Migration {
       return;
     }
     // Build Table against Migration (not SchemaStatements) so that
-    // per-operation recording in addColumn/removeColumn/etc. still applies
-    const table = new Table(tableName, this);
+    // per-operation recording in addColumn/removeColumn/etc. still applies.
+    // Wrap so adapter column-type shorthands (t.hstore, t.jsonb, ...) resolve,
+    // mirroring Rails' adapter ColumnMethods mixin on the yielded Table.
+    const columnTypes = Object.keys(
+      (
+        this.connection as { nativeDatabaseTypes?(): Record<string, unknown> }
+      ).nativeDatabaseTypes?.() ?? {},
+    );
+    const table = withAdapterColumnMethods(new Table(tableName, this), columnTypes);
     if (callback) await callback(table);
   }
 

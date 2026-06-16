@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
-import { Base, serialize } from "../../index.js";
+import { Base, serialize, Migration } from "../../index.js";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
 
 // Rails: class TagCollection
@@ -155,11 +155,28 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(col.type).toBe("hstore");
     });
 
-    it.skip("hstore migration", async () => {
-      // BLOCKED: migration — change_table recording-mode proxy (RecorderTableProxy)
-      // lacks adapter column-type shorthands, so `t.hstore(:keys)` is not a function.
-      // The non-recording path (adapter.changeTable + t.column) already works.
-      // DEFERRED (RFC 0030): tracked by change-table-recorder-adapter-column-methods — converge then un-skip.
+    it("hstore migration", async () => {
+      // Rails: hstore_migration = Class.new(ActiveRecord::Migration::Current) do
+      //          def change; change_table("hstores") { |t| t.hstore :keys }; end
+      //        end
+      class HstoreMigration extends Migration {
+        async change() {
+          await this.changeTable("hstores", async (t) => {
+            await (t as any).hstore("keys");
+          });
+        }
+      }
+
+      const m = new HstoreMigration();
+      await m.suppressMessages(async () => {
+        await m.run(connection, "up");
+        const upCols = (await connection.columns("hstores")).map((c: any) => c.name);
+        expect(upCols).toContain("keys");
+
+        await new HstoreMigration().run(connection, "down");
+        const downCols = (await connection.columns("hstores")).map((c: any) => c.name);
+        expect(downCols).not.toContain("keys");
+      });
     });
 
     it("cast value on write", async () => {
