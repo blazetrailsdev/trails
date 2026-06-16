@@ -72,17 +72,26 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
     await adapter.close();
   });
 
-  itIfSupports("default_expression", "schema dump includes default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "defaults",
-    );
-    expect(output).toMatch(
-      /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
-    );
-  });
+  // Match Rails' single `supports_default_expression?` gate: the column build
+  // above is version-aware (≥8.0.13), so gate the tests with the same value via
+  // `.skipIf` rather than the version-blind backend list, keeping the two in
+  // lockstep on a MySQL 8.0.0–8.0.12 server (CI is pinned to mysql:8, where both
+  // already resolve true).
+  itIfSupports.skipIf(!supportsDefaultExpression)(
+    "default_expression",
+    "schema dump includes default expression",
+    async () => {
+      const output = await SchemaDumper.dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "defaults",
+      );
+      expect(output).toMatch(
+        /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
+      );
+    },
+  );
 
-  itIfSupports(
+  itIfSupports.skipIf(!supportsDefaultExpression)(
     "default_expression",
     "schema dump includes default expression with single quotes reflected correctly",
     async () => {
