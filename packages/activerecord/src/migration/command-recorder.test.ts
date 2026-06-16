@@ -461,6 +461,39 @@ describe("CommandRecorder", () => {
     });
   });
 
+  describe("change_table surfaces adapter ColumnMethods shorthands (serial/bigserial)", () => {
+    // Mirrors Rails: the PG `ColumnMethods` mixin exposes `t.serial` /
+    // `t.bigserial` (SERIAL/BIGSERIAL) inside change_table — shorthands the
+    // adapter advertises via columnMethodNames() beyond NATIVE_DATABASE_TYPES.
+    const pgLike = { columnMethodNames: () => ["serial", "bigserial"] };
+
+    it("records addColumn for t.serial and t.bigserial (up adds)", async () => {
+      const recorder = new CommandRecorder(pgLike);
+      await recorder.changeTable("fruits", async (t) => {
+        await (t as any).serial("seq");
+        await (t as any).bigserial("big_seq");
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "addColumn", args: ["fruits", "seq", "serial", {}] },
+        { cmd: "addColumn", args: ["fruits", "big_seq", "bigserial", {}] },
+      ]);
+    });
+
+    it("reverts t.serial / t.bigserial to removeColumn (down removes)", async () => {
+      const recorder = new CommandRecorder(pgLike);
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", async (t) => {
+          await (t as any).serial("seq");
+          await (t as any).bigserial("big_seq");
+        });
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "removeColumn", args: ["fruits", "big_seq", "bigserial", {}] },
+        { cmd: "removeColumn", args: ["fruits", "seq", "serial", {}] },
+      ]);
+    });
+  });
+
   describe("bulk invert change table", () => {
     it("records two changeTable commands from revert + revert-of-revert", async () => {
       const delegate = { supportsBulkAlter: () => true };
