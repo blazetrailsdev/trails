@@ -24,6 +24,17 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { ArgumentError } from "@blazetrails/activemodel";
+// Aliased so the bundler does not rename the bespoke `class Book` declarations
+// in the describe blocks above (which would change their inferred table name
+// from `books` to `book2s`).
+import { Book as CanonicalBook } from "./test-helpers/models/book.js";
+import { Author as CanonicalAuthor } from "./test-helpers/models/author.js";
+import { Subscriber as CanonicalSubscriber } from "./test-helpers/models/subscriber.js";
+import { Subscription as CanonicalSubscription } from "./test-helpers/models/subscription.js";
+import { Speedometer as CanonicalSpeedometer } from "./test-helpers/models/speedometer.js";
 
 async function assertUpsertConflictTargetBehavior(
   Book: any,
@@ -604,25 +615,11 @@ describe("InsertAllTest", () => {
     const book = await Book.findBy({ title: "Existing" });
     expect((book as any).author).toBe("B");
   });
-  it.skip("insert_all does not include readonly attributes", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts does not consult model.readonlyAttributes() when building keysIncludingTimestamps or _updatableColumns, so readonly columns flow into both INSERT column list and ON CONFLICT update set.
-    // SCOPE: ~15 LOC — filter this.keys against readonlyAttributes() in resolveAttributeAliases path and exclude from _updatableColumns; affects ~3 readonly tests
-  });
-  it.skip("upsert_all does not include readonly attributes", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts does not consult model.readonlyAttributes() when building keysIncludingTimestamps or _updatableColumns, so readonly columns flow into both INSERT column list and ON CONFLICT update set.
-    // SCOPE: ~15 LOC — filter this.keys against readonlyAttributes() in resolveAttributeAliases path and exclude from _updatableColumns; affects ~3 readonly tests
-  });
   it.skip("insert_all! raises for duplicate records", () => {
     // BLOCKED: relation
     // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
     // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
   });
-  it.skip("insert! raises for invalid records", () => {
-    // BLOCKED: validation — insert_all.rb: insert! validates records
-  });
-
   it("upsert_all noop when empty", async () => {
     const Book = makeBook();
     const result = await Book.upsertAll([]);
@@ -761,9 +758,6 @@ describe("InsertAllTest", () => {
   });
   it.skip("upsert and db warnings", () => {
     // BLOCKED: relation — insert_all.rb: DB warnings emitted on upsert
-  });
-  it.skip("upsert all does notupdates existing record by when there is no key", () => {
-    // BLOCKED: relation — insert_all.rb: upsert with no conflict key is no-op
   });
   it.skip("upsert all updates existing record by configured primary key fails when database supports insert conflict target", () => {
     // BLOCKED: adapter-pg — insert_all.rb: conflict-target required on PG
@@ -971,12 +965,6 @@ describe("InsertAllTest", () => {
   });
   it.skip("upsert all works with partitioned indexes", () => {
     // BLOCKED: adapter-pg — insert_all.rb: partitioned index support
-  });
-  it.skip("insert all has many through", () => {
-    // BLOCKED: associations — insert_all.rb: has-many-through insertAll
-  });
-  it.skip("upsert all has many through", () => {
-    // BLOCKED: associations — insert_all.rb: has-many-through upsertAll
   });
   it("upsert all updates using provided sql", async () => {
     const Book = makeBookWithAdapter();
@@ -1495,6 +1483,61 @@ describe("InsertAllTest", () => {
       );
       expect(typeof raw).toBe("string");
       expect(JSON.parse(raw as string)).toEqual({ a: 2, b: ["x"] });
+    },
+  );
+});
+
+// ==========================================================================
+// InsertAllTest — cases requiring the canonical Book/Author/Subscriber/
+// Subscription/Speedometer models + fixtures (Rails' `fixtures :books`).
+// These exercise has_many :through associations and the Speedometer
+// no-DB-unique-key setup, which the bespoke makeBook/makeShip models above
+// cannot express.
+// ==========================================================================
+describe("InsertAllTest", () => {
+  registerModel("Author", CanonicalAuthor);
+  registerModel("Book", CanonicalBook);
+  registerModel("Subscriber", CanonicalSubscriber);
+  registerModel("Subscription", CanonicalSubscription);
+  registerModel("Speedometer", CanonicalSpeedometer);
+  useHandlerFixtures(["authors", "books", "subscribers", "subscriptions"], {
+    schema: canonicalSchema,
+  });
+
+  // Speedometer has no fixtures, so useHandlerFixtures doesn't create its
+  // table — create it from the canonical schema for the no-key upsert test.
+  beforeAll(async () => {
+    await defineSchema({ speedometers: canonicalSchema.speedometers });
+    // The bespoke `books` describe above leaves PG prepared plans built
+    // against its `{ title, author, status }` shape; useHandlerFixtures here
+    // recreates `books` with the canonical shape, so flush the statement
+    // cache to avoid "cached plan must not change result type" on first query.
+    (Base.connection as unknown as { clearCache(): void }).clearCache();
+  });
+
+  it("insert all has many through", async () => {
+    const book = (await CanonicalBook.first()) as any;
+    await expect(book.subscribers.insertAllBang([{ nick: "Jimmy" }])).rejects.toThrow(
+      ArgumentError,
+    );
+  });
+
+  it("upsert all has many through", async () => {
+    const book = (await CanonicalBook.first()) as any;
+    await expect(book.subscribers.upsertAll([{ nick: "Jimmy" }])).rejects.toThrow(ArgumentError);
+  });
+
+  // Rails: skip unless supports_insert_on_duplicate_update? && !supports_insert_conflict_target?
+  // — i.e. MySQL only (ON DUPLICATE KEY UPDATE without conflict-target syntax).
+  // Speedometer's string PK speedometer_id has no DB unique index, so the upsert
+  // matches no row and the existing record is left untouched.
+  it.skipIf(supportsConflictTarget)(
+    "upsert all does notupdates existing record by when there is no key",
+    async () => {
+      await CanonicalSpeedometer.create({ speedometer_id: "s3", name: "Very fast" });
+      await CanonicalSpeedometer.upsertAll([{ speedometer_id: "s3", name: "New Speedometer" }]);
+      const found = (await CanonicalSpeedometer.find("s3")) as any;
+      expect(found.name).toBe("Very fast");
     },
   );
 });

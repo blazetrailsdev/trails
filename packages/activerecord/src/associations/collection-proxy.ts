@@ -25,6 +25,7 @@ import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { filterScopeForCreate } from "./association.js";
 import { RecordNotSaved, ConfigurationError, AssociationTypeMismatch } from "../errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 import {
@@ -898,6 +899,58 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const out = filterScopeForCreate(sfc, assigned, skipAssign);
     if (out) (record as any)._assignAttributes(out);
+  }
+
+  /**
+   * Bulk insert/upsert through a collection association. Mirrors
+   * ActiveRecord::AssociationRelation, which guards `insert`, `insert_all`,
+   * `insert!`, `insert_all!`, `upsert`, and `upsert_all`: when the
+   * association is `has_many :through`, it raises ArgumentError because the
+   * join records can't be built from the bulk path. Non-through associations
+   * fall through to the inherited Relation implementation.
+   */
+  private _assertBulkInsertable(): void {
+    if (this.isThrough) {
+      throw new ArgumentError(
+        "Bulk insert or upsert is currently not supported for has_many through association",
+      );
+    }
+  }
+
+  async insert(
+    attrs: Record<string, unknown>,
+    options?: { uniqueBy?: string | string[] },
+  ): Promise<number> {
+    this._assertBulkInsertable();
+    return super.insert(attrs, options);
+  }
+
+  async insertBang(...args: Parameters<Relation<T>["insertBang"]>): Promise<number> {
+    this._assertBulkInsertable();
+    return super.insertBang(...args);
+  }
+
+  async insertAll(...args: Parameters<Relation<T>["insertAll"]>): Promise<number> {
+    this._assertBulkInsertable();
+    return super.insertAll(...args);
+  }
+
+  async insertAllBang(...args: Parameters<Relation<T>["insertAllBang"]>): Promise<number> {
+    this._assertBulkInsertable();
+    return super.insertAllBang(...args);
+  }
+
+  async upsert(
+    attrs: Record<string, unknown>,
+    options?: { uniqueBy?: string | string[] },
+  ): Promise<number> {
+    this._assertBulkInsertable();
+    return super.upsert(attrs, options);
+  }
+
+  async upsertAll(...args: Parameters<Relation<T>["upsertAll"]>): Promise<number> {
+    this._assertBulkInsertable();
+    return super.upsertAll(...args);
   }
 
   /**
