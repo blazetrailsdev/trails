@@ -3725,7 +3725,7 @@ export class Relation<T extends Base> {
   ): Promise<number> {
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
-      onDuplicate: options?.uniqueBy ? "skip" : undefined,
+      onDuplicate: "skip",
       recordTimestamps: options?.recordTimestamps,
     });
   }

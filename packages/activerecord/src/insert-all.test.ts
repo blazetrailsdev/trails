@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, defineEnum, registerModel } from "./index.js";
 import { InsertAll } from "./insert-all.js";
-import { UnknownAttributeError } from "./errors.js";
+import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { enableSti } from "./inheritance.js";
@@ -48,7 +48,11 @@ describe("InsertAllTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
-      books: { title: "string", author: "string", status: "integer" },
+      books: {
+        title: { type: "string", null: true },
+        author: { type: "string", null: true },
+        status: { type: "integer", null: true },
+      },
       posts: { title: "string", created_at: "datetime", updated_at: "datetime" },
       items: { columns: { code: "string", name: "string" }, primaryKey: ["code"] },
       cpk_orders: {
@@ -311,11 +315,6 @@ describe("InsertAllTest", () => {
     await assertUpsertConflictTargetBehavior(Book, b, supportsConflictTarget);
   });
 
-  it.skip("insert all raises on duplicate records", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
-    // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
-  });
   it.skip("insert all with returning", () => {
     // BLOCKED: adapter-pg
     // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
@@ -381,9 +380,15 @@ describe("InsertAllTest", () => {
     expect(found.author).toBe("B");
   });
 
-  it.skip("upsert all updates changed columns only", () => {
-    // BLOCKED: relation — insert_all.rb: updateOnly / ON CONFLICT filtering
-    /* updateOnly generates correct SQL but memory/SQLite adapter doesn't honor ON CONFLICT DO UPDATE SET restrictions */
+  it("upsert all updates changed columns only", async () => {
+    const Book = makeBook();
+    const b = await Book.create({ title: "Original", author: "Author", status: 0 });
+    await Book.upsertAll([{ id: b.id, title: "Updated", author: "Ignored", status: 9 }], {
+      updateOnly: ["title"],
+    });
+    const found = await Book.find(b.id);
+    expect(found.title).toBe("Updated");
+    expect(found.author).toBe("Author");
   });
 
   it("insert_all with enum values", async () => {
@@ -418,10 +423,15 @@ describe("InsertAllTest", () => {
     expect(all.length).toBe(1);
   });
 
-  it.skip("insert_all with on_duplicate updates record timestamps", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("insert_all with on_duplicate updates record timestamps", async () => {
+    const Ship = makeShip();
+    const oldTime = Temporal.Instant.from("2021-01-01T00:00:00Z");
+    await Ship.insertAll([{ id: 401, name: "Boaty", updated_at: oldTime, updated_on: oldTime }], {
+      recordTimestamps: false,
+    });
+    await Ship.upsertAll([{ id: 401, name: "Renamed" }]);
+    const ship = (await Ship.find(401)) as any;
+    expect(getYear(ship.updated_at)).toBe(new Date().getUTCFullYear());
   });
   it("insert_all with raw sql on_duplicate", async () => {
     const Book = makeBookWithAdapter();
@@ -448,18 +458,26 @@ describe("InsertAllTest", () => {
     // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
 
-  it.skip("upsert all supports update_only option", () => {
-    // BLOCKED: relation — insert_all.rb: updateOnly option support
-    /* updateOnly generates correct SQL but memory/SQLite adapter doesn't honor ON CONFLICT DO UPDATE SET restrictions */
+  it("upsert all supports update_only option", async () => {
+    const Book = makeBook();
+    const b = await Book.create({ title: "Original", author: "Author", status: 0 });
+    await Book.upsertAll([{ id: b.id, title: "New", author: "New Author" }], {
+      updateOnly: "title",
+    });
+    const found = await Book.find(b.id);
+    expect(found.title).toBe("New");
+    expect(found.author).toBe("Author");
   });
 
   it.skip("upsert all supports returning option", () => {
     // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
   });
-  it.skip("insert_all! raises on duplicate", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
-    // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
+  it("insert_all! raises on duplicate", async () => {
+    const Book = makeBook();
+    await Book.insertAllBang([{ id: 1, title: "Rework", author: "1" }]);
+    await expect(Book.insertAllBang([{ id: 1, title: "Duplicate", author: "1" }])).rejects.toThrow(
+      RecordNotUnique,
+    );
   });
   it("insert_all with empty array", async () => {
     const Book = makeBook();
@@ -522,8 +540,12 @@ describe("InsertAllTest", () => {
     expect(all.some((b: any) => b.title === "NoTs")).toBe(true);
   });
 
-  it.skip("insert_all respects attribute aliases", () => {
-    // BLOCKED: relation — insert_all.rb: aliasAttribute support
+  it("insert_all respects attribute aliases", async () => {
+    const Developer = makeDeveloper();
+    Developer.aliasAttribute("title", "name");
+    await Developer.insertAll([{ id: 1, title: "Aliased", salary: 1 }]);
+    const dev = (await Developer.find(1)) as any;
+    expect(dev.name).toBe("Aliased");
   });
   it("insert_all does not modify given array", async () => {
     const Book = makeBook();
@@ -562,14 +584,42 @@ describe("InsertAllTest", () => {
     const record = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(record.name).toBe("updated");
   });
-  it.skip("insert_all can insert rows with all defaults", () => {
-    // BLOCKED: relation — insert_all.rb: insert row with all-default columns
+  it("insert_all can insert rows with all defaults", async () => {
+    const Book = makeBook();
+    // The bang variant emits no ON CONFLICT clause, which SQLite rejects after
+    // DEFAULT VALUES (`INSERT ... DEFAULT VALUES ON CONFLICT` is a syntax error).
+    const count = await Book.insertAllBang([{}]);
+    expect(count).toBeGreaterThanOrEqual(1);
   });
-  it.skip("insert_all generates correct sql", () => {
-    // BLOCKED: relation — insert_all.rb: SQL generation for insertAll
+  it("insert_all generates correct sql", async () => {
+    const Book = makeBook();
+    const ia = new InsertAll(
+      Book.all() as any,
+      Book.connection,
+      [{ id: 1, title: "X", author: "Y" }],
+      {
+        onDuplicate: "skip",
+      },
+    );
+    await (ia as any)._populateUpdatableColumns();
+    const sql = ia.toSql();
+    expect(sql).toContain('INSERT INTO "books"');
+    expect(sql).toMatch(/ON CONFLICT.*DO NOTHING|ON DUPLICATE KEY UPDATE/);
   });
-  it.skip("upsert_all generates correct sql", () => {
-    // BLOCKED: relation — insert_all.rb: SQL generation for upsertAll
+  it("upsert_all generates correct sql", async () => {
+    const Book = makeBook();
+    const ia = new InsertAll(
+      Book.all() as any,
+      Book.connection,
+      [{ id: 1, title: "X", author: "Y" }],
+      {
+        onDuplicate: "update",
+      },
+    );
+    await (ia as any)._populateUpdatableColumns();
+    const sql = ia.toSql();
+    expect(sql).toContain('INSERT INTO "books"');
+    expect(sql).toMatch(/ON CONFLICT.*DO UPDATE SET|ON DUPLICATE KEY UPDATE/);
   });
   it.skip("insert_all with returning and on_duplicate", () => {
     // BLOCKED: adapter-pg
@@ -593,15 +643,34 @@ describe("InsertAllTest", () => {
     // ROOT-CAUSE: insert-all.ts does not consult model.readonlyAttributes() when building keysIncludingTimestamps or _updatableColumns, so readonly columns flow into both INSERT column list and ON CONFLICT update set.
     // SCOPE: ~15 LOC — filter this.keys against readonlyAttributes() in resolveAttributeAliases path and exclude from _updatableColumns; affects ~3 readonly tests
   });
-  it.skip("upsert_all does not include readonly attributes", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts does not consult model.readonlyAttributes() when building keysIncludingTimestamps or _updatableColumns, so readonly columns flow into both INSERT column list and ON CONFLICT update set.
-    // SCOPE: ~15 LOC — filter this.keys against readonlyAttributes() in resolveAttributeAliases path and exclude from _updatableColumns; affects ~3 readonly tests
+  it("upsert_all does not include readonly attributes", async () => {
+    class Book extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+      }
+    }
+    class ReadonlyTitleBook extends Book {
+      static {
+        this.attrReadonly("title");
+      }
+    }
+    const b = await Book.create({ title: "Original", author: "A" });
+    await ReadonlyTitleBook.upsertAll([{ id: b.id, title: "New", author: "B" }]);
+    const found = await Book.find(b.id);
+    expect(found.title).toBe("Original");
+    expect(found.author).toBe("B");
   });
-  it.skip("insert_all! raises for duplicate records", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
-    // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
+  it("insert_all! raises for duplicate records", async () => {
+    const Book = makeBook();
+    await Book.create({ id: 2, title: "Rework", author: "1" });
+    await expect(
+      Book.insertAllBang([
+        { id: 2, title: "Rework", author: "1" },
+        { id: 3, title: "Patterns", author: "1" },
+      ]),
+    ).rejects.toThrow(RecordNotUnique);
   });
   it.skip("insert! raises for invalid records", () => {
     // BLOCKED: validation — insert_all.rb: insert! validates records
@@ -709,8 +778,13 @@ describe("InsertAllTest", () => {
     const fourth = (await Category.find(104)) as any;
     expect(fourth.type).toBeNull();
   });
-  it.skip("upsert and db warnings", () => {
-    // BLOCKED: relation — insert_all.rb: DB warnings emitted on upsert
+  it("upsert and db warnings", async () => {
+    const Book = makeBook();
+    await Book.create({ id: 1001, title: "Existing", author: "1" });
+    // Rails wraps this in with_db_warnings_action(:raise) and asserts nothing
+    // raised; we have no db-warnings facility, so assert the upsert itself
+    // completes cleanly.
+    await expect(Book.upsert({ id: 1001, title: "Remote", author: "1" })).resolves.not.toThrow();
   });
   it.skip("upsert all does notupdates existing record by when there is no key", () => {
     // BLOCKED: relation — insert_all.rb: upsert with no conflict key is no-op
@@ -941,9 +1015,28 @@ describe("InsertAllTest", () => {
     expect(all).toHaveLength(1);
     expect((all[0] as any).author).toBe("Bob");
   });
-  it.skip("upsert all updates using values function on duplicate raw sql", () => {
-    // BLOCKED: adapter-mysql — insert_all.rb: VALUES() function in ON DUPLICATE KEY
-  });
+  // Rails gates this to MySQL (`if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`):
+  // the VALUES() function is MySQL-only ON DUPLICATE KEY UPDATE syntax.
+  it.skipIf(adapterType !== "mysql")(
+    "upsert all updates using values function on duplicate raw sql",
+    async () => {
+      const Book = makeBookWithAdapter();
+      const b1 = await Book.create({ title: "Name" });
+      const b2 = await Book.create({ title: null as any });
+      const { sql } = await import("@blazetrails/arel");
+      await Book.upsertAll(
+        [
+          { id: b1.id, title: "No Name" },
+          { id: b2.id, title: "No Name" },
+        ],
+        { onDuplicate: sql("title = IFNULL(title, values(title))") },
+      );
+      const r1 = (await Book.find(b1.id)) as any;
+      const r2 = (await Book.find(b2.id)) as any;
+      expect(r1.title).toBe("Name");
+      expect(r2.title).toBe("No Name");
+    },
+  );
   it("upsert all updates using provided sql and unique by", async () => {
     const Book = makeBookWithAdapter();
     const book = await Book.create({ title: "Original", author: "Alice", status: 0 });
@@ -959,8 +1052,18 @@ describe("InsertAllTest", () => {
     // status should NOT be updated since onDuplicate only mentions author
     expect((all[0] as any).status).toBe(0);
   });
-  it.skip("insert all when table name contains database", () => {
-    // BLOCKED: relation — insert_all.rb: table name with schema/database prefix
+  // Rails gates this to MySQL (`if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`):
+  // only MySQL qualifies an unqualified table with the connection's database name.
+  it.skipIf(adapterType !== "mysql")("insert all when table name contains database", async () => {
+    const Book = makeBookWithAdapter();
+    const dbName = (Book.connection as any).currentDatabase?.() ?? "test";
+    const original = (Book as any)._tableName;
+    (Book as any)._tableName = `${dbName}.books`;
+    try {
+      await expect(Book.insertAllBang([{ title: "Rework", author: "1" }])).resolves.not.toThrow();
+    } finally {
+      (Book as any)._tableName = original;
+    }
   });
 
   function makeBookWithAdapter() {
@@ -1000,10 +1103,11 @@ describe("InsertAllTest", () => {
   it("insert all raises on duplicate records", async () => {
     const Book = makeBookWithAdapter();
     const b = await Book.create({ title: "Unique", author: "Author" });
-    // insertAll with explicit id that conflicts should raise a constraint violation
+    // Rails uses insert_all! (bang), which raises RecordNotUnique on conflict;
+    // the non-bang insert_all silently skips duplicates.
     await expect(
-      Book.insertAll([{ id: b.id, title: "Duplicate", author: "Other" }]),
-    ).rejects.toThrow();
+      Book.insertAllBang([{ id: b.id, title: "Duplicate", author: "Other" }]),
+    ).rejects.toThrow(RecordNotUnique);
   });
 
   it("insert all returns ActiveRecord Result", async () => {
@@ -1018,20 +1122,12 @@ describe("InsertAllTest", () => {
     expect(result).toBeDefined();
   });
 
-  it.skip("insert all can skip duplicate records", async () => {
-    // BLOCKED: relation — insert_all.rb: skip-duplicates strategy
+  it("insert all can skip duplicate records", async () => {
     const Book = makeBookWithAdapter();
     const b = await Book.create({ title: "Existing", author: "A" });
-    // upsertAll with skip behavior
-    const result = await Book.upsertAll(
-      [
-        { id: b.id, title: "Skip Me", author: "A" },
-        { title: "New One", author: "B" },
-      ],
-      { onDuplicate: "skip" } as any,
-    );
-    expect(result).toBeDefined();
-    // Original should still have old title
+    // Rails: plain insert_all defaults to on_duplicate: :skip, so a conflicting
+    // id is silently skipped (no count change), no exception raised.
+    await Book.insertAll([{ id: b.id, title: "Skip Me", author: "A" }]);
     const existing = await Book.find(b.id);
     expect(existing.title).toBe("Existing");
   });
@@ -1061,9 +1157,13 @@ describe("InsertAllTest", () => {
     expect(found.title).toBe("Original");
   });
 
-  it.skip("insert all generates correct sql", async () => {
-    // BLOCKED: relation — insert_all.rb: SQL generation for insertAll
-    // SQL generation test - adapter specific
+  it("insert all generates correct sql", async () => {
+    const Book = makeBookWithAdapter();
+    const ia = new InsertAll(Book.all() as any, Book.connection, [{ title: "X", author: "Y" }], {
+      onDuplicate: "skip",
+    });
+    await (ia as any)._populateUpdatableColumns();
+    expect(ia.toSql()).toContain('INSERT INTO "books"');
   });
 
   it.skip("insert all returns primary key if returning is supported", async () => {
@@ -1118,8 +1218,10 @@ describe("InsertAllTest", () => {
     expect(result).toBeDefined();
   });
 
-  it.skip("insert all succeeds when passed no attributes", async () => {
-    // BLOCKED: relation — insert_all.rb: insert record with no attributes
+  // Rails gates this to MySQL (`if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`):
+  // ON DUPLICATE KEY UPDATE accepts an empty row, but SQLite/PG reject
+  // `DEFAULT VALUES ON CONFLICT`.
+  it.skipIf(adapterType !== "mysql")("insert all succeeds when passed no attributes", async () => {
     const Book = makeBookWithAdapter();
     const result = await Book.insertAll([{}]);
     expect(result).toBeDefined();
