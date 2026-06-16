@@ -426,10 +426,43 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     ).toBe(0);
   });
 
-  it.skip("destroy associations destroys multiple associations", () => {
-    // BLOCKED: associations — habtm destroyAssociations on polymorphic-looter
-    //   HABTM (Parrot.treasures) hits `throughReflection is not a function`
-    //   when chaining the parrots_treasures cleanup. Tracked for convergence.
+  it("destroy associations destroys multiple associations", async () => {
+    const george = (await Parrot.findBy({ name: "Curious George" })) as Parrot;
+    expect((await association<Pirate>(george, "pirates").toArray()).length).toBeGreaterThan(0);
+    const treasure = await Treasure.create({ name: "gold" });
+    await association<Treasure>(george, "treasures").push(treasure);
+    expect((await association<Treasure>(george, "treasures").toArray()).length).toBeGreaterThan(0);
+
+    const pirateBefore = (await Pirate.all().toArray()).length;
+    const treasureBefore = (await Treasure.all().toArray()).length;
+    await (george as any).destroyAssociations();
+    expect((await Pirate.all().toArray()).length).toBe(pirateBefore);
+    expect((await Treasure.all().toArray()).length).toBe(treasureBefore);
+
+    expect(
+      (
+        await Base.connection.execute(
+          `SELECT * FROM parrots_pirates WHERE parrot_id = ${george.id}`,
+        )
+      ).length,
+    ).toBe(0);
+    expect(
+      await association<Pirate>(george, "pirates")
+        .reload()
+        .then((r) => (r as any).size()),
+    ).toBe(0);
+    expect(
+      (
+        await Base.connection.execute(
+          `SELECT * FROM parrots_treasures WHERE parrot_id = ${george.id}`,
+        )
+      ).length,
+    ).toBe(0);
+    expect(
+      await association<Treasure>(george, "treasures")
+        .reload()
+        .then((r) => (r as any).size()),
+    ).toBe(0);
   });
 
   it("associations with conditions", async () => {
@@ -869,14 +902,24 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     });
   });
 
-  it.skip("association with validate false does not run associated validation callbacks on create", () => {
-    // BLOCKED: associations — habtm Treasure.richPeople reflection traversal
-    //   (`throughReflection is not a function`) plus RichPerson's async
-    //   before_validation on the sync validation chain. Tracked for convergence.
+  it("association with validate false does not run associated validation callbacks on create", async () => {
+    const richPerson = new RichPerson({});
+    const treasure = new Treasure({});
+    await association(treasure, "richPeople").push(richPerson as any);
+    treasure.isValid();
+
+    expect(await association(treasure, "richPeople").size()).toBe(1);
+    // Rails asserts `assert_nil rich_person.first_name`; an unset attribute
+    // reads as undefined here — the point is the before_validation callback
+    // (which would set it) never ran.
+    expect((richPerson as any).first_name ?? null).toBeNull();
   });
 
   it.skip("association with validate false does not run associated validation callbacks on update", () => {
-    // BLOCKED: see "...on create" above — same HABTM + async-validation limits.
+    // BLOCKED: validations — RichPerson's `before_validation` is async, and the
+    //   `RichPerson.createBang` precondition runs it on the synchronous
+    //   validation chain ("before returned a Promise"). Unrelated to HABTM;
+    //   tracked under the async-validation-callback gap.
   });
 
   it("custom join table", async () => {
