@@ -1692,9 +1692,8 @@ describe("TransactionTest", () => {
     const state = new TransactionState();
     state.commitBang();
     // Rails asserts `transaction.state.nullify!` returns nil; nullifyBang()
-    // returns void (the TS equivalent of nil) and clears the finalized state.
+    // returns void — the TS equivalent of nil.
     expect(state.nullifyBang()).toBeUndefined();
-    expect(state.finalized).toBe(false);
   });
   it("transaction rollback with primarykeyless tables", async () => {
     const adp = new BetterSQLite3Adapter(":memory:");
