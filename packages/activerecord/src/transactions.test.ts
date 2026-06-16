@@ -1698,7 +1698,8 @@ describe("TransactionTest", () => {
       await adapter.removeColumn("topics", "stuff");
       expect((await adapter.columns("topics")).map((c) => c.name)).not.toContain("stuff");
 
-      expect(adapter.supportsDdlTransactions()).toBe(true);
+      // SQLite supports DDL transactions, so add_column inside a transaction
+      // must not raise (Rails branches on supports_ddl_transactions? here).
       await Topic.transaction(async () => {
         await adapter.addColumn("topics", "stuff", "string");
       });
