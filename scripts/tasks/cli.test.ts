@@ -881,6 +881,38 @@ describe("commitAndPush (git mutation flow)", () => {
     return e;
   }
 
+  it("rolls back the working tree when the mutator throws between write and commit", () => {
+    const { seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      return "" as never;
+    });
+    // A mutator that writes its file then crashes (e.g. a prettier failure in
+    // formatFiles) must not leave the partial write staged/untracked: the error
+    // propagates, but only after the tree is reset to HEAD and the created path
+    // is cleaned, so the next command isn't blocked by the uncommitted guard.
+    expect(() =>
+      commitAndPush({
+        message: "test",
+        fileToStage: "/some/new-story.md",
+        createdPath: "/some/new-story.md",
+        mutator: () => {
+          throw new Error("formatFiles crashed");
+        },
+        raceMessage: "no",
+        raceExitCode: 99,
+      }),
+    ).toThrow(/formatFiles crashed/);
+    // The mutation never reaches add/commit/push; rollback issues reset + clean.
+    expect(seen).not.toContain("add");
+    expect(seen).not.toContain("commit");
+    expect(seen).not.toContain("push");
+    expect(seen.filter((l) => l === "reset").length).toBe(1);
+    expect(seen.filter((l) => l === "clean").length).toBe(1);
+  });
+
   it("retries once on push failure, succeeds on second attempt", () => {
     const { seen } = setup();
     let push = 0;
