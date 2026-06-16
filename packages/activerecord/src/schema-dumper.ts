@@ -513,9 +513,6 @@ class AdapterSchemaSource implements SchemaSource {
       nullsNotDistinct: idx.nullsNotDistinct,
       using: idx.using,
       type: idx.type,
-      // Mirrors IndexDefinition#concise_options: when every column shares the
-      // same prefix length, collapse the per-column map to a scalar so the dump
-      // emits `length: 10` rather than `length: { name: 10, description: 10 }`.
       lengths: conciseIndexLengths(idx.columns, idx.lengths),
       opclasses: idx.opclasses,
       include: idx.include,
