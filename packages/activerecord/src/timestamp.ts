@@ -4,6 +4,7 @@ import { ActiveRecordError, ReadOnlyRecord, StaleObjectError } from "./errors.js
 import { UpdateManager, Nodes } from "@blazetrails/arel";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 import { runAfterCallbacksOnProto } from "@blazetrails/activemodel";
+import { withTransactionReturningStatus } from "./transactions.js";
 
 /**
  * Timestamp handling for ActiveRecord models.
@@ -74,6 +75,26 @@ export async function touch(
 
   if (touchCols.length === 0) return false;
 
+  // Mirrors Rails: ActiveRecord::Transactions#touch wraps the persistence-layer
+  // touch in `with_transaction_returning_status`, so the record is enrolled in
+  // the current transaction and its `after_update_commit` /
+  // `after_rollback(on: :update)` callbacks fire on commit/rollback. The
+  // pre-write state snapshot is captured inside (before any writeAttribute) so
+  // rollback restores the pre-touch values.
+  return withTransactionReturningStatus.call(this, async () => {
+    return touchRow.call(this, touchCols, now);
+  }) as Promise<boolean>;
+}
+
+/**
+ * Persistence-layer half of touch: builds and runs the targeted UPDATE, sets
+ * the update-callback trigger flag from the affected-row count, applies changes,
+ * and runs after_touch. Mirrors Rails' Persistence#touch → _touch_row → _update_row
+ * (called from inside with_transaction_returning_status).
+ */
+async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant): Promise<boolean> {
+  const ctor = this.constructor as typeof Base;
+
   // Write new values via writeAttribute so changesApplied() populates previousChanges.
   for (const col of touchCols) {
     this.writeAttribute(col, now);
@@ -137,6 +158,11 @@ export async function touch(
     }
     throw new StaleObjectError(this, "touch");
   }
+
+  // Mirrors Rails Persistence#touch: `@_trigger_update_callback = affected_rows == 1`.
+  // This is what trigger_transactional_callbacks? reads to fire after_update_commit /
+  // after_rollback(on: :update) when the enrolling transaction commits/rolls back.
+  (this as any)._triggerUpdateCallback = affected === 1;
 
   this.changesApplied();
 

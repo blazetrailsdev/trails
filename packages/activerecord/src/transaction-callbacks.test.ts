@@ -11,6 +11,7 @@ import {
   Rollback,
   registerModel,
 } from "./index.js";
+import { Associations } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -19,7 +20,7 @@ setupHandlerSuite();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({
-    topics: { title: "string", parent_id: "integer" },
+    topics: { title: "string", parent_id: "integer", updated_at: "datetime" },
     orders: { total: "integer", amount: "integer" },
     payments: { amount: "integer" },
     invoices: { total: "integer" },
@@ -27,7 +28,9 @@ beforeAll(async () => {
       title: "string",
       lock_version: "integer",
       published: "boolean",
+      updated_at: "datetime",
     },
+    comments: { body: "string", post_id: "integer" },
     widgets: { name: "string" },
   });
 });
@@ -254,16 +257,48 @@ describe("TransactionCallbacksTest", () => {
     expect(called.length).toBe(2);
   });
 
-  it.skip("only call after commit on update after transaction commits for existing record on touch", () => {
-    // DEFERRED: `touch` builds a direct UPDATE and fires only after_touch — it
-    // does not enroll in the transactional-callback machinery
-    // (withTransactionReturningStatus / _triggerUpdateCallback), so it never
-    // fires after_update_commit. Wiring touch through transactions is its own story.
+  it("only call after commit on update after transaction commits for existing record on touch", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+    const topic = await Topic.create({ title: "original" });
+    const called: string[] = [];
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
+    await transaction(Topic, async () => {
+      await topic.touch();
+      expect(called).toEqual([]);
+    });
+    expect(called).toEqual(["after_commit"]);
   });
-  it.skip("only call after commit on top level transactions", () => {
-    // DEFERRED: drives the assertion via `touch` inside a requires_new savepoint;
-    // blocked by the same touch gap (touch does not fire transactional commit
-    // callbacks). See "…for existing record on touch" above.
+  it("only call after commit on top level transactions", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+    const topic = await Topic.create({ title: "original" });
+    const called: string[] = [];
+    Topic.afterCommit(function () {
+      called.push("after_commit");
+    });
+    await transaction(Topic, async () => {
+      await transaction(
+        Topic,
+        async () => {
+          await topic.touch();
+        },
+        { requiresNew: true },
+      );
+      // The savepoint commit must NOT fire after_commit — only the outermost does.
+      expect(called).toEqual([]);
+    });
+    expect(called).toEqual(["after_commit"]);
   });
 
   it("call after rollback after transaction rollsback", async () => {
@@ -305,9 +340,25 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_rollback"]);
   });
 
-  it.skip("only call after rollback on update after transaction rollsback for existing record on touch", () => {
-    // DEFERRED: same touch gap — `touch` does not enroll in the transactional
-    // callback machinery, so after_rollback(on: :update) never fires.
+  it("only call after rollback on update after transaction rollsback for existing record on touch", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+    const topic = await Topic.create({ title: "original" });
+    const called: string[] = [];
+    Topic.afterRollback(function () {
+      called.push("after_rollback");
+    });
+    try {
+      await transaction(Topic, async () => {
+        await topic.touch();
+        throw new Error("rollback");
+      });
+    } catch {}
+    expect(called).toEqual(["after_rollback"]);
   });
 
   it("only call after rollback on destroy after transaction rollsback for destroyed record", async () => {
@@ -602,9 +653,33 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual([]);
   });
 
-  it.skip("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", () => {
-    // DEFERRED: needs belongs_to `touch: true` so saving the child enqueues a
-    // parent touch that fires the parent's after_commit callback.
+  it("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", async () => {
+    class Post extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("title", "string");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+    registerModel(Post);
+
+    class Comment extends Base {
+      static {
+        this._tableName = "comments";
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+      }
+    }
+    Associations.belongsTo.call(Comment, "post", { touch: true });
+    registerModel(Comment);
+
+    const post = await Post.create({ title: "Hello" });
+    const called: string[] = [];
+    Post.afterCommit(function () {
+      called.push("after_commit");
+    });
+    await Comment.create({ body: "Reply", post_id: post.id });
+    expect(called).toEqual(["after_commit"]);
   });
 
   it("saving two records that override object id should run after commit callbacks for both", async () => {
