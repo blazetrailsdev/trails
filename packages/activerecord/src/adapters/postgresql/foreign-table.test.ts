@@ -10,8 +10,20 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { TEST_SCHEMA } from "../../test-helpers/test-schema.js";
 import { Base } from "../../index.js";
+import { Professor } from "../../test-helpers/models/professor.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
+
+// Rails: class ForeignProfessor < ActiveRecord::Base; self.table_name = "foreign_professors"
+class ForeignProfessor extends Base {
+  static tableName = "foreign_professors";
+}
+
+// Rails: class ForeignProfessorWithPk < ForeignProfessor; self.primary_key = "id"
+class ForeignProfessorWithPk extends ForeignProfessor {
+  static primaryKey = "id";
+}
 
 const url = new URL(PG_TEST_URL);
 const fdwHost = url.hostname || "localhost";
@@ -33,7 +45,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     await adapter.exec("DROP FOREIGN TABLE IF EXISTS foreign_professors");
     await adapter.exec("DROP SERVER IF EXISTS foreign_server CASCADE");
-    await adapter.exec("DROP TABLE IF EXISTS professors");
     try {
       await adapter.enableExtension("postgres_fdw");
     } catch {
@@ -42,12 +53,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       ctx.skip();
       return;
     }
-    await defineSchema(
-      {
-        professors: { name: { type: "string", null: false } },
-      },
-      { dropExisting: true },
-    );
+    await defineSchema({ professors: TEST_SCHEMA.professors }, { dropExisting: true });
     await adapter.exec(
       `CREATE SERVER foreign_server FOREIGN DATA WRAPPER postgres_fdw ` +
         `OPTIONS (host ${quoteLit(fdwHost)}, port ${quoteLit(fdwPort)}, dbname ${quoteLit(fdwDb)})`,
@@ -71,7 +77,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     await adapter.exec("DROP FOREIGN TABLE IF EXISTS foreign_professors").catch(() => {});
     await adapter.exec("DROP SERVER IF EXISTS foreign_server CASCADE").catch(() => {});
-    await adapter.exec("DROP TABLE IF EXISTS professors").catch(() => {});
     await adapter.disableExtension("postgres_fdw", { force: "cascade" }).catch(() => {});
   });
 
@@ -96,9 +101,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("foreign_tables", "attribute names", async () => {
-      class ForeignProfessor extends Base {
-        static tableName = "foreign_professors";
-      }
       await ForeignProfessor.loadSchema();
       expect(ForeignProfessor.attributeNames()).toEqual(["id", "name"]);
     });
@@ -115,13 +117,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("foreign_tables", "attributes", async () => {
-      class Professor extends Base {
-        static tableName = "professors";
-      }
-      class ForeignProfessorWithPk extends Base {
-        static tableName = "foreign_professors";
-        static primaryKey = "id";
-      }
       await Professor.loadSchema();
       await ForeignProfessorWithPk.loadSchema();
       const created = await Professor.create({ name: "Nicola" });
@@ -131,10 +126,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("foreign_tables", "insert record", async () => {
-      class ForeignProfessorWithPk extends Base {
-        static tableName = "foreign_professors";
-        static primaryKey = "id";
-      }
       await ForeignProfessorWithPk.loadSchema();
       await ForeignProfessorWithPk.createBang({ id: 100, name: "Leonardo" });
       const last = await ForeignProfessorWithPk.last();
@@ -142,13 +133,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("foreign_tables", "update record", async () => {
-      class Professor extends Base {
-        static tableName = "professors";
-      }
-      class ForeignProfessorWithPk extends Base {
-        static tableName = "foreign_professors";
-        static primaryKey = "id";
-      }
       await Professor.loadSchema();
       await ForeignProfessorWithPk.loadSchema();
       const created = await Professor.create({ name: "Nicola" });
@@ -160,13 +144,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("foreign_tables", "delete record", async () => {
-      class Professor extends Base {
-        static tableName = "professors";
-      }
-      class ForeignProfessorWithPk extends Base {
-        static tableName = "foreign_professors";
-        static primaryKey = "id";
-      }
       await Professor.loadSchema();
       await ForeignProfessorWithPk.loadSchema();
       const created = await Professor.create({ name: "Nicola" });
