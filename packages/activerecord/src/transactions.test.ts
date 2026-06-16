@@ -13,7 +13,7 @@ import {
   registerModel,
 } from "./index.js";
 
-import { createSidecarTestAdapter, createTestAdapter } from "./test-adapter.js";
+import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -1576,7 +1576,7 @@ describe("TransactionTest", () => {
   it.skip("invalid keys for transaction", () => {
     // transaction() does not validate option keys — feature gap vs Rails.
   });
-  it("using named savepoints", async () => {
+  itIfSupports("savepoints", "using named savepoints", async () => {
     const { Topic, adapter } = makeSQLiteTopic();
     const first = (await Topic.create({ title: "f", approved: false })) as any;
 
@@ -1665,7 +1665,7 @@ describe("TransactionTest", () => {
   it.skip("sqlite add column in transaction", () => {
     // DDL API (add_column) not exposed at the test layer.
   });
-  it("sqlite default transaction mode is immediate", async () => {
+  it.skipIf(adapterType !== "sqlite")("sqlite default transaction mode is immediate", async () => {
     const { Topic, adapter } = makeSQLiteTopic();
     await assertQueriesMatch(/BEGIN IMMEDIATE TRANSACTION/i, undefined, false, async () => {
       await Topic.transaction(async () => {
@@ -2093,7 +2093,7 @@ describe("TransactionTest", () => {
 // TransactionsWithTransactionalFixturesTest — from transactions_test.rb
 // ==========================================================================
 describe("TransactionsWithTransactionalFixturesTest", () => {
-  it("automatic savepoint in outer transaction", async () => {
+  itIfSupports("savepoints", "automatic savepoint in outer transaction", async () => {
     const { Topic } = makeSQLiteTopic();
     const first = await Topic.create({ title: "x", approved: false });
 
@@ -2109,7 +2109,7 @@ describe("TransactionsWithTransactionalFixturesTest", () => {
 
     expect((await Topic.find(first.id)).approved).toBe(false);
   });
-  it("no automatic savepoint for inner transaction", async () => {
+  itIfSupports("savepoints", "no automatic savepoint for inner transaction", async () => {
     const { Topic } = makeSQLiteTopic();
     const first = await Topic.create({ title: "x", approved: false });
 
