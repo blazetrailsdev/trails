@@ -181,7 +181,14 @@ export class InsertAll {
   }
 
   primaryKeys(): string[] {
+    // Rails: `Array(@model.schema_cache.primary_keys(model.table_name))`
+    // (insert_all.rb:61). We read `this.model.primaryKey` (a pre-existing
+    // schema-cache-vs-attribute divergence), but for the no-PK case both yield
+    // []: a model with no primary key (e.g. a partitioned table — primaryKey is
+    // nil / "") returns [] so `returning` defaults to no RETURNING clause rather
+    // than RETURNING "".
     const pk = this.model.primaryKey;
+    if (pk == null || pk === "") return [];
     return Array.isArray(pk) ? pk : [pk];
   }
 
