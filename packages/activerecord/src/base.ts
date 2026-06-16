@@ -2655,6 +2655,20 @@ export class Base extends Model {
           );
         }
       }
+      // A composite primary key passed as `id: [a, b]` must be routed solely
+      // through the `id=` setter (applied post-super by
+      // `_applyCompositePrimaryKey`). Drop it from `attrsForSuper` so super()'s
+      // raw `writeAttribute("id", …)` doesn't materialize a phantom `id`
+      // attribute for key columns not literally named `id` — Rails' dispatch
+      // (`public_send("id=")`) never creates one.
+      if (
+        Array.isArray((ctor2 as { primaryKey?: unknown }).primaryKey) &&
+        Array.isArray(attrs.id)
+      ) {
+        attrsForSuper = Object.fromEntries(
+          Object.entries(attrsForSuper).filter(([k]) => k !== "id"),
+        );
+      }
       const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };
       const hadOwn2 = Object.prototype.hasOwnProperty.call(
         suppressor2,
