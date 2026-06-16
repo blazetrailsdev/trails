@@ -214,11 +214,12 @@ export class PredicateBuilder {
       const node = inner.length === 1 ? inner[0] : new Nodes.And(inner);
       return [new Nodes.Not(new Nodes.Grouping(node))];
     }
+    // Rails `grouping_queries`: `Arel::Nodes::Or.new(queries.map!(&:reduce(:and)))`
+    // — an n-ary Or over the full array, wrapped in one Grouping.
     const reduced = queryGroups.map((inner) =>
       inner.length === 1 ? inner[0] : new Nodes.And(inner),
     );
-    const orNode = reduced.reduce((acc, g) => new Nodes.Or(acc, g));
-    const grouping = new Nodes.Grouping(orNode);
+    const grouping = new Nodes.Grouping(new Nodes.Or(reduced));
     return negated ? [new Nodes.Not(grouping)] : [grouping];
   }
 
