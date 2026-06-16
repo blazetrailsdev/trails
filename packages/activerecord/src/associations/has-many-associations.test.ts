@@ -27,11 +27,21 @@ import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
-import { Author, AuthorAddress } from "../test-helpers/models/author.js";
-import { Essay } from "../test-helpers/models/essay.js";
-import { Person } from "../test-helpers/models/person.js";
-import { Subscriber } from "../test-helpers/models/subscriber.js";
-import { Subscription } from "../test-helpers/models/subscription.js";
+// Imported under HM-prefixed local aliases so the top-level bindings don't
+// collide with the bespoke `class Author` / `class Post` declarations in the
+// still-unconverted describes below. Without the alias, esbuild renames those
+// in-function classes (e.g. `Author` -> `Author2`) to avoid shadowing the
+// import, which silently changes their inferred table name to `author2s` and
+// breaks every test in those describes. The class identities (and therefore
+// `.name` / inferred table names) are unchanged — only the binding names differ.
+import {
+  Author as HmAuthor,
+  AuthorAddress as HmAuthorAddress,
+} from "../test-helpers/models/author.js";
+import { Essay as HmEssay } from "../test-helpers/models/essay.js";
+import { Person as HmPerson } from "../test-helpers/models/person.js";
+import { Subscriber as HmSubscriber } from "../test-helpers/models/subscriber.js";
+import { Subscription as HmSubscription } from "../test-helpers/models/subscription.js";
 
 const UNIVERSAL_HM_SCHEMA: Schema = {
   cpk_authors: { name: "string", author_code: "string" },
@@ -456,21 +466,21 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   ]);
 
   beforeAll(async () => {
-    registerModel(Subscriber);
-    registerModel(Subscription);
-    registerModel(Author);
-    registerModel(AuthorAddress);
-    registerModel(Essay);
-    registerModel(Person);
-    await Subscriber.loadSchema();
-    await Subscription.loadSchema();
-    await Author.loadSchema();
-    await Essay.loadSchema();
-    await Person.loadSchema();
+    registerModel(HmSubscriber);
+    registerModel(HmSubscription);
+    registerModel(HmAuthor);
+    registerModel(HmAuthorAddress);
+    registerModel(HmEssay);
+    registerModel(HmPerson);
+    await HmSubscriber.loadSchema();
+    await HmSubscription.loadSchema();
+    await HmAuthor.loadSchema();
+    await HmEssay.loadSchema();
+    await HmPerson.loadSchema();
   });
 
   it("custom primary key on new record should fetch with query", async () => {
-    const subscriber = new Subscriber({ nick: "webster132" });
+    const subscriber = new HmSubscriber({ nick: "webster132" });
     const subscriptions = association(subscriber, "subscriptions");
     expect(subscriptions.loaded).toBe(false);
 
@@ -478,13 +488,13 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
       expect(await subscriptions.size()).toBe(2);
     });
 
-    const expected = await Subscription.where({ subscriber_id: "webster132" }).toArray();
+    const expected = await HmSubscription.where({ subscriber_id: "webster132" }).toArray();
     const actual = (await subscriptions.toArray()) as Base[];
     expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
   it("association primary key on new record should fetch with query", async () => {
-    const author = new Author({ name: "David" });
+    const author = new HmAuthor({ name: "David" });
     const essays = association(author, "essays");
     expect(essays.loaded).toBe(false);
 
@@ -492,29 +502,29 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
       expect(await essays.size()).toBe(1);
     });
 
-    const expected = await Essay.where({ writer_id: "David" }).toArray();
+    const expected = await HmEssay.where({ writer_id: "David" }).toArray();
     const actual = (await essays.toArray()) as Base[];
     expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
   it("ids on unloaded association with custom primary key", async () => {
-    const david = people("david") as Person;
-    const expected = (await Essay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
+    const david = people("david") as HmPerson;
+    const expected = (await HmEssay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
     const ids = await (david.association("essays") as any).idsReader();
     expect(ids).toEqual(expected);
   });
 
   it("ids on loaded association with custom primary key", async () => {
-    const david = people("david") as Person;
+    const david = people("david") as HmPerson;
     const assoc = david.association("essays") as any;
     await assoc.loadTarget();
-    const expected = (await Essay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
+    const expected = (await HmEssay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
     const ids = await assoc.idsReader();
     expect(ids).toEqual(expected);
   });
 
   it("blank custom primary key on new record should not run queries", async () => {
-    const author = new Author();
+    const author = new HmAuthor();
     const essays = association(author, "essays");
     expect(essays.loaded).toBe(false);
 
