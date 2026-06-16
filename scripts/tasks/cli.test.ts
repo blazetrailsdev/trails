@@ -877,6 +877,44 @@ describe("commitAndPush (git mutation flow)", () => {
     ]);
   });
 
+  // End-to-end race repro through the mutation seam: a `new`-style mutator
+  // writes its story under a stale `0000-<slug>` dir (the author's slug
+  // predated a concurrent finalize that renamed it to `NNNN-<slug>` on main).
+  // commitAndPush must migrate the stranded story into the finalized dir and
+  // stage `-A` so main never carries two dirs for one RFC.
+  it("reconciles a stale 0000- dir the mutator recreated, staging -A", () => {
+    const { seen } = setup();
+    const cwd = mkdtempSync(join(tmpdir(), "tasks-cap-dup-"));
+    mkdirSync(join(cwd, "rfcs", "0031-foo"), { recursive: true });
+    writeFileSync(join(cwd, "rfcs", "0031-foo", "README.md"), "# foo\n");
+    let addArg = "";
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      if (label === "add") addArg = args?.[3] ?? "";
+      seen.push(label);
+      return "" as never;
+    });
+    commitAndPush({
+      message: "new: 0000-foo/r1",
+      fileToStage: join(cwd, "rfcs", "0000-foo", "stories", "r1.md"),
+      cwd,
+      mutator: () => {
+        const storyDir = join(cwd, "rfcs", "0000-foo", "stories");
+        mkdirSync(storyDir, { recursive: true });
+        writeFileSync(join(storyDir, "r1.md"), `---\nrfc: "0000-foo"\n---\nbody 0000-foo\n`);
+      },
+      raceMessage: "no",
+      raceExitCode: 99,
+    });
+    // The migrated story is the staged set; the dead 0000- dir is gone.
+    expect(addArg).toBe("-A");
+    expect(existsSync(join(cwd, "rfcs", "0000-foo"))).toBe(false);
+    const moved = readFileSync(join(cwd, "rfcs", "0031-foo", "stories", "r1.md"), "utf8");
+    expect(moved).toContain(`rfc: "0031-foo"`);
+    expect(moved).not.toContain("0000-foo");
+  });
+
   // Mimic execFileSync's failure shape: attach .stderr to the error so
   // commitAndPush's race-vs-real-failure discriminator can inspect it.
   function pushError(stderr: string): Error {
