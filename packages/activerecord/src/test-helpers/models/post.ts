@@ -1,6 +1,6 @@
 // vendor/rails/activerecord/test/models/post.rb
 import { Base } from "../../base.js";
-import { enableSti, registerSubclass } from "../../inheritance.js";
+import { registerSubclass } from "../../inheritance.js";
 
 export class CategoryPost extends Base {
   static {
@@ -593,12 +593,9 @@ export class PostRecord extends Base {
 // Track the STI subtree on the `posts` table so registry-safe row-path
 // resolution (Base.instantiate → discriminateClassForRecord) finds these
 // classes through Post's own subtree rather than the global model registry.
-// Rails: `posts` carries a `type` column, so Post is an STI base — its
-// non-abstract descendants get a `type IN (...)` finder condition (Rails'
-// `finder_needs_type_condition?`). Enable STI on the base so the subtree
-// classes below actually scope by type.
-enableSti(Post);
-
+// Rails: `posts` carries a `type` column, so Post's non-abstract descendants
+// auto-layer a `type IN (...)` finder condition (`finder_needs_type_condition?`,
+// column-presence detected) with no explicit enableSti opt-in.
 for (const klass of [
   SpecialPost,
   StiPost,

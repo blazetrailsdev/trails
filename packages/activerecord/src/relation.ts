@@ -5451,9 +5451,37 @@ export class Relation<T extends Base> {
     return this.values();
   }
 
+  /** True when this relation's WHERE equals the model's unscoped baseline —
+   *  empty, or carrying only the STI `type_condition` that `unscoped` itself
+   *  layers on. Mirrors the WHERE half of Rails' `@values == klass.unscoped.values`
+   *  so an STI subclass's unscoped relation still reports as an empty scope.
+   *  @internal */
+  private _whereMatchesUnscopedBaseline(): boolean {
+    if (this._whereClause.isEmpty()) return true;
+    const klass = this._modelClass as any;
+    // Only a finder-type-condition class has a non-empty unscoped baseline; for
+    // anything else a non-empty WHERE means a real, non-empty scope.
+    if (!klass.isFinderNeedsTypeCondition?.()) return false;
+    const connection = klass.connection;
+    if (!connection?.toSql) return false;
+    // Build the baseline against this relation's own table so an alias-qualified
+    // relation compares its type_condition against an identically-qualified one
+    // rather than the default arel_table.
+    const baseline = klass._buildUnscopedRelation?.(this._table ?? undefined);
+    if (!baseline) return false;
+    try {
+      return this._whereClause.toSql(connection) === baseline._whereClause.toSql(connection);
+    } catch {
+      return false;
+    }
+  }
+
   get isEmptyScope(): boolean {
+    // Rails: `@values == klass.unscoped.values`. The unscoped baseline may carry
+    // the STI `type_condition`, so a relation whose WHERE matches that baseline
+    // (rather than being literally empty) is still an empty scope.
     return (
-      this._whereClause.isEmpty() &&
+      this._whereMatchesUnscopedBaseline() &&
       this._orderClauses.length === 0 &&
       this._limitValue === null &&
       this._offsetValue === null &&

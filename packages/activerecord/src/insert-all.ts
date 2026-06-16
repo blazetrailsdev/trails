@@ -5,7 +5,7 @@ import { IndexDefinition } from "./connection-adapters/abstract/schema-definitio
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
-import { stiName, isDescendsFromActiveRecord } from "./inheritance.js";
+import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./adapter.js";
 
@@ -307,12 +307,15 @@ export class InsertAll {
 
   /** @internal */
   private resolveSti(): void {
-    // Rails injects the STI type only for descendants (`!descends_from_active_record?`).
-    // `inheritance_column` now always resolves to a name (default "type"), so gate
-    // on the structural check rather than the column's presence.
-    if (isDescendsFromActiveRecord(this.model)) return;
-    // STI is active on this path (not descends_from), so the column resolves to a
-    // name; `?? "type"` only satisfies the now-nullable getter's type.
+    // Rails injects the STI type only for models that actually participate in STI
+    // (`finder_needs_type_condition?` — a non-abstract subclass whose table carries
+    // the inheritance column). Gating on the column-aware check, not the bare
+    // hierarchical `descends_from_active_record?`, keeps a plain concrete subclass
+    // with no `type` column (e.g. a readonly-attribute subclass) from inserting a
+    // value into a non-existent column.
+    if (!isFinderNeedsTypeCondition(this.model)) return;
+    // STI is active on this path, so the column resolves to a name; `?? "type"`
+    // only satisfies the now-nullable getter's type.
     const inheritanceCol = this.model.inheritanceColumn ?? "type";
     const type = stiName(this.model);
     for (const insert of this.inserts) {
