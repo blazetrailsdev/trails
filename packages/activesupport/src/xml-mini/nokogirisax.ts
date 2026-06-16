@@ -9,9 +9,38 @@ const HASH_SIZE_KEY = "__hash_size__";
 
 type XmlHash = Record<string, unknown>;
 
-async function loadNokogiri() {
+// @blazetrails/nokogiri is an optional peer dependency, so it may not be
+// resolvable when this file is type-checked in isolation (e.g. before its
+// `dist` is built). These local interfaces describe the slice of the Nokogiri
+// SAX surface used below so the dynamic import stays well-typed — including the
+// seven `override` members on HashBuilder — without depending on the package's
+// own declarations being present.
+interface SaxDocument {
+  startDocument(): void;
+  endDocument(): void;
+  startElement(name: string, attrs: ReadonlyArray<[string, string]>): void;
+  endElement(name: string): void;
+  characters(text: string): void;
+  cdataBlock(text: string): void;
+  error(message: string): void;
+}
+
+interface SaxParser {
+  parse(data: string): void;
+}
+
+interface NokogiriModule {
+  SaxDocument: new () => SaxDocument;
+  SAX: { Parser: new (handler: SaxDocument) => SaxParser };
+}
+
+// Loaded via a non-literal specifier so the optional dependency does not have
+// to resolve at type-check time; the cast pins it to the surface above.
+const NOKOGIRI_PACKAGE = "@blazetrails/nokogiri";
+
+async function loadNokogiri(): Promise<NokogiriModule> {
   try {
-    return await import("@blazetrails/nokogiri");
+    return (await import(NOKOGIRI_PACKAGE)) as unknown as NokogiriModule;
   } catch (e) {
     if (isModuleNotFound(e, "@blazetrails/nokogiri")) {
       throw new Error(
