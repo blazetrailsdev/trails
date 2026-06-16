@@ -281,7 +281,12 @@ export function _registerCallbackOnProto(
     chain.config,
     isObj ? (fn as unknown as ASCallbackObject) : undefined,
   );
-  const prepend = !!conditions?.prepend || timing === "after";
+  // Ordinary after-callbacks always run in definition order, achieved by
+  // prepending into activesupport's LIFO-iterated after chain. Transactional
+  // (commit/rollback) callbacks instead honor the explicit `prepend` flag the
+  // caller threads in from ActiveRecord.run_after_transaction_callbacks_in_order_defined.
+  const isTransactional = event === "commit" || event === "rollback";
+  const prepend = !!conditions?.prepend || (timing === "after" && !isTransactional);
   if (prepend) chain.prepend(entry);
   else chain.append(entry);
 }

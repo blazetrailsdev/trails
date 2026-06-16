@@ -136,6 +136,8 @@ export {
   setPermanentConnectionCheckout,
   beforeCommittedOnAllRecords,
   setBeforeCommittedOnAllRecords,
+  runAfterTransactionCallbacksInOrderDefined,
+  setRunAfterTransactionCallbacksInOrderDefined,
 } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {

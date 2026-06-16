@@ -56,6 +56,22 @@ export function setBeforeCommittedOnAllRecords(value: boolean): void {
 }
 
 /**
+ * When true, `after_commit`/`after_rollback` callbacks run in the order they
+ * were defined; when false (the raw framework default) they run in reverse
+ * definition order. Only transactional (commit/rollback) callbacks are
+ * affected — ordinary `after_*` callbacks always run in definition order.
+ * Read at registration time and threaded into the callback chain as the
+ * `prepend` flag, mirroring Rails' `prepend_option` (transactions.rb:320-327).
+ * Mirrors `ActiveRecord.run_after_transaction_callbacks_in_order_defined`
+ * (active_record.rb:351-352, default false).
+ */
+export let runAfterTransactionCallbacksInOrderDefined = false;
+
+export function setRunAfterTransactionCallbacksInOrderDefined(value: boolean): void {
+  runAfterTransactionCallbacksInOrderDefined = value;
+}
+
+/**
  * Controls what happens when a strict-loading violation is detected: either
  * `"raise"` (the default — throw `StrictLoadingViolationError`) or `"log"`
  * (instrument `strict_loading_violation.active_record` and continue loading).

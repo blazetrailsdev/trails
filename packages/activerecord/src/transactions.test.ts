@@ -553,7 +553,9 @@ describe("TransactionTest", () => {
       }
     }
     await Post.create({ title: "test" });
-    expect(log.indexOf("first")).toBeLessThan(log.indexOf("second"));
+    // Default ActiveRecord.run_after_transaction_callbacks_in_order_defined is
+    // false, so after_commit callbacks fire in reverse definition order.
+    expect(log.indexOf("first")).toBeGreaterThan(log.indexOf("second"));
   });
 
   it("after_commit_on_create_in_transaction", async () => {
@@ -665,7 +667,9 @@ describe("TransactionTest", () => {
       }
     }
     await Post.create({ title: "test" });
-    expect(log).toEqual(["a", "b", "c"]);
+    // Default ActiveRecord.run_after_transaction_callbacks_in_order_defined is
+    // false, so after_commit callbacks fire in reverse definition order.
+    expect(log).toEqual(["c", "b", "a"]);
   });
 
   it("after_commit_returns_record_with_save", async () => {
