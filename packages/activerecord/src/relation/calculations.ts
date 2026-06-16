@@ -645,6 +645,12 @@ export async function performCount(
           // over a derived table (rather than `pk IN (<subquery>)`) avoids MariaDB's
           // "doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'" restriction; the
           // inner DISTINCT pk already collapses to the distinct-parent-id count.
+          //
+          // DIVERGENCE: a requested aggregate column (`count(:comments_id)`) is not
+          // honored here — this always counts distinct parent pks. Rails
+          // build_count_subquery rewrites the inner select to `aggregate_column(col)`
+          // for `column_name != :all` (calculations.rb:666-668). No limit-branch test
+          // exercises a non-`:all` column today; tracked for convergence.
           const countSql = `SELECT COUNT(*) AS count FROM (${innerSql}) subquery_for_count`;
           const [withCtes, ctedBinds] = prependCtes(this, countSql, [...allIdBinds]);
           const limitedResult = await this._modelClass.connection.selectAll(
