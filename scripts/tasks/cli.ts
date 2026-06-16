@@ -2665,8 +2665,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   try {
     main();
   } catch (e) {
-    const err = e as { stack?: string; message?: string };
+    const err = e as { stack?: string; message?: string; stderr?: unknown };
     console.error("error: tasks CLI command failed");
+    // A failed git/gh subprocess (execFileSync) puts its real diagnostic on
+    // .stderr, not in the stack — print it too so the failure is legible.
+    const stderr = String(err?.stderr ?? "").trim();
+    if (stderr) console.error(stderr);
     console.error(err?.stack ?? err?.message ?? String(e));
     process.exit(1);
   }

@@ -883,10 +883,17 @@ describe("commitAndPush (git mutation flow)", () => {
 
   it("rolls back the working tree when the mutator throws between write and commit", () => {
     const { seen } = setup();
+    // Model the working tree as the set of untracked paths the mutator created,
+    // so the test asserts the tree is genuinely restored to clean — not merely
+    // that rollback issued some commands. `git clean -fdq -- <path>` removes the
+    // created path; `reset --hard` reverts tracked/staged edits (none here).
+    const NEW_FILE = "/some/new-story.md";
+    const worktree = new Set<string>();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
+      if (label === "clean") worktree.delete(args[args.length - 1]);
       return "" as never;
     });
     // A mutator that writes its file then crashes (e.g. a prettier failure in
@@ -896,21 +903,52 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(() =>
       commitAndPush({
         message: "test",
-        fileToStage: "/some/new-story.md",
-        createdPath: "/some/new-story.md",
+        fileToStage: NEW_FILE,
+        createdPath: NEW_FILE,
         mutator: () => {
+          worktree.add(NEW_FILE); // the write that lands before the crash
           throw new Error("formatFiles crashed");
         },
         raceMessage: "no",
         raceExitCode: 99,
       }),
     ).toThrow(/formatFiles crashed/);
+    // Pre-command state restored: nothing left dirty for the next mutation.
+    expect(worktree.size).toBe(0);
     // The mutation never reaches add/commit/push; rollback issues reset + clean.
     expect(seen).not.toContain("add");
     expect(seen).not.toContain("commit");
     expect(seen).not.toContain("push");
     expect(seen.filter((l) => l === "reset").length).toBe(1);
     expect(seen.filter((l) => l === "clean").length).toBe(1);
+  });
+
+  it("surfaces the underlying error (with stack) when a mutator throws, never a bare exit", () => {
+    setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
+    // The thrown Error propagates out of commitAndPush intact (the top-level
+    // main() wrapper prints its .stack) rather than being swallowed into a bare
+    // `Node.js <version>` + exit 1.
+    let caught: unknown;
+    try {
+      commitAndPush({
+        message: "test",
+        fileToStage: "/some/file.md",
+        mutator: () => {
+          throw new Error("boom");
+        },
+        raceMessage: "no",
+        raceExitCode: 99,
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).stack).toBeTruthy();
   });
 
   it("retries once on push failure, succeeds on second attempt", () => {
