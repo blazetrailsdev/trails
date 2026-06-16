@@ -23,6 +23,9 @@ import type { DatabaseAdapter } from "./adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { AbstractAdapter } from "./index.js";
+import { assertQueriesMatch, assertNoQueries } from "./testing/query-assertions.js";
+import { captureSql } from "./testing/sql-capture.js";
+import { StatementInvalid } from "./errors.js";
 
 // D-1 non-candidates: makeSQLiteTopic / makeSQLiteMovie and the inline
 // SQLite adapter tests below create isolated in-memory adapters because
@@ -677,13 +680,23 @@ describe("TransactionTest", () => {
     expect(savedRecord.title).toBe("test");
   });
 
-  it.skip("after_commit_returns_record_with_destroy", () => {
-    // NOT IN RAILS — our addition covering afterCommit-record-passthrough on destroy.
-    // BLOCKED: transactions — afterCommit callback does not receive the destroyed record
-    // ROOT-CAUSE: committedBang fires for destroy (triggerDestroyCallback=true) and
-    //   the callback fn receives `this`, but the record may not yet be fully marked
-    //   destroyed at callback time. Needs test + verification against running behavior.
-    // SCOPE: ~10 LOC test body; investigate before un-skipping.
+  it("after_commit_returns_record_with_destroy", async () => {
+    // NOT IN RAILS — afterCommit-record-passthrough on destroy.
+    let committedRecord: any = null;
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.afterCommit((record: any) => {
+          committedRecord = record;
+        });
+      }
+    }
+    const p = (await Post.create({ title: "test" })) as any;
+    committedRecord = null;
+    await p.destroy();
+    expect(committedRecord).not.toBeNull();
+    expect(committedRecord.title).toBe("test");
+    expect(committedRecord.isDestroyed()).toBe(true);
   });
 
   it("rollback triggers after_rollback", async () => {
@@ -719,15 +732,37 @@ describe("TransactionTest", () => {
     });
     expect(history).toEqual(["commit_on_destroy"]);
   });
-  it.skip("nested_transaction_with_savepoint_fires_callbacks", () => {
-    // NOT IN RAILS — our addition; closest Rails test is
-    //   test_only_call_after_rollback_on_records_rolled_back_to_a_savepoint
-    //   (transaction_callbacks_test.rb). Verify those Rails tests first.
-    // BLOCKED: transactions — needs savepoint-scoped callback firing
-    // ROOT-CAUSE: afterCommit/afterRollback scoped to savepoint level requires
-    //   TransactionManager to track which savepoint enrolled each record and fire
-    //   callbacks at the right nesting level.
-    // SCOPE: ~20 LOC test body; unblocked once savepoint callback scoping is wired.
+  it("nested_transaction_with_savepoint_fires_callbacks", async () => {
+    // NOT IN RAILS — mirrors Rails'
+    // test_only_call_after_rollback_on_records_rolled_back_to_a_savepoint.
+    const { Topic } = makeSQLiteTopic();
+    const commits: any[] = [];
+    const rollbacks: any[] = [];
+    Topic.afterCommit((r: any) => commits.push(r));
+    Topic.afterRollback((r: any) => rollbacks.push(r));
+
+    const first = (await Topic.create({ title: "first", approved: false })) as any;
+    const second = (await Topic.create({ title: "second", approved: false })) as any;
+    commits.length = 0;
+    rollbacks.length = 0;
+
+    await Topic.transaction(async () => {
+      first.approved = true;
+      await first.saveBang();
+      await Topic.transaction(
+        async () => {
+          second.approved = true;
+          await second.saveBang();
+          throw new Rollback();
+        },
+        { requiresNew: true },
+      );
+    });
+
+    expect(commits).toContain(first);
+    expect(commits).not.toContain(second);
+    expect(rollbacks).toContain(second);
+    expect(rollbacks).not.toContain(first);
   });
   it("after_commit_not_called_on_rollback", async () => {
     const history: string[] = [];
@@ -1515,8 +1550,14 @@ describe("TransactionTest", () => {
   it.skip("rollback dirty changes then retry save on new record with autosave association", () => {
     // Autosave associations not yet ported.
   });
-  it.skip("add to null transaction", () => {
-    // Calls private Ruby method send(:add_to_transaction) — not exposed.
+  it("add to null transaction", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const topic = Topic.new() as any;
+    await expect(topic.addToTransaction()).resolves.not.toThrow();
   });
   it.skip("deprecation on ruby timeout outside inner transaction", () => {
     // PERMANENT-SKIP: Ruby catch/throw semantics — `catch(:abort)` /
@@ -1535,12 +1576,36 @@ describe("TransactionTest", () => {
   it.skip("invalid keys for transaction", () => {
     // transaction() does not validate option keys — feature gap vs Rails.
   });
-  it.skip("using named savepoints", () => {
-    // Direct connection savepoint manipulation interferes with transactional
-    // fixture SAVEPOINT; currentSavepointName counter offset differs.
+  it("using named savepoints", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    const first = (await Topic.create({ title: "f", approved: false })) as any;
+
+    await Topic.transaction(async () => {
+      first.approved = true;
+      await first.saveBang();
+      await adapter.createSavepoint("first");
+
+      first.approved = false;
+      await first.saveBang();
+      await adapter.rollbackToSavepoint("first");
+      expect((await first.reload()).approved).toBe(true);
+
+      first.approved = false;
+      await first.saveBang();
+      await adapter.releaseSavepoint("first");
+      expect((await first.reload()).approved).toBe(false);
+    });
   });
-  it.skip("releasing named savepoints", () => {
-    // Same as "using named savepoints" — direct connection savepoint API.
+  it("releasing named savepoints", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    await Topic.transaction(async () => {
+      await adapter.materializeTransactions();
+
+      await adapter.createSavepoint("another");
+      await adapter.releaseSavepoint("another");
+
+      await expect(adapter.releaseSavepoint("another")).rejects.toThrow(StatementInvalid);
+    });
   });
   it.skip("savepoints name", () => {
     // currentSavepointName counter starts at a different offset inside the
@@ -1600,8 +1665,13 @@ describe("TransactionTest", () => {
   it.skip("sqlite add column in transaction", () => {
     // DDL API (add_column) not exposed at the test layer.
   });
-  it.skip("sqlite default transaction mode is immediate", () => {
-    // Requires assert_queries_match SQL monitoring — not available.
+  it("sqlite default transaction mode is immediate", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    await assertQueriesMatch(/BEGIN IMMEDIATE TRANSACTION/i, undefined, false, async () => {
+      await Topic.transaction(async () => {
+        await adapter.materializeTransactions();
+      });
+    });
   });
   it("mark transaction state as committed", async () => {
     const { TransactionState } = await import("./connection-adapters/abstract/transaction.js");
@@ -1617,27 +1687,100 @@ describe("TransactionTest", () => {
     state.rollbackBang();
     expect(state.rolledBack).toBe(true);
   });
-  it.skip("mark transaction state as nil", () => {
-    // nullifyBang() returns void; Rails' nullify! returns nil. No boolean
-    // getter to assert against — nullified state is indistinguishable here.
+  it("mark transaction state as nil", async () => {
+    const { TransactionState } = await import("./connection-adapters/abstract/transaction.js");
+    const state = new TransactionState();
+    state.commitBang();
+    // Rails asserts `transaction.state.nullify!` returns nil; nullifyBang()
+    // returns void (the TS equivalent of nil) and clears the finalized state.
+    expect(state.nullifyBang()).toBeUndefined();
+    expect(state.finalized).toBe(false);
   });
-  it.skip("transaction rollback with primarykeyless tables", () => {
-    // defineSchema does not support id: false / primarykeyless tables.
+  it("transaction rollback with primarykeyless tables", async () => {
+    const adp = new BetterSQLite3Adapter(":memory:");
+    openAdapters.push(adp);
+    adp.exec("CREATE TABLE transaction_without_primary_keys (thing_id INTEGER)");
+    class K extends Base {
+      static {
+        this._tableName = "transaction_without_primary_keys";
+        this.primaryKey = null as any;
+        this.attribute("thing_id", "integer");
+        this.afterCommit(() => {});
+        this.adapter = adp;
+      }
+    }
+    const before = await K.count();
+    await K.transaction(async () => {
+      await K.createBang({});
+      throw new Rollback();
+    });
+    expect(await K.count()).toBe(before);
   });
-  it.skip("unprepared statement materializes transaction", () => {
-    // Requires assert_queries_match SQL monitoring — not available.
+  it("unprepared statement materializes transaction", async () => {
+    const { Topic } = makeSQLiteTopic();
+    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+      await Topic.transaction(async () => {
+        await Topic.where("1=1").first();
+      });
+    });
   });
-  it.skip("nested transactions skip excess savepoints", () => {
-    // Requires capture_sql SQL monitoring — not available.
+  it("nested transactions skip excess savepoints", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const actualQueries = await captureSql(
+      async () => {
+        await Topic.transaction(
+          async () => {
+            await Topic.transaction(
+              async () => {
+                await Topic.deleteAll();
+                await Topic.transaction(
+                  async () =>
+                    Topic.transaction(async () => Topic.deleteAll(), { requiresNew: true }),
+                  { requiresNew: true },
+                );
+              },
+              { requiresNew: true },
+            );
+            await Topic.deleteAll();
+          },
+          { requiresNew: true },
+        );
+      },
+      { includeSchema: true },
+    );
+
+    const expectedQueries = [
+      /BEGIN/i,
+      /DELETE/i,
+      /^SAVEPOINT/i,
+      /DELETE/i,
+      /^RELEASE/i,
+      /DELETE/i,
+      /COMMIT/i,
+    ];
+    expect(actualQueries).toHaveLength(expectedQueries.length);
+    expectedQueries.forEach((expected, i) => expect(actualQueries[i]).toMatch(expected));
   });
   it.skip("prepared statement materializes transaction", () => {
     // Requires assert_queries_match SQL monitoring — not available.
   });
-  it.skip("savepoint does not materialize transaction", () => {
-    // Requires assert_no_queries / SQL monitoring — not available.
+  it("savepoint does not materialize transaction", async () => {
+    const { Topic } = makeSQLiteTopic();
+    await assertNoQueries(false, async () => {
+      await Topic.transaction(async () => {
+        await Topic.transaction(async () => {}, { requiresNew: true });
+      });
+    });
   });
-  it.skip("raising does not materialize transaction", () => {
-    // Requires assert_no_queries / SQL monitoring — not available.
+  it("raising does not materialize transaction", async () => {
+    const { Topic } = makeSQLiteTopic();
+    await assertNoQueries(false, async () => {
+      await expect(
+        Topic.transaction(async () => {
+          throw new Error("Expected");
+        }),
+      ).rejects.toThrow("Expected");
+    });
   });
   it.skip("accessing raw connection materializes transaction", () => {
     // No rawConnection API exposed.
@@ -1950,11 +2093,42 @@ describe("TransactionTest", () => {
 // TransactionsWithTransactionalFixturesTest — from transactions_test.rb
 // ==========================================================================
 describe("TransactionsWithTransactionalFixturesTest", () => {
-  it.skip("automatic savepoint in outer transaction", () => {
-    // Requires loaded fixtures (topics(1)) — fixture loader not available.
+  it("automatic savepoint in outer transaction", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const first = await Topic.create({ title: "x", approved: false });
+
+    try {
+      await Topic.transaction(async () => {
+        first.approved = true;
+        await first.saveBang();
+        throw new Error("boom");
+      });
+    } catch {
+      /* expected */
+    }
+
+    expect((await Topic.find(first.id)).approved).toBe(false);
   });
-  it.skip("no automatic savepoint for inner transaction", () => {
-    // Requires loaded fixtures (topics(1)) — fixture loader not available.
+  it("no automatic savepoint for inner transaction", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const first = await Topic.create({ title: "x", approved: false });
+
+    await Topic.transaction(async () => {
+      first.approved = true;
+      await first.saveBang();
+
+      try {
+        await Topic.transaction(async () => {
+          first.approved = false;
+          await first.saveBang();
+          throw new Error("boom");
+        });
+      } catch {
+        /* expected */
+      }
+    });
+
+    expect((await Topic.find(first.id)).approved).toBe(false);
   });
 });
 
@@ -1968,8 +2142,16 @@ describe("TransactionUUIDTest", () => {
     await defineSchema({ posts: { title: "string" } });
   });
 
-  it.skip("the uuid is lazily computed", () => {
-    // Requires access to private instance variable @uuid — not accessible in TS.
+  it("the uuid is lazily computed", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    await Post.transaction(async () => {
+      const txn = Post.currentTransaction();
+      expect((txn as any)._uuid).toBeNull();
+    });
   });
   it("the uuid for regular transactions is generated and memoized", async () => {
     class Post extends Base {

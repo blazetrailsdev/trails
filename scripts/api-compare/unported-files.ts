@@ -852,6 +852,17 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "single-database test environment.",
   },
   {
+    testFile: "transaction_instrumentation_test.rb",
+    tests: ["transaction instrumentation on failed rollback"],
+    reason:
+      "Rails gates this with `unless in_memory_db?` " +
+      "(transaction_instrumentation_test.rb:391). A failed DB rollback drives " +
+      "`@connection.throw_away!`, discarding the connection — for the in-memory " +
+      "SQLite database the canonical test adapter uses, that destroys the " +
+      "schema/data and breaks per-test fixture teardown, exactly the case Rails " +
+      "skips.",
+  },
+  {
     testFile: "database_selector_test.rb",
     tests: ["preventing writes works in a threaded environment"],
     reason:
