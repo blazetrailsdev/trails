@@ -8,8 +8,11 @@ export class Content extends Base {
 
   static {
     this.hasOne("contentPosition", { dependent: "destroy" });
-    this.beforeDestroy(function (this: Content) {
-      Content.destroyedIds.push(this.id as number);
+    this.beforeDestroy(function (this: Content, record?: Content) {
+      // Dependent-destroy cascade dispatches with the record as the first
+      // argument; `this` may be unbound on that path.
+      const self = (record ?? this) as Content;
+      Content.destroyedIds.push(self.id as number);
     });
   }
 }
@@ -38,8 +41,9 @@ export class ContentPosition extends Base {
 
   static {
     this.belongsTo("content", { dependent: "destroy" });
-    this.beforeDestroy(function (this: ContentPosition) {
-      ContentPosition.destroyedIds.push(this.id as number);
+    this.beforeDestroy(function (this: ContentPosition, record?: ContentPosition) {
+      const self = (record ?? this) as ContentPosition;
+      ContentPosition.destroyedIds.push(self.id as number);
     });
   }
 }

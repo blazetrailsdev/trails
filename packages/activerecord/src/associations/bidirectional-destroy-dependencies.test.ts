@@ -1,86 +1,62 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
-import { Associations, loadBelongsTo } from "../associations.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+/**
+ * Tests to increase Rails test coverage matching.
+ * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Mirrors associations/bidirectional_destroy_dependencies_test.rb — the
+ * mutually `dependent: :destroy` Content/ContentPosition pair. Rails declares
+ * `fixtures :content, :content_positions`; we mirror that with one
+ * `useHandlerFixtures` call seeding the canonical tables.
+ */
+import { describe, it, expect, beforeEach } from "vitest";
+import { registerModel } from "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import {
+  Content,
+  ContentPosition,
+  ContentWhichRequiresTwoDestroyCalls,
+} from "../test-helpers/models/content.js";
 
 describe("BidirectionalDestroyDependenciesTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      contents: { title: "string" },
-      content_positions: { content_id: "integer", position: "integer" },
-    });
+  useHandlerFixtures(["content", "contentPositions"], { schema: canonicalSchema });
+
+  registerModel(Content);
+  registerModel(ContentPosition);
+  registerModel(ContentWhichRequiresTwoDestroyCalls);
+
+  beforeEach(() => {
+    Content.destroyedIds.length = 0;
+    ContentPosition.destroyedIds.length = 0;
   });
 
-  function makeModels() {
-    class Content extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class ContentPosition extends Base {
-      static {
-        this.attribute("content_id", "integer");
-        this.attribute("position", "integer");
-      }
-    }
-    registerModel("Content", Content);
-    registerModel("ContentPosition", ContentPosition);
-    Associations.hasOne.call(Content, "contentPosition", {
-      className: "ContentPosition",
-      foreignKey: "content_id",
-      dependent: "destroy",
-    });
-    Associations.belongsTo.call(ContentPosition, "content", {
-      className: "Content",
-      foreignKey: "content_id",
-      dependent: "destroy",
-    });
-    return { Content, ContentPosition };
-  }
-
   it("bidirectional dependence when destroying item with belongs to association", async () => {
-    const { Content, ContentPosition } = makeModels();
-    const content = await Content.create({ title: "article" });
-    const contentPosition = await ContentPosition.create({ content_id: content.id, position: 1 });
-
-    const loadedContent = await loadBelongsTo(contentPosition, "content", {
-      className: "Content",
-      foreignKey: "content_id",
-    });
-    expect(loadedContent).not.toBeNull();
+    const contentPosition = await ContentPosition.find(1);
+    const content = await contentPosition.association("content").loadTarget();
+    expect(content).not.toBeNull();
 
     await contentPosition.destroy();
 
-    expect(await ContentPosition.count()).toBe(0);
-    expect(await Content.count()).toBe(0);
+    expect(ContentPosition.destroyedIds).toEqual([contentPosition.id]);
+    expect(Content.destroyedIds).toEqual([(content as Content).id]);
   });
 
   it("bidirectional dependence when destroying item with has one association", async () => {
-    const { Content, ContentPosition } = makeModels();
-    const content = await Content.create({ title: "article" });
-    await ContentPosition.create({ content_id: content.id, position: 1 });
+    const content = await Content.find(1);
+    const contentPosition = await content.association("contentPosition").loadTarget();
+    expect(contentPosition).not.toBeNull();
 
-    // Destroying the content should also destroy the position (dependent: destroy)
     await content.destroy();
-    expect(content.isDestroyed()).toBe(true);
-    expect(await ContentPosition.count()).toBe(0);
-    expect(await Content.count()).toBe(0);
+
+    expect(Content.destroyedIds).toEqual([content.id]);
+    expect(ContentPosition.destroyedIds).toEqual([(contentPosition as ContentPosition).id]);
   });
 
   it("bidirectional dependence when destroying item with has one association fails first time", async () => {
-    const { Content, ContentPosition } = makeModels();
-    const content = await Content.create({ title: "article" });
-    await ContentPosition.create({ content_id: content.id, position: 1 });
+    const content = await ContentWhichRequiresTwoDestroyCalls.find(1);
 
-    // First destroy attempt on content
     await content.destroy();
+    await content.destroy();
+
     expect(content.isDestroyed()).toBe(true);
-    // Both should be gone
-    expect(await Content.count()).toBe(0);
-    expect(await ContentPosition.count()).toBe(0);
   });
 });

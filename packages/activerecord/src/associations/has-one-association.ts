@@ -107,6 +107,14 @@ export class HasOneAssociation extends SingularAssociation {
         }
     }
 
+    // Rails' has_one `delete` never resets the inverse after a dependent
+    // destroy. When the target was destroyed (and thus frozen) — including the
+    // mutual `dependent: :destroy` cycle where it was already torn down on an
+    // outer frame — writing the inverse FK would raise FrozenError, so skip it.
+    if (typeof (target as any).isDestroyed === "function" && (target as any).isDestroyed()) {
+      return;
+    }
+
     super.replace(null);
   }
 

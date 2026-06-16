@@ -736,10 +736,20 @@ export async function destroy<T extends DestroyRecord>(this: T): Promise<T | fal
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
 
-  // Mirrors: ActiveRecord::Transactions#destroy
+  // Mirrors ActiveRecord::Callbacks#destroy's `@_destroy_callback_already_called`
+  // reentrancy guard: two records that `dependent: :destroy` each other (e.g.
+  // Content/ContentPosition) would recurse forever. Once a record's destroy is
+  // in flight, a cascade back into it short-circuits to success.
   const self = this as any;
-  const result = await withTransactionReturningStatus.call(self, () => self._destroyRow());
-  return result ? this : false;
+  if (self._destroyCallbackAlreadyCalled) return this;
+  self._destroyCallbackAlreadyCalled = true;
+  try {
+    // Mirrors: ActiveRecord::Transactions#destroy
+    const result = await withTransactionReturningStatus.call(self, () => self._destroyRow());
+    return result ? this : false;
+  } finally {
+    self._destroyCallbackAlreadyCalled = false;
+  }
 }
 
 /** Mirrors: ActiveRecord::Base#destroy! */
