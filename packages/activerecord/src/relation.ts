@@ -3066,14 +3066,20 @@ export class Relation<T extends Base> {
     const promotedIncludes = this._includesToPromoteFromReferences();
     const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
     const pendingLeftOuter = this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v));
-    if (pendingLeftOuter.length > 0) {
-      const jd = QueryMethodBangs.constructJoinDependency.call(
-        this as any,
-        pendingLeftOuter,
-        Nodes.OuterJoin,
-      );
-      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
-    }
+    // Build the left-outer JoinDependency once. When named INNER joins are also
+    // present it becomes a stashed join folded into the inner JD's
+    // join_constraints (Rails build_join_buckets: stashed_left_joins.unshift
+    // construct_join_dependency(left_joins, OuterJoin)), so an association joined
+    // both ways is deduped via `walk` to a single INNER JOIN. Otherwise it is
+    // emitted on its own as a LEFT OUTER JOIN.
+    const leftOuterJd =
+      pendingLeftOuter.length > 0
+        ? QueryMethodBangs.constructJoinDependency.call(
+            this as any,
+            pendingLeftOuter,
+            Nodes.OuterJoin,
+          )
+        : null;
     // Named INNER joins routed through JoinDependency (nested-through chains
     // needing AliasTracker self-join aliasing). Emitted as InnerJoin so they
     // produce the canonical `*_<owner>_join` aliases (mirrors Rails joins_values
@@ -3092,8 +3098,11 @@ export class Relation<T extends Base> {
       // because our where-hash keys resolve to the real table (not the reference
       // alias), so re-aliasing it would desync the WHERE from the JOIN. Deviation
       // tracked for convergence: RFC 0030 where-hash-keys-resolve-to-join-alias.
-      for (const node of jd.joinConstraints([], undefined, this._referencesValues, true))
+      const stashedLeft = leftOuterJd ? [leftOuterJd] : [];
+      for (const node of jd.joinConstraints(stashedLeft, undefined, this._referencesValues, true))
         manager.appendJoinNode(node);
+    } else if (leftOuterJd) {
+      for (const node of leftOuterJd.joinConstraints([])) manager.appendJoinNode(node);
     }
     // Cross-klass merged JoinDependencies (Rails merge_joins): already built
     // against the source relation's klass, so emit their constraints directly.
