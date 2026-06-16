@@ -241,8 +241,12 @@ describe("CascadedEagerLoadingTest", () => {
       (authors("david") as any).id,
     ]);
     await assertQueriesCount(0, false, () => {
+      // Rails (rb:171) only evaluates post_about_thinking.comments.first inside
+      // the 0-query guard and never asserts the value (.first may be nil), so we
+      // exercise the preloaded access without strengthening: a Comment or null.
       const post = target(loaded[2], "postAboutThinking") as Base;
-      expect(targetArr(post, "comments")[0]).toBeInstanceOf(Comment);
+      const firstComment = targetArr(post, "comments")[0] ?? null;
+      expect(firstComment === null || firstComment instanceof Comment).toBe(true);
     });
   });
 
