@@ -364,11 +364,20 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toMatch(/float.*"temperature".*limit/);
   });
 
-  it.skip("schema dump aliased types", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs type aliasing support */
+  it("schema dump aliased types", async () => {
+    await ctx.createTable("aliased_types", {}, (t) => {
+      t.blob("blob_data");
+      t.numeric("numeric_number");
+    });
+    try {
+      const output = SchemaDumper.dump(ctx);
+      expect(output).toMatch(/t\.binary\("blob_data"\)/);
+      expect(output).toMatch(/t\.decimal\("numeric_number"/);
+    } finally {
+      // Drop the bespoke table so it doesn't linger on the shared worker DB
+      // and perturb other files' schema-signature caching / scheduling.
+      await ctx.dropTable("aliased_types");
+    }
   });
   itIfSupports("expression_index", "schema dump expression indices", async () => {
     await ctx.createTable("users", {}, (t) => {
@@ -902,10 +911,11 @@ describe("SchemaDumperDefaultsTest", () => {
   });
 
   it.skip("schema dump with column infinity default", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Infinity default handling */
+    // BLOCKED: PG default-introspection path — float defaults arrive as the bare
+    // string "Infinity"/"NaN" (no ::cast), and datetime/date defaults are already
+    // rendered as the Ruby literal `::Float::INFINITY` via the OID type's
+    // typeCastForSchema, so the fix is not in cleanDefault. Tracked by
+    // c1-schema-dumper-pg-infinity-default (RFC 0030).
   });
 });
 
