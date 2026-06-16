@@ -130,10 +130,14 @@ export class InsertAll {
     // any inserts.empty? check) still fires on upsertAll([], { uniqueBy }).
     await this._populateUpdatableColumns();
     if (this.inserts.length === 0) return Result.empty();
-    // Mirrors Rails InsertAll#execute: route through exec_insert_all so the
-    // RETURNING rows are captured into an ActiveRecord::Result rather than
-    // discarded (executeMutation only reports the affected-row count).
-    return this.connection.execInsertAll(this.toSql());
+    // Mirrors Rails InsertAll#execute: build the log/instrumentation label
+    // ("Book Bulk Insert" / "Book Upsert") and route through exec_insert_all
+    // so the RETURNING rows are captured into an ActiveRecord::Result rather
+    // than discarded (executeMutation only reports the affected-row count).
+    let message = `${this.model.name} `;
+    if (this.inserts.length > 1) message += "Bulk ";
+    message += this.onDuplicate === "update" ? "Upsert" : "Insert";
+    return this.connection.execInsertAll(this.toSql(), message);
   }
 
   /**
