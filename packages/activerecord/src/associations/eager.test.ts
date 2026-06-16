@@ -16,7 +16,7 @@ import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
-import { assertNoQueries } from "../testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -2491,252 +2491,6 @@ describe("EagerAssociationTest", () => {
       className: "EagerHmtDiBook",
     });
     expect(books).toHaveLength(1);
-  });
-  it("eager with has many and limit", async () => {
-    class EagerHmLimitPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerHmLimitComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_hm_limit_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerHmLimitPost, "eagerHmLimitComments", {
-      className: "EagerHmLimitComment",
-      foreignKey: "eager_hm_limit_post_id",
-    });
-    registerModel("EagerHmLimitPost", EagerHmLimitPost);
-    registerModel("EagerHmLimitComment", EagerHmLimitComment);
-
-    const post = await EagerHmLimitPost.create({ title: "Post" });
-    await EagerHmLimitComment.create({
-      body: "c1",
-      eager_hm_limit_post_id: post.id,
-    });
-    await EagerHmLimitComment.create({
-      body: "c2",
-      eager_hm_limit_post_id: post.id,
-    });
-
-    const posts = await EagerHmLimitPost.all().includes("eagerHmLimitComments").toArray();
-    expect(posts).toHaveLength(1);
-    const comments = (posts[0] as any)._preloadedAssociations.get("eagerHmLimitComments");
-    expect(comments).toHaveLength(2);
-  });
-  it("eager with has many and limit and conditions", async () => {
-    class EagerHmCondPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerHmCondComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_hm_cond_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerHmCondPost, "eagerHmCondComments", {
-      className: "EagerHmCondComment",
-      foreignKey: "eager_hm_cond_post_id",
-    });
-    registerModel("EagerHmCondPost", EagerHmCondPost);
-    registerModel("EagerHmCondComment", EagerHmCondComment);
-
-    const post = await EagerHmCondPost.create({ title: "Post" });
-    await EagerHmCondComment.create({
-      body: "good",
-      eager_hm_cond_post_id: post.id,
-    });
-    await EagerHmCondComment.create({
-      body: "great",
-      eager_hm_cond_post_id: post.id,
-    });
-
-    const posts = await EagerHmCondPost.all().includes("eagerHmCondComments").toArray();
-    expect(posts).toHaveLength(1);
-    const comments = (posts[0] as any)._preloadedAssociations.get("eagerHmCondComments");
-    expect(comments).toHaveLength(2);
-  });
-  it("eager with has many and limit and conditions array", async () => {
-    class EagerHmLcaPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerHmLcaComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_hm_lca_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerHmLcaPost, "eagerHmLcaComments", {
-      className: "EagerHmLcaComment",
-      foreignKey: "eager_hm_lca_post_id",
-    });
-    registerModel("EagerHmLcaPost", EagerHmLcaPost);
-    registerModel("EagerHmLcaComment", EagerHmLcaComment);
-    const post = await EagerHmLcaPost.create({ title: "P" });
-    await EagerHmLcaComment.create({ body: "c1", eager_hm_lca_post_id: post.id });
-    await EagerHmLcaComment.create({ body: "c2", eager_hm_lca_post_id: post.id });
-    const posts = await EagerHmLcaPost.all().includes("eagerHmLcaComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerHmLcaComments")).toHaveLength(2);
-  });
-  it("eager with has many and limit and conditions array on the eagers", async () => {
-    class EagerHmLcePost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerHmLceComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_hm_lce_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerHmLcePost, "eagerHmLceComments", {
-      className: "EagerHmLceComment",
-      foreignKey: "eager_hm_lce_post_id",
-    });
-    registerModel("EagerHmLcePost", EagerHmLcePost);
-    registerModel("EagerHmLceComment", EagerHmLceComment);
-    const post = await EagerHmLcePost.create({ title: "P" });
-    await EagerHmLceComment.create({ body: "c1", eager_hm_lce_post_id: post.id });
-    const posts = await EagerHmLcePost.all().includes("eagerHmLceComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerHmLceComments")).toHaveLength(1);
-  });
-  it("eager with has many and limit and high offset", async () => {
-    class EagerHmHoPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerHmHoComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_hm_ho_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerHmHoPost, "eagerHmHoComments", {
-      className: "EagerHmHoComment",
-      foreignKey: "eager_hm_ho_post_id",
-    });
-    registerModel("EagerHmHoPost", EagerHmHoPost);
-    registerModel("EagerHmHoComment", EagerHmHoComment);
-    const post = await EagerHmHoPost.create({ title: "P" });
-    await EagerHmHoComment.create({ body: "c1", eager_hm_ho_post_id: post.id });
-    await EagerHmHoComment.create({ body: "c2", eager_hm_ho_post_id: post.id });
-    await EagerHmHoComment.create({ body: "c3", eager_hm_ho_post_id: post.id });
-    // With high offset, the main query still returns the post, and includes loads all children
-    const posts = await EagerHmHoPost.all().includes("eagerHmHoComments").toArray();
-    expect(posts).toHaveLength(1);
-    expect((posts[0] as any)._preloadedAssociations.get("eagerHmHoComments")).toHaveLength(3);
-  });
-  it("eager with has many and limit and high offset and multiple array conditions", async () => {
-    class EagerHmHoacPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerHmHoacComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_hm_hoac_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerHmHoacPost, "eagerHmHoacComments", {
-      className: "EagerHmHoacComment",
-      foreignKey: "eager_hm_hoac_post_id",
-    });
-    registerModel("EagerHmHoacPost", EagerHmHoacPost);
-    registerModel("EagerHmHoacComment", EagerHmHoacComment);
-    const post = await EagerHmHoacPost.create({ title: "P" });
-    await EagerHmHoacComment.create({
-      body: "c1",
-      eager_hm_hoac_post_id: post.id,
-    });
-    const posts = await EagerHmHoacPost.all().includes("eagerHmHoacComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerHmHoacComments")).toHaveLength(1);
-  });
-  it("eager with has many and limit and high offset and multiple hash conditions", async () => {
-    class EagerHmHohcPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerHmHohcComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_hm_hohc_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerHmHohcPost, "eagerHmHohcComments", {
-      className: "EagerHmHohcComment",
-      foreignKey: "eager_hm_hohc_post_id",
-    });
-    registerModel("EagerHmHohcPost", EagerHmHohcPost);
-    registerModel("EagerHmHohcComment", EagerHmHohcComment);
-    const post = await EagerHmHohcPost.create({ title: "P" });
-    await EagerHmHohcComment.create({
-      body: "c1",
-      eager_hm_hohc_post_id: post.id,
-    });
-    await EagerHmHohcComment.create({
-      body: "c2",
-      eager_hm_hohc_post_id: post.id,
-    });
-    const posts = await EagerHmHohcPost.all().includes("eagerHmHohcComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerHmHohcComments")).toHaveLength(2);
-  });
-  it("count eager with has many and limit and high offset", async () => {
-    class EagerCntHoPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerCntHoComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_cnt_ho_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerCntHoPost, "eagerCntHoComments", {
-      className: "EagerCntHoComment",
-      foreignKey: "eager_cnt_ho_post_id",
-    });
-    registerModel("EagerCntHoPost", EagerCntHoPost);
-    registerModel("EagerCntHoComment", EagerCntHoComment);
-    const post = await EagerCntHoPost.create({ title: "P" });
-    await EagerCntHoComment.create({ body: "c1", eager_cnt_ho_post_id: post.id });
-    await EagerCntHoComment.create({ body: "c2", eager_cnt_ho_post_id: post.id });
-    // Count should work independently of includes
-    const count = await EagerCntHoPost.all().count();
-    expect(count).toBe(1);
-  });
-  it("eager with has many and limit with no results", async () => {
-    class EagerNoResPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EagerNoResComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_no_res_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(EagerNoResPost, "eagerNoResComments", {
-      className: "EagerNoResComment",
-      foreignKey: "eager_no_res_post_id",
-    });
-    registerModel("EagerNoResPost", EagerNoResPost);
-    registerModel("EagerNoResComment", EagerNoResComment);
-
-    // No posts at all
-    const posts = await EagerNoResPost.all().includes("eagerNoResComments").toArray();
-    expect(posts).toHaveLength(0);
   });
   it.skip("eager count performed on a has many association with multi table conditional", () => {
     // BLOCKED: associations — eager-loading feature gap
@@ -5663,6 +5417,112 @@ describe("EagerAssociationTest", () => {
     await assertNoQueries(false, () => {
       expect(loaded[0].association("post").target).toBeDefined();
     });
+  });
+
+  it("eager with has many and limit", async () => {
+    const loaded = await Post.all()
+      .order("posts.id asc")
+      .includes("author", "comments")
+      .limit(2)
+      .toArray();
+    expect(loaded).toHaveLength(2);
+    const sum = loaded.reduce(
+      (acc, post) => acc + (post.association("comments").target as Base[]).length,
+      0,
+    );
+    expect(sum).toBe(3);
+  });
+
+  it("eager with has many and limit and conditions", async () => {
+    const loaded = await Post.all()
+      .includes("author", "comments")
+      .limit(2)
+      .where("posts.body = 'hello'")
+      .order("posts.id")
+      .toArray();
+    expect(loaded).toHaveLength(2);
+    expect(loaded.map((post) => post.id)).toEqual([4, 5]);
+  });
+
+  it("eager with has many and limit and conditions array", async () => {
+    const loaded = await Post.all()
+      .includes("author", "comments")
+      .limit(2)
+      .where("posts.body = ?", "hello")
+      .order("posts.id")
+      .toArray();
+    expect(loaded).toHaveLength(2);
+    expect(loaded.map((post) => post.id)).toEqual([4, 5]);
+  });
+
+  it("eager with has many and limit and conditions array on the eagers", async () => {
+    const david = authors("david").name;
+    const posts = await Post.includes("author", "comments")
+      .limit(2)
+      .references("author")
+      .where("authors.name = ?", david)
+      .toArray();
+    expect(posts).toHaveLength(2);
+
+    const count = await Post.includes("author", "comments")
+      .limit(2)
+      .references("author")
+      .where("authors.name = ?", david)
+      .count();
+    expect(count).toBe(posts.length);
+  });
+
+  it("eager with has many and limit and high offset", async () => {
+    const posts = await Post.all()
+      .includes("author", "comments")
+      .limit(2)
+      .offset(10)
+      .where({ "authors.name": "David" })
+      .toArray();
+    expect(posts).toHaveLength(0);
+  });
+
+  it("eager with has many and limit and high offset and multiple array conditions", async () => {
+    await assertQueriesCount(1, false, async () => {
+      const posts = await Post.references("authors", "comments")
+        .includes("author", "comments")
+        .limit(2)
+        .offset(10)
+        .where("authors.name = ? and comments.body = ?", authors("david").name, "go wild")
+        .toArray();
+      expect(posts).toHaveLength(0);
+    });
+  });
+
+  it("eager with has many and limit and high offset and multiple hash conditions", async () => {
+    await assertQueriesCount(1, false, async () => {
+      const posts = await Post.all()
+        .includes("author", "comments")
+        .limit(2)
+        .offset(10)
+        .where({ "authors.name": "David", "comments.body": "go wild" })
+        .toArray();
+      expect(posts).toHaveLength(0);
+    });
+  });
+
+  it("count eager with has many and limit and high offset", async () => {
+    const count = await Post.all()
+      .includes("author", "comments")
+      .limit(2)
+      .offset(10)
+      .where({ "authors.name": "David" })
+      .count("*");
+    expect(count).toBe(0);
+  });
+
+  it("eager with has many and limit with no results", async () => {
+    const posts = await Post.all()
+      .includes("author", "comments")
+      .limit(2)
+      .where("posts.title = 'magic forest'")
+      .toArray();
+    expect(posts).toHaveLength(0);
   });
 });
 

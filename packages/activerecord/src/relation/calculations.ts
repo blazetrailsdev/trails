@@ -655,7 +655,7 @@ export async function performCount(
             for (const node of jdOuter.joinConstraints([])) countManager.appendJoinNode(node);
           }
           this._applyJoinsToManager(countManager);
-          countManager.where(table.get(pk).in(new Nodes.SqlLiteral(innerSql)));
+          countManager.where(table.get(pk).in({ ast: new Nodes.SqlLiteral(innerSql) }));
           const [countSql, countOwnBinds] = compileManagerWithBinds(this, countManager);
           const [withCtes, ctedBinds] = prependCtes(this, countSql, [
             ...allIdBinds,
