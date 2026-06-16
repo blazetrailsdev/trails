@@ -1801,14 +1801,34 @@ describe("TransactionTest", () => {
       ).rejects.toThrow("Expected");
     });
   });
-  it.skip("accessing raw connection materializes transaction", () => {
-    // No rawConnection API exposed.
+  it("accessing raw connection materializes transaction", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+      await Topic.transaction(async () => {
+        await adapter.rawConnection();
+      });
+    });
   });
-  it.skip("accessing raw connection disables lazy transactions", () => {
-    // No rawConnection API exposed.
+  it("accessing raw connection disables lazy transactions", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    await adapter.rawConnection();
+    // Lazy transactions disabled: the otherwise-empty transaction now
+    // eagerly materializes, emitting BEGIN/COMMIT.
+    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+      await Topic.transaction(async () => {});
+    });
   });
-  it.skip("checking in connection reenables lazy transactions", () => {
-    // No rawConnection / check-in API exposed at this level.
+  it("checking in connection reenables lazy transactions", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    await adapter.rawConnection();
+    // Mirrors `Topic.connection_pool.checkin`: the pool runs the `:checkin`
+    // callbacks (one of which is enable_lazy_transactions!) around `expire`.
+    // A standalone adapter has no pool, so drive the callbacks directly.
+    adapter._runCheckinCallbacks(() => {});
+    // Lazy transactions re-enabled: the empty transaction emits no queries.
+    await assertNoQueries(false, async () => {
+      await Topic.transaction(async () => {});
+    });
   });
 });
 

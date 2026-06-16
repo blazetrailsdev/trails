@@ -1435,8 +1435,21 @@ export class AbstractAdapter implements Quoting {
     return true;
   }
 
-  get rawConnection(): AbstractAdapter | null {
-    return this._connection;
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#raw_connection
+   * (abstract_adapter.rb). Materializes any pending transaction and disables
+   * lazy transactions for this connection, marking it `_rawConnectionDirty` so
+   * the `:checkin` callback re-enables lazy transactions when the connection
+   * returns to the pool. Async because materialization runs `BEGIN` SQL —
+   * Rails' `raw_connection` is synchronous, but the trails transaction manager
+   * materializes through an async path.
+   */
+  async rawConnection(): Promise<AbstractAdapter | null> {
+    return this.withRawConnection(async (conn) => {
+      await this.disableLazyTransactionsBang();
+      this._rawConnectionDirty = true;
+      return conn;
+    });
   }
 
   // --- Config accessors ---
