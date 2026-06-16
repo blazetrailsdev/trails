@@ -788,6 +788,12 @@ export function loadSchema(this: SchemaHost): void {
  * column set: skip any sibling that has its own `ignoredColumns` (whose
  * schema-sourced defs `applyColumnsHash` already removed), or the borrower
  * would silently inherit the sibling's ignores and be missing columns.
+ *
+ * Recovery is therefore best-effort: when every loaded same-table sibling
+ * declares its own `ignoredColumns`, this returns null and `loadSchema` falls
+ * back to the empty synthesize (the original un-qualified-projection behavior).
+ * That is the conservative choice — better to under-recover than to silently
+ * drop columns the borrowing model does not ignore.
  */
 function borrowSameTableColumns(host: SchemaHost): Map<string, unknown> | null {
   const registry = (host as unknown as { _modelsByName?: Map<string, typeof Base> })._modelsByName;
