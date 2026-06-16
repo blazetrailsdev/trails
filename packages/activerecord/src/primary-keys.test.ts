@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { SchemaDumper } from "./schema-dumper.js";
+import { MissingAttributeError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
@@ -311,12 +312,19 @@ describe("PrimaryKeysTest", () => {
     await expect(AnonDashboard.createBang({ dashboard_id: "q-1" } as any)).resolves.not.toThrow();
   });
 
-  it.skip("assign id raises error if primary key doesnt exist", () => {
-    // BLOCKED: for a no-PK table (dashboards: primaryKey false) the class primaryKey
-    // resolves to null, but instance `id=` silently no-ops/writes instead of raising
-    // ActiveModel::MissingAttributeError. setId writes through to _writeAttribute with a
-    // null/absent column rather than validating the attribute exists.
-    // Tracked: RFC 0030 cc-id-setter-missing-attribute.
+  it("assign id raises error if primary key doesnt exist", async () => {
+    // Rails: anonymous class for dashboards (no id col) → id= raises MissingAttributeError
+    class AnonDashboard extends Base {
+      static {
+        this._tableName = "dashboards";
+      }
+    }
+    await AnonDashboard.loadSchema();
+    expect(AnonDashboard.primaryKey).toBe(null);
+    const dashboard = new AnonDashboard();
+    expect(() => {
+      (dashboard as any).id = "1";
+    }).toThrow(MissingAttributeError);
   });
 
   it("reconfiguring primary key resets composite primary key", () => {

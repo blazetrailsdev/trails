@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
 import { underscore } from "@blazetrails/activesupport";
+import { MissingAttributeError } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "../attribute-methods.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
@@ -112,7 +113,14 @@ export function getId(this: PrimaryKeyInstance): unknown {
  */
 export function setId(this: PrimaryKeyInstance, value: unknown): void {
   const ctor = this.constructor as any;
-  const pk = ctor.primaryKey as string | string[];
+  const pk = ctor.primaryKey as string | string[] | null;
+  if (pk == null) {
+    // Rails: `_write_attribute(@primary_key, value)` with a nil primary key
+    // routes through the AttributeSet's Null attribute, which raises
+    // MissingAttributeError("can't write unknown attribute `#{name}`"). The nil
+    // pk interpolates to an empty name, so the backticks are empty here too.
+    throw new MissingAttributeError("can't write unknown attribute ``");
+  }
   if (Array.isArray(pk)) {
     if (!Array.isArray(value)) {
       throw new TypeError(
