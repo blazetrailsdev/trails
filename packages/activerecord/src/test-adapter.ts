@@ -23,6 +23,7 @@ import {
 } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { Base } from "./base.js";
+import { getEnv } from "@blazetrails/activesupport";
 
 // process.env.PG_TEST_URL / MYSQL_TEST_URL are already worker-scoped by
 // test-setup-worker-db.ts (a setupFile that runs before this module loads).
@@ -35,6 +36,26 @@ export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
   : MYSQL_TEST_URL
     ? "mysql"
     : "sqlite";
+
+/**
+ * Mirror of Rails' `in_memory_db?`
+ * (activerecord/test/support/adapter_helper.rb:13): `current_adapter?(:SQLite3Adapter)
+ * && db_config.database == ":memory:"`.
+ *
+ * The `db_config.database` analog here is the `database` field of the
+ * `DatabaseConfigurations` entry built in `test-helpers/test-database-config.ts`,
+ * which is `AR_TEST_WORKER_DB ?? ":memory:"` — i.e. literally `":memory:"` on the
+ * default lane and a real on-disk clone path when a per-worker template exists.
+ * So `!AR_TEST_WORKER_DB` is exactly `db_config.database == ":memory:"`.
+ *
+ * (Note: the pool's *physical* connection URI from `_pooledSqliteDatabase()` —
+ * `file:…?mode=memory&cache=shared` — is trails' mechanism for sharing that one
+ * `:memory:` database across the pool's connections; it is not the configured
+ * `database` value Rails compares, so it is not what this gate keys on.)
+ */
+export function inMemoryDb(): boolean {
+  return adapterType === "sqlite" && !getEnv("AR_TEST_WORKER_DB");
+}
 
 // --- Connection pool infrastructure -----------------------------------------
 //
