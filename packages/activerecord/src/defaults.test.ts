@@ -7,6 +7,13 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 
+import {
+  describeIfMysql,
+  isMariaDb,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./adapters/abstract-mysql-adapter/test-helper.js";
+import type { TableDefinition as MysqlTableDefinition } from "./connection-adapters/mysql/schema-definitions.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -167,10 +174,62 @@ describe("DefaultTest", () => {
   });
 });
 
-describe("DefaultsTestWithoutTransactionalFixtures", () => {
-  it.skip("mysql not null defaults non strict", () => {
-    // BLOCKED: adapter-mysql — strict-mode toggle via `establish_connection` not supported in test harness.
-    // ROOT-CAUSE: we have no way to reconfigure MySQL strict_mode per-connection in tests.
+// Rails gates these on `current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` and
+// runs them with `use_transactional_tests = false` (MySQL DDL is non-transactional).
+// We mirror that by building the table directly through a dedicated adapter and
+// dropping it afterwards rather than wrapping the body in a fixture transaction.
+describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
+  // Rails' `using_strict(false)` re-establishes the shared connection with
+  // `strict: false`; we instead build a dedicated non-strict adapter (mirroring
+  // the connection.test.ts "mysql strict mode disabled" pattern) so the shared
+  // lane connection is left untouched. `with_mysql_not_null_table` is folded in.
+  async function withMysqlNotNullDefaults(
+    strict: boolean,
+    fn: (klass: typeof Base) => Promise<void>,
+  ): Promise<void> {
+    const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict });
+    const tableName = "test_mysql_not_null_defaults";
+    try {
+      await adapter.createTable(tableName, { force: true }, (t) => {
+        const td = t as MysqlTableDefinition;
+        td.integer("non_null_integer", { null: false });
+        td.string("non_null_string", { null: false });
+        td.text("non_null_text", { null: false });
+        td.blob("non_null_blob", { null: false });
+      });
+      class NotNullDefaults extends Base {
+        static override tableName = tableName;
+      }
+      NotNullDefaults.adapter = adapter;
+      await NotNullDefaults.loadSchema();
+      await fn(NotNullDefaults);
+    } finally {
+      await adapter.dropTable(tableName).catch(() => {});
+      await adapter.close();
+    }
+  }
+
+  // Skipped on MariaDB: with `partial_inserts = false` (Rails 7.0 default) a blank
+  // record INSERTs explicit NULLs for every NOT NULL column. Real MySQL coerces
+  // those to the implicit default (0 / "") in non-strict mode, but MariaDB rejects
+  // an explicit NULL into a NOT NULL column with ER_BAD_NULL_ERROR even when
+  // non-strict — so this assertion only holds on the mysql:8 lane.
+  it.skipIf(isMariaDb)("mysql not null defaults non strict", async () => {
+    await withMysqlNotNullDefaults(false, async (klass) => {
+      const record = new (klass as any)();
+      expect(record.non_null_integer).toBeNull();
+      expect(record.non_null_string).toBeNull();
+      expect(record.non_null_text).toBeNull();
+      expect(record.non_null_blob).toBeNull();
+
+      await record.saveBang();
+      await record.reload();
+
+      expect(record.non_null_integer).toBe(0);
+      expect(record.non_null_string).toBe("");
+      expect(record.non_null_text).toBe("");
+      expect(record.non_null_blob).toBe("");
+    });
   });
   it.skip("mysql not null defaults strict", () => {
     // BLOCKED: adapter-mysql — strict-mode toggle via `establish_connection` not supported in test harness.
