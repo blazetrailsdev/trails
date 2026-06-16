@@ -34,6 +34,7 @@
     "fixture-baseline:refresh": "pnpm test:deps >/dev/null && pnpm tsx scripts/test-deps/build-fixture-baseline.ts",
     "fixture-parity-baseline:refresh": "pnpm tsx scripts/generate-fixture-parity-exclude.ts",
     "test:stubs": "pnpm test:compare -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
+    "prestats:sync": "tsc --build packages/activerecord",
     "stats:sync": "pnpm tsx scripts/sync-stats/sync.ts",
     "parity:validate": "ajv compile -s scripts/parity/canonical/schema.schema.json -s scripts/parity/canonical/query.schema.json --spec=draft2020",
     "parity:schema": "pnpm tsx scripts/parity/run.ts --type=schema",

@@ -32,10 +32,14 @@ send_alert() {
 }
 
 run_sync() {
+  # Go through the `stats:sync` npm script (not `tsx sync.ts` directly) so the
+  # `prestats:sync` hook builds @blazetrails/activerecord's dist/ first — the
+  # script imports adapters from that gitignored build artifact and crashes
+  # with MODULE_NOT_FOUND when it's missing or stale.
   if command -v pnpm >/dev/null 2>&1; then
-    pnpm tsx scripts/sync-stats/sync.ts --latest
+    pnpm stats:sync --latest
   else
-    npx tsx scripts/sync-stats/sync.ts --latest
+    npx tsc --build packages/activerecord && npx tsx scripts/sync-stats/sync.ts --latest
   fi
 }
 
