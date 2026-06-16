@@ -40,6 +40,7 @@ import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
+import { assertQueriesCount } from "../testing/query-assertions.js";
 
 const TEST_SCHEMA: Schema = {
   firms: { name: "string" },
@@ -1091,29 +1092,10 @@ describe("HasOneAssociationsTest", () => {
     expect(loaded).toBeNull();
   });
 
-  it("has one assignment dont trigger save on change of same object", async () => {
-    // Assigning the same FK value should not mark the record as changed
-    const firm = await Firm.create({ name: "SameObj Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
-    const originalLimit = account.credit_limit;
-    // Re-assign same FK — no actual change
-    account.firm_id = firm.id;
-    await account.save();
-    const reloaded = await Account.find(account.id as number);
-    expect(reloaded.credit_limit).toBe(originalLimit);
-    expect(reloaded.firm_id).toBe(firm.id);
-  });
-
-  it("has one assignment triggers save on change on replacing object", async () => {
-    // When the FK is changed to a different firm, saving persists the change
-    const firm1 = await Firm.create({ name: "Replace1" });
-    const firm2 = await Firm.create({ name: "Replace2" });
-    const account = await Account.create({ firm_id: firm1.id, credit_limit: 100 });
-    account.firm_id = firm2.id;
-    await account.save();
-    const reloaded = await Account.find(account.id as number);
-    expect(reloaded.firm_id).toBe(firm2.id);
-  });
+  // "has one assignment dont trigger save on change of same object" and "has one
+  // assignment triggers save on change on replacing object" are implemented
+  // faithfully against the canonical Pirate/Ship models + fixtures in the
+  // HasOneAssociationsCanonicalTest block at end of file.
 
   it.skip("has one autosave with primary key manually set", () => {
     // BLOCKED: associations — has-one feature gap
@@ -1518,8 +1500,47 @@ registerModel(Bulb);
 registerModel(Pirate);
 registerModel(Ship);
 
-describe("HasOneAssociationsCanonicalTest", () => {
+// Canonical-model block: shares the Rails `HasOneAssociationsTest` class name so
+// `test:compare` matches these tests to their Rails counterparts. Kept as a
+// separate describe because it wires real Car/Bulb/Pirate/Ship fixtures via
+// `useHandlerFixtures`, which the bespoke block above cannot mix in.
+describe("HasOneAssociationsTest", () => {
   useHandlerFixtures(["cars", "bulbs", "pirates", "ships", "parrots"]);
+
+  it("has one assignment dont trigger save on change of same object", async () => {
+    const pirate = await Pirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    const ship = (pirate.association("ship") as any).build({ name: "old name" });
+    await ship.save();
+
+    ship.name = "new name";
+    expect((ship as any).changed).toBe(true);
+    await assertQueriesCount(3, false, async () => {
+      // One query for updating name, not triggering query for updating pirate_id
+      (pirate.association("ship") as any).writer(ship);
+      await pirate.save();
+    });
+
+    expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
+  });
+
+  it("has one assignment triggers save on change on replacing object", async () => {
+    const pirate = await Pirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    const ship = (pirate.association("ship") as any).build({ name: "old name" });
+    await ship.save();
+
+    const newShip = await Ship.create({ name: "new name" });
+    await assertQueriesCount(4, false, async () => {
+      // One query to nullify the old ship, one query to update the new ship
+      (pirate.association("ship") as any).writer(newShip);
+      await pirate.save();
+    });
+
+    expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
+  });
 
   it.skip("association keys bypass attribute protection", () => {
     // BLOCKED: the canonical Bulb model's after_create / color= callbacks call

@@ -113,12 +113,14 @@ export class HasOneAssociation extends SingularAssociation {
   protected override replace(record: Base | null, save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const assigningAnother = this.target !== record;
-    if (assigningAnother || (record as any)?.hasChangesToSave?.()) {
+    if (assigningAnother || (record as any)?.hasChangesToSave) {
       if (record) {
         this.setOwnerAttributes(record);
         this.setInverseInstance(record);
       }
       if (save && (this.owner as any).isPersisted?.()) {
+        // The record currently associated (about to be displaced by `record`).
+        const displaced = this.target;
         if (this._pendingReplace) {
           // Only clear on a true revert: a different-record assignment being set back.
           // Same-record (dirty) assignments must not clear even if record === previousTarget.
@@ -126,11 +128,22 @@ export class HasOneAssociation extends SingularAssociation {
             this._pendingReplace.previousTarget !== this._pendingReplace.record;
           if (wasAssignedAnother && record === this._pendingReplace.previousTarget) {
             this._pendingReplace = null;
+          } else if (displaced && (displaced as any).isPersisted?.() && displaced !== record) {
+            // The previously-pending record was persisted independently (e.g.
+            // built then saved directly), so it is now the real associated
+            // record being displaced and must have its FK nullified. This case
+            // arises because our `setNewRecord` calls `replace(record)` with the
+            // default `save=true` (Rails passes `false`), so `build` leaves a
+            // `_pendingReplace` with `previousTarget: null`; a later `writer`
+            // for a different record must promote the now-persisted built record
+            // to `previousTarget`. Exercised by "has one assignment triggers
+            // save on change on replacing object".
+            this._pendingReplace = { record, previousTarget: displaced };
           } else {
             this._pendingReplace.record = record;
           }
         } else {
-          this._pendingReplace = { record, previousTarget: this.target };
+          this._pendingReplace = { record, previousTarget: displaced };
         }
       }
     }
@@ -245,27 +258,40 @@ export class HasOneAssociation extends SingularAssociation {
 }
 
 /** @internal */
-function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<void> {
+async function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<void> {
   const target = assoc.target as Base | null;
-  if (!target) return Promise.resolve();
-  if (method === "delete") return (target as any).delete?.() ?? Promise.resolve();
+  if (!target) return;
+  if (method === "delete") {
+    await ((target as any).delete?.() ?? Promise.resolve());
+    return;
+  }
   if (method === "destroy") {
     // Mirrors Rails HasOneAssociation#remove_target!: tag the record with the
     // association that is destroying it (so its own destroy callbacks can read
     // `destroyed_by_association`) before destroying, and only destroy when the
     // record is actually persisted.
     (target as any).destroyedByAssociation = assoc.reflection;
-    if (target.isPersisted()) return (target as any).destroy?.() ?? Promise.resolve();
-    return Promise.resolve();
+    if (target.isPersisted()) await ((target as any).destroy?.() ?? Promise.resolve());
+    return;
   }
-  if (method === "nullify") {
-    if (target.isPersisted()) {
-      (assoc as any).nullifyOwnerAttributes(target);
-      return (target as any).save?.() ?? Promise.resolve();
+  // Mirrors Rails HasOneAssociation#remove_target!'s `else` branch (no
+  // `dependent`, or `:nullify`): drop the foreign key on the previously
+  // associated record, clear the inverse, and save it. A plain replacement
+  // always nullifies the old record's FK; the `dependent` option only governs
+  // the owner-destroy path. A failed nullify-save aborts the replacement.
+  (assoc as any).nullifyOwnerAttributes(target);
+  assoc.removeInverseInstance(target);
+  if (target.isPersisted() && (assoc.owner as any).isPersisted?.()) {
+    const saved = await ((target as any).save?.() ?? Promise.resolve(true));
+    if (saved === false) {
+      (assoc as any).setOwnerAttributes(target);
+      throw new RecordNotSaved(
+        `Failed to remove the existing associated ${assoc.reflection.name}. ` +
+          `The record failed to save after its foreign key was set to nil.`,
+        target,
+      );
     }
-    return Promise.resolve();
   }
-  return Promise.resolve();
 }
 
 /** @internal */
