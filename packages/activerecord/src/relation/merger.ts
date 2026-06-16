@@ -97,9 +97,6 @@ export class Merger {
       this.other._joinClauses ?? [];
     if (clauses.length > 0) rel._joinClauses.push(...clauses);
     if (this.other._joinValues?.length > 0) rel._joinValues.push(...this.other._joinValues);
-    for (const v of this.other._leftOuterJoinsValues ?? []) {
-      if (!rel._leftOuterJoinsValues.includes(v)) rel._leftOuterJoinsValues.push(v);
-    }
     // Rails merge_joins (merger.rb): when other.klass == relation.klass the
     // association names union directly into joins_values; otherwise Merger builds
     // a single InnerJoin JoinDependency against other.klass and stashes it. We
@@ -122,13 +119,26 @@ export class Merger {
     rel._namedInnerJoinDeps.push(...(this.other._namedInnerJoinDeps ?? []));
   }
 
-  private mergeOuterJoins(_rel: any): void {
-    // Same-model left outer join associations are merged in mergeJoins above via
-    // _leftOuterJoinsValues. Rails' merge_outer_joins also handles a cross-model
-    // path (partitions associations, calls left_outer_joins! on a new JoinDependency)
-    // which is not yet implemented here — Arel::Nodes::OuterJoin is the join type
-    // used in that cross-model path.
-    void Nodes.OuterJoin;
+  // Mirrors Rails merge_outer_joins (merger.rb): when other.klass == relation.klass
+  // the left_outer_joins association names union directly; otherwise Merger builds a
+  // single OuterJoin JoinDependency against other.klass (the names can't resolve on
+  // the receiver's model) and stashes it via left_outer_joins!. We mirror both:
+  // same-klass names fold into _leftOuterJoinsValues; cross-klass names build a
+  // JoinDependency on `other` stashed in _leftOuterJoinDeps.
+  private mergeOuterJoins(rel: any): void {
+    const otherLeft: unknown[] = this.other._leftOuterJoinsValues ?? [];
+    const sameKlass = this.other._modelClass === rel._modelClass;
+    if (sameKlass) {
+      for (const v of otherLeft) {
+        if (!rel._leftOuterJoinsValues.includes(v)) rel._leftOuterJoinsValues.push(v);
+      }
+    } else if (otherLeft.length > 0) {
+      rel._leftOuterJoinDeps.push(
+        constructJoinDependency.call(this.other, otherLeft as any, Nodes.OuterJoin),
+      );
+    }
+    // Carry forward any cross-klass dependencies the source already accumulated.
+    rel._leftOuterJoinDeps.push(...(this.other._leftOuterJoinDeps ?? []));
   }
 
   private mergeMultiValues(rel: any): void {

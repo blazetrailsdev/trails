@@ -161,6 +161,10 @@ interface QueryMethodsHost {
   // merge_joins builds these against `other.klass`); emitted via joinConstraints
   // and walked for klass lookups alongside _namedInnerJoins.
   _namedInnerJoinDeps: JoinDependency[];
+  // Pre-built OuterJoin JoinDependencies from a cross-klass merge (Rails
+  // merge_outer_joins builds these against `other.klass`); emitted via
+  // joinConstraints with OuterJoin type.
+  _leftOuterJoinDeps: JoinDependency[];
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
   _eagerLoadAssociations: AssociationSpec[];
@@ -2397,6 +2401,7 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
   // Cross-klass merged dependencies carry their own nodes (built on the source
   // relation's klass); include them so table-klass / cast-type lookups see them.
   if (this._namedInnerJoinDeps.length > 0) stashedJoins.push(...this._namedInnerJoinDeps);
+  if (this._leftOuterJoinDeps.length > 0) stashedJoins.push(...this._leftOuterJoinDeps);
   return stashedJoins;
 }
 
@@ -2576,7 +2581,8 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     this._eagerLoadAssociations.length > 0 ||
     this._leftOuterJoinsValues.length > 0 ||
     this._namedInnerJoins.length > 0 ||
-    this._namedInnerJoinDeps.length > 0;
+    this._namedInnerJoinDeps.length > 0 ||
+    this._leftOuterJoinDeps.length > 0;
   if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;
 
   const buckets = buildJoinBuckets.call(this);
@@ -2635,6 +2641,12 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // Cross-klass merged JoinDependencies (Rails merge_joins): already built
   // against the source relation's klass, so emit their constraints directly.
   for (const jd of this._namedInnerJoinDeps) {
+    for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
+  }
+
+  // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
+  // built against the source relation's klass with OuterJoin type, emitted directly.
+  for (const jd of this._leftOuterJoinDeps) {
     for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
   }
 
