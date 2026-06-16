@@ -115,12 +115,11 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
   if (pk == null) {
-    // Rails: `_write_attribute(self.class.primary_key, value)` with a nil
-    // primary key writes through to an unknown attribute, which the attribute
-    // set rejects. Mirror that for a key-less table (e.g. a view).
-    throw new MissingAttributeError(
-      `can't write unknown attribute 'id' for ${ctor.name ?? "unknown"}`,
-    );
+    // Rails: `_write_attribute(@primary_key, value)` with a nil primary key
+    // routes through the AttributeSet's Null attribute, which raises
+    // MissingAttributeError("can't write unknown attribute `#{name}`"). Mirror
+    // that for a key-less table (e.g. a view), interpolating the nil pk.
+    throw new MissingAttributeError(`can't write unknown attribute \`${pk ?? ""}\``);
   }
   if (Array.isArray(pk)) {
     if (!Array.isArray(value)) {
