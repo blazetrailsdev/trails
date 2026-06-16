@@ -671,6 +671,12 @@ export async function performCount(
             for (const node of jdOuter.joinConstraints([])) countManager.appendJoinNode(node);
           }
           this._applyJoinsToManager(countManager);
+          // Rails `where!(pk => limited_ids)` adds the id filter to the relation that
+          // STILL carries the original where + from, only nulling limit/offset. Re-apply
+          // them so a collection-level predicate (e.g. `comments.body = 'x'`) keeps
+          // constraining the count, not just the id set.
+          this._applyWheresToManager(countManager, table);
+          applyFromToManager(this, countManager);
           countManager.where(table.get(pk).in(limitedIds));
           const [countSql, countBinds] = compileManagerWithBinds(this, countManager);
           const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
