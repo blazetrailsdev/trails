@@ -2,13 +2,27 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
+import { SchemaDumper } from "./schema-dumper.js";
+import type { SchemaSource } from "./schema-dumper.js";
+import { NotNullViolation } from "./errors.js";
+import { createTestAdapter } from "./test-adapter.js";
+import { MigrationContext } from "./migration.js";
+import type { DatabaseAdapter } from "./adapter.js";
+import {
+  describeIfMysql,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+  supportsDefaultExpression,
+  isMariaDb,
+} from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -18,51 +32,157 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-describe("MysqlDefaultExpressionTest", () => {
-  it.skip("schema dump includes default expression", () => {
-    // BLOCKED: schema — schema dumper does not reflect MySQL expression defaults (uuid() / CONCAT).
-    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
-    // SCOPE: mysql2_specific_schema.rb `defaults` table (uuid, char2_concatenated columns with DEFAULT expressions).
+// Mirrors `MysqlDefaultExpressionTest` (defaults_test.rb:169), gated to the
+// Mysql2Adapter. The three tables come from mysql2_specific_schema.rb — built
+// here with the migration DSL (the expression defaults round-trip through
+// quoteDefaultExpression) and dumped via SchemaDumpingHelper#dump_table_schema.
+describeIfMysql("MysqlDefaultExpressionTest", () => {
+  // The shared per-worker test DB is reset by the global `beforeEach`
+  // (test-setup-ar.ts), which would drop tables built in a `beforeAll`. So
+  // build them per-test via `createTestAdapter` + MigrationContext (the same
+  // idiom as time-precision.test.ts), and drop them in `afterEach`.
+  let adapter: DatabaseAdapter;
+  let ctx: MigrationContext;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    ctx = new MigrationContext(adapter);
+    await ctx.createTable("datetime_defaults", { force: true }, (t: any) => {
+      t.datetime("modified_datetime", { precision: null, default: () => "CURRENT_TIMESTAMP" });
+      t.datetime("precise_datetime", { default: () => "CURRENT_TIMESTAMP(6)" });
+      t.datetime("updated_datetime", {
+        default: () => "CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
+      });
+    });
+    await ctx.createTable("timestamp_defaults", { force: true }, (t: any) => {
+      t.timestamp("nullable_timestamp");
+      t.timestamp("modified_timestamp", { precision: null, default: () => "CURRENT_TIMESTAMP" });
+      t.timestamp("precise_timestamp", { precision: 6, default: () => "CURRENT_TIMESTAMP(6)" });
+      t.timestamp("updated_timestamp", {
+        precision: 6,
+        default: () => "CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
+      });
+    });
+    await ctx.createTable("defaults", { force: true }, (t: any) => {
+      t.date("fixed_date", { default: "2004-01-01" });
+      t.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
+      t.column("char1", "char(1)", { default: "Y" });
+      t.string("char2", { limit: 50, default: "a varchar field" });
+      if (supportsDefaultExpression) {
+        t.binary("uuid", { limit: 36, default: () => "(uuid())" });
+        t.string("char2_concatenated", { default: () => "(concat(`char2`, '-'))" });
+      }
+    });
   });
-  it.skip("schema dump includes default expression with single quotes reflected correctly", () => {
-    // BLOCKED: schema — schema dumper does not reflect MySQL expression defaults (uuid() / CONCAT).
-    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
-    // SCOPE: mysql2_specific_schema.rb `defaults` table (char2_concatenated column with DEFAULT CONCAT expression).
+
+  afterEach(async () => {
+    await ctx.dropTable("defaults", { ifExists: true });
+    await ctx.dropTable("timestamp_defaults", { ifExists: true });
+    await ctx.dropTable("datetime_defaults", { ifExists: true });
   });
-  it.skip("schema dump datetime includes default expression", () => {
-    // BLOCKED: schema — schema dumper does not reflect MySQL CURRENT_TIMESTAMP expression defaults.
-    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
-    // SCOPE: mysql2_specific_schema.rb `datetime_defaults` table.
+
+  // Gated to MySQL only (skipIf isMariaDb): on MariaDB the `uuid()`/`concat()`
+  // function defaults reflect as *literal* values (uuid as the bytes of "uuid()",
+  // concat as a literal string) rather than `default: () => "..."`, because
+  // newColumnFromField/columnDefinitions doesn't catch MariaDB's representation of
+  // arbitrary expression defaults (no MySQL-8 DEFAULT_GENERATED extra). MySQL 8's
+  // DEFAULT_GENERATED path works, so keep the assertions running there. The
+  // CURRENT_TIMESTAMP datetime/timestamp tests below pass on both. MariaDB gap
+  // tracked: RFC 0030 story c2-defaults-mariadb-expression-reflection.
+  itIfSupports.skipIf(isMariaDb)(
+    "default_expression",
+    "schema dump includes default expression",
+    async () => {
+      const output = await SchemaDumper.dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "defaults",
+      );
+      expect(output).toMatch(
+        /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
+      );
+    },
+  );
+
+  itIfSupports.skipIf(isMariaDb)(
+    "default_expression",
+    "schema dump includes default expression with single quotes reflected correctly",
+    async () => {
+      const output = await SchemaDumper.dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "defaults",
+      );
+      expect(output).toMatch(
+        /t\.string\("char2_concatenated", \{ default: \(\) => "\(?concat\(`char2`,\s*(_utf8mb4)?'-'\)\)?" \}\)/i,
+      );
+    },
+  );
+
+  it("schema dump datetime includes default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "datetime_defaults",
+    );
+    expect(output).toMatch(
+      /t\.datetime\("modified_datetime", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP(\(\))?" \}\)/i,
+    );
   });
-  it.skip("schema dump datetime includes precise default expression", () => {
-    // BLOCKED: schema — schema dumper does not reflect MySQL CURRENT_TIMESTAMP(6) expression defaults.
-    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
-    // SCOPE: mysql2_specific_schema.rb `datetime_defaults` table.
+
+  it("schema dump datetime includes precise default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "datetime_defaults",
+    );
+    expect(output).toMatch(
+      /t\.datetime\("precise_datetime",.*default: \(\) => "CURRENT_TIMESTAMP\(6\)" \}\)/i,
+    );
   });
-  it.skip("schema dump datetime includes precise default expression with on update", () => {
-    // BLOCKED: schema — schema dumper does not reflect MySQL ON UPDATE expression defaults.
-    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
-    // SCOPE: mysql2_specific_schema.rb `datetime_defaults` table.
+
+  it("schema dump datetime includes precise default expression with on update", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "datetime_defaults",
+    );
+    expect(output).toMatch(
+      /t\.datetime\("updated_datetime",.*default: \(\) => "CURRENT_TIMESTAMP\(6\) ON UPDATE CURRENT_TIMESTAMP\(6\)" \}\)/i,
+    );
   });
-  it.skip("schema dump timestamp includes default expression", () => {
-    // BLOCKED: schema — schema dumper does not reflect MySQL CURRENT_TIMESTAMP expression defaults.
-    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
-    // SCOPE: mysql2_specific_schema.rb `timestamp_defaults` table.
+
+  it("schema dump timestamp includes default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "timestamp_defaults",
+    );
+    expect(output).toMatch(
+      /t\.timestamp\("modified_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP(\(\))?" \}\)/i,
+    );
   });
-  it.skip("schema dump timestamp includes precise default expression", () => {
-    // BLOCKED: schema — schema dumper does not reflect MySQL CURRENT_TIMESTAMP(6) expression defaults.
-    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
-    // SCOPE: mysql2_specific_schema.rb `timestamp_defaults` table.
+
+  it("schema dump timestamp includes precise default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "timestamp_defaults",
+    );
+    expect(output).toMatch(
+      /t\.timestamp\("precise_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP\(6\)" \}\)/i,
+    );
   });
-  it.skip("schema dump timestamp includes precise default expression with on update", () => {
-    // BLOCKED: schema — schema dumper does not reflect MySQL ON UPDATE expression defaults.
-    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
-    // SCOPE: mysql2_specific_schema.rb `timestamp_defaults` table.
+
+  it("schema dump timestamp includes precise default expression with on update", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "timestamp_defaults",
+    );
+    expect(output).toMatch(
+      /t\.timestamp\("updated_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP\(6\) ON UPDATE CURRENT_TIMESTAMP\(6\)" \}\)/i,
+    );
   });
-  it.skip("schema dump timestamp without default expression", () => {
-    // BLOCKED: schema — schema dumper requires MySQL live connection to dump `timestamp_defaults` table.
-    // ROOT-CAUSE: dump_table_schema not wired through Mysql2Adapter; no schema-dump path for MySQL in test suite.
-    // SCOPE: mysql2_specific_schema.rb `timestamp_defaults` table (nullable_timestamp column, no default).
+
+  it("schema dump timestamp without default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "timestamp_defaults",
+    );
+    expect(output).toMatch(/t\.timestamp\("nullable_timestamp"\);/);
   });
 });
 
@@ -167,14 +287,75 @@ describe("DefaultTest", () => {
   });
 });
 
-describe("DefaultsTestWithoutTransactionalFixtures", () => {
-  it.skip("mysql not null defaults non strict", () => {
-    // BLOCKED: adapter-mysql — strict-mode toggle via `establish_connection` not supported in test harness.
-    // ROOT-CAUSE: we have no way to reconfigure MySQL strict_mode per-connection in tests.
+// Mirrors `DefaultsTestWithoutTransactionalFixtures` (defaults_test.rb:222),
+// gated to the Mysql2Adapter. Rails toggles strict mode via
+// `establish_connection(..., strict:)`; our Mysql2Adapter accepts the same
+// `strict` config key, so `using_strict` becomes a fresh adapter per block.
+describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
+  // Mirrors `with_mysql_not_null_table`: build the NOT NULL table on a
+  // strict/non-strict connection, yield the model, then drop it.
+  async function withMysqlNotNullTable(
+    strict: boolean,
+    fn: (klass: typeof Base) => Promise<void>,
+  ): Promise<void> {
+    const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict });
+    try {
+      await adapter.createTable("test_mysql_not_null_defaults", { force: true }, (t: any) => {
+        t.integer("non_null_integer", { null: false });
+        t.string("non_null_string", { null: false });
+        t.text("non_null_text", { null: false });
+        t.blob("non_null_blob", { null: false });
+      });
+      class TestMysqlNotNullDefault extends Base {
+        static override tableName = "test_mysql_not_null_defaults";
+        // Rails' AR test suite runs with the framework default
+        // `partial_inserts = true` (dirty.rb:50), which the trails harness flips
+        // to false via `load_defaults 7.0` (test-setup-ar.ts). Restore the Rails
+        // test-env value here so `new` (no attrs) omits the NOT NULL columns from
+        // the INSERT — letting the DB apply implicit 0/"" defaults in non-strict
+        // mode — exactly as Rails exercises this test.
+        static override partialInserts = true;
+      }
+      TestMysqlNotNullDefault.adapter = adapter;
+      await TestMysqlNotNullDefault.loadSchema();
+      await fn(TestMysqlNotNullDefault);
+    } finally {
+      await adapter.dropTable("test_mysql_not_null_defaults", { ifExists: true });
+      await adapter.close();
+    }
+  }
+
+  it("mysql not null defaults non strict", async () => {
+    await withMysqlNotNullTable(false, async (klass) => {
+      const record = new klass({});
+      expect((record as any).non_null_integer).toBeNull();
+      expect((record as any).non_null_string).toBeNull();
+      expect((record as any).non_null_text).toBeNull();
+      expect((record as any).non_null_blob).toBeNull();
+
+      await (record as any).saveBang();
+      await (record as any).reload();
+
+      expect((record as any).non_null_integer).toBe(0);
+      expect((record as any).non_null_string).toBe("");
+      expect((record as any).non_null_text).toBe("");
+      // Rails asserts `""` here; a binary column deserializes to bytes in trails
+      // (BinaryType → Uint8Array), so the faithful analog of Ruby's empty binary
+      // string is a zero-length byte array.
+      expect((record as any).non_null_blob).toHaveLength(0);
+    });
   });
-  it.skip("mysql not null defaults strict", () => {
-    // BLOCKED: adapter-mysql — strict-mode toggle via `establish_connection` not supported in test harness.
-    // ROOT-CAUSE: we have no way to reconfigure MySQL strict_mode per-connection in tests.
+
+  it("mysql not null defaults strict", async () => {
+    await withMysqlNotNullTable(true, async (klass) => {
+      const record = new klass({});
+      expect((record as any).non_null_integer).toBeNull();
+      expect((record as any).non_null_string).toBeNull();
+      expect((record as any).non_null_text).toBeNull();
+      expect((record as any).non_null_blob).toBeNull();
+
+      await expect((klass as any).create()).rejects.toThrow(NotNullViolation);
+    });
   });
 });
 
