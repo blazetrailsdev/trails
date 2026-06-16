@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/bulb.rb
 import { Base } from "../../base.js";
+import { association, loadBelongsTo } from "../../associations.js";
 
 export class Bulb extends Base {
   scopeAfterInitialize: any;
@@ -19,10 +20,10 @@ export class Bulb extends Base {
       record.attributesAfterInitialize = { ...(record as any).attributes };
     });
     this.afterCreate(async (record: Bulb) => {
-      const carId = record.readAttribute("car_id") as number | null;
-      record.countAfterCreate = carId
-        ? await Bulb.unscoped(async () => (Bulb as any).where({ car_id: carId }).count())
-        : undefined;
+      record.countAfterCreate = await Bulb.unscoped(async () => {
+        const car = await loadBelongsTo(record, "car", {});
+        return car ? await association(car, "bulbs").count() : undefined;
+      });
     });
   }
 
