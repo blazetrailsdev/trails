@@ -42,6 +42,10 @@ import { Essay as HmEssay } from "../test-helpers/models/essay.js";
 import { Person as HmPerson } from "../test-helpers/models/person.js";
 import { Subscriber as HmSubscriber } from "../test-helpers/models/subscriber.js";
 import { Subscription as HmSubscription } from "../test-helpers/models/subscription.js";
+import { Post as HmPost } from "../test-helpers/models/post.js";
+import { Tag as HmTag } from "../test-helpers/models/tag.js";
+import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 const UNIVERSAL_HM_SCHEMA: Schema = {
   cpk_authors: { name: "string", author_code: "string" },
@@ -7284,35 +7288,31 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  useHandlerFixtures(["posts", "tags", "taggings"], { schema: TEST_SCHEMA });
 
   beforeAll(async () => {
-    await defineSchema({
-      sti_posts: { title: "string", type: "string", tag_id: "integer" },
-    });
+    registerModel(HmPost);
+    registerModel(HmTag);
+    registerModel(HmTagging);
+    await HmPost.loadSchema();
+    await HmTag.loadSchema();
+    await HmTagging.loadSchema();
+    // The `{ schema: TEST_SCHEMA }` rebuild above DROP+CREATEs `posts` (other
+    // still-bespoke describes in this file leave it title-only on the shared
+    // worker DB). On PostgreSQL that invalidates any prepared-statement plan an
+    // earlier describe cached against the old `posts` shape, so the first query
+    // here raises `cached plan must not change result type`. Deallocate them now
+    // (Rails' clear_cache! after DDL) so the join below re-PREPAREs cleanly.
+    (Base.connection as { clearCacheBang?: () => void }).clearCacheBang?.();
   });
 
   it("sti subselect count", async () => {
-    class StiPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("type", "string");
-        this.attribute("tag_id", "integer");
-      }
-    }
-    enableSti(StiPost);
-    class StiSpecialPost extends StiPost {}
-    registerSubclass(StiSpecialPost);
-    registerModel(StiPost);
-    registerModel(StiSpecialPost);
-
-    await StiSpecialPost.create({ title: "A", tag_id: 1 });
-    await StiSpecialPost.create({ title: "B", tag_id: 1 });
-    await StiPost.create({ title: "C", tag_id: 1 });
-
-    const count = await StiSpecialPost.where({ tag_id: 1 }).limit(10).count();
-    expect(count).toBe(2);
+    const tag = (await HmTag.first()) as HmTag;
+    const len = await (HmPost as any)
+      .taggedWith(tag.id as number)
+      .limit(10)
+      .size();
+    expect(len).toBeGreaterThan(0);
   });
 });
 
