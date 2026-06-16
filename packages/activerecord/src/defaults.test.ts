@@ -335,7 +335,10 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
       expect((record as any).non_null_integer).toBe(0);
       expect((record as any).non_null_string).toBe("");
       expect((record as any).non_null_text).toBe("");
-      expect((record as any).non_null_blob).toBe("");
+      // Rails asserts `""` here; a binary column deserializes to bytes in trails
+      // (BinaryType → Uint8Array), so the faithful analog of Ruby's empty binary
+      // string is a zero-length byte array.
+      expect((record as any).non_null_blob).toHaveLength(0);
     });
   });
 
