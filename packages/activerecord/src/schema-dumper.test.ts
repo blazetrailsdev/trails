@@ -544,12 +544,22 @@ describe("SchemaDumperTest", () => {
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG array support */
   });
-  it.skip("schema dump allows array of decimal defaults", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG array support */
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump allows array of decimal defaults",
+    async () => {
+      const { SchemaDumper: PgSchemaDumper } =
+        await import("./connection-adapters/postgresql/schema-dumper.js");
+      const { adapter: testAdapter, ctx: testCtx } = freshSidecarCtx();
+      await testCtx.createTable("bigint_array", {}, (t) => {
+        t.integer("big_int_data_points", { limit: 8, array: true });
+        t.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
+      });
+      const output = await PgSchemaDumper.dump(testAdapter);
+      expect(output).toMatch(
+        /t\.decimal\("decimal_array_default",\s*\{[^}]*default:\s*\["1\.23", "3\.45"\][^}]*array:\s*true/,
+      );
+    },
+  );
   it.skip("schema dump interval type", () => {
     // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
     // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity

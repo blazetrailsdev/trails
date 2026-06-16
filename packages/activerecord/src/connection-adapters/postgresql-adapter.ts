@@ -973,6 +973,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       await this.loadAdditionalTypes([...new Set(initializer.deferredMultirangeOids)]);
       initializer.retryDeferredMultiranges();
     }
+    if (initializer.deferredArrayOids.length > 0) {
+      await this.loadAdditionalTypes([...new Set(initializer.deferredArrayOids)]);
+      initializer.retryDeferredArrays();
+    }
   }
 
   /**
