@@ -13,7 +13,7 @@ function validateSavepointName(name: string): string {
   return name;
 }
 
-export function currentSavepointName(): string {
+function defaultSavepointName(): string {
   return `active_record_${_currentSavepointNumber}`;
 }
 
@@ -31,7 +31,7 @@ export function releaseSavepointSql(name: string): string {
 
 export function nextSavepointName(): string {
   _currentSavepointNumber++;
-  return currentSavepointName();
+  return defaultSavepointName();
 }
 
 export function resetSavepointNumber(): void {
@@ -48,7 +48,22 @@ export interface SavepointHost {
     name: string,
     opts?: { materializeTransactions?: boolean },
   ): Promise<unknown>;
-  currentSavepointName?(): string;
+  currentSavepointName?(): string | null;
+}
+
+/**
+ * Host interface for {@link currentSavepointName}.
+ * Adapters expose `currentTransaction()` via the TransactionManager.
+ */
+export interface CurrentSavepointNameHost {
+  currentTransaction(): { savepointName: string | null };
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints#current_savepoint_name
+ */
+export function currentSavepointName(this: CurrentSavepointNameHost): string | null {
+  return this.currentTransaction().savepointName;
 }
 
 /**
@@ -57,7 +72,7 @@ export interface SavepointHost {
  * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints#create_savepoint
  */
 export async function createSavepoint(this: SavepointHost, name?: string): Promise<void> {
-  const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
+  const spName = name ?? this.currentSavepointName?.() ?? defaultSavepointName();
   await this.internalExecute(createSavepointSql(spName), "TRANSACTION", {
     materializeTransactions: false,
   });
@@ -69,7 +84,7 @@ export async function createSavepoint(this: SavepointHost, name?: string): Promi
  * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints#exec_rollback_to_savepoint
  */
 export async function execRollbackToSavepoint(this: SavepointHost, name?: string): Promise<void> {
-  const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
+  const spName = name ?? this.currentSavepointName?.() ?? defaultSavepointName();
   await this.internalExecute(execRollbackToSavepointSql(spName), "TRANSACTION", {
     materializeTransactions: false,
   });
@@ -81,7 +96,7 @@ export async function execRollbackToSavepoint(this: SavepointHost, name?: string
  * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints#release_savepoint
  */
 export async function releaseSavepoint(this: SavepointHost, name?: string): Promise<void> {
-  const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
+  const spName = name ?? this.currentSavepointName?.() ?? defaultSavepointName();
   await this.internalExecute(releaseSavepointSql(spName), "TRANSACTION", {
     materializeTransactions: false,
   });

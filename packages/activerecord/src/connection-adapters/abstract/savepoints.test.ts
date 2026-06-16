@@ -18,7 +18,11 @@ describe("Savepoints", () => {
   });
 
   it("currentSavepointName", () => {
-    expect(currentSavepointName()).toBe("active_record_0");
+    const host = { currentTransaction: () => ({ savepointName: "active_record_1" }) };
+    expect(currentSavepointName.call(host)).toBe("active_record_1");
+
+    const nullHost = { currentTransaction: () => ({ savepointName: null }) };
+    expect(currentSavepointName.call(nullHost)).toBeNull();
   });
 
   it("nextSavepointName increments", () => {

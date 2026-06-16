@@ -1607,9 +1607,35 @@ describe("TransactionTest", () => {
       await expect(adapter.releaseSavepoint("another")).rejects.toThrow(StatementInvalid);
     });
   });
-  it.skip("savepoints name", () => {
-    // currentSavepointName counter starts at a different offset inside the
-    // fixture SAVEPOINT wrapper.
+  it("savepoints name", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    await Topic.transaction(async () => {
+      await Topic.deleteAll(); // Dirty the transaction to force a savepoint below
+
+      expect(adapter.currentSavepointName()).toBeNull();
+      expect(adapter.currentTransaction().savepointName).toBeNull();
+
+      await Topic.transaction(
+        async () => {
+          await Topic.deleteAll(); // Dirty the transaction to force a savepoint below
+
+          expect(adapter.currentSavepointName()).toBe("active_record_1");
+          expect(adapter.currentTransaction().savepointName).toBe("active_record_1");
+
+          await Topic.transaction(
+            async () => {
+              expect(adapter.currentSavepointName()).toBe("active_record_2");
+              expect(adapter.currentTransaction().savepointName).toBe("active_record_2");
+            },
+            { requiresNew: true },
+          );
+
+          expect(adapter.currentSavepointName()).toBe("active_record_1");
+          expect(adapter.currentTransaction().savepointName).toBe("active_record_1");
+        },
+        { requiresNew: true },
+      );
+    });
   });
   it.skip("rollback when thread killed", () => {
     // PERMANENT-SKIP: Ruby Thread semantics — Thread.kill aborts a thread
