@@ -44,9 +44,21 @@ export class TypeMapInitializer {
   /** Multirange rows whose range OID was not yet in the store during run(). */
   readonly deferredMultirangeOids: number[] = [];
   private deferredMultirangeRows: PgTypeRow[] = [];
+  /** Array rows whose element (typelem) OID was not yet in the store during run(). */
+  readonly deferredArrayOids: number[] = [];
+  private deferredArrayRows: PgTypeRow[] = [];
 
   constructor(store: TypeMap) {
     this.store = store;
+  }
+
+  /** Re-attempt registration for any array rows deferred during run(). */
+  retryDeferredArrays(): void {
+    if (this.deferredArrayRows.length === 0) return;
+    const rows = this.deferredArrayRows;
+    this.deferredArrayRows = [];
+    this.deferredArrayOids.length = 0;
+    rows.forEach((row) => this.registerArrayType(row));
   }
 
   /** Re-attempt registration for any multirange rows deferred during run(). */
@@ -179,11 +191,18 @@ export class TypeMapInitializer {
   }
 
   private registerArrayType(row: PgTypeRow): void {
-    this.registerWithSubtype(
-      row.oid,
-      toInt(row.typelem),
-      (subtype) => new OidArray(subtype, row.typdelim),
-    );
+    // A targeted load_additional_types([arrayOid]) fetches only the array row,
+    // not its element type. When the element OID isn't in the store yet, defer
+    // so the adapter can load it and retry — otherwise the array would silently
+    // fall through to a ValueType (whose type() is "value"), which the schema
+    // dumper emits as a bogus `t.column(name, "value")` instead of `t.decimal`.
+    const subtypeOid = toInt(row.typelem);
+    if (!this.storeHas(subtypeOid)) {
+      this.deferredArrayOids.push(subtypeOid);
+      this.deferredArrayRows.push(row);
+      return;
+    }
+    this.registerWithSubtype(row.oid, subtypeOid, (subtype) => new OidArray(subtype, row.typdelim));
   }
 
   private register(
