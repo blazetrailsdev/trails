@@ -16,6 +16,16 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { beforeCommittedOnAllRecords } from "../../ar-config.js";
 
 /**
+ * Equality-keyed lookup of the candidate instance whose transactional
+ * callbacks should fire for a given logical row.
+ *
+ * @internal
+ */
+interface CandidateLookup {
+  get(record: unknown): unknown;
+}
+
+/**
  * Mirrors: ActiveRecord::ConnectionAdapters::TransactionState
  */
 export class TransactionState {
@@ -598,35 +608,55 @@ export class Transaction {
    * @internal
    */
   private uniqueRecordsByEquality(recs: unknown[]): unknown[] {
-    // Symmetric like Ruby's `==`: try either side's `equals`, falling back to
-    // object identity for non-record entries.
-    const equal = (a: unknown, b: unknown): boolean =>
-      a === b ||
-      (typeof (a as any)?.equals === "function" && (a as any).equals(b)) ||
-      (typeof (b as any)?.equals === "function" && (b as any).equals(a));
     const result: unknown[] = [];
     for (const record of recs) {
-      if (!result.some((kept) => equal(record, kept))) result.push(record);
+      if (!result.some((kept) => this.recordsEqual(record, kept))) result.push(record);
     }
     return result;
+  }
+
+  /**
+   * Symmetric like Ruby's `==`: try either side's `equals`, falling back to
+   * object identity for non-record entries. Mirrors how Rails keys the
+   * `candidates` Hash in prepare_instances_to_run_callbacks_on by record
+   * equality (`hash`/`eql?` → id-based for persisted rows), so two in-memory
+   * copies of the same persisted row collapse to one candidate.
+   *
+   * @internal
+   */
+  private recordsEqual(a: unknown, b: unknown): boolean {
+    return (
+      a === b ||
+      (typeof (a as any)?.equals === "function" && (a as any).equals(b)) ||
+      (typeof (b as any)?.equals === "function" && (b as any).equals(a))
+    );
   }
 
   /** @internal */
   private async runActionOnRecords(
     records: unknown[],
-    instancesToRunCallbacksOn: Map<unknown, unknown>,
+    instancesToRunCallbacksOn: CandidateLookup,
     action: (record: unknown, shouldRunCallbacks: boolean) => Promise<void> | void,
   ): Promise<void> {
     while (records.length > 0) {
       const record = records.shift()!;
+      // Identity comparison (Rails' `record.__id__ == ...`): only the exact
+      // instance chosen as the candidate runs its callbacks; sibling copies of
+      // the same logical row are skipped.
       const shouldRunCallbacks = instancesToRunCallbacksOn.get(record) === record;
       await action(record, shouldRunCallbacks);
     }
   }
 
   /** @internal */
-  private prepareInstancesToRunCallbacksOn(records: unknown[]): Map<unknown, unknown> {
-    const candidates = new Map<unknown, unknown>();
+  private prepareInstancesToRunCallbacksOn(records: unknown[]): CandidateLookup {
+    // [keyRecord, candidate] pairs keyed by record equality, mirroring Rails'
+    // `candidates` Hash. The candidate is the instance whose transactional
+    // callbacks will fire for that logical row.
+    const entries: Array<[unknown, unknown]> = [];
+    const find = (rec: unknown): [unknown, unknown] | undefined =>
+      entries.find((e) => this.recordsEqual(rec, e[0]));
+
     for (const record of records) {
       if (
         typeof (record as any).isTriggerTransactionalCallbacks !== "function" ||
@@ -635,7 +665,10 @@ export class Transaction {
         continue;
       }
 
-      const earlier = candidates.get(record);
+      const entry = find(record);
+      const earlier = entry?.[1];
+
+      // Old configuration: keep the FIRST saved instance as the candidate.
       if (
         earlier &&
         typeof (record as any).constructor?.runCommitCallbacksOnFirstSavedInstancesInTransaction !==
@@ -662,9 +695,11 @@ export class Transaction {
         (record as any)._newRecordBeforeLastCommit = true;
       }
 
-      candidates.set(record, record);
+      if (entry) entry[1] = record;
+      else entries.push([record, record]);
     }
-    return candidates;
+
+    return { get: (rec) => find(rec)?.[1] };
   }
 }
 

@@ -264,6 +264,22 @@ import {
   afterUpdateCommitMethod as _afterUpdateCommitMethod,
   afterDestroyCommitMethod as _afterDestroyCommitMethod,
 } from "./transactions.js";
+import { runAfterTransactionCallbacksInOrderDefined } from "./ar-config.js";
+
+/**
+ * Threads ActiveRecord.run_after_transaction_callbacks_in_order_defined into a
+ * commit/rollback callback's conditions as `prepend`. When true the callback is
+ * prepended so it runs in definition order; when false (the framework default)
+ * it is appended so it runs in reverse definition order. Mirrors Rails'
+ * `prepend_option` (transactions.rb:320-327).
+ *
+ * @internal
+ */
+function _withTransactionCallbackOrder(
+  conditions: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  return { ...conditions, prepend: runAfterTransactionCallbacksInOrderDefined };
+}
 
 import {
   Default as DefaultScoping,
@@ -3609,9 +3625,9 @@ export class Base extends Model {
   ): void {
     super.afterCommit(
       fn,
-      _synthOnCondition(conditions as Record<string, unknown>) as TransactionalCallbackConditions<
-        InstanceType<T>
-      >,
+      _withTransactionCallbackOrder(
+        _synthOnCondition(conditions as Record<string, unknown>),
+      ) as TransactionalCallbackConditions<InstanceType<T>>,
     );
   }
 
@@ -3627,9 +3643,9 @@ export class Base extends Model {
   ): void {
     super.afterRollback(
       fn,
-      _synthOnCondition(conditions as Record<string, unknown>) as TransactionalCallbackConditions<
-        InstanceType<T>
-      >,
+      _withTransactionCallbackOrder(
+        _synthOnCondition(conditions as Record<string, unknown>),
+      ) as TransactionalCallbackConditions<InstanceType<T>>,
     );
   }
 

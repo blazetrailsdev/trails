@@ -7,6 +7,13 @@ import {
   Base,
   transaction,
   beforeCommit,
+  afterCommit,
+  afterSaveCommit,
+  afterCreateCommit,
+  afterUpdateCommit,
+  afterDestroyCommit,
+  afterRollback,
+  setRunAfterTransactionCallbacksInOrderDefined,
   currentTransaction,
   Rollback,
   registerModel,
@@ -15,6 +22,26 @@ import { Associations } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+
+function defineBehaviourTopic() {
+  return class extends Base {
+    history: any[] = [];
+    static {
+      this._tableName = "topics";
+      this.attribute("title", "string");
+      afterCommit(this, (r: any) => r.history.push(3));
+      afterCommit(this, (r: any) => r.history.push(4));
+      afterSaveCommit(this, (r: any) => r.history.push("save"));
+      afterCreateCommit(this, (r: any) => r.history.push("create"));
+      afterUpdateCommit(this, (r: any) => r.history.push("update"));
+      afterDestroyCommit(this, (r: any) => r.history.push("destroy"));
+      afterRollback(this, (r: any) => r.history.push("rollback1"));
+      afterRollback(this, (r: any) => r.history.push("rollback2"));
+      beforeCommit(this, (r: any) => r.history.push(1));
+      beforeCommit(this, (r: any) => r.history.push(2));
+    }
+  };
+}
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -831,8 +858,13 @@ describe("TransactionCallbacksTest", () => {
     // Full mirror of Rails' add_transaction_execution_blocks: all six
     // commit/rollback blocks. Only the create + update commit blocks fire in
     // this all-commit path; the destroy/rollback blocks are inert here.
-    Topic.afterCreateCommit(function (record: any) {
+    // Rails dispatches both create-commit blocks (commit_on_create, then the
+    // re-save) inside a single after_create_commit via do_after_commit(:create),
+    // so they run in registration order regardless of the global
+    // after-transaction callback ordering. Mirror that with one callback.
+    Topic.afterCreateCommit(async function (record: any) {
       (record.history ??= []).push("commit_on_create");
+      await record.saveBang();
     });
     Topic.afterUpdateCommit(function (record: any) {
       (record.history ??= []).push("commit_on_update");
@@ -858,11 +890,6 @@ describe("TransactionCallbacksTest", () => {
       },
       { on: "destroy" },
     );
-    // Re-save inside the create-commit callback: must fire commit_on_update
-    // exactly once, and must NOT re-invoke the create-commit callback.
-    Topic.afterCreateCommit(async function (record: any) {
-      await record.saveBang();
-    });
     const newRecord = new Topic({ title: "New topic" });
     await newRecord.saveBang();
     expect((newRecord as any).history).toEqual(["commit_on_create", "commit_on_update"]);
@@ -870,24 +897,29 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if not using run after transaction callbacks in order defined", async () => {
-      const history: number[] = [];
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-          this.afterCommit(() => {
-            history.push(1);
-          });
-          this.afterCommit(() => {
-            history.push(2);
-          });
-          this.afterCommit(() => {
-            history.push(3);
-          });
-        }
-      }
-      const t = new Topic({ title: "Order test" });
-      await t.save();
-      expect(history).toEqual([1, 2, 3]);
+      setRunAfterTransactionCallbacksInOrderDefined(false);
+      const Topic = defineBehaviourTopic();
+
+      const topic = new Topic() as any;
+      await topic.save();
+      expect(topic.history).toEqual([1, 2, "create", "save", 4, 3]);
+
+      topic.history = [];
+      topic.title = "updated";
+      await topic.save();
+      expect(topic.history).toEqual([1, 2, "update", "save", 4, 3]);
+
+      topic.history = [];
+      await transaction(Topic, async () => {
+        topic.title = "again";
+        await topic.save();
+        throw new Rollback();
+      });
+      expect(topic.history).toEqual(["rollback2", "rollback1"]);
+
+      topic.history = [];
+      await topic.destroy();
+      expect(topic.history).toEqual([1, 2, "destroy", 4, 3]);
     });
   });
 });
@@ -1006,11 +1038,33 @@ describe("TransactionCallbacksTest", () => {
       expect(log).toContain("destroyed");
     });
 
-    it.skip("before commit actions", () => {
-      // DEFERRED: the Rails assertion depends on after_commit callbacks running
-      // in REVERSE definition order; our impl runs them in definition order
-      // (pinned by the CallbackOrderTest below), so the verbatim assertion
-      // cannot pass without changing global callback-ordering semantics.
+    it("before commit actions", async () => {
+      class TopicWithCallbacksOnMultipleActions extends Base {
+        declare saveBeforeCommitHistory: boolean;
+        history: string[] = [];
+        static {
+          this._tableName = "topics";
+          this.attribute("title", "string");
+          this.afterCommit((record: any) => record.history.push("create_and_destroy"), {
+            on: ["create", "destroy"],
+          });
+          this.afterCommit((record: any) => record.history.push("create_and_update"), {
+            on: ["create", "update"],
+          });
+          this.afterCommit((record: any) => record.history.push("update_and_destroy"), {
+            on: ["update", "destroy"],
+          });
+          beforeCommit(this, (record: any) => record.history.push("before_commit"), {
+            if: (record: any) => record.saveBeforeCommitHistory,
+          });
+        }
+      }
+
+      const topic = new TopicWithCallbacksOnMultipleActions() as any;
+      topic.saveBeforeCommitHistory = true;
+      await topic.save();
+
+      expect(topic.history).toEqual(["before_commit", "create_and_update", "create_and_destroy"]);
     });
 
     it("before commit update in same transaction", async () => {
@@ -1040,25 +1094,34 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
-      const log: string[] = [];
-      class Post extends Base {
-        static {
-          this.attribute("title", "string");
-          this.beforeCreate(function () {
-            log.push("first");
-          });
-          this.beforeCreate(function () {
-            log.push("second");
-          });
-          this.afterCreate(function () {
-            log.push("after");
-          });
-        }
+      let Topic: ReturnType<typeof defineBehaviourTopic>;
+      setRunAfterTransactionCallbacksInOrderDefined(true);
+      try {
+        Topic = defineBehaviourTopic();
+      } finally {
+        setRunAfterTransactionCallbacksInOrderDefined(false);
       }
-      await Post.create({ title: "test" });
-      expect(log[0]).toBe("first");
-      expect(log[1]).toBe("second");
-      expect(log[2]).toBe("after");
+
+      const topic = new Topic() as any;
+      await topic.save();
+      expect(topic.history).toEqual([1, 2, 3, 4, "save", "create"]);
+
+      topic.history = [];
+      topic.title = "updated";
+      await topic.save();
+      expect(topic.history).toEqual([1, 2, 3, 4, "save", "update"]);
+
+      topic.history = [];
+      await transaction(Topic, async () => {
+        topic.title = "again";
+        await topic.save();
+        throw new Rollback();
+      });
+      expect(topic.history).toEqual(["rollback1", "rollback2"]);
+
+      topic.history = [];
+      await topic.destroy();
+      expect(topic.history).toEqual([1, 2, 3, 4, "destroy"]);
     });
   }); // CallbackOrderTest
 
@@ -1287,10 +1350,30 @@ describe("TransactionCallbacksTest", () => {
       expect(log).toContain("updated:a2");
     });
 
-    it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => {
-      // DEFERRED: needs the deprecated
-      // `run_commit_callbacks_on_first_saved_instances_in_transaction` flag plus
-      // multiple instances of the same row participating in one transaction.
+    it("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", async () => {
+      const history: string[] = [];
+      class TopicWithTitleHistory extends Base {
+        static {
+          this._tableName = "topics";
+          this.attribute("title", "string");
+          (this as any).runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
+          afterUpdateCommit(this, (record: any) =>
+            history.push(`Updated (title = ${JSON.stringify(record.title)})`),
+          );
+          afterDestroyCommit(this, (record: any) =>
+            history.push(`Destroyed (title = ${JSON.stringify(record.title)})`),
+          );
+        }
+      }
+      const topic = await TopicWithTitleHistory.create({ title: "one" });
+      history.length = 0;
+
+      await transaction(TopicWithTitleHistory, async () => {
+        await (await TopicWithTitleHistory.find(topic.id)).update({ title: "two" });
+        await (await TopicWithTitleHistory.find(topic.id)).destroy();
+      });
+
+      expect(history).toEqual(['Updated (title = "two")']);
     });
 
     it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction", async () => {
@@ -1316,10 +1399,30 @@ describe("TransactionCallbacksTest", () => {
       expect(log).toContain("updated:b2");
     });
 
-    it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => {
-      // DEFERRED: needs the deprecated
-      // `run_commit_callbacks_on_first_saved_instances_in_transaction` flag plus
-      // multiple instances of the same row participating in one transaction.
+    it("destroyed callbacks called on first saved instance in transaction with old configuration", async () => {
+      const history: string[] = [];
+      class TopicWithTitleHistory extends Base {
+        static {
+          this._tableName = "topics";
+          this.attribute("title", "string");
+          (this as any).runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
+          afterUpdateCommit(this, (record: any) =>
+            history.push(`Updated (title = ${JSON.stringify(record.title)})`),
+          );
+          afterDestroyCommit(this, (record: any) =>
+            history.push(`Destroyed (title = ${JSON.stringify(record.title)})`),
+          );
+        }
+      }
+      const topic = await TopicWithTitleHistory.create({ title: "one" });
+      history.length = 0;
+
+      await transaction(TopicWithTitleHistory, async () => {
+        await (await TopicWithTitleHistory.find(topic.id)).destroy();
+        await topic.update({ title: "two" });
+      });
+
+      expect(history).toEqual(['Destroyed (title = "one")']);
     });
   }); // CallbacksOnMultipleInstancesInATransactionTest
 
