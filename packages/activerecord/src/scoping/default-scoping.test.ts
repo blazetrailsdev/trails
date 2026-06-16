@@ -823,11 +823,7 @@ describe("DefaultScopingTest", () => {
     expect(received).toEqual(expected);
   });
 
-  // ROOT-CAUSE: merging an `unscope("where")` relation does not clear the
-  // accumulated where clause — `_whereClause.isEmpty()` stays false after the
-  // merge. Rails' WhereClause merge treats the unscoped side as resetting the
-  // predicates. Tracked by upstream-fix story b2-unscope-where-merge-reset.
-  it.skip("unscope merging", () => {
+  it("unscope merging", () => {
     const merged = Developer.where({ name: "Jamis" }).merge(Developer.unscope("where"));
     expect((merged as any)._whereClause.isEmpty()).toBe(true);
     expect((merged.where({ name: "Jon" }) as any)._whereClause.isEmpty()).toBe(false);

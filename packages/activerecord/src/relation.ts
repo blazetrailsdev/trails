@@ -492,6 +492,9 @@ export class Relation<T extends Base> {
   private _manualReferences: string[] = [];
   private _fromClause: FromClause = FromClause.empty();
   private _createWithAttrs: Record<string, unknown> = {};
+  // Rails' unscope_values: the scopes passed to unscope! are remembered so that
+  // merging this relation into another re-applies the resets (merger.rb NORMAL_VALUES).
+  private _unscopeValues: Array<string | { where: string | string[] }> = [];
   private _extending: Array<Record<string, (...args: any[]) => any>> = [];
   private _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }> = [];
   private _skipPreloading = false;
@@ -5432,6 +5435,7 @@ export class Relation<T extends Base> {
       extending: [...this._extending],
       with: [...this._ctes],
       createWith: { ...this._createWithAttrs },
+      unscope: [...this._unscopeValues],
     };
   }
 
@@ -5772,6 +5776,7 @@ export class Relation<T extends Base> {
     this._manualReferences = [...source._manualReferences];
     this._fromClause = source._fromClause;
     this._createWithAttrs = { ...source._createWithAttrs };
+    this._unscopeValues = [...source._unscopeValues];
     this._extending = [...source._extending];
     // Rebind extension-module methods onto this clone. Ruby's `extend`
     // mutates the singleton class, so a cloned relation keeps the mixed-in

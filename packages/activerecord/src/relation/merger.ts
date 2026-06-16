@@ -21,6 +21,7 @@ export class Merger {
 
   merge(): any {
     const rel = this.relation._clone();
+    this.mergeUnscope(rel);
     this.mergeWhereClause(rel);
     this.mergeSelectValues(rel);
     this.mergeMultiValues(rel);
@@ -31,6 +32,15 @@ export class Merger {
     this.mergeOuterJoins(rel);
     if (this.other._isNone) rel._isNone = true;
     return rel;
+  }
+
+  // Rails merger.rb processes :unscope as a NORMAL_VALUE: before the clauses are
+  // merged it calls `relation.unscope!(*value)`, re-applying the other relation's
+  // resets to the merged relation. This is what lets
+  // `where(...).merge(unscope(:where))` clear the accumulated where clause.
+  private mergeUnscope(rel: any): void {
+    const unscopeValues = this.other._unscopeValues ?? [];
+    if (unscopeValues.length > 0) rel.unscopeBang(...unscopeValues);
   }
 
   private mergeWhereClause(rel: any): void {
