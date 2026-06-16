@@ -113,6 +113,30 @@ export class SingularAssociation extends Association {
     return Boolean(owner._strictLoading) && !owner._strictLoadingBypassCount;
   }
 
+  /**
+   * Mirrors Rails' `SingularAssociation#scope_for_create`
+   * (singular_association.rb:43):
+   *
+   *   def scope_for_create
+   *     super.except!(*Array(klass.primary_key))
+   *   end
+   *
+   * A belongs_to / has_one association scope constrains the target by its
+   * own primary key (`where(humans.id => owner.human_id)` for belongs_to),
+   * so the base `scope_for_create` surfaces that key. Carrying it into a
+   * freshly-built target would stamp the existing parent's id onto the new
+   * record — e.g. `face.create_human` would INSERT with the loaded fixture's
+   * id and collide (`UNIQUE constraint failed: humans.id`). Stripping the
+   * klass primary key(s) is exactly how Rails avoids that.
+   */
+  override scopeForCreate(): Record<string, unknown> {
+    const attrs = super.scopeForCreate();
+    const pk = (this.klass as typeof Base | undefined)?.primaryKey;
+    if (pk == null) return attrs;
+    for (const key of Array.isArray(pk) ? pk : [pk]) delete attrs[key];
+    return attrs;
+  }
+
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     shouldRaise = false,

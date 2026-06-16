@@ -692,10 +692,7 @@ describe("InverseBelongsToTests", () => {
     expect(human.face.description).toBe((face as any).description);
   });
 
-  it.skip("child instance should be shared with newly created parent", async () => {
-    // Tracked: inverse-associations-fixture-port follow-up. create_human autosave
-    // INSERT collides on `humans.id` with the CRC32-hashed fixture id (rowid seq
-    // not advanced past fixtures). Autosave/fixture-id-seq infra gap.
+  it("child instance should be shared with newly created parent", async () => {
     const face = faces("trusting");
     const human = await (face as any).createHuman({ name: "Charles" });
     expect(human.face).not.toBeNull();
@@ -837,9 +834,19 @@ describe("InverseBelongsToTests", () => {
     expect(err.corrections[0]).toBe("confusedFace");
   });
 
-  it.skip("building has many parent association inverses one record", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. build_human does not
-    // wire the inverse has_many, so human.interests.size is 0 (expected 1).
+  it.skip("building has many parent association inverses one record", async () => {
+    // Tracked: build-human-inverses-has-many. The fixture-id collision is fixed
+    // (SingularAssociation#scopeForCreate now strips the klass PK), so this no
+    // longer raises `UNIQUE constraint failed: humans.id`. It still fails on a
+    // separate gap: under has_many_inversing, `build_human` does not wire the
+    // inverse has_many, so `human.interests.size` is 0 (expected 1).
+    await withHasManyInversing(Interest, async () => {
+      const interest = new Interest();
+      (interest as any).buildHuman();
+      expect(await association((interest as any).human, "interests").size()).toBe(1);
+      await (interest as any).saveBang();
+      expect(await association((interest as any).human, "interests").size()).toBe(1);
+    });
   });
 });
 
@@ -965,11 +972,10 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
     await loadBelongsTo(interest, "human", { inverseOf: "interests" });
   });
 
-  it.skip("that we can create associations that have the same reciprocal name from different models", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. The faithful port
-    // (build_zine + build_human + save!) hits `UNIQUE constraint failed:
-    // humans.id`: autosave inserts the freshly-built Human without advancing the
-    // sqlite rowid past the CRC32-hashed fixture ids. Autosave/fixture-id-seq
-    // infra gap, not an inverse_of gap.
+  it("that we can create associations that have the same reciprocal name from different models", async () => {
+    const interest = (await Interest.first()) as any;
+    interest.buildZine({ title: "Get Some in Winter! 2008" });
+    interest.buildHuman({ name: "Gordon" });
+    await interest.saveBang();
   });
 });
