@@ -639,28 +639,14 @@ export async function performCount(
           if (this._limitValue !== null) idSubquery.take(this._limitValue);
           if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
           const [innerSql, allIdBinds] = compileManagerWithBinds(this, idSubquery);
-          // Outer count mirrors Rails recursive calculate() call: COUNT(DISTINCT requested_col).
-          // JD joins are re-applied so a cross-table column (e.g. "comments.id") is reachable.
-          // count("*") routes through JD and uses PK — COUNT(DISTINCT *) is invalid.
-          const colForCount = column != null && column !== "*" ? column : pk;
-          const countManager = table.project(
-            (aggregateColumn(this, colForCount) as any).count(true).as("count"),
-          );
-          if (specsForJd.length > 0) {
-            const jdOuter = QueryMethodBangs.constructJoinDependency.call(
-              anyRel,
-              specsForJd,
-              Nodes.OuterJoin,
-            );
-            for (const node of jdOuter.joinConstraints([])) countManager.appendJoinNode(node);
-          }
-          this._applyJoinsToManager(countManager);
-          countManager.where(table.get(pk).in({ ast: new Nodes.SqlLiteral(innerSql) }));
-          const [countSql, countOwnBinds] = compileManagerWithBinds(this, countManager);
-          const [withCtes, ctedBinds] = prependCtes(this, countSql, [
-            ...allIdBinds,
-            ...countOwnBinds,
-          ]);
+          // Rails build_count_subquery (active_record/relation/calculations.rb): the
+          // limited/distinct subquery is wrapped as a derived table and counted from the
+          // outside — `SELECT COUNT(*) FROM (<subquery>) subquery_for_count`. Counting
+          // over a derived table (rather than `pk IN (<subquery>)`) avoids MariaDB's
+          // "doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'" restriction; the
+          // inner DISTINCT pk already collapses to the distinct-parent-id count.
+          const countSql = `SELECT COUNT(*) AS count FROM (${innerSql}) subquery_for_count`;
+          const [withCtes, ctedBinds] = prependCtes(this, countSql, [...allIdBinds]);
           const limitedResult = await this._modelClass.connection.selectAll(
             withCtes,
             `${this._modelClass.name} Count`,
