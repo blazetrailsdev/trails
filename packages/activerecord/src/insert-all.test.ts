@@ -20,6 +20,7 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { assertQueriesMatch } from "./testing/query-assertions.js";
 
 async function assertUpsertConflictTargetBehavior(
   Book: any,
@@ -426,12 +427,30 @@ describe("InsertAllTest", () => {
   it("insert_all with on_duplicate updates record timestamps", async () => {
     const Ship = makeShip();
     const oldTime = Temporal.Instant.from("2021-01-01T00:00:00Z");
-    await Ship.insertAll([{ id: 401, name: "Boaty", updated_at: oldTime, updated_on: oldTime }], {
-      recordTimestamps: false,
-    });
+    // Seed all four magic columns at the old year with record_timestamps off so
+    // they are not refreshed on insert (Rails travel_to seed equivalent).
+    await Ship.insertAll(
+      [
+        {
+          id: 401,
+          name: "Boaty",
+          created_at: oldTime,
+          created_on: oldTime,
+          updated_at: oldTime,
+          updated_on: oldTime,
+        },
+      ],
+      { recordTimestamps: false },
+    );
     await Ship.upsertAll([{ id: 401, name: "Renamed" }]);
     const ship = (await Ship.find(401)) as any;
-    expect(getYear(ship.updated_at)).toBe(new Date().getUTCFullYear());
+    // Mirrors test_upsert_all_implicitly_sets_timestamps_on_update (insert_all_test.rb:602):
+    // created_* stay at the seed year, updated_* refresh to now.
+    const currentYear = new Date().getUTCFullYear();
+    expect(getYear(ship.updated_at)).toBe(currentYear);
+    expect(getYear(ship.updated_on)).toBe(currentYear);
+    expect(getYear(ship.created_at)).toBe(2021);
+    expect(getYear(ship.created_on)).toBe(2021);
   });
   it("insert_all with raw sql on_duplicate", async () => {
     const Book = makeBookWithAdapter();
@@ -593,33 +612,27 @@ describe("InsertAllTest", () => {
   });
   it("insert_all generates correct sql", async () => {
     const Book = makeBook();
-    const ia = new InsertAll(
-      Book.all() as any,
-      Book.connection,
-      [{ id: 1, title: "X", author: "Y" }],
-      {
-        onDuplicate: "skip",
+    // Mirrors Rails' assert_queries_match { Book.insert_all [...] } (insert_all_test.rb:145):
+    // exercise the real relation→execute path, then match the emitted conflict clause.
+    await assertQueriesMatch(
+      /ON CONFLICT.*DO NOTHING|ON DUPLICATE KEY UPDATE/i,
+      undefined,
+      false,
+      async () => {
+        await Book.insertAll([{ id: 1, title: "X", author: "Y" }]);
       },
     );
-    await (ia as any)._populateUpdatableColumns();
-    const sql = ia.toSql();
-    expect(sql).toContain('INSERT INTO "books"');
-    expect(sql).toMatch(/ON CONFLICT.*DO NOTHING|ON DUPLICATE KEY UPDATE/);
   });
   it("upsert_all generates correct sql", async () => {
     const Book = makeBook();
-    const ia = new InsertAll(
-      Book.all() as any,
-      Book.connection,
-      [{ id: 1, title: "X", author: "Y" }],
-      {
-        onDuplicate: "update",
+    await assertQueriesMatch(
+      /ON CONFLICT.*DO UPDATE SET|ON DUPLICATE KEY UPDATE/i,
+      undefined,
+      false,
+      async () => {
+        await Book.upsertAll([{ id: 1, title: "X", author: "Y" }]);
       },
     );
-    await (ia as any)._populateUpdatableColumns();
-    const sql = ia.toSql();
-    expect(sql).toContain('INSERT INTO "books"');
-    expect(sql).toMatch(/ON CONFLICT.*DO UPDATE SET|ON DUPLICATE KEY UPDATE/);
   });
   it.skip("insert_all with returning and on_duplicate", () => {
     // BLOCKED: adapter-pg
@@ -1153,11 +1166,9 @@ describe("InsertAllTest", () => {
 
   it("insert all generates correct sql", async () => {
     const Book = makeBookWithAdapter();
-    const ia = new InsertAll(Book.all() as any, Book.connection, [{ title: "X", author: "Y" }], {
-      onDuplicate: "skip",
+    await assertQueriesMatch(/INSERT INTO\s+["`']?books/i, undefined, false, async () => {
+      await Book.insertAll([{ title: "X", author: "Y" }]);
     });
-    await (ia as any)._populateUpdatableColumns();
-    expect(ia.toSql()).toContain('INSERT INTO "books"');
   });
 
   it.skip("insert all returns primary key if returning is supported", async () => {
