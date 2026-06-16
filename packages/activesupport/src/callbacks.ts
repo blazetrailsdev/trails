@@ -137,8 +137,10 @@ export class Value {
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate */
 export interface CallTemplate {
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[];
-  makeLambda(): (target: object, value: unknown) => unknown;
-  invertedLambda(): (target: object, value: unknown) => boolean;
+  // Rails make_lambda yields `|target, value, &block|`; the trailing block is the
+  // around continuation, threaded so InstanceExec2/ProcCall can forward it.
+  makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown;
+  invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean;
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::MethodCall */
@@ -255,25 +257,33 @@ export class InstanceExec1 implements CallTemplate {
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::InstanceExec2 */
 export class InstanceExec2 implements CallTemplate {
-  constructor(readonly fn: (target: object, value: unknown) => unknown) {}
+  constructor(readonly fn: (target: object, block: (() => unknown) | null) => unknown) {}
 
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
     return [target, this.fn, "instanceExec", target, block];
   }
 
-  makeLambda(): (target: object, value: unknown) => unknown {
+  makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
     const f = this.fn;
-    // Rails: target.instance_exec(target, value, &block) — self IS the record.
-    return (target: object, value: unknown) => f.call(target, target, value);
+    // Rails: raise ArgumentError unless block; target.instance_exec(target, block, &@override_block)
+    // — the around continuation is the second positional arg, not the chain `value`.
+    return (target: object, _value: unknown, block?: (() => unknown) | null) => {
+      if (!block) throw new Error("InstanceExec2 callback requires a block");
+      return f.call(target, target, block);
+    };
   }
 
-  invertedLambda(): (target: object, value: unknown) => boolean {
+  invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
     const f = this.fn;
-    return (target: object, value: unknown) => !f.call(target, target, value);
+    return (target: object, _value: unknown, block?: (() => unknown) | null) => {
+      if (!block) throw new Error("InstanceExec2 callback requires a block");
+      return !f.call(target, target, block);
+    };
   }
 
-  make(target: object, value: unknown): unknown {
-    return this.fn.call(target, target, value);
+  make(target: object, block: (() => unknown) | null): unknown {
+    if (!block) throw new Error("InstanceExec2 callback requires a block");
+    return this.fn.call(target, target, block);
   }
 }
 
@@ -285,14 +295,18 @@ export class ProcCall implements CallTemplate {
     return [this.fn, block, "call", target, value];
   }
 
-  makeLambda(): (target: object, value: unknown) => unknown {
+  makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
     const f = this.fn;
-    return (target: object, value: unknown) => f(target, value);
+    // Rails: @override_block.call(target, value, &block) — no instance_exec, the
+    // proc keeps its own binding; forward target, value and the block.
+    return (target: object, value: unknown, block?: (() => unknown) | null) =>
+      f(target, value, block);
   }
 
-  invertedLambda(): (target: object, value: unknown) => boolean {
+  invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
     const f = this.fn;
-    return (target: object, value: unknown) => !f(target, value);
+    return (target: object, value: unknown, block?: (() => unknown) | null) =>
+      !f(target, value, block);
   }
 
   make(target: object, _value: unknown): unknown {
@@ -530,7 +544,9 @@ export class Callback {
       const arity = this.filter.length;
       callTemplate =
         arity > 1
-          ? new InstanceExec2(this.filter as (target: object, value: unknown) => unknown)
+          ? new InstanceExec2(
+              this.filter as (target: object, block: (() => unknown) | null) => unknown,
+            )
           : arity > 0
             ? new InstanceExec1(this.filter as (target: object) => unknown)
             : new InstanceExec0(this.filter as () => unknown);

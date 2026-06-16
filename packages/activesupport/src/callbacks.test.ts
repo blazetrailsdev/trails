@@ -94,18 +94,28 @@ describe("Callbacks", () => {
 
     it("InstanceExec call templates bind this to the record (Rails instance_exec)", () => {
       const target = {};
+      const block = () => "block-result";
       const seen: Array<{ self: unknown; args: unknown[] }> = [];
       const record = function (this: unknown, ...args: unknown[]) {
         seen.push({ self: this, args });
       };
 
+      // InstanceExec0/1: instance_exec(&block) / instance_exec(target, &block).
       new CallTemplate.InstanceExec0(record).makeLambda()(target, "v");
       new CallTemplate.InstanceExec1(record).makeLambda()(target, "v");
-      new CallTemplate.InstanceExec2(record).makeLambda()(target, "v");
+      // InstanceExec2 is the around template: instance_exec(target, block, &block).
+      new CallTemplate.InstanceExec2(record).makeLambda()(target, "v", block);
 
       expect(seen[0]).toEqual({ self: target, args: [] });
       expect(seen[1]).toEqual({ self: target, args: [target] });
-      expect(seen[2]).toEqual({ self: target, args: [target, "v"] });
+      expect(seen[2]).toEqual({ self: target, args: [target, block] });
+    });
+
+    it("InstanceExec2 requires a block (Rails raises ArgumentError without one)", () => {
+      const target = {};
+      const template = new CallTemplate.InstanceExec2(() => undefined);
+      expect(() => template.makeLambda()(target, "v")).toThrow();
+      expect(() => template.makeLambda()(target, "v", null)).toThrow();
     });
 
     it("runs before, around, and after in correct order", () => {
