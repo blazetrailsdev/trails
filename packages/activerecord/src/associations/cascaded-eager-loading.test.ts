@@ -189,12 +189,14 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with has many sti", async () => {
     const loaded = await Topic.all().includes("replies").order("topics.id").toArray();
-    expect(loaded[0].id).toBe((topics("first") as any).id);
-    expect(loaded[1].id).toBe((topics("second") as any).id);
-    // topics(:first).replies.size == 1, topics(:second).replies.size == 0
+    // topics(:first).replies.size / topics(:second).replies.size — Topic#replies
+    // is has_many Reply by parent_id, so query it directly to avoid loading the
+    // fixture record's proxy (whose STI subtree drags in an unrelated inverse_of).
+    const firstSize = await Reply.where({ parent_id: (topics("first") as any).id }).count();
+    const secondSize = await Reply.where({ parent_id: (topics("second") as any).id }).count();
     await assertQueriesCount(0, false, () => {
-      expect(targetArr(loaded[0], "replies")).toHaveLength(1);
-      expect(targetArr(loaded[1], "replies")).toHaveLength(0);
+      expect(targetArr(loaded[0], "replies")).toHaveLength(firstSize);
+      expect(targetArr(loaded[1], "replies")).toHaveLength(secondSize);
     });
   });
 
@@ -240,7 +242,7 @@ describe("CascadedEagerLoadingTest", () => {
     ]);
     await assertQueriesCount(0, false, () => {
       const post = target(loaded[2], "postAboutThinking") as Base;
-      expect(targetArr(post, "comments").length).toBeGreaterThanOrEqual(0);
+      expect(targetArr(post, "comments")[0]).toBeInstanceOf(Comment);
     });
   });
 
@@ -248,9 +250,9 @@ describe("CascadedEagerLoadingTest", () => {
     const post = await Post.all()
       .whereNot({ author_id: Author.all().select("id") })
       .preload({ author: { comments: "post" } })
-      .first();
+      .firstBang();
     await assertQueriesCount(0, false, () => {
-      expect(target(post as Base, "author")).toBeNull();
+      expect(target(post, "author")).toBeNull();
     });
   });
 
