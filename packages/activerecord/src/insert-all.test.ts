@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, defineEnum, registerModel } from "./index.js";
 import { InsertAll } from "./insert-all.js";
+import { Result } from "./result.js";
 import { UnknownAttributeError } from "./errors.js";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -16,6 +17,9 @@ import { enableSti } from "./inheritance.js";
 // is given. Use `it.skipIf(...)` inline (not a variable alias) so that
 // scripts/test-compare/extract-ts-tests.ts can match the tests by name.
 const supportsConflictTarget = adapterType !== "mysql";
+// Rails' insert_all_test.rb skips RETURNING tests via `skip unless
+// supports_insert_returning?`. MySQL has no INSERT...RETURNING clause.
+const supportsReturning = adapterType !== "mysql";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -162,30 +166,30 @@ describe("InsertAllTest", () => {
 
   it("insert logs message including model name", async () => {
     const Book = makeBook();
-    const count = await Book.insertAll([{ title: "First", author: "A" }]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    await Book.insertAll([{ title: "First", author: "A" }]);
+    expect(await Book.count()).toBeGreaterThanOrEqual(1);
   });
 
   it("insert all logs message including model name", async () => {
     const Book = makeBook();
-    const count = await Book.insertAll([
+    await Book.insertAll([
       { title: "One", author: "A" },
       { title: "Two", author: "B" },
     ]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    expect(await Book.count()).toBeGreaterThanOrEqual(2);
   });
 
   it("upsert logs message including model name", async () => {
     const Book = makeBook();
     const b = await Book.create({ title: "Existing", author: "Original" });
-    const count = await Book.upsertAll([{ id: b.id, title: "Existing", author: "Updated" }]);
-    expect(count).toBeGreaterThanOrEqual(0);
+    await Book.upsertAll([{ id: b.id, title: "Existing", author: "Updated" }]);
+    expect((await Book.find(b.id)).author).toBe("Updated");
   });
 
   it("upsert all logs message including model name", async () => {
     const Book = makeBook();
-    const count = await Book.upsertAll([{ title: "X", author: "Y" }]);
-    expect(count).toBeGreaterThanOrEqual(0);
+    await Book.upsertAll([{ title: "X", author: "Y" }]);
+    expect(await Book.count()).toBeGreaterThanOrEqual(1);
   });
 
   it("upsert all updates existing record by primary key", async () => {
@@ -316,23 +320,25 @@ describe("InsertAllTest", () => {
     // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
     // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
   });
-  it.skip("insert all with returning", () => {
-    // BLOCKED: adapter-pg
-    // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
-    // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
+  it.skipIf(!supportsReturning)("insert all with returning", async () => {
+    const Book = makeBook();
+    const result = await Book.insertAllBang([{ title: "Rework", author: "DHH" }], {
+      returning: ["id", "title"],
+    });
+    expect(result.columns).toEqual(["id", "title"]);
+    expect(result.pluck("title")).toEqual(["Rework"]);
   });
   it.skipIf(!supportsConflictTarget)("insert all skip duplicates", async () => {
     const Book = makeBook();
     await Book.create({ title: "Existing", author: "Auth" });
     const existing = (await Book.first()) as any;
-    const count = await Book.insertAll(
+    await Book.insertAll(
       [
         { id: existing.id, title: "Dup", author: "Auth" },
         { id: existing.id + 1000, title: "New", author: "Auth2" },
       ],
       { uniqueBy: "id" },
     );
-    expect(count).toBeGreaterThanOrEqual(1);
     const all = await Book.all().toArray();
     expect(all.length).toBe(2);
     expect(all.some((b: any) => b.title === "Existing")).toBe(true);
@@ -389,8 +395,7 @@ describe("InsertAllTest", () => {
   it("insert_all with enum values", async () => {
     const Book = makeBook();
     defineEnum(Book, "status", { draft: 0, published: 1 });
-    const count = await Book.insertAll([{ title: "EnumBook", author: "Auth", status: 0 }]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    await Book.insertAll([{ title: "EnumBook", author: "Auth", status: 0 }]);
     const all = await Book.all().toArray();
     expect(all.some((b: any) => b.title === "EnumBook")).toBe(true);
   });
@@ -412,8 +417,7 @@ describe("InsertAllTest", () => {
     }
     const { Temporal } = await import("@blazetrails/activesupport/temporal");
     const ts = Temporal.Instant.from("2023-06-15T12:00:00Z");
-    const count = await Post.insertAll([{ title: "Timestamped", created_at: ts, updated_at: ts }]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    await Post.insertAll([{ title: "Timestamped", created_at: ts, updated_at: ts }]);
     const all = await Post.all().toArray();
     expect(all.length).toBe(1);
   });
@@ -453,8 +457,12 @@ describe("InsertAllTest", () => {
     /* updateOnly generates correct SQL but memory/SQLite adapter doesn't honor ON CONFLICT DO UPDATE SET restrictions */
   });
 
-  it.skip("upsert all supports returning option", () => {
-    // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
+  it.skipIf(!supportsReturning)("upsert all supports returning option", async () => {
+    const Book = makeBook();
+    const result = await Book.upsertAll([{ title: "Rework", author: "DHH" }], {
+      returning: ["title"],
+    });
+    expect(result.pluck("title")).toEqual(["Rework"]);
   });
   it.skip("insert_all! raises on duplicate", () => {
     // BLOCKED: relation
@@ -463,13 +471,13 @@ describe("InsertAllTest", () => {
   });
   it("insert_all with empty array", async () => {
     const Book = makeBook();
-    const count = await Book.insertAll([]);
-    expect(count).toBe(0);
+    const result = await Book.insertAll([]);
+    expect(result.length).toBe(0);
   });
   it("upsert all with empty array", async () => {
     const Book = makeBook();
-    const count = await Book.upsertAll([]);
-    expect(count).toBe(0);
+    const result = await Book.upsertAll([]);
+    expect(result.length).toBe(0);
   });
   it.skip("insert all with partial unique index", () => {
     // BLOCKED: schema
@@ -479,8 +487,7 @@ describe("InsertAllTest", () => {
   it("insert_all works without callbacks or validations", async () => {
     const Book = makeBook();
     // insertAll bypasses callbacks and validations
-    const count = await Book.insertAll([{ title: "NoCallback", author: "Test" }]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    await Book.insertAll([{ title: "NoCallback", author: "Test" }]);
     const all = await Book.all().toArray();
     expect(all.some((b: any) => b.title === "NoCallback")).toBe(true);
   });
@@ -516,8 +523,7 @@ describe("InsertAllTest", () => {
 
   it("insert_all with record timestamps when model has no timestamp columns", async () => {
     const Book = makeBook();
-    const count = await Book.insertAll([{ title: "NoTs", author: "Auth" }]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    await Book.insertAll([{ title: "NoTs", author: "Auth" }]);
     const all = await Book.all().toArray();
     expect(all.some((b: any) => b.title === "NoTs")).toBe(true);
   });
@@ -571,11 +577,21 @@ describe("InsertAllTest", () => {
   it.skip("upsert_all generates correct sql", () => {
     // BLOCKED: relation — insert_all.rb: SQL generation for upsertAll
   });
-  it.skip("insert_all with returning and on_duplicate", () => {
-    // BLOCKED: adapter-pg
-    // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
-    // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
-  });
+  it.skipIf(!supportsReturning || !supportsConflictTarget)(
+    "insert_all with returning and on_duplicate",
+    async () => {
+      const Book = makeBook();
+      await Book.create({ id: 1, title: "Existing", author: "A" });
+      const result = await Book.insertAll(
+        [
+          { id: 1, title: "Dup", author: "A" },
+          { id: 2, title: "New", author: "B" },
+        ],
+        { uniqueBy: "id", returning: ["title"] },
+      );
+      expect(result.pluck("title")).toEqual(["New"]);
+    },
+  );
   it("insert_all with on_duplicate raw sql", async () => {
     const Book = makeBookWithAdapter();
     const existing = await Book.create({ title: "Existing", author: "A" });
@@ -609,16 +625,28 @@ describe("InsertAllTest", () => {
 
   it("upsert_all noop when empty", async () => {
     const Book = makeBook();
-    const count = await Book.upsertAll([]);
-    expect(count).toBe(0);
+    const result = await Book.upsertAll([]);
+    expect(result.length).toBe(0);
   });
-  it.skip("insert with type casting and serialize is consistent", () => {
-    // BLOCKED: type — insert_all.rb: type-cast + serialize consistency
-  });
-  it.skip("insert all returns requested sql fields", () => {
-    // BLOCKED: adapter-pg
-    // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
-    // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
+  it.skipIf(!supportsReturning)(
+    "insert with type casting and serialize is consistent",
+    async () => {
+      const Book = makeBook();
+      const createdId = (await Book.create({ title: "Rework", author: "DHH" })).id;
+      const result = await Book.insertBang({ title: "Rework", author: "DHH" }, { returning: "id" });
+      const insertedId = result.first()!["id"];
+      const created = await Book.find(createdId);
+      const inserted = await Book.find(insertedId as number);
+      expect(inserted.title).toBe(created.title);
+    },
+  );
+  it.skipIf(!supportsReturning)("insert all returns requested sql fields", async () => {
+    const { sql } = await import("@blazetrails/arel");
+    const Book = makeBook();
+    const result = await Book.insertAllBang([{ title: "Rework", author: "DHH" }], {
+      returning: sql("UPPER(title) as title"),
+    });
+    expect(result.pluck("title")).toEqual(["REWORK"]);
   });
   it.skip("insert all with skip duplicates and autonumber id not given", () => {
     // BLOCKED: relation — insert_all.rb: skip duplicates, autonumber id absent
@@ -687,9 +715,31 @@ describe("InsertAllTest", () => {
     const count = await CpkOrder.count();
     expect(count).toBe(1);
   });
-  it.skip("insert all and upsert all with aliased attributes", () => {
-    // BLOCKED: relation — insert_all.rb: aliasAttribute in insertAll / upsertAll
-  });
+  it.skipIf(!supportsConflictTarget)(
+    "insert all and upsert all with aliased attributes",
+    async () => {
+      // supportsConflictTarget and supportsReturning share the same gate
+      // (both are unsupported only on MySQL), so the RETURNING sub-block runs
+      // unconditionally whenever this test is not skipped.
+      const Book = makeBook();
+      const before = (await Book.count()) as number;
+      const result = await Book.insertAll([{ title: "Remote", author: "DHH" }], {
+        returning: "title",
+      });
+      expect(result.columns).toContain("title");
+      expect(await Book.count()).toBe(before + 1);
+
+      await Book.upsertAll([{ id: 101, title: "Perelandra", author: "Lewis", status: 1 }]);
+      await Book.upsertAll([{ id: 101, title: "Perelandra 2", status: 2 }], {
+        updateOnly: ["title", "status"],
+      });
+
+      const book = await Book.find(101);
+      expect(book.title).toBe("Perelandra 2");
+      expect(book.status).toBe(2);
+      expect(book.author).toBe("Lewis");
+    },
+  );
   it("insert all and upsert all with sti", async () => {
     const { Category, SpecialCategory } = makeCategoryHierarchy();
     const before = (await Category.count()) as number;
@@ -976,23 +1026,22 @@ describe("InsertAllTest", () => {
 
   it("insert", async () => {
     const Book = makeBookWithAdapter();
-    const count = await Book.insertAll([{ title: "Single", author: "A" }]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    await Book.insertAll([{ title: "Single", author: "A" }]);
+    expect(await Book.count()).toBeGreaterThanOrEqual(1);
   });
 
   it("insert!", async () => {
     const Book = makeBookWithAdapter();
-    const count = await Book.insertAll([{ title: "Bang", author: "B" }]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    await Book.insertAll([{ title: "Bang", author: "B" }]);
+    expect(await Book.count()).toBeGreaterThanOrEqual(1);
   });
 
   it("insert all", async () => {
     const Book = makeBookWithAdapter();
-    const count = await Book.insertAll([
+    await Book.insertAll([
       { title: "One", author: "Alice" },
       { title: "Two", author: "Bob" },
     ]);
-    expect(count).toBeGreaterThanOrEqual(2);
     const all = await Book.all().toArray();
     expect(all.length).toBe(2);
   });
@@ -1009,13 +1058,15 @@ describe("InsertAllTest", () => {
   it("insert all returns ActiveRecord Result", async () => {
     const Book = makeBookWithAdapter();
     const result = await Book.insertAll([{ title: "Result", author: "X" }]);
-    expect(result).toBeDefined();
+    expect(result).toBeInstanceOf(Result);
   });
 
-  it("insert all returns requested fields", async () => {
+  it.skipIf(!supportsReturning)("insert all returns requested fields", async () => {
     const Book = makeBookWithAdapter();
-    const result = await Book.insertAll([{ title: "Fields", author: "Y" }]);
-    expect(result).toBeDefined();
+    const result = await Book.insertAllBang([{ title: "Rework", author: "Y" }], {
+      returning: ["id", "title"],
+    });
+    expect(result.pluck("title")).toEqual(["Rework"]);
   });
 
   it.skip("insert all can skip duplicate records", async () => {
@@ -1066,12 +1117,14 @@ describe("InsertAllTest", () => {
     // SQL generation test - adapter specific
   });
 
-  it.skip("insert all returns primary key if returning is supported", async () => {
-    // BLOCKED: adapter-pg
-    // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
-    // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
-    // RETURNING clause support depends on the adapter
-  });
+  it.skipIf(!supportsReturning)(
+    "insert all returns primary key if returning is supported",
+    async () => {
+      const Book = makeBookWithAdapter();
+      const result = await Book.insertAllBang([{ title: "Rework", author: "DHH" }]);
+      expect(result.columns).toEqual(["id"]);
+    },
+  );
 
   it("upsert all does not touch updated at when values do not change", async () => {
     const Ship = makeShip();
@@ -1157,7 +1210,7 @@ describe("insertAll / upsertAll", () => {
     }
     Product.attribute("id", "integer");
     const result = await Product.insertAll([]);
-    expect(result).toBe(0);
+    expect(result.length).toBe(0);
   });
 });
 
@@ -1204,7 +1257,7 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
         this.attribute("id", "integer");
       }
     }
-    expect(await Book.insertAll([])).toBe(0);
+    expect((await Book.insertAll([])).length).toBe(0);
   });
 
   // Rails: test "upsert_all inserts and updates"
@@ -1336,7 +1389,7 @@ describe("InsertAll async uniqueIndexes regression", () => {
       // Should succeed — async _uniqueIndexes() fetches from the live DB.
       await expect(
         Pkg.upsertAll([{ name: "foo", sha: "abc123" }], { uniqueBy: ["sha", "name"] }),
-      ).resolves.toBeGreaterThanOrEqual(0);
+      ).resolves.toBeInstanceOf(Result);
     },
   );
 
@@ -1355,7 +1408,7 @@ describe("InsertAll async uniqueIndexes regression", () => {
       // vi.spyOn passes through to the original by default and records calls;
       // mockRestore in finally guarantees the patched method is restored even
       // if the upsert throws, so the adapter never leaks a spied method.
-      const spy = vi.spyOn(Base.connection, "executeMutation");
+      const spy = vi.spyOn(Base.connection, "execInsertAll");
       let upsertSql: string | undefined;
       try {
         await Flag.upsertAll([{ key: "feature_x", active: true }], { uniqueBy: "key" });

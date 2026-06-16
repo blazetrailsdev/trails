@@ -8,6 +8,7 @@ import { quoteSqlValue } from "./base.js";
 import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./adapter.js";
+import { Result } from "./result.js";
 
 type ModelClass = typeof Base;
 type AdapterDialect = AdapterName;
@@ -62,7 +63,7 @@ export class InsertAll {
     relation: Relation<any>,
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
-  ): Promise<number> {
+  ): Promise<Result> {
     const model = (relation as any)._modelClass as ModelClass;
     const ia = new InsertAll(relation, model.connection, inserts, options);
     return ia.execute();
@@ -123,13 +124,16 @@ export class InsertAll {
     this.ensureValidOptionsForConnectionBang();
   }
 
-  async execute(): Promise<number> {
+  async execute(): Promise<Result> {
     // Resolve uniqueBy before the empty-batch shortcut so the Rails guard
     // (insert_all.rb#initialize validates uniqueBy in the constructor before
     // any inserts.empty? check) still fires on upsertAll([], { uniqueBy }).
     await this._populateUpdatableColumns();
-    if (this.inserts.length === 0) return 0;
-    return this.connection.executeMutation(this.toSql());
+    if (this.inserts.length === 0) return Result.empty();
+    // Mirrors Rails InsertAll#execute: route through exec_insert_all so the
+    // RETURNING rows are captured into an ActiveRecord::Result rather than
+    // discarded (executeMutation only reports the affected-row count).
+    return this.connection.execInsertAll(this.toSql());
   }
 
   /**

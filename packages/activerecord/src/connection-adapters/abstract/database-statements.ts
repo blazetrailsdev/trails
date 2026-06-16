@@ -545,6 +545,14 @@ export function execInsertAll(
   sql: string,
   name: string = "SQL",
 ): Promise<Result> {
+  // Route through the adapter's row-returning `execQuery` rather than
+  // `internalExecQuery`: adapters like SQLite implement row materialization in
+  // their `execQuery` override (and leave `castResult` as an unimplemented
+  // strategy hook), so the RETURNING rows surface only on that path.
+  const host = this as DatabaseStatementsHost & {
+    execQuery?: (sql: string, name?: string | null) => Promise<Result>;
+  };
+  if (host?.execQuery) return host.execQuery(sql, name);
   return internalExecQuery.call(this as DatabaseStatementsHost, sql, name);
 }
 

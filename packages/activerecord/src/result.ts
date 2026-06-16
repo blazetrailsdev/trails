@@ -153,6 +153,22 @@ export class Result {
     return this.#getHashRows();
   }
 
+  /**
+   * Extract one or more columns from each row.
+   *
+   * Mirrors: Enumerable#pluck (ActiveSupport) over the result's hash rows —
+   * a single key yields a flat array of values, multiple keys yield an array
+   * of value tuples.
+   */
+  pluck(...keys: string[]): unknown[] {
+    const rows = this.#getHashRows();
+    if (keys.length === 1) {
+      const key = keys[0];
+      return rows.map((row) => row[key]);
+    }
+    return rows.map((row) => keys.map((key) => row[key]));
+  }
+
   at(idx: number): Record<string, unknown> | undefined {
     const rows = this.#getHashRows();
     return idx < 0 ? rows[rows.length + idx] : rows[idx];
