@@ -258,8 +258,8 @@ export class DeveloperWithBeforeDestroyRaise extends Base {
       joinTable: "developers_projects",
       foreignKey: "developer_id",
     });
-    this.beforeDestroy(async function (this: DeveloperWithBeforeDestroyRaise) {
-      const projects = await (this as any).projects;
+    this.beforeDestroy(async function (developer: DeveloperWithBeforeDestroyRaise) {
+      const projects = await (developer as any).projects;
       if (projects.length === 0) throw new Error();
     });
   }
