@@ -35,6 +35,10 @@ import {
   depCyclePath,
   editFrontmatter,
   finalize,
+  findDuplicateRfcDirs,
+  migrateDuplicateRfcDir,
+  reconcileDuplicateRfcDirs,
+  rewriteRfcRefs,
   parseCsv,
   setDepsError,
   formatFiles,
@@ -871,6 +875,74 @@ describe("commitAndPush (git mutation flow)", () => {
       "commit",
       "push",
     ]);
+  });
+
+  // End-to-end race repro through the mutation seam: a `new`-style mutator
+  // writes its story under a stale `0000-<slug>` dir (the author's slug
+  // predated a concurrent finalize that renamed it to `NNNN-<slug>` on main).
+  // commitAndPush must migrate the stranded story into the finalized dir and
+  // stage `-A` so main never carries two dirs for one RFC.
+  it("reconciles a stale 0000- dir the mutator recreated, staging -A", () => {
+    const { seen } = setup();
+    const cwd = mkdtempSync(join(tmpdir(), "tasks-cap-dup-"));
+    mkdirSync(join(cwd, "rfcs", "0031-foo"), { recursive: true });
+    writeFileSync(join(cwd, "rfcs", "0031-foo", "README.md"), "# foo\n");
+    let addArg = "";
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      if (label === "add") addArg = args?.[3] ?? "";
+      seen.push(label);
+      return "" as never;
+    });
+    commitAndPush({
+      message: "new: 0000-foo/r1",
+      fileToStage: join(cwd, "rfcs", "0000-foo", "stories", "r1.md"),
+      cwd,
+      mutator: () => {
+        const storyDir = join(cwd, "rfcs", "0000-foo", "stories");
+        mkdirSync(storyDir, { recursive: true });
+        writeFileSync(join(storyDir, "r1.md"), `---\nrfc: "0000-foo"\n---\nbody 0000-foo\n`);
+      },
+      raceMessage: "no",
+      raceExitCode: 99,
+    });
+    // The migrated story is the staged set; the dead 0000- dir is gone.
+    expect(addArg).toBe("-A");
+    expect(existsSync(join(cwd, "rfcs", "0000-foo"))).toBe(false);
+    const moved = readFileSync(join(cwd, "rfcs", "0031-foo", "stories", "r1.md"), "utf8");
+    expect(moved).toContain(`rfc: "0031-foo"`);
+    expect(moved).not.toContain("0000-foo");
+  });
+
+  // A reconcile collision (a same-named story already in the finalized dir)
+  // fires inside the acquired lock. It must release the lock on the way out —
+  // migrateDuplicateRfcDir throws (rather than process.exit) so the throw
+  // unwinds through the mutator rollback and commitAndPush's `finally`.
+  it("releases the lock when a reconcile collision throws", () => {
+    const { lockDir } = setup();
+    const cwd = mkdtempSync(join(tmpdir(), "tasks-cap-collide-"));
+    for (const slug of ["0000-foo", "0031-foo"]) {
+      mkdirSync(join(cwd, "rfcs", slug, "stories"), { recursive: true });
+      writeFileSync(join(cwd, "rfcs", slug, "stories", "r1.md"), slug);
+    }
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
+    expect(() =>
+      commitAndPush({
+        message: "test",
+        fileToStage: "/some/file.md",
+        cwd,
+        mutator: () => {},
+        raceMessage: "no",
+        raceExitCode: 99,
+      }),
+    ).toThrow(/already exists/);
+    // The lock file is gone — `finally { releaseTasksLock }` ran, no leak.
+    expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
   });
 
   // Mimic execFileSync's failure shape: attach .stderr to the error so
@@ -2434,5 +2506,100 @@ describe("tasks-CLI critical-section lock", () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-nogit-"));
     expect(acquireTasksLock(dir)).toBeNull();
     expect(() => releaseTasksLock(null)).not.toThrow();
+  });
+});
+
+describe("duplicate RFC-dir reconciliation", () => {
+  // Build a real rfcs/ tree: each entry is `dirName -> { readme?, stories }`.
+  function makeTasks(
+    layout: Record<string, { readme?: boolean; stories?: Record<string, string> }>,
+  ): string {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-dup-"));
+    for (const [name, spec] of Object.entries(layout)) {
+      const rfcDir = join(dir, "rfcs", name);
+      mkdirSync(rfcDir, { recursive: true });
+      if (spec.readme)
+        writeFileSync(join(rfcDir, "README.md"), `---\nstatus: active\n---\n# ${name}\n`);
+      for (const [story, body] of Object.entries(spec.stories ?? {})) {
+        mkdirSync(join(rfcDir, "stories"), { recursive: true });
+        writeFileSync(join(rfcDir, "stories", story), body);
+      }
+    }
+    return dir;
+  }
+
+  it("rewriteRfcRefs rewrites both frontmatter and body mentions", () => {
+    const text = `---\nrfc: "0000-foo"\n---\nSee rfcs/0000-foo/README.md for 0000-foo.\n`;
+    expect(rewriteRfcRefs(text, "0000-foo", "0031-foo")).toBe(
+      `---\nrfc: "0031-foo"\n---\nSee rfcs/0031-foo/README.md for 0031-foo.\n`,
+    );
+  });
+
+  it("findDuplicateRfcDirs flags only placeholder dirs with a finalized twin", () => {
+    const dir = makeTasks({
+      "0000-foo": { stories: { "r1.md": "x" } }, // duplicate: 0031-foo exists
+      "0031-foo": { readme: true },
+      "0000-bar": { readme: true }, // lone placeholder — no twin, NOT flagged
+      "0030-baz": { readme: true }, // finalized, no placeholder — NOT flagged
+    });
+    const dups = findDuplicateRfcDirs(dir);
+    expect(dups).toEqual([{ draftSlug: "0000-foo", finalSlug: "0031-foo", bareSlug: "foo" }]);
+  });
+
+  it("also matches legacy draft- placeholder prefix", () => {
+    const dir = makeTasks({
+      "draft-foo": { stories: { "r1.md": "x" } },
+      "0031-foo": { readme: true },
+    });
+    expect(findDuplicateRfcDirs(dir)).toEqual([
+      { draftSlug: "draft-foo", finalSlug: "0031-foo", bareSlug: "foo" },
+    ]);
+  });
+
+  // The race: a story added to 0000-<slug> survives a rebase onto a main that
+  // already finalized it to NNNN-<slug>, leaving two dirs for one RFC.
+  it("reconcile migrates stranded stories into the finalized dir and removes the placeholder", () => {
+    const dir = makeTasks({
+      "0000-schema-cache": {
+        stories: { "r1.md": `---\nrfc: "0000-schema-cache"\n---\nbody refs 0000-schema-cache\n` },
+      },
+      "0031-schema-cache": { readme: true },
+    });
+    expect(reconcileDuplicateRfcDirs(dir)).toBe(true);
+    // Single dir for the RFC: placeholder gone, story moved with corrected refs.
+    expect(existsSync(join(dir, "rfcs", "0000-schema-cache"))).toBe(false);
+    const moved = join(dir, "rfcs", "0031-schema-cache", "stories", "r1.md");
+    expect(existsSync(moved)).toBe(true);
+    const text = readFileSync(moved, "utf8");
+    expect(text).toContain(`rfc: "0031-schema-cache"`);
+    expect(text).toContain("body refs 0031-schema-cache");
+    expect(text).not.toContain("0000-schema-cache");
+  });
+
+  it("reconcile is a no-op (false) when there is no duplicate pair", () => {
+    const dir = makeTasks({ "0031-foo": { readme: true }, "0000-bar": { readme: true } });
+    expect(reconcileDuplicateRfcDirs(dir)).toBe(false);
+    expect(existsSync(join(dir, "rfcs", "0000-bar"))).toBe(true);
+  });
+
+  // Refuses by THROWING (not process.exit) so the shared tasks lock held by
+  // commitAndPush is released via its `finally` rather than leaked.
+  it("throws when a story of the same name already exists in the finalized dir", () => {
+    const dir = makeTasks({
+      "0000-foo": { stories: { "r1.md": "placeholder" } },
+      "0031-foo": { readme: true, stories: { "r1.md": "finalized" } },
+    });
+    expect(() =>
+      migrateDuplicateRfcDir(dir, {
+        draftSlug: "0000-foo",
+        finalSlug: "0031-foo",
+        bareSlug: "foo",
+      }),
+    ).toThrow(/already exists/);
+    // Pre-flight refusal: both dirs untouched — nothing migrated, nothing removed.
+    expect(readFileSync(join(dir, "rfcs", "0031-foo", "stories", "r1.md"), "utf8")).toBe(
+      "finalized",
+    );
+    expect(existsSync(join(dir, "rfcs", "0000-foo", "stories", "r1.md"))).toBe(true);
   });
 });

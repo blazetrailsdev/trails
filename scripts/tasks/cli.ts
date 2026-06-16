@@ -840,7 +840,14 @@ export function commitAndPush(opts: {
       }
       try {
         opts.mutator();
-        git(["add", opts.fileToStage], { cwd });
+        // A mutation that targeted a stale placeholder slug (e.g. `new` under a
+        // `0000-<slug>` dir after a concurrent `finalize` renamed it to
+        // `NNNN-<slug>` on main) recreates the dead `0000-` dir. Migrate any
+        // stranded stories into the finalized twin before staging so main never
+        // ends up with two dirs for one RFC. When it repaired anything the
+        // mutation's own path may have moved, so stage everything.
+        const reconciled = reconcileDuplicateRfcDirs(cwd);
+        git(["add", reconciled ? "-A" : opts.fileToStage], { cwd });
         git(["commit", "-q", "-m", opts.message], { cwd });
       } catch (e) {
         // Atomic rollback: a throw between the file write and the commit (a
@@ -1599,6 +1606,12 @@ export function formatFiles(files: string[], tasksDir = TASKS_DIR): void {
 // This runs the same build script loadIndex() falls back to, in place.
 function reindex(): void {
   inGitTasks();
+  // Repair any pre-existing duplicate `0000-`/`NNNN-` pair before rebuilding so
+  // the index reflects the single finalized dir. Leaves the migration in the
+  // working tree for the user to commit (build is a local-only operation).
+  if (reconcileDuplicateRfcDirs(TASKS_DIR)) {
+    console.error("reconcile: repaired duplicate RFC dir(s); review and commit the changes");
+  }
   execFileSync(process.execPath, ["scripts/build-index.mjs"], {
     cwd: TASKS_DIR,
     stdio: "inherit",
@@ -1858,6 +1871,122 @@ export function newStory(
     createdPath: storyFile,
   });
   console.log(`created ${rfcSlug}/stories/${storySlug}.md`);
+}
+
+// ──────────────────── duplicate RFC-dir reconciliation ────────────────────
+
+// One placeholder dir (`0000-<slug>` / legacy `draft-<slug>`) found alongside
+// its already-finalized twin (`NNNN-<slug>`, NNNN ≠ 0000) — the duplicate-dir
+// race: a mutation referenced the stale placeholder slug (or rebased a commit
+// that did) after a concurrent `finalize` renamed the dir on main, leaving two
+// dirs for one RFC with stories stranded under the dead `0000-` prefix.
+export interface DuplicateRfcDir {
+  draftSlug: string; // dir name, e.g. "0000-foo" or "draft-foo"
+  finalSlug: string; // finalized dir name, e.g. "0031-foo"
+  bareSlug: string; // shared slug without the numeric/draft prefix, e.g. "foo"
+}
+
+// Scan rfcs/ for placeholder dirs whose bare <slug> already exists as a
+// finalized NNNN-<slug>. A lone placeholder with no finalized twin (a normal
+// pre-finalize RFC) is NOT flagged — only the duplicate pair is.
+export function findDuplicateRfcDirs(tasksDir: string): DuplicateRfcDir[] {
+  const rfcsDir = join(tasksDir, "rfcs");
+  let names: string[];
+  try {
+    names = readdirSync(rfcsDir);
+  } catch {
+    return [];
+  }
+  const dirs = names.filter((n) => {
+    try {
+      return statSync(join(rfcsDir, n)).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+  // bare slug → finalized dir name (NNNN ≠ 0000).
+  const finalized = new Map<string, string>();
+  for (const n of dirs) {
+    const m = /^(\d{4})-(.+)$/.exec(n);
+    if (m && m[1] !== "0000") finalized.set(m[2], n);
+  }
+  const dups: DuplicateRfcDir[] = [];
+  for (const n of dirs) {
+    const m = /^(?:0000|draft)-(.+)$/.exec(n);
+    if (!m) continue;
+    const finalSlug = finalized.get(m[1]);
+    if (finalSlug) dups.push({ draftSlug: n, finalSlug, bareSlug: m[1] });
+  }
+  return dups;
+}
+
+// Rewrite every reference to the placeholder dir slug (e.g. `0000-foo` /
+// `draft-foo`) to the finalized slug (`0031-foo`) throughout a story's text —
+// both the `rfc:` frontmatter scalar and any body mentions. A plain global
+// replace is safe: the placeholder slug carries the full bare slug, so it can't
+// collide with unrelated text.
+export function rewriteRfcRefs(text: string, draftSlug: string, finalSlug: string): string {
+  return text.split(draftSlug).join(finalSlug);
+}
+
+// Migrate every story from a placeholder dir into its finalized twin (rewriting
+// refs), then remove the now-dead placeholder dir. Refuses (exit 1) when a story
+// of the same name already exists in the target — a real conflict for a human to
+// resolve, not a mechanical migration. Returns the migrated story basenames.
+// Does no git of its own; the caller stages the result.
+export function migrateDuplicateRfcDir(tasksDir: string, dup: DuplicateRfcDir): string[] {
+  const rfcsDir = join(tasksDir, "rfcs");
+  const fromDir = join(rfcsDir, dup.draftSlug);
+  const fromStories = join(fromDir, "stories");
+  const toStories = join(rfcsDir, dup.finalSlug, "stories");
+  let storyNames: string[] = [];
+  try {
+    storyNames = readdirSync(fromStories).filter((n) => n.endsWith(".md"));
+  } catch {
+    /* no stories dir under the placeholder — nothing to migrate */
+  }
+  for (const name of storyNames) {
+    if (existsSync(join(toStories, name))) {
+      // THROW, don't process.exit: this collision can fire inside
+      // commitAndPush's acquired tasks lock (reconcile runs after the mutator,
+      // before commit). process.exit would skip the lock's `finally` and leak
+      // the shared lock until stale-steal. Throwing instead unwinds through
+      // commitAndPush's mutator try/catch (rollback + re-throw) and out to the
+      // `finally { releaseTasksLock }`. The check is pre-flight — no fs mutation
+      // has happened yet — so the rollback stays clean.
+      throw new Error(
+        `cannot reconcile duplicate RFC dir rfcs/${dup.draftSlug}: story ` +
+          `"${name}" already exists in rfcs/${dup.finalSlug}/stories. Resolve by hand.`,
+      );
+    }
+  }
+  if (storyNames.length > 0) mkdirSync(toStories, { recursive: true });
+  const migrated: string[] = [];
+  for (const name of storyNames) {
+    const text = readFileSync(join(fromStories, name), "utf8");
+    writeFileSync(join(toStories, name), rewriteRfcRefs(text, dup.draftSlug, dup.finalSlug));
+    migrated.push(name);
+  }
+  // The finalized twin already owns the README; anything left in the placeholder
+  // (a stale README, the emptied stories dir) is the dead duplicate — discard it.
+  rmSync(fromDir, { recursive: true, force: true });
+  return migrated;
+}
+
+// Detect and repair every duplicate `0000-`/`NNNN-` pair in the checkout.
+// Returns true when at least one pair was migrated (so callers can adjust their
+// git staging to `-A`). No-op (returns false) on a clean tree.
+export function reconcileDuplicateRfcDirs(cwd: string | undefined): boolean {
+  const dir = cwd ?? TASKS_DIR;
+  const dups = findDuplicateRfcDirs(dir);
+  for (const dup of dups) {
+    const migrated = migrateDuplicateRfcDir(dir, dup);
+    console.error(
+      `reconcile: merged duplicate RFC dir rfcs/${dup.draftSlug} → rfcs/${dup.finalSlug}` +
+        (migrated.length ? ` (${migrated.length} story file(s))` : ""),
+    );
+  }
+  return dups.length > 0;
 }
 
 // ──────────────────── finalize RFC ────────────────────
