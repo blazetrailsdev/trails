@@ -12,13 +12,12 @@ const PG_OID_MAX = 0xffffffff;
 export class Oid extends UnsignedInteger {
   override readonly name: string = "oid";
 
-  constructor(options?: { limit?: number }) {
-    // PG OIDs are unsigned 32-bit. IntegerType's default signed range
-    // (limit=4 → max 2^31-1) rejects half the valid OID space at
-    // serialize time. Use limit=8 so the base range check permits the
-    // full unsigned-32 window; we clamp to it explicitly below.
-    super({ limit: options?.limit ?? 8 });
-  }
+  // Rails' `class Oid < Type::UnsignedInteger` sets no :limit, so the
+  // introspected column reports `limit == nil` and `t.oid` dumps bare. We
+  // must not pass a limit either: UnsignedInteger already doubles the
+  // default-limit-4 signed max (2^31) to 2^32, giving exactly the unsigned-32
+  // OID window [0, 0xffffffff] — no expanded limit is needed for range
+  // coverage. Carrying limit=8 surfaced a spurious `limit: 8` on oid columns.
 
   override type(): string {
     return "oid";
@@ -37,10 +36,9 @@ export class Oid extends UnsignedInteger {
   }
 
   /**
-   * IntegerType.isSerializable only checks the signed range for the
-   * expanded limit=8 — it'd green-light negatives and values past
-   * 0xffffffff, which cast would then turn into null. Gate both on
-   * the unsigned-32 window.
+   * cast clamps to the unsigned-32 window (returning null for negatives or
+   * values past 0xffffffff); mirror that here so isSerializable agrees with
+   * what serialize will actually emit.
    */
   override isSerializable(value: unknown): boolean {
     if (value == null) return true;
