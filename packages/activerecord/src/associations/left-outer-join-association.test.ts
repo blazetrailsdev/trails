@@ -214,7 +214,10 @@ describe("LeftOuterJoinAssociationTest", () => {
       ]).toArray();
     });
     const sql = queries.join("\n");
-    expect(/"friendships"\."friend_id"/i.test(sql)).toBe(true);
-    expect(/"friendships"\."follower_id"/i.test(sql)).toBe(true);
+    // Mirrors Rails' quote_table_name("friendships.friend_id"): identifier
+    // quoting is adapter-specific — double-quotes on SQLite/PG, backticks on
+    // MySQL/MariaDB — so match either quote char.
+    expect(/["`]friendships["`]\.["`]friend_id["`]/i.test(sql)).toBe(true);
+    expect(/["`]friendships["`]\.["`]follower_id["`]/i.test(sql)).toBe(true);
   });
 });
