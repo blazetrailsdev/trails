@@ -1,97 +1,46 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Trails-internal HABTM harness — no 1:1 Rails counterpart. Rides the canonical
+ * `developers` / `projects` / `developers_projects` tables and the canonical
+ * `Developer` / `Project` models that drive `has_and_belongs_to_many` in Rails.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, loadHabtm } from "../index.js";
-import { Associations } from "../associations.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import "../index.js";
+import { registerModel, association } from "../associations.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Developer as CanonicalDeveloper } from "../test-helpers/models/developer.js";
+import { Project as CanonicalProject } from "../test-helpers/models/project.js";
 
 describe("has_and_belongs_to_many", () => {
-  let adapter: TestDatabaseAdapter;
+  const { developers, projects } = useHandlerFixtures(
+    ["developers", "projects", "developersProjects"],
+    { schema: canonicalSchema },
+  );
 
-  beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      posts: { title: "string" },
-      tags: { name: "string" },
-      developers: { name: "string" },
-      projects: { name: "string" },
-      posts_tags: { post_id: "integer", tag_id: "integer" },
-      developers_projects: { developer_id: "integer", project_id: "integer" },
-    });
+  beforeEach(() => {
+    registerModel("Developer", CanonicalDeveloper);
+    registerModel("Project", CanonicalProject);
   });
-  withTransactionalFixtures(() => adapter);
 
   it("loads associated records through a join table", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("title", "string");
-    Post.adapter = adapter;
-    Associations.hasAndBelongsToMany.call(Post, "tags", { joinTable: "posts_tags" });
-
-    class Tag extends Base {
-      static _tableName = "tags";
-    }
-    Tag.attribute("id", "integer");
-    Tag.attribute("name", "string");
-    Tag.adapter = adapter;
-    registerModel(Tag);
-    registerModel(Post);
-
-    const post = await Post.create({ title: "Hello" });
-    const t1 = await Tag.create({ name: "ruby" });
-    const t2 = await Tag.create({ name: "rails" });
-    const t3 = await Tag.create({ name: "js" });
-
-    // Manually insert into join table
-    await adapter.executeMutation(
-      `INSERT INTO "posts_tags" ("post_id", "tag_id") VALUES (${post.id}, ${t1.id})`,
-    );
-    await adapter.executeMutation(
-      `INSERT INTO "posts_tags" ("post_id", "tag_id") VALUES (${post.id}, ${t2.id})`,
-    );
-
-    const tags = await loadHabtm(post, "tags", { joinTable: "posts_tags" });
-    expect(tags).toHaveLength(2);
-    const names = tags.map((t: any) => t.name).sort();
-    expect(names).toEqual(["rails", "ruby"]);
+    // `david` joins both projects via the `developers_projects` join table.
+    const david = developers("david");
+    const projectList = await association<CanonicalProject>(david, "projects").toArray();
+    expect(projectList).toHaveLength(2);
+    const names = projectList.map((p) => p.name).sort();
+    expect(names).toEqual(["Active Controller", "Active Record"]);
   });
 
   it("uses default join table name (alphabetical)", async () => {
-    class Developer extends Base {
-      static _tableName = "developers";
-    }
-    Developer.attribute("id", "integer");
-    Developer.attribute("name", "string");
-    Developer.adapter = adapter;
-    Associations.hasAndBelongsToMany.call(Developer, "projects");
-    registerModel(Developer);
-
-    class Project extends Base {
-      static _tableName = "projects";
-    }
-    Project.attribute("id", "integer");
-    Project.attribute("name", "string");
-    Project.adapter = adapter;
-    registerModel(Project);
-
-    const dev = await Developer.create({ name: "Alice" });
-    const proj = await Project.create({ name: "Rails" });
-
-    // Default join table: alphabetical order of pluralized names
-    // "developers" and "projects" -> "developers_projects"
-    await adapter.executeMutation(
-      `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${proj.id})`,
-    );
-
-    const projects = await loadHabtm(dev, "projects", {});
-    expect(projects).toHaveLength(1);
-    expect(projects[0].name).toBe("Rails");
+    // `Project.has_and_belongs_to_many :developers` declares no explicit
+    // join table, so it resolves to the alphabetical default
+    // ("developers" + "projects" -> "developers_projects").
+    const activeRecord = projects("active_record");
+    const devs = await association<CanonicalDeveloper>(activeRecord, "developers").toArray();
+    expect(devs.length).toBeGreaterThan(0);
+    expect(devs.map((d) => d.name)).toContain("David");
   });
 });

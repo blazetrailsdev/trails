@@ -27,7 +27,6 @@
   "packages/activerecord/src/associations/disable-joins-routing-widening.test.ts",
   "packages/activerecord/src/associations/eager.test.ts",
   "packages/activerecord/src/associations/extension.test.ts",
-  "packages/activerecord/src/associations/habtm.test.ts",
   "packages/activerecord/src/associations/has-and-belongs-to-many-associations.test.ts",
   "packages/activerecord/src/associations/has-many-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-associations.test.ts",
