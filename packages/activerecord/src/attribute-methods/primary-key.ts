@@ -102,7 +102,13 @@ interface PrimaryKeyInstance {
  */
 export function getId(this: PrimaryKeyInstance): unknown {
   const ctor = this.constructor as any;
-  const pk = ctor.primaryKey as string | string[];
+  const pk = ctor.primaryKey as string | string[] | null;
+  if (pk == null) {
+    // Rails: `_read_attribute(@primary_key)` with a nil primary key reads
+    // through the AttributeSet's Null attribute, which returns nil without
+    // raising (unlike the write path, which raises MissingAttributeError).
+    return null;
+  }
   if (Array.isArray(pk)) return pk.map((col) => this._readAttribute(col));
   return this._readAttribute(pk);
 }

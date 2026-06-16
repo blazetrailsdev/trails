@@ -327,6 +327,20 @@ describe("PrimaryKeysTest", () => {
     }).toThrow(MissingAttributeError);
   });
 
+  it("id returns nil if primary key doesnt exist", async () => {
+    // Rails AttributeMethods::PrimaryKey#id reads through the AttributeSet's
+    // Null attribute for a key-less table, returning nil without raising
+    // (asymmetric with id=, which raises MissingAttributeError).
+    class AnonDashboard extends Base {
+      static {
+        this._tableName = "dashboards";
+      }
+    }
+    await AnonDashboard.loadSchema();
+    expect(AnonDashboard.primaryKey).toBe(null);
+    expect(new AnonDashboard().id).toBe(null);
+  });
+
   it("reconfiguring primary key resets composite primary key", () => {
     class AnonCpkBooks extends Base {
       static {
