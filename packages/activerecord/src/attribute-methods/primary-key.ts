@@ -117,9 +117,9 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
   if (pk == null) {
     // Rails: `_write_attribute(@primary_key, value)` with a nil primary key
     // routes through the AttributeSet's Null attribute, which raises
-    // MissingAttributeError("can't write unknown attribute `#{name}`"). Mirror
-    // that for a key-less table (e.g. a view), interpolating the nil pk.
-    throw new MissingAttributeError(`can't write unknown attribute \`${pk ?? ""}\``);
+    // MissingAttributeError("can't write unknown attribute `#{name}`"). The nil
+    // pk interpolates to an empty name, so the backticks are empty here too.
+    throw new MissingAttributeError("can't write unknown attribute ``");
   }
   if (Array.isArray(pk)) {
     if (!Array.isArray(value)) {
