@@ -24,6 +24,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
@@ -407,11 +408,18 @@ describe("InsertAllTest", () => {
     // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
   });
 
-  it.skip("upsert and db warnings", () => {
-    // BLOCKED: db-warnings facility — Rails wraps the upsert in
-    // with_db_warnings_action(:raise) (insert_all_test.rb:360); no such setting
-    // exists, leaving only a vacuous no-op assertion.
-    // RFC 0030 d2-insert-all-canonical-models.
+  it("upsert and db warnings", async () => {
+    try {
+      await withDbWarningsAction("raise", async () => {
+        await expect(
+          Book.upsert({ id: 1001, name: "Remote", author_id: 1 }),
+        ).resolves.not.toThrow();
+      });
+    } finally {
+      // We need to explicitly remove the record, because `withDbWarningsAction`
+      // prevents the wrapping transaction from being rolled back.
+      await Book.delete(1001);
+    }
   });
 
   it.skip("upsert all logs message including model name", () => {
