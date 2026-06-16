@@ -33,9 +33,11 @@ import { Car } from "./test-helpers/models/car.js";
 import { Wheel } from "./test-helpers/models/wheel.js";
 import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/bulb.js";
 import { Engine } from "./test-helpers/models/engine.js";
+import { Reader } from "./test-helpers/models/reader.js";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { assertQueriesCount } from "./testing/query-assertions.js";
+import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
+import { adapterType } from "./test-adapter.js";
 
 describe("OptimisticLockingTest", () => {
   // Mirrors Rails `fixtures :people, :legacy_things, :references,
@@ -828,6 +830,12 @@ describe("PessimisticLockingTest", () => {
   // file left in the shared worker DB.
   const { people } = useHandlerFixtures(["people"], { schema: canonicalSchema });
 
+  // `eager find with lock` traverses Person's `has_many :readers`, so the
+  // Reader model must be registered for the reflection to resolve.
+  beforeAll(() => {
+    registerModel("Reader", Reader);
+  });
+
   it("typical find with lock", async () => {
     await Person.transaction(async () => {
       const locked = await Person.all().lock().find(people("michael").id);
@@ -835,8 +843,12 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  it.skip("eager find with lock", () => {
-    // BLOCKED: associations — needs eager loading (includes) with lock support
+  // Rails guards this with `unless current_adapter?(:PostgreSQLAdapter)` —
+  // PostgreSQL protests SELECT ... FOR UPDATE on an outer join.
+  it.skipIf(adapterType === "postgres")("eager find with lock", async () => {
+    await Person.transaction(async () => {
+      await Person.includes("readers").lock().find(people("michael").id);
+    });
   });
 
   it("lock does not raise when the object is not dirty", async () => {
@@ -896,12 +908,24 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  it.skip("lock sending custom lock statement", async () => {
-    // BLOCKED: unknown — needs query matching infrastructure
+  // Rails guards this with `if current_adapter?(:PostgreSQLAdapter)`.
+  it.skipIf(adapterType !== "postgres")("lock sending custom lock statement", async () => {
+    await Person.transaction(async () => {
+      const person = await Person.find(people("michael").id);
+      await assertQueriesMatch(/LIMIT \$?\d FOR SHARE NOWAIT/, undefined, false, async () => {
+        await person.lockBang("FOR SHARE NOWAIT");
+      });
+    });
   });
 
-  it.skip("with lock sets isolation", () => {
-    // BLOCKED: transactions — needs transaction isolation level support
+  // Rails guards this with `if current_adapter?(:PostgreSQLAdapter)`.
+  it.skipIf(adapterType !== "postgres")("with lock sets isolation", async () => {
+    const adapter = Base.connection as any;
+    const person = await Person.find(people("michael").id);
+    await person.withLock({ isolation: "read_uncommitted" }, async () => {
+      const currentTransaction = adapter.transactionManager.currentTransaction;
+      expect(currentTransaction.isolationLevel).toBe("read_uncommitted");
+    });
   });
 
   it("with lock locks with no args", async () => {
@@ -911,7 +935,10 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  it.skip("no locks no wait", () => {
-    // BLOCKED: connection-pool — requires concurrent database connections
-  });
+  // PERMANENT-SKIP: thread-based concurrency. Rails' `duel` spawns two
+  // `Thread.new` blocks that each open a `joinable: false` transaction and
+  // race on the same row, then asserts on wall-clock ordering. There is no
+  // single-threaded JS equivalent (same class as the excluded
+  // Marshal/YAML/thread/fork permanent-skips), so this stays skipped.
+  it.skip("no locks no wait", () => {});
 });

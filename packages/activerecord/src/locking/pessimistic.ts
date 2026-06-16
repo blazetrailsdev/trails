@@ -25,9 +25,12 @@ export async function lockBang<T extends Base>(
     );
   }
   const ctor = this.constructor as typeof Base;
+  // Mirrors Rails `lock!`, which reloads via `relation.lock(value).find(id)` —
+  // a primary-key lookup that always carries `LIMIT 1` ahead of the lock clause.
   const sm = ctor.arelTable
     .project(arelStar)
     .where((ctor as any)._buildPkWhereNode(this.id))
+    .take(1)
     .lock(lockClause);
   const conn = ctor.connection;
   const sql = conn.toSql(sm);
