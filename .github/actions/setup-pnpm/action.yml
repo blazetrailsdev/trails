@@ -50,11 +50,15 @@ runs:
     # Node differs from inputs.node-version, validating pnpm under the
     # wrong Node could spuriously fail (or worse, succeed for the wrong
     # reason). No `cache: pnpm` — the whole point of the self-hosted path
-    # is to avoid GitHub's hosted cache service.
+    # is to avoid GitHub's hosted cache service. setup-node v5 defaults
+    # `package-manager-cache: true`, which reads the `packageManager` field
+    # from package.json and would silently re-enable that hosted pnpm-store
+    # cache (the 1 TB WAN-egress incident above) — so pin it off explicitly.
     - if: runner.environment != 'github-hosted'
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: ${{ inputs.node-version }}
+        package-manager-cache: false
     - if: runner.environment != 'github-hosted'
       shell: bash
       env:

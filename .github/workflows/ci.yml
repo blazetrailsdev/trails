@@ -359,6 +359,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          # This job runs prettier via `npx` and never installs pnpm, but
+          # setup-node v5 defaults `package-manager-cache: true` and would
+          # try to cache the pnpm store from the `packageManager` field in
+          # package.json — failing with "Unable to locate executable pnpm".
+          package-manager-cache: false
       # Check only the files changed on this PR/push, not the whole tree.
       # `__ALL__` is the fallback sentinel from the `changes` job (diff
       # couldn't be computed); empty means nothing checkable changed.
