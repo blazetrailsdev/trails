@@ -740,7 +740,11 @@ export function loadSchema(this: SchemaHost): void {
   // whose first sync `columnsHash()` lands after the cache was wiped (and which
   // has no attribute reflection of its own) would otherwise synthesize an empty
   // hash — un-qualifying its projections. Borrow the reflection from an
-  // already-loaded same-table sibling on the same connection.
+  // already-loaded same-table sibling on the same connection. Like the
+  // synthesize fallback below, this restores `columnsHash()`/projection
+  // qualification only — it does not define prototype accessors. `_schemaLoaded`
+  // is set at the end (matching the synthesize path), so a later async load
+  // won't re-reflect; that mirrors the pre-existing fallback's contract.
   if (workHost._attributeDefinitions.size === 0) {
     const borrowed = borrowSameTableColumns(workHost);
     if (borrowed) {
@@ -773,9 +777,17 @@ export function loadSchema(this: SchemaHost): void {
 
 /**
  * Find an already-loaded model that maps to the same table and connection as
- * `host` and return a fresh clone of its `_attributeDefinitions`. Used to
- * recover column reflection synchronously when the schema cache has been
- * cleared (the in-memory cache cannot be re-read from the DB on a sync path).
+ * `host` and return a new map over its `_attributeDefinitions`. Used to recover
+ * column reflection synchronously when the schema cache has been cleared (the
+ * in-memory cache cannot be re-read from the DB on a sync path).
+ *
+ * Only the map is new — the `def` values are shared by reference with the
+ * sibling, which is safe because defs are replaced (never mutated in place) on
+ * a later reflection. The borrowing model applies its own `ignoredColumns` at
+ * read time in `columnsHash()`, so the source must carry the *unfiltered*
+ * column set: skip any sibling that has its own `ignoredColumns` (whose
+ * schema-sourced defs `applyColumnsHash` already removed), or the borrower
+ * would silently inherit the sibling's ignores and be missing columns.
  */
 function borrowSameTableColumns(host: SchemaHost): Map<string, unknown> | null {
   const registry = (host as unknown as { _modelsByName?: Map<string, typeof Base> })._modelsByName;
@@ -795,6 +807,7 @@ function borrowSameTableColumns(host: SchemaHost): Map<string, unknown> | null {
     if (sib === host) continue;
     if (getAbstractClass.call(sib as any)) continue;
     if (sib._attributeDefinitions == null || sib._attributeDefinitions.size === 0) continue;
+    if ((sib._ignoredColumns?.length ?? 0) > 0) continue;
     let sibTable: string;
     let sibConnection: unknown;
     try {
