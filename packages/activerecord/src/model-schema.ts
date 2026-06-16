@@ -734,6 +734,20 @@ export function loadSchema(this: SchemaHost): void {
     return;
   }
 
+  // Cache-miss recovery: Rails models that share a table share one schema
+  // cache entry, so a never-loaded model still sees the table's columns. Our
+  // schema cache is per-connection and gets cleared between tests, so a model
+  // whose first sync `columnsHash()` lands after the cache was wiped (and which
+  // has no attribute reflection of its own) would otherwise synthesize an empty
+  // hash — un-qualifying its projections. Borrow the reflection from an
+  // already-loaded same-table sibling on the same connection.
+  if (workHost._attributeDefinitions.size === 0) {
+    const borrowed = borrowSameTableColumns(workHost);
+    if (borrowed) {
+      workHost._attributeDefinitions = borrowed;
+    }
+  }
+
   // Fallback: no schema cache — synthesize a columnsHash view on the
   // work host so subclasses don't fork _columnsHash (which would persist
   // past a later base reflection).
@@ -755,6 +769,44 @@ export function loadSchema(this: SchemaHost): void {
     workHost._columnsHash = hash;
   }
   workHost._schemaLoaded = true;
+}
+
+/**
+ * Find an already-loaded model that maps to the same table and connection as
+ * `host` and return a fresh clone of its `_attributeDefinitions`. Used to
+ * recover column reflection synchronously when the schema cache has been
+ * cleared (the in-memory cache cannot be re-read from the DB on a sync path).
+ */
+function borrowSameTableColumns(host: SchemaHost): Map<string, unknown> | null {
+  const registry = (host as unknown as { _modelsByName?: Map<string, typeof Base> })._modelsByName;
+  if (!registry) return null;
+
+  let table: string;
+  let connection: unknown;
+  try {
+    table = host.tableName;
+    connection = host.connection;
+  } catch {
+    return null;
+  }
+
+  for (const sibling of registry.values()) {
+    const sib = sibling as unknown as SchemaHost;
+    if (sib === host) continue;
+    if (getAbstractClass.call(sib as any)) continue;
+    if (sib._attributeDefinitions == null || sib._attributeDefinitions.size === 0) continue;
+    let sibTable: string;
+    let sibConnection: unknown;
+    try {
+      sibTable = sib.tableName;
+      sibConnection = sib.connection;
+    } catch {
+      continue;
+    }
+    if (sibTable !== table || sibConnection !== connection) continue;
+    return new Map(sib._attributeDefinitions);
+  }
+  return null;
 }
 
 function getColumnsHash(host: SchemaHost): Record<string, unknown> {
