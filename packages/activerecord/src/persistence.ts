@@ -37,7 +37,7 @@ import { reconcileVirtualAttributes } from "./model-schema.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
-  _instantiate(row: Record<string, unknown>, columnTypes?: Record<string, unknown>): any;
+  _instantiate(row: Record<string, unknown>, block?: (record: any) => void): any;
   /** @internal */
   discriminateClassForRecord?(attributes: Record<string, unknown>): PersistenceHost;
   primaryKey: string | string[];
@@ -130,9 +130,11 @@ export function instantiate(
   const klass = this.discriminateClassForRecord
     ? this.discriminateClassForRecord(attributes)
     : this;
-  const record = klass._instantiate(attributes, columnTypes);
-  if (block) block(record);
-  return record;
+  // `columnTypes` is unused by `_instantiate` (schema cast types come from the
+  // model's attribute definitions); thread the block so it runs before the
+  // find/initialize callbacks, mirroring Rails' `init_with_attributes` yield.
+  void columnTypes;
+  return klass._instantiate(attributes, block);
 }
 
 /**
@@ -1650,14 +1652,13 @@ export function _raiseRecordNotTouchedError(): never {
 
 /** @internal */
 function instantiateInstanceOf(
-  klass: { _instantiate(attrs: Record<string, unknown>, colTypes?: Record<string, unknown>): any },
+  klass: { _instantiate(attrs: Record<string, unknown>, block?: (r: any) => void): any },
   attributes: Record<string, unknown>,
   columnTypes: Record<string, unknown> = {},
   block?: (r: any) => void,
 ): any {
-  const record = klass._instantiate(attributes, columnTypes);
-  block?.(record);
-  return record;
+  void columnTypes;
+  return klass._instantiate(attributes, block);
 }
 
 /** @internal */

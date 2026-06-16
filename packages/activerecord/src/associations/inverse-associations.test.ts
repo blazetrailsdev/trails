@@ -2,10 +2,19 @@
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, association, registerModel, InverseOfAssociationNotFoundError } from "../index.js";
+import {
+  Base,
+  association,
+  registerModel,
+  InverseOfAssociationNotFoundError,
+  InverseOfAssociationRecursiveError,
+} from "../index.js";
 import { loadBelongsTo, loadHasOne, loadHasMany, setBelongsTo } from "../associations.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
 import { Interest } from "../test-helpers/models/interest.js";
@@ -15,7 +24,7 @@ import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Rating } from "../test-helpers/models/rating.js";
-import { Post } from "../test-helpers/models/post.js";
+import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Sponsor } from "../test-helpers/models/sponsor.js";
 import { Club } from "../test-helpers/models/club.js";
@@ -373,12 +382,15 @@ describe("InverseHasOneTests", () => {
 });
 
 describe("InverseHasManyTests", () => {
-  const { humans, comments } = useHandlerFixtures(
-    ["humans", "interests", "posts", "authors", "comments"],
+  const { humans, comments, authors } = useHandlerFixtures(
+    // authors before posts: a `ref("authors", …)` in the posts fixtures resolves
+    // to a CRC32 fallback id unless the authors set is already loaded, which
+    // would orphan every post's `author_id`.
+    ["humans", "interests", "authors", "posts", "comments"],
     { schema: canonicalSchema },
   );
   beforeAll(() => {
-    [Human, Interest, Post, Author, Comment].forEach((m) => registerModel(m));
+    [Human, Interest, Post, SpecialPost, Author, Comment].forEach((m) => registerModel(m));
   });
 
   it("parent instance should be shared with every child on find", async () => {
@@ -394,10 +406,30 @@ describe("InverseHasManyTests", () => {
     }
   });
 
-  it.skip("parent instance should be shared with every child on find for sti", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. STI scoped
-    // collection (special_posts) returns 0 rows when loaded — STI
-    // association-scope gap, not an inverse_of gap.
+  it("parent instance should be shared with every child on find for sti", async () => {
+    const author = authors("david");
+    const posts = await loadHasMany(author, "posts", { inverseOf: "author" });
+    expect(posts.length).toBeGreaterThan(0);
+    for (const post of posts) {
+      expect((post as any).author.name).toBe((author as any).name);
+      (author as any).name = "Bongo";
+      expect((post as any).author.name).toBe((author as any).name);
+      (post as any).author.name = "Mungo";
+      expect((post as any).author.name).toBe((author as any).name);
+    }
+
+    const specialPosts = await loadHasMany(author, "specialPosts", {
+      className: "SpecialPost",
+      inverseOf: "author",
+    });
+    expect(specialPosts.length).toBeGreaterThan(0);
+    for (const post of specialPosts) {
+      expect((post as any).author.name).toBe((author as any).name);
+      (author as any).name = "Bongo";
+      expect((post as any).author.name).toBe((author as any).name);
+      (post as any).author.name = "Mungo";
+      expect((post as any).author.name).toBe((author as any).name);
+    }
   });
 
   it("parent instance should be shared with eager loaded children", async () => {
@@ -604,14 +636,36 @@ describe("InverseHasManyTests", () => {
     expect(human.isPersisted()).toBe(false);
   });
 
-  it.skip("inverse instance should be set before find callbacks are run", () => {
-    // Tracked: RFC 0030 inverse-of-single-association-access-convergence. The
-    // has_many inverse is wired AFTER the child's find callbacks fire.
+  it("inverse instance should be set before find callbacks are run", async () => {
+    (Interest as any).afterFind((interest: any) => {
+      if (!(interest.association("human").isLoaded() && interest.human != null)) {
+        throw new Error("inverse not set before after_find");
+      }
+    });
+    try {
+      const human = (await Human.first())!;
+      const interests = await loadHasMany(human, "interests", { inverseOf: "human" });
+      expect(interests.length).toBeGreaterThan(0);
+    } finally {
+      (Interest as any).resetCallbacks("find");
+    }
   });
 
-  it.skip("inverse instance should be set before initialize callbacks are run", () => {
-    // Tracked: RFC 0030 inverse-of-single-association-access-convergence. Same
-    // ordering gap as the find-callbacks case.
+  it("inverse instance should be set before initialize callbacks are run", async () => {
+    (Interest as any).afterInitialize((interest: any) => {
+      if (!interest.isNewRecord()) {
+        if (!(interest.association("human").isLoaded() && interest.human != null)) {
+          throw new Error("inverse not set before after_initialize");
+        }
+      }
+    });
+    try {
+      const human = (await Human.first())!;
+      const interests = await loadHasMany(human, "interests", { inverseOf: "human" });
+      expect(interests.length).toBeGreaterThan(0);
+    } finally {
+      (Interest as any).resetCallbacks("initialize");
+    }
   });
 
   it("inverse works when the association self references the same object", async () => {
@@ -789,11 +843,6 @@ describe("InverseBelongsToTests", () => {
     // recursive build inverse chain (topic.branch.branch).
   });
 
-  it.skip("recursive inverse on recursive model has many inversing", () => {
-    // Tracked: RFC 0030 inverse-of-single-association-access-convergence.
-    // InverseOfAssociationRecursiveError is not raised on direct access.
-  });
-
   it.skip("unscope does not set inverse when incorrect", () => {
     // Tracked: inverse-associations-fixture-port follow-up. Needs relation
     // .or()/.unscope() inversable? guard semantics.
@@ -891,9 +940,20 @@ describe("InversePolymorphicBelongsToTests", () => {
     // stale-state preservation across child save with validation.
   });
 
-  it.skip("inversed instance should load after autosave if it is not already loaded", () => {
-    // Tracked: RFC 0030 inverse-of-single-association-access-convergence.
-    // Needs autosave to load the not-yet-loaded inverse has_one after save.
+  it("inversed instance should load after autosave if it is not already loaded", async () => {
+    const human = await Human.createBang({});
+    await Face.createBang({ human_id: (human as any).id });
+    const faceAssoc = (human as any).association("autosaveFace");
+    const face = (await faceAssoc.loadTarget()) as any;
+
+    await face.reload(); // clear cached load of autosave_human
+    face.description = "new description";
+    await human.saveBang();
+
+    // After the owner save, autosave's set_inverse_instance must have wired the
+    // child's belongs_to back to the owner without a fresh DB load.
+    expect(face.association("autosaveHuman").isLoaded()).toBe(true);
+    expect(face.association("autosaveHuman").target).not.toBeNull();
   });
 
   it("should not try to set inverse instances when the inverse is a has many", async () => {
@@ -977,5 +1037,29 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
     interest.buildZine({ title: "Get Some in Winter! 2008" });
     interest.buildHuman({ name: "Gordon" });
     await interest.saveBang();
+  });
+});
+
+describe("InverseBranchRecursiveTests", () => {
+  setupHandlerSuite();
+  beforeAll(async () => {
+    await defineSchema(canonicalSchema);
+    [Branch, BrokenBranch].forEach((m) => registerModel(m));
+  });
+
+  it("recursive inverse on recursive model has many inversing", async () => {
+    await withHasManyInversing(BrokenBranch, async () => {
+      const main = await BrokenBranch.create({});
+      const feature = (await association(main, "branches").create({})) as Base;
+      const topic = association(feature, "branches").build({}) as Base;
+      const err = await loadBelongsTo(topic, "branch", {
+        className: "BrokenBranch",
+        inverseOf: "branch",
+      }).catch((e) => e);
+      expect(err).toBeInstanceOf(InverseOfAssociationRecursiveError);
+      expect((err as Error).message).toBe(
+        "Inverse association branch (:branch in BrokenBranch) is recursive.",
+      );
+    });
   });
 });

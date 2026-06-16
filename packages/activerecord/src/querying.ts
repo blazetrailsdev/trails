@@ -120,9 +120,10 @@ export function _loadFromSql<T extends typeof Base>(
     // column (full STI dispatch) and instantiate_instance_of(self, …) otherwise
     // (skip dispatch). _instantiate short-circuits the STI lookup when the
     // column value is absent (undefined is falsy), covering both paths.
-    rows.map((row) => this._instantiate(row)),
+    // The block is threaded into instantiate so it runs (Rails'
+    // `init_with_attributes` yield) before the find/initialize callbacks.
+    rows.map((row) => this._instantiate(row, block as ((r: InstanceType<T>) => void) | undefined)),
   );
-  if (block) records.forEach(block);
   return records;
 }
 
