@@ -193,6 +193,7 @@ export class TransactionInstrumenter {
  */
 export class NullTransaction {
   state: TransactionState | undefined = undefined;
+  readonly savepointName: string | null = null;
 
   get open(): boolean {
     return false;
@@ -296,6 +297,7 @@ export interface TransactionConnection extends DatabaseAdapter {
  */
 export class Transaction {
   readonly state = new TransactionState();
+  readonly savepointName: string | null = null;
   private _callbacks: TransactionCallback[] | null = null;
   private _records: unknown[] | null = null;
   private _lazyEnrollmentRecords: Map<unknown, unknown> | null = null;
