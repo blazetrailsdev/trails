@@ -1043,7 +1043,9 @@ export class SchemaStatements {
 
   async indexes(
     tableName: string,
-  ): Promise<Array<{ name: string; columns: string[]; unique: boolean }>> {
+    // `columns` is a string for expression indexes (the raw expression) and an
+    // array of column names otherwise, mirroring Rails' IndexDefinition#columns.
+  ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
     switch (this.adapterName) {
       case "sqlite": {
         const rows = await this.adapter.execute(`PRAGMA index_list("${tableName}")`);

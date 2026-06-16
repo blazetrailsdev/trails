@@ -67,7 +67,9 @@ export interface ColumnInfo {
 }
 
 export interface IndexInfo {
-  columns: string[];
+  // A string for expression indexes (the raw expression), an array of column
+  // names otherwise — mirrors Rails' IndexDefinition#columns.
+  columns: string | string[];
   unique: boolean;
   name?: string;
   /** Per-column max lengths (number for single-column, Record for multi). */
@@ -93,12 +95,14 @@ export interface IndexInfo {
  * a single scalar (`{name:10, description:10}` → `10`).
  */
 function conciseIndexLengths(
-  columns: string[],
+  columns: string | string[],
   lengths: number | Record<string, number> | undefined,
 ): number | Record<string, number> | undefined {
   if (lengths == null || typeof lengths === "number") return lengths;
+  // An expression index carries `columns` as a string; a per-column prefix-length
+  // map only applies to a column array, so guard before comparing counts.
   const values = Object.values(lengths);
-  if (columns.length === values.length && new Set(values).size === 1) {
+  if (Array.isArray(columns) && columns.length === values.length && new Set(values).size === 1) {
     return values[0];
   }
   return lengths;
@@ -482,7 +486,7 @@ class AdapterSchemaSource implements SchemaSource {
   /** @internal */
   async indexes(tableName: string): Promise<IndexInfo[]> {
     type RichIdx = {
-      columns: string[];
+      columns: string | string[];
       unique: boolean;
       name?: string;
       where?: string;
@@ -513,7 +517,7 @@ class AdapterSchemaSource implements SchemaSource {
       name: idx.name,
       where: idx.where,
       orders:
-        typeof idx.orders === "string"
+        typeof idx.orders === "string" && Array.isArray(idx.columns)
           ? Object.fromEntries(idx.columns.map((c) => [c, idx.orders as string]))
           : idx.orders,
       nullsNotDistinct: idx.nullsNotDistinct,
@@ -1145,10 +1149,15 @@ export class SchemaDumper {
 
   /** @internal */
   indexParts(index: IndexInfo): string[] {
+    // Expression indexes carry the raw expression as a string and dump verbatim
+    // (Rails `index.columns.inspect`); column lists dump as an array, with the
+    // single-column shorthand.
     const cols =
-      index.columns.length === 1
-        ? JSON.stringify(index.columns[0])
-        : `[${index.columns.map((c) => JSON.stringify(c)).join(", ")}]`;
+      typeof index.columns === "string"
+        ? JSON.stringify(index.columns)
+        : index.columns.length === 1
+          ? JSON.stringify(index.columns[0])
+          : `[${index.columns.map((c) => JSON.stringify(c)).join(", ")}]`;
     const parts: string[] = [cols];
     if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
     if (index.unique) parts.push("unique: true");

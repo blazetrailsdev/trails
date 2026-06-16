@@ -35,7 +35,9 @@ type AdapterWithForeignKeys = {
 /** Minimal index descriptor shared by all adapters. */
 export interface IntrospectedIndex {
   name: string;
-  columns: string[];
+  // A string for expression indexes (the raw expression), an array of column
+  // names otherwise — mirrors Rails' IndexDefinition#columns.
+  columns: string | string[];
   unique: boolean;
   /** Partial-index predicate; undefined when adapter does not surface it. */
   where?: string;

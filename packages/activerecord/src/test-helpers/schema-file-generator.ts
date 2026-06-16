@@ -11,7 +11,7 @@
 
 import { getEnv, getOsAsync } from "@blazetrails/activesupport";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
-import type { Schema, ColumnSpec, TableSchema } from "./define-schema.js";
+import type { Schema, ColumnSpec, TableSchema, IndexSpec } from "./define-schema.js";
 
 const SCHEMA_TO_AR: Record<string, string> = { big_integer: "bigint" };
 
@@ -30,13 +30,19 @@ function toArType(primitive: string, adapterName?: string): string {
   return map[primitive] ?? primitive;
 }
 
-function isWrapped(
-  t: TableSchema,
-): t is { columns: Record<string, ColumnSpec>; primaryKey: string[] | false } {
+function isWrapped(t: TableSchema): t is {
+  columns: Record<string, ColumnSpec>;
+  primaryKey?: string[] | false;
+  indexes?: IndexSpec[];
+} {
   if (!t || typeof t !== "object") return false;
-  if (!("primaryKey" in t)) return false;
-  const pk = (t as { primaryKey?: unknown }).primaryKey;
-  return pk === false || Array.isArray(pk);
+  if (!("columns" in t)) return false;
+  if ("primaryKey" in t) {
+    const pk = (t as { primaryKey?: unknown }).primaryKey;
+    if (pk !== false && !Array.isArray(pk)) return false;
+    return true;
+  }
+  return Array.isArray((t as { indexes?: unknown }).indexes);
 }
 
 function columnsOf(t: TableSchema): Record<string, ColumnSpec> {
@@ -46,7 +52,11 @@ function columnsOf(t: TableSchema): Record<string, ColumnSpec> {
 }
 
 function primaryKeyOf(t: TableSchema): string[] | false | undefined {
-  return isWrapped(t) ? (t as { primaryKey: string[] | false }).primaryKey : undefined;
+  return isWrapped(t) ? (t as { primaryKey?: string[] | false }).primaryKey : undefined;
+}
+
+function indexesOf(t: TableSchema): IndexSpec[] {
+  return isWrapped(t) ? ((t as { indexes?: IndexSpec[] }).indexes ?? []) : [];
 }
 
 // `integer` and `big_integer` both map to an auto-increment serial/identity PK
@@ -162,6 +172,30 @@ function generateCode(schema: Schema, adapterName?: string): string {
         );
       }
       lines.push(`  });`);
+    }
+
+    // Emit indexes after the table (Rails `t.index`). The partial `where` is
+    // dropped at SQL generation on adapters without partial-index support, so
+    // it needs no gate here. An expression index (string column with non-word
+    // characters, e.g. "(lower(external_id))") is gated below.
+    for (const index of indexesOf(tableSpec)) {
+      const isExpression = typeof index.columns === "string" && /\W/.test(index.columns);
+      // Coarse `adapterName === "mysql"` gate (not the precise
+      // `supports_expression_index?`, which is true on MySQL 8.0.13+) because
+      // the generator has no DB version. This is exact for the only live
+      // caller — the PG-only template path (template-global-setup.ts) — where
+      // MySQL/SQLite build via defineSchema's runtime supportsExpressionIndex
+      // check instead. A future MySQL-template caller would need that check
+      // here to avoid dropping the index on MySQL 8.
+      if (isExpression && adapterName === "mysql") continue;
+      const optEntries: string[] = [];
+      if (index.unique) optEntries.push(`unique: true`);
+      if (index.where !== undefined) optEntries.push(`where: ${JSON.stringify(index.where)}`);
+      if (index.name !== undefined) optEntries.push(`name: ${JSON.stringify(index.name)}`);
+      const opts = optEntries.length === 0 ? `{}` : `{ ${optEntries.join(", ")} }`;
+      lines.push(
+        `  await ctx.addIndex(${JSON.stringify(tableName)}, ${JSON.stringify(index.columns)}, ${opts});`,
+      );
     }
   }
 

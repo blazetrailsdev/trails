@@ -12,14 +12,12 @@
  * left `it.skip` with a BLOCKED tag and tracked by RFC 0030 follow-up stories:
  *   - insert_all/upsert_all returning an ActiveRecord::Result (RETURNING
  *     extraction) — d2-insert-all-returning-result
- *   - schema-cache unique-index introspection; TEST_SCHEMA also drops the
- *     books unique/partial/expression indexes — d2-insert-all-unique-index-introspection
  *   - SQL logging assertions, db-warnings, has_many_through guards,
  *     partitioned indexes, Speedometer no-DB-key — d2-insert-all-canonical-models
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "./index.js";
-import { UnknownAttributeError } from "./errors.js";
+import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -44,6 +42,11 @@ import { Subscription } from "./test-helpers/models/subscription.js";
 const supportsInsertConflictTarget = adapterType !== "mysql";
 const supportsInsertReturning = adapterType !== "mysql";
 const isMysql = adapterType === "mysql";
+// MySQL/MariaDB lack partial indexes; MariaDB also lacks expression indexes.
+// The harness collapses both to adapterType "mysql", so gate off it — matching
+// Rails' supports_partial_index? / supports_expression_index? on the tests.
+const supportsPartialIndex = adapterType !== "mysql";
+const supportsExpressionIndex = adapterType !== "mysql";
 
 // ReadonlyNameBook < Book with attr_readonly :name (insert_all_test.rb:14).
 class ReadonlyNameBook extends Book {
@@ -89,7 +92,18 @@ describe("InsertAllTest", () => {
   registerModel("Speedometer", Speedometer);
   registerModel("Subscriber", Subscriber);
   registerModel("Subscription", Subscription);
-  useHandlerFixtures(["authors", "books"], { schema: canonicalSchema });
+  useHandlerFixtures(["authors", "books"], {
+    schema: canonicalSchema,
+    // These two raise a DB-level RecordNotUnique; a PG unique violation aborts
+    // the surrounding transaction and poisons transactional-fixtures teardown,
+    // so run them unwrapped (the per-test fixture reseed cleans up). The other
+    // raising tests fail in find_unique_index_for (ArgumentError) before any SQL.
+    usesTransaction: [
+      "insert all raises on duplicate records",
+      "insert all will raise if duplicates are skipped only for a certain conflict target",
+      "insert all and upsert all with index finding options",
+    ],
+  });
 
   beforeAll(async () => {
     ReadonlyNameBook.attrReadonly("name");
@@ -151,10 +165,16 @@ describe("InsertAllTest", () => {
     expect((await Book.upsertAll([])).length).toBe(0);
   });
 
-  it.skip("insert all raises on duplicate records", () => {
-    // BLOCKED: unique-index introspection — Rails relies on the unique index on
-    // [author_id, name] to raise RecordNotUnique, but TEST_SCHEMA drops secondary
-    // indexes. RFC 0030 d2-insert-all-unique-index-introspection.
+  it("insert all raises on duplicate records", async () => {
+    // The third row collides with the awdr fixture (author_id 1, "Agile Web
+    // Development with Rails") on the unique [author_id, name] index.
+    await expect(
+      Book.insertAllBang([
+        { name: "Rework", author_id: 1 },
+        { name: "Patterns of Enterprise Application Architecture", author_id: 1 },
+        { name: "Agile Web Development with Rails", author_id: 1 },
+      ]),
+    ).rejects.toThrow(RecordNotUnique);
   });
 
   it("insert all returns ActiveRecord Result", async () => {
@@ -225,34 +245,83 @@ describe("InsertAllTest", () => {
     await expect(Book.insertAll([{}])).resolves.not.toThrow();
   });
 
-  it.skip("insert all with skip duplicates and autonumber id not given", () => {
-    // BLOCKED: unique-index introspection — relies on the [author_id, name]
-    // unique index. RFC 0030 d2-insert-all-unique-index-introspection.
+  it("insert all with skip duplicates and autonumber id not given", async () => {
+    const before = (await Book.count()) as number;
+    // Duplicates per the unique [author_id, name] index, but their IDs are not
+    // specified, so one is skipped by the index rather than by id.
+    await Book.insertAll([
+      { author_id: 8, name: "Refactoring" },
+      { author_id: 8, name: "Refactoring" },
+    ]);
+    expect(((await Book.count()) as number) - before).toBe(1);
   });
 
-  it.skip("insert all with skip duplicates and autonumber id given", () => {
-    // BLOCKED: unique-index introspection — relies on the [author_id, name]
-    // unique index. RFC 0030 d2-insert-all-unique-index-introspection.
+  it("insert all with skip duplicates and autonumber id given", async () => {
+    const before = (await Book.count()) as number;
+    await Book.insertAll([
+      { id: 200, author_id: 8, name: "Refactoring" },
+      { id: 201, author_id: 8, name: "Refactoring" },
+    ]);
+    expect(((await Book.count()) as number) - before).toBe(1);
   });
 
-  it.skip("skip duplicates strategy does not secretly upsert", () => {
-    // BLOCKED: unique-index introspection — relies on the [author_id, name]
-    // unique index. RFC 0030 d2-insert-all-unique-index-introspection.
+  it("skip duplicates strategy does not secretly upsert", async () => {
+    const book = await Book.create({ format: "EXPECTED", author_id: 8, name: "Refactoring" });
+    const before = (await Book.count()) as number;
+    await Book.insertAll([{ format: "UNEXPECTED", author_id: 8, name: "Refactoring" }]);
+    expect((await Book.count()) as number).toBe(before);
+    await book.reload();
+    expect(book.format).toBe("EXPECTED");
   });
 
-  it.skip("insert all will raise if duplicates are skipped only for a certain conflict target", () => {
-    // BLOCKED: unique-index introspection — unique_by an index name.
-    // RFC 0030 d2-insert-all-unique-index-introspection.
-  });
+  it.skipIf(!supportsInsertConflictTarget)(
+    "insert all will raise if duplicates are skipped only for a certain conflict target",
+    async () => {
+      // The awdr fixture occupies id 1; the conflict target is (author_id, name),
+      // so the colliding primary key surfaces as RecordNotUnique.
+      await expect(
+        Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }], {
+          uniqueBy: "index_books_on_author_id_and_name",
+        }),
+      ).rejects.toThrow(RecordNotUnique);
+    },
+  );
 
-  it.skip("insert all and upsert all with index finding options", () => {
-    // BLOCKED: unique-index introspection. RFC 0030 d2-insert-all-unique-index-introspection.
-  });
+  it.skipIf(!supportsInsertConflictTarget)(
+    "insert all and upsert all with index finding options",
+    async () => {
+      const before = (await Book.count()) as number;
+      await Book.insertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" });
+      await Book.insertAll([{ name: "Remote", author_id: 1 }], { uniqueBy: ["author_id", "name"] });
+      await Book.insertAll([{ name: "Renote", author_id: 1 }], {
+        uniqueBy: "index_books_on_isbn",
+      });
+      await Book.insertAll([{ name: "Recoat", author_id: 1 }], { uniqueBy: "id" });
+      expect(((await Book.count()) as number) - before).toBe(4);
 
-  it.skip("insert all and upsert all with expression index", () => {
-    // BLOCKED: unique-index introspection (expression index dropped by TEST_SCHEMA).
-    // RFC 0030 d2-insert-all-unique-index-introspection.
-  });
+      await expect(
+        Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" }),
+      ).rejects.toThrow(RecordNotUnique);
+    },
+  );
+
+  it.skipIf(!supportsInsertConflictTarget || !supportsExpressionIndex)(
+    "insert all and upsert all with expression index",
+    async () => {
+      const book = await Book.create({ external_id: "abc" });
+      const before = (await Book.count()) as number;
+      await Book.insertAll([{ external_id: "ABC" }], {
+        uniqueBy: "index_books_on_lower_external_id",
+      });
+      expect(((await Book.count()) as number) - before).toBe(0);
+
+      await Book.upsertAll([{ external_id: "Abc" }], {
+        uniqueBy: "index_books_on_lower_external_id",
+      });
+      await book.reload();
+      expect(book.external_id).toBe("Abc");
+    },
+  );
 
   it.skipIf(!supportsInsertConflictTarget)(
     "insert all and upsert all raises when index is missing",
@@ -268,15 +337,37 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skip("insert all and upsert all finds index with inverted unique by columns", () => {
-    // BLOCKED: unique-index introspection. RFC 0030 d2-insert-all-unique-index-introspection.
-  });
+  it.skipIf(!supportsInsertConflictTarget)(
+    "insert all and upsert all finds index with inverted unique by columns",
+    async () => {
+      const before = (await Book.count()) as number;
+      // [author_id, name] has a unique index; passing the columns reversed must
+      // still resolve to it (sorted-column match).
+      await Book.insertAll([{ name: "Remote", author_id: 1 }], { uniqueBy: ["name", "author_id"] });
+      await Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: ["name", "author_id"] });
+      expect(((await Book.count()) as number) - before).toBe(2);
+    },
+  );
 
-  it.skip("insert all and upsert all works with composite primary keys when unique by is provided", () => {
-    // BLOCKED: unique-index introspection — composite-PK conflict target +
-    // "No unique index found for id" on the bang path.
-    // RFC 0030 d2-insert-all-unique-index-introspection.
-  });
+  it.skipIf(!supportsInsertConflictTarget)(
+    "insert all and upsert all works with composite primary keys when unique by is provided",
+    async () => {
+      const before = (await Cart.count()) as number;
+      await Cart.insertAll([{ id: 1, shop_id: 1, title: "My cart" }], {
+        uniqueBy: ["shop_id", "id"],
+      });
+      await Cart.upsertAll([{ id: 3, shop_id: 2, title: "My other cart" }], {
+        uniqueBy: ["shop_id", "id"],
+      });
+      expect(((await Cart.count()) as number) - before).toBe(2);
+
+      // The configured PK is "id"; the DB PK is composite [shop_id, id], so a
+      // bang insert with no unique_by raises on the unmatched "id".
+      await expect(Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart" }])).rejects.toThrow(
+        /No unique index found for id/,
+      );
+    },
+  );
 
   it.skipIf(supportsInsertConflictTarget)(
     "insert all and upsert all works with composite primary keys when unique by is not provided",
@@ -350,11 +441,16 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skip("upsert all updates existing record by configured primary key fails when database supports insert conflict target", () => {
-    // BLOCKED: unique-index introspection — Rails raises "No unique index found
-    // for speedometer_id" because the configured PK has no backing unique index
-    // in the schema cache. RFC 0030 d2-insert-all-unique-index-introspection.
-  });
+  it.skipIf(!supportsInsertConflictTarget)(
+    "upsert all updates existing record by configured primary key fails when database supports insert conflict target",
+    async () => {
+      // speedometer_id is the configured PK but has no backing unique index on
+      // the id-less table, so the conflict-target lookup raises.
+      await expect(
+        Speedometer.upsertAll([{ speedometer_id: "s1", name: "New Speedometer" }]),
+      ).rejects.toThrow(/No unique index found for speedometer_id/);
+    },
+  );
 
   it("upsert all does not update readonly attributes", async () => {
     const newName = "Agile Web Development with Rails, 4th Edition";
@@ -362,9 +458,15 @@ describe("InsertAllTest", () => {
     expect(((await Book.find(1)) as any).name).not.toBe(newName);
   });
 
-  it.skip("upsert all does not update primary keys", () => {
-    // BLOCKED: unique-index introspection — unique_by an index name.
-    // RFC 0030 d2-insert-all-unique-index-introspection.
+  it.skipIf(!supportsInsertConflictTarget)("upsert all does not update primary keys", async () => {
+    await Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7 }]);
+    await Book.upsertAll([{ id: 103, name: "Perelandra", author_id: 7, isbn: "1974522598" }], {
+      uniqueBy: "index_books_on_author_id_and_name",
+    });
+
+    const book = (await Book.findBy({ name: "Perelandra" })) as any;
+    expect(book.id).toBe(101);
+    expect(book.isbn).toBe("1974522598");
   });
 
   it("upsert all passing both on duplicate and update only will raise an error", async () => {
@@ -398,9 +500,29 @@ describe("InsertAllTest", () => {
     expect(book.author_id).toBe(7);
   });
 
-  it.skip("upsert all does not perform an upsert if a partial index doesnt apply", () => {
-    // BLOCKED: unique-index introspection (partial index). RFC 0030 d2-insert-all-unique-index-introspection.
-  });
+  it.skipIf(!supportsInsertConflictTarget || !supportsPartialIndex)(
+    "upsert all does not perform an upsert if a partial index doesnt apply",
+    async () => {
+      await Book.upsertAll([
+        {
+          name: "Out of the Silent Planet",
+          author_id: 7,
+          isbn: "1974522598",
+          published_on: Temporal.Instant.from("1938-04-01T00:00:00Z"),
+        },
+      ]);
+      // The second row's published_on is NULL, so the partial unique index on
+      // isbn does not apply — it inserts rather than updating the first row.
+      await Book.upsertAll([{ name: "Perelandra", author_id: 7, isbn: "1974522598" }], {
+        uniqueBy: "index_books_on_isbn",
+      });
+
+      const names = ((await Book.where({ isbn: "1974522598" }).toArray()) as any[])
+        .map((b) => b.name)
+        .sort();
+      expect(names).toEqual(["Out of the Silent Planet", "Perelandra"]);
+    },
+  );
 
   it("upsert all does not touch updated at when values do not change", async () => {
     const updatedAt = Temporal.Instant.from("2018-01-01T00:00:00Z");
