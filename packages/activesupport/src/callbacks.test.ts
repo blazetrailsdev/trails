@@ -6,6 +6,7 @@ import {
   resetCallbacks,
   runCallbacks,
   CallbacksMixin,
+  CallTemplate,
 } from "./callbacks.js";
 
 describe("Callbacks", () => {
@@ -58,6 +59,63 @@ describe("Callbacks", () => {
       });
 
       expect(target.log).toEqual(["around-before", "block", "around-after"]);
+    });
+
+    it("binds this to the record inside proc/block callbacks (Rails instance_exec)", () => {
+      const target = {
+        seen: [] as unknown[],
+        beforeThis: null as unknown,
+        afterThis: null as unknown,
+        aroundThis: null as unknown,
+        aroundArg: null as unknown,
+      };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "before", function (this: any, record: any) {
+        target.beforeThis = this;
+        target.seen.push(record);
+      });
+      setCallback(target, "save", "after", function (this: any) {
+        target.afterThis = this;
+      });
+      setCallback(target, "save", "around", function (this: any, record: any, next: () => void) {
+        target.aroundThis = this;
+        target.aroundArg = record;
+        next();
+      });
+
+      runCallbacks(target, "save", () => {});
+
+      expect(target.beforeThis).toBe(target);
+      expect(target.afterThis).toBe(target);
+      expect(target.aroundThis).toBe(target);
+      expect(target.aroundArg).toBe(target);
+      expect(target.seen).toEqual([target]);
+    });
+
+    it("InstanceExec call templates bind this to the record (Rails instance_exec)", () => {
+      const target = {};
+      const block = () => "block-result";
+      const seen: Array<{ self: unknown; args: unknown[] }> = [];
+      const record = function (this: unknown, ...args: unknown[]) {
+        seen.push({ self: this, args });
+      };
+
+      // InstanceExec0/1: instance_exec(&block) / instance_exec(target, &block).
+      new CallTemplate.InstanceExec0(record).makeLambda()(target, "v");
+      new CallTemplate.InstanceExec1(record).makeLambda()(target, "v");
+      // InstanceExec2 is the around template: instance_exec(target, block, &block).
+      new CallTemplate.InstanceExec2(record).makeLambda()(target, "v", block);
+
+      expect(seen[0]).toEqual({ self: target, args: [] });
+      expect(seen[1]).toEqual({ self: target, args: [target] });
+      expect(seen[2]).toEqual({ self: target, args: [target, block] });
+    });
+
+    it("InstanceExec2 requires a block (Rails raises ArgumentError without one)", () => {
+      const target = {};
+      const template = new CallTemplate.InstanceExec2(() => undefined);
+      expect(() => template.makeLambda()(target, "v")).toThrow();
+      expect(() => template.makeLambda()(target, "v", null)).toThrow();
     });
 
     it("runs before, around, and after in correct order", () => {

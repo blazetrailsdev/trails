@@ -137,8 +137,10 @@ export class Value {
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate */
 export interface CallTemplate {
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[];
-  makeLambda(): (target: object, value: unknown) => unknown;
-  invertedLambda(): (target: object, value: unknown) => boolean;
+  // Rails make_lambda yields `|target, value, &block|`; the trailing block is the
+  // around continuation, threaded so InstanceExec2/ProcCall can forward it.
+  makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown;
+  invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean;
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::MethodCall */
@@ -238,39 +240,50 @@ export class InstanceExec1 implements CallTemplate {
 
   makeLambda(): (target: object, value: unknown) => unknown {
     const f = this.fn;
-    return (target: object) => f(target);
+    // Rails: target.instance_exec(target, &block) — self IS the record and the
+    // record is also yielded as the block arg. Bind `this` to target.
+    return (target: object) => f.call(target, target);
   }
 
   invertedLambda(): (target: object, value: unknown) => boolean {
     const f = this.fn;
-    return (target: object) => !f(target);
+    return (target: object) => !f.call(target, target);
   }
 
   make(target: object, _value: unknown): unknown {
-    return this.fn(target);
+    return this.fn.call(target, target);
   }
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::InstanceExec2 */
 export class InstanceExec2 implements CallTemplate {
-  constructor(readonly fn: (target: object, value: unknown) => unknown) {}
+  constructor(readonly fn: (target: object, block: (() => unknown) | null) => unknown) {}
 
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
     return [target, this.fn, "instanceExec", target, block];
   }
 
-  makeLambda(): (target: object, value: unknown) => unknown {
+  makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
     const f = this.fn;
-    return (target: object, value: unknown) => f(target, value);
+    // Rails: raise ArgumentError unless block; target.instance_exec(target, block, &@override_block)
+    // — the around continuation is the second positional arg, not the chain `value`.
+    return (target: object, _value: unknown, block?: (() => unknown) | null) => {
+      if (!block) throw new Error("InstanceExec2 callback requires a block");
+      return f.call(target, target, block);
+    };
   }
 
-  invertedLambda(): (target: object, value: unknown) => boolean {
+  invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
     const f = this.fn;
-    return (target: object, value: unknown) => !f(target, value);
+    return (target: object, _value: unknown, block?: (() => unknown) | null) => {
+      if (!block) throw new Error("InstanceExec2 callback requires a block");
+      return !f.call(target, target, block);
+    };
   }
 
-  make(target: object, value: unknown): unknown {
-    return this.fn(target, value);
+  make(target: object, block: (() => unknown) | null): unknown {
+    if (!block) throw new Error("InstanceExec2 callback requires a block");
+    return this.fn.call(target, target, block);
   }
 }
 
@@ -282,14 +295,18 @@ export class ProcCall implements CallTemplate {
     return [this.fn, block, "call", target, value];
   }
 
-  makeLambda(): (target: object, value: unknown) => unknown {
+  makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
     const f = this.fn;
-    return (target: object, value: unknown) => f(target, value);
+    // Rails: @override_block.call(target, value, &block) — no instance_exec, the
+    // proc keeps its own binding; forward target, value and the block.
+    return (target: object, value: unknown, block?: (() => unknown) | null) =>
+      f(target, value, block);
   }
 
-  invertedLambda(): (target: object, value: unknown) => boolean {
+  invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
     const f = this.fn;
-    return (target: object, value: unknown) => !f(target, value);
+    return (target: object, value: unknown, block?: (() => unknown) | null) =>
+      !f(target, value, block);
   }
 
   make(target: object, _value: unknown): unknown {
@@ -355,11 +372,11 @@ export class Before {
       if (!Value.check(callback.options, target)) return true;
       const cb = callback.filter as BeforeCallback;
       if (terminatorFn === false) {
-        cb(target);
+        cb.call(target, target);
         return true;
       } // run but never halt
-      if (terminatorFn) return !terminatorFn(target, () => cb(target));
-      return cb(target) !== false;
+      if (terminatorFn) return !terminatorFn(target, () => cb.call(target, target));
+      return cb.call(target, target) !== false;
     };
   }
 }
@@ -395,7 +412,7 @@ export class After {
   static build(callback: Callback): (target: object) => void {
     return (target: object) => {
       if (!Value.check(callback.options, target)) return;
-      (callback.filter as AfterCallback)(target);
+      (callback.filter as AfterCallback).call(target, target);
     };
   }
 }
@@ -423,7 +440,7 @@ export class Around {
         block();
         return;
       }
-      (callback.filter as AroundCallback)(target, block);
+      (callback.filter as AroundCallback).call(target, target, block);
     };
   }
 }
@@ -519,10 +536,23 @@ export class Callback {
     for (const c of ifConds) userConditions.push((t) => c(t));
     for (const c of unlessConds) userConditions.push((t) => !c(t));
 
-    const callTemplate =
-      typeof this.filter === "function"
-        ? new ProcCall(this.filter)
-        : new MethodCall(this.filter as PropertyKey);
+    // Mirrors ActiveSupport::Callbacks::CallTemplate.build: a Proc/block filter
+    // compiles to InstanceExec{0,1,2} (run via instance_exec, so `self` is the
+    // record) selected by arity; a method-name filter compiles to MethodCall.
+    let callTemplate: CallTemplate;
+    if (typeof this.filter === "function") {
+      const arity = this.filter.length;
+      callTemplate =
+        arity > 1
+          ? new InstanceExec2(
+              this.filter as (target: object, block: (() => unknown) | null) => unknown,
+            )
+          : arity > 0
+            ? new InstanceExec1(this.filter as (target: object) => unknown)
+            : new InstanceExec0(this.filter as () => unknown);
+    } else {
+      callTemplate = new MethodCall(this.filter as PropertyKey);
+    }
 
     if (this.kind === "before") {
       this._compiled = new Before(
@@ -553,13 +583,13 @@ export class Callback {
     if (!Value.check(this.options, target)) return true;
 
     if (this.kind === "before") {
-      return (this.filter as BeforeCallback)(target) !== false;
+      return (this.filter as BeforeCallback).call(target, target) !== false;
     } else if (this.kind === "after") {
-      (this.filter as AfterCallback)(target);
+      (this.filter as AfterCallback).call(target, target);
       return true;
     } else if (this.kind === "around") {
       if (!block) throw new Error("Around callbacks require a block/next function");
-      (this.filter as AroundCallback)(target, block);
+      (this.filter as AroundCallback).call(target, target, block);
       return true;
     }
     return true;
@@ -754,14 +784,14 @@ export class CallbackChain {
       let cbResult: unknown;
       let terminatorHalted = false;
       if (terminatorFn === false) {
-        cbResult = cb(target);
+        cbResult = cb.call(target, target);
       } else if (terminatorFn) {
         terminatorHalted = terminatorFn(target, () => {
-          cbResult = cb(target);
+          cbResult = cb.call(target, target);
           return cbResult;
         });
       } else {
-        cbResult = cb(target);
+        cbResult = cb.call(target, target);
       }
 
       if (isThenable(cbResult)) {
@@ -797,14 +827,14 @@ export class CallbackChain {
             let remVal: unknown;
             let remSyncHalt = false;
             if (terminatorFn === false) {
-              remVal = (rem.filter as BeforeCallback)(target);
+              remVal = (rem.filter as BeforeCallback).call(target, target);
             } else if (terminatorFn) {
               remSyncHalt = terminatorFn(target, () => {
-                remVal = (rem.filter as BeforeCallback)(target);
+                remVal = (rem.filter as BeforeCallback).call(target, target);
                 return remVal;
               });
             } else {
-              remVal = (rem.filter as BeforeCallback)(target);
+              remVal = (rem.filter as BeforeCallback).call(target, target);
             }
             const resolved = isThenable(remVal) ? await remVal : remVal;
             if (remSyncHalt || asyncHalted(resolved))
@@ -844,7 +874,7 @@ export class CallbackChain {
     for (let i = afters.length - 1; i >= 0; i--) {
       const entry = afters[i];
       if (!Value.check(entry.options, target)) continue;
-      const result = (entry.filter as AfterCallback)(target);
+      const result = (entry.filter as AfterCallback).call(target, target);
       if (isThenable(result)) {
         if (opts?.strict === "sync") {
           swallowRejection(result);
@@ -856,7 +886,7 @@ export class CallbackChain {
           await result;
           for (const rem of remaining) {
             if (!Value.check(rem.options, target)) continue;
-            await (rem.filter as AfterCallback)(target);
+            await (rem.filter as AfterCallback).call(target, target);
           }
           return !halted;
         })();
@@ -936,7 +966,7 @@ export class CallbackChain {
         };
         let cbResult: void | Promise<void>;
         try {
-          cbResult = (entry.filter as AroundCallback)(target, next);
+          cbResult = (entry.filter as AroundCallback).call(target, target, next);
         } catch (err) {
           if (pendingProceed) {
             return (async () => {
