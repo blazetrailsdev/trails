@@ -78,11 +78,30 @@ export interface IndexInfo {
   opclasses?: string | Record<string, string>;
   where?: string;
   using?: string;
+  /** MySQL index access method (`"fulltext"` / `"spatial"`). */
+  type?: string;
   nullsNotDistinct?: boolean;
   /** PG covering index INCLUDE columns. */
   include?: string[];
   /** Index comment (MySQL `INDEX_COMMENT`, PG `pg_description`). */
   comment?: string;
+}
+
+/**
+ * Mirrors IndexDefinition#concise_options for index prefix lengths: when every
+ * column carries a length and all are identical, collapse the per-column map to
+ * a single scalar (`{name:10, description:10}` → `10`).
+ */
+function conciseIndexLengths(
+  columns: string[],
+  lengths: number | Record<string, number> | undefined,
+): number | Record<string, number> | undefined {
+  if (lengths == null || typeof lengths === "number") return lengths;
+  const values = Object.values(lengths);
+  if (columns.length === values.length && new Set(values).size === 1) {
+    return values[0];
+  }
+  return lengths;
 }
 
 /**
@@ -464,6 +483,7 @@ class AdapterSchemaSource implements SchemaSource {
       orders?: Record<string, string> | string;
       nullsNotDistinct?: boolean;
       using?: string;
+      type?: string;
       lengths?: number | Record<string, number>;
       opclasses?: string | Record<string, string>;
       include?: string[];
@@ -492,6 +512,7 @@ class AdapterSchemaSource implements SchemaSource {
           : idx.orders,
       nullsNotDistinct: idx.nullsNotDistinct,
       using: idx.using,
+      type: idx.type,
       lengths: idx.lengths,
       opclasses: idx.opclasses,
       include: idx.include,
@@ -1125,7 +1146,8 @@ export class SchemaDumper {
     const parts: string[] = [cols];
     if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
     if (index.unique) parts.push("unique: true");
-    if (index.lengths !== undefined) parts.push(`length: ${this.formatIndexParts(index.lengths)}`);
+    const lengths = conciseIndexLengths(index.columns, index.lengths);
+    if (lengths !== undefined) parts.push(`length: ${this.formatIndexParts(lengths)}`);
     if (index.orders !== undefined) parts.push(`order: ${this.formatIndexParts(index.orders)}`);
     if (index.opclasses !== undefined)
       parts.push(`opclass: ${this.formatIndexParts(index.opclasses)}`);
@@ -1134,6 +1156,8 @@ export class SchemaDumper {
     if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
     if (index.include && index.include.length > 0)
       parts.push(`include: ${JSON.stringify(index.include)}`);
+    // Rails emits `type:` last before `comment:` (schema_dumper.rb#index_parts).
+    if (index.type) parts.push(`type: ${JSON.stringify(index.type)}`);
     if (index.comment) parts.push(`comment: ${JSON.stringify(index.comment)}`);
     return parts;
   }

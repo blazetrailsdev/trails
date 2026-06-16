@@ -1679,6 +1679,8 @@ export class MigrationContext {
       where?: string;
       orders?: Record<string, string>;
       using?: string;
+      type?: string;
+      lengths?: number | Record<string, number>;
       nullsNotDistinct?: boolean;
       include?: string[];
       comment?: string;
@@ -2304,6 +2306,8 @@ export class MigrationContext {
       ifNotExists?: boolean;
       include?: string[];
       using?: string;
+      type?: string;
+      length?: number | Record<string, number>;
       comment?: string;
     },
   ): Promise<void> {
@@ -2311,13 +2315,21 @@ export class MigrationContext {
     const unique = options?.unique ?? false;
     const indexName = options?.name ?? `index_${table}_on_${cols.join("_and_")}`;
     const an = this._adapterName;
-    const uniqueStr = unique ? "UNIQUE " : "";
+    // MySQL FULLTEXT/SPATIAL indexes replace the UNIQUE keyword and ignore it.
+    const typeStr = an === "mysql" && options?.type ? `${options.type.toUpperCase()} ` : "";
+    const uniqueStr = !typeStr && unique ? "UNIQUE " : "";
     const ifNotExistsStr = options?.ifNotExists ? "IF NOT EXISTS " : "";
+    const length = options?.length;
+    const lengthFor = (c: string): number | undefined =>
+      typeof length === "number" ? length : typeof length === "object" ? length[c] : undefined;
     const colsStr = cols
       .map((c) => {
         const isExpr = /\W/.test(c);
         let col = isExpr ? c : this.connection.quoteIdentifier(c);
-        if (an !== "mysql") {
+        if (an === "mysql") {
+          const len = lengthFor(c);
+          if (len != null) col += `(${len})`;
+        } else {
           const ord = options?.order?.[c];
           if (ord) col += ` ${ord.toUpperCase()}`;
         }
@@ -2328,7 +2340,7 @@ export class MigrationContext {
       an === "postgres" && options?.using && options.using !== "btree"
         ? ` USING ${options.using}`
         : "";
-    let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${this.connection.quoteIdentifier(indexName)} ON ${this.connection.quoteTableName(table)}${usingStr} (${colsStr})`;
+    let sql = `CREATE ${typeStr}${uniqueStr}INDEX ${ifNotExistsStr}${this.connection.quoteIdentifier(indexName)} ON ${this.connection.quoteTableName(table)}${usingStr} (${colsStr})`;
     // Clause order mirrors Rails' visit_CreateIndexDefinition
     // (abstract/schema_creation.rb): INCLUDE → NULLS NOT DISTINCT → WHERE.
     if (an === "postgres" && options?.include && options.include.length > 0)
@@ -2351,6 +2363,8 @@ export class MigrationContext {
       where: options?.where,
       orders: options?.order,
       using: usingStr ? options?.using : undefined,
+      type: an === "mysql" ? options?.type : undefined,
+      lengths: an === "mysql" ? options?.length : undefined,
       nullsNotDistinct: options?.nullsNotDistinct,
       include: options?.include,
       comment,
