@@ -5002,6 +5002,14 @@ export class Relation<T extends Base> {
     if (ctes.some((cte) => typeof cte === "function")) {
       throw argumentError("ActiveRecord::Relation#with does not accept a block");
     }
+    // Rails `with` follows the block guard with `check_if_method_has_arguments!`
+    // (query_methods.rb:494). Only its `args.blank? → raise` branch applies here:
+    // the shared `checkIfMethodHasArgumentsBang` helper also flattens plain-object
+    // args into `[key, value, …]`, which would destroy CTE definition hashes
+    // (Rails' `args.flatten!` flattens arrays only, not hashes).
+    if (ctes.length === 0) {
+      throw argumentError("The method .with() must contain arguments.");
+    }
     return this._clone().withBang(...ctes);
   }
 
