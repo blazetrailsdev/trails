@@ -5,6 +5,7 @@ import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { ScopeRegistry } from "./scoping.js";
+import { delegateArrayMethod } from "./relation/delegation.js";
 // Re-export the slot's setter so the package entry and other internal
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -2413,6 +2414,16 @@ function wrapCollectionProxy<T extends Base = Base>(
           ScopeRegistry.setCurrentScope(modelClass as any, prev);
           return result;
         };
+      }
+
+      // Array-method delegation — mirrors Rails' CollectionProxy/Relation
+      // `delegate ... to: :records` (delegation.rb). Falls through here once
+      // the scope and model class don't respond, routing genuine `Array`
+      // methods (e.g. `categories.sort`) through the loaded target. Last in
+      // the trap, so it never shadows own/scope/model methods.
+      if (scopeVal === undefined) {
+        const arrayDelegate = delegateArrayMethod(prop, () => target.target);
+        if (arrayDelegate) return arrayDelegate;
       }
 
       return scopeVal;
