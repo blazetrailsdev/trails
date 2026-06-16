@@ -360,9 +360,15 @@ describe("SchemaDumperTest", () => {
       t.blob("blob_data");
       t.numeric("numeric_number");
     });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toMatch(/t\.binary\("blob_data"\)/);
-    expect(output).toMatch(/t\.decimal\("numeric_number"/);
+    try {
+      const output = SchemaDumper.dump(ctx);
+      expect(output).toMatch(/t\.binary\("blob_data"\)/);
+      expect(output).toMatch(/t\.decimal\("numeric_number"/);
+    } finally {
+      // Drop the bespoke table so it doesn't linger on the shared worker DB
+      // and perturb other files' schema-signature caching / scheduling.
+      await ctx.dropTable("aliased_types");
+    }
   });
   itIfSupports("expression_index", "schema dump expression indices", async () => {
     await ctx.createTable("users", {}, (t) => {
