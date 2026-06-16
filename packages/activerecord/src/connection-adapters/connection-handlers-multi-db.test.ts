@@ -81,20 +81,21 @@ describe("ConnectionHandlersMultiDbTest", () => {
       },
     });
 
-    // `connected_to` force-loads any Relation returned from the block so the
-    // lazy query doesn't escape to a different connection context. In JS an
-    // async block returning a thenable Relation auto-awaits it, so the relation
-    // is loaded within the :secondary scope and `connected_to` resolves to its
-    // records — equivalent to Rails' `relation.first` reading the loaded rows.
-    const records = await Base.connectedTo({ role: "secondary" }, async () => {
+    // Load the relation within the :secondary scope so the query runs against
+    // the connection where the `:memory:` table exists. `load()` returns the
+    // relation itself (then-stripped) so it escapes the block as a loaded
+    // Relation rather than auto-unwrapping to an array.
+    const relation = await Base.connectedTo({ role: "secondary" }, async () => {
       await MultiConnectionTestModel.leaseConnection().executeMutation(
         "CREATE TABLE `multi_connection_test_models` (connection_role VARCHAR (255))",
       );
       await MultiConnectionTestModel.createBang({ connection_role: "reading" });
-      return MultiConnectionTestModel.where({ connection_role: "reading" });
+      return MultiConnectionTestModel.where({ connection_role: "reading" }).load();
     });
 
-    expect(records[0].readAttribute("connection_role")).toBe("reading");
+    // The relation is already loaded, so `.first` returns the cached record
+    // without re-querying in the default (writing) pool — mirroring Rails.
+    expect((await relation.first())!.readAttribute("connection_role")).toBe("reading");
   });
 
   it("establish connection using 3 levels config", () => {
