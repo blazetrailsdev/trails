@@ -37,10 +37,13 @@ describe("CoreTest", () => {
     expect(Topic.name).toBe("Topic");
   });
 
-  it("inspect includes attributes from attributes for inspect", () => {
+  it("inspect includes attributes from attributes for inspect", async () => {
     const { Topic } = makeModel();
-    const t = new Topic({ title: "hello" });
-    expect(t.title).toBe("hello");
+    (Topic as any).attributesForInspect = ["id", "title"];
+    const t = await Topic.create({ title: "hello", author: "david" });
+    const str = t.inspect();
+    expect(str).toBe(`#<Topic id: ${t.id}, title: "hello">`);
+    expect(str).not.toContain("author");
   });
 
   it("inspect instance with lambda date formatter", async () => {
