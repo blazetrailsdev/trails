@@ -734,17 +734,20 @@ export function loadSchema(this: SchemaHost): void {
     return;
   }
 
-  // Cache-miss recovery: Rails models that share a table share one schema
-  // cache entry, so a never-loaded model still sees the table's columns. Our
-  // schema cache is per-connection and gets cleared between tests, so a model
-  // whose first sync `columnsHash()` lands after the cache was wiped (and which
-  // has no attribute reflection of its own) would otherwise synthesize an empty
-  // hash — un-qualifying its projections. Borrow the reflection from an
-  // already-loaded same-table sibling on the same connection. Like the
-  // synthesize fallback below, this restores `columnsHash()`/projection
-  // qualification only — it does not define prototype accessors. `_schemaLoaded`
-  // is set at the end (matching the synthesize path), so a later async load
-  // won't re-reflect; that mirrors the pre-existing fallback's contract.
+  // Cache-miss recovery (defense-in-depth): Rails models that share a table
+  // share one persistent schema-cache entry, so a never-loaded model still sees
+  // the table's columns. trails converged on that by keeping the per-connection
+  // schema cache persistent across tests — `withTransactionalFixtures` now
+  // snapshots and restores it on teardown instead of blanket-clearing, so a
+  // fresh same-table model reads the live cache entry directly via
+  // `loadSchemaFromCacheSync` above. This sibling-borrow is retained as a
+  // backstop for the residual genuinely-cold case (e.g. an explicit
+  // `schemaCache.clear()` mid-test, where trails — unlike Rails — cannot
+  // synchronously re-read columns from the DB). It restores
+  // `columnsHash()`/projection qualification only — it does not define prototype
+  // accessors. `_schemaLoaded` is set at the end (matching the synthesize path),
+  // so a later async load won't re-reflect; that mirrors the pre-existing
+  // fallback's contract.
   if (workHost._attributeDefinitions.size === 0) {
     const borrowed = borrowSameTableColumns(workHost);
     if (borrowed) {
@@ -794,6 +797,12 @@ export function loadSchema(this: SchemaHost): void {
  * back to the empty synthesize (the original un-qualified-projection behavior).
  * That is the conservative choice — better to under-recover than to silently
  * drop columns the borrowing model does not ignore.
+ *
+ * This caveat no longer governs the common path: with the persistent schema
+ * cache (see the recovery comment in `loadSchema`), a fresh same-table model
+ * reads the live cache entry directly and applies its own `ignoredColumns` at
+ * read time, so it does not need a sibling at all. Borrowing only fires in the
+ * residual cold case, where this best-effort behavior is acceptable.
  */
 function borrowSameTableColumns(host: SchemaHost): Map<string, unknown> | null {
   const registry = (host as unknown as { _modelsByName?: Map<string, typeof Base> })._modelsByName;

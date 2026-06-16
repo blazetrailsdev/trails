@@ -68,6 +68,22 @@ function rehydrateColumn(data: unknown): Column {
 // SchemaCache
 // ---------------------------------------------------------------------------
 
+/**
+ * Opaque snapshot of a {@link SchemaCache}'s reflection maps, produced by
+ * {@link SchemaCache#snapshotState} and consumed by
+ * {@link SchemaCache#restoreState}.
+ *
+ * @internal
+ */
+export interface SchemaCacheSnapshot {
+  columns: Map<string, Column[]>;
+  columnsHash: Map<string, Record<string, Column>>;
+  primaryKeys: Map<string, string | string[] | null>;
+  dataSourceExists: Map<string, boolean>;
+  indexes: Map<string, unknown[]>;
+  version: string | number | null;
+}
+
 export class SchemaCache {
   private _columns = new Map<string, Column[]>();
   private _columnsHash = new Map<string, Record<string, Column>>();
@@ -439,6 +455,41 @@ export class SchemaCache {
     this._dataSourceExists.clear();
     this._indexes.clear();
     this._version = null;
+  }
+
+  /**
+   * Capture a shallow snapshot of every reflection map so a caller can restore
+   * the cache to this exact state later. Entries are never mutated in place —
+   * a reflection replaces a table's value rather than editing it — so copying
+   * the Maps is sufficient; the column objects can be shared by reference.
+   *
+   * Used by `withTransactionalFixtures` to revert only the cache mutations a
+   * test's DDL produced (rolled back at the DB) while preserving entries warmed
+   * before the test. Mirrors Rails' persistent process-lifetime schema cache,
+   * which a transactional-fixtures teardown leaves intact — unlike a blanket
+   * `clear()`, which also wipes still-valid unchanged-table entries.
+   *
+   * @internal
+   */
+  snapshotState(): SchemaCacheSnapshot {
+    return {
+      columns: new Map(this._columns),
+      columnsHash: new Map(this._columnsHash),
+      primaryKeys: new Map(this._primaryKeys),
+      dataSourceExists: new Map(this._dataSourceExists),
+      indexes: new Map(this._indexes),
+      version: this._version,
+    };
+  }
+
+  /** @internal Restore the cache to a state captured by {@link snapshotState}. */
+  restoreState(snapshot: SchemaCacheSnapshot): void {
+    this._columns = new Map(snapshot.columns);
+    this._columnsHash = new Map(snapshot.columnsHash);
+    this._primaryKeys = new Map(snapshot.primaryKeys);
+    this._dataSourceExists = new Map(snapshot.dataSourceExists);
+    this._indexes = new Map(snapshot.indexes);
+    this._version = snapshot.version;
   }
 
   // Rails: tables_to_cache(pool) — gets data_sources from connection,

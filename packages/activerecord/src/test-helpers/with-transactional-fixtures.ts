@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, afterEach, afterAll, type TaskContext } from "vitest";
 import type { DatabaseAdapter } from "../adapter.js";
+import type { SchemaCacheSnapshot } from "../connection-adapters/schema-cache.js";
 import { resetTestAdapterState } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { popSkipGlobalReset, pushSkipGlobalReset } from "./skip-global-reset.js";
@@ -38,23 +39,35 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
 }
 
 /**
- * Drop in-memory schema-reflection (columns/indexes/primary-key/data-source
- * exists) so the next test re-reads from the live DB. DDL executed inside an
- * `it()` body — `addColumn`, `createTable`, `changeTable`, etc. — populates
- * the adapter's `SchemaCache`. The outer transaction's rollback reverts the
- * DDL on the database side, but the cache entries it produced survive into
- * the next test and report columns/tables that no longer exist (or vice
- * versa for cached "missing" markers).
+ * Capture the adapter's schema-reflection state at the start of a test so it
+ * can be restored verbatim on teardown.
  *
- * Mirrors how Rails handles teardown via `ConnectionPool#unpin_connection!`:
- * the pool drops its bound state after rollback so the next bind starts
- * fresh. Calling `schemaCache.clear()` from the test-only afterEach keeps
- * the production rollback path untouched.
+ * DDL executed inside an `it()` body — `addColumn`, `createTable`,
+ * `changeTable`, etc. — mutates the adapter's `SchemaCache`. The outer
+ * transaction's rollback reverts that DDL on the database side, so the correct
+ * post-test cache state is exactly the pre-test state: restoring this snapshot
+ * reverts the test's cache mutations while preserving entries warmed before it.
+ *
+ * This replaces the historical blanket `schemaCache.clear()` (PR #2064), which
+ * also wiped still-valid unchanged-table entries — a divergence from Rails,
+ * whose process-lifetime schema cache survives transactional-fixtures teardown
+ * (same-table models therefore share one persistent cache entry). Preserving
+ * unchanged entries lets a fresh same-table model's sync `columnsHash()` read
+ * the live cache entry directly instead of relying on the trails-only
+ * `borrowSameTableColumns` workaround (RFC 0023).
  *
  * @internal
  */
-function clearSchemaCache(adapter: TransactionalFixturesAdapter): void {
-  (adapter as DatabaseAdapter).schemaCache?.clear();
+function snapshotSchemaCache(adapter: TransactionalFixturesAdapter): SchemaCacheSnapshot | null {
+  return (adapter as DatabaseAdapter).schemaCache?.snapshotState() ?? null;
+}
+
+/** @internal Restore the schema cache to a {@link snapshotSchemaCache} state. */
+function restoreSchemaCache(
+  adapter: TransactionalFixturesAdapter,
+  snapshot: SchemaCacheSnapshot | null,
+): void {
+  if (snapshot) (adapter as DatabaseAdapter).schemaCache?.restoreState(snapshot);
 }
 
 /**
@@ -118,13 +131,16 @@ function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPoo
  */
 export interface WithTransactionalFixturesOptions {
   /**
-   * Whether to call `schemaCache.clear()` on the adapter after the outer
-   * transaction rolls back. Defaults to `true`, matching the historical
-   * (and safe-by-default) behavior introduced in PR #2064.
+   * Whether to restore the adapter's schema cache to its pre-test state after
+   * the outer transaction rolls back (reverting cache mutations from DDL run
+   * inside the test while preserving entries warmed before it). Defaults to
+   * `true`, matching the historical safe-by-default behavior introduced in
+   * PR #2064 (which blanket-cleared the cache; now a snapshot/restore preserves
+   * unchanged-table entries — see `snapshotSchemaCache`).
    *
    * Files that do pure DML (no `addColumn` / `createTable` / `changeTable`
-   * inside `it()` bodies) can set this to `false` to skip the
-   * re-introspection cost on every teardown.
+   * inside `it()` bodies) can set this to `false` to skip the snapshot/restore
+   * cost on every teardown.
    */
   invalidateSchemaCache?: boolean;
 
@@ -173,6 +189,11 @@ export function withTransactionalFixtures(
   // discarding signatures for any `defineSchema(...)` that ran inside the
   // `it()` body (whose DDL was rolled back at the DB).
   let outerSig: Map<string, string> | null = null;
+  // Snapshot of the adapter's schema cache taken at the start of each test.
+  // On teardown we restore it — reverting cache mutations from DDL run inside
+  // the `it()` body (whose effects were rolled back at the DB) while preserving
+  // entries warmed before the test (see `snapshotSchemaCache`).
+  let schemaCacheSnapshot: SchemaCacheSnapshot | null = null;
   // Tracks whether we opened an outer transaction for the current test.
   // Tests in usesTransaction run without a wrapping transaction (Rails parity:
   // test_fixtures.rb:108-110 run_in_transaction? returns false for these).
@@ -207,6 +228,7 @@ export function withTransactionalFixtures(
     _txnOpenedForTest = true;
     const adapter = getAdapter();
     outerSig = _snapshotAppliedSchemaSignaturesForAdapter(adapter);
+    schemaCacheSnapshot = invalidateSchemaCache ? snapshotSchemaCache(adapter) : null;
     const pool = pooledAdapterPool(adapter);
     if (pool) {
       // Mirrors Rails test_fixtures.rb:177-184 pin/lease lifecycle:
@@ -243,7 +265,8 @@ export function withTransactionalFixtures(
       const t = tm(adapter);
       while (t.openTransactions > 0) await t.rollbackTransaction();
     }
-    if (invalidateSchemaCache) clearSchemaCache(adapter);
+    if (invalidateSchemaCache) restoreSchemaCache(adapter, schemaCacheSnapshot);
+    schemaCacheSnapshot = null;
     if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(adapter, outerSig);
     outerSig = null;
   });
