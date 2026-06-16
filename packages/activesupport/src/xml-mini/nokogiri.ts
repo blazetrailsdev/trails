@@ -1,5 +1,3 @@
-import type { XmlNode } from "@blazetrails/nokogiri";
-
 const CONTENT_ROOT = "__content__";
 
 function isModuleNotFound(e: unknown, pkg: string): boolean {
@@ -10,9 +8,43 @@ function isModuleNotFound(e: unknown, pkg: string): boolean {
 
 type XmlHash = Record<string, unknown>;
 
-async function loadNokogiri() {
+// @blazetrails/nokogiri is an optional peer dependency, so it may not be
+// resolvable when this file is type-checked in isolation (e.g. before its
+// `dist` is built). These local interfaces describe the slice of the Nokogiri
+// XML DOM surface used below so the dynamic import stays well-typed without
+// depending on the package's own declarations being present.
+interface XmlAttr {
+  nodeName: string;
+  value: string;
+}
+
+interface XmlNode {
+  readonly name: string;
+  readonly content: string;
+  readonly children: XmlNode[];
+  readonly attributeNodes: XmlAttr[];
+  isElement(): boolean;
+  isText(): boolean;
+  isCdata(): boolean;
+}
+
+interface XmlDocument {
+  readonly errors: ReadonlyArray<{ message: string }>;
+  readonly root: XmlNode;
+  dispose(): void;
+}
+
+interface NokogiriModule {
+  parseXml(data: string): XmlDocument;
+}
+
+// Loaded via a non-literal specifier so the optional dependency does not have
+// to resolve at type-check time; the cast pins it to the surface above.
+const NOKOGIRI_PACKAGE = "@blazetrails/nokogiri";
+
+async function loadNokogiri(): Promise<NokogiriModule> {
   try {
-    return await import("@blazetrails/nokogiri");
+    return (await import(NOKOGIRI_PACKAGE)) as unknown as NokogiriModule;
   } catch (e) {
     if (isModuleNotFound(e, "@blazetrails/nokogiri")) {
       throw new Error(
