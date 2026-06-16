@@ -22,6 +22,23 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return super.virtualTables(lines);
   }
 
+  /**
+   * Mirrors Rails' `Column#bigint?` (sql_type based): a live SQLite column
+   * reflects a `bigint` declaration as sqlType `"BIGINT"` with dsl type
+   * `"integer"`, so detect it off sqlType. The `column.bigint` flag covers
+   * mock sources that set it directly.
+   * @internal
+   */
+  protected isBigint(column: Column): boolean {
+    return !!column.bigint || /\bbigint\b/i.test(column.sqlType ?? "");
+  }
+
+  /** @internal */
+  protected override schemaType(column: Column): string {
+    if (this.isBigint(column)) return "bigint";
+    return super.schemaType(column);
+  }
+
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
     return this.schemaType(column) === "integer";
@@ -29,7 +46,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isExplicitPrimaryKeyDefault(column: Column): boolean {
-    return !!column.bigint;
+    return this.isBigint(column);
   }
 
   /** @internal */
