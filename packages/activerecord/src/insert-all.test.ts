@@ -778,13 +778,12 @@ describe("InsertAllTest", () => {
     const fourth = (await Category.find(104)) as any;
     expect(fourth.type).toBeNull();
   });
-  it("upsert and db warnings", async () => {
-    const Book = makeBook();
-    await Book.create({ id: 1001, title: "Existing", author: "1" });
-    // Rails wraps this in with_db_warnings_action(:raise) and asserts nothing
-    // raised; we have no db-warnings facility, so assert the upsert itself
-    // completes cleanly.
-    await expect(Book.upsert({ id: 1001, title: "Remote", author: "1" })).resolves.not.toThrow();
+  it.skip("upsert and db warnings", () => {
+    // BLOCKED: db-warnings facility — insert_all_test.rb:360 wraps the upsert in
+    // with_db_warnings_action(:raise) and asserts nothing is raised. We have no
+    // db_warnings_action setting / warning-to-exception escalation, so the only
+    // assertion left ("upsert resolves") is a vacuous no-op. Keep skipped rather
+    // than ratify the deviation; tracked by RFC 0030 d2-insert-all-canonical-models.
   });
   it.skip("upsert all does notupdates existing record by when there is no key", () => {
     // BLOCKED: relation — insert_all.rb: upsert with no conflict key is no-op
