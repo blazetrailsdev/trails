@@ -25,7 +25,7 @@ describeIfMysql("Mysql2Adapter", () => {
     await adapter.getDatabaseVersion();
   });
 
-  describe("MysqlExplainTest", () => {
+  describe("MySQLExplainTest", () => {
     // mirrors Rails: fixtures :authors, :author_addresses
     const { authors } = useHandlerFixtures(["authors", "authorAddresses", "posts"], {
       schema: canonicalSchema,
@@ -90,7 +90,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
   // TS-only coverage of our buildExplainClause/Relation#explain plumbing. These
   // use defineSchema (DDL), which auto-commits on MySQL and would break the
-  // transactional fixtures above, so they live outside MysqlExplainTest with no
+  // transactional fixtures above, so they live outside MySQLExplainTest with no
   // fixture wrapping. Not Rails tests — kept in a sibling block so test:compare
   // doesn't read them as members of the MySQLExplainTest class.
   describe("explain helpers (trails-only)", () => {
