@@ -111,6 +111,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // model-schema.loadSchema to call adapter.primaryKey(tableName) and
       // store the result (incl. null) on _primaryKey — a cross-cutting
       // change outside this PR's test-only scope.
+      // DEFERRED (RFC 0030): tracked by model-loadschema-nil-primary-key-from-introspection — converge then un-skip.
     });
 
     itIfSupports("foreign_tables", "attributes", async () => {
