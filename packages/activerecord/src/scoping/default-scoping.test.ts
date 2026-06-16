@@ -866,36 +866,24 @@ describe("DefaultScopingTest", () => {
     expect(received).toEqual(expected);
   });
 
-  // ROOT-CAUSE: eager_load/includes/preload of the STI `specialComments` hasMany
-  // builds the wrong foreign key (`comments.special_post_id` instead of
-  // `comments.post_id`), so the faithful body raises `no such column`. Tracked by
-  // upstream-fix story b2-sti-hasmany-preload-foreign-key.
-  it.skip("sti association with unscoped not affected by default scope", async () => {
+  it("sti association with unscoped not affected by default scope", async () => {
     const post = posts("thinking") as any;
     const expected = [comments("does_it_hurt").id];
 
     await (post.specialComments as any).updateAll({ deleted_at: new Date() });
 
     await expect(Post.joins("specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
-    expect(await (post.specialComments as any).reload().toArray()).toEqual([]);
+    expect(await (await (post.specialComments as any).reload()).toArray()).toEqual([]);
+
+    const specialCommentIds = async (rel: any) =>
+      (await (await rel.find(post.id)).specialComments.toArray()).map((c: any) => c.id);
 
     await (SpecialComment as any).unscoped(async () => {
-      const joined = await Post.joins("specialComments").find(post.id);
-      expect((joined as any).id).toBe(post.id);
-      const viaJoins = await (joined as any).specialComments.toArray();
-      expect(viaJoins.map((c: any) => c.id)).toEqual(expected);
-      const eager = (await (
-        (await Post.eagerLoad("specialComments").find(post.id)) as any
-      ).specialComments.toArray()) as any[];
-      expect(eager.map((c) => c.id)).toEqual(expected);
-      const inc = (await (
-        (await Post.includes("specialComments").find(post.id)) as any
-      ).specialComments.toArray()) as any[];
-      expect(inc.map((c) => c.id)).toEqual(expected);
-      const pre = (await (
-        (await Post.preload("specialComments").find(post.id)) as any
-      ).specialComments.toArray()) as any[];
-      expect(pre.map((c) => c.id)).toEqual(expected);
+      expect((await Post.joins("specialComments").find(post.id)).id).toBe(post.id);
+      expect(await specialCommentIds(Post.joins("specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.eagerLoad("specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.includes("specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.preload("specialComments"))).toEqual(expected);
     });
   });
 
