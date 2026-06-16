@@ -1580,11 +1580,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           : `${underscore(ctor.name)}_id`));
     // A composite FK derived from the owner's query_constraints (e.g.
     // Sharded::BlogPost `[blog_id, id]`) pairs each FK column with the owner's
-    // query-constraint key, not its scalar `id`. Rails resolves the owner key
-    // via `active_record_primary_key`, which is the query_constraints list.
+    // query-constraint key, not its scalar `id`. Defer to the reflection's
+    // `activeRecordPrimaryKey` — the single resolver the join/preload paths
+    // already use (Rails `reflection.active_record_primary_key`).
     if (!asName && Array.isArray(foreignKey) && !Array.isArray(primaryKey)) {
-      const qc = ownerQueryConstraintsList.call(ctor as never);
-      if (qc && qc.length === foreignKey.length) primaryKey = qc;
+      const reflection = (ctor as any)._reflectOnAssociation?.(this._assocName);
+      if (Array.isArray(reflection?.activeRecordPrimaryKey)) {
+        primaryKey = reflection.activeRecordPrimaryKey;
+      }
     }
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     // insert_record: assign the owner's FK/type onto the record, then save.

@@ -85,7 +85,6 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
 import * as Reflection from "./reflection.js";
-import { queryConstraintsList as ownerQueryConstraintsList } from "./persistence.js";
 
 /**
  * Association options.
@@ -1453,7 +1452,8 @@ export function computeHasManyWhere(
   // instance's class. For an STI subclass owner (e.g. a `SpecialPost` row whose
   // `has_many :special_comments` is declared on `Post`) the column is still
   // `post_id`, not `special_post_id`. Mirrors Rails using `reflection.foreign_key`.
-  const reflectionFk = (ctor as any)._reflectOnAssociation?.(assocName)?.foreignKey;
+  const reflection = (ctor as any)._reflectOnAssociation?.(assocName);
+  const reflectionFk = reflection?.foreignKey;
   const foreignKey =
     options.foreignKey ??
     reflectionFk ??
@@ -1466,11 +1466,11 @@ export function computeHasManyWhere(
   if (Array.isArray(foreignKey)) {
     // A composite FK derived from the owner's query_constraints (e.g.
     // Sharded::BlogPost `[blog_id, id]`) is keyed against those constraint
-    // columns, not the owner's scalar `id`. Rails resolves the owner key via
-    // `active_record_primary_key`, which is the query_constraints list.
-    if (!Array.isArray(primaryKey)) {
-      const qc = ownerQueryConstraintsList.call(ctor as never);
-      if (qc && qc.length === foreignKey.length) primaryKey = qc;
+    // columns, not the owner's scalar `id`. Defer to the reflection's
+    // `activeRecordPrimaryKey` — the single resolver the join/preload paths
+    // already use (Rails `reflection.active_record_primary_key`).
+    if (!Array.isArray(primaryKey) && Array.isArray(reflection?.activeRecordPrimaryKey)) {
+      primaryKey = reflection.activeRecordPrimaryKey;
     }
     // Composite FK requires a composite PK of matching length — otherwise
     // we'd silently readAttribute(undefined) and produce a bogus/empty
