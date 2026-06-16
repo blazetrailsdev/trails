@@ -222,6 +222,8 @@ const DSL_HELPER_METHODS = new Set([
   "date",
   "datetime",
   "timestamp",
+  // PG timestamp-with-time-zone — TableDefinition.timestamptz helper.
+  "timestamptz",
   "time",
   "binary",
   "json",
