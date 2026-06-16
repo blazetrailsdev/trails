@@ -408,6 +408,9 @@ describe("InsertAllTest", () => {
     // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
   });
 
+  // Rails guards this with `unless in_memory_db?` (insert_all_test.rb:359).
+  // trails' default SQLite worker is file-backed, never `:memory:`, so the
+  // guard is a no-op here and the test runs on every adapter.
   it("upsert and db warnings", async () => {
     try {
       await withDbWarningsAction("raise", async () => {
