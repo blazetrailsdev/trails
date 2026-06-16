@@ -952,11 +952,21 @@ export function _violatesStrictLoading(record: Base, options: AssociationOptions
 /**
  * Whether a lazy load would actually reach `find_target` — and therefore
  * `violates_strict_loading?`. Rails gates the strict-loading check inside
- * `find_target`, which `find_target?` only enters when
- * `!owner.new_record? || foreign_key_present?` (association.rb:320). So a *new*
- * strict-loading owner WITHOUT the foreign key present never raises on a lazy
- * load; it returns nil/[] silently. This returns false for exactly that case so
- * callers can skip the violation, matching `find_target?` / `null_scope?`.
+ * `find_target`, which `find_target?` only enters under macro-specific rules:
+ *
+ *   - has_one/has_many/habtm (`Association#find_target?`, association.rb:320):
+ *     `!loaded? && (!owner.new_record? || foreign_key_present?) && klass` — a
+ *     persisted owner always reaches it; a *new* owner only when the FK is
+ *     present.
+ *   - belongs_to (`BelongsToAssociation#find_target?`,
+ *     belongs_to_association.rb:124): `!loaded? && foreign_key_present? && klass`
+ *     — there is NO new-record short-circuit; the owner-side FK must be present
+ *     even for a persisted owner. (Mirrors the OO belongs_to override of
+ *     `findTargetNeeded` in belongs-to-association.ts.)
+ *
+ * So a strict-loading owner that never reaches `find_target` returns nil/[]
+ * silently. This returns false for exactly those cases so callers can skip the
+ * violation, matching `find_target?` / `null_scope?`.
  *
  * `foreign_key_present?` has the same two-branch dispatch used by the OO
  * association and `CollectionProxy._foreignKeyPresent`: a belongs_to reads the
@@ -973,6 +983,10 @@ function _findTargetReachable(
   options: AssociationOptions,
   kind: "belongsTo" | "foreign",
 ): boolean {
+  // belongs_to requires foreign_key_present? regardless of new/persisted state.
+  if (kind === "belongsTo") {
+    return _associationForeignKeyPresent(record, assocName, options, kind);
+  }
   if (!record.isNewRecord()) return true;
   return _associationForeignKeyPresent(record, assocName, options, kind);
 }

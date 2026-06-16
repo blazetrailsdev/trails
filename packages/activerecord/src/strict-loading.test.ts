@@ -2668,6 +2668,17 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     await expect(loadHabtm(developer, "projects", optionsFor("projects"))).resolves.toEqual([]);
   });
 
+  it("does not raise on lazy loading a belongs_to on a persisted strict-loading owner without the foreign key", async () => {
+    // belongs_to_association.rb:124 find_target? = !loaded? && foreign_key_present?
+    // — no new-record branch, so a persisted owner with a nil FK never reaches
+    // find_target and never raises (matches the OO belongs_to association).
+    const developer = await Developer.find(developers("david").id);
+    developer.firm_id = null as unknown as number;
+    developer.strictLoadingBang();
+    expect(developer.isNewRecord()).toBe(false);
+    await expect(loadBelongsTo(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
+  });
+
   it("raises on lazy loading a belongs_to on a new strict-loading owner with the foreign key present", async () => {
     const developer = new Developer({ name: "New Dev", firm_id: 1 });
     developer.strictLoadingBang();
