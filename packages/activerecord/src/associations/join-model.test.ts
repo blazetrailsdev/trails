@@ -104,8 +104,15 @@ describe("AssociationsJoinModelTest", () => {
 
   it("has many array methods called by method missing", async () => {
     const david = (await Author.find(authors("david").id)) as Author;
+    // Rails routes Array methods (`any?`, `sort`) through the collection
+    // proxy's method_missing. trails exposes the curated `any(fn)` surface
+    // (CollectionProxy#any), so the `any?`-with-block half drives the real
+    // proxy delegation path. trails has no method_missing for arbitrary Array
+    // methods like `sort`, so the second clause sorts the loaded target.
+    expect(
+      await (david as any).categories.any((category: Base) => (category as any).name === "General"),
+    ).toBe(true);
     const cats = (await (david as any).categories.toArray()) as Base[];
-    expect(cats.some((category: any) => category.name === "General")).toBe(true);
-    expect(() => [...cats].sort()).not.toThrow();
+    expect(() => [...cats].sort((a, b) => (a as any).id - (b as any).id)).not.toThrow();
   });
 });
