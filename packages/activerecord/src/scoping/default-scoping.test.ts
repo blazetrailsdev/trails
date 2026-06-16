@@ -883,17 +883,19 @@ describe("DefaultScopingTest", () => {
     });
   });
 
-  // ROOT-CAUSE: `unscope({ where: "title" })` on an STI subclass strips the
-  // implicit STI `type IN (...)` predicate along with the `title` default-scope
-  // condition, so the count returns every row in `posts` instead of just the
-  // STI subtree. Rails keeps the STI type condition (it is not part of the
-  // default scope's where). Tracked by upstream-fix story b2-sti-type-survives-unscope.
-  it.skip("sti conditions are not carried in default scope", async () => {
+  // `unscope({ where: "title" })` strips only the default-scope `title`
+  // predicate; the implicit STI `type IN (...)` condition survives.
+  it("sti conditions are not carried in default scope", async () => {
     await ConditionalStiPost.create({ body: "" });
     await SubConditionalStiPost.create({ body: "" });
     await SubConditionalStiPost.create({ title: "Hello world", body: "" });
     expect(await ConditionalStiPost.count()).toBe(2);
-    expect(await ConditionalStiPost.unscope({ where: "title" }).count()).toBe(3);
+    expect((await ConditionalStiPost.all().toArray()).length).toBe(2);
+    expect((await ConditionalStiPost.unscope({ where: "title" }).toArray()).length).toBe(3);
+
+    expect(await SubConditionalStiPost.count()).toBe(1);
+    expect((await SubConditionalStiPost.all().toArray()).length).toBe(1);
+    expect((await SubConditionalStiPost.unscope({ where: "title" }).toArray()).length).toBe(2);
   });
 
   it("default scope include with count", async () => {
