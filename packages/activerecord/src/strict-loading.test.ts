@@ -22,6 +22,11 @@ import {
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { Developer, AuditLog } from "./test-helpers/models/developer.js";
+import { Ship } from "./test-helpers/models/ship.js";
+import { Project } from "./test-helpers/models/project.js";
+import { Firm } from "./test-helpers/models/company.js";
 
 // ==========================================================================
 // StrictLoadingTest — targets strict_loading_test.rb
@@ -541,12 +546,6 @@ describe("StrictLoadingTest", () => {
       slhotc_firms: { name: "string" },
       slhotc_devs: { name: "string", slhotc_firm_id: "integer" },
       slhotc_members: { name: "string", slhotc_dev_id: "integer" },
-      slnrg_firms: { name: "string" },
-      slnrg_devs: { name: "string", slnrg_firm_id: "integer" },
-      slnrg_logs: { message: "string", slnrg_dev_id: "integer" },
-      slnrg_profiles: { bio: "string", slnrg_dev_id: "integer" },
-      slnrg_projects: { name: "string" },
-      slnrg_devs_projects: { slnrg_dev_id: "integer", slnrg_project_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1886,133 +1885,6 @@ describe("StrictLoadingTest", () => {
     await expect(member.save()).resolves.toBe(true);
     expect(member.isNewRecord()).toBe(false);
   });
-
-  // The functional loaders mirror Rails' `find_target?` gate (association.rb:320):
-  // `violates_strict_loading?` is reached only from inside `find_target`, which
-  // `find_target?` enters when `!owner.new_record? || foreign_key_present?`. So a
-  // new-record strict-loading owner WITHOUT the foreign key present returns nil/[]
-  // silently instead of raising. These cover all four functional loaders.
-  describe("new-record find_target? gate", () => {
-    class SlnrgFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class SlnrgDev extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("slnrg_firm_id", "integer");
-      }
-    }
-    class SlnrgLog extends Base {
-      static {
-        this.attribute("message", "string");
-        this.attribute("slnrg_dev_id", "integer");
-      }
-    }
-    class SlnrgProfile extends Base {
-      static {
-        this.attribute("bio", "string");
-        this.attribute("slnrg_dev_id", "integer");
-      }
-    }
-    class SlnrgProject extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    beforeAll(() => {
-      registerModel("SlnrgFirm", SlnrgFirm);
-      registerModel("SlnrgDev", SlnrgDev);
-      registerModel("SlnrgLog", SlnrgLog);
-      registerModel("SlnrgProfile", SlnrgProfile);
-      registerModel("SlnrgProject", SlnrgProject);
-      Associations.hasMany.call(SlnrgDev, "slnrgLogs", {
-        className: "SlnrgLog",
-        foreignKey: "slnrg_dev_id",
-      });
-      Associations.hasOne.call(SlnrgDev, "slnrgProfile", {
-        className: "SlnrgProfile",
-        foreignKey: "slnrg_dev_id",
-      });
-      Associations.belongsTo.call(SlnrgDev, "slnrgFirm", {
-        className: "SlnrgFirm",
-        foreignKey: "slnrg_firm_id",
-      });
-      Associations.hasAndBelongsToMany.call(SlnrgDev, "slnrgProjects", {
-        className: "SlnrgProject",
-        joinTable: "slnrg_devs_projects",
-        foreignKey: "slnrg_dev_id",
-        associationForeignKey: "slnrg_project_id",
-      });
-    });
-
-    it("does not raise on lazy loading a has_many on a new strict-loading owner without the foreign key", async () => {
-      const dev = new SlnrgDev({ name: "New Dev" });
-      dev.strictLoadingBang();
-      expect(dev.isNewRecord()).toBe(true);
-      await expect(
-        loadHasMany(dev, "slnrgLogs", { className: "SlnrgLog", foreignKey: "slnrg_dev_id" }),
-      ).resolves.toEqual([]);
-    });
-
-    it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
-      const dev = new SlnrgDev({ name: "New Dev" });
-      dev.strictLoadingBang();
-      await expect(
-        loadHasOne(dev, "slnrgProfile", { className: "SlnrgProfile", foreignKey: "slnrg_dev_id" }),
-      ).resolves.toBeNull();
-    });
-
-    it("does not raise on lazy loading a belongs_to on a new strict-loading owner without the foreign key", async () => {
-      const dev = new SlnrgDev({ name: "New Dev" });
-      dev.strictLoadingBang();
-      await expect(
-        loadBelongsTo(dev, "slnrgFirm", { className: "SlnrgFirm", foreignKey: "slnrg_firm_id" }),
-      ).resolves.toBeNull();
-    });
-
-    it("does not raise on lazy loading a habtm on a new strict-loading owner without the foreign key", async () => {
-      const dev = new SlnrgDev({ name: "New Dev" });
-      dev.strictLoadingBang();
-      await expect(
-        loadHabtm(dev, "slnrgProjects", {
-          className: "SlnrgProject",
-          joinTable: "slnrg_devs_projects",
-          foreignKey: "slnrg_dev_id",
-          associationForeignKey: "slnrg_project_id",
-        }),
-      ).resolves.toEqual([]);
-    });
-
-    it("raises on lazy loading a belongs_to on a new strict-loading owner with the foreign key present", async () => {
-      const dev = new SlnrgDev({ name: "New Dev", slnrg_firm_id: 1 });
-      dev.strictLoadingBang();
-      expect(dev.isNewRecord()).toBe(true);
-      await expect(
-        loadBelongsTo(dev, "slnrgFirm", { className: "SlnrgFirm", foreignKey: "slnrg_firm_id" }),
-      ).rejects.toThrow(StrictLoadingViolationError);
-    });
-
-    it("raises on lazy loading a has_many on a new strict-loading owner with the primary key present", async () => {
-      const dev = new SlnrgDev({ name: "New Dev", id: 1 });
-      dev.strictLoadingBang();
-      expect(dev.isNewRecord()).toBe(true);
-      await expect(
-        loadHasMany(dev, "slnrgLogs", { className: "SlnrgLog", foreignKey: "slnrg_dev_id" }),
-      ).rejects.toThrow(StrictLoadingViolationError);
-    });
-
-    it("still raises on lazy loading a strict-loading has_many on a persisted owner", async () => {
-      const dev = await SlnrgDev.create({ name: "Saved Dev" });
-      dev.strictLoadingBang();
-      expect(dev.isNewRecord()).toBe(false);
-      await expect(
-        loadHasMany(dev, "slnrgLogs", { className: "SlnrgLog", foreignKey: "slnrg_dev_id" }),
-      ).rejects.toThrow(StrictLoadingViolationError);
-    });
-  });
-
   it("preload audit logs are strict loading because parent is strict loading", async () => {
     class SlpplDev extends Base {
       static {
@@ -2744,5 +2616,82 @@ describe("strictLoadingByDefault", () => {
     await User.create({ name: "Bob" });
     const user = await User.findBy({ name: "Bob" });
     expect(user!.isStrictLoading()).toBe(false);
+  });
+});
+
+// The functional loaders mirror Rails' `find_target?` gate (association.rb:320):
+// `violates_strict_loading?` is reached only from inside `find_target`, which
+// `find_target?` enters when `!owner.new_record? || foreign_key_present?`. So a
+// new-record strict-loading owner WITHOUT the foreign key present returns nil/[]
+// silently instead of raising; once the FK (belongs_to) or owner PK
+// (has_one/has_many/habtm via `ForeignAssociation#foreign_key_present?`) is
+// present, it raises again. Uses the canonical `Developer` and friends — the
+// same models Rails' strict_loading_test.rb drives (`has_many :audit_logs`,
+// `has_one :ship`, `belongs_to :firm`, `has_and_belongs_to_many :projects`).
+describe("StrictLoadingNewRecordFindTargetTest", () => {
+  // `useHandlerFixtures` wires `setupHandlerSuite` internally; the `developers`
+  // fixture gives a persisted owner for the unchanged-behavior assertion.
+  const { developers } = useHandlerFixtures(["developers"]);
+  // The loaders resolve target classes by name from the registry; register the
+  // canonical targets so `Developer`'s declared associations resolve.
+  registerModel(Developer);
+  registerModel(AuditLog);
+  registerModel(Ship);
+  registerModel(Project);
+  registerModel(Firm);
+
+  const optionsFor = (name: string) =>
+    (Developer as any)._reflectOnAssociation(name).options as Record<string, unknown>;
+
+  it("does not raise on lazy loading a has_many on a new strict-loading owner without the foreign key", async () => {
+    const developer = new Developer({ name: "New Dev" });
+    developer.strictLoadingBang();
+    expect(developer.isNewRecord()).toBe(true);
+    await expect(loadHasMany(developer, "auditLogs", optionsFor("auditLogs"))).resolves.toEqual([]);
+  });
+
+  it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
+    const developer = new Developer({ name: "New Dev" });
+    developer.strictLoadingBang();
+    await expect(loadHasOne(developer, "ship", optionsFor("ship"))).resolves.toBeNull();
+  });
+
+  it("does not raise on lazy loading a belongs_to on a new strict-loading owner without the foreign key", async () => {
+    const developer = new Developer({ name: "New Dev" });
+    developer.strictLoadingBang();
+    await expect(loadBelongsTo(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
+  });
+
+  it("does not raise on lazy loading a habtm on a new strict-loading owner without the foreign key", async () => {
+    const developer = new Developer({ name: "New Dev" });
+    developer.strictLoadingBang();
+    await expect(loadHabtm(developer, "projects", optionsFor("projects"))).resolves.toEqual([]);
+  });
+
+  it("raises on lazy loading a belongs_to on a new strict-loading owner with the foreign key present", async () => {
+    const developer = new Developer({ name: "New Dev", firm_id: 1 });
+    developer.strictLoadingBang();
+    expect(developer.isNewRecord()).toBe(true);
+    await expect(loadBelongsTo(developer, "firm", optionsFor("firm"))).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
+  });
+
+  it("raises on lazy loading a has_many on a new strict-loading owner with the primary key present", async () => {
+    const developer = new Developer({ name: "New Dev", id: 1 });
+    developer.strictLoadingBang();
+    expect(developer.isNewRecord()).toBe(true);
+    await expect(loadHasMany(developer, "auditLogs", optionsFor("auditLogs"))).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
+  });
+
+  it("still raises on lazy loading a strict-loading has_many on a persisted owner", async () => {
+    const developer = await Developer.find(developers("david").id);
+    developer.strictLoadingBang();
+    expect(developer.isNewRecord()).toBe(false);
+    await expect(loadHasMany(developer, "auditLogs", optionsFor("auditLogs"))).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
 });
