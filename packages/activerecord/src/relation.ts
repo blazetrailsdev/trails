@@ -3729,7 +3729,7 @@ export class Relation<T extends Base> {
   ): Promise<Result> {
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
-      onDuplicate: options?.uniqueBy ? "skip" : undefined,
+      onDuplicate: "skip",
       returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });
