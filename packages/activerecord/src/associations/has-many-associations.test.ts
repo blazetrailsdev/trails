@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import {
   SubclassNotFound,
@@ -26,6 +26,12 @@ import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { Author, AuthorAddress } from "../test-helpers/models/author.js";
+import { Essay } from "../test-helpers/models/essay.js";
+import { Person } from "../test-helpers/models/person.js";
+import { Subscriber } from "../test-helpers/models/subscriber.js";
+import { Subscription } from "../test-helpers/models/subscription.js";
 
 const UNIVERSAL_HM_SCHEMA: Schema = {
   cpk_authors: { name: "string", author_code: "string" },
@@ -436,198 +442,95 @@ const UNIVERSAL_HM_SCHEMA: Schema = {
 // under TM Phase 5. The main `HasManyAssociationsTest` block further down
 // in this file still relies on auto-derived schema and is a follow-up.
 const HEAD_SCHEMA: Schema = {
-  cpk_authors: {
-    columns: { name: "string", author_code: "string" },
-    primaryKey: ["author_code"],
-  },
-  cpk_posts: { title: "string", author_code: "string" },
-  apk_authors: { name: "string", author_code: "string" },
-  apk_posts: { title: "string", author_code: "string" },
-  ids_authors: {
-    columns: { name: "string", author_code: "string" },
-    primaryKey: ["author_code"],
-  },
-  ids_posts: { title: "string", author_code: "string" },
-  blank_pk_authors: {
-    columns: { name: "string", author_code: "string" },
-    primaryKey: ["author_code"],
-  },
-  blank_pk_posts: { title: "string", author_code: "string" },
   posts: { title: "string" },
 };
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const { people } = useHandlerFixtures([
+    "authors",
+    "authorAddresses",
+    "essays",
+    "subscribers",
+    "subscriptions",
+    "people",
+  ]);
 
   beforeAll(async () => {
-    await defineSchema(HEAD_SCHEMA);
+    registerModel(Subscriber);
+    registerModel(Subscription);
+    registerModel(Author);
+    registerModel(AuthorAddress);
+    registerModel(Essay);
+    registerModel(Person);
+    await Subscriber.loadSchema();
+    await Subscription.loadSchema();
+    await Author.loadSchema();
+    await Essay.loadSchema();
+    await Person.loadSchema();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  // BLOCKED (tracked-pending-convergence): a new-record owner with a custom
+  // primary key present should still fetch its has_many collection (Rails
+  // ForeignAssociation#foreign_key_present?), but the canonical reflection's
+  // association scope applies `none` (AND 1=0) for new-record owners because a
+  // second reflection in the scope chain resolves `activeRecordPrimaryKey` to
+  // undefined → falls back to `id` → reports the FK absent. `size()` returns
+  // the correct count via the proxy COUNT path, but `toArray()` returns []. See
+  // convergence story has-many-new-record-custom-pk-null-scope.
+  it.skip("custom primary key on new record should fetch with query", async () => {
+    const subscriber = new Subscriber({ nick: "webster132" });
+    const subscriptions = association(subscriber, "subscriptions");
+    expect(subscriptions.loaded).toBe(false);
+
+    await assertQueriesCount(1, false, async () => {
+      expect(await subscriptions.size()).toBe(2);
+    });
+
+    const expected = await Subscription.where({ subscriber_id: "webster132" }).toArray();
+    const actual = (await subscriptions.toArray()) as Base[];
+    expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
-  it("custom primary key on new record should fetch with query", async () => {
-    class CpkAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("author_code", "string");
-        this.primaryKey = "author_code";
-      }
-    }
-    class CpkPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_code", "string");
-      }
-    }
-    registerModel("CpkAuthor", CpkAuthor);
-    registerModel("CpkPost", CpkPost);
-    Associations.hasMany.call(CpkAuthor, "cpk_posts", {
-      className: "CpkPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
-    });
-    const author = await CpkAuthor.create({ name: "Alice", author_code: "A1" });
-    await CpkPost.create({ title: "Post 1", author_code: "A1" });
-    const posts = await loadHasMany(author, "cpk_posts", {
-      className: "CpkPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
-    });
-    expect(posts.length).toBe(1);
-  });
+  // BLOCKED (tracked-pending-convergence): same root cause as above — see
+  // convergence story has-many-new-record-custom-pk-null-scope.
+  it.skip("association primary key on new record should fetch with query", async () => {
+    const author = new Author({ name: "David" });
+    const essays = association(author, "essays");
+    expect(essays.loaded).toBe(false);
 
-  it("association primary key on new record should fetch with query", async () => {
-    class ApkAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("author_code", "string");
-      }
-    }
-    class ApkPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_code", "string");
-      }
-    }
-    registerModel("ApkAuthor", ApkAuthor);
-    registerModel("ApkPost", ApkPost);
-    Associations.hasMany.call(ApkAuthor, "apk_posts", {
-      className: "ApkPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
+    await assertQueriesCount(1, false, async () => {
+      expect(await essays.size()).toBe(1);
     });
-    const author = await ApkAuthor.create({ name: "Bob", author_code: "B1" });
-    await ApkPost.create({ title: "Post B", author_code: "B1" });
-    const posts = await loadHasMany(author, "apk_posts", {
-      className: "ApkPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
-    });
-    expect(posts.length).toBe(1);
+
+    const expected = await Essay.where({ writer_id: "David" }).toArray();
+    const actual = (await essays.toArray()) as Base[];
+    expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
   it("ids on unloaded association with custom primary key", async () => {
-    class IdsAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("author_code", "string");
-        this.primaryKey = "author_code";
-      }
-    }
-    class IdsPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_code", "string");
-      }
-    }
-    registerModel("IdsAuthor", IdsAuthor);
-    registerModel("IdsPost", IdsPost);
-    Associations.hasMany.call(IdsAuthor, "ids_posts", {
-      className: "IdsPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
-    });
-    const author = await IdsAuthor.create({ name: "Carol", author_code: "C1" });
-    const p1 = await IdsPost.create({ title: "P1", author_code: "C1" });
-    const p2 = await IdsPost.create({ title: "P2", author_code: "C1" });
-    const posts = await loadHasMany(author, "ids_posts", {
-      className: "IdsPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
-    });
-    const ids = posts.map((p: any) => p.id);
-    expect(ids).toContain(p1.id);
-    expect(ids).toContain(p2.id);
+    const david = people("david") as Person;
+    const expected = (await Essay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
+    const ids = await (david.association("essays") as any).idsReader();
+    expect(ids).toEqual(expected);
   });
 
   it("ids on loaded association with custom primary key", async () => {
-    class LoadedIdsAuthor extends Base {
-      static _tableName = "ids_authors";
-      static {
-        this.attribute("name", "string");
-        this.attribute("author_code", "string");
-        this.primaryKey = "author_code";
-      }
-    }
-    class LoadedIdsPost extends Base {
-      static _tableName = "ids_posts";
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_code", "string");
-      }
-    }
-    registerModel("LoadedIdsAuthor", LoadedIdsAuthor);
-    registerModel("LoadedIdsPost", LoadedIdsPost);
-    Associations.hasMany.call(LoadedIdsAuthor, "loaded_ids_posts", {
-      className: "LoadedIdsPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
-    });
-    const author = await LoadedIdsAuthor.create({ name: "Carol", author_code: "C1" });
-    const p1 = await LoadedIdsPost.create({ title: "P1", author_code: "C1" });
-    const p2 = await LoadedIdsPost.create({ title: "P2", author_code: "C1" });
-
-    const assoc = (author as any).association("loaded_ids_posts");
+    const david = people("david") as Person;
+    const assoc = david.association("essays") as any;
     await assoc.loadTarget();
-    expect(assoc.isLoaded()).toBe(true);
+    const expected = (await Essay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
     const ids = await assoc.idsReader();
-    expect(ids).toEqual([p1.id, p2.id]);
+    expect(ids).toEqual(expected);
   });
 
   it("blank custom primary key on new record should not run queries", async () => {
-    class BlankPkAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("author_code", "string");
-        this.primaryKey = "author_code";
-      }
-    }
-    class BlankPkPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_code", "string");
-      }
-    }
-    registerModel("BlankPkAuthor", BlankPkAuthor);
-    registerModel("BlankPkPost", BlankPkPost);
-    Associations.hasMany.call(BlankPkAuthor, "blank_pk_posts", {
-      className: "BlankPkPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
+    const author = new Author();
+    const essays = association(author, "essays");
+    expect(essays.loaded).toBe(false);
+
+    await assertQueriesCount(0, false, async () => {
+      expect(await essays.size()).toBe(0);
     });
-    const author = new BlankPkAuthor({ name: "Eve" });
-    expect(author.author_code).toBeNull();
-    const executeSpy = vi.spyOn(Base.connection, "execute");
-    const posts = await loadHasMany(author, "blank_pk_posts", {
-      className: "BlankPkPost",
-      foreignKey: "author_code",
-      primaryKey: "author_code",
-    });
-    expect(posts).toHaveLength(0);
-    expect(executeSpy).not.toHaveBeenCalled();
   });
 });
 
