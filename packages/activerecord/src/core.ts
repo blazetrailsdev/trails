@@ -674,6 +674,16 @@ function relation(this: CoreHost): any {
   return (this as any).all();
 }
 
+/**
+ * Canonical key for matching a requested id against a fetched record's PK.
+ * Numeric ids (`number` | `bigint`) are folded to their decimal string so a
+ * `bigint` PK value compares equal to the `number`/string the caller passed
+ * (and vice versa); other scalar key types fall back to identity.
+ */
+function pkMatchKey(value: unknown): unknown {
+  return typeof value === "bigint" || typeof value === "number" ? String(value) : value;
+}
+
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // Reflect the schema before casting ids — the cast below reads
   // attribute definitions that lazy reflection populates.
@@ -779,9 +789,12 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     const records = await this.all()
       .where({ [this.primaryKey as string]: castIds })
       .toArray();
+    // Key by pkMatchKey so a BigInt PK matches the number/string id passed in
+    // (a raw-value Map would miss `1n` vs `1` and spuriously raise below).
+    const idToRecord = new Map<unknown, any>();
+    for (const r of records) idToRecord.set(pkMatchKey(r.id), r);
     if (records.length !== castIds.length) {
-      const foundIds = new Set<unknown>(records.map((r: any) => r.id));
-      const missing = castIds.filter((i) => !foundIds.has(i));
+      const missing = castIds.filter((i) => !idToRecord.has(pkMatchKey(i)));
       throw new RecordNotFound(
         `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
         this.name,
@@ -790,9 +803,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       );
     }
     // in_order_of: return in input order
-    const idToRecord = new Map<unknown, any>();
-    for (const r of records) idToRecord.set(r.id, r);
-    return castIds.map((cid) => idToRecord.get(cid)!);
+    return castIds.map((cid) => idToRecord.get(pkMatchKey(cid))!);
   }
   const castId = this._castAttributeValue(this.primaryKey as string, id);
   const record = await this.all()
