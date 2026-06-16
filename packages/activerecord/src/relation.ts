@@ -50,7 +50,6 @@ import {
   areStructurallyCompatible,
   VALID_UNSCOPING_VALUES,
   argumentError,
-  isBlankArgument,
   assertModifiableBang as _assertModifiableBang,
   checkIfMethodHasArgumentsBang as _checkIfMethodHasArgumentsBang,
   isTableNameMatches as _isTableNameMatches,
@@ -5016,17 +5015,12 @@ export class Relation<T extends Base> {
       throw argumentError("ActiveRecord::Relation#with does not accept a block");
     }
     // Rails `with` follows the block guard with `check_if_method_has_arguments!`
-    // (query_methods.rb:494), whose `args.blank? → raise` branch applies to the
-    // empty-varargs case. We skip that helper's `args.flatten!` step (it flattens
-    // plain-object args into `[key, value, …]`, destroying CTE definition hashes;
-    // Rails' `flatten!` flattens arrays only), but still mirror its trailing
-    // `compact_blank!` (query_methods.rb:2220): a blank arg (`null`, `[]`, `{}`)
-    // survives the blank check then compacts away, so `with(null)` no-ops.
-    if (ctes.length === 0) {
-      throw argumentError("The method .with() must contain arguments.");
-    }
-    const compacted = ctes.filter((cte) => !isBlankArgument(cte));
-    return this._clone().withBang(...compacted);
+    // (query_methods.rb:494). The shared helper raises on empty varargs, then
+    // mirrors `args.flatten!` (arrays only — CTE definition hashes survive) and
+    // `compact_blank!` (a blank arg like `null`/`[]`/`{}` compacts away, so
+    // `with(null)` no-ops). It mutates `ctes` in place.
+    this.checkIfMethodHasArgumentsBang("with", ctes);
+    return this._clone().withBang(...ctes);
   }
 
   /**
