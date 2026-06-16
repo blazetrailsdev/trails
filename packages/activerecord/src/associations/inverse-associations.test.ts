@@ -1040,7 +1040,11 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
   });
 });
 
-describe("InverseBranchRecursiveTests", () => {
+// Rails declares `test_recursive_inverse_on_recursive_model_has_many_inversing`
+// inside `InverseBelongsToTests`; a second same-named describe carries the
+// dedicated `branches` table setup BrokenBranch needs without disturbing the
+// fixture-backed block above.
+describe("InverseBelongsToTests", () => {
   setupHandlerSuite();
   beforeAll(async () => {
     await defineSchema(canonicalSchema);
