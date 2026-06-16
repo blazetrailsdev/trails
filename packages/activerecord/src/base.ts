@@ -2453,6 +2453,11 @@ export class Base extends Model {
 
   _newRecord = true;
   _destroyed = false;
+  // Mirrors ActiveRecord::Callbacks#destroy's `@_destroy_callback_already_called`
+  // reentrancy guard: two records that `dependent: :destroy` each other would
+  // otherwise recurse forever. Set while this record's destroy callback chain is
+  // running so a cascade back into the same record short-circuits.
+  _destroyCallbackAlreadyCalled = false;
   _readonly = false;
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;

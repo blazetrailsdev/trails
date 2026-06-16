@@ -106,8 +106,11 @@ export class HasOneAssociation extends SingularAssociation {
           await (target as any).destroy();
         }
     }
-
-    super.replace(null);
+    // Rails' HasOneAssociation#delete (has_one_association.rb:26-52) returns
+    // right after the `case` and never resets `self.target`. We must not reset
+    // it either: in the mutual `dependent: :destroy` cycle the target is already
+    // frozen by the time control returns here, and writing its inverse FK would
+    // raise FrozenError.
   }
 
   protected override replace(record: Base | null, save = true): void {

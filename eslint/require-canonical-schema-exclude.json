@@ -12,7 +12,6 @@
   "packages/activerecord/src/associations/association-scope-cache.test.ts",
   "packages/activerecord/src/associations/association-scope.test.ts",
   "packages/activerecord/src/associations/belongs-to-associations.test.ts",
-  "packages/activerecord/src/associations/bidirectional-destroy-dependencies.test.ts",
   "packages/activerecord/src/associations/callbacks.test.ts",
   "packages/activerecord/src/associations/collection-proxy.test.ts",
   "packages/activerecord/src/associations/constructor-form-and-hmt-insert.test.ts",
