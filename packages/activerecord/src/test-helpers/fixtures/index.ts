@@ -90,6 +90,7 @@ export * from "./owners.js";
 export * from "./paragraphs.js";
 export * from "./parrots.js";
 export * from "./parrots-pirates.js";
+export * from "./parrots-treasures.js";
 export * from "./people.js";
 export * from "./peoples-treasures.js";
 export * from "./pets.js";

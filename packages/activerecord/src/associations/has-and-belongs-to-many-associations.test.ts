@@ -51,6 +51,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       "pirates",
       "parrotsPirates",
       "treasures",
+      "parrotsTreasures",
     ],
     { schema: canonicalSchema },
   );
@@ -429,8 +430,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("destroy associations destroys multiple associations", async () => {
     const george = (await Parrot.findBy({ name: "Curious George" })) as Parrot;
     expect((await association<Pirate>(george, "pirates").toArray()).length).toBeGreaterThan(0);
-    const treasure = await Treasure.create({ name: "gold" });
-    await association<Treasure>(george, "treasures").push(treasure);
     expect((await association<Treasure>(george, "treasures").toArray()).length).toBeGreaterThan(0);
 
     const pirateBefore = (await Pirate.all().toArray()).length;

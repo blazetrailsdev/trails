@@ -438,6 +438,10 @@ export const fixtureRegistry = {
     joinTable: "parrots_pirates",
     data: FixtureData.parrotsPiratesFixtureData,
   },
+  parrotsTreasures: {
+    joinTable: "parrots_treasures",
+    data: FixtureData.parrotsTreasuresFixtureData,
+  },
   people: {
     model: () => import("./models/person.js").then((m) => m.Person),
     data: FixtureData.personFixtureData,
