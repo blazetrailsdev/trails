@@ -9,6 +9,7 @@
  */
 
 import { NotImplementedError } from "../../errors.js";
+import { pgDatetimeConfig } from "./pg-datetime-config.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -53,6 +54,7 @@ export interface ColumnMethods {
   polygon(name: string, options?: ColumnOptions): unknown;
   circle(name: string, options?: ColumnOptions): unknown;
   serial(name: string, options?: ColumnOptions): unknown;
+  timestamptz(name: string, options?: ColumnOptions): unknown;
   tsrange(name: string, options?: ColumnOptions): unknown;
   tstzrange(name: string, options?: ColumnOptions): unknown;
   tsvector(name: string, options?: ColumnOptions): unknown;
@@ -217,7 +219,19 @@ export class TableDefinition extends AbstractTableDefinition {
     if ((type as string) === "virtual") {
       type = options.type ?? type;
     }
-    return super.newColumnDefinition(name, type, options);
+    const def = super.newColumnDefinition(name, type, options);
+    // Record the physical storage type for datetime-family columns so the
+    // schema dumper can re-derive the dumped type against the live
+    // datetime_type (mirrors what re-introspecting the column would yield).
+    // `:datetime` resolves to whatever datetime_type is aliased to at creation
+    // time; `:timestamp` / `:timestamptz` are stored as-written.
+    const t = def.type as string;
+    if (t === "datetime") {
+      def.datetimePhysicalType = pgDatetimeConfig.datetimeType;
+    } else if (t === "timestamp" || t === "timestamptz") {
+      def.datetimePhysicalType = t;
+    }
+    return def;
   }
 
   /** @internal */
@@ -294,6 +308,10 @@ export class TableDefinition extends AbstractTableDefinition {
 
   numrange(name: string, options: ColumnOptions = {}): this {
     return this.pgColumn(name, "numrange" as ColumnType, undefined, options);
+  }
+
+  timestamptz(name: string, options: ColumnOptions = {}): this {
+    return this.pgColumn(name, "timestamptz" as ColumnType, undefined, options);
   }
 
   tsrange(name: string, options: ColumnOptions = {}): this {
@@ -388,6 +406,9 @@ export class TableDefinition extends AbstractTableDefinition {
   ): this {
     const col = new ColumnDefinition(name, type, options);
     if (sqlType !== undefined) col.sqlType = sqlType;
+    // Mirror newColumnDefinition's datetime-family physical-type recording for
+    // the helper methods (e.g. t.timestamptz) that bypass newColumnDefinition.
+    if ((type as string) === "timestamptz") col.datetimePhysicalType = "timestamptz";
     this.columns.push(col);
     return this;
   }
