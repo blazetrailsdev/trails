@@ -130,8 +130,20 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected schemaType(column: Column): string {
-    if (column.bigint || column.type === "bigint") return "bigint";
+    if (this.isBigint(column)) return "bigint";
     return column.type;
+  }
+
+  /**
+   * Mirrors `ConnectionAdapters::Column#bigint?` (`/\Abigint\b/.match?(sql_type)`),
+   * which the abstract `schema_type` consults. A live column reflects a `bigint`
+   * declaration as sqlType `"bigint"`/`"BIGINT"` with dsl type `"integer"`, so
+   * detect it off sqlType; the `bigint` flag / `type === "bigint"` arms keep mock
+   * sources that set them directly working.
+   * @internal
+   */
+  protected isBigint(column: Column): boolean {
+    return !!column.bigint || column.type === "bigint" || /^bigint\b/i.test(column.sqlType ?? "");
   }
 
   /** @internal */
