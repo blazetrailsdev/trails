@@ -904,36 +904,6 @@ describe("AssociationsTest", () => {
     expect(cached).not.toBeNull();
     expect((cached as any).title).toBe("Great post");
   });
-  it("append composite foreign key has many association", async () => {
-    class CpkOwner extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkItem extends Base {
-      static {
-        this.attribute("owner_region_id", "integer");
-        this.attribute("owner_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("CpkOwner", CpkOwner);
-    registerModel("CpkItem", CpkItem);
-    Associations.hasMany.call(CpkOwner, "cpkItems", {
-      className: "CpkItem",
-      foreignKey: ["owner_region_id", "owner_id"],
-    });
-    const owner = await CpkOwner.create({ region_id: 1, id: 10, name: "Owner" });
-    const item = await CpkItem.create({ label: "New Item" });
-    const proxy = association(owner, "cpkItems");
-    await proxy.push(item);
-    expect(item.owner_region_id).toBe(1);
-    expect(item.owner_id).toBe(10);
-  });
-
   it("nullify composite foreign key has many association", async () => {
     class CpkOwner2 extends Base {
       static {
@@ -4515,9 +4485,19 @@ describe("WithAnnotationsTest", () => {
 describe("AssociationsTest", () => {
   // `authorFavorites` is declared so its rows are loaded (Rails: `fixtures
   // :author_favorites`); the subselect test reads them through the association.
-  const { companies, authors } = useHandlerFixtures(["companies", "authors", "authorFavorites"], {
-    schema: canonicalSchema,
-  });
+  const { companies, authors, shardedBlogPosts } = useHandlerFixtures(
+    [
+      "companies",
+      "authors",
+      "authorFavorites",
+      "shardedBlogs",
+      "shardedBlogPosts",
+      "shardedComments",
+    ],
+    {
+      schema: canonicalSchema,
+    },
+  );
 
   let Author: typeof AuthorT;
   let AuthorFavorite: typeof Base;
@@ -4527,8 +4507,15 @@ describe("AssociationsTest", () => {
   let Tagging: typeof TaggingT;
   let Developer: typeof DeveloperT;
   let Project: typeof Base;
+  let ShardedBlog: typeof Base;
+  let ShardedBlogPost: typeof Base;
+  let ShardedComment: typeof Base;
 
   beforeAll(async () => {
+    const shardedMod = await import("./test-helpers/models/sharded.js");
+    ShardedBlog = shardedMod.ShardedBlog as never;
+    ShardedBlogPost = shardedMod.ShardedBlogPost as never;
+    ShardedComment = shardedMod.ShardedComment as never;
     const authorMod = await import("./test-helpers/models/author.js");
     Author = authorMod.Author as never;
     AuthorFavorite = authorMod.AuthorFavorite as never;
@@ -4561,6 +4548,9 @@ describe("AssociationsTest", () => {
     registerModel("Tagging", Tagging);
     registerModel("Developer", Developer);
     registerModel("Project", Project);
+    registerModel("ShardedBlog", ShardedBlog);
+    registerModel("ShardedBlogPost", ShardedBlogPost);
+    registerModel("ShardedComment", ShardedComment);
   });
 
   it("subselect", async () => {
@@ -4593,5 +4583,17 @@ describe("AssociationsTest", () => {
     const firm = companies("first_firm");
     const scope = association(firm, "associationWithReferences").scope();
     expect((scope as any)._referencesValues).toEqual(["foo"]);
+  });
+
+  it("append composite foreign key has many association", async () => {
+    const blogPost = shardedBlogPosts("great_post_blog_one");
+    const comment = new ShardedComment({ body: "Great post! :clap:" });
+    await comment.save();
+    await association(blogPost, "comments").push(comment);
+
+    const comments = await association(blogPost, "comments").toArray();
+    expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
+    expect((comment as any).blog_post_id).toBe((blogPost as any).id);
+    expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
   });
 });
