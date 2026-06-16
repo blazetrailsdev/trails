@@ -1,9 +1,23 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
+import { StringType } from "@blazetrails/activemodel";
+import { Connection } from "./connection.js";
+import { AttributedDeveloper, DeveloperName } from "../test-helpers/models/developer.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 describe("ConnectionTest", () => {
-  it.skip("#type_for_attribute is not aware of custom types", () => {
-    // BLOCKED: type — connection type/attribute gap
-    // ROOT-CAUSE: connection.ts or attribute-methods/connection.ts missing Rails parity
-    // SCOPE: ~20 LOC fix; affects ~1 test in connection.test.ts
+  useHandlerFixtures(["developers"], { schema: TEST_SCHEMA });
+
+  beforeAll(async () => {
+    await AttributedDeveloper.loadSchema();
+  });
+
+  it("#type_for_attribute is not aware of custom types", () => {
+    const typeCaster = new Connection(AttributedDeveloper, "developers");
+
+    const type = typeCaster.typeForAttribute("name");
+
+    expect(type).not.toBeInstanceOf(DeveloperName);
+    expect(type.constructor).toBe(StringType);
   });
 });

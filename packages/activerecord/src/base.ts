@@ -3662,6 +3662,39 @@ export class Base extends Model {
     return ModelSchema.tableExists.call(this);
   }
 
+  /**
+   * Class-level string representation, e.g. `Post(id: integer, title: string)`.
+   *
+   * Mirrors: ActiveRecord::Core.inspect (the class method). Crucially, the
+   * not-connected branch must NOT touch the connection — a Model whose
+   * connection config points at an unreachable database (see
+   * invalid-connection.test.ts) inspects without raising.
+   */
+  static inspect(): string {
+    const name = this.name;
+    if ((this as typeof Base) === Base) {
+      return name;
+    } else if (this.abstractClass) {
+      return `${name}(abstract)`;
+    } else if (
+      !((this as { _schemaLoaded?: boolean })._schemaLoaded ?? false) &&
+      !this.isConnectedQ()
+    ) {
+      return `${name} (call '${name}.load_schema' to load schema informations)`;
+    }
+    // Schema is loaded (or a live connection is available): list the columns'
+    // attribute types. Mirrors Rails' `table_exists?` branch — `columnsHash` is
+    // empty when the table is absent.
+    const columns = this.columnsHash();
+    if (Object.keys(columns).length === 0) {
+      return `${name}(Table doesn't exist)`;
+    }
+    const attrList = Object.entries(this.attributeTypes())
+      .map(([attr, type]) => `${attr}: ${type.type()}`)
+      .join(", ");
+    return `${name}(${attrList})`;
+  }
+
   static hasAttribute(name: string): boolean {
     return this.hasAttributeDefinition(name);
   }

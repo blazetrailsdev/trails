@@ -66,10 +66,14 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     expect(() => resolveConfig(config)).toThrow(InvalidConfigurationError);
   });
 
-  it.skip("invalid symbol config", () => {
-    // Ruby-specific: Rails rejects a Symbol value (`{ "foo" => :bar }`). TS has no
-    // Symbol-keyed config equivalent distinct from the "invalid string config" case
-    // already covered above; nothing to assert.
+  it("invalid symbol config", () => {
+    // Rails: `{ "foo" => :bar }` — a Symbol value. The TS-faithful analogue of a
+    // Ruby Symbol is a JS Symbol, which is neither a URL string nor a Hash, so
+    // _buildConfigs rejects it the same way Rails does.
+    const config = { foo: Symbol("bar") };
+    expect(() => resolveConfig(config as unknown as RawConfigurations)).toThrow(
+      InvalidConfigurationError,
+    );
   });
 
   it("resolver with database uri and current env symbol key", () => {
