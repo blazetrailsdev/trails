@@ -27,61 +27,57 @@ describeIfMysql("Mysql2Adapter", () => {
 
   describe("MysqlExplainTest", () => {
     // mirrors Rails: fixtures :authors, :author_addresses
-    // Scoped to its own sub-describe so transactional wrapping doesn't
-    // affect the defineSchema-based tests below.
-    describe("fixture-backed", () => {
-      const { authors } = useHandlerFixtures(["authors", "authorAddresses", "posts"], {
-        schema: canonicalSchema,
-      });
+    const { authors } = useHandlerFixtures(["authors", "authorAddresses", "posts"], {
+      schema: canonicalSchema,
+    });
 
-      // Mirror Rails' explain_option / expected_analyze_clause split exactly:
-      //   supports_analyze?         = mariadb && version >= 10.1.0       → "ANALYZE"
-      //   supports_explain_analyze? = mariadb ? version <= 10.0          → "EXPLAIN ANALYZE"
-      //                                       : version >= 6.0
-      //   else                                                          → "EXPLAIN EXTENDED"
-      // explain_option picks :analyze when either holds, else :extended.
-      // MariaDB >= 10.1 prints a bare ANALYZE clause (no EXPLAIN prefix).
-      let explainOpt: string;
-      let expectedClause: string;
-      beforeAll(() => {
-        const ver = adapter.databaseVersion;
-        const supportsAnalyze = isMariaDb && ver.gte("10.1.0");
-        // `version <= "10.0"` expressed as `Version("10.0") >= version`.
-        const supportsExplainAnalyze = isMariaDb ? new Version("10.0").gte(ver) : ver.gte("6.0");
-        explainOpt = supportsAnalyze || supportsExplainAnalyze ? "analyze" : "extended";
-        expectedClause = supportsAnalyze
-          ? "ANALYZE"
-          : supportsExplainAnalyze
-            ? "EXPLAIN ANALYZE"
-            : "EXPLAIN EXTENDED";
-      });
+    // Mirror Rails' explain_option / expected_analyze_clause split exactly:
+    //   supports_analyze?         = mariadb && version >= 10.1.0       → "ANALYZE"
+    //   supports_explain_analyze? = mariadb ? version <= 10.0          → "EXPLAIN ANALYZE"
+    //                                       : version >= 6.0
+    //   else                                                          → "EXPLAIN EXTENDED"
+    // explain_option picks :analyze when either holds, else :extended.
+    // MariaDB >= 10.1 prints a bare ANALYZE clause (no EXPLAIN prefix).
+    let explainOpt: string;
+    let expectedClause: string;
+    beforeAll(() => {
+      const ver = adapter.databaseVersion;
+      const supportsAnalyze = isMariaDb && ver.gte("10.1.0");
+      // `version <= "10.0"` expressed as `Version("10.0") >= version`.
+      const supportsExplainAnalyze = isMariaDb ? new Version("10.0").gte(ver) : ver.gte("6.0");
+      explainOpt = supportsAnalyze || supportsExplainAnalyze ? "analyze" : "extended";
+      expectedClause = supportsAnalyze
+        ? "ANALYZE"
+        : supportsExplainAnalyze
+          ? "EXPLAIN ANALYZE"
+          : "EXPLAIN EXTENDED";
+    });
 
-      it("explain with options as symbol", async () => {
-        // Rails: Author.where(id: 1).explain(explain_option)
-        const result = await Author.where({ id: authors("david").id }).explain(explainOpt);
-        // Our header appends " for:" where Rails prints a bare clause.
-        expect(result).toContain(`${expectedClause} for:`);
-        expect(result).toContain("SELECT `authors`");
-      });
+    it("explain with options as symbol", async () => {
+      // Rails: Author.where(id: 1).explain(explain_option)
+      const result = await Author.where({ id: authors("david").id }).explain(explainOpt);
+      // Our header appends " for:" where Rails prints a bare clause.
+      expect(result).toContain(`${expectedClause} for:`);
+      expect(result).toContain("SELECT `authors`");
+    });
 
-      it("explain with options as strings", async () => {
-        // Rails: Author.where(id: 1).explain(explain_option.to_s.upcase) — uppercase string
-        const result = await Author.where({ id: authors("david").id }).explain(
-          explainOpt.toUpperCase(),
-        );
-        expect(result).toContain(`${expectedClause} for:`);
-        expect(result).toContain("SELECT `authors`");
-      });
+    it("explain with options as strings", async () => {
+      // Rails: Author.where(id: 1).explain(explain_option.to_s.upcase) — uppercase string
+      const result = await Author.where({ id: authors("david").id }).explain(
+        explainOpt.toUpperCase(),
+      );
+      expect(result).toContain(`${expectedClause} for:`);
+      expect(result).toContain("SELECT `authors`");
+    });
 
-      it("explain options with eager loading", async () => {
-        // Rails: Author.where(id: 1).includes(:posts).explain(explain_option)
-        const result = await Author.where({ id: authors("david").id })
-          .includes("posts")
-          .explain(explainOpt);
-        expect(result).toContain(`${expectedClause} for:`);
-        const blocks = result.split("\n\n").filter((b) => /EXPLAIN|ANALYZE/.test(b));
-        expect(blocks.length).toBeGreaterThanOrEqual(2);
-      });
+    it("explain options with eager loading", async () => {
+      // Rails: Author.where(id: 1).includes(:posts).explain(explain_option)
+      const result = await Author.where({ id: authors("david").id })
+        .includes("posts")
+        .explain(explainOpt);
+      expect(result).toContain(`${expectedClause} for:`);
+      const blocks = result.split("\n\n").filter((b) => /EXPLAIN|ANALYZE/.test(b));
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
     });
 
     it("explain for one query", async () => {
@@ -90,7 +86,14 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(typeof result).toBe("string");
       expect(result.length).toBeGreaterThan(0);
     });
+  });
 
+  // TS-only coverage of our buildExplainClause/Relation#explain plumbing. These
+  // use defineSchema (DDL), which auto-commits on MySQL and would break the
+  // transactional fixtures above, so they live outside MysqlExplainTest with no
+  // fixture wrapping. Not Rails tests — kept in a sibling block so test:compare
+  // doesn't read them as members of the MySQLExplainTest class.
+  describe("explain helpers (trails-only)", () => {
     it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", () => {
       const clause = adapter.buildExplainClause([{ format: "json" }]);
       expect(clause).toBe("EXPLAIN FORMAT=JSON for:");

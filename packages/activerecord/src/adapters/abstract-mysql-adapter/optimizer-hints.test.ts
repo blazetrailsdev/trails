@@ -12,10 +12,8 @@ import { Post } from "../../test-helpers/models/post.js";
 // Rails wraps the whole OptimizerHintsTest body in `if supports_optimizer_hints?`
 // (MySQL ≥ 5.7.7, never MariaDB), so the examples never run on a server that
 // reports no support. Mirror that with a conditional describe.
-const describeOptimizerHints = supportsOptimizerHints ? describe : describe.skip;
-
 describeIfMysql("Mysql2Adapter", () => {
-  describeOptimizerHints("OptimizerHintsTest", () => {
+  describe.skipIf(!supportsOptimizerHints)("OptimizerHintsTest", () => {
     // mirrors Rails: fixtures :posts
     useHandlerFixtures(["posts"], { schema: canonicalSchema });
 
