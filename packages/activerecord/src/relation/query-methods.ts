@@ -1584,12 +1584,10 @@ export function checkIfMethodHasArgumentsBang(
 
 /** @internal */
 export function flattenedArgs(args: unknown[]): unknown[] {
-  return args.flatMap((e) => {
-    if (Array.isArray(e)) return flattenedArgs(e);
-    // Only expand plain objects — leave class instances (Arel nodes, Dates, …) as-is.
-    if (isPlainObject(e)) return flattenedArgs(Object.entries(e).flat());
-    return e;
-  });
+  // Mirrors Ruby `Array#flatten!`: recurse into nested arrays only. Hashes
+  // (plain objects) and every other value pass through untouched, so
+  // `with({ cte: rel })` keeps its CTE definition hash intact.
+  return args.flatMap((e) => (Array.isArray(e) ? flattenedArgs(e) : e));
 }
 
 const VALID_DIRECTIONS = new Set(["asc", "desc"]);
