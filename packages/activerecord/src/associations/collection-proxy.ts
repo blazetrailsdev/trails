@@ -1,5 +1,6 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
+import { Result } from "../result.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
 
@@ -25,6 +26,7 @@ import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { filterScopeForCreate } from "./association.js";
 import { RecordNotSaved, ConfigurationError, AssociationTypeMismatch } from "../errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 import {
@@ -898,6 +900,58 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const out = filterScopeForCreate(sfc, assigned, skipAssign);
     if (out) (record as any)._assignAttributes(out);
+  }
+
+  /**
+   * Bulk insert/upsert through a collection association. Mirrors
+   * ActiveRecord::AssociationRelation, which guards `insert`, `insert_all`,
+   * `insert!`, `insert_all!`, `upsert`, and `upsert_all`: when the
+   * association is `has_many :through`, it raises ArgumentError because the
+   * join records can't be built from the bulk path. Non-through associations
+   * fall through to the inherited Relation implementation.
+   */
+  private _assertBulkInsertable(): void {
+    if (this.isThrough) {
+      throw new ArgumentError(
+        "Bulk insert or upsert is currently not supported for has_many through association",
+      );
+    }
+  }
+
+  async insert(
+    attrs: Record<string, unknown>,
+    options?: { uniqueBy?: string | string[] },
+  ): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.insert(attrs, options);
+  }
+
+  async insertBang(...args: Parameters<Relation<T>["insertBang"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.insertBang(...args);
+  }
+
+  async insertAll(...args: Parameters<Relation<T>["insertAll"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.insertAll(...args);
+  }
+
+  async insertAllBang(...args: Parameters<Relation<T>["insertAllBang"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.insertAllBang(...args);
+  }
+
+  async upsert(
+    attrs: Record<string, unknown>,
+    options?: { uniqueBy?: string | string[] },
+  ): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.upsert(attrs, options);
+  }
+
+  async upsertAll(...args: Parameters<Relation<T>["upsertAll"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.upsertAll(...args);
   }
 
   /**
@@ -2810,6 +2864,53 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async loadTarget(): Promise<T[]> {
     await this.load();
     return this._target;
+  }
+
+  /**
+   * Whether find should read the in-memory target rather than querying the
+   * database. Canonical for the proxy path (the proxy owns `_target` and its
+   * loaded flag); the module-level `isFindFromTarget(proxy)` helper resolves
+   * here via `_association`. Mirrors
+   * ActiveRecord::Associations::CollectionAssociation#find_from_target?
+   * (collection_association.rb:308) — kept in clause-order parity with
+   * `CollectionAssociation#isFindFromTarget`.
+   *
+   * @internal
+   */
+  isFindFromTarget(): boolean {
+    return (
+      this._targetLoaded ||
+      (this._record.isStrictLoading() && this._record.isStrictLoadingAll()) ||
+      !!this._assocDef.options.strictLoading ||
+      this._record.isNewRecord() ||
+      this._target.some((r) => r.isNewRecord() || !!(r as any).changed)
+    );
+  }
+
+  /**
+   * Render the collection, loading the target (from memory when
+   * `find_from_target?`, otherwise via a bounded query) without forcing a
+   * premature reload. Mirrors
+   * ActiveRecord::Associations::CollectionProxy#inspect, which delegates to
+   * Relation#inspect after `load_target if find_from_target?`.
+   *
+   * Rails' proxy inspect is synchronous (blocking DB I/O inside `inspect`);
+   * JS has no blocking I/O, so loading the target here is async. This widens
+   * the return to `Promise<string>` vs Relation#inspect's `string`.
+   */
+  // @ts-expect-error async divergence from Relation#inspect — see doc comment.
+  async inspect(): Promise<string> {
+    if (this.isFindFromTarget()) await this.loadTarget();
+    const limitValue = (this as any)._limitValue as number | null;
+    const take = limitValue != null ? Math.min(limitValue, 11) : 11;
+    // Rails' unloaded branch is `annotate("loading for inspect").take(...)`
+    // (relation.rb:1291); carry the annotation onto the bounded query.
+    const subject = this._targetLoaded
+      ? this._target
+      : ((await this.annotate("loading for inspect").limit(take).toArray()) as T[]);
+    const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
+    if (entries.length === 11) entries[10] = "...";
+    return `#<${this.constructor.name} [${entries.join(", ")}]>`;
   }
 
   /**

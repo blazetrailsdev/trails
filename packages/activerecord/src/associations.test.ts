@@ -7426,12 +7426,40 @@ describe("AssociationProxyTest", () => {
     await post.updateColumns({ title: "updated" });
     expect(proxy.loaded).toBe(false);
   });
-  it.skip("inspect does not reload a not yet loaded target", () => {
-    // Tracked: RFC 0030 story collection-proxy-inspect
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* Rails: assert_match on andreas.audit_logs.inspect — needs inspect() on CollectionProxy */
+  it("inspect does not reload a not yet loaded target", async () => {
+    class APAuditLog extends Base {
+      static {
+        this._tableName = "ap_audit_logs";
+        this.attribute("developer_id", "integer");
+        this.attribute("message", "string");
+        // Mirrors audit_log.rb: AuditLog.attributes_for_inspect = [:id, :message].
+        (this as any).attributesForInspect = ["id", "message"];
+      }
+    }
+    class APDeveloper extends Base {
+      static {
+        this._tableName = "ap_developers";
+        this.attribute("name", "string");
+      }
+    }
+    Associations.hasMany.call(APDeveloper, "apAuditLogs", {
+      foreignKey: "developer_id",
+      className: "APAuditLog",
+    });
+    Associations.belongsTo.call(APAuditLog, "apDeveloper", {
+      foreignKey: "developer_id",
+      className: "APDeveloper",
+    });
+    registerModel("APDeveloper", APDeveloper);
+    registerModel("APAuditLog", APAuditLog);
+
+    const andreas = new APDeveloper({ name: "Andreas" });
+    // Mirrors developer.rb `log=`: building an audit_log without loading.
+    association(andreas, "apAuditLogs").build({ message: "new developer added" });
+    const proxy = association(andreas, "apAuditLogs");
+    expect(proxy.loaded).toBe(false);
+    expect(await proxy.inspect()).toMatch(/message: "new developer added"/);
+    expect(proxy.loaded).toBe(true);
   });
   it("save on parent saves children", async () => {
     class APAuditLog extends Base {

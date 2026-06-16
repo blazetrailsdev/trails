@@ -27,6 +27,7 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { Base } from "./base.js";
+import { Result } from "./result.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Cart } from "./test-helpers/models/cart.js";
@@ -40,6 +41,7 @@ import { Subscription } from "./test-helpers/models/subscription.js";
 // Adapter capability gates (mirror Rails' supports_* predicates / current_adapter?).
 // MySQL's ON DUPLICATE KEY UPDATE has no conflict-target syntax and no RETURNING.
 const supportsInsertConflictTarget = adapterType !== "mysql";
+const supportsInsertReturning = adapterType !== "mysql";
 const isMysql = adapterType === "mysql";
 
 // ReadonlyNameBook < Book with attr_readonly :name (insert_all_test.rb:14).
@@ -118,9 +120,10 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert with type casting and serialize is consistent", () => {
-    // BLOCKED: returning-Result — Rails reads the inserted id via
-    // `insert!(..., returning: :id).first["id"]`; insert_all returns a row
-    // count, not an ActiveRecord::Result. RFC 0030 d2-insert-all-returning-result.
+    // BLOCKED: Rails passes an array as the (string) book name and relies on
+    // serialize round-tripping; trails' Book.name is a plain string type, so
+    // this exercises serialize behavior out of scope here.
+    // RFC 0030 d2-insert-all-returning-result.
   });
 
   it("insert all", async () => {
@@ -141,9 +144,10 @@ describe("InsertAllTest", () => {
   });
 
   it("insert all should handle empty arrays", async () => {
-    expect(await Book.insertAll([])).toBe(0);
-    expect(await Book.insertAllBang([])).toBe(0);
-    expect(await Book.upsertAll([])).toBe(0);
+    // Rails asserts assert_empty on the returned ActiveRecord::Result.
+    expect((await Book.insertAll([])).length).toBe(0);
+    expect((await Book.insertAllBang([])).length).toBe(0);
+    expect((await Book.upsertAll([])).length).toBe(0);
   });
 
   it.skip("insert all raises on duplicate records", () => {
@@ -152,28 +156,52 @@ describe("InsertAllTest", () => {
     // indexes. RFC 0030 d2-insert-all-unique-index-introspection.
   });
 
-  it.skip("insert all returns ActiveRecord Result", () => {
-    // BLOCKED: returning-Result. RFC 0030 d2-insert-all-returning-result.
+  it("insert all returns ActiveRecord Result", async () => {
+    const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }]);
+    expect(result).toBeInstanceOf(Result);
   });
 
-  it.skip("insert all returns primary key if returning is supported", () => {
-    // BLOCKED: returning-Result. RFC 0030 d2-insert-all-returning-result.
+  it.skipIf(!supportsInsertReturning)(
+    "insert all returns primary key if returning is supported",
+    async () => {
+      const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }]);
+      expect(result.columns).toEqual(["id"]);
+    },
+  );
+
+  it.skipIf(!supportsInsertReturning)(
+    "insert all returns nothing if returning is empty",
+    async () => {
+      const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
+        returning: [],
+      });
+      expect(result.columns).toEqual([]);
+    },
+  );
+
+  it.skipIf(!supportsInsertReturning)(
+    "insert all returns nothing if returning is false",
+    async () => {
+      const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
+        returning: false,
+      });
+      expect(result.columns).toEqual([]);
+    },
+  );
+
+  it.skipIf(!supportsInsertReturning)("insert all returns requested fields", async () => {
+    const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
+      returning: ["id", "name"],
+    });
+    expect(result.pluck("name")).toEqual(["Rework"]);
   });
 
-  it.skip("insert all returns nothing if returning is empty", () => {
-    // BLOCKED: returning-Result. RFC 0030 d2-insert-all-returning-result.
-  });
-
-  it.skip("insert all returns nothing if returning is false", () => {
-    // BLOCKED: returning-Result. RFC 0030 d2-insert-all-returning-result.
-  });
-
-  it.skip("insert all returns requested fields", () => {
-    // BLOCKED: returning-Result. RFC 0030 d2-insert-all-returning-result.
-  });
-
-  it.skip("insert all returns requested sql fields", () => {
-    // BLOCKED: returning-Result. RFC 0030 d2-insert-all-returning-result.
+  it.skipIf(!supportsInsertReturning)("insert all returns requested sql fields", async () => {
+    const { sql } = await import("@blazetrails/arel");
+    const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
+      returning: sql("UPPER(name) as name"),
+    });
+    expect(result.pluck("name")).toEqual(["REWORK"]);
   });
 
   it("insert all can skip duplicate records", async () => {
@@ -269,7 +297,10 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all and upsert all with aliased attributes", () => {
-    // BLOCKED: returning-Result — the returning sub-block reads result.columns.
+    // BLOCKED: RETURNING does not resolve aliased attributes — `returning: :title`
+    // (alias for `name`) emits `RETURNING "title"` instead of `"name" AS "title"`,
+    // so SQLite errors "no such column: title". The INSERT column list resolves
+    // the alias, but Builder.returning() does not.
     // RFC 0030 d2-insert-all-returning-result.
   });
 
@@ -670,9 +701,11 @@ describe("InsertAllTest", () => {
     expect(await Book.where({ format: "X" }).count()).toBe(before + 2);
   });
 
-  it.skip("insert all has many through", () => {
-    // BLOCKED: has_many_through insert_all ArgumentError guard.
-    // RFC 0030 d2-insert-all-canonical-models.
+  it("insert all has many through", async () => {
+    const book = (await Book.first()) as any;
+    await expect(book.subscribers.insertAllBang([{ nick: "Jimmy" }])).rejects.toThrow(
+      /has_many through/,
+    );
   });
 
   it("upsert all on relation", async () => {
@@ -698,9 +731,11 @@ describe("InsertAllTest", () => {
     expect(await Book.where({ format: "X" }).count()).toBe(before + 2);
   });
 
-  it.skip("upsert all has many through", () => {
-    // BLOCKED: has_many_through upsert_all ArgumentError guard.
-    // RFC 0030 d2-insert-all-canonical-models.
+  it("upsert all has many through", async () => {
+    const book = (await Book.first()) as any;
+    await expect(book.subscribers.upsertAll([{ nick: "Jimmy" }])).rejects.toThrow(
+      /has_many through/,
+    );
   });
 
   it("upsert all updates using provided sql", async () => {

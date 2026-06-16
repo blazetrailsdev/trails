@@ -66,12 +66,12 @@ describe("Relation private build-arel helpers", () => {
       expect(args).toEqual(["a", "b"]);
     });
 
-    it("recursively expands plain objects via flattenedArgs (trails extension over Rails)", () => {
-      // The canonical flattenedArgs expands plain objects into key/value
-      // entries so where({a: 1}) call sites can re-process the pieces.
-      const args: unknown[] = [{ a: "x" }];
+    it("flattens arrays only, leaving plain-object args intact (Rails flatten! parity)", () => {
+      // Ruby `args.flatten!` recurses into nested arrays only; hashes pass
+      // through untouched, so a CTE definition hash like {a: rel} survives.
+      const args: unknown[] = [[{ a: "x" }]];
       relation().checkIfMethodHasArgumentsBang("select", args);
-      expect(args).toEqual(["a", "x"]);
+      expect(args).toEqual([{ a: "x" }]);
     });
   });
 

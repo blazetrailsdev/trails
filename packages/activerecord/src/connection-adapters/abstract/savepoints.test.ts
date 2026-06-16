@@ -4,8 +4,6 @@ import {
   createSavepointSql,
   execRollbackToSavepointSql,
   releaseSavepointSql,
-  nextSavepointName,
-  resetSavepointNumber,
   createSavepoint,
   execRollbackToSavepoint,
   releaseSavepoint,
@@ -13,17 +11,12 @@ import {
 } from "./savepoints.js";
 
 describe("Savepoints", () => {
-  beforeEach(() => {
-    resetSavepointNumber();
-  });
-
   it("currentSavepointName", () => {
-    expect(currentSavepointName()).toBe("active_record_0");
-  });
+    const host = { currentTransaction: () => ({ savepointName: "active_record_1" }) };
+    expect(currentSavepointName.call(host)).toBe("active_record_1");
 
-  it("nextSavepointName increments", () => {
-    expect(nextSavepointName()).toBe("active_record_1");
-    expect(nextSavepointName()).toBe("active_record_2");
+    const nullHost = { currentTransaction: () => ({ savepointName: null }) };
+    expect(currentSavepointName.call(nullHost)).toBeNull();
   });
 
   describe("SQL generation", () => {
@@ -49,6 +42,7 @@ describe("Savepoints", () => {
     beforeEach(() => {
       executedSql = [];
       host = {
+        currentSavepointName: () => "active_record_1",
         async internalExecute(sql: string, _name: string) {
           executedSql.push(sql);
         },
@@ -56,7 +50,6 @@ describe("Savepoints", () => {
     });
 
     it("createSavepoint executes SAVEPOINT SQL", async () => {
-      nextSavepointName();
       await createSavepoint.call(host);
       expect(executedSql).toEqual(["SAVEPOINT active_record_1"]);
     });
@@ -67,13 +60,11 @@ describe("Savepoints", () => {
     });
 
     it("execRollbackToSavepoint executes ROLLBACK TO SAVEPOINT SQL", async () => {
-      nextSavepointName();
       await execRollbackToSavepoint.call(host);
       expect(executedSql).toEqual(["ROLLBACK TO SAVEPOINT active_record_1"]);
     });
 
     it("releaseSavepoint executes RELEASE SAVEPOINT SQL", async () => {
-      nextSavepointName();
       await releaseSavepoint.call(host);
       expect(executedSql).toEqual(["RELEASE SAVEPOINT active_record_1"]);
     });

@@ -81,13 +81,48 @@ export function descendants(modelClass: typeof Base): (typeof Base)[] {
 }
 
 /**
- * Check if a model descends directly from ActiveRecord::Base
- * (i.e. is not an STI subclass).
+ * Hierarchical half of Rails' `descends_from_active_record?`: the `self == Base`
+ * / abstract-superclass recursion / `superclass == Base` structure, with the
+ * inheritance-column-presence test left to the caller. Splitting it out lets
+ * {@link isFinderNeedsTypeCondition} memoize the stable structural answer without
+ * caching a transient cold-schema column miss.
+ *
+ * Independent of the explicit `enableSti` sentinel that {@link isStiSubclass}
+ * keys off — that sentinel still gates the registry-resolved row-dispatch paths.
+ *
+ * @internal
+ */
+function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
+  // Rails: `self == Base` → false.
+  if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) return false;
+  const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
+  if (!parent || parent === Function.prototype || typeof parent.name !== "string") return true;
+  // Rails: `elsif superclass.abstract_class?` → recurse through the abstract chain.
+  if (getAbstractClass.call(parent)) return descendsFromActiveRecordByHierarchy(parent);
+  // Rails else branch begins with `superclass == Base`.
+  return Object.prototype.hasOwnProperty.call(parent, "_isActiveRecordBase");
+}
+
+/**
+ * Check if a model descends directly from ActiveRecord::Base — i.e. it is a
+ * hierarchy root rather than a concrete STI subclass.
+ *
+ * Mirrors Rails' else branch `superclass == Base || !columns_hash.include?(inheritance_column)`:
+ * a non-root class still "descends" (is not an STI subclass) when it doesn't
+ * actually carry the inheritance column, or STI is disabled. trails uses the
+ * column-aware {@link classHasAttribute} (declared attribute or reflected column)
+ * in place of Rails' `columns_hash.include?`, since schema reflection is lazy.
+ * Decoupled from the explicit `enableSti` sentinel ({@link isStiSubclass}), which
+ * still gates the registry-resolved row-dispatch paths.
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record?
  */
 export function isDescendsFromActiveRecord(modelClass: typeof Base): boolean {
-  return !isStiSubclass(modelClass);
+  if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
+  return (
+    inheritanceColumnDisabled(modelClass) ||
+    !classHasAttribute(modelClass, getInheritanceColumn(modelClass))
+  );
 }
 
 /**
@@ -476,9 +511,18 @@ export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
   if (Object.prototype.hasOwnProperty.call(modelClass, "_finderNeedsTypeCondition")) {
     return (modelClass as any)._finderNeedsTypeCondition === true;
   }
-  const result = !isDescendsFromActiveRecord(modelClass);
-  (modelClass as any)._finderNeedsTypeCondition = result;
-  return result;
+  // Rails: `descends_from_active_record? ? :false : :true`, memoized.
+  if (!isDescendsFromActiveRecord(modelClass)) {
+    (modelClass as any)._finderNeedsTypeCondition = true;
+    return true;
+  }
+  // `descends` is true. Memoize only the stable reasons (a hierarchy root, or STI
+  // explicitly disabled); a non-root model that descends only because its `type`
+  // column hasn't reflected yet must recompute once schema warms.
+  if (descendsFromActiveRecordByHierarchy(modelClass) || inheritanceColumnDisabled(modelClass)) {
+    (modelClass as any)._finderNeedsTypeCondition = false;
+  }
+  return false;
 }
 
 let _applicationRecordClass: typeof Base | null = null;

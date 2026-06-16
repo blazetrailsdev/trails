@@ -43,6 +43,7 @@ export {
 } from "./migration/compatibility.js";
 
 import { ActiveRecordError } from "./errors.js";
+import { pgRealTypeUnlessAliased } from "./connection-adapters/postgresql/pg-datetime-config.js";
 
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
 // For {from,to} hashes, returns `to` (which may be null to clear a comment).
@@ -1667,6 +1668,7 @@ export class MigrationContext {
         precision?: number | null;
         scale?: number | null;
         array?: boolean;
+        datetimePhysicalType?: string;
       }
     >
   >();
@@ -2005,6 +2007,7 @@ export class MigrationContext {
         precision?: number | null;
         scale?: number | null;
         array?: boolean;
+        datetimePhysicalType?: string;
       }
     >();
     const compositePk =
@@ -2032,6 +2035,7 @@ export class MigrationContext {
         precision: col.options.precision,
         scale: col.options.scale,
         array: (col.options as { array?: boolean }).array,
+        datetimePhysicalType: (col as { datetimePhysicalType?: string }).datetimePhysicalType,
       });
     }
     if (options?.as != null) {
@@ -2467,10 +2471,20 @@ export class MigrationContext {
     precision?: number | null;
     scale?: number | null;
     array?: boolean;
+    datetimePhysicalType?: string;
   }> {
     const meta = this._columnMeta.get(tableName);
     if (meta) {
-      return Array.from(meta.entries()).map(([name, info]) => ({ name, ...info }));
+      const isPg = this._adapterName === "postgres";
+      return Array.from(meta.entries()).map(([name, info]) => {
+        // PostgreSQL: rewrite datetime-family columns against the live
+        // datetime_type, mirroring what re-introspecting the stored physical
+        // type would yield (PostgreSQL::OID::DateTime#real_type_unless_aliased).
+        if (isPg && info.datetimePhysicalType) {
+          return { name, ...info, type: pgRealTypeUnlessAliased(info.datetimePhysicalType) };
+        }
+        return { name, ...info };
+      });
     }
     const cols = this._columns.get(tableName);
     if (!cols) return [];

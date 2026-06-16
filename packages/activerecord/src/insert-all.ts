@@ -5,9 +5,10 @@ import { IndexDefinition } from "./connection-adapters/abstract/schema-definitio
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
-import { stiName, isDescendsFromActiveRecord } from "./inheritance.js";
+import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./adapter.js";
+import { Result } from "./result.js";
 
 type ModelClass = typeof Base;
 type AdapterDialect = AdapterName;
@@ -62,7 +63,7 @@ export class InsertAll {
     relation: Relation<any>,
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
-  ): Promise<number> {
+  ): Promise<Result> {
     const model = (relation as any)._modelClass as ModelClass;
     const ia = new InsertAll(relation, model.connection, inserts, options);
     return ia.execute();
@@ -123,13 +124,20 @@ export class InsertAll {
     this.ensureValidOptionsForConnectionBang();
   }
 
-  async execute(): Promise<number> {
+  async execute(): Promise<Result> {
     // Resolve uniqueBy before the empty-batch shortcut so the Rails guard
     // (insert_all.rb#initialize validates uniqueBy in the constructor before
     // any inserts.empty? check) still fires on upsertAll([], { uniqueBy }).
     await this._populateUpdatableColumns();
-    if (this.inserts.length === 0) return 0;
-    return this.connection.executeMutation(this.toSql());
+    if (this.inserts.length === 0) return Result.empty();
+    // Mirrors Rails InsertAll#execute: build the log/instrumentation label
+    // ("Book Bulk Insert" / "Book Upsert") and route through exec_insert_all
+    // so the RETURNING rows are captured into an ActiveRecord::Result rather
+    // than discarded (executeMutation only reports the affected-row count).
+    let message = `${this.model.name} `;
+    if (this.inserts.length > 1) message += "Bulk ";
+    message += this.onDuplicate === "update" ? "Upsert" : "Insert";
+    return this.connection.execInsertAll(this.toSql(), message);
   }
 
   /**
@@ -308,12 +316,15 @@ export class InsertAll {
 
   /** @internal */
   private resolveSti(): void {
-    // Rails injects the STI type only for descendants (`!descends_from_active_record?`).
-    // `inheritance_column` now always resolves to a name (default "type"), so gate
-    // on the structural check rather than the column's presence.
-    if (isDescendsFromActiveRecord(this.model)) return;
-    // STI is active on this path (not descends_from), so the column resolves to a
-    // name; `?? "type"` only satisfies the now-nullable getter's type.
+    // Rails injects the STI type only for models that actually participate in STI
+    // (`finder_needs_type_condition?` — a non-abstract subclass whose table carries
+    // the inheritance column). Gating on the column-aware check, not the bare
+    // hierarchical `descends_from_active_record?`, keeps a plain concrete subclass
+    // with no `type` column (e.g. a readonly-attribute subclass) from inserting a
+    // value into a non-existent column.
+    if (!isFinderNeedsTypeCondition(this.model)) return;
+    // STI is active on this path, so the column resolves to a name; `?? "type"`
+    // only satisfies the now-nullable getter's type.
     const inheritanceCol = this.model.inheritanceColumn ?? "type";
     const type = stiName(this.model);
     for (const insert of this.inserts) {

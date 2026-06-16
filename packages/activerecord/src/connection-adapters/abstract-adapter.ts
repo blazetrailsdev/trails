@@ -380,6 +380,7 @@ export interface AbstractAdapter {
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result>;
+  execInsertAll(sql: string, name?: string): Promise<Result>;
   execInsert(
     sql: string,
     name?: string | null,
@@ -468,6 +469,7 @@ export interface AbstractAdapter {
   createSavepoint(name: string): Promise<void>;
   releaseSavepoint(name: string): Promise<void>;
   rollbackToSavepoint(name: string): Promise<void>;
+  currentSavepointName(): string | null;
   readonly inTransaction: boolean;
   changeTableComment?(
     tableName: string,

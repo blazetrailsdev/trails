@@ -52,6 +52,10 @@ export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action"
  */
 export class ColumnDefinition {
   sqlType?: string;
+  // PostgreSQL only: physical storage type ("timestamp" / "timestamptz") for
+  // datetime-family columns, recorded at creation time so the schema dumper
+  // can re-derive the dumped type against the live datetime_type.
+  datetimePhysicalType?: string;
   constructor(
     readonly name: string,
     readonly type: ColumnType,

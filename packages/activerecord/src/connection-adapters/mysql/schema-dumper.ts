@@ -50,15 +50,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
 
-  /**
-   * Per-table PK column order from `@connection.primary_key(table)` (MySQL returns
-   * columns in `seq_in_index` order). Used by `emitTable` to render
-   * `primaryKey: [...]` in index order rather than `SHOW FULL FIELDS` declaration
-   * order, matching Rails.
-   * @internal
-   */
-  primaryKeyOrderCache: Record<string, string[] | undefined> = Object.create(null);
-
   /** @internal */
   protected override async fetchTableOptions(tableName: string): Promise<Record<string, unknown>> {
     if (!this.connection) return {};
@@ -145,7 +136,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isExplicitPrimaryKeyDefault(column: MysqlColumn): boolean {
-    return column.type === "integer" && column.autoIncrement === false;
+    // Mirrors Rails `column.type == :integer && !column.auto_increment?`. Use `!autoIncrement`
+    // (not `=== false`) so a non-auto-increment PK whose flag is undefined still counts.
+    return column.type === "integer" && !column.autoIncrement;
   }
 
   /** @internal */
@@ -213,14 +206,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   override async table(tableName: string, lines: string[]): Promise<void> {
-    if (this.connection?.primaryKeys) {
-      try {
-        this.primaryKeyOrderCache[tableName] = await this.connection.primaryKeys(tableName);
-      } catch {
-        // Live introspection is best-effort; fall through to declaration order.
-      }
-    }
     await this.populateVirtualExpressionCache(tableName);
+    // super.table (abstract) populates primaryKeyOrderCache via @connection.primaryKeys.
     await super.table(tableName, lines);
   }
 
@@ -259,26 +246,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
       }
     }
     this.virtualExpressionCache[tableName] = byColumn;
-  }
-
-  /** @internal */
-  protected override orderPrimaryKeyColumns(
-    tableName: string,
-    pkColumns: ColumnInfo[],
-  ): ColumnInfo[] {
-    const order = this.primaryKeyOrderCache[tableName];
-    if (!order || order.length === 0) return pkColumns;
-    const byName = new Map(pkColumns.map((c) => [c.name, c]));
-    const reordered: ColumnInfo[] = [];
-    for (const name of order) {
-      const col = byName.get(name);
-      if (col) {
-        reordered.push(col);
-        byName.delete(name);
-      }
-    }
-    for (const col of byName.values()) reordered.push(col);
-    return reordered;
   }
 
   /** @internal */

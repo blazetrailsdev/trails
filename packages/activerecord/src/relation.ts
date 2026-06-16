@@ -50,7 +50,6 @@ import {
   areStructurallyCompatible,
   VALID_UNSCOPING_VALUES,
   argumentError,
-  isBlankArgument,
   assertModifiableBang as _assertModifiableBang,
   checkIfMethodHasArgumentsBang as _checkIfMethodHasArgumentsBang,
   isTableNameMatches as _isTableNameMatches,
@@ -81,6 +80,7 @@ import {
 import { wrapWithScopeProxy } from "./relation/delegation.js";
 import { resolveAliasedColumn } from "./reflection.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
+import type { Result } from "./result.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
@@ -3721,11 +3721,16 @@ export class Relation<T extends Base> {
    */
   async insertAll(
     records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[]; recordTimestamps?: boolean },
-  ): Promise<number> {
+    options?: {
+      uniqueBy?: string | string[];
+      returning?: InsertAllOptions["returning"];
+      recordTimestamps?: boolean;
+    },
+  ): Promise<Result> {
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
       onDuplicate: "skip",
+      returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });
   }
@@ -3741,13 +3746,15 @@ export class Relation<T extends Base> {
       uniqueBy?: string | string[];
       updateOnly?: string | string[];
       onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
+      returning?: InsertAllOptions["returning"];
       recordTimestamps?: boolean;
     },
-  ): Promise<number> {
+  ): Promise<Result> {
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
       updateOnly: options?.updateOnly,
       onDuplicate: options?.onDuplicate ?? "update",
+      returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });
   }
@@ -5016,17 +5023,12 @@ export class Relation<T extends Base> {
       throw argumentError("ActiveRecord::Relation#with does not accept a block");
     }
     // Rails `with` follows the block guard with `check_if_method_has_arguments!`
-    // (query_methods.rb:494), whose `args.blank? → raise` branch applies to the
-    // empty-varargs case. We skip that helper's `args.flatten!` step (it flattens
-    // plain-object args into `[key, value, …]`, destroying CTE definition hashes;
-    // Rails' `flatten!` flattens arrays only), but still mirror its trailing
-    // `compact_blank!` (query_methods.rb:2220): a blank arg (`null`, `[]`, `{}`)
-    // survives the blank check then compacts away, so `with(null)` no-ops.
-    if (ctes.length === 0) {
-      throw argumentError("The method .with() must contain arguments.");
-    }
-    const compacted = ctes.filter((cte) => !isBlankArgument(cte));
-    return this._clone().withBang(...compacted);
+    // (query_methods.rb:494). The shared helper raises on empty varargs, then
+    // mirrors `args.flatten!` (arrays only — CTE definition hashes survive) and
+    // `compact_blank!` (a blank arg like `null`/`[]`/`{}` compacts away, so
+    // `with(null)` no-ops). It mutates `ctes` in place.
+    this.checkIfMethodHasArgumentsBang("with", ctes);
+    return this._clone().withBang(...ctes);
   }
 
   /**
@@ -5136,8 +5138,8 @@ export class Relation<T extends Base> {
    */
   async insert(
     attrs: Record<string, unknown>,
-    options?: { uniqueBy?: string | string[] },
-  ): Promise<number> {
+    options?: { uniqueBy?: string | string[]; returning?: InsertAllOptions["returning"] },
+  ): Promise<Result> {
     return this.insertAll([attrs], options);
   }
 
@@ -5149,7 +5151,7 @@ export class Relation<T extends Base> {
   async insertBang(
     attrs: Record<string, unknown>,
     options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
-  ): Promise<number> {
+  ): Promise<Result> {
     return this.insertAllBang([attrs], options);
   }
 
@@ -5162,7 +5164,7 @@ export class Relation<T extends Base> {
   async insertAllBang(
     records: Record<string, unknown>[],
     options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
-  ): Promise<number> {
+  ): Promise<Result> {
     return InsertAll.execute(this, records, {
       returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
@@ -5176,8 +5178,8 @@ export class Relation<T extends Base> {
    */
   async upsert(
     attrs: Record<string, unknown>,
-    options?: { uniqueBy?: string | string[] },
-  ): Promise<number> {
+    options?: { uniqueBy?: string | string[]; returning?: InsertAllOptions["returning"] },
+  ): Promise<Result> {
     return this.upsertAll([attrs], options);
   }
 
@@ -5457,9 +5459,37 @@ export class Relation<T extends Base> {
     return this.values();
   }
 
+  /** True when this relation's WHERE equals the model's unscoped baseline —
+   *  empty, or carrying only the STI `type_condition` that `unscoped` itself
+   *  layers on. Mirrors the WHERE half of Rails' `@values == klass.unscoped.values`
+   *  so an STI subclass's unscoped relation still reports as an empty scope.
+   *  @internal */
+  private _whereMatchesUnscopedBaseline(): boolean {
+    if (this._whereClause.isEmpty()) return true;
+    const klass = this._modelClass as any;
+    // Only a finder-type-condition class has a non-empty unscoped baseline; for
+    // anything else a non-empty WHERE means a real, non-empty scope.
+    if (!klass.isFinderNeedsTypeCondition?.()) return false;
+    const connection = klass.connection;
+    if (!connection?.toSql) return false;
+    // Build the baseline against this relation's own table so an alias-qualified
+    // relation compares its type_condition against an identically-qualified one
+    // rather than the default arel_table.
+    const baseline = klass._buildUnscopedRelation?.(this._table ?? undefined);
+    if (!baseline) return false;
+    try {
+      return this._whereClause.toSql(connection) === baseline._whereClause.toSql(connection);
+    } catch {
+      return false;
+    }
+  }
+
   get isEmptyScope(): boolean {
+    // Rails: `@values == klass.unscoped.values`. The unscoped baseline may carry
+    // the STI `type_condition`, so a relation whose WHERE matches that baseline
+    // (rather than being literally empty) is still an empty scope.
     return (
-      this._whereClause.isEmpty() &&
+      this._whereMatchesUnscopedBaseline() &&
       this._orderClauses.length === 0 &&
       this._limitValue === null &&
       this._offsetValue === null &&

@@ -21,12 +21,55 @@ interface Column extends ColumnInfo {
 }
 
 export class SchemaDumper extends BaseSchemaDumper {
+  /**
+   * Per-table primary-key column order from `@connection.primary_key(table)`.
+   * Populated by `table()` before column iteration so `emitTable` can render
+   * `primaryKey: [...]` (and pick the single-PK column) in PK definition order
+   * rather than introspection/declaration order. Mirrors Rails' reliance on
+   * `@connection.primary_key(table)`, which already returns columns in key order.
+   * @internal
+   */
+  protected primaryKeyOrderCache: Record<string, string[] | undefined> = Object.create(null);
+
   static override create<T extends typeof BaseSchemaDumper>(
     this: T,
     source: SchemaSource,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
     return new this(source, options) as InstanceType<T>;
+  }
+
+  /** @internal */
+  override async table(tableName: string, lines: string[]): Promise<void> {
+    const adapter = this._adapter();
+    if (adapter && typeof adapter.primaryKeys === "function") {
+      try {
+        this.primaryKeyOrderCache[tableName] = await adapter.primaryKeys(tableName);
+      } catch {
+        // Live introspection is best-effort; fall through to declaration order.
+      }
+    }
+    await super.table(tableName, lines);
+  }
+
+  /** @internal */
+  protected override orderPrimaryKeyColumns(
+    tableName: string,
+    pkColumns: ColumnInfo[],
+  ): ColumnInfo[] {
+    const order = this.primaryKeyOrderCache[tableName];
+    if (!order || order.length === 0) return pkColumns;
+    const byName = new Map(pkColumns.map((c) => [c.name, c]));
+    const reordered: ColumnInfo[] = [];
+    for (const name of order) {
+      const col = byName.get(name);
+      if (col) {
+        reordered.push(col);
+        byName.delete(name);
+      }
+    }
+    for (const col of byName.values()) reordered.push(col);
+    return reordered;
   }
 
   /** @internal */
@@ -87,22 +130,28 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected schemaType(column: Column): string {
-    if (column.bigint || column.type === "bigint") return "bigint";
+    if (this.isBigint(column)) return "bigint";
     return column.type;
+  }
+
+  /**
+   * Mirrors `ConnectionAdapters::Column#bigint?` (`/\Abigint\b/.match?(sql_type)`),
+   * which the abstract `schema_type` consults. A live column reflects a `bigint`
+   * declaration as sqlType `"bigint"`/`"BIGINT"` with dsl type `"integer"`, so
+   * detect it off sqlType; the `bigint` flag / `type === "bigint"` arms keep mock
+   * sources that set them directly working.
+   * @internal
+   */
+  protected isBigint(column: Column): boolean {
+    return !!column.bigint || column.type === "bigint" || /^bigint\b/i.test(column.sqlType ?? "");
   }
 
   /** @internal */
   protected schemaLimit(column: Column): string | undefined {
-    if (column.bigint || column.type === "bigint") return undefined;
-    // Rails dumps `t.oid` bare because its oid column reports `limit == nil`
-    // (NATIVE_DATABASE_TYPES[:oid] carries no :limit, postgresql_adapter.rb:177)
-    // and schema_limit only emits when the limit differs from the native type's
-    // (abstract/schema_dumper.rb:64). Our PG introspection diverges — it surfaces
-    // limit 8 for oid — so we suppress here to match the dump. The root-cause fix
-    // (introspection should not carry the oid limit, or a general
-    // native_database_types limit comparison like isSerial below) is tracked in
-    // rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md.
-    if (this.schemaType(column) === "oid") return undefined;
+    // Mirrors Rails `schema_limit`: `limit = column.limit unless column.bigint?` — same
+    // predicate `schema_type` uses, so a column whose bigint-ness is only visible through
+    // sqlType is limit-suppressed too.
+    if (this.isBigint(column)) return undefined;
     // Rails suppresses the serial/bigserial limit because it matches the native
     // database type's default (int4 limit = 4, int8 limit = 8). We don't have
     // the native_database_types comparison available here, so we guard explicitly
@@ -199,24 +248,30 @@ export class SchemaDumper extends BaseSchemaDumper {
     );
     const hasCompositePk = pkColumns.length > 1;
     const pkColumn = pkColumns[0];
-    const hasId = !hasCompositePk && pkColumn?.name === "id";
+    // The single-PK column name Rails skips in the column loop (`next if column.name == pk`).
+    // Composite PKs (Rails Array case) and PK-less tables never skip a column.
+    const singlePkName = !hasCompositePk && pkColumn ? pkColumn.name : undefined;
     const stripped = this.removePrefixAndSuffix(tableName);
 
     // All values in tableOpts are pre-formatted TS-DSL text for formatColspecRaw.
     const tableOpts: Record<string, unknown> = {};
     if (hasCompositePk) {
+      // Rails (Array case) emits only `primary_key: [...]`; the TS DSL also needs
+      // `id: false` so createTable doesn't auto-add an `id` column on round-trip.
       tableOpts["primaryKey"] = JSON.stringify(pkColumns.map((c) => c.name));
       tableOpts["id"] = "false";
-    } else if (!hasId) {
+    } else if (!pkColumn) {
       tableOpts["id"] = "false";
-    } else if (pkColumn) {
-      // Emit the id spec for a non-default PK, or a default-typed PK that carries a comment.
-      if (!this.isDefaultPrimaryKey(pkColumn) || pkColumn.comment) {
-        // columnSpecForPrimaryKey returns a FLAT spec (dialect overrides post-process it,
-        // e.g. MySQL deletes auto_increment); wrap into `id: { ... }` here at the call site,
-        // after those overrides, so the PK's own `comment:` doesn't collide with the
-        // table-level `comment:`. Mirrors Rails schema_dumper.rb:174-179.
-        const pkSpec = this.columnSpecForPrimaryKey(pkColumn);
+    } else {
+      // Rails (String case): print `primary_key: <name>` for a non-"id" key, then the
+      // column spec unless empty. Mirrors schema_dumper.rb:170-179.
+      if (pkColumn.name !== "id") tableOpts["primaryKey"] = JSON.stringify(pkColumn.name);
+      // columnSpecForPrimaryKey returns a FLAT spec (dialect overrides post-process it,
+      // e.g. MySQL deletes auto_increment); wrap into `id: { ... }` here at the call site,
+      // after those overrides, so the PK's own `comment:` doesn't collide with the
+      // table-level `comment:`.
+      const pkSpec = this.columnSpecForPrimaryKey(pkColumn);
+      if (Object.keys(pkSpec).length > 0) {
         if (Object.keys(pkSpec).every((k) => k === "id" || k === "default")) {
           Object.assign(tableOpts, pkSpec);
         } else {
@@ -240,7 +295,7 @@ export class SchemaDumper extends BaseSchemaDumper {
     );
 
     for (const col of columns) {
-      if (col.name === "id" && hasId) continue;
+      if (col.name === singlePkName) continue;
 
       const [dslType, spec] = this.columnSpec(col);
       const optStr = Object.keys(spec).length > 0 ? `, { ${this.formatColspecRaw(spec)} }` : "";

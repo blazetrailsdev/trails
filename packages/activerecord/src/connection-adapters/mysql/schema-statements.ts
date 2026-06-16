@@ -573,9 +573,25 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
       def = null;
     } else if (extraRaw.toUpperCase().startsWith("DEFAULT_GENERATED")) {
       if (typeof def === "string") {
-        const wrapped = def.startsWith("(") ? def : `(${def})`;
+        // Unescape backslash-escaped single quotes the way newColumnFromField
+        // does, so an expression like concat(`c`,_utf8mb4\'-\') round-trips to
+        // concat(`c`,_utf8mb4'-') in the dumped `default: () => "..."`.
+        const wrapped = (def.startsWith("(") ? def : `(${def})`).replace(/\\'/g, "'");
         defFn = onUpdateMatch ? `${wrapped} ON UPDATE ${onUpdateMatch[1]}` : wrapped;
       }
+      def = null;
+    } else if (this.isMariadb() && typeof def === "string" && /^[A-Za-z]/.test(def)) {
+      // MariaDB reports arbitrary expression/function defaults (e.g. uuid(),
+      // concat(`char2`, '-')) as bare expressions in
+      // information_schema.column_default — string literals come back
+      // single-quoted and numerics bare-numeric, so a default whose leading
+      // token is a (function-name) letter is a function default. This mirrors
+      // Rails' default_type (mysql/schema_statements.rb), whose :function branch
+      // fires when the captured DEFAULT token matches /^[A-z]+$/. Unlike MySQL 8
+      // (handled by the DEFAULT_GENERATED branch above), MariaDB does not tag
+      // these with an extra, so they are detected from the default shape; the
+      // implicit `NULL` token was already coerced to a real null above.
+      defFn = def;
       def = null;
     }
     const onUpdateForColumn =

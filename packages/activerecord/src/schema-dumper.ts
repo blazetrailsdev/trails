@@ -222,6 +222,8 @@ const DSL_HELPER_METHODS = new Set([
   "date",
   "datetime",
   "timestamp",
+  // PG timestamp-with-time-zone — TableDefinition.timestamptz helper.
+  "timestamptz",
   "time",
   "binary",
   "json",
@@ -1085,11 +1087,6 @@ export class SchemaDumper {
       if (col.array && !colspec.array) colspec.array = true;
       if (
         !col.isSerial &&
-        // Rails' oid column reports limit == nil, so `t.oid` dumps bare; our PG
-        // introspection diverges (surfaces limit 8). Suppress to match. See the
-        // schemaLimit note in abstract/schema-dumper.ts — root cause tracked in
-        // the c1-schema-dumper-residual-gaps story (RFC 0030).
-        dslType !== "oid" &&
         col.limit !== undefined &&
         col.limit !== null &&
         extraOpts?.limit === undefined

@@ -1,10 +1,12 @@
 import type { Base } from "./base.js";
 import { Relation } from "./relation.js";
+import { Result } from "./result.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import { _setAssociationRelationCtor } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _cacheSingularTarget } from "./associations.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 /**
  * A Relation produced by a collection association (e.g. `blog.posts`,
@@ -115,6 +117,53 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
     return (this._association as CollectionProxy<T>).createBang(merged, block) as Promise<T>;
+  }
+
+  /**
+   * Bulk insert/upsert through a chained association relation
+   * (`book.subscribers.where(...).insert_all`). Mirrors Rails'
+   * `AssociationRelation`, which guards `insert`, `insert_all`, `insert!`,
+   * `insert_all!`, `upsert`, and `upsert_all`: a `has_many :through`
+   * association raises ArgumentError. Non-through associations fall through
+   * to the inherited Relation implementation. (The un-chained
+   * `CollectionProxy` carries the same guard.)
+   */
+  private _assertBulkInsertable(): void {
+    if (this._association.reflection.options?.through) {
+      throw new ArgumentError(
+        "Bulk insert or upsert is currently not supported for has_many through association",
+      );
+    }
+  }
+
+  async insert(...args: Parameters<Relation<T>["insert"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.insert(...args);
+  }
+
+  async insertBang(...args: Parameters<Relation<T>["insertBang"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.insertBang(...args);
+  }
+
+  async insertAll(...args: Parameters<Relation<T>["insertAll"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.insertAll(...args);
+  }
+
+  async insertAllBang(...args: Parameters<Relation<T>["insertAllBang"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.insertAllBang(...args);
+  }
+
+  async upsert(...args: Parameters<Relation<T>["upsert"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.upsert(...args);
+  }
+
+  async upsertAll(...args: Parameters<Relation<T>["upsertAll"]>): Promise<Result> {
+    this._assertBulkInsertable();
+    return super.upsertAll(...args);
   }
 
   /**

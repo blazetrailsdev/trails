@@ -52,6 +52,7 @@ import {
   isStiSubclass,
   getStiBase,
   instantiateSti,
+  stiName,
   computeType as inheritanceComputeType,
   subclasses as inheritanceSubclasses,
   descendants as inheritanceDescendants,
@@ -1717,12 +1718,16 @@ export class Base extends Model {
    *  Rails bakes this into `relation()` so both `unscoped` and the
    *  default-scoped path carry it; we layer it onto the base relation. */
   private static _applyStiTypeCondition(rel: any): any {
-    if (isStiSubclass(this)) {
-      const col = getInheritanceColumn(getStiBase(this));
-      if (col) {
-        const stiNames = [this.name, ...this.descendants.map((d: typeof Base) => d.name)];
-        return rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
-      }
+    // Rails gates the finder type-condition on `finder_needs_type_condition?`
+    // (hierarchical + inheritance-column presence), not on an explicit enableSti
+    // sentinel — so any non-abstract subclass over a `type`-bearing table scopes
+    // by type. The column resolves on the subclass itself (default "type").
+    if (isFinderNeedsTypeCondition(this)) {
+      const col = getInheritanceColumn(this);
+      // Rails: `([self] + descendants).map(&:sti_name)` (inheritance.rb#type_condition)
+      // — `sti_name` honors `store_full_sti_class` / overrides, not the bare class name.
+      const stiNames = [stiName(this), ...this.descendants.map((d: typeof Base) => stiName(d))];
+      return rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
     }
     return rel;
   }

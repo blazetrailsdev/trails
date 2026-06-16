@@ -19,6 +19,19 @@ function freshSidecarCtx(): { adapter: DatabaseAdapter; ctx: MigrationContext } 
   return { adapter, ctx };
 }
 
+// Mirrors: ActiveRecord::TestCase#with_postgresql_datetime_type. Temporarily
+// flips PostgreSQLAdapter.datetimeType so :datetime resolves to :timestamptz.
+async function withPostgresqlDatetimeType(type: string, fn: () => Promise<void>): Promise<void> {
+  const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
+  const was = PostgreSQLAdapter.datetimeType;
+  PostgreSQLAdapter.datetimeType = type;
+  try {
+    await fn();
+  } finally {
+    PostgreSQLAdapter.datetimeType = was;
+  }
+}
+
 describe("SchemaDumperTest", () => {
   let ctx: MigrationContext;
   beforeEach(async () => {
@@ -571,10 +584,11 @@ describe("SchemaDumperTest", () => {
       indexes: () => [],
     };
     const output = TopLevelDumper.dump(source) as string;
-    // timestamptz/uuid have no TableDefinition helper, so they round-trip
-    // through the generic `t.column(name, sqlType)` path — keeping their own
-    // type name rather than collapsing to the `enum` fallback.
-    expect(output).toContain('t.column("ts", "timestamptz"');
+    // Regression guard against collapsing to the `enum` fallback. timestamptz/
+    // interval/oid resolve to their TableDefinition helpers (`t.timestamptz`/
+    // `t.interval`/`t.oid`); uuid has no helper and round-trips through the
+    // generic `t.column(name, sqlType)` path, keeping its own type name.
+    expect(output).toContain('t.timestamptz("ts"');
     expect(output).toContain('t.column("guid", "uuid"');
     // interval/oid resolve to their TableDefinition helpers (Rails emits
     // `t.interval`/`t.oid`, not `t.column`).
@@ -870,14 +884,24 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("updated_at");
   });
 
-  it.skip("schema dump with timestamptz datetime format", () => {
-    // BLOCKED: datetime_type-aware dump — the PG dumper does not rewrite
-    // timestamp/timestamptz columns based on PostgreSQLAdapter.datetimeType, and
-    // there is no `t.timestamptz` TableDefinition helper.
-    // ROOT-CAUSE: schema-dumper datetime_type mapping + missing timestamptz helper.
-    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
-    /* needs datetime_type-aware dump + timestamptz helper */
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump with timestamptz datetime format",
+    async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await ctx.createTable("timestamps", {}, (t) => {
+          t.datetime("this_should_remain_datetime");
+          (t as any).timestamptz("this_is_an_alias_of_datetime");
+          t.column("without_time_zone", "timestamp");
+          t.column("with_time_zone", "timestamptz");
+        });
+        const output = SchemaDumper.dump(ctx) as string;
+        expect(output).toContain('t.datetime("this_should_remain_datetime"');
+        expect(output).toContain('t.datetime("this_is_an_alias_of_datetime"');
+        expect(output).toContain('t.timestamp("without_time_zone"');
+        expect(output).toContain('t.datetime("with_time_zone"');
+      });
+    },
+  );
   it.skip("timestamps schema dump before rails 7", () => {
     // BLOCKED: needs Migration version compatibility (Migration[6.1]).
     // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
@@ -886,20 +910,44 @@ describe("SchemaDumperTest", () => {
     // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
     // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
   });
-  it.skip("schema dump when changing datetime type for an existing app", () => {
-    // BLOCKED: datetime_type-aware dump — toggling PostgreSQLAdapter.datetimeType
-    // must flip which columns dump as datetime vs timestamp/timestamptz.
-    // ROOT-CAUSE: schema-dumper datetime_type mapping + missing timestamptz helper.
-    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
-    /* needs datetime_type-aware dump + timestamptz helper */
-  });
-  it.skip("schema dump with correct timestamp types via create table and t timestamptz", () => {
-    // BLOCKED: no `t.timestamptz` TableDefinition helper, and the dumper does not
-    // emit `t.timestamptz` for timestamptz columns under the default datetime_type.
-    // ROOT-CAUSE: missing timestamptz helper + schema-dumper mapping gap.
-    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
-    /* needs timestamptz helper + dump mapping */
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump when changing datetime type for an existing app",
+    async () => {
+      await ctx.createTable("timestamps", {}, (t) => {
+        t.datetime("default_format");
+        t.column("without_time_zone", "timestamp");
+        t.column("with_time_zone", "timestamptz");
+      });
+
+      let output = SchemaDumper.dump(ctx) as string;
+      expect(output).toContain('t.datetime("default_format"');
+      expect(output).toContain('t.datetime("without_time_zone"');
+      expect(output).toContain('t.timestamptz("with_time_zone"');
+
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        output = SchemaDumper.dump(ctx) as string;
+        expect(output).toContain('t.timestamp("default_format"');
+        expect(output).toContain('t.timestamp("without_time_zone"');
+        expect(output).toContain('t.datetime("with_time_zone"');
+      });
+    },
+  );
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump with correct timestamp types via create table and t timestamptz",
+    async () => {
+      await ctx.createTable("timestamps", {}, (t) => {
+        t.datetime("default_format");
+        t.datetime("without_time_zone");
+        t.timestamp("also_without_time_zone");
+        (t as any).timestamptz("with_time_zone");
+      });
+      const output = SchemaDumper.dump(ctx) as string;
+      expect(output).toContain('t.datetime("default_format"');
+      expect(output).toContain('t.datetime("without_time_zone"');
+      expect(output).toContain('t.datetime("also_without_time_zone"');
+      expect(output).toContain('t.timestamptz("with_time_zone"');
+    },
+  );
 
   it("schema dump with correct timestamp types via add column", async () => {
     await ctx.createTable("posts", {}, (t) => {
