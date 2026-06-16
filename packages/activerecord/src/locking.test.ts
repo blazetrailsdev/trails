@@ -828,7 +828,13 @@ describe("PessimisticLockingTest", () => {
   // `people` table so the full fixture columns (gender, *_id, counts) and the
   // shared Person model resolve, regardless of any bespoke `people` a sibling
   // file left in the shared worker DB.
-  const { people } = useHandlerFixtures(["people"], { schema: canonicalSchema });
+  // `with lock sets isolation` must run outside the transactional-fixtures
+  // wrapper — setting an isolation level inside a nested transaction raises
+  // (mirrors Rails, where isolation requires a top-level transaction).
+  const { people } = useHandlerFixtures(["people"], {
+    schema: canonicalSchema,
+    usesTransaction: ["with lock sets isolation"],
+  });
 
   // `eager find with lock` traverses Person's `has_many :readers`, so the
   // Reader model must be registered for the reflection to resolve.

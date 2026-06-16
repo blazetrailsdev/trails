@@ -11,12 +11,12 @@ export class Publication extends Base {
     this.hasMany("editorships");
     this.hasMany("editors", { through: "editorships" });
 
-    this.afterInitialize((record: Publication) => {
-      (record as any).editorInChief = (record as any).buildEditorInChief({ name: "John Doe" });
+    this.afterInitialize(function (this: Publication) {
+      (this as any).editorInChief = (this as any).buildEditorInChief({ name: "John Doe" });
     });
 
-    this.afterSaveCommit((record: Publication) => {
-      record.touchName();
+    this.afterSaveCommit(async function (this: Publication) {
+      this.touchName();
     });
   }
 
