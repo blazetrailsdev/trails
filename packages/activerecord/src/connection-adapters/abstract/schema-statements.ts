@@ -1220,15 +1220,24 @@ export class SchemaStatements {
 
   async indexExists(
     tableName: string,
-    columnName: string | string[],
+    columnName: string | string[] | null | undefined,
     options?: { unique?: boolean; name?: string },
   ): Promise<boolean> {
     const allIndexes = await this.adapterIndexes(tableName);
-    const targetCols = Array.isArray(columnName) ? columnName : [columnName];
+    // Rails `defined_for?`: the column check only applies when columns are
+    // present (`columns.blank?` — nil, "", and [] are all absent), so
+    // `index_exists?(:t, nil, name: ...)` matches on name alone (used to
+    // reverse a named expression index).
+    const hasColumn =
+      columnName != null &&
+      columnName !== "" &&
+      !(Array.isArray(columnName) && columnName.length === 0);
+    const targetCols = hasColumn ? (Array.isArray(columnName) ? columnName : [columnName]) : null;
 
     return allIndexes.some((idx) => {
       if (options?.name && idx.name !== options.name) return false;
       if (options?.unique !== undefined && idx.unique !== options.unique) return false;
+      if (targetCols == null) return true;
       return (
         targetCols.length === idx.columns.length && targetCols.every((c, i) => c === idx.columns[i])
       );
@@ -1673,9 +1682,12 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): Promise<[IndexDefinition, string | undefined, boolean]> {
-    const columnNames = Array.isArray(columnName) ? columnName : [columnName];
+    // Mirrors Rails: a String column with non-word chars (e.g. "remind_at, place_id"
+    // or "(data->'foo')") is an expression — kept verbatim as the index columns,
+    // with the index name derived from its `\w+` runs joined by "_".
+    const columnNames = this.indexColumnNames(columnName);
     const indexName =
-      options.name?.toString() ?? this.indexName(tableName, { column: columnNames });
+      options.name?.toString() ?? this.indexName(tableName, this.indexNameOptions(columnNames));
 
     if (!options.internal) {
       this._validateIndexLength(tableName, indexName);

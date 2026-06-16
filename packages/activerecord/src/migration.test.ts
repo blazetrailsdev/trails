@@ -12,6 +12,7 @@ import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration } from "./migration.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { Logger } from "@blazetrails/activesupport";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
@@ -1365,11 +1366,6 @@ describe("MigrationTest", () => {
     expect(cols["title"]).toBeDefined();
   });
 
-  it.skip("migration instance has connection", () => {
-    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass).
-  });
-
   it("migration.connection returns _connectionOverride when set", () => {
     class M extends Migration {
       async up() {}
@@ -1485,10 +1481,13 @@ describe("MigrationTest", () => {
   });
 
   it.skip("name collision across dbs", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires multi-database support
+    // BLOCKED: filesystem-migrator — Rails builds `MigrationContext.new(MIGRATIONS_ROOT + "/valid")`
+    // and runs `migrator.up`, loading versioned migration files from a directory and asserting
+    // `Person` gained a `last_name` column. trails' MigrationContext is an adapter-backed DDL
+    // recorder (createTable/addColumn maps), not a path-based file loader with version tracking,
+    // so there is no faithful way to load the `/valid` fixture migrations here.
+    // ROOT-CAUSE: MigrationContext lacks Rails' filesystem migration-loading semantics.
+    // Tracked upstream in RFC 0030 story `migration-context-filesystem-loader`.
   });
 
   it("migration detection without schema migration table", async () => {
@@ -3573,5 +3572,17 @@ describe("MigrationProperTableNameAndCopy", () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+// Connection-fallback tests need a live Base connection pool (Rails leases the
+// migration connection from ActiveRecord::Base), so they run under
+// setupHandlerSuite rather than the freshAdapter()-per-test MigrationTest block.
+describe("MigrationTest", () => {
+  setupHandlerSuite();
+
+  it("migration instance has connection", () => {
+    const migration = new (class extends Migration {})();
+    expect(migration.connection).toBe(Base.leaseConnection());
   });
 });

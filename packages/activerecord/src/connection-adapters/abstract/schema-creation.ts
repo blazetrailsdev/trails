@@ -208,28 +208,18 @@ export class SchemaCreation {
       `${this.adapter.quoteIdentifier(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
-    const columnsSql = index.columns.map((c) => {
-      let col = this.adapter.quoteIdentifier(c);
-      const len =
-        typeof index.lengths === "number"
-          ? index.lengths
-          : (index.lengths as Record<string, number>)[c];
-      if (len) col += `(${len})`;
-      if (this.supportsIndexSortOrder()) {
-        const order =
-          typeof index.orders === "string"
-            ? index.orders
-            : (index.orders as Record<string, string>)[c];
-        if (order) col += ` ${order.toUpperCase()}`;
-      }
-      const opc =
-        typeof index.opclasses === "string"
-          ? index.opclasses
-          : (index.opclasses as Record<string, string>)[c];
-      if (this.adapterName === "postgres" && opc) col += ` ${opc}`;
-      return col;
-    });
-    parts.push(`(${columnsSql.join(", ")})`);
+    // Rails `quoted_columns`: a String column set is an expression, emitted
+    // verbatim (e.g. "remind_at, place_id", "(data->'foo')"); otherwise each
+    // column is quoted with its length/order/opclass decoration.
+    const columns =
+      typeof index.columns === "string"
+        ? index.columns
+        : this.quotedColumnsForIndex(index.columns, {
+            lengths: index.lengths,
+            orders: index.orders,
+            opclasses: index.opclasses,
+          });
+    parts.push(`(${columns})`);
     if (this.supportsIndexInclude() && index.include && index.include.length > 0) {
       const includeCols = index.include.map((c) => this.adapter.quoteIdentifier(c));
       parts.push(`INCLUDE (${includeCols.join(", ")})`);
@@ -237,6 +227,35 @@ export class SchemaCreation {
     if (this.supportsNullsNotDistinct() && index.nullsNotDistinct) parts.push("NULLS NOT DISTINCT");
     if (this.supportsPartialIndex() && index.where) parts.push(`WHERE ${index.where}`);
     return parts.join(" ");
+  }
+
+  /**
+   * Mirrors Rails `quoted_columns_for_index`: quote each column name and append
+   * its length/order/opclass decoration.
+   */
+  protected quotedColumnsForIndex(
+    columnNames: string[],
+    options: {
+      lengths: number | Record<string, number>;
+      orders: string | Record<string, string>;
+      opclasses: string | Record<string, string>;
+    },
+  ): string {
+    return columnNames
+      .map((c) => {
+        let col = this.adapter.quoteIdentifier(c);
+        const len = typeof options.lengths === "number" ? options.lengths : options.lengths[c];
+        if (len) col += `(${len})`;
+        if (this.supportsIndexSortOrder()) {
+          const order = typeof options.orders === "string" ? options.orders : options.orders[c];
+          if (order) col += ` ${order.toUpperCase()}`;
+        }
+        const opc =
+          typeof options.opclasses === "string" ? options.opclasses : options.opclasses[c];
+        if (this.adapterName === "postgres" && opc) col += ` ${opc}`;
+        return col;
+      })
+      .join(", ");
   }
 
   protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {

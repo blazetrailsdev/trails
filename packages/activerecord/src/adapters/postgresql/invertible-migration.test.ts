@@ -34,8 +34,32 @@ describeIfPg("PostgreSQLAdapter", () => {
       await m.run(adapter, "down");
       expect(await adapter.tableExists("settings")).toBe(false);
     });
-    it.skip("migrate revert add index with expression", () => {
-      // BLOCKED: migration — expression index reversal requires CommandRecorder inversion for non-name indexes
+    it("migrate revert add index with expression", async () => {
+      class ExpressionIndexMigration extends Migration {
+        async change() {
+          await this.createTable("settings", (t) => {
+            t.column("data", "jsonb");
+          });
+          await this.addIndex("settings", "(data->'foo')", {
+            using: "gin",
+            name: "index_settings_data_foo",
+          });
+        }
+      }
+      const m = new ExpressionIndexMigration();
+      await m.run(adapter, "up");
+
+      expect(await adapter.tableExists("settings")).toBe(true);
+      expect(await adapter.indexExists("settings", null, { name: "index_settings_data_foo" })).toBe(
+        true,
+      );
+
+      await new ExpressionIndexMigration().run(adapter, "down");
+
+      expect(await adapter.tableExists("settings")).toBe(false);
+      expect(await adapter.indexExists("settings", null, { name: "index_settings_data_foo" })).toBe(
+        false,
+      );
     });
     it("migrate revert create enum", async () => {
       class CreateEnumMig extends Migration {
