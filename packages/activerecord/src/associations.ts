@@ -77,7 +77,7 @@ import {
   camelize,
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
-import { getInheritanceColumn, findStiClass, stiEnabled } from "./inheritance.js";
+import { getInheritanceColumn, findStiClass, stiEnabled, registerSubclass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns, _foreignKeysEqual } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
@@ -184,10 +184,58 @@ interface ReflectionLike {
 export const modelRegistry = new Map<string, typeof Base>();
 
 /**
- * Register a model class for association resolution.
- * Can be called as registerModel(Model) or registerModel("Name", Model).
+ * Find the framework `Base` class in `model`'s prototype chain without
+ * importing the `Base` value (which would create a module-init cycle). `Base`
+ * is the single class that *owns* the static `_modelsByName` map; subclasses
+ * inherit it. Falls back to `null` for the (impossible-in-practice) case of a
+ * class that never reaches `Base`.
+ * @internal
  */
-export function registerModel(nameOrModel: string | typeof Base, model?: typeof Base): void {
+function frameworkBase(model: typeof Base): typeof Base | null {
+  let c: unknown = model;
+  while (typeof c === "function" && c !== Function.prototype) {
+    if (Object.prototype.hasOwnProperty.call(c, "_modelsByName")) return c as typeof Base;
+    c = Object.getPrototypeOf(c);
+  }
+  return null;
+}
+
+/**
+ * Register a model class for association resolution.
+ *
+ * Three forms:
+ * - `registerModel(Model)` — register a single class by its `.name`.
+ * - `registerModel("Name", Model)` — register under an explicit name.
+ * - `registerModel([A, B, C])` — batch-register an array of classes. Each is
+ *   registered as in the single form, and any STI subclass (one whose direct
+ *   prototype is another AR model rather than `Base` itself) is additionally
+ *   routed through {@link registerSubclass} so it lands in its parent's
+ *   `_subclasses`. STI on the parent must still be enabled explicitly via
+ *   `enableSti` — the array form does not call it.
+ */
+export function registerModel(model: typeof Base): void;
+export function registerModel(name: string, model: typeof Base): void;
+export function registerModel(models: (typeof Base)[]): void;
+export function registerModel(
+  nameOrModel: string | typeof Base | (typeof Base)[],
+  model?: typeof Base,
+): void {
+  if (Array.isArray(nameOrModel)) {
+    for (const m of nameOrModel) {
+      registerModel(m);
+      // STI subclass: its direct prototype is another AR model, not the
+      // framework `Base` (a base model's prototype is `Base` directly). We
+      // locate `Base` by walking the chain for the class that *owns*
+      // `_modelsByName` — `Base` declares it; every subclass inherits it —
+      // rather than importing the `Base` value (that would create an
+      // associations.ts ⇄ base.ts module-init cycle).
+      const proto = Object.getPrototypeOf(m) as typeof Base;
+      if (proto && proto !== Function.prototype && proto !== frameworkBase(m)) {
+        registerSubclass(m);
+      }
+    }
+    return;
+  }
   if (typeof nameOrModel === "string") {
     if (!model) throw new Error("registerModel(name, model) requires a model class");
     modelRegistry.set(nameOrModel, model);
