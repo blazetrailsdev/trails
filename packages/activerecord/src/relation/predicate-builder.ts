@@ -148,19 +148,13 @@ export class PredicateBuilder {
         { joinForeignKey: fk, joinForeignType: ft, joinPrimaryKey: pkFor },
         values,
       ).queries();
-      const groups: Nodes.Node[] = [];
+      const queryGroups: Nodes.Node[][] = [];
       for (const query of queries) {
         const inner = this.buildFromHash(query);
         if (inner.length === 0) continue;
-        groups.push(inner.length === 1 ? inner[0] : new Nodes.And(inner));
+        queryGroups.push(inner);
       }
-      if (groups.length === 0) return [];
-      if (negated) return groups.map((g) => new Nodes.Not(new Nodes.Grouping(g)));
-      if (groups.length === 1) return groups;
-      const combined = groups.reduce((acc, g, i) =>
-        i === 0 ? g : new Nodes.Grouping(new Nodes.Or(acc, g)),
-      );
-      return [combined];
+      return this.groupingQueries(queryGroups, negated);
     }
     // Through: delegate with the associated model's primary key (Rails: through_association? path).
     // Always build positively — negation is applied once at the group level below (mirrors Rails
@@ -189,24 +183,43 @@ export class PredicateBuilder {
     // Core non-polymorphic, non-through path.
     // Rails expand_from_hash is always positive; negation is applied once at the group level.
     const queries = new AssociationQueryValue(associatedTable, value).queries();
-    const groups: Nodes.Node[] = [];
+    const queryGroups: Nodes.Node[][] = [];
     for (const query of queries) {
       // Cycle guard: prevents infinite recursion when FK name == association name.
       if (isSameHash(query, attributes)) {
-        groups.push(this.build(this.resolveColumn(key), value));
+        queryGroups.push([this.build(this.resolveColumn(key), value)]);
       } else {
         const inner = this.buildFromHash(query);
         if (inner.length === 0) continue;
-        groups.push(inner.length === 1 ? inner[0] : new Nodes.And(inner));
+        queryGroups.push(inner);
       }
     }
-    if (groups.length === 0) return [];
-    if (negated) return groups.map((g) => new Nodes.Not(new Nodes.Grouping(g)));
-    if (groups.length === 1) return groups;
-    const combined = groups.reduce((acc, g, i) =>
-      i === 0 ? g : new Nodes.Grouping(new Nodes.Or(acc, g)),
+    return this.groupingQueries(queryGroups, negated);
+  }
+
+  /**
+   * Mirrors PredicateBuilder#grouping_queries: a single query group's predicates
+   * are returned *flat* (so each column stays an addressable predicate, which
+   * `WhereClause#extract_attributes` — and thus `rewhere` — relies on); multiple
+   * groups are each AND-reduced and ORed inside a Grouping. Negation wraps the
+   * group(s) in `NOT (...)` rather than negating each predicate independently.
+   *
+   * @internal
+   */
+  private groupingQueries(queryGroups: Nodes.Node[][], negated: boolean): Nodes.Node[] {
+    if (queryGroups.length === 0) return [];
+    if (queryGroups.length === 1) {
+      const inner = queryGroups[0];
+      if (!negated) return inner;
+      const node = inner.length === 1 ? inner[0] : new Nodes.And(inner);
+      return [new Nodes.Not(new Nodes.Grouping(node))];
+    }
+    const reduced = queryGroups.map((inner) =>
+      inner.length === 1 ? inner[0] : new Nodes.And(inner),
     );
-    return [combined];
+    const orNode = reduced.reduce((acc, g) => new Nodes.Or(acc, g));
+    const grouping = new Nodes.Grouping(orNode);
+    return negated ? [new Nodes.Not(grouping)] : [grouping];
   }
 
   buildNegated(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
@@ -540,12 +553,6 @@ export class PredicateBuilder {
     block?: (key: string) => any,
   ): Nodes.Node[] {
     return this.buildFromHash(attributes);
-  }
-
-  private groupingQueries(queries: Nodes.Node[][]): Nodes.Node | Nodes.Node[] {
-    if (queries.length === 1) return queries[0];
-    const ands = queries.map((q) => (q.length === 1 ? q[0] : new Nodes.And(q)));
-    return [new Nodes.Grouping(new Nodes.Or(ands))];
   }
 
   private convertDotNotationToHash(attributes: Record<string, unknown>): Record<string, unknown> {

@@ -591,22 +591,18 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#rewhere
    */
   rewhere(conditions: Record<string, unknown>): Relation<T> {
-    // Mirrors rewhere → build_where_clause (query_methods.rb:1065): unwrap/forbid
-    // strong-params, since trails inlines the clause build rather than delegating.
     conditions = sanitizeForbiddenAttributes(conditions);
     const rel = this._clone();
-    const keysToReplace = new Set(Object.keys(conditions));
-    rel._whereClause = rel._whereClause.except(...keysToReplace);
-    const castConditions: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(conditions)) {
-      castConditions[key] =
-        value instanceof Relation
-          ? value
-          : Array.isArray(value)
-            ? value.map((v) => this._castWhereValue(key, v))
-            : this._castWhereValue(key, value);
-    }
-    rel._whereClause.predicates.push(...this.predicateBuilder.buildFromHash(castConditions));
+    // Mirrors rewhere (query_methods.rb): `where_clause = build_where_clause(...)`,
+    // `unscope!(where: where_clause.extract_attributes)`, `where_clause += ...`.
+    // Building through the same `build_where_clause` path as `where` keeps the
+    // predicates separate (so a polymorphic `belongs_to` key like `writer`
+    // expands to distinct `writer_type`/`writer_id` predicates), and excepting by
+    // the *columns the new predicates reference* — not the hash keys — drops both
+    // of those columns before re-adding them.
+    const newClause = rel.buildWhereClause(conditions) as WhereClause;
+    rel._whereClause = rel._whereClause.except(...newClause.extractAttributes());
+    rel._whereClause.predicates.push(...newClause.predicates);
     return rel;
   }
 
