@@ -247,7 +247,8 @@ export class InsertAll {
   /** @internal */
   private configureOnDuplicateUpdateLogic(onDuplicate: InsertAllOptions["onDuplicate"]): void {
     if (this.isCustomUpdateSqlProvided(onDuplicate) && this.updateOnly !== undefined) {
-      throw new Error(
+      // Rails: raise ArgumentError (insert_all.rb).
+      throw new ArgumentError(
         "You can't set :update_only and provide custom update SQL via :on_duplicate at the same time",
       );
     }
