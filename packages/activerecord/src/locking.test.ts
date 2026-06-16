@@ -17,7 +17,7 @@ import { Associations, association } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-import { Person } from "./test-helpers/models/person.js";
+import { Person, RichPerson } from "./test-helpers/models/person.js";
 import { Frog } from "./test-helpers/models/frog.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { StringKeyObject } from "./test-helpers/models/string-key-object.js";
@@ -622,24 +622,7 @@ describe("OptimisticLockingTest", () => {
     expect(reloaded.isDestroyed()).toBe(true);
   });
   it("removing has and belongs to many associations upon destroy", async () => {
-    // RichPerson's async beforeValidation callbacks conflict with the sync
-    // validation chain, so we use a local class with the same HABTM.
-    class TestRichPerson extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("first_name", "string");
-        this.attribute("lock_version", "integer", { default: 0 });
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    registerModel("TestRichPerson", TestRichPerson);
-    Associations.hasAndBelongsToMany.call(TestRichPerson, "treasures", {
-      className: "Treasure",
-      joinTable: "peoples_treasures",
-      foreignKey: "rich_person_id",
-    });
-    const p = await TestRichPerson.createBang({ first_name: "Jon" });
+    const p = await RichPerson.createBang({ first_name: "Jon" });
     const proxy = association(p, "treasures");
     await proxy.create({});
     expect(await proxy.isEmpty()).toBe(false);
