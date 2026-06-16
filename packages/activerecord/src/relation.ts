@@ -3485,12 +3485,36 @@ export class Relation<T extends Base> {
         updateValues.push([table.get(lockingCol), this._incrementAttribute(lockingCol)]);
       }
     }
-    const um = new UpdateManager().table(table).set(updateValues);
-    for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
-      um.where(node);
+    const primaryKey = this._modelClass.primaryKey;
+    let stmtAst;
+    if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
+      // Mirrors Rails `update_all` (relation.rb:606-617): build the arel from
+      // `apply_join_dependency.arel` when eager-loading, else `build_arel`, then
+      // `compile_update`. The join sources are preserved so the visitor rewrites
+      // a joined UPDATE into `UPDATE ... WHERE pk IN (SELECT pk ... JOIN ...)`,
+      // honoring a default_scope JOIN predicate (`projects.name`) that a bare
+      // UpdateManager would drop. `arel.source.left = table` forces the UPDATE
+      // target back to the model table.
+      const arel = this._eagerLoadingForSql()
+        ? this.applyJoinDependencyForArel(this._groupColumns.length === 0)._buildArel()
+        : this._buildArel();
+      arel.source.left = table;
+      const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
+      const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
+      const key = Array.isArray(primaryKey)
+        ? primaryKey.map((pk) => table.get(pk))
+        : table.get(primaryKey);
+      stmtAst = arel.compileUpdate(updateValues, key, havingAst, groupColumns).ast;
+    } else {
+      // No primary key — fall back to a plain UpdateManager.
+      const um = new UpdateManager().table(table).set(updateValues);
+      for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
+        um.where(node);
+      }
+      stmtAst = um.ast;
     }
 
-    const [updateSql, updateBinds] = this._compileAstWithBinds(um.ast);
+    const [updateSql, updateBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._modelClass.connection.execUpdate(
       updateSql,
       `${this._modelClass.name} Update All`,

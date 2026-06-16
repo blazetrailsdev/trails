@@ -17,7 +17,7 @@ export interface Crud {
   createInsert(): InsertManager;
   compileUpdate(
     values: UpdateValues,
-    key?: Node | null,
+    key?: Node | Node[] | null,
     havingClause?: Node | null,
     groupValuesColumns?: Node[],
   ): UpdateManager;

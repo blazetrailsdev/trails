@@ -457,16 +457,23 @@ describe("RelationScopingTest", () => {
     expect(afterCount).toBe(2);
   });
 
-  it.skip("update all default scope filters on joins", () => {
-    // BLOCKED: update_all/delete_all drop the default_scope's JOIN, so the
-    // WHERE on the joined table (`projects.name`) references a missing column
-    // ("no such column: projects.name"). Rails rewrites these as subqueries
-    // when the relation joins. Needs relation update_all/delete_all parity.
+  it("update all default scope filters on joins", async () => {
+    await DeveloperFilteredOnJoins.updateAll({ salary: 65000 });
+    const david = (await CanonicalDeveloper.find(developers("david").id)) as Base;
+    expect(david.salary).toBe(65000);
+
+    // has not changed jamis
+    const jamis = (await CanonicalDeveloper.find(developers("jamis").id)) as Base;
+    expect(jamis.salary).not.toBe(65000);
   });
 
-  it.skip("delete all default scope filters on joins", () => {
-    // BLOCKED: same root cause as "update all default scope filters on joins" —
-    // delete_all omits the default_scope JOIN, raising on `projects.name`.
+  it("delete all default scope filters on joins", async () => {
+    expect(await DeveloperFilteredOnJoins.all().toArray()).not.toEqual([]);
+
+    await DeveloperFilteredOnJoins.deleteAll();
+
+    expect(await DeveloperFilteredOnJoins.all().toArray()).toEqual([]);
+    expect(await CanonicalDeveloper.all().toArray()).not.toEqual([]);
   });
 
   it("current scope does not pollute sibling subclasses", async () => {

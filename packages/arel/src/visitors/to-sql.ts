@@ -1529,7 +1529,12 @@ export class ToSql extends Visitor {
       stmt.limit = null;
       stmt.offset = null;
       stmt.orders = [];
-      const key = this.subselectKey(o.key);
+      // A composite primary key arrives as an array of column nodes, rendered as
+      // a row-value tuple `(pk1, pk2) IN (SELECT pk1, pk2 ...)`. Mirrors Rails
+      // `prepare_update_statement`'s `Grouping.new(o.key)`.
+      const key = Array.isArray(o.key)
+        ? o.key.map((k) => this.subselectKey(k))
+        : this.subselectKey(o.key);
       const columns = new Nodes.Grouping(key);
       stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
       if (this.hasJoinSources(o)) {
