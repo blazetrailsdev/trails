@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/bulb.rb
 import { Base } from "../../base.js";
+import { association, loadBelongsTo } from "../../associations.js";
 
 export class Bulb extends Base {
   scopeAfterInitialize: any;
@@ -18,12 +19,19 @@ export class Bulb extends Base {
     this.afterInitialize((record: Bulb) => {
       record.attributesAfterInitialize = { ...(record as any).attributes };
     });
-    this.afterCreate(async function (this: Bulb) {
-      const carId = this.readAttribute("car_id") as number | null;
-      this.countAfterCreate = carId
-        ? await Bulb.unscoped(async () => (Bulb as any).where({ car_id: carId }).count())
-        : undefined;
+    this.afterCreate(async (record: Bulb) => {
+      record.countAfterCreate = await Bulb.unscoped(async () => {
+        const car = await loadBelongsTo(record, "car", {});
+        return car ? await association(car, "bulbs").count() : undefined;
+      });
     });
+  }
+
+  // Rails overrides only `color=` and keeps the generated attribute reader
+  // (bulb.rb:27-29). Defining a TS setter on the prototype suppresses our
+  // generated `color` getter, so mirror the reader explicitly.
+  get color(): unknown {
+    return this.readAttribute("color");
   }
 
   set color(color: string) {
