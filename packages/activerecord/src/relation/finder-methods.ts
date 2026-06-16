@@ -321,6 +321,13 @@ function hasReversibleOrder(rel: FinderRelation): boolean {
 
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
   if (this._isNone) return n !== undefined ? [] : null;
+  // Rails: Relation#first returns from the already-loaded records (no re-query),
+  // mirroring find_nth_with_limit's loaded? branch. Ordering was applied at load
+  // time, so records[0]/records[0, n] preserve the implicit PK order.
+  if ((this as any)._loaded) {
+    const records: any[] = (this as any)._records;
+    return n !== undefined ? records.slice(0, n) : (records[0] ?? null);
+  }
   if (n !== undefined) {
     const rel = this._clone();
     rel._limitValue = n;
