@@ -56,6 +56,17 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
  * the live cache entry directly instead of relying on the trails-only
  * `borrowSameTableColumns` workaround (RFC 0023).
  *
+ * Scope: restore is correct only when the test's in-body DDL is rolled back at
+ * the DB, so the post-test schema equals the pre-test schema the snapshot
+ * captured. That holds on the transactional adapters (SQLite/Postgres). MySQL
+ * auto-commits DDL — but the caller contract above already forbids in-body
+ * schema work there ("Schema work must happen in `beforeAll` … on MySQL"), so
+ * any MySQL DDL runs before the first per-test snapshot and the snapshot
+ * captures the already-committed shape. (Tests that genuinely need real commits
+ * declare `usesTransaction` and never reach this restore — afterEach
+ * early-returns for them.) The blanket `clear()` previously masked any
+ * contract violation by forcing a fresh re-introspection on the next read.
+ *
  * @internal
  */
 function snapshotSchemaCache(adapter: TransactionalFixturesAdapter): SchemaCacheSnapshot | null {
