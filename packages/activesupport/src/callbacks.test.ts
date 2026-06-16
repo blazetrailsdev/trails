@@ -6,6 +6,7 @@ import {
   resetCallbacks,
   runCallbacks,
   CallbacksMixin,
+  CallTemplate,
 } from "./callbacks.js";
 
 describe("Callbacks", () => {
@@ -58,6 +59,53 @@ describe("Callbacks", () => {
       });
 
       expect(target.log).toEqual(["around-before", "block", "around-after"]);
+    });
+
+    it("binds this to the record inside proc/block callbacks (Rails instance_exec)", () => {
+      const target = {
+        seen: [] as unknown[],
+        beforeThis: null as unknown,
+        afterThis: null as unknown,
+        aroundThis: null as unknown,
+        aroundArg: null as unknown,
+      };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "before", function (this: any, record: any) {
+        target.beforeThis = this;
+        target.seen.push(record);
+      });
+      setCallback(target, "save", "after", function (this: any) {
+        target.afterThis = this;
+      });
+      setCallback(target, "save", "around", function (this: any, record: any, next: () => void) {
+        target.aroundThis = this;
+        target.aroundArg = record;
+        next();
+      });
+
+      runCallbacks(target, "save", () => {});
+
+      expect(target.beforeThis).toBe(target);
+      expect(target.afterThis).toBe(target);
+      expect(target.aroundThis).toBe(target);
+      expect(target.aroundArg).toBe(target);
+      expect(target.seen).toEqual([target]);
+    });
+
+    it("InstanceExec call templates bind this to the record (Rails instance_exec)", () => {
+      const target = {};
+      const seen: Array<{ self: unknown; args: unknown[] }> = [];
+      const record = function (this: unknown, ...args: unknown[]) {
+        seen.push({ self: this, args });
+      };
+
+      new CallTemplate.InstanceExec0(record).makeLambda()(target, "v");
+      new CallTemplate.InstanceExec1(record).makeLambda()(target, "v");
+      new CallTemplate.InstanceExec2(record).makeLambda()(target, "v");
+
+      expect(seen[0]).toEqual({ self: target, args: [] });
+      expect(seen[1]).toEqual({ self: target, args: [target] });
+      expect(seen[2]).toEqual({ self: target, args: [target, "v"] });
     });
 
     it("runs before, around, and after in correct order", () => {
