@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { makeRange } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 import { InclusionValidator } from "./inclusion.js";
 
@@ -47,25 +48,31 @@ describe("InclusionValidationTest", () => {
   });
 
   it("validates inclusion of beginless numeric range", () => {
-    class Person extends Model {
+    class Topic extends Model {
       static {
-        this.attribute("role", "string");
-        this.validates("role", { inclusion: { in: ["admin", "user", "guest"] } });
+        this.attribute("price", "integer");
+        this.validates("price", { inclusion: { in: makeRange(null, 1000) } });
       }
     }
-    const p = new Person({ role: "admin" });
-    expect(p.isValid()).toBe(true);
+    expect(new Topic({ price: -100 }).isValid()).toBe(true);
+    expect(new Topic({ price: 0 }).isValid()).toBe(true);
+    expect(new Topic({ price: 100 }).isValid()).toBe(true);
+    expect(new Topic({ price: 2000 }).isValid()).toBe(false);
+    expect(new Topic({ price: 1000 }).isValid()).toBe(true);
   });
 
   it("validates inclusion of endless numeric range", () => {
-    class Person extends Model {
+    class Topic extends Model {
       static {
-        this.attribute("tier", "string");
-        this.validates("tier", { inclusion: { in: ["free", "premium"] } });
+        this.attribute("price", "integer");
+        this.validates("price", { inclusion: { in: makeRange(0, null) } });
       }
     }
-    const p = new Person({ tier: "free" });
-    expect(p.isValid()).toBe(true);
+    expect(new Topic({ price: -1 }).isValid()).toBe(false);
+    expect(new Topic({ price: -100 }).isValid()).toBe(false);
+    expect(new Topic({ price: 100 }).isValid()).toBe(true);
+    expect(new Topic({ price: 2000 }).isValid()).toBe(true);
+    expect(new Topic({ price: 0 }).isValid()).toBe(true);
   });
 
   it("validates inclusion of", () => {

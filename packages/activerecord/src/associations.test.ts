@@ -19,6 +19,7 @@ import {
   ConfigurationError,
   touchBelongsToParents,
 } from "./index.js";
+import { makeRange } from "@blazetrails/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -7206,8 +7207,10 @@ describe("AssociationProxyTest", () => {
 
   beforeAll(async () => {
     await defineSchema({
+      ap_audit_logs: { developer_id: "integer", message: "string" },
       ap_categories: { name: "string" },
       ap_comments: { ap_post_id: "integer", body: "string" },
+      ap_developers: { name: "string", salary: "integer" },
       ap_posts: { title: "string" },
       ap_tagged_posts: { title: "string" },
       ap_taggings: { ap_category_id: "integer", ap_tagged_post_id: "integer" },
@@ -7430,12 +7433,41 @@ describe("AssociationProxyTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* Rails: assert_match on andreas.audit_logs.inspect — needs inspect() on CollectionProxy */
   });
-  it.skip("save on parent saves children", () => {
-    // Tracked: RFC 0030 story autosave-has-many-save-on-parent
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* requires autosave */
+  it("save on parent saves children", async () => {
+    class APAuditLog extends Base {
+      static {
+        this._tableName = "ap_audit_logs";
+        this.attribute("developer_id", "integer");
+        this.attribute("message", "string");
+      }
+    }
+    class APDeveloper extends Base {
+      static {
+        this._tableName = "ap_developers";
+        this.attribute("name", "string");
+        this.attribute("salary", "integer");
+        // Mirrors developer.rb:97-98.
+        this.validates("salary", { inclusion: { in: makeRange(50_000, 200_000) } });
+        this.validates("name", { length: { in: [3, 20] } });
+        this.beforeCreate((developer: any) => {
+          association(developer, "apAuditLogs").build({ message: "Computer created" });
+        });
+      }
+    }
+    Associations.hasMany.call(APDeveloper, "apAuditLogs", {
+      foreignKey: "developer_id",
+      className: "APAuditLog",
+    });
+    Associations.belongsTo.call(APAuditLog, "apDeveloper", {
+      foreignKey: "developer_id",
+      className: "APDeveloper",
+    });
+    registerModel("APDeveloper", APDeveloper);
+    registerModel("APAuditLog", APAuditLog);
+
+    const developer = await APDeveloper.create({ name: "Bryan", salary: 50_000 });
+    await developer.reload();
+    expect(await association(developer, "apAuditLogs").size()).toBe(1);
   });
   it("reload returns association", async () => {
     const { APPost, APComment } = setupProxyModels();
