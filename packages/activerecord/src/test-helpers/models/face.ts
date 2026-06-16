@@ -18,8 +18,8 @@ export class Face extends Base {
       inverseOf: "puzzledPolymorphicFace",
     });
 
-    this.validate(function (this: Face) {
-      void (this as any).human;
+    this.validate((face: Face) => {
+      void (face as any).human;
     });
   }
 }
