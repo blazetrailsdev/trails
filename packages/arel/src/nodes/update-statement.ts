@@ -14,7 +14,7 @@ export class UpdateStatement extends Node {
   havings: Node[];
   limit: Node | null;
   offset: Node | null;
-  key: Node | null;
+  key: Node | Node[] | null;
 
   constructor(relation: Node | null = null) {
     super();

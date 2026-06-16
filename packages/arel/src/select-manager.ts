@@ -546,7 +546,7 @@ export class SelectManager extends TreeManager {
    */
   compileUpdate(
     values: UpdateValues,
-    key: Node | null = null,
+    key: Node | Node[] | null = null,
     havingClause: Node | null = null,
     groupValuesColumns: Node[] = [],
   ): UpdateManager {
