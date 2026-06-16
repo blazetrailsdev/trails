@@ -108,6 +108,10 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   virtual_columns: ALL,
   // `supports_foreign_tables?`: PostgreSQL only. (postgresql_adapter.rb:255; abstract default false)
   foreign_tables: ["postgres"] as readonly Backend[],
+  // `supports_default_expression?` (adapter_helper.rb:23): PostgreSQL always true;
+  // MySQL true for mysql:8 (≥ 8.0.13, not MariaDB); falsy for SQLite (the method
+  // only branches on PG / Mysql2 / Trilogy).
+  default_expression: ["postgres", "mysql"] as readonly Backend[],
   // `supports_optimizer_hints?`: MySQL only in CI. PostgreSQL checks
   // extension_available?("pg_hint_plan") at runtime (postgresql_adapter.rb:295) — CI
   // does not have pg_hint_plan installed, so PG effectively returns false.

@@ -93,4 +93,14 @@ const _serverVersion = parseMysqlVersion(mysqlVersionStr);
 export const supportsOptimizerHints =
   mysqlAvailable && !mariaDb && _serverVersion?.gte("5.7.7") === true;
 
+/**
+ * Mirrors `supports_default_expression?` (adapter_helper.rb:23) for MySQL: an
+ * expression/function column default needs MariaDB ≥ 10.2.1 or MySQL ≥ 8.0.13.
+ * Gates the `defaults` table's `uuid` / `char2_concatenated` expression columns
+ * exactly as Rails' mysql2_specific_schema.rb does.
+ */
+export const supportsDefaultExpression =
+  mysqlAvailable &&
+  (mariaDb ? _serverVersion?.gte("10.2.1") === true : _serverVersion?.gte("8.0.13") === true);
+
 export { Mysql2Adapter };
