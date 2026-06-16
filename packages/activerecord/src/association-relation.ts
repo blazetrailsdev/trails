@@ -135,32 +135,40 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     }
   }
 
-  async insert(...args: Parameters<Relation<T>["insert"]>): Promise<number> {
+  async insert(...args: Parameters<Relation<T>["insert"]>): ReturnType<Relation<T>["insert"]> {
     this._assertBulkInsertable();
     return super.insert(...args);
   }
 
-  async insertBang(...args: Parameters<Relation<T>["insertBang"]>): Promise<number> {
+  async insertBang(
+    ...args: Parameters<Relation<T>["insertBang"]>
+  ): ReturnType<Relation<T>["insertBang"]> {
     this._assertBulkInsertable();
     return super.insertBang(...args);
   }
 
-  async insertAll(...args: Parameters<Relation<T>["insertAll"]>): Promise<number> {
+  async insertAll(
+    ...args: Parameters<Relation<T>["insertAll"]>
+  ): ReturnType<Relation<T>["insertAll"]> {
     this._assertBulkInsertable();
     return super.insertAll(...args);
   }
 
-  async insertAllBang(...args: Parameters<Relation<T>["insertAllBang"]>): Promise<number> {
+  async insertAllBang(
+    ...args: Parameters<Relation<T>["insertAllBang"]>
+  ): ReturnType<Relation<T>["insertAllBang"]> {
     this._assertBulkInsertable();
     return super.insertAllBang(...args);
   }
 
-  async upsert(...args: Parameters<Relation<T>["upsert"]>): Promise<number> {
+  async upsert(...args: Parameters<Relation<T>["upsert"]>): ReturnType<Relation<T>["upsert"]> {
     this._assertBulkInsertable();
     return super.upsert(...args);
   }
 
-  async upsertAll(...args: Parameters<Relation<T>["upsertAll"]>): Promise<number> {
+  async upsertAll(
+    ...args: Parameters<Relation<T>["upsertAll"]>
+  ): ReturnType<Relation<T>["upsertAll"]> {
     this._assertBulkInsertable();
     return super.upsertAll(...args);
   }
