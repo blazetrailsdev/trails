@@ -11,6 +11,7 @@ import {
   type ColumnType,
   type ColumnOptions,
   type AddForeignKeyOptions,
+  type AddIndexOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import {
   SchemaStatements,
@@ -69,6 +70,10 @@ function _extractNewCommentValue(
 export interface MigrationArConfig {
   tableNamePrefix: string;
   tableNameSuffix: string;
+  // Mirrors Rails' `Migration#connection` fallback to the migration connection
+  // pool (`ActiveRecord::Base.lease_connection`) when no per-migration
+  // connection has been assigned. Injected by Base to avoid the import cycle.
+  leaseConnection?: () => DatabaseAdapter;
 }
 let _arConfig: MigrationArConfig | null = null;
 /** @internal */
@@ -368,12 +373,17 @@ export abstract class Migration {
         break;
       }
       case "addIndex": {
-        const idxOpts: { column: string | string[]; name?: string } = {
-          column: args[1] as string | string[],
-        };
+        // Rails inverts add_index to remove_index with the original positional
+        // args, so a String expression column (e.g. "remind_at, place_id") routes
+        // through the expression-aware index-name derivation rather than being
+        // wrapped in a `column:` option and matched as a literal identifier list.
+        const column = args[1] as string | string[];
         const origOpts = args[2] as { name?: string } | undefined;
-        if (origOpts?.name) idxOpts.name = origOpts.name;
-        await this.removeIndex(args[0] as string, idxOpts);
+        if (origOpts?.name) {
+          await this.removeIndex(args[0] as string, column, { name: origOpts.name });
+        } else {
+          await this.removeIndex(args[0] as string, column);
+        }
         break;
       }
       case "removeIndex": {
@@ -669,13 +679,7 @@ export abstract class Migration {
   async addIndex(
     tableName: string,
     columns: string | string[],
-    options: {
-      unique?: boolean;
-      name?: string;
-      where?: string;
-      order?: Record<string, string>;
-      ifNotExists?: boolean;
-    } = {},
+    options: AddIndexOptions = {},
   ): Promise<void> {
     if (this._recording) {
       this._recorder.record("addIndex", [tableName, columns, options]);
@@ -1346,7 +1350,9 @@ export abstract class Migration {
   // --- Connection (Rails: Migration#connection, #connection_pool) ---
 
   get connection(): DatabaseAdapter {
-    return this._connectionOverride ?? this.adapter;
+    // Rails: `@connection || ActiveRecord::Base.lease_connection`. A bare
+    // migration with no assigned connection leases one from the migration pool.
+    return this._connectionOverride ?? this.adapter ?? _arConfig!.leaseConnection!();
   }
 
   set connection(conn: DatabaseAdapter | undefined) {

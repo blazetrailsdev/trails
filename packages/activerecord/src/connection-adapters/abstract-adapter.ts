@@ -281,7 +281,7 @@ export interface AbstractAdapter {
   generateIndexName(tableName: string, column: string | string[]): string;
   indexExists(
     tableName: string,
-    columns: string | string[],
+    columns: string | string[] | null | undefined,
     options?: { name?: string; unique?: boolean },
   ): Promise<boolean>;
   tableExists(tableName: string): Promise<boolean>;

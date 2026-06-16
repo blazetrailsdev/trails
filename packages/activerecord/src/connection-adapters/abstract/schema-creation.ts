@@ -208,6 +208,19 @@ export class SchemaCreation {
       `${this.adapter.quoteIdentifier(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
+    // Rails `quoted_columns`: a String column set is an expression — emitted
+    // verbatim, never quoted or split (e.g. "remind_at, place_id", "(data->'foo')").
+    if (typeof index.columns === "string") {
+      parts.push(`(${index.columns})`);
+      if (this.supportsIndexInclude() && index.include && index.include.length > 0) {
+        const includeCols = index.include.map((c) => this.adapter.quoteIdentifier(c));
+        parts.push(`INCLUDE (${includeCols.join(", ")})`);
+      }
+      if (this.supportsNullsNotDistinct() && index.nullsNotDistinct)
+        parts.push("NULLS NOT DISTINCT");
+      if (this.supportsPartialIndex() && index.where) parts.push(`WHERE ${index.where}`);
+      return parts.join(" ");
+    }
     const columnsSql = index.columns.map((c) => {
       let col = this.adapter.quoteIdentifier(c);
       const len =

@@ -387,14 +387,31 @@ describe("InvertibleMigrationTest", () => {
     expect(await tableExists("idx_test")).toBe(false);
   });
 
-  it.skip("migrate revert add index without name on expression", () => {
-    // Rails: `add_index :horses, "remind_at, place_id"` (a String column
-    // list) then asserts `index_exists?(:horses, [:remind_at, :place_id])`
-    // round-trips through migrate(:up)/(:down). BLOCKED: addIndex treats a
-    // String `columns` arg as a single identifier and quotes it, so the
-    // comma-list is rejected; faithful support needs String-column parsing +
-    // expression-aware index-name derivation + index introspection. Deferred
-    // to the next F-3 batch.
+  it("migrate revert add index without name on expression", async () => {
+    class InvertibleMig extends Migration {
+      async change() {
+        await this.createTable("horses", (t) => {
+          t.text("content");
+          t.datetime("remind_at");
+          t.integer("place_id");
+          t.bigint("parent_id");
+        });
+      }
+    }
+    class RevertNonNamedExpressionIndexMigration extends Migration {
+      async change() {
+        await this.addIndex("horses", "remind_at, place_id");
+      }
+    }
+    await makeMigration(new InvertibleMig()).up();
+    await makeMigration(new RevertNonNamedExpressionIndexMigration()).up();
+
+    const ss = (adapter as any).schemaStatements();
+    expect(await ss.indexExists("horses", ["remind_at", "place_id"])).toBe(true);
+
+    await makeMigration(new RevertNonNamedExpressionIndexMigration()).down();
+
+    expect(await ss.indexExists("horses", ["remind_at", "place_id"])).toBe(false);
   });
 
   it("up only", async () => {

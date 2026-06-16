@@ -4097,6 +4097,7 @@ registerMigrationArConfig({
   get tableNameSuffix() {
     return Base._tableNameSuffix;
   },
+  leaseConnection: () => Base.leaseConnection(),
 });
 
 // Side-effect import (currently no-op); kept so future globalid hooks can
