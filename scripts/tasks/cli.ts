@@ -678,6 +678,27 @@ export function releaseTasksLock(lock: LockHandle | null): void {
   }
 }
 
+// Restore the working tree to a clean HEAD after a mid-mutation failure.
+// `reset --hard HEAD` reverts any tracked edit or staged change the mutator
+// made; `createdPath` (a brand-new file or directory the mutator wrote) is
+// still untracked after the reset, so `git clean` removes it. Both steps are
+// best-effort — a rollback failure must not mask the original error we're
+// about to re-raise.
+function rollbackWorktree(cwd: string | undefined, createdPath?: string): void {
+  try {
+    git(["reset", "--hard", "--quiet", "HEAD"], { silent: true, cwd });
+  } catch {
+    /* nothing committed yet / git unavailable — clean handles the file */
+  }
+  if (createdPath) {
+    try {
+      git(["clean", "-fdq", "--", createdPath], { silent: true, cwd });
+    } catch {
+      /* path already gone or unknown to git */
+    }
+  }
+}
+
 // Pull-rebase → run mutator → commit → push, retrying once on
 // non-fast-forward. `mutator` is run inside each attempt so a rebased
 // index file is re-read between tries. Throws (and asks caller to
@@ -694,6 +715,11 @@ export function commitAndPush(opts: {
   // checkout known to be on that branch.
   cwd?: string;
   pushRefspec?: string;
+  // Path a `new`/`new-rfc` mutator creates from scratch (a file or a whole
+  // directory). On a mid-mutation throw, rollbackWorktree removes it so the
+  // partial write doesn't leave the checkout dirty. Omit for mutators that
+  // only edit an already-tracked file — `reset --hard HEAD` reverts those.
+  createdPath?: string;
 }): void {
   const cwd = opts.cwd;
   const pushRefspec = opts.pushRefspec ?? "HEAD:main";
@@ -812,9 +838,21 @@ export function commitAndPush(opts: {
         releaseTasksLock(lock);
         process.exit(1);
       }
-      opts.mutator();
-      git(["add", opts.fileToStage], { cwd });
-      git(["commit", "-q", "-m", opts.message], { cwd });
+      try {
+        opts.mutator();
+        git(["add", opts.fileToStage], { cwd });
+        git(["commit", "-q", "-m", opts.message], { cwd });
+      } catch (e) {
+        // Atomic rollback: a throw between the file write and the commit (a
+        // prettier crash in formatFiles, a failed `git add`/`commit`, etc.)
+        // would otherwise strand the written/staged file in the working tree,
+        // blocking every later command on the uncommitted-changes guard.
+        // Restore the tree to the clean HEAD this attempt started from, then
+        // re-raise so the real error surfaces (the top-level handler prints
+        // its message + stack) instead of a swallowed bare exit.
+        rollbackWorktree(cwd, opts.createdPath);
+        throw e;
+      }
       try {
         git(["push", "--quiet", "origin", pushRefspec], { silent: true, cwd });
         return;
@@ -1817,6 +1855,7 @@ export function newStory(
     raceExitCode: 4,
     cwd: tasksDir,
     pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
+    createdPath: storyFile,
   });
   console.log(`created ${rfcSlug}/stories/${storySlug}.md`);
 }
@@ -2043,6 +2082,7 @@ export function newRfc(
     raceExitCode: 4,
     cwd: tasksDir,
     pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
+    createdPath: rfcDir,
   });
   console.log(`created rfcs/${rfcId}/README.md`);
 }
@@ -2616,4 +2656,22 @@ Set $TASKS_DIR to override the default ~/github/blazetrailsdev/tasks.
 // CLI entry — only runs when this module is the script entrypoint, not
 // when imported (e.g. by the smoke test). Matches the pattern used by
 // scripts/fixtures-compare/compare.ts and scripts/api-compare/lint-deps.ts.
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) main();
+// Wrap main() so an unexpected throw surfaces the real error message + stack
+// instead of node's bare `Node.js <version>` + exit 1 — that swallowed crash
+// is exactly what made a mid-mutation failure undiagnosable. The CLI's own
+// expected failures all call process.exit with a specific message, so only
+// genuine bugs reach here.
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  try {
+    main();
+  } catch (e) {
+    const err = e as { stack?: string; message?: string; stderr?: unknown };
+    console.error("error: tasks CLI command failed");
+    // A failed git/gh subprocess (execFileSync) puts its real diagnostic on
+    // .stderr, not in the stack — print it too so the failure is legible.
+    const stderr = String(err?.stderr ?? "").trim();
+    if (stderr) console.error(stderr);
+    console.error(err?.stack ?? err?.message ?? String(e));
+    process.exit(1);
+  }
+}
