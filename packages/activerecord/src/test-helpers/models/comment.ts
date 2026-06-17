@@ -3,6 +3,10 @@ import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 
 export class Comment extends Base {
+  declare author_id: number | null;
+  declare author_type: string | null;
+  declare author: Base | null;
+
   static {
     this.scope("limitBy", (q: any, l: number) => q.limit(l));
     this.scope("containingTheLetterE", (q: any) => q.where("comments.body LIKE '%e%'"));

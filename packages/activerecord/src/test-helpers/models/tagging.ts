@@ -2,6 +2,11 @@
 import { Base } from "../../base.js";
 
 export class Tagging extends Base {
+  declare tag_id: number;
+  declare taggable_id: number;
+  declare taggable_type: string;
+  declare taggable: Base | null;
+
   static {
     this.belongsTo("tag", { scope: (q: any) => q.includes("tagging") });
     this.belongsTo("superTag", { className: "Tag", foreignKey: "super_tag_id" });

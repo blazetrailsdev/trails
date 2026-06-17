@@ -1,6 +1,9 @@
 // vendor/rails/activerecord/test/models/post.rb
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
+import type { Comment } from "./comment.js";
+import type { Tagging } from "./tagging.js";
 
 export class CategoryPost extends Base {
   static {
@@ -12,6 +15,11 @@ export class CategoryPost extends Base {
 }
 
 export class Post extends Base {
+  declare title: string;
+  declare body: string;
+  declare comments: AssociationProxy<Comment>;
+  declare taggings: AssociationProxy<Tagging>;
+
   static namedExtension = {
     author() {
       return "lifo";

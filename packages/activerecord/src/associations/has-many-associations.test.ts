@@ -634,8 +634,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await PersonWithPolymorphicDependentNullifyComments.create({
       first_name: "Laertis",
     });
-    const welcome = posts("welcome") as any;
-    const comment = (await welcome.comments.first()) as any;
+    const comment = (await posts("welcome").comments.first())!;
     setBelongsTo(comment, "author", author, { polymorphic: true });
     await comment.save();
 
@@ -643,7 +642,7 @@ describe("HasManyAssociationsTest", () => {
     expect(comment.author_type).toBe(author.constructor.name);
 
     await author.destroy();
-    const reloaded = (await Comment.find(comment.id)) as any;
+    const reloaded = (await Comment.find(comment.id as number))!;
 
     expect(reloaded.author_id).toBeNull();
     expect(reloaded.author_type).toBeNull();
@@ -661,7 +660,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("build with polymorphic has many does not allow to override type and id", async () => {
-    const welcome = posts("welcome") as any;
+    const welcome = posts("welcome");
     const tagging = welcome.taggings.build({ taggable_id: 99, taggable_type: "ShouldNotChange" });
 
     expect(tagging.taggable_id).toBe(welcome.id);
@@ -669,14 +668,14 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("build from polymorphic association sets inverse instance", async () => {
-    const post = HmPost.new() as any;
+    const post = HmPost.new();
     const tagging = post.taggings.build();
 
     expect(await tagging.taggable).toBe(post);
   });
 
   it("attributes are set when initialized from polymorphic has many null relationship", async () => {
-    const post = HmPost.new({ title: "title", body: "bar" }) as any;
+    const post = HmPost.new({ title: "title", body: "bar" });
     const tag = await HmTag.create({ name: "foo" });
 
     const tagging = await post.taggings.firstOrInitialize({ tag });
