@@ -226,15 +226,7 @@ describe("SelectTest", () => {
 
     assertNonSelectColumnsWontBeLoaded((await posts.first()) as never);
     assertNonSelectColumnsWontBeLoaded((await posts.preload("comments").first()) as never);
-    // Rails' third call — `posts.eager_load(:comments).first` — is omitted here.
-    // BLOCKED: eager_load builds its own full t0_r* column projection via the
-    // JoinDependency and discards the relation's explicit `select` projection,
-    // so the base record loads every column instead of just `UPPER(title) AS
-    // title` (the loaded `body` then never raises MissingAttributeError).
-    // Honoring a custom base-table select under eager loading is a framework
-    // change spanning the JoinDependency projection + row hydration — out of
-    // scope for this fixture port. The plain + preload paths exercise the same
-    // assertion faithfully.
+    assertNonSelectColumnsWontBeLoaded((await posts.eagerLoad("comments").first()) as never);
   });
 
   it("merging select from different model", async () => {
@@ -256,14 +248,22 @@ describe("SelectTest", () => {
     }
   });
 
-  it.skip("type casted extra select with eager loading", () => {
-    // BLOCKED: associations — eager_load discards the relation's explicit extra
-    // `select` projection ("posts.id * 1.1 AS foo") in favor of the JoinDependency's
-    // own t0_r* column list, so the aliased/type-casted column never hydrates onto
-    // the base record. Same gap as the omitted `eager_load` branch in
-    // "non select columns wont be loaded" — honoring a custom select under eager
-    // loading spans the JoinDependency projection + row hydration. Tracked
-    // upstream: RFC 0030 story eager-load-extra-select-projection.
+  it("type casted extra select with eager loading", async () => {
+    // Rails reads the aliased extra select via `posts.first.foo`; trails exposes
+    // query-only aliases through `readAttribute` (no dynamic accessor is
+    // generated for non-schema columns), matching the sibling hash-select tests.
+    const posts = Post.select("posts.id * 1.1 AS foo").eagerLoad("comments");
+    const post = (await posts.first()) as never as { readAttribute(n: string): unknown };
+    // The explicit extra select is preserved through the JoinDependency and
+    // hydrated onto the base record. Rails additionally type-casts the value to
+    // Float (1.1) via the result set's column_types; trails does not yet cast
+    // arbitrary computed select columns by their DB result type — a pre-existing,
+    // adapter-wide gap (SQLite returns a number, but MySQL/PG return the string
+    // "1.1" because their adapters report no result column_types). Tracked for
+    // convergence: RFC 0030 story eager-load-extra-select-result-type-cast. Until
+    // then, assert the numeric value to keep the projection/hydration fix covered
+    // on every adapter.
+    expect(Number(post.readAttribute("foo"))).toBe(1.1);
   });
 
   it("aliased select using as with joins and includes", async () => {
