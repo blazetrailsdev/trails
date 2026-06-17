@@ -117,47 +117,47 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     expect(multiRange.name).toBe("int4multirange");
   });
 
-  it("defers multirange and retries after range OID is loaded", () => {
+  it("skips multirange registration when range OID is not in the store", () => {
     const store = new TestStore();
     store.registerType(23, integerSubtype);
-    // Process only the multirange row first (no range row in batch).
-    const initializer = new TypeMapInitializer(store);
-    initializer.run([row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 })]);
-
-    // Not yet registered — range 3904 wasn't in the store.
+    // Process only the multirange row (no range row in the batch). Mirrors
+    // Rails' register_with_subtype: a miss is skipped silently. The eager full
+    // load registers the range before its multirange in the same pass, so this
+    // miss never happens in practice.
+    new TypeMapInitializer(store).run([
+      row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 }),
+    ]);
     expect(store.lookup(4451)).not.toBeInstanceOf(MultiRangeType);
-    expect(initializer.deferredMultirangeOids).toContain(3904);
 
-    // Simulate the adapter loading the range type, then retrying.
+    // When the range and multirange rows arrive together (the eager-load
+    // shape), the range registers first and the multirange resolves it.
     new TypeMapInitializer(store).run([
       row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
+      row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 }),
     ]);
-    initializer.retryDeferredMultiranges();
-
     const multiRange = store.lookup(4451) as MultiRangeType;
     expect(multiRange).toBeInstanceOf(MultiRangeType);
     expect(multiRange.name).toBe("int4multirange");
   });
 
-  it("defers array and retries after element OID is loaded", () => {
+  it("skips array registration when element OID is not in the store", () => {
     const store = new TestStore();
     // The base type map keys scalar types by name (e.g. "numeric"), not by OID.
     store.registerType("numeric", integerSubtype);
 
-    // Process only the array row first (element OID 1700 not yet keyed in the
-    // store) — the shape of a targeted load_additional_types([arrayOid]).
-    const initializer = new TypeMapInitializer(store);
-    initializer.run([row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 })]);
-
-    // Not yet registered — element OID 1700 wasn't in the store.
+    // Process only the array row (element OID 1700 not yet keyed in the store).
+    // Mirrors Rails' register_with_subtype skip-on-miss.
+    new TypeMapInitializer(store).run([
+      row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),
+    ]);
     expect(store.lookup(1231)).not.toBeInstanceOf(OidArray);
-    expect(initializer.deferredArrayOids).toContain(1700);
 
-    // Simulate the adapter loading the element type (aliases OID 1700 →
-    // "numeric"), then retrying the deferred array.
-    new TypeMapInitializer(store).run([row({ oid: 1700, typname: "numeric" })]);
-    initializer.retryDeferredArrays();
-
+    // When the element row aliases OID 1700 → "numeric" first (the by-typname
+    // pass of the eager full load), the array row resolves its subtype.
+    store.aliasType(1700, "numeric");
+    new TypeMapInitializer(store).run([
+      row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),
+    ]);
     expect(store.lookup(1231)).toBeInstanceOf(OidArray);
   });
 

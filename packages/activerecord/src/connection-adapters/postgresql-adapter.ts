@@ -638,7 +638,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         await client.query(`SET SESSION ${key} TO ${this.quoteLiteral(pgVal)}`);
       }
     }
+    // Set the flag before reloadTypeMap so the pg_type queries it issues take
+    // the configured-connection fast path in _acquireFreshClient instead of
+    // recursing back into configure.
     this._connectionConfigured = true;
+    // Mirrors Rails' configure_connection, which ends with reload_type_map →
+    // initialize_type_map → load_additional_types: an eager full load of every
+    // array/range/multirange/enum/domain type once per connection. Running it
+    // here aliases every scalar OID up front so targeted loadAdditionalTypes
+    // misses (columns(), getOidType) always find their element/range subtype in
+    // the store — no deferral path needed.
+    await this.reloadTypeMap();
   }
 
   /**
@@ -961,14 +971,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     for await (const query of this.loadTypesQueries(initializer, oids)) {
       const rows = (await this.schemaQuery(query)) as unknown as PgTypeRow[];
       initializer.run(rows);
-    }
-    if (initializer.deferredMultirangeOids.length > 0) {
-      await this.loadAdditionalTypes([...new Set(initializer.deferredMultirangeOids)]);
-      initializer.retryDeferredMultiranges();
-    }
-    if (initializer.deferredArrayOids.length > 0) {
-      await this.loadAdditionalTypes([...new Set(initializer.deferredArrayOids)]);
-      initializer.retryDeferredArrays();
     }
   }
 
