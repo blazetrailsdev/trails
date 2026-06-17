@@ -31,7 +31,6 @@ import {
   loadHasMany,
   loadHasManyThrough,
   isAssociationCached,
-  setBelongsTo,
 } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
@@ -635,7 +634,7 @@ describe("HasManyAssociationsTest", () => {
       first_name: "Laertis",
     });
     const comment = (await posts("welcome").comments.first())!;
-    setBelongsTo(comment, "author", author, { polymorphic: true });
+    comment.author = author;
     await comment.save();
 
     expect(comment.author_id).toBe(author.id);
@@ -652,8 +651,8 @@ describe("HasManyAssociationsTest", () => {
     const writer = humans("gordon");
     const category = categories("general");
     const essay = TypedEssay.new();
-    setBelongsTo(essay, "category", category, { primaryKey: "name" });
-    setBelongsTo(essay, "writer", writer, { primaryKey: "name", polymorphic: true });
+    essay.category = category;
+    essay.writer = writer;
     await essay.save();
 
     expect(await Category.joins("humanWritersOfTypedEssays").count()).toBe(1);
