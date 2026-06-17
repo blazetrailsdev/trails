@@ -101,6 +101,11 @@ export class Aliases {
     return this._aliasCache.get(node)?.get(column);
   }
 
+  /** The (column, alias) pairs projected for a single node. */
+  columnsForNode(node: JoinPart | null): AliasMap[] {
+    return this._tables.find((t) => t.node === node)?.columns ?? [];
+  }
+
   /**
    * Build the SELECT projection — `table[column].as(alias)` for every column of
    * every joined table. Mirrors Rails' Aliases#columns returning Arel nodes.
@@ -115,6 +120,14 @@ export class JoinDependency {
   private _baseAlias: string;
   private _aliasTracker: AliasTracker;
   private _aliasesCache?: Aliases;
+  /**
+   * Mirrors Rails' `@join_root_alias` (join_dependency.rb:154). True when the
+   * relation has no explicit `select` — the base table projects all its columns
+   * as `t0_r*`. False when an explicit `select` is present — the base table
+   * projects only its primary key as `t0_r0`, and the relation's own select list
+   * supplies the rest of the projection (hydrated onto the parent record).
+   */
+  private _joinRootAlias = true;
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   /**
@@ -797,15 +810,20 @@ export class JoinDependency {
     return this.instantiateFromRows(resultSet, strictLoadingValue).parents;
   }
 
-  applyColumnAliases(relation: any): any {
-    const arelNodes = this._buildSelectArelNodes();
-    if (typeof relation.reselectBang === "function") {
-      relation.reselectBang(...arelNodes);
-      return relation;
-    } else if (typeof relation.select === "function") {
-      return relation.select(...arelNodes);
-    }
-    return relation;
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency#apply_column_aliases
+   * (join_dependency.rb:153) — `@join_root_alias = relation.select_values.empty?`
+   * then `relation._select!(-> { aliases.columns })`. When the relation carries
+   * an explicit `select`, the base table's alias columns shrink to its primary
+   * key (`!join_root_alias`); the relation's own select list then supplies the
+   * rest of the projection. Returns the alias-column Arel nodes so callers that
+   * build the projection manually (the eager-load SelectManager) can append them
+   * after the relation's explicit select.
+   */
+  applyColumnAliases(relation: any): Nodes.As[] {
+    this._joinRootAlias = (relation?.selectValues?.length ?? 0) === 0;
+    this._aliasesCache = undefined;
+    return this._buildSelectArelNodes();
   }
 
   each(callback: (part: JoinPart, index: number) => void): void {
@@ -885,7 +903,9 @@ export class JoinDependency {
     const aliases = this.aliases();
     const basePk = (this._baseModel as any).primaryKey ?? "id";
     const basePkCols: string[] = Array.isArray(basePk) ? basePk : [basePk];
-    const baseColumns = getModelColumns(this._baseModel);
+    // The base table's aliased (column, alias) pairs — all columns normally, or
+    // just the primary key under an explicit select (`applyColumnAliases`).
+    const baseAliasCols = aliases.columnsForNode(joinRoot);
     const aliasSet = new Set(aliases.columns().map((a) => a.alias));
 
     const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
@@ -895,8 +915,8 @@ export class JoinDependency {
 
     for (const row of rows) {
       const parentAttrs: Record<string, unknown> = Object.create(null);
-      for (let i = 0; i < baseColumns.length; i++) {
-        parentAttrs[baseColumns[i]] = row[aliases.columnAlias(joinRoot, baseColumns[i])!];
+      for (const { column, alias } of baseAliasCols) {
+        parentAttrs[column] = row[alias];
       }
       // Rails appends Aliases::Column.new(name, name) for non-`t\d+_r\d+` columns
       // so they land on the parent (and only the parent) record.
@@ -1123,7 +1143,17 @@ export class JoinDependency {
       })),
     });
 
-    const tables = [columnsFor(this._joinRoot, getModelColumns(this._baseModel), 0)];
+    // Rails: when the relation carries an explicit select (`!join_root_alias`),
+    // the base table contributes only its primary key (or nothing for a no-PK
+    // model); otherwise it contributes every column.
+    let rootColumns: string[];
+    if (this._joinRootAlias) {
+      rootColumns = getModelColumns(this._baseModel);
+    } else {
+      const pk = (this._baseModel as any).primaryKey;
+      rootColumns = pk ? (Array.isArray(pk) ? pk : [pk]) : [];
+    }
+    const tables = [columnsFor(this._joinRoot, rootColumns, 0)];
     for (const node of this.nodes) {
       tables.push(columnsFor(node, node.columns, node.tableIndex));
     }

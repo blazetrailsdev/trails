@@ -4461,7 +4461,15 @@ export class Relation<T extends Base> {
   ): SelectManager {
     const table = this._modelClass.arelTable;
 
-    const manager = table.project(...jd.buildSelectArel());
+    // Mirrors Rails' apply_column_aliases + `_select!(-> { aliases.columns })`:
+    // an explicit `select` keeps its own projection and the JoinDependency only
+    // contributes the base PK (t0_r0) plus the joined tables' alias columns.
+    // Without a select, the base table projects every column as `t0_r*`.
+    const selectCols = this._selectColumns ?? [];
+    const aliasNodes = jd.applyColumnAliases(this);
+    const projection =
+      selectCols.length > 0 ? [...this.arelColumns(selectCols), ...aliasNodes] : aliasNodes;
+    const manager = table.project(...(projection as Parameters<typeof table.project>));
 
     for (const node of jd.nodes) {
       manager.appendJoinNode(node.arelJoin!);
