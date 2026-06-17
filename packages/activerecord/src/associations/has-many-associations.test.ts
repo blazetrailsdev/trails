@@ -7669,7 +7669,7 @@ describe("HasManyAssociationsTest", () => {
     // `default_scope { where(id: 1) }` restricts the collection to post id 1.
     // Mary (author 2) owns no post with id 1, so the proxy is empty.
     const author = (await HmAuthor.find(authors("mary").id)) as HmAuthor;
-    const exists = await association(author, "firstPosts").exists();
+    const exists = await author.firstPosts.exists();
     expect(exists).toBe(false);
   });
 });
