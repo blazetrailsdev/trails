@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { IntegerType, StringType } from "@blazetrails/activemodel";
+import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
 import { Nodes, Collectors } from "@blazetrails/arel";
 import { LogSubscriber } from "./log-subscriber.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
@@ -175,22 +175,38 @@ describe("BindParameterTest", () => {
     expect(await scope.count()).toBe(1);
   });
 
-  it.skip("binds are logged", () => {
-    // BLOCKED: adapter — payload.binds carries primitives, not Attribute objects.
-    // ROOT-CAUSE / tracked by RFC 0016 story
-    // `preserve-queryattribute-binds-in-notification-payload`. Rails builds
-    // `Relation::QueryAttribute.new("id", 1, Type::Value.new)`, passes it to
-    // exec_query, and asserts the `sql.active_record` payload preserves the same
-    // Attribute objects (bind_parameter_test.rb:137-145). trails type-casts binds
-    // to primitives in the relation/predicate-builder layer *upstream* of the
-    // adapter, so the notification boundary only ever carries primitives (see
-    // `find one uses binds`, whose payload.binds is `[1]`) — there is no
-    // adapter-level payload.binds (objects) vs type_casted_binds (primitives)
-    // split to assert against. A hand-built exec_query with raw QueryAttribute
-    // binds can't reproduce it either: the sqlite driver type-casts inside
-    // `execute` *before* instrumentation is entered, so it rejects and no event
-    // fires. Preserving Attribute objects on the payload is production work,
-    // tracked in the follow-up story.
+  it("binds are logged", async (ctx) => {
+    // Rails gates the whole BindParameterTest on `if prepared_statements`
+    // (bind_parameter_test.rb:9); mirror that class wrapper.
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+
+    // Rails (bind_parameter_test.rb:137-145):
+    //   sub   = Arel::Nodes::BindParam.new(1)
+    //   binds = [Relation::QueryAttribute.new("id", 1, Type::Value.new)]
+    //   sql   = "select * from topics where id = #{sub.to_sql}"   # => "... = ?"
+    //   @connection.exec_query(sql, "SQL", binds)
+    //   assert_equal binds, message[4][:binds]
+    // The `sql.active_record` payload must preserve the SAME QueryAttribute
+    // objects passed to exec_query (payload.binds), distinct from the driver
+    // primitives in payload.type_casted_binds.
+    // Arel::Nodes::BindParam#to_sql renders the placeholder "?".
+    const sql = `select * from topics where id = ${new Nodes.BindParam(1).toSql()}`;
+    const binds = [new QueryAttribute("id", 1, new ValueType())];
+
+    const subscriber = new LogListener();
+    const handle = Notifications.subscribe("sql.active_record", (e: Event) => subscriber.call(e));
+    try {
+      await conn.execQuery(sql, "SQL", binds);
+      // Rails finds the message by `args[4][:sql] == sql`, but adapters that
+      // rewrite the placeholder (PostgreSQL turns "?" into "$1" in
+      // preprocessQuery) put the rewritten SQL on the payload, so match on the
+      // bind objects we passed — the thing actually under test — instead.
+      const message = subscriber.events.find((e) => e.payload.binds === binds);
+      expect(message?.payload.binds).toBe(binds);
+    } finally {
+      Notifications.unsubscribe(handle);
+    }
   });
 
   it("find one uses binds", async (ctx) => {
