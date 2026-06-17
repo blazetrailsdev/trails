@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { adapterType } from "./test-adapter.js";
+import { adapterType, createTestAdapter } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, MigrationContext, registerModel } from "./index.js";
@@ -330,11 +330,19 @@ describe("TimestampsWithoutTransactionTest", () => {
     expect(p.isPersisted()).toBe(true);
     expect(p.created_at ?? undefined).toBeUndefined();
   });
-  it.skip("index is created for both timestamps", () => {
-    // BLOCKED: type — timestamp type/attribute gap
-    // ROOT-CAUSE: timestamp.ts or attribute-methods/timestamp.ts missing Rails parity
-    // SCOPE: ~20 LOC fix; affects ~1 test in timestamp.test.ts
-    /* fixture-dependent */
+  it("index is created for both timestamps", async () => {
+    const adapter = createTestAdapter();
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("foos", { force: true }, (t) => {
+      t.timestamps({ null: true, index: true });
+    });
+    try {
+      const indexes = await ctx.indexes("foos");
+      const columns = indexes.flatMap((i) => i.columns).sort();
+      expect(columns).toEqual(["created_at", "updated_at"]);
+    } finally {
+      await ctx.dropTable("foos");
+    }
   });
 });
 

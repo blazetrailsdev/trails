@@ -1041,11 +1041,13 @@ export class TableDefinition {
     return this.column(name, enumType as ColumnType, rest);
   }
 
-  timestamps(options: ColumnOptions = {}): this {
+  timestamps(
+    options: Omit<ColumnOptions, "index"> & { index?: boolean | AddIndexOptions } = {},
+  ): this {
     const { null: nullOption, ...rest } = options;
     const opts = { ...rest, null: nullOption ?? false };
-    this.datetime("created_at", opts);
-    this.datetime("updated_at", opts);
+    this.column("created_at", "datetime", opts);
+    this.column("updated_at", "datetime", opts);
     return this;
   }
 
