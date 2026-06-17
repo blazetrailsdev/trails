@@ -9,6 +9,7 @@ import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base } from "../../index.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -111,13 +112,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec("DROP TABLE IF EXISTS bad_virtual").catch(() => {});
     });
 
-    it.skip("schema dumping", () => {
-      // BLOCKED: schema — TS schema dumper emits TS DSL (t.string/t.integer) and does
-      // not honor virtual-column options. The PG-specific prepareColumnOptions
-      // (as/stored) is unreachable from emitTable's column rendering path.
-      // ROOT-CAUSE: schema-dumper.ts emitTable bypasses connection-adapter
-      // prepareColumnOptions for virtual columns. Affects schema_dumping mirror.
-      // DEFERRED (RFC 0030): tracked by schema-dumper-emittable-virtual-column-options — converge then un-skip.
+    itIfSupports("virtual_columns", "schema dumping", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "virtual_columns");
+      expect(output).toMatch(
+        /t\.virtual\(\s*"upper_name",\s*\{\s*type:\s*"string",\s*as:\s*"upper\(\(name\)::text\)",\s*stored:\s*true\s*\}\s*\)/i,
+      );
+      expect(output).toMatch(
+        /t\.virtual\(\s*"name_length",\s*\{\s*type:\s*"integer",\s*as:\s*"length\(\(name\)::text\)",\s*stored:\s*true\s*\}\s*\)/i,
+      );
+      expect(output).toMatch(
+        /t\.virtual\(\s*"name_octet_length",\s*\{\s*type:\s*"integer",\s*as:\s*"octet_length\(\(name\)::text\)",\s*stored:\s*true\s*\}\s*\)/i,
+      );
+      expect(output).toMatch(
+        /t\.virtual\(\s*"column2",\s*\{\s*type:\s*"integer",\s*as:\s*"\(column1 \+ 1\)",\s*stored:\s*true\s*\}\s*\)/i,
+      );
     });
 
     itIfSupports("virtual_columns", "build fixture sql", async () => {
