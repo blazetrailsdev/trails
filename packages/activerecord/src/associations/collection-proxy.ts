@@ -2778,9 +2778,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // subquery below — which structurally collapses duplicate join rows to one
     // row per id — is kept only for shapes AssociationScope can't route yet
     // (nested-through, polymorphic-has_many sources, polymorphic-belongsTo
-    // without sourceType).
+    // without sourceType). Composite owner/target primary keys also stay on
+    // the IN-subquery path: those shapes surface the trails-specific
+    // ConfigurationError guards below at construction (the single-column
+    // IN-subquery can't express a composite key), and routing them through the
+    // JOIN here would silently bypass that validation. `scope()` already used
+    // the IN-subquery path for every through shape before this change, so
+    // keeping composite keys there preserves the prior behavior exactly.
     const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
-    if (refl && _canRouteThroughViaAssociationScope(refl, this._assocDef.options)) {
+    const ownerPkComposite = Array.isArray((ctor as any).primaryKey);
+    const targetPkComposite = Array.isArray((this.model as any).primaryKey);
+    if (
+      refl &&
+      !ownerPkComposite &&
+      !targetPkComposite &&
+      _canRouteThroughViaAssociationScope(refl, this._assocDef.options)
+    ) {
       const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
       // null FK (unsaved owner / null PK) — same short-circuit the
       // IN-subquery path uses below.
