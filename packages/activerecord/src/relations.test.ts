@@ -5019,8 +5019,10 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order("title").reverseOrder().toSql();
-    expect(sql).toContain("DESC");
+    // Rails: Topic.order(Arel.sql("length(title)")).reverse_order — a balanced-paren
+    // function is reversible (does_not_support_reverse? only flags nulls/unbalanced).
+    const sql = Post.order("LENGTH(title)").reverseOrder().toSql();
+    expect(sql).toContain("LENGTH(title) DESC");
   });
 
   it("reverse arel assoc order with multiargument function", () => {
@@ -5035,8 +5037,7 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Rails reverse_sql_order raises IrreversibleOrderError on "nulls first/last"
-    // (does_not_support_reverse?), since the reversed direction is ambiguous.
+    // Rails does_not_support_reverse? raises IrreversibleOrderError on "nulls first/last".
     expect(() => Post.order("title ASC NULLS FIRST").reverseOrder().toSql()).toThrow(
       IrreversibleOrderError,
     );

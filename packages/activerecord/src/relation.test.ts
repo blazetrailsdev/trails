@@ -1474,18 +1474,6 @@ describe("RelationTest", () => {
     expect(Post.all()).toBeInstanceOf(Relation);
   });
 
-  it("reverse order with function", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    // Rails reverse_sql_order reverses a balanced-paren single-term string order
-    // by flipping its trailing ASC↔DESC; does_not_support_reverse? only flags
-    // unbalanced comma-sections or "nulls first/last", not bare function calls.
-    expect(Post.order("LOWER(title) ASC").reverseOrder().toSql()).toContain("LOWER(title) DESC");
-  });
-
   it.skip("eagerLoad emits LEFT OUTER JOIN and t0_r0-style column aliases", () => {
     try {
       class Author extends Base {
