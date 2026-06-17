@@ -2768,6 +2768,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _buildThroughScope(): any {
     const ctor = this._record.constructor as typeof Base;
+    // Rails' CollectionAssociation#scope for a through/HABTM proxy is the
+    // JOIN-based AssociationScope relation (`SELECT target.* FROM target
+    // INNER JOIN join_table ...`) — the same relation the loader executes.
+    // For shapes AssociationScope can route, build that JOIN relation here so
+    // the proxy's seeded state and `scope()` preserve join-row multiplicity
+    // (three `developers_projects` rows for one project yield three rows /
+    // count 3), matching Rails. The legacy `id IN (SELECT source_fk ...)`
+    // subquery below — which structurally collapses duplicate join rows to one
+    // row per id — is kept only for shapes AssociationScope can't route yet
+    // (nested-through, polymorphic-has_many sources, polymorphic-belongsTo
+    // without sourceType).
+    const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
+    if (refl && _canRouteThroughViaAssociationScope(refl, this._assocDef.options)) {
+      const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
+      // null FK (unsaved owner / null PK) — same short-circuit the
+      // IN-subquery path uses below.
+      return joinRel ?? (this.model as any).all().none();
+    }
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
     if (!throughAssoc) {
