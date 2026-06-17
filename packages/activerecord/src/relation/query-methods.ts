@@ -1356,13 +1356,7 @@ function reverseOrderBang(this: QueryMethodsHost): any {
         const reversed = reverseSqlOrder.call(this, [clause]) as string[];
         return { raw: reversed.join(", ") };
       }
-      // Bare column with no direction ("name") flips to a desc tuple so the
-      // column is quoted like Rails. Any other single-term string is a SQL
-      // expression ("LOWER(title)", "LENGTH(title) ASC"): route through
-      // reverseSqlOrder, the faithful port of Rails reverse_sql_order, which
-      // flips trailing ASC↔DESC (appends DESC otherwise) and raises
-      // IrreversibleOrderError only on "nulls first/last" — balanced-paren
-      // functions are reversible in Rails (does_not_support_reverse?).
+      // Bare column flips to a quoted desc tuple; any SQL expression goes through reverseSqlOrder.
       if (/^[\w.]+$/.test(clause)) {
         return [clause, "desc" as const];
       }

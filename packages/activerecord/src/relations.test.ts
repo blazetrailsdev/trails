@@ -5019,8 +5019,7 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Rails: Topic.order(Arel.sql("length(title)")).reverse_order — a balanced-paren
-    // function is reversible (does_not_support_reverse? only flags nulls/unbalanced).
+    // Rails: Topic.order(Arel.sql("length(title)")).reverse_order — balanced-paren is reversible.
     const sql = Post.order("LENGTH(title)").reverseOrder().toSql();
     expect(sql).toContain("LENGTH(title) DESC");
   });
