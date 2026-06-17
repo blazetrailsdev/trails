@@ -731,32 +731,35 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Build one AliasTracker spanning every JoinDependency bucket — inner
-   * `joins`, `leftOuterJoins`, eager load, and `includes` — plus the flat
-   * association where-joins already minted on this relation. This mirrors Rails'
-   * single `JoinDependency#alias_tracker`: trails builds a JoinDependency per
-   * bucket, but seeding one tracker from all of them gives whereAssociated /
-   * whereMissing a unified alias namespace, so a self-join they add is aliased
-   * relative to a sibling join in ANY bucket (e.g. an inner
-   * `joins(:readingListing)` and a left-outer `missing(:unreadListing)` both on
-   * the books table).
+   * Build one AliasTracker spanning the join buckets that actually emit SQL —
+   * inner `joins`, `leftOuterJoins`, eager load, and `includes` promoted to
+   * eager load — plus the flat association where-joins already minted on this
+   * relation. This mirrors Rails' single `JoinDependency#alias_tracker`: trails
+   * builds a JoinDependency per bucket, but seeding one tracker from all of them
+   * gives whereAssociated / whereMissing a unified alias namespace, so a
+   * self-join they add is aliased relative to a sibling join in ANY bucket (e.g.
+   * an inner `joins(:readingListing)` and a left-outer `missing(:unreadListing)`
+   * both on the books table).
    *
-   * The tracker is built with the adapter's `tableAliasLength` (mirroring
-   * Rails' `AliasTracker.create(connection, …)`) so long self-join aliases
-   * truncate identically to the JoinDependency/adapter path.
+   * Preload-only `includes` (not promoted via `references`) are excluded: they
+   * never become SQL joins (`_applyJoinsToManager` skips them too), so claiming
+   * an alias for them would force a where-chain self-join alias Rails' build_joins
+   * never allocates (query_methods.rb:1882-1896 only builds the tracker for the
+   * emitted join buckets).
    *
-   * It is seeded from the actual join *nodes* (each bucket's joined tables),
-   * not from a snapshot that includes the initial table: a table joined in any
-   * bucket — including the owner table itself via a self-join — is therefore
-   * claimed, so a later flat where-join on it aliases (`aliased_table_for`,
-   * alias_tracker.rb:58-77). A *standalone* true self-association (target ==
-   * owner with no prior join) is intentionally left unaliased: the flat path
-   * rebinds the ON predicate by table NAME (`_rebindTableInNode`), which cannot
-   * distinguish the owner side from the target side, so aliasing it here would
-   * rewrite both. That is the pre-existing deviation documented on
-   * `_rebindOperand`; converging it needs identity-based rebinding and is out of
-   * scope for this story. `jdJoins` carries each JoinDependency join's
-   * (table, association) for association-level dedup.
+   * The tracker is built with the adapter's `tableAliasLength` (mirroring Rails'
+   * `AliasTracker.create(connection, …)`) so long self-join aliases truncate
+   * identically to the JoinDependency/adapter path. It is seeded from the actual
+   * join *nodes*: a table joined in any bucket — including the owner table via a
+   * self-join — is claimed, so a later flat where-join on it aliases
+   * (`aliased_table_for`, alias_tracker.rb:58-77). A *standalone* true
+   * self-association (target == owner with no prior join) is intentionally left
+   * unaliased: the flat path rebinds the ON predicate by table NAME
+   * (`_rebindTableInNode`), which cannot distinguish the owner side from the
+   * target side, so aliasing it here would rewrite both. That is the pre-existing
+   * deviation documented on `_rebindOperand`; converging it needs identity-based
+   * rebinding and is out of scope for this story. `jdJoins` carries each
+   * JoinDependency join's (table, association) for association-level dedup.
    *
    * @internal
    */
@@ -767,7 +770,29 @@ export class Relation<T extends Base> {
     const tracker = new AliasTracker(aliasLength);
     const ownerTable = (this._modelClass as any).tableName;
     const jdJoins: Array<{ table: string; assoc: string }> = [];
-    const deps = _qm.buildJoinDependencies.call(this as any) as JoinDependency[];
+
+    // Mirror the join buckets `_applyJoinsToManager` actually emits: named inner
+    // joins, eager load, includes promoted to eager load, and left-outer joins
+    // not already covered by eager.
+    const promotedIncludes = this._includesToPromoteFromReferences();
+    const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
+    const emitted: AssociationSpec[] = [
+      ...this._namedInnerJoins,
+      ...this._eagerLoadAssociations,
+      ...promotedIncludes,
+      ...this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v)),
+    ];
+
+    const deps: JoinDependency[] = [];
+    if (emitted.length > 0) {
+      deps.push(
+        QueryMethodBangs.constructJoinDependency.call(this as any, emitted, null) as JoinDependency,
+      );
+    }
+    // Cross-klass merged dependencies (Rails merge_joins / merge_outer_joins)
+    // are emitted directly, so include their joined tables too.
+    deps.push(...this._namedInnerJoinDeps, ...this._leftOuterJoinDeps);
+
     for (const jd of deps) {
       for (const node of jd.nodes) {
         const table = node.tableName;
