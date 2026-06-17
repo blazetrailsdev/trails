@@ -47,7 +47,7 @@ export class InsertAll {
    * Builder.conflictTarget can read `index.columns` / `index.where`.
    */
   uniqueBy: string | string[] | IndexDefinition | undefined;
-  readonly returning: string | string[] | Nodes.SqlLiteral | false;
+  returning: string | string[] | Nodes.SqlLiteral | false;
 
   onDuplicate: "skip" | "update" | undefined;
   updateOnly: string | string[] | undefined;
@@ -58,6 +58,13 @@ export class InsertAll {
   private _updatableColumns: string[] | undefined;
   private _uniqueByResolved = false;
   private _keysIncludingTimestamps: Set<string> | undefined;
+  // Resolved from schema_cache.primary_keys(table_name) during the async
+  // _populateUpdatableColumns pass; undefined until then. See primaryKeys().
+  private _schemaCachePrimaryKeys: string[] | undefined;
+  // True when `returning` was auto-defaulted to the primary keys (Rails:
+  // `@returning = primary_keys if @returning == true`), so it can be
+  // re-resolved to the schema-cache value once that's available.
+  private _returningDefaulted = false;
 
   static async execute(
     relation: Relation<any>,
@@ -100,6 +107,7 @@ export class InsertAll {
           ? (this.connection as any).supportsInsertReturning()
           : false;
       this.returning = supportsReturning ? this.primaryKeys() : false;
+      this._returningDefaulted = supportsReturning;
     }
 
     if (this.inserts.length === 0) {
@@ -160,6 +168,16 @@ export class InsertAll {
     // defers it because schema-cache reads are async — but it must still
     // run on every path so updateOnly + uniqueBy still gets validated and
     // index.where flows through to conflictTarget.
+    // Resolve the database primary keys from the schema cache (Rails'
+    // `primary_keys` is `Array(schema_cache.primary_keys(table_name))`) before
+    // anything reads primaryKeys(), so readonlyColumns and the Builder's
+    // conflict target see the schema-cache value rather than the model's
+    // configured primary key. findUniqueIndexFor still reads model.primaryKey
+    // directly for its `unique_by || model.primary_key` match.
+    if (this._schemaCachePrimaryKeys === undefined) {
+      this._schemaCachePrimaryKeys = await this.dbPrimaryKeys();
+      if (this._returningDefaulted) this.returning = this.primaryKeys();
+    }
     if (!this._uniqueByResolved) {
       this.uniqueBy = await this.findUniqueIndexFor(this.uniqueBy);
       this._uniqueByResolved = true;
@@ -182,11 +200,15 @@ export class InsertAll {
 
   primaryKeys(): string[] {
     // Rails: `Array(@model.schema_cache.primary_keys(model.table_name))`
-    // (insert_all.rb:61). We read `this.model.primaryKey` (a pre-existing
-    // schema-cache-vs-attribute divergence), but for the no-PK case both yield
-    // []: a model with no primary key (e.g. a partitioned table — primaryKey is
-    // nil / "") returns [] so `returning` defaults to no RETURNING clause rather
-    // than RETURNING "".
+    // (insert_all.rb:61) — the *database* primary keys from the schema cache,
+    // not the model's attribute-derived `primary_key`. Those reads are async
+    // in our port, so they're resolved once into `_schemaCachePrimaryKeys`
+    // during _populateUpdatableColumns. Until that runs (the constructor's
+    // `returning` default and verifyAttributes), fall back to the model's
+    // primary key; for the no-PK case (partitioned table — primaryKey nil/"")
+    // both yield [] so `returning` emits no RETURNING clause rather than
+    // RETURNING "".
+    if (this._schemaCachePrimaryKeys !== undefined) return this._schemaCachePrimaryKeys;
     const pk = this.model.primaryKey;
     if (pk == null || pk === "") return [];
     return Array.isArray(pk) ? pk : [pk];
@@ -397,8 +419,11 @@ export class InsertAll {
     // below compares against the *database* primary keys (schema_cache), so a
     // model whose configured PK lacks a backing unique index (e.g. Speedometer)
     // raises rather than emitting a bogus conflict target.
+    const modelPk = this.model.primaryKey;
+    const modelPrimaryKeys =
+      modelPk == null || modelPk === "" ? [] : Array.isArray(modelPk) ? modelPk : [modelPk];
     const nameOrCols =
-      uniqueBy == null ? this.primaryKeys() : Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy];
+      uniqueBy == null ? modelPrimaryKeys : Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy];
     const match = nameOrCols.map(String);
     const sortedMatch = [...match].sort().join(",");
     const tableName = this.model.arelTable.name;
@@ -415,8 +440,9 @@ export class InsertAll {
     // The PK fallback is order-sensitive (Rails `match == primary_keys`,
     // insert_all.rb:163) — unlike the index match above, which sorts. A
     // composite PK supplied in a different column order falls through to the
-    // raise, matching Rails.
-    const dbPrimaryKeys = (await this.dbPrimaryKeys()).map(String);
+    // raise, matching Rails. `primaryKeys()` is the schema-cache value, already
+    // resolved in _populateUpdatableColumns before this method runs.
+    const dbPrimaryKeys = this.primaryKeys().map(String);
     if (match.join(",") === dbPrimaryKeys.join(",")) {
       return uniqueBy == null
         ? undefined
