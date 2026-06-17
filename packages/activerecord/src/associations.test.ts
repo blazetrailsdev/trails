@@ -3359,15 +3359,70 @@ describe("PreloaderTest", () => {
     }).call();
     expect(spy).toHaveBeenCalledTimes(2);
   });
-  // D-1 non-candidate: this test intentionally uses two separate adapters
-  // (adapterA, adapterB) to verify that LoaderQuery#hashKey uses adapter
-  // identity to distinguish queries against identically-named tables on
-  // different databases. A single shared Base.adapter cannot express this
-  // multi-database scenario.
-  it.skip("multi database polymorphic preload with same table name", () => {
-    // Tracked: RFC 0030 story multi-db-polymorphic-preload
-    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment (multi-DB pattern).
-    // Needs reimplementation against the pool (no bypass).
+  // Mirrors Rails' Dog (primary connection) and OtherDog (ARUnit2Model — a
+  // second database), both backed by a table named `dogs`. A polymorphic
+  // preload over comments pointing at each must run two queries rather than
+  // batch them together, because LoaderQuery#hashKey distinguishes loaders by
+  // connection identity. The original test expressed the two databases by
+  // assigning adapters directly (bypassing the handler); this reimplementation
+  // routes the second `dogs` through a real pooled connection.
+  it("multi database polymorphic preload with same table name", async () => {
+    class MdpDog extends Base {
+      static {
+        this.tableName = "dogs";
+      }
+    }
+    // Second database, same `dogs` table name (Rails: OtherDog < ARUnit2Model,
+    // an abstract class connected to the `arunit2` database).
+    class MdpAnimalsBase extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    class MdpOtherDog extends MdpAnimalsBase {
+      static {
+        this.tableName = "dogs";
+      }
+    }
+    class MdpComment extends Base {
+      static {
+        this.tableName = "comments";
+        this.attribute("origin_id", "integer");
+        this.attribute("origin_type", "string");
+      }
+    }
+    Associations.belongsTo.call(MdpComment, "origin", { polymorphic: true });
+    registerModel("MdpDog", MdpDog);
+    registerModel("MdpOtherDog", MdpOtherDog);
+    registerModel("MdpComment", MdpComment);
+
+    const [secondaryPool] = MdpAnimalsBase.connectsTo({
+      database: { writing: { adapter: "sqlite3", database: ":memory:", pool: 1 } },
+    });
+    try {
+      await secondaryPool.adapterReady;
+      // The canonical `dogs` table, created in the secondary database so its
+      // SELECT resolves against this pool rather than the primary one.
+      await MdpOtherDog.leaseConnection().executeMutation(
+        "CREATE TABLE `dogs` (`id` INTEGER PRIMARY KEY, `trainer_id` INTEGER, " +
+          "`breeder_id` INTEGER, `dog_lover_id` INTEGER, `alias` VARCHAR(255))",
+      );
+
+      const dogComment = new MdpComment({ origin_id: 1, origin_type: "MdpDog" });
+      const otherDogComment = new MdpComment({ origin_id: 1, origin_type: "MdpOtherDog" });
+
+      // Same table name, same key, same id — these two loaders would coalesce
+      // into a single query were it not for their distinct connections.
+      const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+      await new Preloader({
+        records: [dogComment, otherDogComment],
+        associations: ["origin"],
+      }).call();
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      Base.connectionHandler.removeConnectionPool("MdpAnimalsBase");
+    }
   });
 
   it("preload with available records", async () => {
