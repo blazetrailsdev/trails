@@ -1498,10 +1498,22 @@ describe("MigrationTest", () => {
     const migrator = Migrator.fromDir(migrationsPath, adp);
     await migrator.up();
 
-    (Person as any).adapter = adp;
-    (Person as any).resetColumnInformation();
-    await loadSchemaFromAdapter.call(Person as any);
-    expect(Person.columnNames()).toContain("last_name");
+    // Point Person at the isolated migration DB only for the duration of the
+    // assertion, then restore. Unlike Rails — where the pool is global and
+    // `MigrationContext.new(path)` never touches the connection — our test
+    // adapter is per-instance, so we must restore Person's original adapter
+    // (and re-reset its column cache) to avoid leaking `last_name` into later
+    // tests in this worker.
+    const originalAdapter = (Person as any)._adapter;
+    try {
+      (Person as any).adapter = adp;
+      (Person as any).resetColumnInformation();
+      await loadSchemaFromAdapter.call(Person as any);
+      expect(Person.columnNames()).toContain("last_name");
+    } finally {
+      (Person as any)._adapter = originalAdapter;
+      (Person as any).resetColumnInformation();
+    }
   });
 
   it("migration detection without schema migration table", async () => {
