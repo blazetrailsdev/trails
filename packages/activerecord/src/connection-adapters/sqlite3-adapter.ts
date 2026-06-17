@@ -1133,6 +1133,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   // --- Database info ---
 
+  // SQLite has no adapter-specific `ColumnMethods` module (sqlite3/schema_definitions.rb
+  // defines none), so it inherits the abstract `columnMethodNames()` list unchanged —
+  // no override here is intentional.
+
   nativeDatabaseTypes(): Record<string, { name: string; limit?: number }> {
     return {
       primary_key: { name: "integer" },

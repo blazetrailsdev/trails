@@ -510,6 +510,27 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return NATIVE_DATABASE_TYPES;
   }
 
+  // Mirrors MySQL's explicit `ColumnMethods` list (`mysql/schema_definitions.rb:46`
+  // `define_column_methods`): blob variants, text variants, and the `unsigned_*`
+  // shorthands — absent from NATIVE_DATABASE_TYPES — on top of the abstract names.
+  // `:blob` is in the Rails MySQL list too, but it's already surfaced via the
+  // abstract `blob`/`binary` alias, so we don't repeat it here.
+  override columnMethodNames(): string[] {
+    return [
+      ...super.columnMethodNames(),
+      "tinyblob",
+      "mediumblob",
+      "longblob",
+      "tinytext",
+      "mediumtext",
+      "longtext",
+      "unsignedInteger",
+      "unsignedBigint",
+      "unsignedFloat",
+      "unsignedDecimal",
+    ];
+  }
+
   indexAlgorithms(): Record<string, string> {
     return {
       default: "ALGORITHM = DEFAULT",

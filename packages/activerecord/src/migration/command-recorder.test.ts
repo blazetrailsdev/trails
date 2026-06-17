@@ -494,6 +494,49 @@ describe("CommandRecorder", () => {
     });
   });
 
+  describe("change_table surfaces adapter ColumnMethods shorthands (MySQL unsigned/blob)", () => {
+    // Mirrors Rails: the MySQL `ColumnMethods` mixin exposes `t.unsignedInteger`,
+    // `t.mediumtext`, `t.longblob`, ... inside change_table — shorthands the
+    // adapter advertises via columnMethodNames() beyond NATIVE_DATABASE_TYPES.
+    //
+    // NOTE: the generic proxy records the camelCase method name as the column
+    // type (`unsignedInteger`), whereas Rails records the snake symbol
+    // (`:unsigned_integer`). That recorder-side normalization is tracked
+    // separately in story recorder-camelcase-column-type-normalization
+    // (RFC 0023); the assertions below document current behavior.
+    const mysqlLike = {
+      columnMethodNames: () => ["unsignedInteger", "mediumtext", "longblob"],
+    };
+
+    it("records addColumn for MySQL shorthands (up adds)", async () => {
+      const recorder = new CommandRecorder(mysqlLike);
+      await recorder.changeTable("fruits", async (t) => {
+        await (t as any).unsignedInteger("qty");
+        await (t as any).mediumtext("notes");
+        await (t as any).longblob("payload");
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "addColumn", args: ["fruits", "qty", "unsignedInteger", {}] },
+        { cmd: "addColumn", args: ["fruits", "notes", "mediumtext", {}] },
+        { cmd: "addColumn", args: ["fruits", "payload", "longblob", {}] },
+      ]);
+    });
+
+    it("reverts MySQL shorthands to removeColumn (down removes)", async () => {
+      const recorder = new CommandRecorder(mysqlLike);
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", async (t) => {
+          await (t as any).unsignedInteger("qty");
+          await (t as any).mediumtext("notes");
+        });
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "removeColumn", args: ["fruits", "notes", "mediumtext", {}] },
+        { cmd: "removeColumn", args: ["fruits", "qty", "unsignedInteger", {}] },
+      ]);
+    });
+  });
+
   describe("bulk invert change table", () => {
     it("records two changeTable commands from revert + revert-of-revert", async () => {
       const delegate = { supportsBulkAlter: () => true };

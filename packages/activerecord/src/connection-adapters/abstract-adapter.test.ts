@@ -45,6 +45,35 @@ describe("AbstractAdapter#returnValueAfterInsert", () => {
   });
 });
 
+describe("AbstractAdapter#columnMethodNames", () => {
+  it("mirrors the abstract ColumnMethods list (define_column_methods + blob/numeric aliases)", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.columnMethodNames()).toEqual([
+      "bigint",
+      "binary",
+      "boolean",
+      "date",
+      "datetime",
+      "decimal",
+      "float",
+      "integer",
+      "json",
+      "string",
+      "text",
+      "time",
+      "timestamp",
+      "virtual",
+      "blob",
+      "numeric",
+    ]);
+  });
+
+  it("does not surface native-types-only `primary_key`", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.columnMethodNames()).not.toContain("primary_key");
+  });
+});
+
 describe("AbstractAdapter.extractLimit", () => {
   it("parses limit from sql type with parens", () => {
     expect(TestAdapter.extractLimit("varchar(255)")).toBe(255);
