@@ -3561,13 +3561,26 @@ export class Current extends Migration {
 registerVersion(CURRENT_VERSION, Current);
 
 /**
- * Mirrors: ActiveRecord::Migration::Compatibility::V5_0
+ * Mirrors: ActiveRecord::Migration::Compatibility::V5_0 (compatibility.rb:347)
  *
- * Legacy 5.0-flavor migration semantics. The behavior ported here is the
+ * Legacy 5.0-flavor migration semantics. The only behavior ported here is the
  * PostgreSQL uuid primary-key implicit default: a `create_table` with
  * `id: :uuid` and no explicit `:default` receives `uuid_generate_v4()` — the
  * 5.0-era default — whereas the modern path emits `gen_random_uuid()`. An
  * explicit `default: nil` is honored verbatim (no implicit default applied).
+ *
+ * Deferred (story scope is uuid-only — tracked by
+ * legacy-migration-5-0-create-table-and-chain, RFC 0030):
+ *  - The rest of `V5_0.create_table` (compatibility.rb:371–387): integer/bigint
+ *    PK `default: nil`, and `id: :integer` default when no `:id` is given.
+ *  - The inner `TableDefinition` mixin and sibling overrides
+ *    (compatibility.rb:348–362, 393–415): `primary_key`, `references`/
+ *    `belongs_to` (`type: :integer`), `create_join_table`, `add_column`,
+ *    `add_reference`/`add_belongs_to`.
+ *  - The Rails ancestry is `V5_0 < V5_1` (compatibility.rb:347); the V5_1..V7_x
+ *    chain is not built yet, so this stands in by extending `Current`. Until the
+ *    intermediate versions exist there are no overrides to inherit, so the
+ *    behavior is equivalent for the uuid path; once they land, re-parent V5_0.
  */
 export class V5_0 extends Current {
   override async createTable(
