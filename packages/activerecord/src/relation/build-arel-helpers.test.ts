@@ -227,8 +227,11 @@ describe("where-hash key resolves to the referenced join alias", () => {
       .joins("toys")
       .where({ toys: { name: "Bone" } })
       .toSql();
-    expect(sql).toContain('INNER JOIN "da_toys" "toys"');
-    expect(sql).toContain('"toys"."name" = ');
-    expect(sql).not.toContain('"da_toys"."name"');
+    // Identifier quote char differs by adapter (" on sqlite/pg, ` on
+    // mysql/mariadb); strip quotes so the shape assertion holds everywhere.
+    const bare = sql.replace(/["`]/g, "");
+    expect(bare).toMatch(/INNER JOIN da_toys (?:AS )?toys\b/);
+    expect(bare).toMatch(/WHERE toys\.name\b/);
+    expect(bare).not.toMatch(/da_toys\.name/);
   });
 });
