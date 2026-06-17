@@ -710,10 +710,19 @@ async function _defineSchemaImpl(
 
   const cache = getCache(adapter);
 
+  // Track whether any DROP/CREATE DDL ran so we can deallocate the
+  // connection's prepared statements at the end, mirroring Rails'
+  // `create_table`/`drop_table` calling `clear_cache!`. Without this,
+  // PostgreSQL raises `cached plan must not change result type` (0A000) on
+  // the first query that reuses a prepared-statement plan cached against the
+  // table's prior shape, aborting the transaction.
+  let issuedDdl = false;
+
   if (opts?.dropExisting) {
     for (const table of [...order].reverse()) {
       await ss.dropTable(table, { ifExists: true });
       cache.delete(table);
+      issuedDdl = true;
     }
   }
 
@@ -754,6 +763,7 @@ async function _defineSchemaImpl(
     // dropAllTables clearing the signature cache, this eliminates the need
     // for afterAll(dropAllTables) in useHandlerTransactionalFixtures.
     await ss.dropTable(table, { ifExists: true });
+    issuedDdl = true;
     const createOpts: { id?: boolean | { type: string }; primaryKey?: string | string[] } = {};
     if (pk === false) createOpts.id = false;
     else if (serialPkName !== null) {
@@ -845,5 +855,13 @@ async function _defineSchemaImpl(
     }
     cache.set(table, newSig);
     if (warm) await _warmSchemaCache(adapter, table);
+  }
+
+  // Deallocate prepared statements cached against the now-replaced table
+  // shapes, mirroring Rails `clear_cache!`. PG would otherwise raise
+  // `cached plan must not change result type` on the first reuse of a stale
+  // plan; other adapters treat this as a harmless cache reset.
+  if (issuedDdl) {
+    adapter.clearCacheBang?.();
   }
 }
