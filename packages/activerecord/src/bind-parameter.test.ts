@@ -153,7 +153,13 @@ describe("BindParameterTest", () => {
     expect((await topics.toArray()).map((t: any) => t.id)).toEqual([1]);
     cap.stop();
 
-    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
+    const key = conn.sqlKey(cap.sqls.at(-1));
+    expect(statementCacheKeys(conn)).toContain(key);
+
+    // Rails' second half (bind_parameter_test.rb): a fresh `clear_cache!` evicts
+    // the entry, proving the pool is writable in both directions.
+    conn.clearCache();
+    expect(statementCacheKeys(conn)).not.toContain(key);
   });
 
   it("statement cache with query cache", async (ctx) => {
