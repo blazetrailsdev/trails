@@ -259,26 +259,6 @@ function predicatesWithWrappedSqlLiterals(predicates: Nodes.Node[]): Nodes.Node[
 
 export { predicatesWithWrappedSqlLiterals as getWrappedSqlPredicates };
 
-/**
- * Render a WhereClause's predicates as inlined SQL for human-readable
- * `Relation#inspect`. Rails has no `WhereClause#to_sql`; inlined where-SQL is
- * produced via the connection (`conn.to_sql(arel)` under
- * `unprepared_statement`), so we build the Arel AND/SqlLiteral-wrapped AST and
- * route it through the connection's visitor rather than re-quoting bind values
- * with a bespoke renderer. A free function (not a `WhereClause#toSql` method)
- * keeps SQL generation on Arel nodes + visitors, mirroring Rails which has no
- * such method on the class.
- */
-export function whereClauseToSql(
-  whereClause: WhereClause,
-  connection: { toSql(arel: unknown): string },
-): string {
-  const wrapped = predicatesWithWrappedSqlLiterals(whereClause.predicates);
-  if (wrapped.length === 0) return "";
-  const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
-  return connection.toSql(node);
-}
-
 /** @internal */
 function predicates(wc: WhereClause): Nodes.Node[] {
   return wc.predicates;
