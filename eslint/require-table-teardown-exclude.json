@@ -1,4 +1,1 @@
-[
-  "packages/activerecord/src/adapters/abstract-mysql-adapter/active-schema.test.ts",
-  "packages/activerecord/src/connection-adapters/abstract/schema-statements-on-adapter.test.ts"
-]
+["packages/activerecord/src/adapters/abstract-mysql-adapter/active-schema.test.ts"]
