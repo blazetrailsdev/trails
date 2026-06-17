@@ -178,8 +178,8 @@ await Post.createBang({ title: "x" });
 ```
 
 Related families that follow the same suffix: `toggleBang`, `incrementBang`,
-`decrementBang`, `reloadBang`, the `validatesUniqueness`/`validatesPresenceOf`
-declarations, and the enum bang setters from `defineEnum`/`Base.enum`.
+`decrementBang`, the `validatesUniqueness`/`validatesPresenceOf` declarations,
+and the enum bang setters from `defineEnum`/`Base.enum`.
 
 ### 2. Async singular-association loading (`belongsTo` / `hasOne`)
 
