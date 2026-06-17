@@ -4441,7 +4441,7 @@ describe("AssociationsTest", () => {
       shardedComments("great_comment_blog_post_two"),
     ];
 
-    const blogPosts = await ShardedBlogPost.where({ comments }).toArray();
+    const blogPosts = await ShardedBlogPost.where({ comments });
 
     const expectedPosts = [
       shardedBlogPosts("great_post_blog_one"),
@@ -4460,7 +4460,7 @@ describe("AssociationsTest", () => {
 
     const blogPosts = await ShardedBlogPost.where({
       comments: comments[comments.length - 1],
-    }).toArray();
+    });
 
     const expectedPosts = [shardedBlogPosts("great_post_blog_two")];
     expect(blogPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b)).toEqual(
@@ -4476,7 +4476,7 @@ describe("AssociationsTest", () => {
 
     const blogPosts = await ShardedBlogPost.where({
       comments: ShardedComment.where({ body: "I really enjoyed the post!" }),
-    }).toArray();
+    });
 
     expect(blogPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b)).toEqual(
       expectedPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b),
@@ -4498,7 +4498,7 @@ describe("AssociationsTest", () => {
     const expectedComments = await ShardedComment.where({
       blog_id: (blogPost as any).blog_id,
       blog_post_id: (blogPost as any).id,
-    }).toArray();
+    });
 
     let comments: any[] = [];
     const sqls = await captureSql(async () => {
@@ -4541,9 +4541,9 @@ describe("AssociationsTest", () => {
 
   it("preloads model with query constraints by explicitly configured fk and pk", async () => {
     const comment = shardedComments("great_comment_blog_post_one");
-    const comments = await ShardedComment.where({ id: (comment as any).id })
-      .preload("blogPostById")
-      .toArray();
+    const comments = await ShardedComment.where({ id: (comment as any).id }).preload(
+      "blogPostById",
+    );
     const loaded = comments[0];
     // Rails reads `comment.blog_post_by_id` from the preloaded cache and compares
     // it to the directly-loaded `comment.blog_post`; read the preloaded record
