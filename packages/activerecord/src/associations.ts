@@ -88,6 +88,7 @@ import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-
 import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
 import * as Reflection from "./reflection.js";
 import type { AssociationReflection } from "./reflection.js";
+import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { foreignKeyPresentFor } from "./associations/foreign-association.js";
 import { throughForeignKeyPresent } from "./associations/through-association.js";
 
@@ -1292,7 +1293,8 @@ export async function loadHasOne(
   } else {
     // Inline fallback: no reflection registered.
     if (Array.isArray(foreignKey)) {
-      const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
+      const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
         throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
       }
@@ -1529,7 +1531,8 @@ export async function loadHasMany(
   } else {
     // Inline fallback: no reflection (lower-level test helpers).
     if (Array.isArray(foreignKey)) {
-      const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
+      const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
         throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
       }
@@ -1566,6 +1569,29 @@ export async function loadHasMany(
 
   syncToAssociationInstance(record, assocName, results);
   return results;
+}
+
+/**
+ * Resolve the owner-side key for an inline (no-reflection) association
+ * fallback, mirroring `reflection.activeRecordPrimaryKey` semantics
+ * (reflection.rb:587 `active_record_primary_key`): for a composite-FK
+ * query_constraints owner with a scalar primary key, key on the owner's
+ * query_constraints list rather than the scalar `id`. `primaryKey` already
+ * reflects any explicit `options.primaryKey`, so only widen the default.
+ */
+function _inlineOwnerKey(
+  ctor: typeof Base,
+  options: AssociationOptions,
+  primaryKey: string | string[],
+): string | string[] {
+  if (
+    !Array.isArray(primaryKey) &&
+    options.primaryKey === undefined &&
+    (options.queryConstraints || hasQueryConstraints.call(ctor as any))
+  ) {
+    return queryConstraintsList.call(ctor as any) ?? primaryKey;
+  }
+  return primaryKey;
 }
 
 /**
