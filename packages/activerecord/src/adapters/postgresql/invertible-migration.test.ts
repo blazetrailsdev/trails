@@ -11,10 +11,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
-    await adapter.execute("DROP TABLE IF EXISTS enums").catch(() => {});
-    await adapter.execute("DROP TABLE IF EXISTS settings").catch(() => {});
-    await adapter.execute("DROP TABLE IF EXISTS bars").catch(() => {});
-    await adapter.execute("DROP TABLE IF EXISTS foos").catch(() => {});
+    await adapter.dropTable("enums", { ifExists: true }).catch(() => {});
+    await adapter.dropTable("settings", { ifExists: true }).catch(() => {});
+    await adapter.dropTable("bars", { ifExists: true }).catch(() => {});
+    await adapter.dropTable("foos", { ifExists: true }).catch(() => {});
     await adapter.dropEnum("color", { ifExists: true }).catch(() => {});
     await adapter.close();
   });
