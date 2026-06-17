@@ -4486,7 +4486,7 @@ describe("AssociationsTest", () => {
   it("has many association with composite foreign key loads records", async () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
 
-    const comments = await association(blogPost, "comments").toArray();
+    const comments = await (blogPost as any).comments;
     const ids = comments.map((c: any) => c.id);
     expect(ids).toContain((shardedComments("wow_comment_blog_post_one") as any).id);
     expect(ids).toContain((shardedComments("great_comment_blog_post_one") as any).id);
@@ -4502,7 +4502,7 @@ describe("AssociationsTest", () => {
 
     let comments: any[] = [];
     const sqls = await captureSql(async () => {
-      comments = await association(blogPost, "comments").toArray();
+      comments = await blogPost.comments;
     });
     const sql = sqls.find((s) => /sharded_comments/.test(s))!;
 
@@ -4518,8 +4518,9 @@ describe("AssociationsTest", () => {
     blogPost = await ShardedBlogPostWithRevision.find((blogPost as any).id);
 
     // Rails raises when the association is loaded (`.to_a`); trails derives the
-    // foreign key eagerly when the proxy is built, so the throw surfaces here.
-    expect(() => association(blogPost, "commentsWithoutQueryConstraints")).toThrow(
+    // foreign key eagerly when the proxy is built, so the throw surfaces on the
+    // accessor itself.
+    expect(() => blogPost.commentsWithoutQueryConstraints).toThrow(
       // Full Rails message tail (omitting the owner class name, which differs
       // between Rails `Sharded::BlogPostWithRevision` and the trails class).
       /has more than 2 attributes\. Active Record is unable to derive the query constraints for the association\. You need to explicitly define the query constraints for this association\./,
@@ -4530,7 +4531,7 @@ describe("AssociationsTest", () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
 
     const sqls = await captureSql(async () => {
-      await association(blogPost, "comments").toArray();
+      await (blogPost as any).comments;
     });
     const sql = sqls.find((s) => /sharded_comments/.test(s))!;
 
