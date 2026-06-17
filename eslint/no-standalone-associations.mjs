@@ -114,7 +114,8 @@ export function assocName(arg) {
  */
 export function siteKey(rel, node, macro) {
   const receiverArg = node.arguments[0];
-  const receiver = receiverArg && receiverArg.type === "Identifier" ? receiverArg.name : "<dynamic>";
+  const receiver =
+    receiverArg && receiverArg.type === "Identifier" ? receiverArg.name : "<dynamic>";
   return `${rel}::${receiver}::${macro}::${assocName(node.arguments[1])}`;
 }
 
@@ -220,9 +221,7 @@ const rule = {
               const stmts = block.body;
               const last = stmts[stmts.length - 1];
 
-              const indentWidth = last
-                ? last.loc.start.column
-                : block.loc.start.column + 2;
+              const indentWidth = last ? last.loc.start.column : block.loc.start.column + 2;
               const indent = " ".repeat(indentWidth);
 
               // Build `this.<macro>(<args after receiver>);` from the original

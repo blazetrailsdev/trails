@@ -97,9 +97,7 @@ tester.run("no-standalone-associations", rule, {
     // No fix: class declared AFTER the call (moving it earlier could reorder).
     {
       filename: FILENAME,
-      code:
-        "Associations.hasMany.call(P, 'cs', {});\n" +
-        "class P extends Base {\n  static {}\n}",
+      code: "Associations.hasMany.call(P, 'cs', {});\n" + "class P extends Base {\n  static {}\n}",
       errors: [{ messageId: "standaloneNoFix" }],
     },
     // No fix: ambiguous — two classes share the receiver name.
