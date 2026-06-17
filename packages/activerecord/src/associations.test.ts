@@ -4667,8 +4667,11 @@ describe("AssociationsTest", () => {
   });
 
   it("include with order works", async () => {
+    // Rails runs two order forms: `order: "id"` (raw SQL string) then
+    // `order: :id` (symbol → quoted column reference). The hash form is the
+    // trails equivalent of the symbol/column-reference form.
     await Account.all().order("id").includes("firm").first();
-    await Account.all().order("id").includes("firm").first();
+    await Account.all().order({ id: "asc" }).includes("firm").first();
   });
 
   it("bad collection keys", () => {
