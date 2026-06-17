@@ -144,16 +144,12 @@ export class RichPerson extends Base {
 
     this.hasAndBelongsToMany("treasures", { joinTable: "peoples_treasures" });
 
-    this.beforeValidation(async function (this: RichPerson) {
-      if (this.isNewRecord()) await this.runBeforeCreate();
-    });
-    this.beforeValidation(async function (this: RichPerson) {
-      await this.runBeforeValidation();
-    });
+    this.beforeValidation((record: RichPerson) => record.runBeforeCreate(), { on: "create" });
+    this.beforeValidation((record: RichPerson) => record.runBeforeValidation());
   }
 
   /** @internal */
-  private async runBeforeCreate() {
+  runBeforeCreate() {
     this.writeAttribute(
       "first_name",
       (this.readAttribute("first_name") ?? "").toString() + "run_before_create",
@@ -161,7 +157,7 @@ export class RichPerson extends Base {
   }
 
   /** @internal */
-  private async runBeforeValidation() {
+  runBeforeValidation() {
     this.writeAttribute(
       "first_name",
       (this.readAttribute("first_name") ?? "").toString() + "run_before_validation",

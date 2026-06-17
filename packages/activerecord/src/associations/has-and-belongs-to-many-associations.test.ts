@@ -914,11 +914,17 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((richPerson as any).first_name ?? null).toBeNull();
   });
 
-  it.skip("association with validate false does not run associated validation callbacks on update", () => {
-    // BLOCKED: validations — RichPerson's `before_validation` is async, and the
-    //   `RichPerson.createBang` precondition runs it on the synchronous
-    //   validation chain ("before returned a Promise"). Unrelated to HABTM;
-    //   tracked under the async-validation-callback gap.
+  it("association with validate false does not run associated validation callbacks on update", async () => {
+    const richPerson = await RichPerson.createBang({});
+    const personFirstName = (richPerson as any).first_name;
+    expect(personFirstName ?? null).not.toBeNull();
+
+    const treasure = new Treasure({});
+    await (treasure as any).richPeople.push(richPerson as any);
+    treasure.isValid();
+
+    expect(await (treasure as any).richPeople.size()).toBe(1);
+    expect((richPerson as any).first_name).toBe(personFirstName);
   });
 
   it("custom join table", async () => {
