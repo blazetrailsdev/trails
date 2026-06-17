@@ -22,7 +22,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterEach(async () => {
     // Rails: @connection.drop_table :postgresql_collations, if_exists: true
-    await adapter.execute("DROP TABLE IF EXISTS postgresql_collations");
+    await adapter.dropTable("postgresql_collations", { ifExists: true });
     await adapter.close();
   });
 

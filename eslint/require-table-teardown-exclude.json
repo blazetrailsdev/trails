@@ -1,10 +1,4 @@
 [
   "packages/activerecord/src/adapters/abstract-mysql-adapter/active-schema.test.ts",
-  "packages/activerecord/src/adapters/postgresql/collation.test.ts",
-  "packages/activerecord/src/adapters/postgresql/invertible-migration.test.ts",
-  "packages/activerecord/src/adapters/postgresql/range.test.ts",
-  "packages/activerecord/src/adapters/postgresql/schema.test.ts",
-  "packages/activerecord/src/adapters/postgresql/uuid.test.ts",
-  "packages/activerecord/src/adapters/postgresql/virtual-column.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/schema-statements-on-adapter.test.ts"
 ]

@@ -903,6 +903,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await (Article as any).create({ title: "zOMG, welcome to my blorgh!" });
       const welcome = await (Article as any).last();
       expect(welcome.title).toBe("zOMG, welcome to my blorgh!");
+      await adapter.dropTable("articles", { ifExists: true });
     });
   });
 
@@ -1005,9 +1006,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     // exercises the createTable → DDL → dump round-trip via the
     // `options:` table-option string.
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS trains`);
-      await adapter.exec(`DROP TABLE IF EXISTS transportation_modes`);
-      await adapter.exec(`DROP TABLE IF EXISTS vehicles`);
+      await adapter.dropTable("trains", { ifExists: true });
+      await adapter.dropTable("transportation_modes", { ifExists: true });
+      await adapter.dropTable("vehicles", { ifExists: true });
     });
 
     it.skipIf(!pgSupportsNativePartitioning)("list partition options is dumped", async () => {
@@ -1070,7 +1071,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("SchemaTableCommentTest", () => {
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS commented_table`);
+      await adapter.dropTable("commented_table", { ifExists: true });
     });
 
     it("table comment is dumped and round-trips via createTable", async () => {

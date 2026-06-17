@@ -50,7 +50,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   afterAll(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`).catch(() => {});
+    await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
   });
   describe("PostgresqlVirtualColumnTest", () => {
     itIfSupports("virtual_columns", "virtual column with full inserts", async () => {
@@ -109,7 +109,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           t.virtual("invalid", { type: "string", as: "LOWER(name)" });
         }),
       ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
-      await adapter.exec("DROP TABLE IF EXISTS bad_virtual").catch(() => {});
+      await adapter.dropTable("bad_virtual", { ifExists: true }).catch(() => {});
     });
 
     itIfSupports("virtual_columns", "schema dumping", async () => {

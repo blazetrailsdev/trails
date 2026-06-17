@@ -804,7 +804,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         expect(rows[0].column_default).toMatch(/gen_random_uuid/);
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_rt`);
+        await adapter.dropTable("pg_uuids_rt", { ifExists: true });
       }
     });
 

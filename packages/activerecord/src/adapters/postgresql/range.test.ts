@@ -323,7 +323,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(names).toContain("i8");
         expect(names).toContain("fr");
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS range_migration_test`);
+        await adapter.dropTable("range_migration_test", { ifExists: true });
       }
     });
     it("multirange int4", async () => {
