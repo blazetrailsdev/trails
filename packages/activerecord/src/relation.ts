@@ -113,6 +113,7 @@ import { Map as TypeCasterMap } from "./type-caster/map.js";
 import {
   WhereClause,
   getWrappedSqlPredicates as predicatesWithWrappedSqlLiterals,
+  whereClauseToSql,
 } from "./relation/where-clause.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { touchAttributesWithTime } from "./timestamp.js";
@@ -1385,7 +1386,7 @@ export class Relation<T extends Base> {
     const parts: string[] = [];
     parts.push(`${this._modelClass.name}.all`);
     if (!this._whereClause.isEmpty()) {
-      const sql = this._whereClause.toSql((this._modelClass as any).connection);
+      const sql = whereClauseToSql(this._whereClause, (this._modelClass as any).connection);
       if (sql) parts.push(`.where(${JSON.stringify(sql)})`);
     }
     if (this._orderClauses.length > 0) {
@@ -5611,7 +5612,10 @@ export class Relation<T extends Base> {
     const baseline = klass._buildUnscopedRelation?.(this._table ?? undefined);
     if (!baseline) return false;
     try {
-      return this._whereClause.toSql(connection) === baseline._whereClause.toSql(connection);
+      return (
+        whereClauseToSql(this._whereClause, connection) ===
+        whereClauseToSql(baseline._whereClause, connection)
+      );
     } catch {
       return false;
     }
