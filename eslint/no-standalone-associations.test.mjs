@@ -113,3 +113,44 @@ tester.run("no-standalone-associations", rule, {
     },
   ],
 });
+
+// ── Baseline-exclusion path: a site whose key is in the committed exclude list
+// is grandfathered and must NOT be reported. Exercises the full
+// loadExclude → siteKey → Set.has path (otherwise never hit, since the global
+// env above points at a non-existent baseline). ──
+import fs from "fs";
+import os from "os";
+import path from "path";
+
+const tmpBaseline = path.join(os.tmpdir(), `nsa-exclude-${process.pid}.json`);
+// `Associations.hasMany.call(P, "cs", {})` in FILENAME → this exact site key.
+fs.writeFileSync(tmpBaseline, JSON.stringify([`${FILENAME}::P::hasMany::cs`]));
+process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = tmpBaseline;
+
+const baselineTester = new RuleTester({
+  languageOptions: {
+    parser: (await import("typescript-eslint")).parser,
+    ecmaVersion: 2022,
+    sourceType: "module",
+  },
+});
+
+baselineTester.run("no-standalone-associations (baseline)", rule, {
+  valid: [
+    // Grandfathered site (key present in the baseline) → suppressed.
+    { filename: FILENAME, code: "Associations.hasMany.call(P, 'cs', {});" },
+  ],
+  invalid: [
+    // A different site in the same file (key NOT in the baseline) still fires —
+    // proves suppression is site-granular, not file-wide.
+    {
+      filename: FILENAME,
+      code: "Associations.hasMany.call(P, 'other', {});",
+      errors: [{ messageId: "standaloneNoFix" }],
+    },
+  ],
+});
+
+// Restore the non-existent path so any later import sees a clean slate.
+process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = "/nonexistent-exclude.json";
+fs.rmSync(tmpBaseline, { force: true });
