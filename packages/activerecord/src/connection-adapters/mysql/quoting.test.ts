@@ -114,19 +114,6 @@ describe("MySQL quoting — typeCast", () => {
   it("throws on Date — Date is no longer accepted", () => {
     expect(() => typeCast(new Date())).toThrow(TypeError);
   });
-
-  // Receiver-less `typeCast(Temporal)` must still cap fractional seconds at
-  // microseconds via MYSQL_QUOTING_HOST — the abstract dispatch fallback would
-  // otherwise emit 7–9 digits MySQL rejects in strict mode. No Rails counterpart.
-  it("caps PlainTime fractional seconds at microseconds without a receiver", () => {
-    expect(typeCast(new Temporal.PlainTime(12, 0, 0, 123, 456, 789))).toBe("12:00:00.123456");
-  });
-
-  it("caps PlainDateTime fractional seconds at microseconds without a receiver", () => {
-    expect(typeCast(new Temporal.PlainDateTime(2026, 5, 8, 14, 32, 0, 123, 456, 789))).toBe(
-      "2026-05-08 14:32:00.123456",
-    );
-  });
 });
 
 describe("MySQL quoting — quotedBinary", () => {

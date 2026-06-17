@@ -391,9 +391,9 @@ export function quotedDate(
  * range literal: `[begin,end)` or `[begin,end]` depending on excludeEnd.
  * @internal
  */
-export function encodeRange(range: Range): string {
-  const begin = typeCastRangeValue(range.begin);
-  const end = typeCastRangeValue(range.end);
+export function encodeRange(this: QuotingDispatchHost, range: Range): string {
+  const begin = typeCastRangeValue.call(this, range.begin);
+  const end = typeCastRangeValue.call(this, range.end);
   return `[${begin},${end}${range.excludeEnd ? ")" : "]"}`;
 }
 
@@ -416,8 +416,8 @@ function isSqlLiteral(value: unknown): value is { value: string } {
  * values and joins them into a PG literal string: `{v1,v2,...}`.
  * @internal
  */
-function encodeArray(arrayData: ArrayData): string {
-  const values = typeCastArray(arrayData.values);
+function encodeArray(this: QuotingDispatchHost, arrayData: ArrayData): string {
+  const values = typeCastArray.call(this, arrayData.values);
   return formatArray(values);
 }
 
@@ -451,8 +451,10 @@ function determineEncodingOfStringsInArray(_value: unknown): null {
  * on leaf values.
  * @internal
  */
-function typeCastArray(values: unknown[]): unknown[] {
-  return values.map((item) => (Array.isArray(item) ? typeCastArray(item) : typeCast(item)));
+function typeCastArray(this: QuotingDispatchHost, values: unknown[]): unknown[] {
+  return values.map((item) =>
+    Array.isArray(item) ? typeCastArray.call(this, item) : typeCast.call(this, item),
+  );
 }
 
 /**
@@ -460,8 +462,8 @@ function typeCastArray(values: unknown[]): unknown[] {
  * infinite bounds, otherwise delegates to typeCast.
  * @internal
  */
-function typeCastRangeValue(value: unknown): unknown {
-  return isInfinity(value) ? "" : typeCast(value);
+function typeCastRangeValue(this: QuotingDispatchHost, value: unknown): unknown {
+  return isInfinity(value) ? "" : typeCast.call(this, value);
 }
 
 /**

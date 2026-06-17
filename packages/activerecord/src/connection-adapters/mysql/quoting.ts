@@ -19,7 +19,6 @@ import {
 } from "../abstract/sql-datetime.js";
 import {
   quote as abstractQuote,
-  quotedTime as abstractQuotedTime,
   dispatchQuotedDate,
   dispatchQuotedTime,
   type QuotingDispatchHost,
@@ -250,20 +249,6 @@ export function quotedDate(
 }
 
 /**
- * Default dispatch host for receiver-less `quote(value)` / `typeCast(value)`
- * calls, so date/time literals still reach MySQL's microsecond-capping
- * `quotedDate`. `quotedTime` re-runs the abstract helper bound to this host so
- * its internal `quoted_date` dispatch also lands on the MySQL formatter. Mirrors
- * SQLite's `SQLITE_QUOTING_HOST`.
- */
-const MYSQL_QUOTING_HOST: QuotingDispatchHost = {
-  quotedDate,
-  quotedTime(value) {
-    return abstractQuotedTime.call(MYSQL_QUOTING_HOST, value);
-  },
-};
-
-/**
  * Cast a value to the primitive form MySQL drivers expect for binds.
  * Booleans become 1/0; Temporal types are formatted as unquoted
  * `YYYY-MM-DD HH:MM:SS[.ffffff]` strings (it's `quote()`'s job to
@@ -283,17 +268,16 @@ export function typeCast(this: QuotingDispatchHost | void, value: unknown): unkn
   if (value instanceof BigDecimal) return value.toString("F");
   // Rails dispatches date/time through `self.quoted_time` / `self.quoted_date`
   // (abstract/quoting.rb:93-101); thread `this` so MySQL's microsecond-capping
-  // `quotedDate` override is honored here too. Receiver-less calls fall back to
-  // MYSQL_QUOTING_HOST so the µs cap still applies (abstract helpers emit ns).
-  const host = this && typeof this === "object" ? this : MYSQL_QUOTING_HOST;
-  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(host, value);
+  // `quotedDate` override is honored here. Always invoked with an adapter
+  // receiver — the standalone is never called receiver-less.
+  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
     value instanceof Temporal.ZonedDateTime
   ) {
-    return dispatchQuotedDate(host, value);
+    return dispatchQuotedDate(this, value);
   }
   if (value instanceof Date)
     throw new TypeError(
