@@ -16,8 +16,10 @@ import {
   DeveloperFilteredOnJoins,
 } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Post } from "../test-helpers/models/post.js";
-import { Comment } from "../test-helpers/models/comment.js";
+import { Post, FirstPost, SpecialPostWithDefaultScope } from "../test-helpers/models/post.js";
+import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
+import { Author } from "../test-helpers/models/author.js";
+import { association } from "../associations.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Reference, BadReference } from "../test-helpers/models/reference.js";
 
@@ -28,6 +30,10 @@ registerModel(Comment);
 registerModel(Person);
 registerModel(Reference);
 registerModel(BadReference);
+registerModel(Author);
+registerModel(FirstPost);
+registerModel(SpecialPostWithDefaultScope);
+registerModel(SpecialComment);
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -37,8 +43,17 @@ useHandlerTransactionalFixtures();
 // has-many forwarding cases, people/references for BadReference default scope).
 // The file's older bespoke tests ride prefixed throwaway tables (`rg_developers`,
 // `rg_posts`, `*_posts`) so seeded canonical rows never pollute their counts.
-const { developers, people, references } = useFixtures(
-  ["developers", "projects", "developersProjects", "posts", "comments", "people", "references"],
+const { developers, people, references, authors } = useFixtures(
+  [
+    "developers",
+    "projects",
+    "developersProjects",
+    "authors",
+    "posts",
+    "comments",
+    "people",
+    "references",
+  ],
   () => Base.connection as any,
   { schema: canonicalSchema },
 );
@@ -85,15 +100,34 @@ describe("RelationScopingTest", () => {
     return Developer;
   }
 
-  it.skip("unscoped breaks caching", () => {
-    // BLOCKED: `FirstPost.unscoped { author.reload.first_post }` must invalidate
-    // the cached singular association so the default-scope-lifted read re-runs.
-    // trails returns the stale nil cache. Needs unscoped-block cache invalidation.
+  it("unscoped breaks caching", async () => {
+    const author = authors("mary");
+    expect(await author.loadHasOne("firstPost")).toBeNull();
+    const post = await FirstPost.unscoped(async () => {
+      await author.reload();
+      return author.loadHasOne("firstPost");
+    });
+    expect(post).not.toBeNull();
   });
 
-  it.skip("scope breaks caching on collections", () => {
-    // BLOCKED: same root cause — `SpecialPostWithDefaultScope.unscoped { ... }`
-    // must bust the cached collection so the unscoped reload re-queries.
+  it("scope breaks caching on collections", async () => {
+    let author = authors("david");
+    await author.reload();
+    const ids = (await association(author, "specialPostsWithDefaultScope").toArray()).map(
+      (p: any) => p.id,
+    );
+    expect(ids.sort((a: number, b: number) => a - b)).toEqual([1, 5, 6]);
+    const scopedPosts = await SpecialPostWithDefaultScope.unscoped(async () => {
+      author = authors("david");
+      await author.reload();
+      return association(author, "specialPostsWithDefaultScope").toArray();
+    });
+    const expected = (await association(author, "posts").toArray())
+      .map((p: any) => p.id)
+      .sort((a: number, b: number) => a - b);
+    expect(scopedPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b)).toEqual(
+      expected,
+    );
   });
 
   it("reverse order", () => {
@@ -373,10 +407,14 @@ describe("RelationScopingTest", () => {
     expect(post!.title).toBe("David");
   });
 
-  it.skip("scoped find include", () => {
-    // BLOCKED: `Developer.includes(:projects).scoping { where("projects.id" => 2) }`
-    // requires the eager-load JOIN built by the scoped relation to be visible to
-    // the inner where referencing the included table. Needs includes-scoping parity.
+  it("scoped find include", async () => {
+    // with the include, will retrieve only developers for the given project
+    const scopedDevelopers = (await CanonicalDeveloper.includes("projects").scoping(async () =>
+      CanonicalDeveloper.where({ "projects.id": 2 }).toArray(),
+    )) as Base[];
+    expect(scopedDevelopers.map((d: any) => d.id)).toContain(developers("david").id);
+    expect(scopedDevelopers.map((d: any) => d.id)).not.toContain(developers("jamis").id);
+    expect(scopedDevelopers.length).toBe(1);
   });
 
   it("scoped find joins", async () => {
@@ -523,10 +561,12 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("scoping respects sti constraint", () => {
-    // BLOCKED: STI find — subclass `find(id)` does not enforce the type
-    // constraint at query time, so `SpecialComment.find(id_of_plain)` returns
-    // a record instead of raising RecordNotFound.
+  it("scoping respects sti constraint", async () => {
+    await Comment.unscoped(async () => {
+      const comment = (await Comment.find(1)) as Base;
+      expect(comment.id).toBe(1);
+      await expect(SpecialComment.find(1)).rejects.toThrow(RecordNotFound);
+    });
   });
 
   it("scoping with klass method works in the scope block", async () => {
