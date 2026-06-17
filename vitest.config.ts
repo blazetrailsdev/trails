@@ -194,10 +194,45 @@ const alias = {
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
 };
 
+// Reporting-only code-coverage config (v8 provider — no instrumentation step,
+// faster than istanbul). Wired into the non-blocking `Coverage` CI job, which
+// passes `--coverage` (and `--coverage.all` to count untested files in the
+// denominator). No `thresholds` key is set, so coverage NEVER fails the build.
+//
+// activerecord / activerecord-cli are excluded from the baseline: their suite
+// forks 6 workers and dominates CI time, so AR coverage is tracked as a
+// separate opt-in follow-up rather than folded into the light-package baseline.
+// website is excluded (built, not unit-tested here).
+const COVERAGE_INCLUDE = ["packages/*/src/**/*.ts", "packages/*/src/**/*.mts"];
+const COVERAGE_EXCLUDE = [
+  "**/*.test.ts",
+  "**/*.test.mts",
+  "**/*.d.ts",
+  "**/dist/**",
+  "**/__snapshots__/**",
+  "**/test-helpers/**",
+  "**/test-support/**",
+  "**/*.config.ts",
+  "packages/website/**",
+  "packages/activerecord/**",
+  "packages/activerecord-cli/**",
+  "packages/*/dx-tests/**",
+  "packages/*/virtualized-dx-tests/**",
+];
+
 export default defineConfig({
   resolve: { alias },
   test: {
     globals: true,
+    coverage: {
+      provider: "v8",
+      // text-summary → CI log; json-summary → parsed into the step summary;
+      // json + lcov → uploaded as artifacts for external tooling.
+      reporter: ["text-summary", "json-summary", "json", "lcov"],
+      reportsDirectory: "./coverage",
+      include: COVERAGE_INCLUDE,
+      exclude: COVERAGE_EXCLUDE,
+    },
     projects: [
       {
         // All activerecord tests. Each fork gets its own database (rails_js_test_N

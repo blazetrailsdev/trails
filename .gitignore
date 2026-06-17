@@ -40,3 +40,6 @@ file:trails_test_*
 
 # ESLint rule unit-test scratch fixtures (rails-error-parity / rails-arel-tosql)
 eslint/.tmp-*.json
+
+# vitest coverage reports (reporting-only CI job)
+coverage/
