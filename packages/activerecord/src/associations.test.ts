@@ -247,6 +247,10 @@ describe("AssociationsTest", () => {
       static {
         this._tableName = "el_parents";
         this.attribute("name", "string");
+        this.hasMany("elChildren", {
+          foreignKey: "el_parent_id",
+          className: "ELChild",
+        });
       }
     }
     class ELChild extends Base {
@@ -256,10 +260,6 @@ describe("AssociationsTest", () => {
         this.attribute("el_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(ELParent, "elChildren", {
-      foreignKey: "el_parent_id",
-      className: "ELChild",
-    });
     registerModel("ELParent", ELParent);
     registerModel("ELChild", ELChild);
     const parent = await ELParent.create({ name: "p1" });
@@ -278,6 +278,10 @@ describe("AssociationsTest", () => {
       static {
         this._tableName = "d_posts";
         this.attribute("title", "string");
+        this.hasMany("dComments", {
+          foreignKey: "d_post_id",
+          className: "DComment",
+        });
       }
     }
     class DComment extends Base {
@@ -287,10 +291,6 @@ describe("AssociationsTest", () => {
         this.attribute("d_post_id", "integer");
       }
     }
-    Associations.hasMany.call(DPost, "dComments", {
-      foreignKey: "d_post_id",
-      className: "DComment",
-    });
     registerModel("DPost", DPost);
     registerModel("DComment", DComment);
     const post = await DPost.create({ title: "test" });
