@@ -4626,15 +4626,15 @@ describe("AssociationsTest", () => {
 
   it("eager loading should not change count of children", async () => {
     const liquid = await Liquid.create({ name: "salty" });
-    const molecule = await association(liquid, "molecules").create({ name: "molecule_1" });
-    await association(molecule, "electrons").create({ name: "electron_1" });
-    await association(molecule, "electrons").create({ name: "electron_2" });
+    const molecule = await (liquid as any).molecules.create({ name: "molecule_1" });
+    await (molecule as any).electrons.create({ name: "electron_1" });
+    await (molecule as any).electrons.create({ name: "electron_2" });
 
     const liquids = await Liquid.includes({ molecules: "electrons" })
       .references("molecules")
       .where("molecules.id is not null")
       .toArray();
-    expect((await association(liquids[0], "molecules").toArray()).length).toBe(1);
+    expect((await (liquids[0] as any).molecules.toArray()).length).toBe(1);
   });
 
   it("subselect", async () => {
@@ -4648,30 +4648,37 @@ describe("AssociationsTest", () => {
 
   it("loading the association target should keep child records marked for destruction", async () => {
     const ship = await Ship.create({ name: "The good ship Dollypop" });
-    const part = await association(ship, "parts").create({ name: "Mast" });
+    const part = await (ship as any).parts.create({ name: "Mast" });
     markForDestruction(part);
     // Rails `ship.parts[0]` loads the target preserving in-memory records
     // (marked-for-destruction kept); `load()` merges in-memory over DB rows.
-    const parts = await association(ship, "parts").load();
+    const parts = await (ship as any).parts.load();
     expect(isMarkedForDestruction(parts[0])).toBe(true);
   });
 
   it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
     const ship = await Ship.create({ name: "The good ship Dollypop" });
-    const part = await association(ship, "parts").create({ name: "Mast" });
+    const part = await (ship as any).parts.create({ name: "Mast" });
     markForDestruction(part);
     const reloaded = await ShipPart.find((part as any).id as number);
     await reloaded.updateColumn("name", "Deck");
-    const parts = await association(ship, "parts").load();
+    const parts = await (ship as any).parts.load();
     expect(parts[0].name).toBe("Deck");
   });
 
   it("include with order works", async () => {
-    // Rails runs two order forms: `order: "id"` (raw SQL string) then
-    // `order: :id` (symbol → quoted column reference). The hash form is the
-    // trails equivalent of the symbol/column-reference form.
-    await Account.all().order("id").includes("firm").first();
-    await Account.all().order({ id: "asc" }).includes("firm").first();
+    // Rails wraps both calls in `assert_nothing_raised` and runs two order
+    // forms: `order: "id"` (raw SQL string) then `order: :id` (symbol → quoted
+    // column reference). The hash form is the trails equivalent of the
+    // symbol/column-reference form.
+    let raised: unknown;
+    try {
+      await Account.all().order("id").includes("firm").first();
+      await Account.all().order({ id: "asc" }).includes("firm").first();
+    } catch (e) {
+      raised = e;
+    }
+    expect(raised).toBeUndefined();
   });
 
   it("bad collection keys", () => {
