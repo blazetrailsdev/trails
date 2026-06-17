@@ -617,6 +617,14 @@ export class CollectionAssociation extends Association {
     const fk = this.reflection.options.foreignKey;
     if (typeof fk === "string") return [fk];
     if (Array.isArray(fk)) return fk;
+    // Prefer the reflection's foreign key, derived from the class that
+    // *declared* the association (`reflection.active_record`), not the owner
+    // instance's class. For an STI subclass owner (e.g. a `SpecialPost` whose
+    // `has_many :special_comments` is declared on `Post`) this yields
+    // `post_id`, not `special_post_id` — mirrors Rails `reflection.foreign_key`.
+    const reflectionFk = (this.reflection as any).foreignKey;
+    if (typeof reflectionFk === "string") return [reflectionFk];
+    if (Array.isArray(reflectionFk)) return reflectionFk;
     const ctor = this.owner.constructor as any;
     if (this.reflection.options.as) {
       return [`${underscore(this.reflection.options.as)}_id`];
