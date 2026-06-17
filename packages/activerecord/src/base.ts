@@ -1929,7 +1929,17 @@ export class Base extends Model {
   ): Relation<InstanceType<T>> {
     const scope = this.currentScope;
     if (scope) {
-      return scope._clone();
+      // Rails' `all`: `self == current_scope.klass ? current_scope.clone :
+      // relation.merge!(current_scope)`. When the current scope was set on a
+      // superclass (an STI subclass reading a scope installed on its base, e.g.
+      // inside `Comment.unscoped { SpecialComment.find(1) }`), build this
+      // class's own relation — which carries the STI `type_condition` — and
+      // merge the inherited scope into it, rather than cloning the parent's
+      // type-unconstrained relation.
+      if ((scope as any)._modelClass === this) {
+        return scope._clone();
+      }
+      return this._buildUnscopedRelation().merge(scope);
     }
     return this._buildDefaultRelation(options?.allQueries);
   }
