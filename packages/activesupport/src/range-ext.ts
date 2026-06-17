@@ -43,7 +43,8 @@ export function overlap<T extends number | Date>(a: Range<T>, b: Range<T>): bool
 export const overlaps = overlap; // alias
 
 /**
- * include? — returns true if range includes another range or value.
+ * cover? — returns true if a numeric/date range covers a scalar value
+ * (endpoint comparison via `<=>`).
  */
 export function rangeIncludesValue<T extends number | Date>(range: Range<T>, value: T): boolean {
   const toNum = (v: T): number => (v instanceof Date ? v.getTime() : (v as number));
@@ -52,6 +53,28 @@ export function rangeIncludesValue<T extends number | Date>(range: Range<T>, val
   if (range.begin !== null && n < toNum(range.begin)) return false;
   if (range.end !== null) {
     if (range.excludeEnd ? n >= toNum(range.end) : n > toNum(range.end)) return false;
+  }
+  return true;
+}
+
+/**
+ * String `Range#include?` — membership in the `succ`-enumerated sequence from
+ * `begin` to `end`, NOT a plain lexicographic cover. Ruby enumerates string
+ * ranges by `String#succ`, which orders strings length-first then
+ * lexicographically (so `("a".."bbb").include?("z")` is true even though
+ * `"z" > "bbb"` lexically — `"z"` is shorter, so it sorts before `"bbb"`).
+ * Equivalent to: `begin <= value <= end` in succ order (length, then lex).
+ */
+export function rangeIncludesStringValue(range: Range<string>, value: string): boolean {
+  // succ order: shorter strings sort first; equal-length ties break by the
+  // ordinary code-unit comparison Ruby's `String#<=>` uses.
+  const succCmp = (a: string, b: string): number =>
+    a.length !== b.length ? a.length - b.length : a < b ? -1 : a > b ? 1 : 0;
+
+  if (range.begin !== null && succCmp(value, range.begin) < 0) return false;
+  if (range.end !== null) {
+    const c = succCmp(value, range.end);
+    if (range.excludeEnd ? c >= 0 : c > 0) return false;
   }
   return true;
 }
