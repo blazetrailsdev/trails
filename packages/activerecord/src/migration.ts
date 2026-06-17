@@ -2328,7 +2328,16 @@ export class MigrationContext {
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
     const unique = options?.unique ?? false;
-    const indexName = options?.name ?? `index_${table}_on_${cols.join("_and_")}`;
+    // Rails derives the default name from `index_name_options`: an expression
+    // column (a String with non-word chars, e.g. "(lower(external_id))") is
+    // reduced to its `\w+` runs joined by "_", not the raw parenthesised SQL.
+    // Matching `addIndexOptions`/`indexNameOptions` keeps the name identical
+    // across the direct addIndex and schema dump/reload (loadSchema) paths.
+    const nameParts =
+      cols.length === 1 && /\W/.test(cols[0])
+        ? [cols[0].match(/\w+/g)?.join("_") ?? cols[0]]
+        : cols;
+    const indexName = options?.name ?? `index_${table}_on_${nameParts.join("_and_")}`;
     const an = this._adapterName;
     // MySQL FULLTEXT/SPATIAL indexes replace the UNIQUE keyword and ignore it.
     const typeStr = an === "mysql" && options?.type ? `${options.type.toUpperCase()} ` : "";
