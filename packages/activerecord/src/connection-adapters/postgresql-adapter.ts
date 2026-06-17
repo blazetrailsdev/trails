@@ -2208,7 +2208,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async exec(sql: string): Promise<void> {
     await this.withRawConnection(async (conn) => {
-      await (conn as unknown as pg.Client).query(sql);
+      try {
+        await (conn as unknown as pg.Client).query(sql);
+      } catch (e) {
+        // The bare driver `exec()` is the DDL path for schema statements.
+        // Unlike `execute()`/`executeMutation()`, it bypasses bind rewriting,
+        // but server-side rejections (e.g. SQLSTATE 42804 "cannot be cast
+        // automatically" from a bad change_column) must still surface as
+        // ActiveRecord::StatementInvalid, not a raw pg driver error.
+        throw this._translateException(e, sql, []);
+      }
     });
   }
 
