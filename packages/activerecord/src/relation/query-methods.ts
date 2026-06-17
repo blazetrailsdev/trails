@@ -1356,12 +1356,12 @@ function reverseOrderBang(this: QueryMethodsHost): any {
         const reversed = reverseSqlOrder.call(this, [clause]) as string[];
         return { raw: reversed.join(", ") };
       }
-      if (/[(),]/.test(clause) || /\bCASE\b/i.test(clause)) {
-        throw new IrreversibleOrderError(
-          `Relation has a non-reversible order and cannot be reversed: ${clause}`,
-        );
+      // Bare column flips to a quoted desc tuple; any SQL expression goes through reverseSqlOrder.
+      if (/^[\w.]+$/.test(clause)) {
+        return [clause, "desc" as const];
       }
-      return [clause, "desc" as const];
+      const reversed = reverseSqlOrder.call(this, [clause]) as string[];
+      return { raw: reversed.join(", ") };
     }
     const [col, dir] = clause;
     return [col, dir === "asc" ? "desc" : "asc"] as [string, "asc" | "desc"];

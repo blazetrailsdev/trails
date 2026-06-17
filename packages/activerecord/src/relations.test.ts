@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from "vitest";
-import { Base, Relation, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  RecordNotFound,
+  SoleRecordExceeded,
+  IrreversibleOrderError,
+} from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -5012,8 +5019,9 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order("title").reverseOrder().toSql();
-    expect(sql).toContain("DESC");
+    // Rails: Topic.order(Arel.sql("length(title)")).reverse_order — balanced-paren is reversible.
+    const sql = Post.order("LENGTH(title)").reverseOrder().toSql();
+    expect(sql).toContain("LENGTH(title) DESC");
   });
 
   it("reverse arel assoc order with multiargument function", () => {
@@ -5028,8 +5036,10 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order("title ASC NULLS FIRST").reverseOrder().toSql();
-    expect(sql).toContain("ORDER BY");
+    // Rails does_not_support_reverse? raises IrreversibleOrderError on "nulls first/last".
+    expect(() => Post.order("title ASC NULLS FIRST").reverseOrder().toSql()).toThrow(
+      IrreversibleOrderError,
+    );
   });
 
   it("default reverse order on table without primary key", async () => {

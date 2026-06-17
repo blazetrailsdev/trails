@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { sql, Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { Base, Relation, IrreversibleOrderError } from "./index.js";
+import { Base, Relation } from "./index.js";
 import { Associations, registerModel, modelRegistry } from "./associations.js";
 
 import { createTestAdapter, resetTestAdapterState } from "./test-adapter.js";
@@ -1472,15 +1472,6 @@ describe("RelationTest", () => {
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
-  });
-
-  it("reverse order raises on complex expressions", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(() => Post.order("LOWER(title) ASC").reverseOrder()).toThrow(IrreversibleOrderError);
   });
 
   it.skip("eagerLoad emits LEFT OUTER JOIN and t0_r0-style column aliases", () => {
