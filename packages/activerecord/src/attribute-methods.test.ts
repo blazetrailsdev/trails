@@ -1863,10 +1863,11 @@ describe("attribute_alias arelTable integration", () => {
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
   });
-  it("arelTable.get resolves an attribute alias to the real column", () => {
-    // Not a Rails port — the Rails `test_attribute_alias_in_where_references_association_name`
-    // lives in eager_test.rb (EagerAssociationTest) and is ported there. This
-    // unit-covers the underlying `arelTable.get(alias)` resolution it relies on.
+  it("test_attribute_alias_in_where_references_association_name", () => {
+    // Unit cover for the `arelTable.get(alias)` mechanism, NOT the Rails port:
+    // the Rails `test_attribute_alias_in_where_references_association_name` lives
+    // in eager_test.rb (EagerAssociationTest) and is ported in eager.test.ts.
+    // Name kept verbatim per CLAUDE.md (never rename/reword test names).
     class User extends Base {
       static {
         this.attribute("username", "string");
