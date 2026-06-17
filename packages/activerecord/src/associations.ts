@@ -1572,15 +1572,6 @@ export async function loadHasMany(
 }
 
 /**
- * Compute the WHERE condition hash that scopes a hasMany relation to its
- * owner. Returns null if primary key values are missing (Rails'
- * NullRelation fallback). Pure — no Relation construction.
- *
- * Shared by `buildHasManyRelation` (which wraps it in `all().where(...)`)
- * and CollectionProxy's constructor (which seeds its own where-clause
- * via the same condition).
- */
-/**
  * Resolve the owner-side key for an inline (no-reflection) association
  * fallback, mirroring `reflection.activeRecordPrimaryKey` semantics
  * (reflection.rb:587 `active_record_primary_key`): for a composite-FK
@@ -1603,6 +1594,15 @@ function _inlineOwnerKey(
   return primaryKey;
 }
 
+/**
+ * Compute the WHERE condition hash that scopes a hasMany relation to its
+ * owner. Returns null if primary key values are missing (Rails'
+ * NullRelation fallback). Pure — no Relation construction.
+ *
+ * Shared by `buildHasManyRelation` (which wraps it in `all().where(...)`)
+ * and CollectionProxy's constructor (which seeds its own where-clause
+ * via the same condition).
+ */
 export function computeHasManyWhere(
   record: Base,
   assocName: string,
