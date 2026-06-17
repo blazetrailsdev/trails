@@ -86,8 +86,13 @@ export function toParam(this: Identifiable): string | null {
  * Mirrors: ActiveRecord::Integration#max_updated_column_timestamp
  */
 function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
+  // Mirrors Rails timestamp.rb:163-167 — reads `timestamp_attributes_for_update_in_model`,
+  // which maps updated_at/updated_on through `attribute_aliases` to the real
+  // column (e.g. Developer's updated_at → legacy_updated_at) before reading.
+  const aliases: Record<string, string> = (record.constructor as any)?._attributeAliases ?? {};
   const candidates: TemporalTimestamp[] = [];
-  for (const col of ["updated_at", "updated_on"] as const) {
+  for (const name of ["updated_at", "updated_on"] as const) {
+    const col = aliases[name] ?? name;
     if (record.hasAttribute?.(col)) {
       const val = record._readAttribute(col);
       if (val instanceof Temporal.Instant) {
@@ -140,7 +145,10 @@ export function cacheVersion(this: Identifiable): string | null {
   if (!klass.cacheVersioning) return null;
 
   if ((this as any).hasAttribute?.("updated_at")) {
-    const val = this._readAttribute("updated_at");
+    // Mirrors Rails integration.rb:101-107 — reads `updated_at` via the
+    // alias-aware reader, so models aliasing updated_at to a real column
+    // (e.g. legacy_updated_at) still resolve their cache version.
+    const val = this.readAttribute("updated_at");
     if (val instanceof Temporal.Instant) {
       const fmt: string = klass.cacheTimestampFormat ?? "usec";
       return formatTimestamp(val, fmt);

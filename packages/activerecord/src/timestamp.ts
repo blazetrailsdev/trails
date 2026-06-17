@@ -66,11 +66,14 @@ export async function touch(
     }
   }
 
-  const touchColSet = new Set<string>();
-  if (ctor._attributeDefinitions.has("updated_at")) touchColSet.add("updated_at");
-  for (const name of resolvedNames) {
-    if (ctor._attributeDefinitions.has(name)) touchColSet.add(name);
-  }
+  // Mirrors Rails Persistence#touch (persistence.rb:797-803):
+  //   attribute_names = timestamp_attributes_for_update_in_model
+  //   attribute_names = (attribute_names | names)...
+  // Start from the same alias-resolved, columnNames()-filtered set the readonly
+  // check above iterates (updateTimestampAttrs) so the two never diverge, then
+  // union in the caller-supplied names unconditionally — Rails adds them with no
+  // column-existence guard, letting the DB raise on a nonexistent column.
+  const touchColSet = new Set<string>([...updateTimestampAttrs, ...resolvedNames]);
   const touchCols = Array.from(touchColSet);
 
   if (touchCols.length === 0) return false;
@@ -227,7 +230,11 @@ export function timestampAttributesForCreateInModel(this: TimestampHost): string
   const names =
     typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
   const cols = new Set(names);
-  this._timestampAttributesForCreateInModel = CREATED_ATTRS.filter((a) => cols.has(a));
+  // Mirrors Rails timestamp.rb:64-66 — intersect the *alias-resolved* timestamp
+  // attributes (e.g. created_at → legacy_created_at) with the model's columns.
+  this._timestampAttributesForCreateInModel = timestampAttributesForCreate
+    .call(this)
+    .filter((a) => cols.has(a));
   return this._timestampAttributesForCreateInModel;
 }
 
@@ -236,7 +243,11 @@ export function timestampAttributesForUpdateInModel(this: TimestampHost): string
   const names =
     typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
   const cols = new Set(names);
-  this._timestampAttributesForUpdateInModel = UPDATED_ATTRS.filter((a) => cols.has(a));
+  // Mirrors Rails timestamp.rb:69-72 — intersect the *alias-resolved* timestamp
+  // attributes (e.g. updated_at → legacy_updated_at) with the model's columns.
+  this._timestampAttributesForUpdateInModel = timestampAttributesForUpdate
+    .call(this)
+    .filter((a) => cols.has(a));
   return this._timestampAttributesForUpdateInModel;
 }
 
