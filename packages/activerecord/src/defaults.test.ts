@@ -94,6 +94,21 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
     );
   });
 
+  // Trails-specific: Rails reads SHOW FULL FIELDS (varchar Default is unquoted
+  // natively), but the trails columns() path reflects via information_schema,
+  // where MariaDB reports string literal defaults single-quoted. columns() must
+  // strip the outer quotes so the dump matches `a varchar field`, not
+  // `'a varchar field'`. `char2` is created unconditionally (no expression-default
+  // support needed), so this assertion is not gated on `supportsDefaultExpression`.
+  // MySQL 8 already reflects unquoted; the strip is gated on MariaDB.
+  it("schema dump includes unquoted string literal default", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "defaults",
+    );
+    expect(output).toMatch(/t\.string\("char2", \{ limit: 50, default: "a varchar field" \}\)/);
+  });
+
   itIfSupports(
     "default_expression",
     "schema dump includes default expression with single quotes reflected correctly",
