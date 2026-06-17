@@ -883,6 +883,40 @@ describe("DefaultScopingTest", () => {
     });
   });
 
+  // Write-path sibling of the read/scope STI fix above: build / push /
+  // nullify on an STI subclass owner must derive the foreign key from the
+  // class that *declared* the association (`Post` → `post_id`), not the
+  // owner instance's class (`SpecialPost` → `special_post_id`). Mirrors
+  // Rails using `reflection.foreign_key` on every write path.
+  it("sti association write paths use the declaring-class foreign key", async () => {
+    const post = posts("thinking") as any;
+    expect(post.constructor.name).toBe("SpecialPost");
+
+    await (SpecialComment as any).unscoped(async () => {
+      // CollectionProxy#build (_buildRaw)
+      const built = post.specialComments.build({ body: "built sti comment" });
+      expect(built._readAttribute("post_id")).toBe(post.id);
+
+      // CollectionAssociation#setOwnerAttributes → foreignKeyColumns. Exercise
+      // it on a record built outside the association so no scope_for_create FK
+      // masks the column actually written by setOwnerAttributes.
+      const assoc = post.association("specialComments");
+      const fresh = new SpecialComment({ body: "fresh sti comment" });
+      assoc.setOwnerAttributes(fresh);
+      expect(fresh._readAttribute("post_id")).toBe(post.id);
+
+      // The nullify update (computeNullifiedOwnerAttributes) keys the
+      // declaring-class FK, not `special_post_id`.
+      expect(Object.keys(assoc.computeNullifiedOwnerAttributes())).toEqual(["post_id"]);
+
+      // CollectionProxy#push (insert_record)
+      const pushed = new SpecialComment({ body: "pushed sti comment" });
+      await post.specialComments.push(pushed);
+      expect(pushed._readAttribute("post_id")).toBe(post.id);
+      expect(pushed.isNewRecord()).toBe(false);
+    });
+  });
+
   // `unscope({ where: "title" })` strips only the default-scope `title`
   // predicate; the implicit STI `type IN (...)` condition survives.
   it("sti conditions are not carried in default scope", async () => {

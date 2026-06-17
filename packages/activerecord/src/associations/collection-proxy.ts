@@ -783,6 +783,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._replaceOnTarget(record, { skipCallbacks: true });
   }
 
+  /**
+   * Owner FK column(s) from the reflection, which derives them from the class
+   * that *declared* the association (`reflection.active_record`), not the owner
+   * instance's class. For an STI subclass owner (e.g. a `SpecialPost` whose
+   * `has_many :special_comments` is declared on `Post`) this yields `post_id`,
+   * not `special_post_id` — mirrors Rails `reflection.foreign_key`. Returns
+   * undefined for anonymous inline associations with no registered reflection,
+   * so callers fall back to the owner-class derivation.
+   * @internal
+   */
+  private _reflectionForeignKey(): string | string[] | undefined {
+    const ctor = this._record.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+    };
+    return ctor._reflectOnAssociation?.(this._assocName)?.foreignKey ?? undefined;
+  }
+
   private _buildRaw(attrs: Record<string, unknown> = {}): Base {
     const ctor = this._record.constructor as typeof Base;
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
@@ -790,8 +807,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Polymorphic "as" option
     const asName = this._assocDef.options.as;
     const foreignKey = asName
-      ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
-      : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
+      ? (this._assocDef.options.foreignKey ??
+        this._reflectionForeignKey() ??
+        `${underscore(asName)}_id`)
+      : (this._assocDef.options.foreignKey ??
+        this._reflectionForeignKey() ??
+        `${underscore(ctor.name)}_id`);
 
     const buildAttrs: Record<string, unknown> = {
       ...attrs,
@@ -1572,8 +1593,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const asName = this._assocDef.options.as;
     let primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const foreignKey = asName
-      ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
+      ? (this._assocDef.options.foreignKey ??
+        this._reflectionForeignKey() ??
+        `${underscore(asName)}_id`)
       : (this._assocDef.options.foreignKey ??
+        this._reflectionForeignKey() ??
         this._assocDef.options.queryConstraints ??
         (Array.isArray(primaryKey)
           ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
@@ -1616,6 +1640,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         record._writeAttribute(foreignKey as string, pkValue);
       }
       if (typeCol) record._writeAttribute(typeCol, ctor.name);
+
       return record.save();
     };
     for (const record of records) {
@@ -2020,8 +2045,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const asName = this._assocDef.options.as;
     const ownerPk = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const foreignKey = asName
-      ? (this._assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
+      ? (this._assocDef.options.foreignKey ??
+        this._reflectionForeignKey() ??
+        `${underscore(asName)}_id`)
       : (this._assocDef.options.foreignKey ??
+        this._reflectionForeignKey() ??
         this._assocDef.options.queryConstraints ??
         (Array.isArray(ownerPk)
           ? ownerPk.map((col: string) => `${underscore(ctor.name)}_${col}`)
@@ -2155,6 +2183,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
     const foreignKey =
       this._assocDef.options.foreignKey ??
+      this._reflectionForeignKey() ??
       this._assocDef.options.queryConstraints ??
       (asName
         ? `${underscore(asName)}_id`
