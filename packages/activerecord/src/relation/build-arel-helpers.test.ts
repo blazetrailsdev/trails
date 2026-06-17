@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { Base, Relation, UnmodifiableRelation } from "../index.js";
+import { Base, Relation, UnmodifiableRelation, registerModel } from "../index.js";
 import { createSidecarTestAdapter } from "../test-adapter.js";
 
 class Post extends Base {
@@ -192,5 +192,46 @@ describe("Relation#offset float truncation", () => {
   it("emits OFFSET 1 in SQL when offset(1.7) is called", () => {
     const sql = relation().offset(1.7).toSql();
     expect(sql).toContain("OFFSET 1");
+  });
+});
+
+// Regression guard for RFC 0030 where-hash-keys-resolve-to-join-alias: a
+// first-occurrence join referenced by a where-hash key is re-aliased to the
+// reference name (Rails make_constraints → aliased_table_for) AND the where-hash
+// key resolves to that same alias, so JOIN and WHERE stay in sync. Pins the SQL
+// shape so a future change that touches one side (joinTableAliasFor) but not the
+// other (_applyReferencedAlias) can't silently desync while behavioral counts
+// still match.
+describe("where-hash key resolves to the referenced join alias", () => {
+  class HaPet extends Base {
+    static _tableName = "da_pets";
+    static {
+      this.hasMany("toys", { className: "HaToy", foreignKey: "pet_id" });
+    }
+  }
+  HaPet.attribute("id", "integer");
+  HaPet.attribute("name", "string");
+  HaPet.adapter = createSidecarTestAdapter().adapter;
+  class HaToy extends Base {
+    static _tableName = "da_toys";
+  }
+  HaToy.attribute("id", "integer");
+  HaToy.attribute("name", "string");
+  HaToy.attribute("pet_id", "integer");
+  HaToy.adapter = createSidecarTestAdapter().adapter;
+  registerModel(HaPet);
+  registerModel(HaToy);
+
+  it("aliases the JOIN to the reference name and binds the WHERE to it", () => {
+    const sql = (HaPet as any)
+      .joins("toys")
+      .where({ toys: { name: "Bone" } })
+      .toSql();
+    // Identifier quote char differs by adapter (" on sqlite/pg, ` on
+    // mysql/mariadb); strip quotes so the shape assertion holds everywhere.
+    const bare = sql.replace(/["`]/g, "");
+    expect(bare).toMatch(/INNER JOIN da_toys (?:AS )?toys\b/);
+    expect(bare).toMatch(/WHERE toys\.name\b/);
+    expect(bare).not.toMatch(/da_toys\.name/);
   });
 });

@@ -85,10 +85,11 @@ export class TableMetadata {
       if (!reflection && arelTable && arelTable.name !== tableName) {
         arelTable = arelTable.alias(tableName);
       } else if (reflection && arelTable && fallback?.aliasFor) {
-        // Reflection key: only alias when the association is joined under an
-        // AliasTracker alias (a self-join). `aliasFor` returns the join's alias
-        // (the key) in that case, and null for a first-occurrence join that
-        // keeps its real table name — so the WHERE stays in sync with the JOIN.
+        // Reflection key: alias to the join's referenced name when the
+        // association is joined. `aliasFor` returns the reference name (the key)
+        // the join is re-aliased to (`da_toys AS toys` for `joins(:toys)`), so
+        // the WHERE binds to the same alias as the JOIN; null when no join
+        // exists, so the key resolves to the association's own table name.
         const joinAlias = fallback.aliasFor(tableName);
         if (joinAlias && joinAlias !== arelTable.name) {
           arelTable = arelTable.alias(joinAlias);

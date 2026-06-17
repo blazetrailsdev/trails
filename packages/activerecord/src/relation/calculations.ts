@@ -552,7 +552,11 @@ export async function performCount(
     if (!Array.isArray(this._modelClass.primaryKey)) {
       const pk = this._modelClass.primaryKey as string;
       const jd = QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
-      const jdNodes: Nodes.Join[] = jd.joinConstraints([]);
+      const jdNodes: Nodes.Join[] = jd.joinConstraints(
+        [],
+        undefined,
+        anyRel._aliasableReferences(),
+      );
       // Mirror calculations.rb:235: only set distinct when the relation isn't already distinct.
       const joinedRel = (
         this._isDistinct
@@ -637,7 +641,8 @@ export async function performCount(
               specsForJd,
               Nodes.OuterJoin,
             );
-            for (const node of jd.joinConstraints([])) idSubquery.appendJoinNode(node);
+            for (const node of jd.joinConstraints([], undefined, anyRel._aliasableReferences()))
+              idSubquery.appendJoinNode(node);
           }
           this._applyJoinsToManager(idSubquery);
           this._applyWheresToManager(idSubquery, table);
@@ -668,7 +673,12 @@ export async function performCount(
               specsForJd,
               Nodes.OuterJoin,
             );
-            for (const node of jdOuter.joinConstraints([])) countManager.appendJoinNode(node);
+            for (const node of jdOuter.joinConstraints(
+              [],
+              undefined,
+              anyRel._aliasableReferences(),
+            ))
+              countManager.appendJoinNode(node);
           }
           this._applyJoinsToManager(countManager);
           // Rails `where!(pk => limited_ids)` adds the id filter to the relation that
@@ -700,7 +710,8 @@ export async function performCount(
             specsForJd,
             Nodes.OuterJoin,
           );
-          for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+          for (const node of jd.joinConstraints([], undefined, anyRel._aliasableReferences()))
+            manager.appendJoinNode(node);
         }
         this._applyJoinsToManager(manager);
         this._applyWheresToManager(manager, table);
