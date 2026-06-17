@@ -2768,24 +2768,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _buildThroughScope(): any {
     const ctor = this._record.constructor as typeof Base;
-    // Rails' CollectionAssociation#scope for a through/HABTM proxy is the
-    // JOIN-based AssociationScope relation (`SELECT target.* FROM target
-    // INNER JOIN join_table ...`) — the same relation the loader executes.
-    // For shapes AssociationScope can route, build that JOIN relation here so
-    // the proxy's seeded state and `scope()` preserve join-row multiplicity
-    // (three `developers_projects` rows for one project yield three rows /
-    // count 3), matching Rails. The legacy `id IN (SELECT source_fk ...)`
-    // subquery below — which structurally collapses duplicate join rows to one
-    // row per id — is kept only for shapes AssociationScope can't route yet
-    // (nested-through, polymorphic-has_many sources, polymorphic-belongsTo
-    // without sourceType). Composite owner/target primary keys also stay on
-    // the IN-subquery path: those shapes surface the trails-specific
-    // ConfigurationError guards below at construction (the single-column
-    // IN-subquery can't express a composite key), and routing them through the
-    // JOIN here would silently bypass that validation. `scope()` already used
-    // the IN-subquery path for every through shape before this change, so
-    // keeping composite keys there preserves the prior behavior exactly.
+    // Rails' CollectionAssociation#scope is always the JOIN-based
+    // AssociationScope relation. Delegate to it (buildThroughJoinScope = the
+    // relation the loader runs) for the shapes AssociationScope can route, so
+    // scope() carries Rails' join-row multiplicity instead of the deduping
+    // `id IN (subquery)` the fallback below builds. Everything else keeps that
+    // pre-existing trails-only fallback — converging those shapes needs
+    // AssociationScope to grow the missing routing (separate work).
     const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
+    // Composite keys can't be expressed by the single-column IN-subquery and
+    // trip its ConfigurationError guards below — keep them off the JOIN route.
     const ownerPkComposite = Array.isArray((ctor as any).primaryKey);
     const targetPkComposite = Array.isArray((this.model as any).primaryKey);
     if (
