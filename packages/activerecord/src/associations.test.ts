@@ -3344,7 +3344,6 @@ describe("PreloaderTest", () => {
         associations: ["origin"],
       }).call();
       expect(spy).toHaveBeenCalledTimes(2);
-      spy.mockRestore();
     } finally {
       Base.connectionHandler.removeConnectionPool("MdpAnimalsBase");
     }
