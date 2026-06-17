@@ -41,7 +41,7 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["src/**/*.test.ts", "server/**/*.test.ts"],
+          include: ["src/**/*.test.ts", "server/**/*.test.ts", "scripts/**/*.test.ts"],
           exclude: ["src/lib/frontiers/components/**/*.test.ts"],
         },
         resolve: { alias: aliases },
