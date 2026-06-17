@@ -25,7 +25,13 @@ import type { Firm as FirmT } from "./test-helpers/models/company.js";
 import type { Tag as TagT } from "./test-helpers/models/tag.js";
 import type { Tagging as TaggingT } from "./test-helpers/models/tagging.js";
 import type { Developer as DeveloperT } from "./test-helpers/models/developer.js";
-import { Associations, loadBelongsTo, loadHasMany, setBelongsTo } from "./associations.js";
+import {
+  Associations,
+  loadBelongsTo,
+  loadHasMany,
+  loadHasOne,
+  setBelongsTo,
+} from "./associations.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { createFixtures } from "./test-fixtures.js";
@@ -183,6 +189,8 @@ describe("AssociationsTest", () => {
       d_posts: { title: "string" },
       dqc_blog_posts: { blog_id: "integer", revision: "integer", title: "string" },
       dqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
+      nrfqc_blog_posts: { blog_id: "integer", title: "string" },
+      nrfqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
       el_children: { el_parent_id: "integer", value: "string" },
       el_parents: { name: "string" },
       inf_child2s: { inf_parent2_id: "integer", inf_parent2_region_id: "integer", label: "string" },
@@ -774,6 +782,74 @@ describe("AssociationsTest", () => {
       foreignKey: ["author_region_id", "author_id"],
     });
     expect(posts).toHaveLength(1);
+  });
+  it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
+    // No-reflection fallback: loadHasMany invoked with a composite FK against a
+    // query_constraints owner whose primary key is scalar. The inline branch
+    // must derive the owner key from the owner's query_constraints
+    // (`[blog_id, id]`), mirroring `reflection.activeRecordPrimaryKey`, rather
+    // than zipping the scalar `id` against the 2-column FK (which would raise
+    // CompositePrimaryKeyMismatchError).
+    class NrfqcBlogPost extends Base {
+      static {
+        this._tableName = "nrfqc_blog_posts";
+        this.attribute("blog_id", "integer");
+        this.attribute("title", "string");
+        (this as any)._queryConstraintsList = ["blog_id", "id"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    class NrfqcComment extends Base {
+      static {
+        this._tableName = "nrfqc_comments";
+        this.attribute("blog_id", "integer");
+        this.attribute("blog_post_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    registerModel("NrfqcBlogPost", NrfqcBlogPost);
+    registerModel("NrfqcComment", NrfqcComment);
+    // Deliberately NOT calling Associations.hasMany — no reflection registered.
+    const post = await NrfqcBlogPost.create({ blog_id: 1, title: "Post" });
+    await NrfqcComment.create({ blog_id: 1, blog_post_id: post.id, body: "A" });
+    await NrfqcComment.create({ blog_id: 1, blog_post_id: post.id, body: "B" });
+    await NrfqcComment.create({ blog_id: 2, blog_post_id: post.id, body: "Other" });
+    const comments = await loadHasMany(post, "nrfqcComments", {
+      className: "NrfqcComment",
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
+    expect(comments).toHaveLength(2);
+    expect(comments.map((c) => c.body).sort()).toEqual(["A", "B"]);
+  });
+  it("has one loads via inline fallback resolving composite owner key from query constraints", async () => {
+    // Same no-reflection fallback path as the has_many case above, exercised
+    // through loadHasOne.
+    class Nrfqc1BlogPost extends Base {
+      static {
+        this._tableName = "nrfqc_blog_posts";
+        this.attribute("blog_id", "integer");
+        this.attribute("title", "string");
+        (this as any)._queryConstraintsList = ["blog_id", "id"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    class Nrfqc1Comment extends Base {
+      static {
+        this._tableName = "nrfqc_comments";
+        this.attribute("blog_id", "integer");
+        this.attribute("blog_post_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    registerModel("Nrfqc1BlogPost", Nrfqc1BlogPost);
+    registerModel("Nrfqc1Comment", Nrfqc1Comment);
+    const post = await Nrfqc1BlogPost.create({ blog_id: 7, title: "Post" });
+    await Nrfqc1Comment.create({ blog_id: 7, blog_post_id: post.id, body: "Only" });
+    const comment = await loadHasOne(post, "nrfqc1Comment", {
+      className: "Nrfqc1Comment",
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
+    expect((comment as Nrfqc1Comment | null)?.body).toBe("Only");
   });
   it("belongs to association does not use parent query constraints if not configured to", async () => {
     // Rails: test_belongs_to_association_does_not_use_parent_query_constraints_if_not_configured_to
