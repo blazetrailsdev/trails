@@ -593,6 +593,22 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
       // implicit `NULL` token was already coerced to a real null above.
       defFn = def;
       def = null;
+    } else if (
+      this.isMariadb() &&
+      typeof def === "string" &&
+      def.startsWith("'") &&
+      def.endsWith("'")
+    ) {
+      // MariaDB reports string/char/enum literal defaults *quoted* in
+      // information_schema.column_default (e.g. `DEFAULT 'a varchar field'`
+      // comes back as the string "'a varchar field'"), whereas Rails reads
+      // SHOW FULL FIELDS where Default is already unquoted. Strip the outer
+      // single quotes and unescape `\'`, mirroring Rails' :text default branch
+      // (mysql/schema_statements.rb:201-203, `default[1...-1].gsub("\\'", "'")`).
+      // MySQL 8 reports these unquoted, so this is gated on MariaDB; the
+      // expression-default branches above already claimed function/uuid()/concat
+      // defaults, so only plain quoted literals reach here.
+      def = def.slice(1, -1).replace(/\\'/g, "'");
     }
     const onUpdateForColumn =
       onUpdateMatch && (defFn == null || !/ ON UPDATE /i.test(defFn)) ? onUpdateMatch[1] : null;

@@ -92,6 +92,11 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
     expect(output).toMatch(
       /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
     );
+    // MariaDB reports string literal defaults single-quoted in
+    // information_schema; columns() must strip the outer quotes so the dump
+    // matches Rails' SHOW-FULL-FIELDS (unquoted) value — `a varchar field`,
+    // not `'a varchar field'`. MySQL 8 already reflects unquoted.
+    expect(output).toMatch(/t\.string\("char2", \{ limit: 50, default: "a varchar field" \}\)/);
   });
 
   itIfSupports(
