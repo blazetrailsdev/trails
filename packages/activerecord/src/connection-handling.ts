@@ -334,6 +334,38 @@ export function withConnection<T>(
   }
 }
 
+/**
+ * Run an internal query/transaction inside `with_connection(prevent_permanent_checkout:
+ * true)` so the pool releases its connection afterwards instead of leasing it
+ * permanently via the deprecated `.connection` getter under
+ * `permanent_connection_checkout = :deprecated | :disallowed`.
+ *
+ * Runs the block inline (no wrap) when there is no lease to manage: a model
+ * backed by a directly-assigned adapter (`Model.adapter = x`), or one without a
+ * handler-registered pool (e.g. HABTM join models, whose `.connection` delegates
+ * to the owner and whose `connectionPool()` therefore throws for a direct-adapter
+ * owner).
+ *
+ * @internal
+ */
+export function withQueryConnection<T>(modelClass: typeof Base, run: () => Promise<T>): Promise<T> {
+  const klass = modelClass as unknown as {
+    _adapter?: unknown;
+    connectionPool?(): ConnectionPool | null | undefined;
+  };
+  if (klass._adapter || typeof klass.connectionPool !== "function") return run();
+  let pool: ConnectionPool | null | undefined;
+  try {
+    pool = klass.connectionPool();
+  } catch {
+    return run();
+  }
+  if (!pool || typeof pool.withConnection !== "function") return run();
+  return Promise.resolve(
+    pool.withConnection(run, { preventPermanentCheckout: true }),
+  ) as Promise<T>;
+}
+
 export function connectionDbConfig(this: typeof Base) {
   return connectionPool.call(this).dbConfig;
 }

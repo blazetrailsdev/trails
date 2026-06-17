@@ -9,6 +9,7 @@ import {
   DeleteManager,
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
+import { withQueryConnection } from "./connection-handling.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import {
   ActiveRecordError,
@@ -91,7 +92,6 @@ import {
   aggregateColumn as _aggregateColumn,
   isAllAttributes as _isAllAttributes,
   hasInclude as _hasInclude,
-  performCalculation as _performCalculation,
   isDistinctSelect as _isDistinctSelect,
   operationOverAggregateColumn as _operationOverAggregateColumn,
   executeSimpleCalculation as _executeSimpleCalculation,
@@ -2486,6 +2486,16 @@ export class Relation<T extends Base> {
       // assignment and return the promise derived from itself, deadlocking.
       return this._loadAsyncPromise;
     }
+    // Run the query inside `with_connection` so the pool releases the connection
+    // afterwards instead of holding it permanently. `preventPermanentCheckout`
+    // neutralizes the deprecated `_modelClass.connection` reads on the build /
+    // execute path (they resolve to the already-checked-out connection) under
+    // `permanent_connection_checkout = :deprecated | :disallowed`. Mirrors Rails,
+    // whose read paths run inside `with_connection`.
+    return this._withQueryConnection(() => this._toArrayInner());
+  }
+
+  private async _toArrayInner(): Promise<T[]> {
     // Lazily reflect the schema before issuing the query so consumers
     // don't have to call loadSchema explicitly. Idempotent and cheap.
     await (
@@ -3264,10 +3274,8 @@ export class Relation<T extends Base> {
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
     // to the adapter's generic "SQL" default.
     const [existsSql, existsBinds] = rel._compileAstWithBinds(manager.ast);
-    const rows = await rel._modelClass.connection.execute(
-      existsSql,
-      existsBinds,
-      `${rel._modelClass.name} Exists?`,
+    const rows = await rel._withQueryConnection(() =>
+      rel._modelClass.connection.execute(existsSql, existsBinds, `${rel._modelClass.name} Exists?`),
     );
     return rows.length > 0;
   }
@@ -3372,7 +3380,12 @@ export class Relation<T extends Base> {
     ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
     if (this._isNone) return [];
+    return this._withQueryConnection(() => this._pluckInner(...columns));
+  }
 
+  private async _pluckInner(
+    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown[]> {
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
     // the eager values) and recurses, so the plucked columns can reference the
@@ -4804,6 +4817,11 @@ export class Relation<T extends Base> {
     for (const node of allNodes) {
       manager.where(node);
     }
+  }
+
+  /** Run an internal read query inside `with_connection`; see {@link withQueryConnection}. */
+  private _withQueryConnection<R>(run: () => Promise<R>): Promise<R> {
+    return withQueryConnection(this._modelClass as unknown as typeof Base, run);
   }
 
   /** Resolve the connection through the public getter, returning null for HABTM join models with no established connection. */
@@ -6329,11 +6347,6 @@ export class Relation<T extends Base> {
   /** @internal */
   private hasInclude(columnName: string | null): boolean {
     return _hasInclude(this as any, columnName);
-  }
-
-  /** @internal */
-  private performCalculation(operation: string, columnName: string): Promise<unknown> {
-    return _performCalculation(this as any, operation, columnName);
   }
 
   /** @internal */

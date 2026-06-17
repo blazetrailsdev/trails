@@ -11,6 +11,8 @@
 import { Nodes, Table } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
+import type { Base } from "../base.js";
+import { withQueryConnection } from "../connection-handling.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
 import {
@@ -952,19 +954,34 @@ export interface CalculationMethods {
 }
 
 /**
+ * Wrap a calculation method so its query runs inside `with_connection`; see
+ * {@link withQueryConnection}. Releases the connection afterwards instead of
+ * permanently leasing it via the deprecated `.connection` getter under
+ * `permanent_connection_checkout = :deprecated | :disallowed`.
+ */
+function inQueryConnection<A extends unknown[], R>(
+  fn: (this: CalculationRelation, ...args: A) => Promise<R>,
+): (this: CalculationRelation, ...args: A) => Promise<R> {
+  return function (this: CalculationRelation, ...args: A): Promise<R> {
+    const modelClass = (this as { _modelClass?: unknown })._modelClass as typeof Base;
+    return withQueryConnection(modelClass, () => fn.apply(this, args));
+  };
+}
+
+export const Calculations = {
+  count: inQueryConnection(performCount),
+  sum: inQueryConnection(performSum),
+  average: inQueryConnection(performAverage),
+  minimum: inQueryConnection(performMinimum),
+  maximum: inQueryConnection(performMaximum),
+} as const;
+
+/**
  * Tracks column aliases during calculation queries to avoid
  * conflicts when multiple aggregates are computed.
  *
  * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
  */
-export const Calculations = {
-  count: performCount,
-  sum: performSum,
-  average: performAverage,
-  minimum: performMinimum,
-  maximum: performMaximum,
-} as const;
-
 export class ColumnAliasTracker {
   private _aliases: Map<string, number> = new Map();
 
