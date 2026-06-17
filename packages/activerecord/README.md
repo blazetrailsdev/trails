@@ -3,20 +3,35 @@
 The ORM layer of [trails](../../README.md) — a TypeScript port of Ruby on
 Rails' [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html):
 persistence, querying, associations, validations, enums, and migrations. It is
-the leading package of the monorepo. The goal is **100% API compatible with
-Rails**, matched **test for test** against the Rails source — if you can read
-the Rails API docs, you already know how to use this.
+the leading package of the monorepo. If you can read the Rails API docs, you
+already know how to use this.
+
+The goal has two halves:
+
+- **Rails parity wherever the languages allow it.** Class names, method
+  signatures, and behavior are designed to match Rails. Progress isn't measured
+  by feel — we port the Rails test suite **test for test** (`test:compare`) and
+  match the public API surface method for method (`api:compare`), so behavior is
+  pinned to Rails' own tests rather than to our interpretation of them.
+- **Rails-quality developer experience where the languages diverge.** Some Ruby
+  idioms have no TypeScript equivalent — synchronous DB access, `!`/`?` in
+  method names, the `inherited` hook, metaprogrammed attribute readers. Rather
+  than drop those features, trails picks the most Rails-faithful, type-safe
+  TypeScript shape (e.g. `save!` → `saveBang()`, lazy readers → awaited loaders)
+  and documents each divergence. See
+  [Behavioral deviations](#behavioral-deviations-from-rails) and the
+  [deviations guide](../website/docs/guides/activerecord-rails-deviations.md).
 
 Built on `@blazetrails/arel` (SQL AST) and `@blazetrails/activemodel`
 (attributes, validations, callbacks, dirty tracking). This README is the
 focused entry point for ActiveRecord; for the project-wide overview, package
 list, and design principles see the [root README](../../README.md).
 
-> The single biggest difference from Rails: **JavaScript has no synchronous DB
-> access**, so nearly every method that touches the database is `async` and
-> must be `await`ed. See [Behavioral deviations](#behavioral-deviations-from-rails)
-> below — especially the `Bang` suffix, async singular-association loading, and
-> the sync/async validation split.
+> The single biggest divergence: **JavaScript has no synchronous DB access**, so
+> nearly every method that touches the database is `async` and must be
+> `await`ed. The deviations below — the `Bang` suffix, async
+> singular-association loading, and the sync/async validation split — mostly
+> follow from that one fact.
 
 ## Install
 
@@ -91,6 +106,75 @@ ar db:schema:dump   # writes db/schema.ts (re-run after each migration, like Rai
 See the [root README](../../README.md#zero-declare-models--trails-tsc) for the
 full zero-declare story and the `declare`-pattern reference at
 [`dx-tests/declare-patterns.test-d.ts`](dx-tests/declare-patterns.test-d.ts).
+
+### Adopting against an existing database
+
+Already have a database (and maybe an existing TypeScript app)? You don't need
+`ar new`. Introspect the schema, generate models, and wire `trails-tsc` into
+your current build:
+
+1. **Dump the schema.** Point ActiveRecord at your DB (see
+   [connection config](#database-adapters) below), then introspect it into a
+   committed `db/schema.ts` — re-run after each migration, like Rails'
+   `schema.rb`:
+
+   ```sh
+   ar db:schema:dump
+   ```
+
+2. **Generate models from the schema.** `ar models:dump` emits one
+   `class X extends Base` module per table, with `belongsTo` / `hasMany`
+   inferred from foreign keys. You own the files afterward (no round-trip
+   merge); re-running regenerates.
+
+   ```sh
+   ar models:dump --out app/models          # or omit --out to print to stdout
+   ar models:dump --only users,posts        # subset; --ignore is the inverse
+   ar models:dump --strip-prefix wp_         # drop a table-name prefix/suffix
+   ```
+
+3. **Wire `trails-tsc` into your existing tsconfig.** The simplest path is to
+   run `ar init` in the project root — it merges the required settings into your
+   existing `tsconfig.json` (JSONC-aware, non-destructive; it won't overwrite
+   without `--force`). To add them by hand, you need:
+
+   ```jsonc
+   {
+     "compilerOptions": {
+       "target": "ES2022",
+       "module": "Node16",
+       "moduleResolution": "Node16",
+       "strict": true,
+       "plugins": [{ "name": "@blazetrails/trails-tsc/ts-plugin" }],
+     },
+     "include": ["app/models/**/*.ts", "db/migrate/**/*.ts"],
+   }
+   ```
+
+   Then type-check through `trails-tsc` (the schema-aware `tsc` replacement):
+
+   ```sh
+   trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json
+   ```
+
+   The `plugins` entry is for editor support (autocomplete/hover via tsserver),
+   which is still in flight; the command-line `trails-tsc` check works today.
+
+See the [activerecord-cli README](../activerecord-cli/README.md) for the full
+flag set and project layout.
+
+## Examples
+
+- **[Twitter clone](../../examples/twitter-clone/)** — a minimal Twitter/X clone
+  on Express + better-sqlite3. It exercises the parts of ActiveRecord you reach
+  for first: timestamped migrations, models with `belongsTo` / `hasMany` /
+  `hasMany … through` (self-referential follows), scopes, validations, eager
+  loading with `includes`, association proxies, and error mapping
+  (`RecordNotFound` → 404, `RecordInvalid` → 422). Its
+  [README](../../examples/twitter-clone/README.md) walks through setup, and
+  `pnpm smoke` runs the whole flow end-to-end (in-memory DB, no HTTP).
+
+A Vite example (front-end / SPA integration) is planned.
 
 ## Rails patterns translate directly
 
@@ -338,6 +422,7 @@ The intentional divergences (and why) are catalogued in the
 ## Further reading
 
 - [Root README](../../README.md) — project overview, package list, design principles.
+- [Twitter clone example](../../examples/twitter-clone/) — a runnable Express + ActiveRecord app.
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) — Rails-port methodology and conventions.
 - [Ruby → TypeScript conventions](../../docs/ruby-ts-conventions.md) — the authoritative naming rules.
 - [activerecord-cli README](../activerecord-cli/README.md) — the `ar` CLI in depth.
@@ -347,5 +432,3 @@ The intentional divergences (and why) are catalogued in the
 ## License
 
 MIT. See [LICENSE](../../LICENSE) and [LICENSES.md](../../LICENSES.md).
-</content>
-</invoke>
