@@ -796,6 +796,8 @@ jobs:
             packages/website/node_modules/.vite
           key: vitepress-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'packages/website/docs/.vitepress/config.ts') }}
       - run: pnpm --filter @blazetrails/website exec svelte-kit sync
+      - name: Unit-test docs build scripts
+        run: pnpm --filter @blazetrails/website exec vitest run scripts/
       - name: Build SvelteKit
         run: pnpm --filter @blazetrails/website run build:sw && pnpm --filter @blazetrails/website exec vite build
       - name: Build docs (typedoc + VitePress)
