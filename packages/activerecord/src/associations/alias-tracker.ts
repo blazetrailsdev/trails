@@ -125,6 +125,25 @@ export class AliasTracker {
     return count > 1 ? `${this.truncate(aliasedName)}_${count}` : aliasedName;
   }
 
+  /**
+   * Claim a join target `tableName` and return the SQL alias to use: `undefined`
+   * on its first use (the real name is kept), else the `candidate` aliased and
+   * `_N`-suffixed on repeats. Unlike `aliasNameFor`, the collision decision runs
+   * through `_getCount`, so a table already present in the seeded `joins`
+   * (`initialCountFor`) or `aliases` map counts as taken. Mirrors the real-table
+   * branch of `aliased_table_for` (alias_tracker.rb:58-77) without needing an
+   * Arel table.
+   *
+   * @internal
+   */
+  aliasNameForTable(tableName: string, candidate: string | (() => string)): string | undefined {
+    if (this._getCount(tableName) === 0) {
+      this.aliases.set(tableName, 1);
+      return undefined;
+    }
+    return this.aliasNameFor(typeof candidate === "function" ? candidate() : candidate);
+  }
+
   aliasFor(tableName: string): string {
     const count = this._getCount(tableName);
     if (count === 0) {

@@ -325,11 +325,12 @@ function _trackerAliasFor(
   assocName: string,
   ownerTable: string,
 ): string | undefined {
-  if ((tracker.aliases.get(table) ?? 0) === 0) {
-    tracker.aliases.set(table, 1);
-    return undefined;
-  }
-  return tracker.aliasNameFor(`${_pluralize(_toUnderscore(assocName))}_${ownerTable}`);
+  // Thunk the candidate: it is only built when `table` is already claimed
+  // (mirroring Rails' block-arg to aliased_table_for).
+  return tracker.aliasNameForTable(
+    table,
+    () => `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`,
+  );
 }
 
 function validateExplainOptions(options: ExplainOption[]): void {
@@ -767,7 +768,19 @@ export class Relation<T extends Base> {
     tracker: AliasTracker;
     jdJoins: Array<{ table: string; assoc: string }>;
   } {
-    const tracker = new AliasTracker(aliasLength);
+    // Seed the tracker with the manual `_joinValues` (raw string / Arel join
+    // nodes) so a where-chain alias decision counts collisions against them via
+    // initialCountFor, mirroring Rails' `alias_tracker(leading_joins +
+    // join_nodes, aliases)` (query_methods.rb:1891-1896, alias_tracker.rb:28-43).
+    const manualJoins = this._joinValues.map((v) =>
+      typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v,
+    );
+    const tracker = new AliasTracker(
+      aliasLength,
+      undefined,
+      manualJoins,
+      (this._modelClass as any).connection,
+    );
     const ownerTable = (this._modelClass as any).tableName;
     const jdJoins: Array<{ table: string; assoc: string }> = [];
 
