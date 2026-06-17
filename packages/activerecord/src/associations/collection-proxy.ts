@@ -1288,49 +1288,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
         return results.length;
       }
-      // Non-distinct through with a belongsTo source (the shape HABTM lowers
-      // to): the proxy's `scope()` (`_buildThroughScope`) models the target as
-      // an `id IN (SELECT source_fk ...)` subquery, which structurally
-      // collapses duplicate join rows to one target row per id. Rails counts
-      // join-row multiplicity instead via `scope.count(:all)` over the JOIN —
-      // a HABTM with three `developers_projects` rows pointing at the same
-      // project counts 3 (see `test_distinct_after_the_fact`). Count over the
-      // JOIN-based AssociationScope relation (the exact one `loadHasMany`
-      // executes), emitting a single `SELECT COUNT(*) ... INNER JOIN ...`.
-      //
-      // Distinct collections keep the deduping subquery count (correct under
-      // DISTINCT); hasMany-source throughs can't produce duplicate join rows,
-      // so they keep the existing path; diverged proxies (whereBang /
-      // orderBang) fall through to the generic count path so their mutations
-      // are honored.
-      //
-      // Branch on the *scoped relation's* distinct value (mirroring Rails'
-      // `association_scope.distinct_value` in CollectionAssociation#size), not
-      // the proxy's own `distinctValue`: a HABTM declared with a `-> { distinct }`
-      // scope applies DISTINCT only inside the association scope, so the scoped
-      // relation is the authoritative source for whether the count should dedup.
-      const sourceRefl = (refl as { sourceReflection?: { belongsTo?: () => boolean } } | undefined)
-        ?.sourceReflection;
-      if (
-        !this._assocDef.options.disableJoins &&
-        !this._relationStateDiverged() &&
-        typeof sourceRefl?.belongsTo === "function" &&
-        sourceRefl.belongsTo() &&
-        _canRouteThroughViaAssociationScope(refl, this._assocDef.options) &&
-        !this.scope().distinctValue
-      ) {
-        const joinRel = buildThroughJoinScope(
-          this._record,
-          this._assocName,
-          this._assocDef.options,
-        );
-        if (!joinRel) return 0;
-        const counted = await joinRel.count();
-        if (typeof counted !== "number") {
-          throw new Error("Grouped counts are not supported for association collection counts");
-        }
-        return counted;
-      }
+      // Routed shapes fall through to `countFn.call(this.scope())` below;
+      // `_buildThroughScope` returns the JOIN relation for them, so the count
+      // matches Rails' `scope.count(:all)` (join-row multiplicity preserved).
     }
     // On the diverged path `this` carries in-place proxy mutations
     // (whereBang etc.), so route through Relation.prototype.count to
@@ -2797,6 +2757,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _buildThroughScope(): any {
     const ctor = this._record.constructor as typeof Base;
+    // Rails' scope IS the JOIN-based AssociationScope relation: delegate to it
+    // for the shapes it can route. Composite keys stay on the IN-subquery
+    // fallback below (they trip its ConfigurationError guards); other
+    // unroutable shapes (nested/polymorphic) do too.
+    const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
+    const ownerPkComposite = Array.isArray((ctor as any).primaryKey);
+    const targetPkComposite = Array.isArray((this.model as any).primaryKey);
+    if (
+      refl &&
+      !ownerPkComposite &&
+      !targetPkComposite &&
+      _canRouteThroughViaAssociationScope(refl, this._assocDef.options)
+    ) {
+      const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
+      return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
+    }
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
     if (!throughAssoc) {
