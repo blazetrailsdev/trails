@@ -10,7 +10,7 @@ import { IntegerType, StringType } from "@blazetrails/activemodel";
 import { Nodes, Collectors } from "@blazetrails/arel";
 import { LogSubscriber } from "./log-subscriber.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
-import { Base } from "./index.js";
+import { Base, RecordNotFound } from "./index.js";
 import { registerModel } from "./associations.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -123,13 +123,18 @@ describe("BindParameterTest", () => {
   // the real invariant Rails asserts: preparable SELECTs (find/find_by/where on a
   // scalar — placeholder SQL + binds) populate the pool, while inlined queries
   // (IN-clause arrays, SQL string literals — no binds) do not.
-  function captureSelectSql(): { sqls: string[]; stop: () => void } {
+  // `stop()` freezes the capture before each test's assertions; the suite-level
+  // `afterEach(() => Notifications.unsubscribeAll())` above is the teardown safety
+  // net, so a query that throws before `stop()` can't leak this subscriber into
+  // later tests.
+  function captureSelectSql(table = "topics"): { sqls: string[]; stop: () => void } {
     const sqls: string[] = [];
-    const isTopicsSelect = (sql: unknown): sql is string =>
-      typeof sql === "string" && /^\s*SELECT\b/i.test(sql) && /\btopics\b/.test(sql);
+    const tableRe = new RegExp(`\\b${table}\\b`);
+    const isTableSelect = (sql: unknown): sql is string =>
+      typeof sql === "string" && /^\s*SELECT\b/i.test(sql) && tableRe.test(sql);
     const sub = Notifications.subscribe("sql.active_record", (e: Event) => {
       const sql = e.payload.sql;
-      if (isTopicsSelect(sql)) sqls.push(sql);
+      if (isTableSelect(sql)) sqls.push(sql);
     });
     return { sqls, stop: () => Notifications.unsubscribe(sub) };
   }
@@ -173,17 +178,24 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
-    const cap = captureSelectSql();
+    const cap = captureSelectSql("topics");
     expect((await Topic.find(1)).id).toBe(1);
-    // Rails: Topic.find_by_id(2) — find and find_by share the per-class
-    // `_findByStatementCache` keyed on `[:id]`, so both run the same
-    // `... WHERE "id" = ? LIMIT 1` statement (core.ts cachedFindByStatement).
-    expect((await Topic.findBy({ id: 2 }))!.id).toBe(2);
     cap.stop();
+    // Rails asserts the cached find statement is keyed into the connection pool.
+    const topicSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(topicSql));
 
-    // Rails asserts that cached find statement is keyed into the connection pool.
-    const findSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
-    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(findSql));
+    // Rails then runs `assert_raises(RecordNotFound) { SillyReply.find(2) }` and
+    // asserts the *raising* model's statement is still cached — proving the
+    // prepared statement is pooled even when the SELECT returns no row, and that
+    // a second, distinct model gets its own pool entry. SillyReply isn't in the
+    // canonical schema, so use Author (a distinct model/table this suite already
+    // loads) to cover both invariants.
+    const authorCap = captureSelectSql("authors");
+    await expect(Author.find(999999)).rejects.toBeInstanceOf(RecordNotFound);
+    authorCap.stop();
+    const authorSql = authorCap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(authorSql));
   });
 
   it("statement cache with find by", async (ctx) => {

@@ -886,7 +886,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
                 // in-txn / out-of-txn cached-plan handling stay in one place.
                 return await this._runQuery<ArrayQueryResult>(client, rewritten, bindArray, {
                   rowMode: "array",
-                  prepareOverride: options?.prepare,
+                  prepareHint: options?.prepare,
                   onPrepared: (stmtName) => {
                     payload.statement_name = stmtName;
                   },
@@ -1224,17 +1224,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     binds: unknown[],
     extra: {
       rowMode?: "array";
-      prepareOverride?: boolean;
+      // A *hint*, not a guarantee: `true` (e.g. `select_all` threading a
+      // preparable SELECT) still passes through `_shouldPrepare`, so PG's own
+      // gates — prepared_statements, non-empty binds, a non-zero pool limit —
+      // decide whether to actually prepare. This avoids forcing a server-side
+      // PREPARE that a disabled (maxSize 0) pool would leak per execution. Only
+      // an explicit `false` hard-disables preparation.
+      prepareHint?: boolean;
       onPrepared?: (stmtName: string) => void;
     } = {},
   ): Promise<R> {
-    const { prepareOverride, onPrepared, ...queryExtra } = extra;
-    // `select_all` threads `prepare: true` for a preparable SELECT, but PG's own
-    // gates (prepared_statements, non-empty binds, a non-zero pool limit) still
-    // decide whether to actually prepare — so a `true` hint routes through
-    // `_shouldPrepare` rather than forcing a server-side PREPARE that a disabled
-    // (maxSize 0) pool would leak. Only an explicit `false` hard-disables.
-    const prepare = prepareOverride === false ? false : this._shouldPrepare(binds);
+    const { prepareHint, onPrepared, ...queryExtra } = extra;
+    const prepare = prepareHint === false ? false : this._shouldPrepare(binds);
     const attempt = async (): Promise<R> => {
       if (prepare) {
         const stmtName = this._preparedNameFor(client, sql);
