@@ -228,7 +228,7 @@ describeIfMysql("Mysql2Adapter", () => {
             ),
         );
         expect(sqls[0]).toMatch(
-          /^CREATE TEMPORARY TABLE `temp` \(INDEX `index_temp_on_zip` \(`zip`\)\) AS SELECT id, name, zip FROM a_really_complicated_query/,
+          /^CREATE TEMPORARY TABLE `temp` \(INDEX `index_temp_on_zip` \(`zip`\)\)(?: ROW_FORMAT=DYNAMIC)? AS SELECT id, name, zip FROM a_really_complicated_query/,
         );
       } finally {
         await adapter.dropTable("temp", { ifExists: true });
