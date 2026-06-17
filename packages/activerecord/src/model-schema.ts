@@ -1138,39 +1138,7 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
   try {
     const conn = host.connection;
     const table = host.tableName;
-    if (!conn || !table) return null;
-    // Resolve columns through the shared schema cache so the reflection is
-    // memoized (`getCachedColumnsHash` warms after this), making subsequent
-    // cold-cache writes reconcile query-free. Mirror loadSchemaFromCache's
-    // FakePool handling so a lone-connection pool (SQLite :memory:, size 1)
-    // doesn't deadlock on withConnection.
-    const cache = conn.schemaCache;
-    if (cache && typeof cache.columnsHash === "function") {
-      const candidate = conn.pool ?? conn;
-      const pool =
-        candidate &&
-        typeof (candidate as { withConnection?: unknown }).withConnection === "function"
-          ? new FakePool(conn)
-          : candidate;
-      const hash = (await cache.columnsHash(pool, table)) as Record<string, unknown> | undefined;
-      if (hash) {
-        const names = Object.keys(hash);
-        if (names.length > 0) {
-          // The shared cache is now warm. A model that synthesized a minimal
-          // columnsHash while the cache was cold (loadSchema's fallback set
-          // `_schemaLoaded` with only the declared attrs) would otherwise keep
-          // that stale view forever — leaving `columnNames()` reading the warm
-          // cache's real columns while `attributeNames()` stays minimal. Drop
-          // the flag so the next `loadSchema` re-reflects from the warm cache
-          // and merges the real columns into `_attributeDefinitions`.
-          if (host._schemaLoaded) host._schemaLoaded = false;
-          return new Set(names);
-        }
-      }
-      return null;
-    }
-    // No schema cache available — fall back to a raw introspection query.
-    if (typeof conn.columns !== "function") return null;
+    if (!conn || !table || typeof conn.columns !== "function") return null;
     const cols = (await conn.columns(table)) as Array<{ name: string }> | undefined;
     if (Array.isArray(cols) && cols.length > 0) {
       return new Set(cols.map((c) => c.name));
