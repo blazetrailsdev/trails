@@ -10,10 +10,12 @@ R.2 #536, R.3 #543. `packages/activerecord/src/type-virtualization/` is
 populated with `virtualize.ts`, `walker.ts`, `synthesize.ts`,
 `type-registry.ts`, `transitive-extends-walker.ts`, `resolve-target.ts`.
 
-Open: entire Phase 2.1–2.6 tsserver-plugin track (~1400 LOC across 6 PRs;
-`packages/activerecord/src/tsserver-plugin/` does not exist yet). Phase 3
-docs + consumer cutover (~150 LOC). Follow-ups: association-option
-`scope:` narrowing, enum value-label unions, adoption metrics.
+Open: the Phase 2 tsserver-plugin track is now owned by **RFC 0035
+(`tsserver-editor-plugin`, tasks repo)**, which adopts and re-verifies this
+plan — the §2.1–2.6 breakdown and packaging premise below are superseded (see
+the banner on § Phase 2). Phase 3 docs + consumer cutover (~150 LOC) is still
+live here. Follow-ups: association-option `scope:` narrowing, enum value-label
+unions, adoption metrics.
 
 Related:
 
