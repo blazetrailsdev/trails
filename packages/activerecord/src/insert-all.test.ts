@@ -489,6 +489,26 @@ describe("InsertAllTest", () => {
     },
   );
 
+  // Speedometer's configured PK (speedometer_id) is not a database primary key,
+  // so Rails InsertAll#readonly_columns (schema_cache primary_keys = []) does NOT
+  // exclude it from the ON DUPLICATE KEY UPDATE set. (On conflict-target adapters
+  // any insert/upsert on this id-less table raises in find_unique_index_for
+  // before the update set is built — see the configured-primary-key tests above —
+  // so this convergence is only observable on MySQL.)
+  it.skipIf(!isMysql)(
+    "upsert all on a table without a database primary key treats the configured primary key as updatable",
+    async () => {
+      await assertQueriesMatch(
+        /ON DUPLICATE KEY UPDATE[\s\S]*speedometer_id/,
+        undefined,
+        false,
+        async () => {
+          await Speedometer.upsertAll([{ speedometer_id: "s9", name: "Fast" }]);
+        },
+      );
+    },
+  );
+
   it("upsert all does not update readonly attributes", async () => {
     const newName = "Agile Web Development with Rails, 4th Edition";
     await ReadonlyNameBook.upsertAll([{ id: 1, name: newName }]);
