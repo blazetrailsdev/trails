@@ -68,6 +68,19 @@ class DivergentPrimaryKeyBook extends Book {
   }
 }
 
+// Mirrors the `if supports_insert_returning?` guard inside
+// test_insert_all_and_upsert_all_with_aliased_attributes (insert_all_test.rb:314).
+// Kept out of the test body so vitest/no-conditional-in-test stays happy.
+async function assertInsertAllReturningAlias(): Promise<void> {
+  if (!supportsInsertReturning) return;
+  const before = (await Book.count()) as number;
+  const result = await Book.insertAll([{ title: "Remote", author_id: 1 }], {
+    returning: "title",
+  });
+  expect(result.columns).toContain("title");
+  expect(await Book.count()).toBe(before + 1);
+}
+
 function getYear(val: unknown): number {
   if (val == null) return 0;
   if (val instanceof Temporal.Instant) return val.toZonedDateTimeISO("UTC").year;
@@ -401,12 +414,18 @@ describe("InsertAllTest", () => {
     // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
   });
 
-  it.skip("insert all and upsert all with aliased attributes", () => {
-    // BLOCKED: RETURNING does not resolve aliased attributes — `returning: :title`
-    // (alias for `name`) emits `RETURNING "title"` instead of `"name" AS "title"`,
-    // so SQLite errors "no such column: title". The INSERT column list resolves
-    // the alias, but Builder.returning() does not.
-    // RFC 0030 d2-insert-all-returning-result.
+  it("insert all and upsert all with aliased attributes", async () => {
+    await assertInsertAllReturningAlias();
+
+    await Book.upsertAll([{ id: 101, title: "Perelandra", author_id: 7, isbn: "1974522598" }]);
+    await Book.upsertAll([{ id: 101, title: "Perelandra 2", author_id: 6, isbn: "111111" }], {
+      updateOnly: ["title", "isbn"],
+    });
+
+    const book = (await Book.find(101)) as any;
+    expect(book.title).toBe("Perelandra 2");
+    expect(book.isbn).toBe("111111");
+    expect(book.author_id).toBe(7);
   });
 
   it("insert all and upsert all with sti", async () => {

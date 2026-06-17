@@ -373,6 +373,18 @@ export class InsertAll {
       }
       this.inserts[i] = resolved;
     }
+    // Mirrors insert_all.rb:121-122: update_only and unique_by are alias-resolved
+    // alongside the insert keys so the ON CONFLICT update list and conflict
+    // target reference physical column names.
+    if (this.updateOnly !== undefined) {
+      const cols = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
+      this.updateOnly = cols.map((c) => this.resolveAttributeAlias(c));
+    }
+    if (typeof this.uniqueBy === "string") {
+      this.uniqueBy = this.resolveAttributeAlias(this.uniqueBy);
+    } else if (Array.isArray(this.uniqueBy)) {
+      this.uniqueBy = this.uniqueBy.map((c) => this.resolveAttributeAlias(c));
+    }
   }
 
   /** @internal */
@@ -600,18 +612,16 @@ export class Builder implements InsertBuilder {
     if (!ret) return undefined;
     if (ret instanceof Nodes.SqlLiteral) return ret.value;
     const cols = Array.isArray(ret) ? ret : [ret];
+    const aliases = (this.model as any)._attributeAliases as Record<string, string> | undefined;
     return cols
       .map((attr: string) => {
-        const model = this._insertAll.model;
-        if (
-          typeof (model as any).attributeAlias === "function" &&
-          (model as any).attributeAlias(attr)
-        ) {
-          return `"${(model as any).attributeAlias(attr).replace(/"/g, '""')}" AS "${attr.replace(/"/g, '""')}"`;
+        const physical = aliases?.[attr];
+        if (physical) {
+          return `"${physical.replace(/"/g, '""')}" AS "${attr.replace(/"/g, '""')}"`;
         }
         return `"${attr.replace(/"/g, '""')}"`;
       })
-      .join(", ");
+      .join(",");
   }
 
   skipDuplicates(): boolean {
