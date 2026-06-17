@@ -11,6 +11,8 @@
 import { Nodes, Table } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
+import type { Base } from "../base.js";
+import { withQueryConnection } from "../connection-handling.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
 import {
@@ -941,37 +943,17 @@ export interface CalculationMethods {
 }
 
 /**
- * Tracks column aliases during calculation queries to avoid
- * conflicts when multiple aggregates are computed.
- *
- * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
- */
-/**
- * Wrap a calculation method so its query runs inside `with_connection(
- * prevent_permanent_checkout: true)`. This releases the connection afterwards
- * instead of permanently leasing it via the deprecated `.connection` getter
- * under `permanent_connection_checkout = :deprecated | :disallowed`. Falls back
- * to a direct call for mock relations whose model lacks `withConnection`.
+ * Wrap a calculation method so its query runs inside `with_connection`; see
+ * {@link withQueryConnection}. Releases the connection afterwards instead of
+ * permanently leasing it via the deprecated `.connection` getter under
+ * `permanent_connection_checkout = :deprecated | :disallowed`.
  */
 function inQueryConnection<A extends unknown[], R>(
   fn: (this: CalculationRelation, ...args: A) => Promise<R>,
 ): (this: CalculationRelation, ...args: A) => Promise<R> {
   return function (this: CalculationRelation, ...args: A): Promise<R> {
-    const modelClass = (this as { _modelClass?: unknown })._modelClass as {
-      _adapter?: unknown;
-      withConnection?<X>(
-        run: () => Promise<X>,
-        o?: { preventPermanentCheckout?: boolean },
-      ): Promise<X>;
-    };
-    // A directly-assigned adapter (`Model.adapter = x`) bypasses the pool/lease,
-    // so there's nothing to prevent and no pool for `withConnection` to use.
-    if (modelClass?._adapter || typeof modelClass?.withConnection !== "function") {
-      return fn.apply(this, args);
-    }
-    return modelClass.withConnection(() => fn.apply(this, args), {
-      preventPermanentCheckout: true,
-    });
+    const modelClass = (this as { _modelClass?: unknown })._modelClass as typeof Base;
+    return withQueryConnection(modelClass, () => fn.apply(this, args));
   };
 }
 
@@ -983,6 +965,12 @@ export const Calculations = {
   maximum: inQueryConnection(performMaximum),
 } as const;
 
+/**
+ * Tracks column aliases during calculation queries to avoid
+ * conflicts when multiple aggregates are computed.
+ *
+ * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
+ */
 export class ColumnAliasTracker {
   private _aliases: Map<string, number> = new Map();
 

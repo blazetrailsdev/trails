@@ -14,6 +14,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Rollback } from "./errors.js";
 export { Rollback };
+import { withQueryConnection } from "./connection-handling.js";
 
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
@@ -88,7 +89,7 @@ export async function transaction<T>(
   // the already-checked-out connection instead of flipping the lease to permanent
   // under `permanent_connection_checkout = :deprecated | :disallowed`, so the
   // pool releases the connection once the transaction completes.
-  return runInQueryConnection(modelClass, async () => {
+  return withQueryConnection(modelClass, async () => {
     const adapter = modelClass.connection;
 
     const result = await dbTransaction.call(
@@ -117,31 +118,6 @@ export async function transaction<T>(
     );
     return result as T | undefined;
   });
-}
-
-/**
- * Run an internal query/transaction inside `with_connection(prevent_permanent_checkout: true)`
- * so the pool releases its connection afterwards instead of holding it
- * permanently. Falls back to invoking the block directly for model classes /
- * mocks that don't expose `withConnection`.
- *
- * @internal
- */
-export function runInQueryConnection<T>(
-  modelClass: typeof Base,
-  run: () => Promise<T>,
-): Promise<T> {
-  const klass = modelClass as unknown as {
-    _adapter?: unknown;
-    withConnection?<X>(
-      fn: () => Promise<X>,
-      o?: { preventPermanentCheckout?: boolean },
-    ): Promise<X>;
-  };
-  // A directly-assigned adapter (`Model.adapter = x`) bypasses the pool/lease,
-  // so there's nothing to prevent and no pool for `withConnection` to use.
-  if (klass._adapter || typeof klass.withConnection !== "function") return run();
-  return klass.withConnection(run, { preventPermanentCheckout: true });
 }
 
 /**
@@ -586,7 +562,7 @@ export async function withTransactionReturningStatus<T>(
   // Wrap in `with_connection` so the `ensure_finalize` connection probe and the
   // nested transaction don't permanently lease a connection under
   // `permanent_connection_checkout = :deprecated | :disallowed`.
-  await runInQueryConnection(modelClass, async () => {
+  await withQueryConnection(modelClass, async () => {
     // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
     const adapter = modelClass.connection;
     const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;

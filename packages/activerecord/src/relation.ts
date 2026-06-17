@@ -9,6 +9,7 @@ import {
   DeleteManager,
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
+import { withQueryConnection } from "./connection-handling.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import {
   ActiveRecordError,
@@ -4820,26 +4821,9 @@ export class Relation<T extends Base> {
     }
   }
 
-  /**
-   * Run an internal query inside `with_connection(prevent_permanent_checkout:
-   * true)` so the pool releases its connection afterwards rather than flipping
-   * the lease to permanent via the deprecated `.connection` getter under
-   * `permanent_connection_checkout = :deprecated | :disallowed`. Falls back to
-   * invoking the block directly for mock model classes without `withConnection`.
-   */
+  /** Run an internal read query inside `with_connection`; see {@link withQueryConnection}. */
   private _withQueryConnection<R>(run: () => Promise<R>): Promise<R> {
-    const modelClass = this._modelClass as unknown as {
-      _adapter?: unknown;
-      withConnection?<X>(
-        fn: () => Promise<X>,
-        o?: { preventPermanentCheckout?: boolean },
-      ): Promise<X>;
-    };
-    // A directly-assigned adapter (`Model.adapter = x`) bypasses the pool/lease
-    // entirely, so there's no permanent-checkout to prevent — and calling
-    // `withConnection` would throw (no pool established). Run inline.
-    if (modelClass._adapter || typeof modelClass.withConnection !== "function") return run();
-    return modelClass.withConnection(run, { preventPermanentCheckout: true });
+    return withQueryConnection(this._modelClass as unknown as typeof Base, run);
   }
 
   /** Resolve the connection through the public getter, returning null for HABTM join models with no established connection. */
@@ -6361,7 +6345,7 @@ export class Relation<T extends Base> {
 
   /** @internal */
   private performCalculation(operation: string, columnName: string): Promise<unknown> {
-    return this._withQueryConnection(() => _performCalculation(this as any, operation, columnName));
+    return _performCalculation(this as any, operation, columnName);
   }
 
   /** @internal */
