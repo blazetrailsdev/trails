@@ -1803,14 +1803,22 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Relation#scoping
    */
-  static async scoping<R>(rel: any, fn: () => R | Promise<R>): Promise<R> {
-    const prev = ScopeRegistry.currentScope(this);
-    ScopeRegistry.setCurrentScope(this, rel);
-    try {
-      return await fn();
-    } finally {
-      ScopeRegistry.setCurrentScope(this, prev);
-    }
+  static async scoping<R>(rel: any, fn: () => R | Promise<R>): Promise<R>;
+  static async scoping<R>(
+    rel: any,
+    options: { allQueries?: boolean | null },
+    fn: () => R | Promise<R>,
+  ): Promise<R>;
+  static async scoping<R>(
+    rel: any,
+    optionsOrFn: { allQueries?: boolean | null } | (() => R | Promise<R>),
+    maybeFn?: () => R | Promise<R>,
+  ): Promise<R> {
+    // Delegate to Relation#scoping so the all_queries threading (global current
+    // scope + nested-unset guard) lives in one place.
+    return typeof optionsOrFn === "function"
+      ? rel.scoping(optionsOrFn)
+      : rel.scoping(optionsOrFn, maybeFn);
   }
 
   /**
