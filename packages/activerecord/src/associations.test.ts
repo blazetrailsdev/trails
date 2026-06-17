@@ -2246,6 +2246,9 @@ describe("PreloaderTest", () => {
       gql_posts: { gql_author_id: "integer", title: "string" },
       gqs_authors: { name: "string" },
       gqs_posts: { gqs_author_id: "integer", title: "string" },
+      gse_authors: { name: "string" },
+      gse_comments: { body: "string", gse_post_id: "integer" },
+      gse_posts: { gse_author_id: "integer", title: "string" },
       gsl_authors: { name: "string" },
       gsl_comments: { body: "string", gsl_post_id: "integer" },
       gsl_posts: { gsl_author_id: "integer", title: "string" },
@@ -3015,9 +3018,69 @@ describe("PreloaderTest", () => {
     // 3 batched DB calls: thinking_posts, welcome_posts, then ONE coalesced comments call.
     expect(spy).toHaveBeenCalledTimes(3);
   });
-  it.skip("preload groups queries with same sql at second level", () => {
-    // Tracked: RFC 0030 story preload-extending-grouping
-    /* BLOCKED: associations — needs `extending` association option to differentiate vs `same scope`. */
+  it("preload groups queries with same sql at second level", async () => {
+    const gseExtension = {
+      mostRecent(this: any) {
+        return this.order("id DESC").first();
+      },
+    };
+    class GSEAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class GSEPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("gse_author_id", "integer");
+      }
+    }
+    class GSEComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("gse_post_id", "integer");
+      }
+    }
+    Associations.hasMany.call(GSEAuthor, "gseThinkingPosts", {
+      className: "GSEPost",
+      foreignKey: "gse_author_id",
+      scope: (rel: any) => rel.where({ title: "Thinking" }),
+    });
+    Associations.hasMany.call(GSEAuthor, "gseWelcomePosts", {
+      className: "GSEPost",
+      foreignKey: "gse_author_id",
+      scope: (rel: any) => rel.where({ title: "Welcome" }),
+    });
+    Associations.hasMany.call(GSEPost, "gseComments", {
+      className: "GSEComment",
+      foreignKey: "gse_post_id",
+    });
+    // Same SQL as gseComments, differing only by an `extending` module — Rails
+    // excludes `:extending` from `values_for_queries`, so these coalesce.
+    Associations.hasMany.call(GSEPost, "gseCommentsWithExtending", {
+      className: "GSEComment",
+      foreignKey: "gse_post_id",
+      scope: (rel: any) => rel.extending(gseExtension),
+    });
+    registerModel("GSEAuthor", GSEAuthor);
+    registerModel("GSEPost", GSEPost);
+    registerModel("GSEComment", GSEComment);
+    const a = await GSEAuthor.create({ name: "David" });
+    const tp = await GSEPost.create({ title: "Thinking", gse_author_id: a.id });
+    const wp = await GSEPost.create({ title: "Welcome", gse_author_id: a.id });
+    await GSEComment.create({ body: "c1", gse_post_id: tp.id });
+    await GSEComment.create({ body: "c2", gse_post_id: wp.id });
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({
+      records: [a],
+      associations: [
+        { gseThinkingPosts: "gseComments" },
+        { gseWelcomePosts: "gseCommentsWithExtending" },
+      ],
+    }).call();
+    // 3 batched DB calls: thinking_posts, welcome_posts, then ONE coalesced
+    // comments call shared by gseComments and gseCommentsWithExtending.
+    expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload with grouping sets inverse association", async () => {
     class IAAuthor extends Base {
