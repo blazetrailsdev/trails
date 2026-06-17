@@ -617,15 +617,19 @@ export class CollectionAssociation extends Association {
     const fk = this.reflection.options.foreignKey;
     if (typeof fk === "string") return [fk];
     if (Array.isArray(fk)) return fk;
-    // Prefer the reflection's foreign key, derived from the class that
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+    };
+    // Prefer the *rich* reflection's foreign key, derived from the class that
     // *declared* the association (`reflection.active_record`), not the owner
-    // instance's class. For an STI subclass owner (e.g. a `SpecialPost` whose
-    // `has_many :special_comments` is declared on `Post`) this yields
+    // instance's class. `this.reflection` is the lightweight AssociationDefinition
+    // with no `foreignKey` getter, so resolve the registered Reflection the same
+    // way `foreignKeyPresent` does. For an STI subclass owner (e.g. a `SpecialPost`
+    // whose `has_many :special_comments` is declared on `Post`) this yields
     // `post_id`, not `special_post_id` — mirrors Rails `reflection.foreign_key`.
-    const reflectionFk = (this.reflection as any).foreignKey;
+    const reflectionFk = ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
     if (typeof reflectionFk === "string") return [reflectionFk];
     if (Array.isArray(reflectionFk)) return reflectionFk;
-    const ctor = this.owner.constructor as any;
     if (this.reflection.options.as) {
       return [`${underscore(this.reflection.options.as)}_id`];
     }

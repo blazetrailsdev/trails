@@ -897,10 +897,13 @@ describe("DefaultScopingTest", () => {
       const built = post.specialComments.build({ body: "built sti comment" });
       expect(built._readAttribute("post_id")).toBe(post.id);
 
-      // CollectionAssociation#build → setOwnerAttributes → foreignKeyColumns
+      // CollectionAssociation#setOwnerAttributes → foreignKeyColumns. Exercise
+      // it on a record built outside the association so no scope_for_create FK
+      // masks the column actually written by setOwnerAttributes.
       const assoc = post.association("specialComments");
-      const builtViaAssoc = assoc.build({ body: "assoc built sti comment" });
-      expect(builtViaAssoc._readAttribute("post_id")).toBe(post.id);
+      const fresh = new SpecialComment({ body: "fresh sti comment" });
+      assoc.setOwnerAttributes(fresh);
+      expect(fresh._readAttribute("post_id")).toBe(post.id);
 
       // The nullify update (computeNullifiedOwnerAttributes) keys the
       // declaring-class FK, not `special_post_id`.
