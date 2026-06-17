@@ -22,6 +22,7 @@ import useFixturesSchema from "./eslint/use-fixtures-schema.mjs";
 import requireCanonicalSchema from "./eslint/require-canonical-schema.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
+import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 
 export default defineConfig(
   {
@@ -130,6 +131,7 @@ export default defineConfig(
           "require-canonical-schema": requireCanonicalSchema,
           "require-table-teardown": requireTableTeardown,
           "no-raw-sql": noRawSql,
+          "no-standalone-associations": noStandaloneAssociations,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
         },
@@ -380,6 +382,24 @@ export default defineConfig(
     ],
     rules: {
       "blazetrails/no-raw-sql": "error",
+    },
+  },
+
+  // ── no-standalone-associations: associations must be declared in-class via
+  //    `this.<macro>(…)` in a `static {}` block, not bolted on after the class
+  //    with the standalone `Associations.<macro>.call(Model, …)` form. The
+  //    in-class form lets materialize-model-declares.ts generate the `declare`
+  //    accessors so `parent.children` reads naturally. Autofixable when the
+  //    target class is same-file with a static block (else report-only).
+  //    ~1.9k pre-existing sites are grandfathered in
+  //    eslint/no-standalone-associations-exclude.json (a generated data file,
+  //    refreshed by scripts/generate-standalone-associations-exclude.ts) and
+  //    ratcheted down as sites convert; only NEW standalone usages fail.
+  //    See eslint/no-standalone-associations.mjs. ──
+  {
+    files: ["packages/*/src/**/*.ts"],
+    rules: {
+      "blazetrails/no-standalone-associations": "error",
     },
   },
 
