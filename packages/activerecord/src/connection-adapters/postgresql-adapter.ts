@@ -353,6 +353,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Whether _maybeConfigureConnection has run for the current _rawConnection.
   // Reset on reconnect.
   private _connectionConfigured = false;
+  // Whether the eager load_additional_types pass has run for the current
+  // physical connection. Reset on disconnect/discard (a brand-new socket needs
+  // it) but NOT on resetBang: DISCARD ALL leaves the in-memory type map intact,
+  // and the reset reconfigure runs inside the _inFlightReset barrier — issuing
+  // the pg_type queries there would deadlock awaitRawConnectionReady.
+  private _typeMapEagerLoaded = false;
   // The single StatementPool attached to _rawConnection. PG prepared
   // statements are session-scoped; lifetime tracks _rawConnection.
   private _statementPool: StatementPool | null = null;
@@ -639,6 +645,43 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
     this._connectionConfigured = true;
+    // Mirrors Rails' configure_connection, which ends with reload_type_map →
+    // initialize_type_map → load_additional_types: an eager full load of every
+    // array/range/multirange/enum/domain type once per physical connection.
+    // Aliasing every scalar OID up front means targeted loadAdditionalTypes
+    // misses (columns(), getOidType) always find their element/range subtype in
+    // the store — no deferral path needed.
+    //
+    // The pg_type queries run DIRECTLY on `client` (like the SET statements
+    // above), NOT through schemaQuery/withRawConnection. configure runs while
+    // the acquire machinery still holds `_acquiring` (and, on resetBang, inside
+    // the `_inFlightReset` barrier); routing these queries back through the
+    // connection-readiness stack would re-enter connectBang/verify or block on
+    // that barrier and deadlock. Issuing them on the raw socket sidesteps all
+    // of it, exactly as Rails runs them inline on the raw connection.
+    //
+    // Gated per physical socket: resetBang's DISCARD ALL leaves the in-memory
+    // type map intact, so the reconfigure it triggers can skip the reload.
+    if (!this._typeMapEagerLoaded) {
+      this._typeMapEagerLoaded = true;
+      await this._eagerLoadAdditionalTypes(client);
+    }
+  }
+
+  /**
+   * Run Rails' full `load_additional_types` reload directly on the raw
+   * connection `client`, bypassing schemaQuery/withRawConnection. Used only
+   * from `_maybeConfigureConnection`, where re-entering the acquire stack would
+   * deadlock. Rebuilds the base type map first (mirroring reload_type_map's
+   * clear) so the registrations layer onto a fresh map.
+   */
+  private async _eagerLoadAdditionalTypes(client: pg.Client): Promise<void> {
+    this._typeMap = null;
+    const initializer = new TypeMapInitializer(this.typeMap);
+    for await (const query of this.loadTypesQueries(initializer)) {
+      const result = await client.query(query);
+      initializer.run(result.rows as unknown as PgTypeRow[]);
+    }
   }
 
   /**
@@ -962,14 +1005,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const rows = (await this.schemaQuery(query)) as unknown as PgTypeRow[];
       initializer.run(rows);
     }
-    if (initializer.deferredMultirangeOids.length > 0) {
-      await this.loadAdditionalTypes([...new Set(initializer.deferredMultirangeOids)]);
-      initializer.retryDeferredMultiranges();
-    }
-    if (initializer.deferredArrayOids.length > 0) {
-      await this.loadAdditionalTypes([...new Set(initializer.deferredArrayOids)]);
-      initializer.retryDeferredArrays();
-    }
   }
 
   /**
@@ -1132,6 +1167,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       if (this._rawConnection === client) {
         this._rawConnection = null;
         this._connectionConfigured = false;
+        this._typeMapEagerLoaded = false;
         this._statementPool?.detach();
         this._statementPool = null;
       }
@@ -2236,6 +2272,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._client = null;
     this._inTransaction = false;
     this._connectionConfigured = false;
+    this._typeMapEagerLoaded = false;
     this._closed = true;
     const conn = this._rawConnection;
     this._rawConnection = null;
@@ -2286,6 +2323,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._rawConnection = null;
     this._client = null;
     this._connectionConfigured = false;
+    this._typeMapEagerLoaded = false;
     this._statementPool?.detach();
     this._statementPool = null;
     this._needsDeallocateAll = false;
@@ -2426,6 +2464,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             if (this._rawConnection === live) {
               this._rawConnection = null;
               this._connectionConfigured = false;
+              this._typeMapEagerLoaded = false;
               this._statementPool?.detach();
               this._statementPool = null;
             }
@@ -2477,6 +2516,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._rawConnection = null;
     this._client = null;
     this._connectionConfigured = false;
+    this._typeMapEagerLoaded = false;
     this._statementPool?.detach();
     this._statementPool = null;
     this._needsDeallocateAll = false;
@@ -2499,6 +2539,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._rawConnection = null;
     this._client = null;
     this._connectionConfigured = false;
+    this._typeMapEagerLoaded = false;
     this._statementPool?.detach();
     this._statementPool = null;
     this._needsDeallocateAll = false;

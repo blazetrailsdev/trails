@@ -41,33 +41,9 @@ export interface PgTypeRow {
 
 export class TypeMapInitializer {
   private store: TypeMap;
-  /** Multirange rows whose range OID was not yet in the store during run(). */
-  readonly deferredMultirangeOids: number[] = [];
-  private deferredMultirangeRows: PgTypeRow[] = [];
-  /** Array rows whose element (typelem) OID was not yet in the store during run(). */
-  readonly deferredArrayOids: number[] = [];
-  private deferredArrayRows: PgTypeRow[] = [];
 
   constructor(store: TypeMap) {
     this.store = store;
-  }
-
-  /** Re-attempt registration for any array rows deferred during run(). */
-  retryDeferredArrays(): void {
-    if (this.deferredArrayRows.length === 0) return;
-    const rows = this.deferredArrayRows;
-    this.deferredArrayRows = [];
-    this.deferredArrayOids.length = 0;
-    rows.forEach((row) => this.registerArrayType(row));
-  }
-
-  /** Re-attempt registration for any multirange rows deferred during run(). */
-  retryDeferredMultiranges(): void {
-    if (this.deferredMultirangeRows.length === 0) return;
-    const rows = this.deferredMultirangeRows;
-    this.deferredMultirangeRows = [];
-    this.deferredMultirangeOids.length = 0;
-    rows.forEach((row) => this.registerMultirangeType(row));
   }
 
   run(records: PgTypeRow[]): void {
@@ -163,13 +139,11 @@ export class TypeMapInitializer {
             : (rangeType as unknown as RangeSubtype);
         return new MultiRangeType(subtype, row.typname);
       });
-    } else if (rangeOid !== 0) {
-      // Range OID found but not yet registered — defer so adapter can load it.
-      this.deferredMultirangeOids.push(rangeOid);
-      this.deferredMultirangeRows.push(row);
     }
-    // rangeOid still 0 means range type not in store yet; skip silently.
-    // The adapter's loadAdditionalTypes will retry via columns() batch-load.
+    // A miss (range OID 0 or not yet registered) is skipped silently, mirroring
+    // Rails' register_with_subtype. The eager full load run by configureConnection
+    // registers the range row before its multirange in the same pass, so the
+    // store is already populated by the time this runs.
   }
 
   private registerEnumType(row: PgTypeRow): void {
@@ -191,18 +165,15 @@ export class TypeMapInitializer {
   }
 
   private registerArrayType(row: PgTypeRow): void {
-    // A targeted load_additional_types([arrayOid]) fetches only the array row,
-    // not its element type. When the element OID isn't in the store yet, defer
-    // so the adapter can load it and retry — otherwise the array would silently
-    // fall through to a ValueType (whose type() is "value"), which the schema
-    // dumper emits as a bogus `t.column(name, "value")` instead of `t.decimal`.
-    const subtypeOid = toInt(row.typelem);
-    if (!this.storeHas(subtypeOid)) {
-      this.deferredArrayOids.push(subtypeOid);
-      this.deferredArrayRows.push(row);
-      return;
-    }
-    this.registerWithSubtype(row.oid, subtypeOid, (subtype) => new OidArray(subtype, row.typdelim));
+    // Skip-on-miss via registerWithSubtype, mirroring Rails' register_array_type.
+    // The eager full load run by configureConnection aliases every scalar OID
+    // (its by-typname pass) before this array pass, so the element type is in
+    // the store and the array never falls through to a ValueType.
+    this.registerWithSubtype(
+      row.oid,
+      toInt(row.typelem),
+      (subtype) => new OidArray(subtype, row.typdelim),
+    );
   }
 
   private register(
