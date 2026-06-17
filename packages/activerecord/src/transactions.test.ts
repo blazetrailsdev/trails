@@ -29,6 +29,7 @@ import { AbstractAdapter } from "./index.js";
 import { assertQueriesMatch, assertNoQueries } from "./testing/query-assertions.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { StatementInvalid } from "./errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 // D-1 non-candidates: makeSQLiteTopic / makeSQLiteMovie and the inline
 // SQLite adapter tests below create isolated in-memory adapters because
@@ -1567,8 +1568,11 @@ describe("TransactionTest", () => {
     const p = await Post.create({ title: "txn-state" });
     expect((p as any).isPersisted()).toBe(true);
   });
-  it.skip("invalid keys for transaction", () => {
-    // transaction() does not validate option keys — feature gap vs Rails.
+  it("invalid keys for transaction", async () => {
+    const { Topic } = makeSQLiteTopic();
+    await expect(Topic.transaction(async () => {}, { nested: true } as any)).rejects.toThrow(
+      ArgumentError,
+    );
   });
   itIfSupports("savepoints", "using named savepoints", async () => {
     const { Topic, adapter } = makeSQLiteTopic();
@@ -1682,8 +1686,27 @@ describe("TransactionTest", () => {
     movie.writeAttribute("movieid", null);
     expect(movie.movieid).toBeNull();
   });
-  it.skip("sqlite add column in transaction", () => {
-    // DDL API (add_column) not exposed at the test layer.
+  it.skipIf(adapterType !== "sqlite")("sqlite add column in transaction", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    try {
+      // First test if column creation/deletion works correctly when no
+      // transaction is in place. We go back to the connection for the column
+      // queries because the model's columns are cached.
+      await adapter.addColumn("topics", "stuff", "string");
+      expect((await adapter.columns("topics")).map((c) => c.name)).toContain("stuff");
+
+      await adapter.removeColumn("topics", "stuff");
+      expect((await adapter.columns("topics")).map((c) => c.name)).not.toContain("stuff");
+
+      // SQLite supports DDL transactions, so add_column inside a transaction
+      // must not raise (Rails branches on supports_ddl_transactions? here).
+      await Topic.transaction(async () => {
+        await adapter.addColumn("topics", "stuff", "string");
+      });
+      expect((await adapter.columns("topics")).map((c) => c.name)).toContain("stuff");
+    } finally {
+      Topic.resetColumnInformation();
+    }
   });
   it.skipIf(adapterType !== "sqlite")("sqlite default transaction mode is immediate", async () => {
     const { Topic, adapter } = makeSQLiteTopic();
