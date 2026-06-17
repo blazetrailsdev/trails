@@ -66,16 +66,14 @@ export async function touch(
     }
   }
 
-  // Mirrors Rails ClassMethods#touch_attributes_with_time:
+  // Mirrors Rails Persistence#touch (persistence.rb:797-803):
   //   attribute_names = timestamp_attributes_for_update_in_model
-  //   attribute_names |= names
-  // Start from the same alias-resolved, columnNames()-filtered set the
-  // readonly check above iterates (updateTimestampAttrs) so the two never
-  // diverge, then union in the caller-supplied names.
-  const touchColSet = new Set<string>(updateTimestampAttrs);
-  for (const name of resolvedNames) {
-    if (ctor._attributeDefinitions.has(name)) touchColSet.add(name);
-  }
+  //   attribute_names = (attribute_names | names)...
+  // Start from the same alias-resolved, columnNames()-filtered set the readonly
+  // check above iterates (updateTimestampAttrs) so the two never diverge, then
+  // union in the caller-supplied names unconditionally — Rails adds them with no
+  // column-existence guard, letting the DB raise on a nonexistent column.
+  const touchColSet = new Set<string>([...updateTimestampAttrs, ...resolvedNames]);
   const touchCols = Array.from(touchColSet);
 
   if (touchCols.length === 0) return false;
