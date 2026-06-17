@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { cleanDefault, cleanRawPgExpression } from "./schema-dumper.js";
@@ -1287,6 +1287,51 @@ describe("cleanDefault", () => {
     expect(cleanDefault(null)).toBeNull();
     expect(cleanDefault(undefined)).toBeUndefined();
   });
+});
+
+// These tests dump real schemas built via MigrationContext on the shared
+// per-worker DB; drop every table they create, by name, so the leaked tables
+// don't collide with sibling files under parallel forks.
+afterAll(async () => {
+  const { ctx } = freshCtx();
+  const o = { ifExists: true } as const;
+  await ctx.dropTable("articles", o);
+  await ctx.dropTable("authors", o);
+  await ctx.dropTable("auto_inc", o);
+  await ctx.dropTable("bigint_array", o);
+  await ctx.dropTable("binaries", o);
+  await ctx.dropTable("binary_fields", o);
+  await ctx.dropTable("booleans", o);
+  await ctx.dropTable("CamelTable", o);
+  await ctx.dropTable("codes", o);
+  await ctx.dropTable("comments", o);
+  await ctx.dropTable("companies", o);
+  await ctx.dropTable("custom_pk", o);
+  await ctx.dropTable("defaults", o);
+  await ctx.dropTable("dump_defaults", o);
+  await ctx.dropTable("events", o);
+  await ctx.dropTable("goofy_string_id", o);
+  await ctx.dropTable("ignored_table", o);
+  await ctx.dropTable("indexed", o);
+  await ctx.dropTable("key_tests", o);
+  await ctx.dropTable("limits", o);
+  await ctx.dropTable("myapp_posts", o);
+  await ctx.dropTable("myapp_users", o);
+  await ctx.dropTable("myapp_users_v1", o);
+  await ctx.dropTable("numeric_data", o);
+  await ctx.dropTable("postgresql_oids", o);
+  await ctx.dropTable("postgresql_times", o);
+  await ctx.dropTable("posts", o);
+  await ctx.dropTable("products", o);
+  await ctx.dropTable("safe", o);
+  await ctx.dropTable("strict", o);
+  await ctx.dropTable("string_key_objects", o);
+  await ctx.dropTable("temp_cache", o);
+  await ctx.dropTable("test_schema_exclusion", o);
+  await ctx.dropTable("test_schema_unique", o);
+  await ctx.dropTable("test_uc_no_idx", o);
+  await ctx.dropTable("timestamps", o);
+  await ctx.dropTable("users", o);
 });
 
 describe("formatColspecRaw", () => {

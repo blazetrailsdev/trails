@@ -95,7 +95,12 @@ beforeEach(async () => {
 // files sharing the worker DB.
 afterAll(async () => {
   const conn = schema();
-  for (const t of RESERVED_TABLES) await conn.dropTable(t, { ifExists: true });
+  await conn.dropTable("values", { ifExists: true });
+  await conn.dropTable("group", { ifExists: true });
+  await conn.dropTable("distinct_select", { ifExists: true });
+  await conn.dropTable("distinct", { ifExists: true });
+  await conn.dropTable("select", { ifExists: true });
+  await conn.dropTable("order", { ifExists: true });
 });
 
 // Mirrors the Rails private `create_test_fixtures` loader: seed only the named

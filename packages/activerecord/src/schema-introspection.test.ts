@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { createTestAdapter } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import {
@@ -29,6 +29,16 @@ function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
     },
   }) as A;
 }
+
+// The tables these tests create via MigrationContext leak into the shared
+// per-worker DB; drop them by name so they don't collide with sibling files.
+afterEach(async () => {
+  const ctx = new MigrationContext(createTestAdapter());
+  await ctx.dropTable("widgets", { ifExists: true });
+  await ctx.dropTable("gadgets", { ifExists: true });
+  await ctx.dropTable("users", { ifExists: true });
+  await ctx.dropTable("standalone", { ifExists: true });
+});
 
 describe("introspectTables", () => {
   it("uses adapter.tables() when the adapter implements it", async () => {

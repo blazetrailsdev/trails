@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "./index.js";
 import { IrreversibleMigration } from "./migration.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
@@ -15,6 +15,25 @@ import type { DatabaseAdapter } from "./adapter.js";
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+// Tables these migrations create (some via auto-reversed `change`, some up-only)
+// leak into the shared per-worker DB; drop each by name so they don't collide
+// with sibling files under parallel forks.
+afterEach(async () => {
+  const ss = (freshAdapter() as any).schemaStatements();
+  await ss.dropTable("horses", { ifExists: true });
+  await ss.dropTable("animals", { ifExists: true });
+  await ss.dropTable("foo", { ifExists: true });
+  await ss.dropTable("bar_table", { ifExists: true });
+  await ss.dropTable("items", { ifExists: true });
+  await ss.dropTable("first_table", { ifExists: true });
+  await ss.dropTable("second_table", { ifExists: true });
+  await ss.dropTable("up_test", { ifExists: true });
+  await ss.dropTable("down_test", { ifExists: true });
+  await ss.dropTable("idx_test", { ifExists: true });
+  await ss.dropTable("up_only_tbl", { ifExists: true });
+  await ss.dropTable("posts", { ifExists: true });
+});
 
 describe("InvertibleMigrationTest", () => {
   let adapter: DatabaseAdapter;
