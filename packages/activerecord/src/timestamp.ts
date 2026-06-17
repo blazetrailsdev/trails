@@ -66,14 +66,13 @@ export async function touch(
     }
   }
 
-  const touchColSet = new Set<string>();
-  // Mirrors Rails Persistence#touch: touches `timestamp_attributes_for_update_in_model`,
-  // i.e. updated_at/updated_on resolved through `attribute_aliases` to the real
-  // column (e.g. Developer's updated_at → legacy_updated_at).
-  for (const name of UPDATED_ATTRS) {
-    const col = aliases[name] ?? name;
-    if (ctor._attributeDefinitions.has(col)) touchColSet.add(col);
-  }
+  // Mirrors Rails ClassMethods#touch_attributes_with_time:
+  //   attribute_names = timestamp_attributes_for_update_in_model
+  //   attribute_names |= names
+  // Start from the same alias-resolved, columnNames()-filtered set the
+  // readonly check above iterates (updateTimestampAttrs) so the two never
+  // diverge, then union in the caller-supplied names.
+  const touchColSet = new Set<string>(updateTimestampAttrs);
   for (const name of resolvedNames) {
     if (ctor._attributeDefinitions.has(name)) touchColSet.add(name);
   }
