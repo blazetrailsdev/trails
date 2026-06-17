@@ -176,7 +176,14 @@ export class InsertAll {
     // directly for its `unique_by || model.primary_key` match.
     if (this._schemaCachePrimaryKeys === undefined) {
       this._schemaCachePrimaryKeys = await this.dbPrimaryKeys();
-      if (this._returningDefaulted) this.returning = this.primaryKeys();
+      if (this._returningDefaulted) {
+        // Rails: `@returning = primary_keys` then `@returning = false if
+        // @returning == []` (insert_all.rb:39-40). For an id-less table the
+        // schema-cache primary keys are [], so RETURNING is dropped entirely
+        // rather than emitting a bare `RETURNING ""`.
+        const pks = this.primaryKeys();
+        this.returning = pks.length > 0 ? pks : false;
+      }
     }
     if (!this._uniqueByResolved) {
       this.uniqueBy = await this.findUniqueIndexFor(this.uniqueBy);
