@@ -34,6 +34,8 @@ function emitTableSql(td: TableDefinition): string {
   return new SQLite3SchemaCreation("sqlite", adapter).accept(td);
 }
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { Person } from "./test-helpers/models/person.js";
+import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 import {
@@ -1480,14 +1482,26 @@ describe("MigrationTest", () => {
     expect(versions.length).toBe(0);
   });
 
-  it.skip("name collision across dbs", () => {
-    // BLOCKED: filesystem-migrator — Rails builds `MigrationContext.new(MIGRATIONS_ROOT + "/valid")`
-    // and runs `migrator.up`, loading versioned migration files from a directory and asserting
-    // `Person` gained a `last_name` column. trails' MigrationContext is an adapter-backed DDL
-    // recorder (createTable/addColumn maps), not a path-based file loader with version tracking,
-    // so there is no faithful way to load the `/valid` fixture migrations here.
-    // ROOT-CAUSE: MigrationContext lacks Rails' filesystem migration-loading semantics.
-    // Tracked upstream in RFC 0030 story `migration-context-filesystem-loader`.
+  it("name collision across dbs", async () => {
+    // Rails builds `MigrationContext.new(MIGRATIONS_ROOT + "/valid")` and runs
+    // `migrator.up`, loading versioned migration files from a directory, then
+    // asserts `Person` gained a `last_name` column. trails' filesystem
+    // equivalent is `Migrator.fromDir(dir, adapter)`, which discovers
+    // `\d+_*.ts` files, imports each as a MigrationLike, and runs them in
+    // version order.
+    const adp = await freshAdapterWithSchema();
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const migrationsPath = join(here, "test-helpers", "migrations", "valid");
+
+    const migrator = Migrator.fromDir(migrationsPath, adp);
+    await migrator.up();
+
+    (Person as any).adapter = adp;
+    (Person as any).resetColumnInformation();
+    await loadSchemaFromAdapter.call(Person as any);
+    expect(Person.columnNames()).toContain("last_name");
   });
 
   it("migration detection without schema migration table", async () => {
