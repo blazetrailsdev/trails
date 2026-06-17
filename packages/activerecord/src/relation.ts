@@ -126,7 +126,7 @@ import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { rubyInspectArray, inspectArelValue, inspectOrderClause } from "./relation/ruby-inspect.js";
 import { JoinDependency } from "./associations/join-dependency.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
-import type { AliasTracker } from "./associations/alias-tracker.js";
+import { AliasTracker } from "./associations/alias-tracker.js";
 
 /**
  * A Relation returned from `load()` / `reload()` — a normal Relation with
@@ -252,33 +252,43 @@ function _addAssocJoin(
   leftOuterJoinsValues: ReadonlyArray<unknown> | undefined,
   ownerTable: string,
   quoteTable: (name: string) => string,
-  aliasLength: number,
-  // Joins already emitted via JoinDependency (_namedInnerJoins from a prior
-  // `joins(:assoc)`), resolved to comparable table/ON specs. Considered for
-  // collision/alias detection (so a sibling association on the same table is
-  // aliased) but never themselves re-emitted; JoinDependency owns their SQL.
-  existingJdJoins: ReadonlyArray<{ table: string; on: string | Nodes.Node; assoc?: string }> = [],
+  // One AliasTracker shared across every JoinDependency bucket (inner joins,
+  // left-outer joins, eager load) plus the flat where-joins already minted on
+  // this relation — mirroring Rails' single `JoinDependency#alias_tracker`. A
+  // self-join added here is therefore aliased relative to a sibling join in ANY
+  // bucket, not just the flat one. Mutated as joins are minted.
+  tracker: AliasTracker,
+  // Association joins already emitted via JoinDependency (joins/leftOuterJoins/
+  // eager). Used only for association-level dedup (a repeat of the same
+  // association reuses the existing join); their SQL is owned by JoinDependency
+  // and never re-emitted here.
+  jdJoins: ReadonlyArray<{ table: string; assoc: string }> = [],
 ): string | undefined {
   // If the association is already covered by the deferred LEFT OUTER JOIN path,
   // skip — that join is emitted when the manager is built, so adding a second
   // join here would cause ambiguous column names.
   if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return undefined;
-  // Read-side view unions the JoinDependency joins so collision/alias detection
-  // sees a `joins(:assoc)` that lives outside _joinClauses; writes still target
-  // _joinClauses only.
-  const visible = existingJdJoins.length > 0 ? [...existingJdJoins, ...clauses] : clauses;
   // Association-level dedup (Rails `left_outer_joins_values |= args`,
-  // query_methods.rb:124-128) must run BEFORE the table/ON collision check: an
-  // already-aliased sibling join's ON references the alias, so it no longer
-  // equals a repeat call's freshly-derived ON and would mint a second alias.
-  const sameAssoc = visible.find((j) => j.assoc === assocName && j.table === join.table);
-  if (sameAssoc) return (sameAssoc as { as?: string }).as;
-  const sameTableJoins = visible.filter((j) => j.table === join.table);
-  if (sameTableJoins.length > 0) {
-    if (sameTableJoins.every((j) => _onEquals(j.on, join.on))) return undefined; // all compatible — skip
-    // Two sibling associations target the same table under different ON
-    // conditions — alias the later join per Rails' AliasTracker (see below).
-    const { alias, base } = _selfJoinAlias(assocName, ownerTable, visible, aliasLength);
+  // query_methods.rb:124-128): a sibling join for the SAME association already
+  // emitted via JoinDependency or a prior flat where-join is reused. A
+  // JoinDependency join carries no flat alias, so the predicate keeps the real
+  // table; a prior flat join reuses whatever alias it minted.
+  if (jdJoins.some((j) => j.assoc === assocName && j.table === join.table)) return undefined;
+  const sameAssoc = clauses.find((j) => j.assoc === assocName && j.table === join.table);
+  if (sameAssoc) return sameAssoc.as;
+  // Flat-to-flat repeat with a compatible ON collapses into the existing join.
+  const sameTableFlat = clauses.filter((j) => j.table === join.table);
+  if (sameTableFlat.length > 0 && sameTableFlat.every((j) => _onEquals(j.on, join.on))) {
+    return undefined;
+  }
+  // Mint via the unified tracker: real table on first use, else the Rails
+  // `{plural}_{owner_table}` candidate (with `_N` on repeat). When the target
+  // table is already claimed by a join in another bucket, this aliases the new
+  // join consistently — the cross-bucket self-join case (e.g. an inner
+  // `joins(:readingListing)` and a left-outer `missing(:unreadListing)` both on
+  // the books table).
+  const alias = _trackerAliasFor(tracker, join.table, assocName, ownerTable);
+  if (alias) {
     // Rebind the target reference to the alias. An Arel predicate node is
     // rebound at the AST level (swap the target `Table` inside its attributes);
     // a raw-SQL ON string still references the target as `<quotedTable>.<col>`,
@@ -293,7 +303,6 @@ function _addAssocJoin(
       on: reboundOn,
       quoted: true,
       as: alias,
-      aliasBase: base,
       assoc: assocName,
     });
     return alias;
@@ -303,36 +312,24 @@ function _addAssocJoin(
 }
 
 /**
- * Compute a Rails-`AliasTracker`-faithful self-join alias for a sibling
- * association join colliding on the same table. Mirrors `aliased_table_for`
- * (alias_tracker.rb:60-77): the candidate `"#{plural_name}_#{owner_table}"`
- * (reflection.rb:328-330) is normalized to `table_alias_length` (dots →
- * underscores), and a `_<count>` suffix on a `truncate`d (`length - 2`) base is
- * appended for repeats — so long names neither diverge from Rails nor exceed
- * adapter alias limits.
- *
- * The count keys on the base name: a seed from pre-existing joins whose emitted
- * name exactly equals the candidate (`initial_count_for`, alias_tracker.rb:28-43),
- * plus the aliases this helper already minted for the SAME candidate — tracked
- * via `aliasBase`, not by matching the suffix pattern, so an unrelated join
- * named `<truncated>_<n>` can't perturb the count. `base` is returned so the
- * caller can stamp it onto the clause for that attribution.
+ * Claim `table` in the shared AliasTracker and return the SQL alias to use:
+ * `undefined` on the table's first use (it keeps its real name), else the
+ * Rails `aliased_table_for` candidate `"#{plural_name}_#{owner_table}"`
+ * (reflection.rb:328-330), suffixed `_N` on repeats by the tracker. Mirrors the
+ * collision branch of `JoinDependency#addAssociation` so a flat where-join and a
+ * JoinDependency join draw from one alias namespace.
  */
-function _selfJoinAlias(
+function _trackerAliasFor(
+  tracker: AliasTracker,
+  table: string,
   assocName: string,
   ownerTable: string,
-  clauses: ReadonlyArray<{ table: string; as?: string; aliasBase?: string }>,
-  aliasLength: number,
-): { alias: string; base: string } {
-  const candidate = `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`;
-  const aliasedName = candidate.slice(0, aliasLength).replace(/\./g, "_");
-  const truncated = aliasedName.slice(0, aliasLength - 2);
-  const seed = clauses.filter(
-    (j) => j.aliasBase === undefined && (j.as ?? j.table) === aliasedName,
-  ).length;
-  const minted = clauses.filter((j) => j.aliasBase === aliasedName).length;
-  const count = seed + minted + 1;
-  return { alias: count > 1 ? `${truncated}_${count}` : aliasedName, base: aliasedName };
+): string | undefined {
+  if ((tracker.aliases.get(table) ?? 0) === 0) {
+    tracker.aliases.set(table, 1);
+    return undefined;
+  }
+  return tracker.aliasNameFor(`${_pluralize(_toUnderscore(assocName))}_${ownerTable}`);
 }
 
 function validateExplainOptions(options: ExplainOption[]): void {
@@ -648,8 +645,7 @@ export class Relation<T extends Base> {
       const cloned = rel._clone();
       const ownerTable = (rel._modelClass as any).tableName;
       const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
-      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
-      const jdJoins = cloned._namedInnerJoinClauses();
+      const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(ownerTable);
       let effectiveTable = target.table;
       for (const join of target.joins) {
         const alias = _addAssocJoin(
@@ -661,7 +657,7 @@ export class Relation<T extends Base> {
           cloned._leftOuterJoinsValues,
           ownerTable,
           quoteTable,
-          aliasLength,
+          tracker,
           jdJoins,
         );
         if (alias && join.table === target.table) effectiveTable = alias;
@@ -696,8 +692,7 @@ export class Relation<T extends Base> {
       const cloned = rel._clone();
       const ownerTable = (rel._modelClass as any).tableName;
       const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
-      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
-      const jdJoins = cloned._namedInnerJoinClauses();
+      const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(ownerTable);
       let effectiveTable = target.table;
       for (const join of target.joins) {
         const alias = _addAssocJoin(
@@ -709,7 +704,7 @@ export class Relation<T extends Base> {
           cloned._leftOuterJoinsValues,
           ownerTable,
           quoteTable,
-          aliasLength,
+          tracker,
           jdJoins,
         );
         if (alias && join.table === target.table) effectiveTable = alias;
@@ -734,28 +729,46 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Resolve simple `joins(:assoc)` names (stored in _namedInnerJoins and emitted
-   * via JoinDependency) to comparable table/ON specs, so whereAssociated /
-   * whereMissing can detect a sibling join on the same table and alias it rather
-   * than minting a colliding bare-table join. Nested-through names that the flat
-   * resolver can't express are skipped (no comparable single ON).
+   * Build one AliasTracker spanning every JoinDependency bucket — inner
+   * `joins`, `leftOuterJoins`, eager load, and `includes` — plus the flat
+   * association where-joins already minted on this relation. This mirrors Rails'
+   * single `JoinDependency#alias_tracker`: trails builds a JoinDependency per
+   * bucket, but seeding one tracker from all of them gives whereAssociated /
+   * whereMissing a unified alias namespace, so a self-join they add is aliased
+   * relative to a sibling join in ANY bucket (e.g. an inner
+   * `joins(:readingListing)` and a left-outer `missing(:unreadListing)` both on
+   * the books table).
+   *
+   * The base table is excluded from the seed so a first true self-join (target
+   * == owner) keeps the owner unaliased, preserving the existing flat-path
+   * behavior. `jdJoins` carries each JoinDependency join's (table, association)
+   * for association-level dedup.
    *
    * @internal
    */
-  private _namedInnerJoinClauses(): Array<{
-    table: string;
-    on: string | Nodes.Node;
-    assoc: string;
-  }> {
-    const out: Array<{ table: string; on: string | Nodes.Node; assoc: string }> = [];
-    for (const v of this._namedInnerJoins) {
-      if (typeof v !== "string") continue;
-      const resolved = this._resolveAssociationJoin(v);
-      for (const j of resolved ? (Array.isArray(resolved) ? resolved : [resolved]) : []) {
-        out.push({ table: j.table, on: j.on, assoc: v });
+  private _unifiedJoinAliasTracker(ownerTable: string): {
+    tracker: AliasTracker;
+    jdJoins: Array<{ table: string; assoc: string }>;
+  } {
+    const seed = new Map<string, number>();
+    const jdJoins: Array<{ table: string; assoc: string }> = [];
+    const deps = _qm.buildJoinDependencies.call(this as any) as JoinDependency[];
+    for (const jd of deps) {
+      for (const [name, count] of jd.aliasTrackerSnapshot) {
+        if (name === ownerTable) continue;
+        seed.set(name, Math.max(seed.get(name) ?? 0, count));
+      }
+      for (const node of jd.nodes) {
+        jdJoins.push({ table: node.tableName, assoc: node.immediateAssocName });
       }
     }
-    return out;
+    const tracker = new AliasTracker(undefined, seed);
+    // Replay flat where-joins already on this relation so a repeat self-join in
+    // a later chained whereAssociated/whereMissing gets the next `_N` suffix.
+    for (const c of this._joinClauses) {
+      _trackerAliasFor(tracker, c.table, c.assoc ?? "", ownerTable);
+    }
+    return { tracker, jdJoins };
   }
 
   /**
