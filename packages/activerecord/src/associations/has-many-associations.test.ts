@@ -31,6 +31,7 @@ import {
   loadHasMany,
   loadHasManyThrough,
   isAssociationCached,
+  setBelongsTo,
 } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
@@ -57,6 +58,11 @@ import { Subscription as HmSubscription } from "../test-helpers/models/subscript
 import { Post as HmPost, FirstPost as HmFirstPost } from "../test-helpers/models/post.js";
 import { Tag as HmTag } from "../test-helpers/models/tag.js";
 import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
+import { Comment as HmComment } from "../test-helpers/models/comment.js";
+import { Human as HmHuman } from "../test-helpers/models/human.js";
+import { Category as HmCategory } from "../test-helpers/models/category.js";
+import { TypedEssay as HmTypedEssay } from "../test-helpers/models/essay.js";
+import { PersonWithPolymorphicDependentNullifyComments as HmPersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 const UNIVERSAL_HM_SCHEMA: Schema = {
@@ -599,169 +605,83 @@ describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const { posts, humans, categories } = useHandlerFixtures(
+    ["posts", "comments", "humans", "categories", "essays", "tags", "taggings", "people"],
+    { schema: TEST_SCHEMA },
+  );
+
   beforeAll(async () => {
-    await defineSchema({
-      dnp_comments: {
-        author_id: "integer",
-        author_type: "string",
-        body: "string",
-      },
-      dnp_people: { first_name: "string" },
-      jp_comments: {
-        body: "string",
-        commentable_id: "integer",
-        commentable_type: "string",
-      },
-      jp_posts: { title: "string" },
-      bphm_comments: {
-        body: "string",
-        commentable_id: "integer",
-        commentable_type: "string",
-      },
-      bphm_posts: { title: "string" },
-      bp_inv_comments: {
-        body: "string",
-        commentable_id: "integer",
-        commentable_type: "string",
-      },
-      bp_inv_posts: { title: "string" },
-      null_poly_comments: {
-        commentable_id: "integer",
-        commentable_type: "string",
-        body: "string",
-      },
-    });
+    registerModel(HmPost);
+    registerModel(HmComment);
+    registerModel(HmHuman);
+    registerModel(HmCategory);
+    registerModel(HmEssay);
+    registerModel(HmTag);
+    registerModel(HmTagging);
+    registerModel(HmPersonWithPolymorphicDependentNullifyComments);
+    enableSti(HmEssay);
+    registerSubclass(HmTypedEssay);
+    await HmPost.loadSchema();
+    await HmComment.loadSchema();
+    await HmHuman.loadSchema();
+    await HmCategory.loadSchema();
+    await HmEssay.loadSchema();
+    await HmTag.loadSchema();
+    await HmTagging.loadSchema();
   });
+
   it("depends and nullify on polymorphic assoc", async () => {
-    class DnpComment extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("author_type", "string");
-        this.attribute("body", "string");
-      }
-    }
-    class DnpPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
-    registerModel(DnpComment);
-    registerModel(DnpPerson);
-    Associations.hasMany.call(DnpPerson, "comments", {
-      className: "DnpComment",
-      as: "author",
-      dependent: "nullify",
+    const author = await HmPersonWithPolymorphicDependentNullifyComments.create({
+      first_name: "Laertis",
     });
-    const author = await DnpPerson.create({ first_name: "Laertis" });
-    const comment = await DnpComment.create({
-      author_id: author.id,
-      author_type: "DnpPerson",
-      body: "Hello",
-    });
-    expect(comment.author_id).toBe(author.id);
-    expect(comment.author_type).toBe("DnpPerson");
+    const comment = (await (posts("welcome") as any).comments.first()) as HmComment;
+    setBelongsTo(comment, "author", author, { polymorphic: true });
+    await comment.save();
+
+    expect((comment as any).author_id).toBe(author.id);
+    expect((comment as any).author_type).toBe(author.constructor.name);
+
     await author.destroy();
-    const reloaded = await DnpComment.find(comment.id as number);
-    expect(reloaded.author_id).toBeNull();
-    expect(reloaded.author_type).toBeNull();
+    const reloaded = await HmComment.find((comment as any).id as number);
+
+    expect((reloaded as any).author_id).toBeNull();
+    expect((reloaded as any).author_type).toBeNull();
   });
 
   it("joining through a polymorphic association with a where clause", async () => {
-    class JpComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-      }
-    }
-    class JpPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(JpComment);
-    registerModel(JpPost);
-    const post = await JpPost.create({ title: "Hello" });
-    await JpComment.create({ body: "Great", commentable_id: post.id, commentable_type: "JpPost" });
-    await JpComment.create({ body: "Nice", commentable_id: post.id, commentable_type: "JpPost" });
-    const comments = await JpComment.where({
-      commentable_id: post.id,
-      commentable_type: "JpPost",
-    }).toArray();
-    expect(comments.length).toBe(2);
+    const writer = humans("gordon");
+    const category = categories("general");
+    const essay = HmTypedEssay.new();
+    setBelongsTo(essay, "category", category, { primaryKey: "name" });
+    setBelongsTo(essay, "writer", writer, { primaryKey: "name", polymorphic: true });
+    await essay.save();
+
+    expect(await (HmCategory as any).joins("humanWritersOfTypedEssays").count()).toBe(1);
   });
 
   it("build with polymorphic has many does not allow to override type and id", async () => {
-    class BphmComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-      }
-    }
-    class BphmPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(BphmComment);
-    registerModel(BphmPost);
-    Associations.hasMany.call(BphmPost, "bphmComments", {
-      as: "commentable",
-      className: "BphmComment",
-    });
-    const post = await BphmPost.create({ title: "Hello" });
-    const proxy = association(post, "bphmComments");
-    const comment = proxy.build({ body: "nice", commentable_id: 999, commentable_type: "Evil" });
-    expect(comment.commentable_id).toBe(post.id);
-    expect(comment.commentable_type).toBe("BphmPost");
+    const welcome = posts("welcome") as any;
+    const tagging = welcome.taggings.build({ taggable_id: 99, taggable_type: "ShouldNotChange" });
+
+    expect(tagging.taggable_id).toBe(welcome.id);
+    expect(tagging.taggable_type).toBe("Post");
   });
 
   it("build from polymorphic association sets inverse instance", async () => {
-    class BpInvComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-      }
-    }
-    class BpInvPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(BpInvComment);
-    registerModel(BpInvPost);
-    Associations.hasMany.call(BpInvPost, "bpInvComments", {
-      as: "commentable",
-      className: "BpInvComment",
-    });
-    const post = await BpInvPost.create({ title: "Hello" });
-    const proxy = association(post, "bpInvComments");
-    const comment = proxy.build({ body: "nice" });
-    expect(comment.commentable_id).toBe(post.id);
-    expect(comment.commentable_type).toBe("BpInvPost");
+    const post = HmPost.new();
+    const tagging = association(post, "taggings").build();
+
+    expect(await loadBelongsTo(tagging, "taggable", { polymorphic: true })).toBe(post);
   });
 
   it("attributes are set when initialized from polymorphic has many null relationship", async () => {
-    class NullPolyComment extends Base {
-      static {
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-        this.attribute("body", "string");
-      }
-    }
-    registerModel(NullPolyComment);
-    const comment = NullPolyComment.new({
-      commentable_id: null as any,
-      commentable_type: null as any,
-      body: "Orphan",
-    });
-    expect((comment as any).commentable_id).toBeNull();
-    expect((comment as any).commentable_type).toBeNull();
-    expect((comment as any).body).toBe("Orphan");
+    const post = HmPost.new({ title: "title", body: "bar" });
+    const tag = await HmTag.create({ name: "foo" });
+
+    const tagging = await (association(post, "taggings") as any).firstOrInitialize({ tag });
+
+    expect((tagging as any).tag_id).toBe(tag.id);
+    expect((tagging as any).taggable_type).toBe("Post");
   });
 });
 
