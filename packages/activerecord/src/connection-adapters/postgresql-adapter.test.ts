@@ -46,6 +46,31 @@ const pgSupportsNativePartitioning = pgServerVersionNum >= 100000;
 
 const describeIfPg = pgAvailable ? describe : describe.skip;
 
+describe("PostgreSQLAdapter#columnMethodNames", () => {
+  it("appends PG ColumnMethods shorthands to the abstract list", () => {
+    const adapter = Object.create(PostgreSQLAdapter.prototype) as PostgreSQLAdapter;
+    const names = adapter.columnMethodNames();
+    for (const name of [
+      "serial",
+      "bigserial",
+      "bitVarying",
+      "int4range",
+      "int8range",
+      "jsonb",
+      "uuid",
+      "hstore",
+      "citext",
+      "timestamptz",
+      "enum",
+    ]) {
+      expect(names).toContain(name);
+    }
+    // Abstract names still present; native-types `primary_key` is not surfaced.
+    expect(names).toContain("virtual");
+    expect(names).not.toContain("primary_key");
+  });
+});
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 

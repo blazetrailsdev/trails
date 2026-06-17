@@ -509,6 +509,31 @@ export const RAW_CONNECTION_DEPRECATION_MESSAGE =
   "deprecated and will be removed. Pass a configuration hash (or connection " +
   "string) and let the adapter open and manage the connection itself.";
 
+/**
+ * The base `ColumnMethods` shorthands every adapter's `change_table` proxy
+ * exposes, mirroring `abstract/schema_definitions.rb:324` (`define_column_methods`
+ * plus the `:blob`/`:numeric` aliases). Adapter-specific names are appended in
+ * each adapter's `columnMethodNames()` override.
+ */
+export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
+  "bigint",
+  "binary",
+  "boolean",
+  "date",
+  "datetime",
+  "decimal",
+  "float",
+  "integer",
+  "json",
+  "string",
+  "text",
+  "time",
+  "timestamp",
+  "virtual",
+  "blob",
+  "numeric",
+];
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
@@ -1130,13 +1155,15 @@ export class AbstractAdapter implements Quoting {
    * (`abstract/schema_definitions.rb` ColumnMethods). The `change_table`
    * recorder uses these to surface `t.<type>` shorthands faithfully.
    *
-   * The abstract default approximates the list from `nativeDatabaseTypes`;
-   * adapters whose `ColumnMethods` list diverges from their native types
-   * (e.g. PostgreSQL's `serial`/`bigserial`, which are SERIAL/BIGSERIAL
-   * pseudo-types absent from `NATIVE_DATABASE_TYPES`) override this.
+   * Mirrors the explicit `ColumnMethods` list in
+   * `abstract/schema_definitions.rb:324` (`define_column_methods` plus the
+   * `blob`/`numeric` aliases) — NOT `Object.keys(nativeDatabaseTypes())`, which
+   * is only an approximation (it surfaces `primary_key` and omits `virtual`).
+   * Adapters whose `ColumnMethods` list adds more (MySQL, PostgreSQL) override
+   * this and append their own names to `super.columnMethodNames()`.
    */
   columnMethodNames(): string[] {
-    return Object.keys(this.nativeDatabaseTypes());
+    return [...ABSTRACT_COLUMN_METHOD_NAMES];
   }
 
   isReplica(): boolean {

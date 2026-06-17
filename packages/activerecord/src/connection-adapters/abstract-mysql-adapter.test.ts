@@ -45,6 +45,32 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
   });
 });
 
+describe("AbstractMysqlAdapter#columnMethodNames", () => {
+  it("appends MySQL ColumnMethods shorthands to the abstract list", async () => {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as any;
+    const names = adapter.columnMethodNames();
+    for (const name of [
+      "tinyblob",
+      "mediumblob",
+      "longblob",
+      "tinytext",
+      "mediumtext",
+      "longtext",
+      "unsignedInteger",
+      "unsignedBigint",
+      "unsignedFloat",
+      "unsignedDecimal",
+    ]) {
+      expect(names).toContain(name);
+    }
+    // Abstract names still present; native-types `primary_key` is not surfaced.
+    expect(names).toContain("virtual");
+    expect(names).toContain("bigint");
+    expect(names).not.toContain("primary_key");
+  });
+});
+
 describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
   async function makeAdapter(columnName: string, extra: string, supportsRename = false) {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");

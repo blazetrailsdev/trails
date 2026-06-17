@@ -2082,12 +2082,47 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return (this.constructor as typeof PostgreSQLAdapter).nativeDatabaseTypes();
   }
 
-  // Mirrors PG's explicit `ColumnMethods` list (`postgresql/schema_definitions.rb`
-  // `define_column_methods`): `serial`/`bigserial` are SERIAL/BIGSERIAL
-  // pseudo-types exposed as column shorthands but absent from
-  // NATIVE_DATABASE_TYPES, so add them to the native-types approximation.
+  // Mirrors PG's explicit `ColumnMethods` list (`postgresql/schema_definitions.rb:185`
+  // `define_column_methods`), appended to the abstract names. `serial`/`bigserial`
+  // are SERIAL/BIGSERIAL pseudo-types and the range/geometric/network types are all
+  // exposed as `change_table` shorthands. Multi-word names use the camelCase form of
+  // the trails TableDefinition method (e.g. `bit_varying` -> `bitVarying`).
   override columnMethodNames(): string[] {
-    return [...super.columnMethodNames(), "serial", "bigserial"];
+    return [
+      ...super.columnMethodNames(),
+      "bigserial",
+      "bit",
+      "bitVarying",
+      "cidr",
+      "citext",
+      "daterange",
+      "hstore",
+      "inet",
+      "interval",
+      "int4range",
+      "int8range",
+      "jsonb",
+      "ltree",
+      "macaddr",
+      "money",
+      "numrange",
+      "oid",
+      "point",
+      "line",
+      "lseg",
+      "box",
+      "path",
+      "polygon",
+      "circle",
+      "serial",
+      "tsrange",
+      "tstzrange",
+      "tsvector",
+      "uuid",
+      "xml",
+      "timestamptz",
+      "enum",
+    ];
   }
 
   // Mirrors: PostgreSQLAdapter#set_standard_conforming_strings (postgresql_adapter.rb:412)
