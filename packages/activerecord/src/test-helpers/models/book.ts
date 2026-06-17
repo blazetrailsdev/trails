@@ -1,5 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Author } from "./author.js";
 import type { Citation } from "./citation.js";
 import type { Essay } from "./essay.js";
@@ -104,8 +105,29 @@ export class Book extends Base {
   declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
     ((name: "formatRecord") => Promise<Base | null>);
   declare loadHasOne: (name: "essay") => Promise<Essay | null>;
-  declare columns: unknown | null;
-  declare indexes: unknown | null;
+  declare author_id: number;
+  declare author_visibility: number | null;
+  declare boolean_status: boolean;
+  declare cover: string | null;
+  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare difficulty: number | null;
+  declare external_id: string;
+  declare font_size: number | null;
+  declare format: string;
+  declare format_record_id: number;
+  declare format_record_type: string;
+  declare illustrator_visibility: number | null;
+  declare isbn: string;
+  declare language: number | null;
+  declare last_read: number | null;
+  declare name: string;
+  declare nullable_status: number;
+  declare original_name: string;
+  declare published_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare status: number | null;
+  declare tags_count: number | null;
+  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_on: Temporal.PlainDate;
 
   static {
     this.belongsTo("author");
