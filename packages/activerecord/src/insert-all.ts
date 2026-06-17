@@ -440,8 +440,9 @@ export class InsertAll {
     // The PK fallback is order-sensitive (Rails `match == primary_keys`,
     // insert_all.rb:163) — unlike the index match above, which sorts. A
     // composite PK supplied in a different column order falls through to the
-    // raise, matching Rails.
-    const dbPrimaryKeys = (await this.dbPrimaryKeys()).map(String);
+    // raise, matching Rails. `primaryKeys()` is the schema-cache value, already
+    // resolved in _populateUpdatableColumns before this method runs.
+    const dbPrimaryKeys = this.primaryKeys().map(String);
     if (match.join(",") === dbPrimaryKeys.join(",")) {
       return uniqueBy == null
         ? undefined

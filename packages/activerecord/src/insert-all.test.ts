@@ -25,7 +25,7 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
-import { assertQueriesMatch } from "./testing/query-assertions.js";
+import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -53,6 +53,18 @@ const supportsExpressionIndex = adapterType !== "mysql";
 class ReadonlyNameBook extends Book {
   static {
     this.attrReadonly("name");
+  }
+}
+
+// trails-only regression model: a model whose configured primary_key ("isbn")
+// diverges from the table's schema-cache primary keys (books' real PK is "id").
+// "isbn" is chosen because it has a backing unique index, so the conflict-target
+// resolution succeeds and we can observe the `returning` clause. Rails computes
+// `primary_keys` as `Array(schema_cache.primary_keys(table_name))`
+// (insert_all.rb:61), so InsertAll must emit `RETURNING "id"` — not "isbn".
+class DivergentPrimaryKeyBook extends Book {
+  static {
+    this.primaryKey = "isbn";
   }
 }
 
@@ -868,6 +880,26 @@ describe("InsertAllTest", () => {
 
     await conn.executeMutation('DROP TABLE IF EXISTS "measurements" CASCADE');
   });
+
+  // trails-only regression (no Rails counterpart): guards insert_all.rb:61 —
+  // `primary_keys` reads the schema cache, so a model whose configured
+  // primary_key ("name") differs from the table's real PK ("id") still emits
+  // `RETURNING "id"`. Before the schema-cache fix this emitted `RETURNING "name"`.
+  it.skipIf(!supportsInsertReturning)(
+    "insert all returning uses schema-cache primary keys not the model primary key",
+    async () => {
+      await assertQueriesMatch(/RETURNING "id"/, undefined, false, async () => {
+        await DivergentPrimaryKeyBook.insertAll([
+          { name: "Divergent", isbn: "9990000000001", author_id: 1 },
+        ]);
+      });
+      await assertNoQueriesMatch(/RETURNING "isbn"/, false, async () => {
+        await DivergentPrimaryKeyBook.insertAll([
+          { name: "Divergent II", isbn: "9990000000002", author_id: 1 },
+        ]);
+      });
+    },
+  );
 
   it("insert all with enum values", async () => {
     await Book.insertAllBang([
