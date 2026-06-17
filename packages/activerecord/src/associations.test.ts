@@ -34,7 +34,6 @@ import {
 } from "./associations.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
-import { createFixtures } from "./test-fixtures.js";
 import { Preloader } from "./associations/preloader.js";
 import { Batch } from "./associations/preloader/batch.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
@@ -44,12 +43,6 @@ describe("AssociationsTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
-      ships: {
-        name: "string",
-        pirate_id: "integer",
-        treasures_count: { type: "integer", default: 0 },
-      },
-      ship_parts: { name: "string", ship_id: "integer" },
       as_cpk_children: { parent_region_id: "integer", parent_id: "integer", label: "string" },
       cpk_children: {
         parent_region_id: "integer",
@@ -70,8 +63,6 @@ describe("AssociationsTest", () => {
         columns: { region_id: "integer", id: "integer", name: "string" },
         primaryKey: ["region_id", "id"],
       },
-      a_comments: { a_post_id: "integer", body: "string" },
-      a_posts: { title: "string" },
       as_cpk_childs: { label: "string", parent_id: "integer", parent_region_id: "integer" },
       as_cpk_items: { label: "string", owner_id: "integer", owner_region_id: "integer" },
       as_cpk_owners: {
@@ -185,14 +176,10 @@ describe("AssociationsTest", () => {
         primaryKey: ["region_id", "id"],
       },
       cqc_posts: { author_id: "integer", author_region_id: "integer", title: "string" },
-      d_comments: { body: "string", d_post_id: "integer" },
-      d_posts: { title: "string" },
       dqc_blog_posts: { blog_id: "integer", revision: "integer", title: "string" },
       dqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
       nrfqc_blog_posts: { blog_id: "integer", title: "string" },
       nrfqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
-      el_children: { el_parent_id: "integer", value: "string" },
-      el_parents: { name: "string" },
       inf_child2s: { inf_parent2_id: "integer", inf_parent2_region_id: "integer", label: "string" },
       inf_childs: { inf_parent_id: "integer", inf_parent_region_id: "integer", label: "string" },
       inf_parent2s: {
@@ -203,8 +190,6 @@ describe("AssociationsTest", () => {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      io_comments: { body: "string", io_post_id: "integer" },
-      io_posts: { score: "integer", title: "string" },
       pbt_blog_posts: {
         blog_id: "integer",
         parent_id: "integer",
@@ -242,80 +227,6 @@ describe("AssociationsTest", () => {
     });
   });
 
-  it("eager loading should not change count of children", async () => {
-    class ELParent extends Base {
-      static {
-        this._tableName = "el_parents";
-        this.attribute("name", "string");
-        this.hasMany("elChildren", {
-          foreignKey: "el_parent_id",
-          className: "ELChild",
-        });
-      }
-    }
-    class ELChild extends Base {
-      static {
-        this._tableName = "el_children";
-        this.attribute("value", "string");
-        this.attribute("el_parent_id", "integer");
-      }
-    }
-    registerModel("ELParent", ELParent);
-    registerModel("ELChild", ELChild);
-    const parent = await ELParent.create({ name: "p1" });
-    await ELChild.create({ value: "c1", el_parent_id: parent.id });
-    await ELChild.create({ value: "c2", el_parent_id: parent.id });
-    // Count before eager loading
-    const countBefore = (await ELChild.all().toArray()).length;
-    // Eager load
-    await ELParent.all().includes("elChildren").toArray();
-    // Count after eager loading should be the same
-    const countAfter = (await ELChild.all().toArray()).length;
-    expect(countAfter).toBe(countBefore);
-  });
-  it("loading the association target should keep child records marked for destruction", async () => {
-    class DPost extends Base {
-      static {
-        this._tableName = "d_posts";
-        this.attribute("title", "string");
-        this.hasMany("dComments", {
-          foreignKey: "d_post_id",
-          className: "DComment",
-        });
-      }
-    }
-    class DComment extends Base {
-      static {
-        this._tableName = "d_comments";
-        this.attribute("body", "string");
-        this.attribute("d_post_id", "integer");
-      }
-    }
-    registerModel("DPost", DPost);
-    registerModel("DComment", DComment);
-    const post = await DPost.create({ title: "test" });
-    const comment = await DComment.create({ body: "doomed", d_post_id: post.id });
-    markForDestruction(comment);
-    expect(isMarkedForDestruction(comment)).toBe(true);
-    // Loading the association target should not clear the mark
-    const proxy = association(post, "dComments");
-    const comments = await proxy.toArray();
-    expect(comments.length).toBe(1);
-    // The original object is still marked
-    expect(isMarkedForDestruction(comment)).toBe(true);
-  });
-  it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
-    const f = createFixtures();
-    const ship = await f.Ship.create({ name: "The good ship Dollypop" });
-    const proxy = association(ship, "parts");
-    const part = await proxy.create({ name: "Mast" });
-    markForDestruction(part);
-    const reloaded = await f.ShipPart.find(part.id as number);
-    await reloaded.updateColumn("name", "Deck");
-    const parts = await proxy.toArray();
-    expect(parts).toHaveLength(1);
-    expect(parts[0].name).toBe("Deck");
-  });
   it("loading cpk association when persisted and in memory differ", async () => {
     class CpkOrder extends Base {
       static {
@@ -351,62 +262,6 @@ describe("AssociationsTest", () => {
     });
     expect(items.length).toBe(1);
   });
-  it("include with order works", async () => {
-    class IOPost extends Base {
-      static {
-        this._tableName = "io_posts";
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    class IOComment extends Base {
-      static {
-        this._tableName = "io_comments";
-        this.attribute("body", "string");
-        this.attribute("io_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(IOPost, "ioComments", {
-      foreignKey: "io_post_id",
-      className: "IOComment",
-    });
-    registerModel("IOPost", IOPost);
-    registerModel("IOComment", IOComment);
-    await IOPost.create({ title: "B", score: 2 });
-    await IOPost.create({ title: "A", score: 1 });
-    const posts = await IOPost.all().includes("ioComments").order("score").toArray();
-    expect(posts.length).toBe(2);
-    expect(posts[0].title).toBe("A");
-    expect(posts[1].title).toBe("B");
-  });
-  it("bad collection keys", async () => {
-    class APost extends Base {
-      static {
-        this._tableName = "a_posts";
-        this.attribute("title", "string");
-      }
-    }
-    class AComment extends Base {
-      static {
-        this._tableName = "a_comments";
-        this.attribute("body", "string");
-        this.attribute("a_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(APost, "aComments", {
-      foreignKey: "a_post_id",
-      className: "AComment",
-    });
-    registerModel("APost", APost);
-    registerModel("AComment", AComment);
-    const post = await APost.create({ title: "test" });
-    const proxy = association(post, "aComments");
-    // Attempting to set ids with bad keys should not silently succeed
-    // In Rails this tests that bad foreign key values raise
-    const comments = await proxy.toArray();
-    expect(comments.length).toBe(0);
-  });
-
   it("should construct new finder sql after create", async () => {
     class BPost extends Base {
       static {
@@ -4704,6 +4559,13 @@ describe("AssociationsTest", () => {
   let ShardedBlog: typeof Base;
   let ShardedBlogPost: typeof Base;
   let ShardedComment: typeof Base;
+  let Company: typeof Base;
+  let Account: typeof Base;
+  let Liquid: typeof Base;
+  let Molecule: typeof Base;
+  let Electron: typeof Base;
+  let Ship: typeof Base;
+  let ShipPart: typeof Base;
 
   beforeAll(async () => {
     const shardedMod = await import("./test-helpers/models/sharded.js");
@@ -4714,12 +4576,20 @@ describe("AssociationsTest", () => {
     Author = authorMod.Author as never;
     AuthorFavorite = authorMod.AuthorFavorite as never;
     const companyMod = await import("./test-helpers/models/company.js");
+    Company = companyMod.Company as never;
     Firm = companyMod.Firm as never;
     Client = companyMod.Client as never;
     Tag = (await import("./test-helpers/models/tag.js")).Tag as never;
     Tagging = (await import("./test-helpers/models/tagging.js")).Tagging as never;
     Developer = (await import("./test-helpers/models/developer.js")).Developer as never;
     Project = (await import("./test-helpers/models/project.js")).Project as never;
+    Account = (await import("./test-helpers/models/account.js")).Account as never;
+    Liquid = (await import("./test-helpers/models/liquid.js")).Liquid as never;
+    Molecule = (await import("./test-helpers/models/molecule.js")).Molecule as never;
+    Electron = (await import("./test-helpers/models/electron.js")).Electron as never;
+    const shipMod = await import("./test-helpers/models/ship.js");
+    Ship = shipMod.Ship as never;
+    ShipPart = (await import("./test-helpers/models/ship-part.js")).ShipPart as never;
   });
 
   // Earlier describe blocks in this file create `companies` / `authors` with
@@ -4745,6 +4615,26 @@ describe("AssociationsTest", () => {
     registerModel("ShardedBlog", ShardedBlog);
     registerModel("ShardedBlogPost", ShardedBlogPost);
     registerModel("ShardedComment", ShardedComment);
+    registerModel("Company", Company);
+    registerModel("Account", Account);
+    registerModel("Liquid", Liquid);
+    registerModel("Molecule", Molecule);
+    registerModel("Electron", Electron);
+    registerModel("Ship", Ship);
+    registerModel("ShipPart", ShipPart);
+  });
+
+  it("eager loading should not change count of children", async () => {
+    const liquid = await Liquid.create({ name: "salty" });
+    const molecule = await association(liquid, "molecules").create({ name: "molecule_1" });
+    await association(molecule, "electrons").create({ name: "electron_1" });
+    await association(molecule, "electrons").create({ name: "electron_2" });
+
+    const liquids = await Liquid.includes({ molecules: "electrons" })
+      .references("molecules")
+      .where("molecules.id is not null")
+      .toArray();
+    expect((await association(liquids[0], "molecules").toArray()).length).toBe(1);
   });
 
   it("subselect", async () => {
@@ -4754,6 +4644,38 @@ describe("AssociationsTest", () => {
       .where({ author: Author.where({ id: author.id }) })
       .toArray();
     expect(fav2.map((f: any) => f.id)).toEqual(favs.map((f: any) => f.id));
+  });
+
+  it("loading the association target should keep child records marked for destruction", async () => {
+    const ship = await Ship.create({ name: "The good ship Dollypop" });
+    const part = await association(ship, "parts").create({ name: "Mast" });
+    markForDestruction(part);
+    // Rails `ship.parts[0]` loads the target preserving in-memory records
+    // (marked-for-destruction kept); `load()` merges in-memory over DB rows.
+    const parts = await association(ship, "parts").load();
+    expect(isMarkedForDestruction(parts[0])).toBe(true);
+  });
+
+  it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
+    const ship = await Ship.create({ name: "The good ship Dollypop" });
+    const part = await association(ship, "parts").create({ name: "Mast" });
+    markForDestruction(part);
+    const reloaded = await ShipPart.find((part as any).id as number);
+    await reloaded.updateColumn("name", "Deck");
+    const parts = await association(ship, "parts").load();
+    expect(parts[0].name).toBe("Deck");
+  });
+
+  it("include with order works", async () => {
+    await Account.all().order("id").includes("firm").first();
+    await Account.all().order("id").includes("firm").first();
+  });
+
+  it("bad collection keys", () => {
+    expect(() => {
+      class AnonCollectionKeys extends Base {}
+      (AnonCollectionKeys as any).hasMany("wheels", { name: "wheels" });
+    }).toThrow();
   });
 
   it("using limitable reflections helper", () => {
