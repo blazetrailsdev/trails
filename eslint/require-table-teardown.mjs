@@ -45,9 +45,10 @@
  * `for (const t of TABLES) await conn.dropTable(t)` and
  * `TABLES.forEach(t => conn.dropTable(t))` / `.map(...)` / `.flatMap(...)` are
  * recognized when the iterated value resolves statically — either an inline
- * array of literal names (`["a", "b"].forEach(...)`) or a `const TABLES = [...]`
- * of literal names in the same file. Every static name in that list counts as
- * dropped. A loop whose iterable can't be resolved statically (an imported
+ * array of literal names (`["a", "b"].forEach(...)`, optionally `as const`) or a
+ * `const TABLES = [...]` of literal names in the same file. Every static name
+ * in that list counts as dropped. A loop whose iterable can't be resolved
+ * statically (an imported
  * const, a name built at runtime) still drops nothing, exactly as before.
  *
  * `createTable("foo", { force: true })` is NOT exempt: `force` drops-then-recreates
@@ -137,18 +138,38 @@ function droppedTableNames(call) {
 }
 
 /**
+ * Strips TypeScript-only wrappers that don't change the runtime value —
+ * `[…] as const`, `[…] satisfies T`, `[…]!`, `(…)` — so the array beneath a
+ * type assertion is still resolvable.
+ */
+function unwrap(node) {
+  let n = node;
+  while (
+    n &&
+    (n.type === "TSAsExpression" ||
+      n.type === "TSSatisfiesExpression" ||
+      n.type === "TSNonNullExpression" ||
+      n.type === "TSTypeAssertion")
+  ) {
+    n = n.expression;
+  }
+  return n;
+}
+
+/**
  * Every statically-known string in an array-valued node, or null when the node
- * isn't a resolvable array. An inline `["a", "b"]` resolves directly; a bare
- * `TABLES` identifier resolves through `arrayConsts` (file-local
- * `const TABLES = [...]`). Non-static elements are dropped silently — a partial
- * list still credits the literal names it does contain.
+ * isn't a resolvable array. An inline `["a", "b"]` (optionally `as const`)
+ * resolves directly; a bare `TABLES` identifier resolves through `arrayConsts`
+ * (file-local `const TABLES = [...]`). Non-static elements are dropped silently
+ * — a partial list still credits the literal names it does contain.
  */
 function arrayStrings(node, arrayConsts) {
-  if (!node) return null;
-  if (node.type === "ArrayExpression") {
-    return node.elements.map(staticString).filter((n) => n !== null);
+  const n = unwrap(node);
+  if (!n) return null;
+  if (n.type === "ArrayExpression") {
+    return n.elements.map(staticString).filter((s) => s !== null);
   }
-  if (node.type === "Identifier") return arrayConsts.get(node.name) ?? null;
+  if (n.type === "Identifier") return arrayConsts.get(n.name) ?? null;
   return null;
 }
 
@@ -222,7 +243,7 @@ const rule = {
 
     return {
       VariableDeclarator(node) {
-        if (node.id.type === "Identifier" && node.init?.type === "ArrayExpression") {
+        if (node.id.type === "Identifier" && unwrap(node.init)?.type === "ArrayExpression") {
           arrayConsts.set(node.id.name, arrayStrings(node.init, arrayConsts));
         }
       },

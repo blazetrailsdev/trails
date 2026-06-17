@@ -59,6 +59,12 @@ tester.run("require-table-teardown", rule, {
     'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
       "for (const t of TABLES) await ctx.dropTable(t);\n" +
       'const TABLES = ["a", "b"];',
+    // `as const` inline array (a real pattern in this repo's for-of loops).
+    'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+      'for (const t of ["a", "b"] as const) await ctx.dropTable(t);',
+    // `as const` on the declared const array.
+    'const TABLES = ["a", "b"] as const;\nawait ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+      "TABLES.forEach((t) => ctx.dropTable(t));",
   ],
   invalid: [
     // Created, never dropped.
