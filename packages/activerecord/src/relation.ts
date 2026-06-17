@@ -5168,7 +5168,15 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#with_recursive
    */
-  withRecursive(...ctes: Array<Record<string, Relation<any> | string>>): Relation<T> {
+  withRecursive(
+    ...ctes: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
+  ): Relation<T> {
+    // Rails `with_recursive` (query_methods.rb:518-521) calls only
+    // `check_if_method_has_arguments!(__callee__, args)` before `spawn.with_recursive!`
+    // — unlike `with`, it has no `block_given?` guard. The shared helper raises on
+    // empty varargs, then mirrors `args.flatten!` (arrays only) and `compact_blank!`
+    // (so `withRecursive(null)` no-ops). It mutates `ctes` in place.
+    this.checkIfMethodHasArgumentsBang("with_recursive", ctes);
     return this._clone().withRecursiveBang(...ctes);
   }
 
