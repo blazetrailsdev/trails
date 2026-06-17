@@ -233,7 +233,9 @@ describe("SchemaDumperTest", () => {
       order: { name: "desc" },
     });
     const output = SchemaDumper.dump(ctx);
-    expect(output).toContain('order: { name: "desc" }');
+    // Rails IndexDefinition#concise_options collapses a single-column order to a
+    // scalar (`order: :desc`), not the expanded `order: { name: :desc }` map.
+    expect(output).toContain('order: "desc"');
   });
   it("schema dumps index length", async () => {
     const { adapter: lenAdapter, ctx: lenCtx } = freshCtx();
@@ -615,6 +617,42 @@ describe("SchemaDumperTest", () => {
       orders: "desc NULLS LAST",
     });
     expect(parts.join(", ")).toContain(`order: "desc NULLS LAST"`);
+  });
+
+  it("indexParts collapses uniform multi-column orders to a scalar", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const dumper = new (TopLevelDumper as any)(emptySource);
+    const parts = dumper.indexParts({
+      columns: ["name", "rating"],
+      unique: false,
+      orders: { name: "desc", rating: "desc" },
+    });
+    expect(parts.join(", ")).toContain(`order: "desc"`);
+  });
+
+  it("indexParts keeps mixed multi-column orders as a map", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const dumper = new (TopLevelDumper as any)(emptySource);
+    const parts = dumper.indexParts({
+      columns: ["name", "rating"],
+      unique: false,
+      orders: { name: "desc", rating: "asc" },
+    });
+    expect(parts.join(", ")).toContain(`order: { name: "desc", rating: "asc" }`);
+  });
+
+  it("indexParts collapses uniform multi-column opclasses to a scalar", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const dumper = new (TopLevelDumper as any)(emptySource);
+    const parts = dumper.indexParts({
+      columns: ["name", "description"],
+      unique: false,
+      opclasses: { name: "varchar_pattern_ops", description: "varchar_pattern_ops" },
+    });
+    expect(parts.join(", ")).toContain(`opclass: "varchar_pattern_ops"`);
   });
 
   it.skipIf(adapterType !== "postgres")("schema dump includes limit on array type", async () => {
