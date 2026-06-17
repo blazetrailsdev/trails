@@ -185,7 +185,7 @@ const rule = {
           const stmt = node.parent;
           if (!receiver) {
             reason = "the receiver is not a simple identifier";
-          } else if (stmt.type !== "ExpressionStatement" || stmt.parent === undefined) {
+          } else if (stmt.type !== "ExpressionStatement") {
             reason = "the call is not a standalone statement";
           } else {
             const resolved = classesByName.get(receiver);
@@ -220,15 +220,33 @@ const rule = {
               const stmts = block.body;
               const last = stmts[stmts.length - 1];
 
-              // Build `this.<macro>(<args after receiver>);` preserving the
-              // original argument source text verbatim.
+              const indentWidth = last
+                ? last.loc.start.column
+                : block.loc.start.column + 2;
+              const indent = " ".repeat(indentWidth);
+
+              // Build `this.<macro>(<args after receiver>);` from the original
+              // argument source text. Continuation lines of a multi-line
+              // argument keep their indentation *relative to the old statement*,
+              // so shift them by (new indent − old statement column) to land
+              // correctly inside the static block — the fix output is then
+              // already formatted, not reliant on a follow-up prettier pass.
+              const shift = indentWidth - stmt.loc.start.column;
+              const reindent = (txt) =>
+                txt
+                  .split("\n")
+                  .map((line, i) => {
+                    if (i === 0) return line;
+                    if (shift >= 0) return " ".repeat(shift) + line;
+                    // Dedent: drop up to -shift leading spaces.
+                    const drop = Math.min(-shift, line.length - line.trimStart().length);
+                    return line.slice(drop);
+                  })
+                  .join("\n");
               const restText = node.arguments
                 .slice(1)
-                .map((a) => sourceCode.getText(a))
+                .map((a) => reindent(sourceCode.getText(a)))
                 .join(", ");
-              const indent = last
-                ? " ".repeat(last.loc.start.column)
-                : " ".repeat(block.loc.start.column + 2);
               const inserted = `\n${indent}this.${macro}(${restText});`;
               const anchor = last ?? sourceCode.getFirstToken(block, { skip: 0 }); // '{'
 

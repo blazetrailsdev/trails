@@ -40,14 +40,27 @@ tester.run("no-standalone-associations", rule, {
         "class P extends Base {\n  static {\n    this._tableName = 'ps';\n    this.hasMany('cs', { className: 'C' });\n  }\n}\n",
       errors: [{ messageId: "standalone", data: { macro: "hasMany", receiver: "P" } }],
     },
-    // belongsTo with a multi-line options object — arg text preserved verbatim.
+    // belongsTo with a multi-line options object — continuation lines are
+    // reindented to land cleanly inside the static block (old statement col 0
+    // → new indent 4, so a +4 shift on every line after the first).
     {
       filename: FILENAME,
       code:
         "class C extends Base {\n  static {\n    this._tableName = 'cs';\n  }\n}\n" +
         "Associations.belongsTo.call(C, 'p', {\n  className: 'P',\n});\n",
       output:
-        "class C extends Base {\n  static {\n    this._tableName = 'cs';\n    this.belongsTo('p', {\n  className: 'P',\n});\n  }\n}\n",
+        "class C extends Base {\n  static {\n    this._tableName = 'cs';\n    this.belongsTo('p', {\n      className: 'P',\n    });\n  }\n}\n",
+      errors: [{ messageId: "standalone" }],
+    },
+    // Multi-line arg dedented when the old statement was more deeply indented
+    // than the target static block (shift is negative).
+    {
+      filename: FILENAME,
+      code:
+        "class C extends Base {\nstatic {\nthis._tableName = 'cs';\n}\n}\n" +
+        "    Associations.hasMany.call(C, 'xs', {\n      className: 'X',\n    });\n",
+      output:
+        "class C extends Base {\nstatic {\nthis._tableName = 'cs';\nthis.hasMany('xs', {\n  className: 'X',\n});\n}\n}\n",
       errors: [{ messageId: "standalone" }],
     },
     // No fix: receiver class is not declared in this file.
@@ -60,6 +73,12 @@ tester.run("no-standalone-associations", rule, {
     {
       filename: FILENAME,
       code: "class P extends Base {}\nAssociations.hasMany.call(P, 'cs', {});",
+      errors: [{ messageId: "standaloneNoFix" }],
+    },
+    // No fix: the call is not a standalone statement (used as an initializer).
+    {
+      filename: FILENAME,
+      code: "class P extends Base { static {} }\nconst r = Associations.hasMany.call(P, 'cs', {});",
       errors: [{ messageId: "standaloneNoFix" }],
     },
     // No fix: receiver is not a simple identifier.
