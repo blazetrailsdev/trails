@@ -621,7 +621,7 @@ export class Builder implements InsertBuilder {
         }
         return `"${attr.replace(/"/g, '""')}"`;
       })
-      .join(", ");
+      .join(",");
   }
 
   skipDuplicates(): boolean {
