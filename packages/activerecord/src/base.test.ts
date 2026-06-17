@@ -13,7 +13,7 @@ import {
   getRaiseOnAssignToAttrReadonly,
   setRaiseOnAssignToAttrReadonly,
 } from "./index.js";
-import { SubclassNotFound, NameError } from "./errors.js";
+import { SubclassNotFound, NameError, TableNotSpecified } from "./errors.js";
 import { quoteSqlValue } from "./base.js";
 
 import { createSidecarTestAdapter, adapterType } from "./test-adapter.js";
@@ -2599,12 +2599,15 @@ describe("BasicsTest", () => {
     expect(User.ignoredColumns).toContain("secret");
   });
   it(".columns_hash raises an error if the record has an empty table name", () => {
-    class AbstractBase extends Base {
+    class FirstAbstractClass extends Base {
       static {
         this.abstractClass = true;
       }
     }
-    expect(() => AbstractBase.columnsHash()).toThrow();
+    const expectedMessage =
+      "FirstAbstractClass has no table configured. Set one with FirstAbstractClass.table_name=";
+    expect(() => FirstAbstractClass.columnsHash()).toThrow(TableNotSpecified);
+    expect(() => FirstAbstractClass.columnsHash()).toThrow(expectedMessage);
   });
   it("ignored columns have no attribute methods", () => {
     class User extends Base {

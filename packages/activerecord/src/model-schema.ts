@@ -16,6 +16,7 @@ import {
   baseClass,
   getAbstractClass,
 } from "./inheritance.js";
+import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
@@ -194,9 +195,7 @@ export interface ColumnLike {
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#columns_hash
  */
 export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
-  if (this.abstractClass) {
-    throw new Error(`Cannot call columnsHash on abstract class ${this.name}`);
-  }
+  // load_schema! raises TableNotSpecified for abstract (table-less) classes.
   loadSchema.call(this as SchemaHost);
 
   // STI-aware adapter + table resolution: adapter may live on the base
@@ -717,6 +716,16 @@ export function resetColumnInformation(this: SchemaHost): void {
  */
 export function loadSchema(this: SchemaHost): void {
   if (this._schemaLoaded) return;
+
+  // Rails ModelSchema#load_schema!: `raise TableNotSpecified unless table_name`.
+  // Abstract classes have no concrete table (Rails' table_name is nil for them),
+  // so reflecting one's schema is an error.
+  if (getAbstractClass.call(this as any)) {
+    const klass = this as unknown as typeof Base;
+    throw new TableNotSpecified(
+      `${klass.name} has no table configured. Set one with ${klass.name}.table_name=`,
+    );
+  }
 
   // The class that actually owns the schema load — the STI base when
   // `this` is a subclass. We set `_schemaLoaded` only on the workHost
