@@ -3173,19 +3173,18 @@ export class Relation<T extends Base> {
         this._namedInnerJoins,
         Nodes.InnerJoin,
       );
-      // Thread references_values so a per-join hash select key (e.g.
-      // `select(comments_with_extend: { body: :x })` on a second `comments`
-      // join) aliases that join's table to the referenced name, mirroring Rails
-      // build_joins → join_constraints(stashed, alias_tracker, references_values).
-      // Collisions-only: a first/only-occurrence join keeps its real table name,
-      // because our where-hash keys resolve to the real table (not the reference
-      // alias), so re-aliasing it would desync the WHERE from the JOIN. Deviation
-      // tracked for convergence: RFC 0030 where-hash-keys-resolve-to-join-alias.
+      // Thread references_values so a join referenced by a where-hash / per-join
+      // hash select key aliases its table to the referenced name (first use), and
+      // a duplicate join onto the same table to its alias_candidate — mirroring
+      // Rails build_joins → join_constraints(stashed, alias_tracker,
+      // references_values). The where-hash keys resolve to the same aliased name
+      // (`joinTableAliasFor`), so the WHERE and JOIN stay in sync.
       const stashedLeft = leftOuterJd ? [leftOuterJd] : [];
-      for (const node of jd.joinConstraints(stashedLeft, undefined, this._referencesValues, true))
+      for (const node of jd.joinConstraints(stashedLeft, undefined, this._aliasableReferences()))
         manager.appendJoinNode(node);
     } else if (leftOuterJd) {
-      for (const node of leftOuterJd.joinConstraints([])) manager.appendJoinNode(node);
+      for (const node of leftOuterJd.joinConstraints([], undefined, this._aliasableReferences()))
+        manager.appendJoinNode(node);
     }
     // Cross-klass merged JoinDependencies (Rails merge_joins): already built
     // against the source relation's klass, so emit their constraints directly.

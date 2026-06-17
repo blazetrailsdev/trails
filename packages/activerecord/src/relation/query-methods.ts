@@ -2366,27 +2366,27 @@ export function lookupTableKlassFromJoinDependencies(
 }
 
 /**
- * Resolve the SQL alias a where-hash key should use when the association named
- * by that key is joined under an AliasTracker alias (a self-join / duplicate of
- * a table already in the FROM). Rails aliases such a join to the reference name
- * (which equals the association key) and builds the WHERE against that alias;
- * `where(manager: { … })` on a self-referential `belongs_to :manager` resolves
- * to the `manager` alias rather than the base table.
+ * Resolve the SQL alias a where-hash key should use, mirroring Rails'
+ * `make_constraints` aliasing the referenced join to the reference name (which
+ * equals the association key) and building the WHERE against that alias.
  *
- * Returns the key itself when a colliding join for it exists (the referenced
- * rename in `_applyReferencedAlias` lands on that name), else `null` so a
- * first/only-occurrence join — which keeps its real table name — is left
- * unaliased.
+ * A where-hash key auto-adds itself to `references_values` (build_where_clause),
+ * so a join named by that key is always re-aliased by `_applyReferencedAlias`:
+ * to the referenced name on first use (`Pet.joins(:toys).where(toys: { … })` →
+ * `JOIN da_toys toys … WHERE toys.…`), or to its alias_candidate when it is a
+ * duplicate of a table already aliased to that name. Returns the key itself
+ * (the reference name) whenever a join for it exists — the rename always lands
+ * on that name for the first occurrence the WHERE binds to — and `null` when no
+ * such join exists, so the key resolves to the base table.
  * @internal
  */
 export function joinTableAliasFor(this: QueryMethodsHost, assocName: string): string | null {
+  // Only aliasable references rename the join (manual bare-string `references(…)`
+  // promote includes to eager_load but never alias — `_aliasableReferences`).
+  if (!(this as any)._aliasableReferences().includes(assocName)) return null;
   let alias: string | null = null;
   eachJoinDependencies.call(this, undefined, (join: any) => {
-    if (
-      join.immediateAssocName === assocName &&
-      join.effectiveSqlName &&
-      join.effectiveSqlName !== join.tableName
-    ) {
+    if (join.immediateAssocName === assocName) {
       alias = assocName;
     }
   });
@@ -2642,13 +2642,21 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // no explicit joins). Rails processes these as named_join → OuterJoin type.
   if (namedJoins.length > 0) {
     const jd = constructJoinDependency.call(this, namedJoins, Nodes.OuterJoin);
-    const constraintNodes = jd.joinConstraints(stashedJoins, aliases);
+    const constraintNodes = jd.joinConstraints(
+      stashedJoins,
+      aliases,
+      (this as any)._aliasableReferences(),
+    );
     for (const node of constraintNodes) arel.source.right.push(node);
   } else if (stashedJoins.length > 0) {
     // Stashed join dependencies (eager_load or left_outer combined with explicit
     // joins) — generate join SQL via joinConstraints (mirrors build_joins:1896).
     const [primary, ...rest] = stashedJoins;
-    const constraintNodes = primary.joinConstraints(rest, aliases);
+    const constraintNodes = primary.joinConstraints(
+      rest,
+      aliases,
+      (this as any)._aliasableReferences(),
+    );
     for (const node of constraintNodes) arel.source.right.push(node);
   }
 
@@ -2658,13 +2666,12 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // (mirrors Rails joins_values → named_join with InnerJoin).
   if (this._namedInnerJoins.length > 0) {
     const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
-    // Thread references_values so a per-join hash select key (e.g.
-    // `select(comments_with_extend: { body: :x })` on a second `comments` join)
-    // aliases that join's table to the referenced name (Rails build_joins:1896).
-    // Collisions-only (see relation.ts _applyJoinsToManager): a first/only-
-    // occurrence join keeps its real table name so the WHERE stays in sync.
-    // Deviation tracked: RFC 0030 where-hash-keys-resolve-to-join-alias.
-    for (const node of jd.joinConstraints([], aliases, this._referencesValues, true))
+    // Thread references_values so a join referenced by a where-hash / per-join
+    // hash select key aliases its table to the referenced name (first use), and a
+    // duplicate join onto the same table to its alias_candidate (Rails
+    // build_joins:1896). The where-hash keys resolve to the same aliased name
+    // (`joinTableAliasFor`), so the WHERE and JOIN stay in sync.
+    for (const node of jd.joinConstraints([], aliases, (this as any)._aliasableReferences()))
       arel.source.right.push(node);
   }
 
