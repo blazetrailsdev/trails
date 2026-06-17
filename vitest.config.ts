@@ -216,6 +216,10 @@ const COVERAGE_EXCLUDE = [
   "packages/website/**",
   "packages/activerecord/**",
   "packages/activerecord-cli/**",
+  // trails-tsc tests aren't run in the coverage job (their subprocess-spawning
+  // watcher/build tests trip vitest's worker-RPC timeout under load); exclude
+  // its source too so `--coverage.all` doesn't count it at 0% and skew the base.
+  "packages/trails-tsc/**",
   "packages/*/dx-tests/**",
   "packages/*/virtualized-dx-tests/**",
 ];
