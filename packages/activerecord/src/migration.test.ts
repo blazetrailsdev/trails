@@ -269,6 +269,23 @@ describe("MigrationTest", () => {
     expect(ctx.indexExists("users", "email")).toBe(false);
   });
 
+  // Skipped on MySQL: CI runs MariaDB, which lacks expression-index support
+  // (Rails `supports_expression_index?` is MySQL 8.0.13+ only), so the DDL
+  // itself is rejected before the name can be asserted.
+  it.skipIf(adapterType === "mysql")(
+    "addIndex derives expression-index name from \\w+ runs, not raw SQL",
+    async () => {
+      const { ctx } = freshContext();
+      await ctx.createTable("books", {}, (t) => {
+        t.string("external_id");
+      });
+      await ctx.addIndex("books", "(lower(external_id))", { unique: true });
+      const indexes = ctx.indexes("books");
+      expect(indexes).toHaveLength(1);
+      expect(indexes[0].name).toBe("index_books_on_lower_external_id");
+    },
+  );
+
   it("inline index from createTable block is tracked", async () => {
     const { ctx } = freshContext();
     await ctx.createTable("posts", {}, (t) => {
