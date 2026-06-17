@@ -958,6 +958,13 @@ describe("QueryCacheExpiryTest", () => {
     }
     await new ChangeMig().run(cached, "up");
     expect(cached.queryCache.empty).toBe(true);
+    class TeardownMig extends Migration {
+      async up() {
+        await this.dropTable("qc_mig_tasks", { ifExists: true });
+      }
+      async down() {}
+    }
+    await new TeardownMig().run(cached, "up");
   });
 
   it("enable disable", async () => {

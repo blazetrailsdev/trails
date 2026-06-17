@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { adapterType, createTestAdapter } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
@@ -967,6 +967,9 @@ describe("TimestampTest — t.timestamps() end-to-end", () => {
       t.timestamps();
     });
   });
+  afterAll(async () => {
+    await new MigrationContext(Base.connection).dropTable("timed_authors", { ifExists: true });
+  });
 
   it.skipIf(adapterType === "mysql")(
     "create fills both columns when table has NOT NULL timestamp columns from t.timestamps()",
@@ -995,6 +998,11 @@ describe("TimestampTest — t.timestamps() end-to-end", () => {
     await ctx.createTable("nullable_timed_authors", {}, (t) => {
       t.string("name");
       t.timestamps({ null: true });
+    });
+  });
+  afterAll(async () => {
+    await new MigrationContext(Base.connection).dropTable("nullable_timed_authors", {
+      ifExists: true,
     });
   });
 

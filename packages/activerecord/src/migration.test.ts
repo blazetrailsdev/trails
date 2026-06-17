@@ -65,6 +65,36 @@ function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
   return { adapter, ctx };
 }
 
+// Migration tests legitimately create ad-hoc tables (Rails' migration_test.rb
+// does too); they leak into the shared per-worker DB, so drop each by name —
+// mirroring Rails' teardown — to avoid collisions with sibling files.
+afterAll(async () => {
+  const { ctx } = freshContext();
+  const o = { ifExists: true } as const;
+  await ctx.dropTable("articles", o);
+  await ctx.dropTable("bk1", o);
+  await ctx.dropTable("bk2", o);
+  await ctx.dropTable("bk3", o);
+  await ctx.dropTable("bk4", o);
+  await ctx.dropTable("bk5", o);
+  await ctx.dropTable("bk6", o);
+  await ctx.dropTable("bk7", o);
+  await ctx.dropTable("bk_idx", o);
+  await ctx.dropTable("books", o);
+  await ctx.dropTable("games", o);
+  await ctx.dropTable("join_table", o);
+  await ctx.dropTable("memberships", o);
+  await ctx.dropTable("nonexistent", o);
+  await ctx.dropTable("old_name", o);
+  await ctx.dropTable("pend_t", o);
+  await ctx.dropTable("pre_old_suf", o);
+  await ctx.dropTable("products", o);
+  await ctx.dropTable("rv_bulk", o);
+  await ctx.dropTable("things", o);
+  await ctx.dropTable("values", o);
+  await ctx.dropTable("widgets", o);
+});
+
 function internalMetadataExistsSql(kind: typeof adapterType): string {
   const byAdapter = {
     sqlite: `SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type='table' AND name='ar_internal_metadata'`,
