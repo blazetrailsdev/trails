@@ -203,13 +203,22 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
-    const cap = captureSelectSql();
+    const cap = captureSelectSql("topics");
     expect((await Topic.findBy({ id: 1 }))!.id).toBe(1);
-    expect((await Topic.findByBang({ id: 2 })).id).toBe(2);
     cap.stop();
+    const topicSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(topicSql));
 
-    const findSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
-    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(findSql));
+    // Rails: `assert_raises(RecordNotFound) { SillyReply.find_by!(id: 2) }`, then
+    // asserts the raising model's statement is still cached. SillyReply isn't in
+    // the canonical schema, so use Author (a distinct loaded model) to cover both
+    // the RecordNotFound-still-cached and second-pool-entry invariants for
+    // find_by! the same way the find test does for find.
+    const authorCap = captureSelectSql("authors");
+    await expect(Author.findByBang({ id: 999999 })).rejects.toBeInstanceOf(RecordNotFound);
+    authorCap.stop();
+    const authorSql = authorCap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(authorSql));
   });
 
   it("statement cache with in clause", async (ctx) => {
@@ -231,19 +240,18 @@ describe("BindParameterTest", () => {
     expect(statementCacheKeys(conn)).not.toContain(conn.sqlKey(cap.sqls.at(-1)));
   });
 
-  it("statement cache with sql string literal", async (ctx) => {
-    const conn = Topic.leaseConnection() as any;
-    ctx.skip(!conn.preparedStatements);
-    conn.clearCache();
-
-    const cap = captureSelectSql();
-    const topics = Topic.where("topics.id = ?", 1);
-    expect((await topics.toArray()).map((t: any) => t.id)).toEqual([1]);
-    cap.stop();
-
-    // A SQL string literal is inlined with no binds, so it is not prepared/pooled.
-    expect(statementCacheKeys(conn)).not.toContain(conn.sqlKey(cap.sqls.at(-1)));
-  });
+  // DEVIATION (tracked): Rails asserts the SQL string literal IS cached
+  // (bind_parameter_test.rb:100-107, `assert_includes`): `sanitize_sql` bakes the
+  // value into an `Arel::Nodes::SqlLiteral`, leaving `collector.preparable = true`
+  // (no unpreparable node), so a no-bind-but-preparable SELECT is pooled. trails
+  // infers preparability from bind presence (see the note in
+  // database-statements.ts `selectAll`), and this query inlines to zero binds —
+  // indistinguishable from the genuinely-non-preparable IN-clause array above —
+  // so it is NOT pooled. Asserting `not.toContain` here would ratify that
+  // inversion, so the case stays skipped pending the collector.preparable
+  // threading that converges it to Rails' `assert_includes`. Tracked by RFC 0016
+  // story `thread-collector-preparable-for-statement-cache`.
+  it.skip("statement cache with sql string literal", () => {});
 
   it("too many binds", async () => {
     const conn = Topic.leaseConnection() as any;
