@@ -575,10 +575,6 @@ export class JoinDependency {
     return this.aliases().selectArel();
   }
 
-  buildSelectArel(): Nodes.As[] {
-    return this._buildSelectArelNodes();
-  }
-
   get baseKlass(): typeof Base {
     return this._baseModel;
   }
