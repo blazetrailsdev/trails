@@ -1,376 +1,164 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
-import { describe, it, expect, beforeAll } from "vitest";
+// vendor/rails/activerecord/test/cases/cache_key_test.rb
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
+import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
+import { MigrationContext } from "./migration.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-
-const TEST_SCHEMA = {
-  posts: {
-    title: "string",
-    updated_at: "datetime",
-  },
-  users: {
-    name: "string",
-    updated_at: "datetime",
-  },
-} as const;
-
-// ==========================================================================
-// CacheKeyTest — targets cache_key_test.rb
-// ==========================================================================
-describe("CacheKeyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("cache_key format is not too precise", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({ title: "a" });
-    const key = p.cacheKey();
-    expect(key).toContain("posts/");
-  });
-
-  it("cache_key_with_version always has both key and version", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "a" });
-    const key = p.cacheKey();
-    expect(key).toContain("posts/");
-  });
-});
+// Mirrors Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars).
+function usec(ts: unknown): string {
+  if (!(ts instanceof Temporal.Instant)) throw new Error("expected an Instant");
+  const dt = ts.toZonedDateTimeISO("UTC");
+  const y = dt.year.toString().padStart(4, "0");
+  const mo = dt.month.toString().padStart(2, "0");
+  const day = dt.day.toString().padStart(2, "0");
+  const h = dt.hour.toString().padStart(2, "0");
+  const mi = dt.minute.toString().padStart(2, "0");
+  const s = dt.second.toString().padStart(2, "0");
+  const us = (dt.millisecond * 1000 + dt.microsecond).toString().padStart(6, "0");
+  return `${y}${mo}${day}${h}${mi}${s}${us}`;
+}
 
 describe("CacheKeyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+  // Rails: `cache_mes` / `cache_me_with_versions` are not schema.rb fixture
+  // tables — the test builds them with `create_table(..., force: true) { |t|
+  // t.timestamps }` in `setup` and drops them in `teardown`. Mirror that here
+  // rather than seeding placeholders into the canonical schema. Rails also sets
+  // `self.use_transactional_tests = false`, so each test recreates the tables.
+  let adapter: DatabaseAdapter;
+  let ctx: MigrationContext;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    ctx = new MigrationContext(adapter);
+    await ctx.createTable("cache_mes", { force: true }, (t: any) => t.timestamps());
+    await ctx.createTable("cache_me_with_versions", { force: true }, (t: any) => t.timestamps());
   });
 
-  function expandCacheKey(key: unknown, namespace?: string): string {
-    let base: string;
-    if (key === null || key === undefined) {
-      base = "";
-    } else if (typeof key === "boolean") {
-      base = String(key);
-    } else if (Array.isArray(key)) {
-      base = key.map((k) => expandCacheKey(k)).join("/");
-    } else if (typeof key === "object" && key !== null && "cacheKey" in key) {
-      base = (key as { cacheKey(): string }).cacheKey();
-    } else {
-      base = String(key);
+  afterEach(async () => {
+    await ctx.dropTable("cache_mes", { ifExists: true });
+    await ctx.dropTable("cache_me_with_versions", { ifExists: true });
+  });
+
+  function cacheMe() {
+    class CacheMe extends Base {
+      static {
+        this.cacheVersioning = false;
+      }
     }
-    return namespace ? `${namespace}/${base}` : base;
+    (CacheMe as any).adapter = adapter;
+    return CacheMe as any;
   }
 
-  it("entry legacy optional ivars", () => {
-    const entry = { value: "hello", expiresAt: null };
-    expect(entry.value).toBe("hello");
-    expect(entry.expiresAt).toBeNull();
-  });
-
-  it("expand cache key", () => {
-    expect(expandCacheKey("foo")).toBe("foo");
-    expect(expandCacheKey("bar/baz")).toBe("bar/baz");
-  });
-
-  it("expand cache key with rails cache id", () => {
-    expect(expandCacheKey("foo", "myapp")).toBe("myapp/foo");
-  });
-
-  it("expand cache key with rails app version", () => {
-    expect(expandCacheKey("key", "v1")).toBe("v1/key");
-  });
-
-  it("expand cache key rails cache id should win over rails app version", () => {
-    expect(expandCacheKey("key", "app_id")).toBe("app_id/key");
-  });
-
-  it("expand cache key respond to cache key", () => {
-    const obj = {
-      cacheKey() {
-        return "custom/key";
-      },
-    };
-    expect(expandCacheKey(obj)).toBe("custom/key");
-  });
-
-  it("expand cache key array with something that responds to cache key", () => {
-    const obj = {
-      cacheKey() {
-        return "obj-1";
-      },
-    };
-    expect(expandCacheKey([obj, "extra"])).toBe("obj-1/extra");
-  });
-
-  it("expand cache key of nil", () => {
-    expect(expandCacheKey(null)).toBe("");
-  });
-
-  it("expand cache key of false", () => {
-    expect(expandCacheKey(false)).toBe("false");
-  });
-
-  it("expand cache key of true", () => {
-    expect(expandCacheKey(true)).toBe("true");
-  });
-
-  it("expand cache key of array like object", () => {
-    const arrayLike = ["a", "b", "c"];
-    expect(expandCacheKey(arrayLike)).toBe("a/b/c");
-  });
-
-  it("cache_version is only there when versioning is on", async () => {
-    class Post extends Base {
+  function cacheMeWithVersion() {
+    class CacheMeWithVersion extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
         this.cacheVersioning = true;
       }
     }
-    const p = await Post.create({ title: "test", updated_at: Temporal.Now.instant() });
-    const version = p.cacheVersion();
-    expect(version).not.toBeNull();
-    expect(typeof version).toBe("string");
-  });
+    (CacheMeWithVersion as any).adapter = adapter;
+    return CacheMeWithVersion as any;
+  }
 
-  it("cache_version is the same when it comes from the DB or from the user", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheVersioning = true;
-      }
-    }
-    const p = await Post.create({ title: "test" });
-    // Reload from DB twice — both reads should produce identical cache versions,
-    // verifying that the timestamp formatting is stable across DB loads.
-    const found1 = await Post.find(p.id);
-    const found2 = await Post.find(p.id);
-    const v1 = found1.cacheVersion();
-    const v2 = found2.cacheVersion();
-    expect(typeof v1).toBe("string");
-    expect(typeof v2).toBe("string");
-    expect(v1).toBe(v2);
-  });
+  it("cache_key format is not too precise", async () => {
+    const CacheMe = cacheMe();
+    const record = await CacheMe.create({});
+    const key = record.cacheKey();
 
-  it("cache_version does NOT call updated_at when value is from the database", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheVersioning = true;
-      }
-    }
-    const now = Temporal.Now.instant();
-    const p = await Post.create({ title: "test", updated_at: now });
-    const found = await Post.find(p.id);
-    const version = found.cacheVersion();
-    expect(version).not.toBeNull();
-    expect(typeof version).toBe("string");
-  });
-
-  it("cache_version does call updated_at when it is assigned via a Time object", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheVersioning = true;
-      }
-    }
-    const now = instant("2025-06-15T14:23:55.123456Z");
-    const p = new Post({ title: "test", updated_at: now });
-    const version = p.cacheVersion();
-    expect(version).not.toBeNull();
-    // usec format: YYYYMMDDHHMMSSuuuuuu (20 chars) — with real microseconds
-    expect(version).toBe("20250615142355123456");
-  });
-
-  it("cache_version does call updated_at when it is assigned via a string", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheVersioning = true;
-      }
-    }
-    const p = new Post({ title: "test", updated_at: "2025-01-01T00:00:00.000Z" });
-    const version = p.cacheVersion();
-    expect(version).not.toBeNull();
-    expect(version).toBe("20250101000000000000");
-  });
-
-  it("cache_version does call updated_at when it is assigned via a hash", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheVersioning = true;
-      }
-    }
-    const p = new Post({ title: "test", updated_at: "2025-01-01T12:00:00Z" });
-    const version = p.cacheVersion();
-    expect(version).not.toBeNull();
-    expect(typeof version).toBe("string");
-  });
-
-  it("updated_at on class but not on instance raises an error", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "test" });
-    const version = p.cacheVersion();
-    expect(version).toBeNull();
-  });
-
-  it("cache key format for new records", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "new" });
-    expect(p.cacheKey()).toBe("posts/new");
-  });
-
-  it("cache key for timestamp", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const p = await Post.create({ title: "ts" });
-    p.writeAttribute("updated_at", "2023-06-15T12:00:00Z");
-    // versioning off: cacheKeyWithVersion() == cacheKey() == tableName/id-usecTimestamp (20 chars)
-    const key = p.cacheKeyWithVersion();
-    expect(key).toBe(`posts/${p.id}-20230615120000000000`);
-  });
-
-  it("cache version for new records", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "new" });
-    expect(p.cacheVersion()).toBeNull();
+    await record.reload();
+    expect(record.cacheKey()).toBe(key);
   });
 
   it("cache_key has no version when versioning is on", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheVersioning = true;
-      }
-    }
-    const p = await Post.create({ title: "v" });
-    p.writeAttribute("updated_at", "2023-01-01T00:00:00Z");
-    const key = p.cacheKey();
-    expect(key).toBe(`posts/${p.id}`);
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    expect(record.cacheKey()).toBe(`cache_me_with_versions/${record.id}`);
+  });
+
+  it("cache_version is only there when versioning is on", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const CacheMe = cacheMe();
+    expect((await CacheMeWithVersion.create({})).cacheVersion()).not.toBeNull();
+    expect((await CacheMe.create({})).cacheVersion()).toBeNull();
+  });
+
+  it("cache_key_with_version always has both key and version", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const CacheMe = cacheMe();
+
+    const r1 = await CacheMeWithVersion.create({});
+    expect(r1.cacheKeyWithVersion()).toBe(
+      `cache_me_with_versions/${r1.id}-${usec(r1.readAttribute("updated_at"))}`,
+    );
+
+    const r2 = await CacheMe.create({});
+    expect(r2.cacheKeyWithVersion()).toBe(
+      `cache_mes/${r2.id}-${usec(r2.readAttribute("updated_at"))}`,
+    );
+  });
+
+  it("cache_version is the same when it comes from the DB or from the user", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    const recordFromDb = await CacheMeWithVersion.find(record.id);
+    expect(recordFromDb.cacheVersion()).toBe(record.cacheVersion());
   });
 
   it("cache_version does not truncate zeros when timestamp ends in zeros", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheVersioning = true;
-      }
-    }
-    const p = await Post.create({ title: "z" });
-    p.writeAttribute("updated_at", "2023-01-01T10:00:00.000Z");
-    const version = p.cacheVersion();
-    expect(version).toBe("20230101100000000000");
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    record.writeAttribute("updated_at", Temporal.Instant.from("2016-11-12T00:00:00.000000Z"));
+    const recordFromDb = await CacheMeWithVersion.find(record.id);
+    recordFromDb.writeAttribute("updated_at", Temporal.Instant.from("2016-11-12T00:00:00.000000Z"));
+    expect(record.cacheVersion()).toBe("20161112000000000000");
+    expect(recordFromDb.cacheVersion()).toBe(record.cacheVersion());
   });
 
   it("cache_version calls updated_at when the value is generated at create time", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheVersioning = true;
-      }
-    }
-    const p = await Post.create({ title: "gen" });
-    const updatedAt = p.updated_at;
-    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
-    const version = p.cacheVersion();
-    expect(version).not.toBeNull();
-    expect(typeof version).toBe("string");
-    expect(version).toHaveLength(20);
-  });
-});
-
-describe("cacheKey / cacheKeyWithVersion", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    expect(record.cacheVersion()).toBe(usec(record.readAttribute("updated_at")));
   });
 
-  it("returns model/new for new records", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    const user = new User({ name: "Alice" });
-    expect(user.cacheKey()).toBe("users/new");
+  it("cache_version does NOT call updated_at when value is from the database", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    const recordFromDb = await CacheMeWithVersion.find(record.id);
+    expect(recordFromDb.cacheVersion()).toBe(usec(recordFromDb.readAttribute("updated_at")));
   });
 
-  it("returns model/id for persisted records", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    const user = await User.create({ name: "Alice" });
-    expect(user.cacheKey()).toBe(`users/${user.id}`);
+  it("cache_version does call updated_at when it is assigned via a Time object", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    const recordFromDb = await CacheMeWithVersion.find(record.id);
+    recordFromDb.updated_at = new Date("2016-11-12T01:02:03Z");
+    expect(recordFromDb.cacheVersion()).toBe("20161112010203000000");
   });
 
-  it("cacheKeyWithVersion includes updated_at", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("updated_at", "datetime");
-
-    const user = await User.create({ name: "Alice" });
-    const key = user.cacheKeyWithVersion();
-    expect(key).toMatch(/^users\/\d+-\d+$/);
+  it("cache_version does call updated_at when it is assigned via a string", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    const recordFromDb = await CacheMeWithVersion.find(record.id);
+    recordFromDb.updated_at = "2016-11-12T01:02:03Z";
+    expect(recordFromDb.cacheVersion()).toBe("20161112010203000000");
   });
 
-  it("cacheVersion returns timestamp string", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("updated_at", "datetime");
-    User.cacheVersioning = true;
+  it("cache_version does call updated_at when it is assigned via a hash", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    const recordFromDb = await CacheMeWithVersion.find(record.id);
+    // Rails assigns a multiparameter hash ({1=>2016, 2=>11, ...}); the trails
+    // equivalent value object is a Date built from the same components.
+    recordFromDb.updated_at = new Date(Date.UTC(2016, 10, 12, 1, 2, 3));
+    expect(recordFromDb.cacheVersion()).toBe("20161112010203000000");
+  });
 
-    const user = await User.create({});
-    expect(user.cacheVersion()).not.toBeNull();
+  it("updated_at on class but not on instance raises an error", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    const recordFromDb = await CacheMeWithVersion.where({ id: record.id }).select("id").first();
+    expect(() => recordFromDb.cacheVersion()).toThrow(MissingAttributeError);
   });
 });
