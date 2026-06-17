@@ -1093,6 +1093,21 @@ export class AbstractAdapter implements Quoting {
     // Subclasses with statement caches override this
   }
 
+  /**
+   * The key under which `sql` is stored in the connection's statement pool.
+   * The identity default mirrors the adapters whose `StatementPool` keys by the
+   * raw SQL (SQLite, MySQL); only PostgreSQL defines a real `#sql_key` (it
+   * prefixes the schema search path), which it overrides here. Hoisting the
+   * identity default to the abstract adapter lets `respond_to?(:sql_key)`-style
+   * introspection — `@connection.respond_to?(:sql_key) ? sql_key(sql) : sql` —
+   * resolve uniformly across adapters.
+   *
+   * @internal
+   */
+  sqlKey(sql: string): string {
+    return sql;
+  }
+
   get role(): string {
     return (this.pool as any)?.role ?? "writing";
   }

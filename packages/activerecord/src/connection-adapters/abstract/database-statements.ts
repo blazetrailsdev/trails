@@ -1493,7 +1493,31 @@ export const DatabaseStatements = {
     // here lets adapters that override execQuery (e.g. PostgreSQLAdapter,
     // which populates columnTypes via its type_map) have their override
     // picked up automatically.
-    return this.execQuery(sql, name, binds, { allowRetry: opts?.allowRetry ?? false });
+    //
+    // Rails' select_all runs `exec_query(sql, ..., prepare: prepared_statements &&
+    // preparable)`, where `preparable` is the Arel collector's first-class flag.
+    // trails has no threaded `collector.preparable` yet, so it INFERS preparability
+    // from bind presence: a preparable Arel yields placeholder SQL plus a bind
+    // array, while an inlined one yields no binds. A non-empty bind array under
+    // prepared_statements is therefore the prepared-statement signal — it routes
+    // equality SELECTs through the pooled path (SQLite `_cachedStatement`) while
+    // inlined queries use a fresh statement.
+    //
+    // This matches Rails for every shape that carries binds, and for the no-bind
+    // IN-clause array (non-preparable in both). It diverges only for a no-bind but
+    // *preparable* query — a SQL string literal — which Rails caches and trails
+    // cannot distinguish from the inlined IN-clause. Converging that needs the real
+    // `collector.preparable` flag: RFC 0016 story
+    // `thread-collector-preparable-for-statement-cache`.
+    const prepare = !!(
+      (this as { preparedStatements?: boolean }).preparedStatements &&
+      binds &&
+      binds.length > 0
+    );
+    return this.execQuery(sql, name, binds, {
+      allowRetry: opts?.allowRetry ?? false,
+      prepare,
+    });
   },
 
   // select_one/value/values/rows delegate to select_all so the QueryCache
