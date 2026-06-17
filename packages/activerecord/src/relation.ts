@@ -171,6 +171,24 @@ function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | 
   return `${y}${mo}${d}${h}${mi}${s}${us}`;
 }
 
+/**
+ * Inline a WhereClause's predicates to SQL for the synchronous `inspect`
+ * query-chain (a trails deviation: Rails `inspect` blocks on DB I/O, which sync
+ * JS can't). Rails' WhereClause has no `to_sql` — inline where-SQL is produced
+ * at the Relation level via `conn.unprepared_statement { conn.to_sql(arel) }` —
+ * so this glue lives here with its only consumer, not on WhereClause, and routes
+ * the Arel AND/SqlLiteral-wrapped AST through the connection visitor.
+ */
+function _whereClauseToSql(
+  whereClause: WhereClause,
+  connection: { toSql(arel: unknown): string },
+): string {
+  const wrapped = predicatesWithWrappedSqlLiterals(whereClause.predicates);
+  if (wrapped.length === 0) return "";
+  const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
+  return connection.toSql(node);
+}
+
 /** Structural equality for a join ON: Arel nodes compare by `eql`, raw SQL by string. */
 function _onEquals(a: string | Nodes.Node, b: string | Nodes.Node): boolean {
   if (a instanceof Nodes.Node && b instanceof Nodes.Node) return a.eql(b);
@@ -1385,7 +1403,7 @@ export class Relation<T extends Base> {
     const parts: string[] = [];
     parts.push(`${this._modelClass.name}.all`);
     if (!this._whereClause.isEmpty()) {
-      const sql = this._whereClause.toSql((this._modelClass as any).connection);
+      const sql = _whereClauseToSql(this._whereClause, (this._modelClass as any).connection);
       if (sql) parts.push(`.where(${JSON.stringify(sql)})`);
     }
     if (this._orderClauses.length > 0) {
@@ -5636,7 +5654,10 @@ export class Relation<T extends Base> {
     const baseline = klass._buildUnscopedRelation?.(this._table ?? undefined);
     if (!baseline) return false;
     try {
-      return this._whereClause.toSql(connection) === baseline._whereClause.toSql(connection);
+      return (
+        _whereClauseToSql(this._whereClause, connection) ===
+        _whereClauseToSql(baseline._whereClause, connection)
+      );
     } catch {
       return false;
     }

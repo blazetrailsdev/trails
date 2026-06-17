@@ -102,18 +102,6 @@ export class WhereClause {
     return wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
   }
 
-  // Renders the predicates as inlined SQL for human-readable `Relation#inspect`.
-  // Rails has no `WhereClause#to_sql`; inlined where-SQL is produced via the
-  // connection (`conn.to_sql(arel)` under `unprepared_statement`), so route
-  // through the connection's visitor here rather than re-quoting bind values
-  // with a bespoke renderer.
-  toSql(connection: { toSql(arel: unknown): string }): string {
-    const wrapped = predicatesWithWrappedSqlLiterals(this.predicates);
-    if (wrapped.length === 0) return "";
-    const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
-    return connection.toSql(node);
-  }
-
   isContradiction(): boolean {
     for (const node of this.predicates) {
       if (node instanceof Nodes.In) {
