@@ -324,7 +324,11 @@ export class JoinDependency {
       arelJoin = joins[0] as Nodes.Join;
       // When the target table was aliased (collision), scope/STI predicates from
       // klass.all() reference the unaliased table. Rebind to the aliased table.
-      if (effectiveName !== targetTable!) {
+      // Skip when the source (foreign) table shares the target's real name — a
+      // self-join — because a name-based rebind cannot tell the join's own
+      // (already-aliased) target columns from the foreign-side columns, and would
+      // wrongly rewrite the FK equality's foreign reference onto the alias.
+      if (effectiveName !== targetTable! && sourceAlias !== targetTable!) {
         const on = (arelJoin as any).right as Nodes.On;
         const rebound = rebindTableReferences(on.expr as Nodes.Node, targetTable!, targetArelTable);
         if (rebound !== on.expr) {

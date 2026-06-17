@@ -25,6 +25,7 @@ import { Owner } from "../test-helpers/models/owner.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
+import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { Project } from "../test-helpers/models/project.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
@@ -5329,6 +5330,23 @@ describe("EagerAssociationTest", () => {
       .toArray();
     expect(posts).toHaveLength(0);
   });
+
+  it("test_type_cast_in_where_references_association_name", async () => {
+    const parent = (await Comment.find(comments("greetings").id)) as Comment;
+    const child = (await (parent as any).children.create({
+      label: "child",
+      body: "hi",
+      post_id: (parent as any).post_id,
+    })) as Comment;
+
+    const comment = (await Comment.includes("children")
+      .where({ "children.label": "child" })
+      .last()) as Comment;
+
+    expect(comment.id).toBe(parent.id);
+    const children = (await (comment as any).children.toArray()) as Base[];
+    expect(children.map((c) => c.id)).toEqual([child.id]);
+  });
 });
 
 // ==========================================================================
@@ -5389,6 +5407,32 @@ describe("EagerAssociationTest", () => {
         authors("mary").id,
       );
     });
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Firm/Client fixtures) — ports the
+// attribute-alias + self-join where-hash case over the real Firm/Client models
+// (both on the `companies` table). Same describe name as the other
+// EagerAssociationTest blocks so test:compare matches the Rails
+// `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { companies } = useHandlerFixtures(["companies"]);
+  beforeAll(async () => {
+    await defineSchema(canonicalSchema, { dropExisting: true });
+  });
+  registerModel(Company);
+  registerModel(Firm);
+  registerModel(Client);
+
+  it("test_attribute_alias_in_where_references_association_name", async () => {
+    const firm = (await Firm.includes("clients")
+      .where({ "clients.newName": "Summit" })
+      .last()) as Firm;
+    expect(firm.id).toBe(companies("first_firm").id);
+    const clients = (await (firm as any).clients.toArray()) as Base[];
+    expect(clients.map((c) => c.id)).toEqual([companies("first_client").id]);
   });
 });
 

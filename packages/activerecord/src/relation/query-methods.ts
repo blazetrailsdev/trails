@@ -925,9 +925,11 @@ export function buildWhereClause(
           ? value.map((v) => this._castWhereValue(resolved, v))
           : this._castWhereValue(resolved, value);
     }
-    const parts = this.predicateBuilder.buildFromHash(normalized, (tableName: string) =>
-      lookupTableKlassFromJoinDependencies.call(this, tableName),
-    );
+    const block: ((tableName: string) => unknown) & {
+      aliasFor?: (assocName: string) => string | null;
+    } = (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName);
+    block.aliasFor = (assocName: string) => joinTableAliasFor.call(this, assocName);
+    const parts = this.predicateBuilder.buildFromHash(normalized, block);
     return new WhereClause(parts);
   }
 
@@ -2361,6 +2363,34 @@ export function lookupTableKlassFromJoinDependencies(
     if (tableName === join.tableName) found = join.baseKlass;
   });
   return found;
+}
+
+/**
+ * Resolve the SQL alias a where-hash key should use when the association named
+ * by that key is joined under an AliasTracker alias (a self-join / duplicate of
+ * a table already in the FROM). Rails aliases such a join to the reference name
+ * (which equals the association key) and builds the WHERE against that alias;
+ * `where(manager: { … })` on a self-referential `belongs_to :manager` resolves
+ * to the `manager` alias rather than the base table.
+ *
+ * Returns the key itself when a colliding join for it exists (the referenced
+ * rename in `_applyReferencedAlias` lands on that name), else `null` so a
+ * first/only-occurrence join — which keeps its real table name — is left
+ * unaliased.
+ * @internal
+ */
+export function joinTableAliasFor(this: QueryMethodsHost, assocName: string): string | null {
+  let alias: string | null = null;
+  eachJoinDependencies.call(this, undefined, (join: any) => {
+    if (
+      join.immediateAssocName === assocName &&
+      join.effectiveSqlName &&
+      join.effectiveSqlName !== join.tableName
+    ) {
+      alias = assocName;
+    }
+  });
+  return alias;
 }
 
 /** @internal */

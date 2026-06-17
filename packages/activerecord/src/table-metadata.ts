@@ -49,7 +49,9 @@ export class TableMetadata {
 
   associatedTable(
     tableName: string,
-    fallback?: (name: string) => typeof Base | null,
+    fallback?: ((name: string) => typeof Base | null) & {
+      aliasFor?: (assocName: string) => string | null;
+    },
   ): TableMetadata {
     const reflection = this._klass
       ? (reflectOnAssociation(this._klass, tableName) ??
@@ -82,6 +84,15 @@ export class TableMetadata {
       // join's actual table name instead.)
       if (!reflection && arelTable && arelTable.name !== tableName) {
         arelTable = arelTable.alias(tableName);
+      } else if (reflection && arelTable && fallback?.aliasFor) {
+        // Reflection key: only alias when the association is joined under an
+        // AliasTracker alias (a self-join). `aliasFor` returns the join's alias
+        // (the key) in that case, and null for a first-occurrence join that
+        // keeps its real table name — so the WHERE stays in sync with the JOIN.
+        const joinAlias = fallback.aliasFor(tableName);
+        if (joinAlias && joinAlias !== arelTable.name) {
+          arelTable = arelTable.alias(joinAlias);
+        }
       }
       return new TableMetadata(associationKlass, arelTable, reflection);
     }

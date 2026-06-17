@@ -53,7 +53,13 @@ export class TableAlias extends Binary {
   }
 
   get(columnName: string): Attribute {
-    return new Attribute(this, columnName);
+    // Resolve attribute aliases through the underlying relation's klass, the
+    // same way Table#get does, so `where("clients.new_name": …)` against a
+    // self-join alias still maps `new_name` to the real column.
+    const klass = (this.relation as { klass?: { _attributeAliases?: Record<string, string> } })
+      ?.klass;
+    const resolved = klass?._attributeAliases?.[columnName] ?? columnName;
+    return new Attribute(this, resolved);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
