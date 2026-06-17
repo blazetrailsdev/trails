@@ -210,20 +210,29 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
     it("indexes in create", async () => {
-      const sqls = await captureSql(() =>
-        adapter
-          .schemaStatements()
-          .createTable(
-            "temp",
-            { temporary: true, as: "SELECT id, name, zip FROM a_really_complicated_query" },
-            (t) => {
-              t.index(["zip"]);
-            },
-          ),
-      );
-      expect(sqls[0]).toMatch(
-        /^CREATE TEMPORARY TABLE `temp` \(INDEX `index_temp_on_zip` \(`zip`\)\) AS SELECT id, name, zip FROM a_really_complicated_query/,
-      );
+      // Rails stubs `execute` for this case so the CREATE never runs (it only
+      // asserts the generated DDL string). Our captureSql executes-then-swallows
+      // instead, and the `AS SELECT ... a_really_complicated_query` errors out so
+      // `temp` never persists — but require-table-teardown matches statically, so
+      // we balance the create with a guarded drop.
+      try {
+        const sqls = await captureSql(() =>
+          adapter
+            .schemaStatements()
+            .createTable(
+              "temp",
+              { temporary: true, as: "SELECT id, name, zip FROM a_really_complicated_query" },
+              (t) => {
+                t.index(["zip"]);
+              },
+            ),
+        );
+        expect(sqls[0]).toMatch(
+          /^CREATE TEMPORARY TABLE `temp` \(INDEX `index_temp_on_zip` \(`zip`\)\)(?: ROW_FORMAT=DYNAMIC)? AS SELECT id, name, zip FROM a_really_complicated_query/,
+        );
+      } finally {
+        await adapter.dropTable("temp", { ifExists: true });
+      }
     });
   });
 });
