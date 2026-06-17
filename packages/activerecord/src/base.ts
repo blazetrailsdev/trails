@@ -1929,8 +1929,8 @@ export class Base extends Model {
   ): Relation<InstanceType<T>> {
     const scope = this.currentScope;
     if (scope) {
-      // Rails' `all`: `self == current_scope.klass ? current_scope.clone :
-      // relation.merge!(current_scope)`. When the current scope was set on a
+      // Rails' `all`: `self == scope.model ? scope.clone :
+      // relation.merge!(scope)`. When the current scope was set on a
       // superclass (an STI subclass reading a scope installed on its base, e.g.
       // inside `Comment.unscoped { SpecialComment.find(1) }`), build this
       // class's own relation — which carries the STI `type_condition` — and
