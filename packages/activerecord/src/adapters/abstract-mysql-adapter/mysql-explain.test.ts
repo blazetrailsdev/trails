@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base } from "../../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
@@ -86,13 +85,42 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(typeof result).toBe("string");
       expect(result.length).toBeGreaterThan(0);
     });
+
+    // trails-only: the ExplainRegistry → ExplainSubscriber → adapter.explain
+    // pipeline only works on MySQL if execute() emits sql.active_record.
+    // Without that, Relation#explain silently falls back to toSql() (which
+    // keeps Arel's double-quoted identifiers) rather than the payload SQL the
+    // driver saw (post-`mysqlQuote` → backticks). Asserting backticks (and the
+    // absence of double quotes) is what discriminates the two paths; a plain
+    // "contains the table name" assertion would pass either way. Uses the
+    // canonical authors/posts fixtures rather than a bespoke table.
+    it("Relation#explain on MySQL captures the SELECT via sql.active_record", async () => {
+      const plan = await Author.where({ id: authors("david").id }).explain();
+      expect(plan).toContain("`authors`");
+      expect(plan).not.toMatch(/"authors"/);
+      expect(plan).toMatch(/EXPLAIN.*for:/);
+    });
+
+    it("Relation#explain on MySQL captures preload queries", async () => {
+      const plan = await Author.where({ id: authors("david").id })
+        .preload("posts")
+        .explain();
+      const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
+      // The fallback path emits exactly one block (toSql() of the outer
+      // relation only, no preload query). Requiring ≥ 2 blocks proves the
+      // preload query was captured through sql.active_record, not substituted
+      // from toSql(). Both blocks carry backtick-quoted identifiers.
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
+      expect(plan).toContain("`authors`");
+      expect(plan).toContain("`posts`");
+      expect(plan).not.toMatch(/"(authors|posts)"/);
+    });
   });
 
-  // TS-only coverage of our buildExplainClause/Relation#explain plumbing. These
-  // use defineSchema (DDL), which auto-commits on MySQL and would break the
-  // transactional fixtures above, so they live outside MySQLExplainTest with no
-  // fixture wrapping. Not Rails tests — kept in a sibling block so test:compare
-  // doesn't read them as members of the MySQLExplainTest class.
+  // TS-only coverage of our buildExplainClause/Relation#explain plumbing. Not
+  // Rails tests — kept in a sibling block so test:compare doesn't read them as
+  // members of the MySQLExplainTest class. These exercise the adapter directly
+  // (no DB rows), so they need no fixtures.
   describe("explain helpers (trails-only)", () => {
     it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", () => {
       const clause = adapter.buildExplainClause([{ format: "json" }]);
@@ -116,75 +144,6 @@ describeIfMysql("Mysql2Adapter", () => {
       const result = await adapter.explain("SELECT 1", [], [{ format: "json" }]);
       expect(typeof result).toBe("string");
       expect(result.length).toBeGreaterThan(0);
-    });
-
-    it("Relation#explain on MySQL captures the SELECT via sql.active_record", async () => {
-      // End-to-end: the full ExplainRegistry → ExplainSubscriber →
-      // adapter.explain pipeline only works on MySQL if execute()
-      // emits sql.active_record. Without that, Relation#explain
-      // silently falls back to toSql() (which keeps Arel's
-      // double-quoted identifiers) rather than the payload SQL the
-      // driver saw (which goes through `mysqlQuote` → backticks).
-      // Asserting backticks is the thing that discriminates the two
-      // paths — plain "contains the table name" would pass either
-      // way.
-      await defineSchema({
-        ex_rel_mysqls: { name: "string" },
-      });
-      class ExRelMysql extends Base {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      await ExRelMysql.create({ name: "r" });
-      const plan = await ExRelMysql.all().explain();
-      expect(typeof plan).toBe("string");
-      // The captured SQL came from `payload.sql` (post-mysqlQuote),
-      // so it uses backtick-quoted identifiers. The fallback
-      // `toSql()` path would emit `"ex_rel_mysqls"` with double
-      // quotes instead.
-      expect(plan).toContain("`ex_rel_mysqls`");
-      expect(plan).not.toMatch(/"ex_rel_mysqls"/);
-      // MySQL buildExplainClause header format:
-      expect(plan).toMatch(/EXPLAIN.*for:/);
-    });
-
-    it("Relation#explain on MySQL captures preload queries", async () => {
-      const { registerModel } = await import("../../index.js");
-      await defineSchema({
-        ex_mysql_authors: { name: "string" },
-        ex_mysql_books: { title: "string", ex_mysql_author_id: "integer" },
-      });
-      class ExMysqlAuthor extends Base {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      class ExMysqlBook extends Base {
-        static {
-          this.attribute("title", "string");
-          this.attribute("ex_mysql_author_id", "integer");
-        }
-      }
-      ExMysqlAuthor.hasMany("exMysqlBooks", { className: "ExMysqlBook" });
-      registerModel(ExMysqlAuthor);
-      registerModel(ExMysqlBook);
-      const a = (await ExMysqlAuthor.create({ name: "A" })) as any;
-      await ExMysqlBook.create({ title: "B", ex_mysql_author_id: a.id });
-
-      const plan = await ExMysqlAuthor.all().preload("exMysqlBooks").explain();
-      const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
-      // The fallback path emits exactly one block (toSql() of the
-      // outer relation only, no preload query). Requiring ≥ 2
-      // blocks proves the preload query was captured through
-      // sql.active_record, not substituted from toSql().
-      expect(blocks.length).toBeGreaterThanOrEqual(2);
-      // Both blocks came from `payload.sql` and therefore carry
-      // backtick-quoted identifiers — the fallback form would use
-      // double quotes.
-      expect(plan).toContain("`ex_mysql_authors`");
-      expect(plan).toContain("`ex_mysql_books`");
-      expect(plan).not.toMatch(/"ex_mysql_(authors|books)"/);
     });
   });
 });

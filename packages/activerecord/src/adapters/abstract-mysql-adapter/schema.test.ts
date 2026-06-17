@@ -6,6 +6,7 @@ import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./tes
 import { Base } from "../../base.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { defineFixtures } from "../../test-helpers/define-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -51,9 +52,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("schema", async () => {
-      await defineSchema(adapter, {
-        posts: { title: "string", body: "text", type: "string" },
-      });
+      await defineSchema(adapter, { posts: canonicalSchema.posts });
       try {
         class Post extends Base {
           static _tableName = "posts";
@@ -83,7 +82,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("primary key", async () => {
-      await defineSchema(adapter, { topics: { title: "string" } });
+      await defineSchema(adapter, { topics: canonicalSchema.topics });
       try {
         expect(await adapter.primaryKey("topics")).toBe("id");
       } finally {
@@ -92,7 +91,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("data source exists?", async () => {
-      await defineSchema(adapter, { topics: { title: "string" } });
+      await defineSchema(adapter, { topics: canonicalSchema.topics });
       try {
         const db = await adapter.currentDatabase();
         // Rails passes @omgpost.table_name, which is the qualified `db.topics` form.
@@ -201,7 +200,7 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
 
   it("primary key method with ansi quotes", async () => {
     const a = ansi!;
-    await defineSchema(a, { topics: { title: "string" } });
+    await defineSchema(a, { topics: canonicalSchema.topics });
     try {
       expect(await a.primaryKey("topics")).toBe("id");
     } finally {
@@ -212,14 +211,10 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
   it("foreign keys method with ansi quotes", async () => {
     const a = ansi!;
     // Mirrors Rails test/schema/schema.rb: lessons_students is id:false with a
-    // bigint student_id referencing students(id). Bigint width matches the
-    // default Rails PK so addForeignKey doesn't trip MySQL's type-match rule.
+    // student_id referencing students(id) — both from the canonical schema.
     await defineSchema(a, {
-      students: { name: "string" },
-      lessons_students: {
-        columns: { student_id: "big_integer" },
-        primaryKey: false,
-      },
+      students: canonicalSchema.students,
+      lessons_students: canonicalSchema.lessons_students,
     });
     try {
       await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });

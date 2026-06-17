@@ -824,8 +824,11 @@ export const TEST_SCHEMA: Schema = {
 
   lessons_students: {
     columns: {
-      lesson_id: "integer",
-      student_id: "integer",
+      // Rails schema.rb uses `t.references :lesson` / `t.references :student`,
+      // which create bigint FK columns (matching the bigint `students.id` PK so
+      // `add_foreign_key :lessons_students, :students` is type-compatible).
+      lesson_id: "big_integer",
+      student_id: "big_integer",
     },
     primaryKey: false,
   },

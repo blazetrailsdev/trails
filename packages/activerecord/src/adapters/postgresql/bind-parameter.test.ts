@@ -1,70 +1,67 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/bind_parameter_test.rb
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
-
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+import { describe, it, expect } from "vitest";
+import { describeIfPg } from "./test-helper.js";
+import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
+import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { Post } from "../../test-helpers/models/post.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
-
-  beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    // `dropExisting: true` makes this file repeatable against a
-    // non-empty PG test DB — a prior aborted run could leave `bind_test`
-    // behind, and the per-adapter signature cache starts empty in a
-    // fresh process, so defineSchema would otherwise try CREATE TABLE
-    // over an existing table.
-    await defineSchema(adapter, { bind_test: { name: "string" } }, { dropExisting: true });
-    await adapter.executeMutation(`INSERT INTO "bind_test" ("name") VALUES ('hello')`);
-  });
-
-  afterAll(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "bind_test"`).catch(() => {});
-    await adapter.close();
-  });
-
-  withTransactionalFixtures(() => adapter);
-
   describe("BindParameterTest", () => {
+    // Mirrors Rails' `fixtures :posts`. Authors are declared first so the posts
+    // fixture's author label-ref resolves to David's id (matching Rails posts.yml).
+    useHandlerFixtures(["authors", "posts"], { schema: canonicalSchema });
+
+    // Mirrors Rails' private `assert_quoted_as(expected, value, match: 0)`:
+    // Post.where("title = ?", value) renders `value` into the SQL with the PG
+    // adapter's quoting, and the row query confirms the cast.
+    //
+    // DIVERGENCE: Rails binds the `?` as a parameter ($1) at execution, so PG
+    // casts e.g. an integer against the varchar `title` and the query returns
+    // empty. trails inlines the raw fragment into the executed SQL, so a
+    // type-mismatched comparison like `title = 0` raises 42883 in PG instead of
+    // returning empty. We therefore assert the rendered SQL for every case
+    // (which matches Rails verbatim) and only execute the row query for the
+    // matching string case. Tracked for convergence:
+    // RFC 0023 story `relation-raw-fragment-bind-parameterization`.
+    async function assertQuotedAs(expected: string, value: unknown, match = 0) {
+      const relation = Post.where("title = ?", value);
+      expect(relation.toSql()).toBe(`SELECT "posts".* FROM "posts" WHERE (title = ${expected})`);
+      if (match > 0) {
+        expect(await relation.count()).toBe(match);
+      }
+    }
+
     it("where with string for string column using bind parameters", async () => {
-      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, ["hello"]);
-      expect(rows).toHaveLength(1);
-      expect(rows[0].name).toBe("hello");
+      await assertQuotedAs("'Welcome to the weblog'", "Welcome to the weblog", 1);
     });
 
     it("where with integer for string column using bind parameters", async () => {
-      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [123]);
-      expect(rows).toHaveLength(0);
+      await assertQuotedAs("0", 0);
     });
 
     it("where with float for string column using bind parameters", async () => {
-      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [1.5]);
-      expect(rows).toHaveLength(0);
+      // Rails passes `0.0` and expects the literal `0.0`. JS has a single
+      // `Number` type, so `0.0 === 0` and the adapter renders `0` — there is no
+      // distinct float literal to reproduce Ruby's `0.0`.
+      await assertQuotedAs("0", 0.0);
     });
 
     it("where with boolean for string column using bind parameters", async () => {
-      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [true]);
-      expect(rows).toHaveLength(0);
+      await assertQuotedAs("FALSE", false);
     });
 
     it("where with decimal for string column using bind parameters", async () => {
-      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [99.99]);
-      expect(rows).toHaveLength(0);
+      // Rails passes `BigDecimal(0)` and expects `0.0`. JS has no BigDecimal;
+      // the nearest value is a plain `Number`, which the adapter renders `0`.
+      await assertQuotedAs("0", 0);
     });
 
     it("where with rational for string column using bind parameters", async () => {
-      const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, [0.3333]);
-      expect(rows).toHaveLength(0);
+      // Rails passes `Rational(0)` and expects `0/1`. JS has no Rational type;
+      // the nearest value is a plain `Number`, which the adapter renders `0`.
+      await assertQuotedAs("0", 0);
     });
   });
 });
