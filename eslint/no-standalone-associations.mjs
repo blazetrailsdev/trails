@@ -247,14 +247,22 @@ const rule = {
                 .slice(1)
                 .map((a) => reindent(sourceCode.getText(a)))
                 .join(", ");
-              const inserted = `\n${indent}this.${macro}(${restText});`;
-              const anchor = last ?? sourceCode.getFirstToken(block, { skip: 0 }); // '{'
+              const stmtText = `this.${macro}(${restText});`;
 
-              const fixes = [
-                last
-                  ? fixer.insertTextAfter(last, inserted)
-                  : fixer.insertTextAfter(anchor, inserted),
-              ];
+              const fixes = [];
+              if (last) {
+                // Append after the last existing statement; its closing brace
+                // already sits on its own line.
+                fixes.push(fixer.insertTextAfter(last, `\n${indent}${stmtText}`));
+              } else {
+                // Empty `static {}`: insert after the `{` and add a newline +
+                // brace indentation so the closing `}` lands on its own line.
+                // Note getFirstToken(block) is the `static` keyword, so filter
+                // to the `{` token explicitly.
+                const brace = sourceCode.getFirstToken(block, { filter: (t) => t.value === "{" });
+                const closeIndent = " ".repeat(block.loc.start.column);
+                fixes.push(fixer.insertTextAfter(brace, `\n${indent}${stmtText}\n${closeIndent}`));
+              }
 
               // Remove the whole standalone statement, including the leading
               // indentation and the trailing newline, to avoid a blank line.

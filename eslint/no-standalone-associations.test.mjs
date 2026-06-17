@@ -52,6 +52,13 @@ tester.run("no-standalone-associations", rule, {
         "class C extends Base {\n  static {\n    this._tableName = 'cs';\n    this.belongsTo('p', {\n      className: 'P',\n    });\n  }\n}\n",
       errors: [{ messageId: "standalone" }],
     },
+    // Safe fix into an EMPTY static block — insert right after `{`.
+    {
+      filename: FILENAME,
+      code: "class P extends Base {\n  static {}\n}\nAssociations.hasMany.call(P, 'cs', {});\n",
+      output: "class P extends Base {\n  static {\n    this.hasMany('cs', {});\n  }\n}\n",
+      errors: [{ messageId: "standalone" }],
+    },
     // Multi-line arg dedented when the old statement was more deeply indented
     // than the target static block (shift is negative).
     {
