@@ -90,22 +90,25 @@ export interface IndexInfo {
 }
 
 /**
- * Mirrors IndexDefinition#concise_options for index prefix lengths: when every
- * column carries a length and all are identical, collapse the per-column map to
- * a single scalar (`{name:10, description:10}` → `10`).
+ * Mirrors IndexDefinition#concise_options (schema_definitions.rb): when every
+ * column carries the option and all values are identical, collapse the
+ * per-column map to a single scalar (`{name:10, description:10}` → `10`,
+ * `{name:"desc", rating:"desc"}` → `"desc"`). Applies uniformly to lengths,
+ * orders, and opclasses — including the single-column case (`{name:"desc"}` →
+ * `"desc"`).
  */
-function conciseIndexLengths(
+function conciseOptions<T>(
   columns: string | string[],
-  lengths: number | Record<string, number> | undefined,
-): number | Record<string, number> | undefined {
-  if (lengths == null || typeof lengths === "number") return lengths;
-  // An expression index carries `columns` as a string; a per-column prefix-length
-  // map only applies to a column array, so guard before comparing counts.
-  const values = Object.values(lengths);
+  options: T | Record<string, T> | undefined,
+): T | Record<string, T> | undefined {
+  if (options == null || typeof options !== "object") return options;
+  // An expression index carries `columns` as a string; a per-column option map
+  // only applies to a column array, so guard before comparing counts.
+  const values = Object.values(options as Record<string, T>);
   if (Array.isArray(columns) && columns.length === values.length && new Set(values).size === 1) {
     return values[0];
   }
-  return lengths;
+  return options;
 }
 
 /**
@@ -1161,11 +1164,12 @@ export class SchemaDumper {
     const parts: string[] = [cols];
     if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
     if (index.unique) parts.push("unique: true");
-    const lengths = conciseIndexLengths(index.columns, index.lengths);
+    const lengths = conciseOptions(index.columns, index.lengths);
     if (lengths !== undefined) parts.push(`length: ${this.formatIndexParts(lengths)}`);
-    if (index.orders !== undefined) parts.push(`order: ${this.formatIndexParts(index.orders)}`);
-    if (index.opclasses !== undefined)
-      parts.push(`opclass: ${this.formatIndexParts(index.opclasses)}`);
+    const orders = conciseOptions(index.columns, index.orders);
+    if (orders !== undefined) parts.push(`order: ${this.formatIndexParts(orders)}`);
+    const opclasses = conciseOptions(index.columns, index.opclasses);
+    if (opclasses !== undefined) parts.push(`opclass: ${this.formatIndexParts(opclasses)}`);
     if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
     if (index.using && index.using !== "btree") parts.push(`using: ${JSON.stringify(index.using)}`);
     if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
