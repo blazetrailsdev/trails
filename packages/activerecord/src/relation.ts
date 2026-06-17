@@ -5172,15 +5172,11 @@ export class Relation<T extends Base> {
   withRecursive(
     ...ctes: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
   ): Relation<T> {
-    // Mirrors Rails `with_recursive` (query_methods.rb:518): same block guard as
-    // `with` — a trailing function argument is the TS equivalent of a Ruby block.
-    if (ctes.some((cte) => typeof cte === "function")) {
-      throw argumentError("ActiveRecord::Relation#with_recursive does not accept a block");
-    }
-    // Rails `with_recursive` calls `check_if_method_has_arguments!(__callee__, args)`
-    // (query_methods.rb:519) before `spawn.with_recursive!`. The shared helper raises
-    // on empty varargs, then mirrors `args.flatten!` (arrays only) and
-    // `compact_blank!` (so `withRecursive(null)` no-ops). It mutates `ctes` in place.
+    // Rails `with_recursive` (query_methods.rb:518-521) calls only
+    // `check_if_method_has_arguments!(__callee__, args)` before `spawn.with_recursive!`
+    // — unlike `with`, it has no `block_given?` guard. The shared helper raises on
+    // empty varargs, then mirrors `args.flatten!` (arrays only) and `compact_blank!`
+    // (so `withRecursive(null)` no-ops). It mutates `ctes` in place.
     this.checkIfMethodHasArgumentsBang("with_recursive", ctes);
     return this._clone().withRecursiveBang(...ctes);
   }
