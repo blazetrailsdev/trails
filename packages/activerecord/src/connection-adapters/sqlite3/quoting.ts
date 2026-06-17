@@ -9,14 +9,10 @@
  */
 
 import {
-  formatInstantForSql,
-  formatPlainDateTimeForSql,
-  formatPlainDateForSql,
-  formatPlainTimeForSql,
-} from "../abstract/sql-datetime.js";
-import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
+  dispatchQuotedDate,
+  dispatchQuotedTime,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -175,7 +171,7 @@ export function quoteDefaultExpression(value: unknown): string {
   return quote(value);
 }
 
-export function typeCast(value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost | void, value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean") return value ? unquotedTrue() : unquotedFalse();
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -185,12 +181,20 @@ export function typeCast(value: unknown): unknown {
   // emits the fixed-form string via the inherited abstract quoter.)
   if (value instanceof BigDecimal) return Number(value.toString("F"));
   if (typeof value === "symbol") return value.description ?? null;
-  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
-  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
-  // PlainTime is stored with a 2000-01-01 date prefix so SQLite can round-trip it.
-  if (value instanceof Temporal.PlainTime) return `2000-01-01 ${formatPlainTimeForSql(value)}`;
-  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
+  // Rails dispatches date/time through `self.quoted_time` / `self.quoted_date`
+  // (abstract/quoting.rb:93-101) — which SQLite overrides to keep a `2000-01-01`
+  // prefix on times. Thread `this` so the dispatch lands on those overrides;
+  // bare calls fall back to SQLITE_QUOTING_HOST so the prefix is still applied.
+  const host = this && typeof this === "object" ? this : SQLITE_QUOTING_HOST;
+  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(host, value);
+  if (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.ZonedDateTime
+  ) {
+    return dispatchQuotedDate(host, value);
+  }
   if (value instanceof Date)
     throw new TypeError(
       "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",

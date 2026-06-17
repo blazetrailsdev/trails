@@ -656,7 +656,9 @@ export class AbstractAdapter implements Quoting {
    * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#type_cast
    */
   typeCast(value: unknown): unknown {
-    return abstractTypeCast(value);
+    // `.call(this)` so Rails' `type_cast` → `self.quoted_date`/`self.quoted_time`
+    // dispatch reaches adapter overrides (abstract/quoting.rb:93-101).
+    return abstractTypeCast.call(this, value);
   }
 
   /**

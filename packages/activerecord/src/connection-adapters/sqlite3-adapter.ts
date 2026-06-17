@@ -760,7 +760,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   override typeCast(value: unknown): unknown {
-    return sqliteTypeCast(value);
+    // `.call(this)` so the inherited date/time dispatch resolves to this
+    // adapter's `quotedDate` / `quotedTime` (2000-01-01-prefixed times).
+    return sqliteTypeCast.call(this, value);
   }
 
   /**

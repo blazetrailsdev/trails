@@ -17,7 +17,6 @@ import {
   formatInstantForSql,
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
-  formatPlainTimeForSql,
 } from "./sql-datetime.js";
 
 /**
@@ -131,7 +130,7 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#type_cast
  */
-export function typeCast(value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost | void, value: unknown): unknown {
   if (typeof value === "symbol") return value.description ?? String(value);
   if (value === true) return unquotedTrue();
   if (value === false) return unquotedFalse();
@@ -140,11 +139,20 @@ export function typeCast(value: unknown): unknown {
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;
-  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
-  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
-  if (value instanceof Temporal.PlainTime) return formatPlainTimeForSql(value);
-  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
+  // Rails dispatches `Type::Time::Value` through `self.quoted_time` and
+  // `Date`/`Time` through `self.quoted_date` (abstract/quoting.rb:93-101), the
+  // same self-dispatch `quote` uses. Thread `this` so adapter overrides — e.g.
+  // PostgreSQL's BC-suffixing `quotedDate` — flow into `type_cast` too; bare
+  // calls fall back to the module-level helpers.
+  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
+  if (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.ZonedDateTime
+  ) {
+    return dispatchQuotedDate(this, value);
+  }
   if (value instanceof Date)
     throw new TypeError(
       "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
@@ -344,7 +352,10 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
 }
 
 /** @internal */
-function dispatchQuotedDate(host: QuotingDispatchHost | void, value: TemporalDateLike): string {
+export function dispatchQuotedDate(
+  host: QuotingDispatchHost | void,
+  value: TemporalDateLike,
+): string {
   if (host && typeof host === "object" && typeof host.quotedDate === "function") {
     return host.quotedDate(value);
   }
@@ -352,7 +363,10 @@ function dispatchQuotedDate(host: QuotingDispatchHost | void, value: TemporalDat
 }
 
 /** @internal */
-function dispatchQuotedTime(host: QuotingDispatchHost | void, value: Temporal.PlainTime): string {
+export function dispatchQuotedTime(
+  host: QuotingDispatchHost | void,
+  value: Temporal.PlainTime,
+): string {
   if (host && typeof host === "object" && typeof host.quotedTime === "function") {
     return host.quotedTime(value);
   }

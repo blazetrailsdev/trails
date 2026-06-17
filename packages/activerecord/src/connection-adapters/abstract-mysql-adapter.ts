@@ -322,7 +322,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#type_cast
    */
   override typeCast(value: unknown): unknown {
-    return mysqlTypeCast(value);
+    // `.call(this)` so the date/time dispatch resolves to this adapter's
+    // `quotedDate` override (abstract/quoting.rb:93-101).
+    return mysqlTypeCast.call(this, value);
   }
 
   /**
