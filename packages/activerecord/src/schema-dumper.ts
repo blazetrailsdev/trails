@@ -458,32 +458,46 @@ class AdapterSchemaSource implements SchemaSource {
   async columns(tableName: string): Promise<ColumnInfo[]> {
     const mod = await loadSchemaIntrospection();
     const cols = await mod.introspectColumns(this._adapter, tableName);
-    return cols.map((col) => ({
-      name: col.name,
-      // Carry the dsl cast type in `type` and the raw SQL type in `sqlType`
-      // (Epic 3.3-U2). schemaType/schemaLimit/schemaPrecision read the dsl
-      // type off `type` and inspect the raw declaration off `sqlType`. The
-      // legacy `emitTable` path tolerates a dsl `type` via sqlTypeToDsl and
-      // sources limit/precision/scale from the dedicated fields below.
-      type: col.type || col.sqlType || "unknown",
-      sqlType: col.sqlType ?? undefined,
-      primaryKey: col.primaryKey,
-      null: col.null,
-      default: col.default,
-      defaultFunction: col.defaultFunction ?? null,
-      limit: col.limit ?? undefined,
-      precision: col.precision === undefined ? undefined : col.precision,
-      scale: col.scale ?? undefined,
-      collation: col.collation ?? undefined,
-      array: (col as any).array === true ? true : undefined,
-      isEnum: col.type === "enum" ? true : undefined,
-      isSerial: (col as any).isSerial === true ? true : undefined,
-      comment: col.comment ?? undefined,
-      autoIncrement: (col as any).autoIncrement === true ? true : undefined,
-      unsigned: (col as any).unsigned === true ? true : undefined,
-      virtual: (col as any).virtual === true ? true : undefined,
-      extra: (col as any).extra ?? undefined,
-    }));
+    return cols.map((col) => {
+      // Generated/virtual columns: carry the flag through so the dialect dumper's
+      // schemaTypeWithVirtual / prepareColumnOptions emit `t.virtual` with
+      // `as:`/`stored:`. The flag lives behind `isVirtual()` on real Column
+      // objects (PG/MySQL) and `.virtual` on plain mock sources; the generation
+      // expression rides `defaultFunction` (Rails' extract_expression_for_virtual_column).
+      const isVirtual =
+        typeof (col as any).isVirtual === "function"
+          ? (col as any).isVirtual()
+          : (col as any).virtual === true;
+      return {
+        name: col.name,
+        // Carry the dsl cast type in `type` and the raw SQL type in `sqlType`
+        // (Epic 3.3-U2). schemaType/schemaLimit/schemaPrecision read the dsl
+        // type off `type` and inspect the raw declaration off `sqlType`. The
+        // legacy `emitTable` path tolerates a dsl `type` via sqlTypeToDsl and
+        // sources limit/precision/scale from the dedicated fields below.
+        type: col.type || col.sqlType || "unknown",
+        sqlType: col.sqlType ?? undefined,
+        primaryKey: col.primaryKey,
+        null: col.null,
+        // A virtual column has no user-visible default (Rails Column#has_default?
+        // is false); clear it so schemaDefault doesn't emit a `default:` alongside
+        // the `as:`/`stored:` generation options.
+        default: isVirtual ? undefined : col.default,
+        defaultFunction: col.defaultFunction ?? null,
+        limit: col.limit ?? undefined,
+        precision: col.precision === undefined ? undefined : col.precision,
+        scale: col.scale ?? undefined,
+        collation: col.collation ?? undefined,
+        array: (col as any).array === true ? true : undefined,
+        isEnum: col.type === "enum" ? true : undefined,
+        isSerial: (col as any).isSerial === true ? true : undefined,
+        comment: col.comment ?? undefined,
+        autoIncrement: (col as any).autoIncrement === true ? true : undefined,
+        unsigned: (col as any).unsigned === true ? true : undefined,
+        virtual: isVirtual ? true : undefined,
+        extra: (col as any).extra ?? undefined,
+      };
+    });
   }
 
   /** @internal */
