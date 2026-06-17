@@ -777,7 +777,7 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
     Base.releaseConnection();
     expect(Base.connectionPool().activeConnection).toBeNull();
 
-    await Post.create({ title: "foo", body: "bar" });
+    await Post.createBang({ title: "foo", body: "bar" });
     expect(Post.connectionPool().activeConnection).toBeNull();
 
     await Post.first();

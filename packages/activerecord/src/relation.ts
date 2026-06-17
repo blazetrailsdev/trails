@@ -92,7 +92,6 @@ import {
   aggregateColumn as _aggregateColumn,
   isAllAttributes as _isAllAttributes,
   hasInclude as _hasInclude,
-  performCalculation as _performCalculation,
   isDistinctSelect as _isDistinctSelect,
   operationOverAggregateColumn as _operationOverAggregateColumn,
   executeSimpleCalculation as _executeSimpleCalculation,
@@ -6341,11 +6340,6 @@ export class Relation<T extends Base> {
   /** @internal */
   private hasInclude(columnName: string | null): boolean {
     return _hasInclude(this as any, columnName);
-  }
-
-  /** @internal */
-  private performCalculation(operation: string, columnName: string): Promise<unknown> {
-    return _performCalculation(this as any, operation, columnName);
   }
 
   /** @internal */
