@@ -498,6 +498,12 @@ describe("CommandRecorder", () => {
     // Mirrors Rails: the MySQL `ColumnMethods` mixin exposes `t.unsignedInteger`,
     // `t.mediumtext`, `t.longblob`, ... inside change_table — shorthands the
     // adapter advertises via columnMethodNames() beyond NATIVE_DATABASE_TYPES.
+    //
+    // NOTE: the generic proxy records the camelCase method name as the column
+    // type (`unsignedInteger`), whereas Rails records the snake symbol
+    // (`:unsigned_integer`). That recorder-side normalization is tracked
+    // separately in story recorder-camelcase-column-type-normalization
+    // (RFC 0023); the assertions below document current behavior.
     const mysqlLike = {
       columnMethodNames: () => ["unsignedInteger", "mediumtext", "longblob"],
     };
