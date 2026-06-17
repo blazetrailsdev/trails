@@ -8,6 +8,8 @@ import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base, serialize, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
+import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -31,13 +33,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = Base.connection as PostgreSQLAdapter;
     await defineSchema({});
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
+    await adapter.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
     await adapter.exec(`
       CREATE TABLE pg_arrays (
         id serial primary key,
         tags character varying(255)[],
         ratings integer[],
+        datetimes timestamp(6)[],
+        hstores hstore[],
         decimals numeric(10,2)[] DEFAULT '{}',
-        timestamps timestamp[] DEFAULT '{}'
+        timestamps timestamp(6)[] DEFAULT '{}'
       )
     `);
     await adapter.loadAdditionalTypes();
@@ -447,25 +452,50 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(updated[0].tags).toEqual(["one", "two", "three"]);
     });
 
-    it.skip("mutate value in array", async () => {
-      // BLOCKED: hstore[] subtype + missing schema column.
-      // The pg_arrays table created above omits the `hstores hstore[]` column (needs the
-      // hstore extension), and OID::HStore is not wired as an array element subtype, so
-      // an `hstore[]` column would not deserialize to per-element hash objects. Both the
-      // hstore-extension table setup and the array-of-hstore OID wiring are prerequisites.
-      // DEFERRED (RFC 0030): tracked by pg-array-oid-element-subtypes — converge then un-skip.
+    it("mutate value in array", async () => {
+      // Rails: x = PgArray.create!(hstores: [{ a: "a" }, { b: "b" }]); x.hstores.first["a"] = "c"
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+      }
+      await PgArrays.loadSchema();
+      const x = (await (PgArrays as any).create({
+        hstores: [{ a: "a" }, { b: "b" }],
+      })) as any;
+      x.hstores[0]["a"] = "c";
+      await x.save();
+      await x.reload();
+      expect(x.hstores).toEqual([{ a: "c" }, { b: "b" }]);
+      // Rails: assert_not_predicate x, :changed?
+      expect(x.changed).toBe(false);
     });
-    it.skip("datetime with timezone awareness", async () => {
-      // BLOCKED: tz-aware timestamp[] DB round-trip — the in-memory cast already
-      // wraps each element in a TimeWithZone (TimeZoneConverter recurses into
-      // arrays), but the DB round-trip mis-converts: write stores the correct UTC
-      // wall-clock ("2020-06-15 17:00:00", identical to the scalar path), yet the
-      // array element deserialize reads it back shifted by +4h while the scalar
-      // datetime reads it back correctly. The array element subtype's read path
-      // does not interpret the stored wall-clock the way the scalar DateTime does.
-      // SCOPE: array OID element deserialize — same family as the timestamp[] precision
-      //   round-trip loss below.
-      // DEFERRED (RFC 0030): tracked by pg-array-oid-element-subtypes — converge then un-skip.
+    it("datetime with timezone awareness", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      try {
+        class PgArrays extends Base {
+          static tableName = "pg_arrays";
+          static timeZoneAwareAttributes = true;
+        }
+        await PgArrays.loadSchema();
+        const timeString = "2020-06-15T10:00:00-07:00";
+        const instant = Temporal.Instant.from(timeString);
+
+        const record = new PgArrays({ datetimes: [timeString] } as any);
+        const before = (record as any).datetimes as TimeWithZone[];
+        expect(before[0]).toBeInstanceOf(TimeWithZone);
+        expect(before[0].utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+        expect(before[0].timeZone.name).toBe(zone.name);
+
+        await (record as any).save();
+        await (record as any).reload();
+        const after = (record as any).datetimes as TimeWithZone[];
+        expect(after[0]).toBeInstanceOf(TimeWithZone);
+        expect(after[0].utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+        expect(after[0].timeZone.name).toBe(zone.name);
+      } finally {
+        resetZone();
+      }
     });
     it("assigning non array value", async () => {
       class PgArrays extends Base {
@@ -545,13 +575,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].tags).toEqual(tags);
     });
 
-    it.skip("precision is respected on timestamp columns", async () => {
-      // BLOCKED: adapter-pg — timestamp array microsecond precision survives the
-      // in-memory create-time cast but is dropped on the DB round-trip: the
-      // timestamp[] serialize/deserialize path truncates the usec component.
-      // SCOPE: array OID element serialize/deserialize (also covers hstore[] and the
-      //   precision plumb).
-      // DEFERRED (RFC 0030): tracked by pg-array-oid-element-subtypes — converge then un-skip.
+    it("precision is respected on timestamp columns", async () => {
+      // Rails: time = Time.now.change(usec: 123); record = PgArray.create!(timestamps: [time])
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+      }
+      await PgArrays.loadSchema();
+      const time = Temporal.Now.instant()
+        .toZonedDateTimeISO("UTC")
+        .with({ microsecond: 123, nanosecond: 0 })
+        .toInstant();
+      const record = (await (PgArrays as any).create({ timestamps: [time] })) as any;
+      // Rails: assert_equal 1, record.timestamps.count
+      expect(record.timestamps).toHaveLength(1);
+      // Rails: assert_equal 123, record.timestamps.first.usec
+      expect((record.timestamps[0] as Temporal.Instant).epochNanoseconds % 1000000n).toBe(123000n);
+      await record.reload();
+      expect((record.timestamps[0] as Temporal.Instant).epochNanoseconds % 1000000n).toBe(123000n);
     });
   });
 });

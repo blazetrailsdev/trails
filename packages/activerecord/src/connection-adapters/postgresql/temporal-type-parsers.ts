@@ -26,8 +26,22 @@ const OID_TIMESTAMP = 1114;
 const OID_TIMESTAMPTZ = 1184;
 const OID_TIMETZ = 1266;
 
+// Array OIDs for the temporal types. pg's default array parsers decode each
+// element with the built-in scalar parser (JS Date in the host's local zone),
+// which shifts naive `timestamp[]` values by the host UTC offset and drops
+// sub-millisecond precision. Returning the raw array literal here lets
+// OID::Array.deserialize parse it, routing each element through the Temporal
+// wire parser the same way the scalar path does.
+const OID_DATE_ARRAY = 1182;
+const OID_TIME_ARRAY = 1183;
+const OID_TIMESTAMP_ARRAY = 1115;
+const OID_TIMESTAMPTZ_ARRAY = 1185;
+const OID_TIMETZ_ARRAY = 1270;
+
 // Text-format parsers receive strings; binary-format parsers receive Buffer.
 type PgParser = (value: string | Buffer) => unknown;
+
+const passthrough: PgParser = (v) => v;
 
 const TEMPORAL_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser>([
   [OID_TIMESTAMPTZ, (v) => parsePostgresInstant(v as string)],
@@ -35,6 +49,11 @@ const TEMPORAL_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser
   [OID_DATE, (v) => parsePostgresDate(v as string)],
   [OID_TIME, (v) => parsePostgresTime(v as string)],
   [OID_TIMETZ, (v) => parsePostgresTimeTz(v as string)],
+  [OID_DATE_ARRAY, passthrough],
+  [OID_TIME_ARRAY, passthrough],
+  [OID_TIMESTAMP_ARRAY, passthrough],
+  [OID_TIMESTAMPTZ_ARRAY, passthrough],
+  [OID_TIMETZ_ARRAY, passthrough],
 ]);
 
 /**
