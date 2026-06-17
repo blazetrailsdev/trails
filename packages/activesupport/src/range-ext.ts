@@ -63,7 +63,17 @@ export function rangeIncludesValue<T extends number | Date>(range: Range<T>, val
  * ranges by `String#succ`, which orders strings length-first then
  * lexicographically (so `("a".."bbb").include?("z")` is true even though
  * `"z" > "bbb"` lexically — `"z"` is shorter, so it sorts before `"bbb"`).
- * Equivalent to: `begin <= value <= end` in succ order (length, then lex).
+ *
+ * Approximation: this models succ ordering as `(length, then lexicographic)`,
+ * which is EXACT for strings whose characters all share one succ class
+ * (e.g. pure lowercase `a-z`, the inputs Rails string ranges are used with).
+ * It is NOT a full `String#succ` reachability check. Ruby's `succ` only
+ * increments alphanumerics and carries within a character class, so values
+ * that mix classes or contain punctuation are unreachable even when they fall
+ * inside the `(length, lex)` window — e.g. Ruby's `("a".."bbb").include?("a1")`
+ * is `false` (succ never produces `"a1"`), but this returns `true`. Faithful
+ * succ-reachability would require replicating the per-class carry logic of
+ * `String#succ`; deferred until a validator input actually needs it.
  */
 export function rangeIncludesStringValue(range: Range<string>, value: string): boolean {
   // succ order: shorter strings sort first; equal-length ties break by the
