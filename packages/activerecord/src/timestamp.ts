@@ -67,7 +67,13 @@ export async function touch(
   }
 
   const touchColSet = new Set<string>();
-  if (ctor._attributeDefinitions.has("updated_at")) touchColSet.add("updated_at");
+  // Mirrors Rails Persistence#touch: touches `timestamp_attributes_for_update_in_model`,
+  // i.e. updated_at/updated_on resolved through `attribute_aliases` to the real
+  // column (e.g. Developer's updated_at → legacy_updated_at).
+  for (const name of UPDATED_ATTRS) {
+    const col = aliases[name] ?? name;
+    if (ctor._attributeDefinitions.has(col)) touchColSet.add(col);
+  }
   for (const name of resolvedNames) {
     if (ctor._attributeDefinitions.has(name)) touchColSet.add(name);
   }
@@ -227,7 +233,11 @@ export function timestampAttributesForCreateInModel(this: TimestampHost): string
   const names =
     typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
   const cols = new Set(names);
-  this._timestampAttributesForCreateInModel = CREATED_ATTRS.filter((a) => cols.has(a));
+  // Mirrors Rails timestamp.rb:64-66 — intersect the *alias-resolved* timestamp
+  // attributes (e.g. created_at → legacy_created_at) with the model's columns.
+  this._timestampAttributesForCreateInModel = timestampAttributesForCreate
+    .call(this)
+    .filter((a) => cols.has(a));
   return this._timestampAttributesForCreateInModel;
 }
 
@@ -236,7 +246,11 @@ export function timestampAttributesForUpdateInModel(this: TimestampHost): string
   const names =
     typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
   const cols = new Set(names);
-  this._timestampAttributesForUpdateInModel = UPDATED_ATTRS.filter((a) => cols.has(a));
+  // Mirrors Rails timestamp.rb:69-72 — intersect the *alias-resolved* timestamp
+  // attributes (e.g. updated_at → legacy_updated_at) with the model's columns.
+  this._timestampAttributesForUpdateInModel = timestampAttributesForUpdate
+    .call(this)
+    .filter((a) => cols.has(a));
   return this._timestampAttributesForUpdateInModel;
 }
 

@@ -47,8 +47,9 @@ export class FixtureSetPrimaryKeyError extends Error {
 
 const FIXTURE_MAX_ID = 2 ** 30 - 1;
 
-// Standard Rails timestamp columns, auto-filled at fixture insert when present and
-// unset (see fill_timestamps below). Mirrors ActiveRecord::Timestamp's create+update sets.
+// Standard Rails timestamp columns, auto-filled at fixture insert when present
+// (after alias resolution) and unset (see fill_timestamps below). Mirrors
+// ActiveRecord::Timestamp's create+update sets.
 const TIMESTAMP_COLUMN_NAMES = ["created_at", "created_on", "updated_at", "updated_on"];
 
 // CRC32 lookup table (polynomial 0xedb88320). For ASCII labels this produces values
@@ -684,7 +685,17 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     // quoting renders an engine-safe datetime literal (no tz offset on MySQL).
     if ((ModelClass as { recordTimestamps?: boolean }).recordTimestamps !== false) {
       const colNames = new Set(cols.map((c) => c.name));
-      const stampCols = TIMESTAMP_COLUMN_NAMES.filter((c) => colNames.has(c));
+      // Mirrors Rails FixtureSet::TableRow#fill_timestamps → model_metadata
+      // #timestamp_column_names == all_timestamp_attributes_in_model: the model's
+      // *alias-resolved* timestamp columns (e.g. Developer → legacy_updated_at),
+      // not the literal created_at/updated_at names. Resolved against the actual
+      // insert columns (not the model's columnNames(), which can be stale before
+      // the schema cache is warmed — RFC 0030) so the fill is correct regardless.
+      const aliases: Record<string, string> =
+        (ModelClass as { _attributeAliases?: Record<string, string> })._attributeAliases ?? {};
+      const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
+        colNames.has(c),
+      );
       if (stampCols.length > 0) {
         const now = currentTimeFromProperTimezone();
         for (const row of rows) {
