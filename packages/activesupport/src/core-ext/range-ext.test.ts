@@ -5,6 +5,7 @@ import {
   overlap,
   overlaps,
   rangeIncludesValue,
+  rangeIncludesStringValue,
   rangeIncludesRange,
   cover,
   rangeToFs,
@@ -209,6 +210,32 @@ describe("RangeTest", () => {
   it("date time with each", () => {
     const r = makeRange(0, 4);
     expect([...rangeEach(r)]).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("string include uses succ order not lexicographic", () => {
+    // Mirrors Ruby ("aaa".."bbb").include? — succ order (length, then lex).
+    const r = makeRange("aaa", "bbb");
+    expect(rangeIncludesStringValue(r, "aaa")).toBe(true);
+    expect(rangeIncludesStringValue(r, "abc")).toBe(true);
+    expect(rangeIncludesStringValue(r, "bbb")).toBe(true);
+    expect(rangeIncludesStringValue(r, "bbc")).toBe(false); // past end
+    expect(rangeIncludesStringValue(r, "aa")).toBe(false); // shorter than begin
+    expect(rangeIncludesStringValue(r, "aaab")).toBe(false); // longer than end
+
+    // succ order, not lexical: "z" is shorter than "bbb" so it sorts before it,
+    // even though "z" > "bbb" lexically. Ruby: ("a".."bbb").include?("z") == true.
+    const r2 = makeRange("a", "bbb");
+    expect(rangeIncludesStringValue(r2, "z")).toBe(true);
+    expect(rangeIncludesStringValue(r2, "ab")).toBe(true);
+    expect(rangeIncludesStringValue(makeRange("a", "z"), "mm")).toBe(false);
+  });
+
+  it("string include approximates succ for mixed character classes", () => {
+    // Known gap: Ruby's String#succ never produces "a1" from "a" (mixing
+    // letter+digit classes), so ("a".."bbb").include?("a1") == false. The
+    // (length, lex) model returns true. Pinned so the divergence is intentional
+    // and visible; revisit if a validator input needs exact succ reachability.
+    expect(rangeIncludesStringValue(makeRange("a", "bbb"), "a1")).toBe(true);
   });
 
   it("date time with step", () => {

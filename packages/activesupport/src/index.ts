@@ -486,6 +486,7 @@ export {
   overlap,
   overlaps,
   rangeIncludesValue,
+  rangeIncludesStringValue,
   rangeIncludesRange,
   cover,
   rangeToFs,

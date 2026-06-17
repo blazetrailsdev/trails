@@ -16,7 +16,11 @@
  * method-lookup semantics.
  */
 import { resolveValue } from "./resolve-value.js";
-import { rangeIncludesValue, type RangeExt as Range } from "@blazetrails/activesupport";
+import {
+  rangeIncludesValue,
+  rangeIncludesStringValue,
+  type RangeExt as Range,
+} from "@blazetrails/activesupport";
 
 export { resolveValue };
 
@@ -180,12 +184,16 @@ export function inclusionMethod(enumerable: unknown): "include?" | "cover?" {
     const endpoint = enumerable.begin ?? enumerable.end;
     // boundary: range-ext's comparators (rangeIncludesValue) accept JS Date
     // alongside number, coercing to epoch for ordering — mirror that here.
+    // Per clusivity.rb:40-50 only Numeric/Time/Date endpoints select cover?;
+    // a String range falls through to include?, whose membership is the
+    // succ-order enumeration check (not a lexicographic cover) Ruby applies
+    // to string ranges.
     if (typeof endpoint === "number" || endpoint instanceof Date) return "cover?";
   }
   return "include?";
 }
 
-function isRange(members: unknown): members is Range<number | Date> {
+function isRange(members: unknown): members is Range<number | Date | string> {
   return (
     typeof members === "object" &&
     members !== null &&
@@ -196,9 +204,18 @@ function isRange(members: unknown): members is Range<number | Date> {
 }
 
 function testMembership(members: unknown, value: unknown, method: "include?" | "cover?"): boolean {
-  if (method === "cover?" && isRange(members)) {
-    // Range#cover? semantics — endpoint check against the range bounds.
-    return rangeIncludesValue(members, value as number | Date);
+  if (isRange(members)) {
+    const endpoint = members.begin ?? members.end;
+    // A string-endpoint Range arrives via inclusionMethod's include? branch.
+    // Ruby's `Range#include?` on strings is succ-order membership, not the
+    // lexicographic `cover?` the numeric/date branch uses.
+    if (typeof endpoint === "string") {
+      return typeof value === "string" && rangeIncludesStringValue(members as Range<string>, value);
+    }
+    if (method === "cover?") {
+      // Range#cover? semantics — endpoint check against the range bounds.
+      return rangeIncludesValue(members as Range<number | Date>, value as number | Date);
+    }
   }
   return isMemberOf(members, value);
 }

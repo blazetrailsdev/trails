@@ -125,15 +125,18 @@ describe("InclusionValidationTest", () => {
   });
 
   it("validates inclusion of range", () => {
-    // TS doesn't have Ruby ranges, so use an array of all values in the range
-    class Person extends Model {
+    class Topic extends Model {
       static {
-        this.attribute("age", "integer");
-        this.validates("age", { inclusion: { in: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } });
+        this.attribute("title", "string");
+        this.validates("title", { inclusion: { in: makeRange("aaa", "bbb") } });
       }
     }
-    expect(new Person({ age: 5 }).isValid()).toBe(true);
-    expect(new Person({ age: 11 }).isValid()).toBe(false);
+    expect(new Topic({ title: "bbc" }).isValid()).toBe(false);
+    expect(new Topic({ title: "aa" }).isValid()).toBe(false);
+    expect(new Topic({ title: "aaab" }).isValid()).toBe(false);
+    expect(new Topic({ title: "aaa" }).isValid()).toBe(true);
+    expect(new Topic({ title: "abc" }).isValid()).toBe(true);
+    expect(new Topic({ title: "bbb" }).isValid()).toBe(true);
   });
 
   it("validates inclusion of time range", () => {
