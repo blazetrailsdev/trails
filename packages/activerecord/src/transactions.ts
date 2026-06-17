@@ -82,32 +82,66 @@ export async function transaction<T>(
     }
   }
 
-  const adapter = modelClass.connection;
+  // Mirrors Rails `ActiveRecord::Transactions::ClassMethods#transaction`, which
+  // runs inside `with_connection { |c| c.transaction(...) }`. `preventPermanentCheckout`
+  // ensures the deprecated `.connection` reads on the build/callback path return
+  // the already-checked-out connection instead of flipping the lease to permanent
+  // under `permanent_connection_checkout = :deprecated | :disallowed`, so the
+  // pool releases the connection once the transaction completes.
+  return runInQueryConnection(modelClass, async () => {
+    const adapter = modelClass.connection;
 
-  const result = await dbTransaction.call(
-    adapter as any,
-    async (userTx?: unknown) => {
-      let internalTx: Transaction;
-      if (userTx instanceof Transaction) {
-        internalTx = userTx;
-      } else if (userTx && (userTx as any)._internalTransaction instanceof Transaction) {
-        internalTx = (userTx as any)._internalTransaction;
-      } else {
-        const tmCurrent = (adapter as any).currentTransaction?.();
-        internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(adapter);
-      }
-      return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () => {
-        const publicTx = userTx instanceof PublicTransaction ? userTx : internalTx.userTransaction;
-        return fn(publicTx);
-      });
-    },
-    {
-      requiresNew: options?.requiresNew,
-      isolation: options?.isolation,
-      joinable: options?.joinable,
-    },
-  );
-  return result as T | undefined;
+    const result = await dbTransaction.call(
+      adapter as any,
+      async (userTx?: unknown) => {
+        let internalTx: Transaction;
+        if (userTx instanceof Transaction) {
+          internalTx = userTx;
+        } else if (userTx && (userTx as any)._internalTransaction instanceof Transaction) {
+          internalTx = (userTx as any)._internalTransaction;
+        } else {
+          const tmCurrent = (adapter as any).currentTransaction?.();
+          internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(adapter);
+        }
+        return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () => {
+          const publicTx =
+            userTx instanceof PublicTransaction ? userTx : internalTx.userTransaction;
+          return fn(publicTx);
+        });
+      },
+      {
+        requiresNew: options?.requiresNew,
+        isolation: options?.isolation,
+        joinable: options?.joinable,
+      },
+    );
+    return result as T | undefined;
+  });
+}
+
+/**
+ * Run an internal query/transaction inside `with_connection(prevent_permanent_checkout: true)`
+ * so the pool releases its connection afterwards instead of holding it
+ * permanently. Falls back to invoking the block directly for model classes /
+ * mocks that don't expose `withConnection`.
+ *
+ * @internal
+ */
+export function runInQueryConnection<T>(
+  modelClass: typeof Base,
+  run: () => Promise<T>,
+): Promise<T> {
+  const klass = modelClass as unknown as {
+    _adapter?: unknown;
+    withConnection?<X>(
+      fn: () => Promise<X>,
+      o?: { preventPermanentCheckout?: boolean },
+    ): Promise<X>;
+  };
+  // A directly-assigned adapter (`Model.adapter = x`) bypasses the pool/lease,
+  // so there's nothing to prevent and no pool for `withConnection` to use.
+  if (klass._adapter || typeof klass.withConnection !== "function") return run();
+  return klass.withConnection(run, { preventPermanentCheckout: true });
 }
 
 /**
@@ -549,27 +583,35 @@ export async function withTransactionReturningStatus<T>(
 
   let status: T;
 
-  // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-  const adapter = modelClass.connection;
-  const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
+  // Wrap in `with_connection` so the `ensure_finalize` connection probe and the
+  // nested transaction don't permanently lease a connection under
+  // `permanent_connection_checkout = :deprecated | :disallowed`.
+  await runInQueryConnection(modelClass, async () => {
+    // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
+    const adapter = modelClass.connection;
+    const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
 
-  await transaction(modelClass, async () => {
-    // Enroll record with the TransactionManager so it fires committedBang/
-    // rolledbackBang after the transaction commits or rolls back. The TM-driven
-    // rolledbackBang path calls _restoreTransactionRecordState which reads the
-    // persistent _startTransactionState snapshot — matching Rails exactly. We
-    // intentionally do NOT register a per-call tx.afterRollback hook here: the
-    // closure would capture per-save state, and on multi-save rollbacks the
-    // last-registered hook would overwrite the correct outermost snapshot.
-    await addToTransaction.call(this, !hadOuterTransaction || hasTransactionalCallbacks.call(this));
-    rememberTransactionRecordState.call(this);
+    await transaction(modelClass, async () => {
+      // Enroll record with the TransactionManager so it fires committedBang/
+      // rolledbackBang after the transaction commits or rolls back. The TM-driven
+      // rolledbackBang path calls _restoreTransactionRecordState which reads the
+      // persistent _startTransactionState snapshot — matching Rails exactly. We
+      // intentionally do NOT register a per-call tx.afterRollback hook here: the
+      // closure would capture per-save state, and on multi-save rollbacks the
+      // last-registered hook would overwrite the correct outermost snapshot.
+      await addToTransaction.call(
+        this,
+        !hadOuterTransaction || hasTransactionalCallbacks.call(this),
+      );
+      rememberTransactionRecordState.call(this);
 
-    status = await fn();
-    // Ruby truthiness: only false/nil trigger rollback (0, "" are truthy in Ruby)
-    if (status === false || status == null) {
-      throw new Rollback();
-    }
-    return status;
+      status = await fn();
+      // Ruby truthiness: only false/nil trigger rollback (0, "" are truthy in Ruby)
+      if (status === false || status == null) {
+        throw new Rollback();
+      }
+      return status;
+    });
   });
 
   return status!;

@@ -2486,6 +2486,16 @@ export class Relation<T extends Base> {
       // assignment and return the promise derived from itself, deadlocking.
       return this._loadAsyncPromise;
     }
+    // Run the query inside `with_connection` so the pool releases the connection
+    // afterwards instead of holding it permanently. `preventPermanentCheckout`
+    // neutralizes the deprecated `_modelClass.connection` reads on the build /
+    // execute path (they resolve to the already-checked-out connection) under
+    // `permanent_connection_checkout = :deprecated | :disallowed`. Mirrors Rails,
+    // whose read paths run inside `with_connection`.
+    return this._withQueryConnection(() => this._toArrayInner());
+  }
+
+  private async _toArrayInner(): Promise<T[]> {
     // Lazily reflect the schema before issuing the query so consumers
     // don't have to call loadSchema explicitly. Idempotent and cheap.
     await (
@@ -3265,10 +3275,8 @@ export class Relation<T extends Base> {
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
     // to the adapter's generic "SQL" default.
     const [existsSql, existsBinds] = rel._compileAstWithBinds(manager.ast);
-    const rows = await rel._modelClass.connection.execute(
-      existsSql,
-      existsBinds,
-      `${rel._modelClass.name} Exists?`,
+    const rows = await rel._withQueryConnection(() =>
+      rel._modelClass.connection.execute(existsSql, existsBinds, `${rel._modelClass.name} Exists?`),
     );
     return rows.length > 0;
   }
@@ -3373,7 +3381,12 @@ export class Relation<T extends Base> {
     ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
     if (this._isNone) return [];
+    return this._withQueryConnection(() => this._pluckInner(...columns));
+  }
 
+  private async _pluckInner(
+    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown[]> {
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
     // the eager values) and recurses, so the plucked columns can reference the
@@ -4805,6 +4818,28 @@ export class Relation<T extends Base> {
     for (const node of allNodes) {
       manager.where(node);
     }
+  }
+
+  /**
+   * Run an internal query inside `with_connection(prevent_permanent_checkout:
+   * true)` so the pool releases its connection afterwards rather than flipping
+   * the lease to permanent via the deprecated `.connection` getter under
+   * `permanent_connection_checkout = :deprecated | :disallowed`. Falls back to
+   * invoking the block directly for mock model classes without `withConnection`.
+   */
+  private _withQueryConnection<R>(run: () => Promise<R>): Promise<R> {
+    const modelClass = this._modelClass as unknown as {
+      _adapter?: unknown;
+      withConnection?<X>(
+        fn: () => Promise<X>,
+        o?: { preventPermanentCheckout?: boolean },
+      ): Promise<X>;
+    };
+    // A directly-assigned adapter (`Model.adapter = x`) bypasses the pool/lease
+    // entirely, so there's no permanent-checkout to prevent — and calling
+    // `withConnection` would throw (no pool established). Run inline.
+    if (modelClass._adapter || typeof modelClass.withConnection !== "function") return run();
+    return modelClass.withConnection(run, { preventPermanentCheckout: true });
   }
 
   /** Resolve the connection through the public getter, returning null for HABTM join models with no established connection. */
@@ -6326,7 +6361,7 @@ export class Relation<T extends Base> {
 
   /** @internal */
   private performCalculation(operation: string, columnName: string): Promise<unknown> {
-    return _performCalculation(this as any, operation, columnName);
+    return this._withQueryConnection(() => _performCalculation(this as any, operation, columnName));
   }
 
   /** @internal */

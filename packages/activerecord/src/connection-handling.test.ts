@@ -6,6 +6,9 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Post } from "./test-helpers/models/post.js";
 import {
   connectedToStack,
   currentRole,
@@ -155,18 +158,6 @@ describe("ConnectionHandlingTest", () => {
     );
 
     expect(Base.connectionPool().activeConnection).toBeNull();
-  });
-
-  it.skip("common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed", () => {
-    // BLOCKED: internal query execution acquires its connection through the
-    // deprecated `Model.connection` getter (relation.ts `_modelClass.connection`,
-    // persistence's insert quoting), which calls `pool.leaseConnection()` and
-    // makes the lease sticky/permanent. Under `permanent_connection_checkout =
-    // :deprecated | :disallowed`, common APIs (create!/first/count) must instead
-    // run inside `with_connection` so the connection is released afterwards.
-    // ROOT-CAUSE: relation.ts read paths + persistence insert must wrap SQL
-    // execution in `withConnection` rather than reaching for the permanent
-    // `.connection` lease. Tracked: rfcs/0030 with-connection-query-path story.
   });
 
   it("connected_to switches role for block", () => {
@@ -758,5 +749,41 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     } finally {
       __resetPrimaryAbstractClass();
     }
+  });
+});
+
+describe("ConnectionHandlingTest common APIs with_connection", () => {
+  // Mirrors Rails `ConnectionHandlingTest` with `fixtures :posts`. The test
+  // asserts the pool releases its connection after each common API, so it must
+  // run OUTSIDE transactional fixtures (which hold a permanent lease for the
+  // wrapping transaction) — opt out by name via `usesTransaction`.
+  const testName =
+    "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed";
+  useHandlerFixtures(["posts"], {
+    schema: canonicalSchema,
+    usesTransaction: [testName],
+  });
+
+  afterEach(async () => {
+    setPermanentConnectionCheckout(true);
+    // The test runs outside transactional fixtures (it asserts the pool
+    // releases its connection), so the inserted row is committed — clean it up
+    // to avoid perturbing the shared worker DB for sibling test files.
+    await Post.where({ title: "foo" }).deleteAll();
+  });
+
+  it(testName, async () => {
+    setPermanentConnectionCheckout("deprecated");
+    Base.releaseConnection();
+    expect(Base.connectionPool().activeConnection).toBeNull();
+
+    await Post.create({ title: "foo", body: "bar" });
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.first();
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.count();
+    expect(Post.connectionPool().activeConnection).toBeNull();
   });
 });

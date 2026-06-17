@@ -143,14 +143,34 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
 // Class methods
 // ---------------------------------------------------------------------------
 
+interface CachedSchemaSource {
+  schemaCache?: { getCachedPrimaryKeys?(table: string): string | string[] | null | undefined };
+}
+
 interface PrimaryKeyHost {
   primaryKey: string | string[];
   _primaryKey?: string | string[];
   name: string;
   tableName?: string;
-  connection?: {
-    schemaCache?: { getCachedPrimaryKeys?(table: string): string | string[] | null | undefined };
+  _adapter?: CachedSchemaSource | null;
+  connectionPool?(): {
+    activeConnection?: CachedSchemaSource | null;
+    poolConfig?: { schemaCache?: CachedSchemaSource["schemaCache"] | null };
   };
+}
+
+/**
+ * Resolve the cached schema WITHOUT leasing a connection. Reading
+ * `this.connection` would route through the deprecated getter and flip the
+ * pool's lease to permanent under `permanent_connection_checkout =
+ * :deprecated | :disallowed` — so model construction (which reads `primary_key`)
+ * would permanently hold a connection. Mirrors Rails' `get_primary_key`, which
+ * consults the schema cache rather than checking out a connection.
+ */
+function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource["schemaCache"] | undefined {
+  if (host._adapter?.schemaCache) return host._adapter.schemaCache;
+  const pool = host.connectionPool?.();
+  return pool?.activeConnection?.schemaCache ?? pool?.poolConfig?.schemaCache ?? undefined;
 }
 
 /**
@@ -178,7 +198,7 @@ export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | nul
   if (configured !== undefined) return configured;
   try {
     const table = this.tableName;
-    const cached = table ? this.connection?.schemaCache?.getCachedPrimaryKeys?.(table) : undefined;
+    const cached = table ? cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(table) : undefined;
     if (cached !== undefined) return cached;
   } catch {
     // No connection/schema configured — fall through to the convention.
