@@ -314,6 +314,17 @@ Status legend: ✅ merged, 🚧 in flight, 📋 planned.
 
 ### Phase 2 — tsserver plugin 📋
 
+> **Superseded by RFC 0035 (`tsserver-editor-plugin`, tasks repo).** The
+> §2.1–2.6 breakdown below predates the move of the tooling into a standalone
+> `@blazetrails/trails-tsc` package (with its `TscPlugin` host and an existing
+> `ts-plugin` LSP shell that already virtualizes `.tse`). RFC 0035 adopts and
+> re-verifies this plan, fixes the LSP architecture (wrap the AR virtualizer as
+> a `trails-tsc` `TscPlugin` consumed by the existing host/LSP shell rather than
+> a new `packages/activerecord/src/tsserver-plugin/` directory), trims the MVP
+> to completions/hover/go-to-definition, and owns the story breakdown. Treat
+> RFC 0035 as the source of truth for Phase 2; the text below is retained for
+> historical context only. Phase 1b/R.\* and Phase 3 are unaffected.
+
 The **editor** shell that brings the same virtualization the CLI does
 to IDE autocomplete, hover, go-to-definition, rename, find-references,
 and inline diagnostics. Users opt in with one line in their
