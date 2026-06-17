@@ -397,11 +397,25 @@ describe("InsertAllTest", () => {
     // RFC 0030 d2-insert-all-returning-result.
   });
 
-  it.skip("insert all and upsert all with sti", () => {
-    // BLOCKED: insert_all STI type injection — resolveSti() treats the canonical
-    // SpecialCategory (STI via registerSubclass, no enableSti) as a base class,
-    // so the inheritance column is not auto-filled and rows with differing keys
-    // fail verifyAttributes. RFC 0030 d2-insert-all-canonical-models.
+  it("insert all and upsert all with sti", async () => {
+    const before = (await Category.count()) as number;
+    await SpecialCategory.insertAll([{ name: "First" }, { name: "Second", type: null }]);
+    expect(await Category.count()).toBe(before + 2);
+
+    const [first, second] = (await Category.last(2)) as any[];
+    expect(first.type).toBe("SpecialCategory");
+    expect(second.type).toBeNull();
+
+    await SpecialCategory.upsertAll([
+      { id: 103, name: "First" },
+      { id: 104, name: "Second", type: null },
+    ]);
+
+    const category3 = (await Category.find(103)) as any;
+    expect(category3.type).toBe("SpecialCategory");
+
+    const category4 = (await Category.find(104)) as any;
+    expect(category4.type).toBeNull();
   });
 
   it.skip("upsert logs message including model name", () => {
