@@ -2943,7 +2943,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   override typeCast(value: unknown): unknown {
-    return pgTypeCast(value);
+    // `.call(this)` so the inherited date/time dispatch resolves to this
+    // adapter's `quotedDate` (BC-suffixing), mirroring PG#type_cast's `super`.
+    return pgTypeCast.call(this, value);
   }
 
   /**

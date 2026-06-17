@@ -212,7 +212,7 @@ export function quoteDefaultExpression(
   return ` DEFAULT ${quote(serialized)}`;
 }
 
-export function typeCast(value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost | void, value: unknown): unknown {
   if (value instanceof BinaryData) {
     // node-postgres binds Buffer as bytea natively (text-format hex literal).
     // Returning a Buffer over the existing Uint8Array preserves bytes
@@ -243,7 +243,7 @@ export function typeCast(value: unknown): unknown {
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
     if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
   }
-  return abstractTypeCast(value);
+  return abstractTypeCast.call(this, value);
 }
 
 export function escapeBytea(value: Buffer | Uint8Array | string): string {

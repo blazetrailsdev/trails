@@ -16,9 +16,13 @@ import {
   formatInstantForSqlMysql as formatInstantForSql,
   formatPlainDateTimeForSqlMysql as formatPlainDateTimeForSql,
   formatPlainDateForSql,
-  formatPlainTimeForSqlMysql as formatPlainTimeForSql,
 } from "../abstract/sql-datetime.js";
-import { quote as abstractQuote, type QuotingDispatchHost } from "../abstract/quoting.js";
+import {
+  quote as abstractQuote,
+  dispatchQuotedDate,
+  dispatchQuotedTime,
+  type QuotingDispatchHost,
+} from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -253,7 +257,7 @@ export function quotedDate(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#type_cast
  */
-export function typeCast(value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost | void, value: unknown): unknown {
   if (typeof value === "symbol") return value.description ?? String(value);
   if (value === true) return unquotedTrue();
   if (value === false) return unquotedFalse();
@@ -262,11 +266,18 @@ export function typeCast(value: unknown): unknown {
   if (typeof value === "string") return value;
   // Rails type_cast: `when BigDecimal then value.to_s("F")`.
   if (value instanceof BigDecimal) return value.toString("F");
-  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
-  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
-  if (value instanceof Temporal.PlainTime) return formatPlainTimeForSql(value);
-  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
+  // Rails dispatches date/time through `self.quoted_time` / `self.quoted_date`
+  // (abstract/quoting.rb:93-101); thread `this` so MySQL's microsecond-capping
+  // `quotedDate` override is honored here too.
+  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
+  if (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.ZonedDateTime
+  ) {
+    return dispatchQuotedDate(this, value);
+  }
   if (value instanceof Date)
     throw new TypeError(
       "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
