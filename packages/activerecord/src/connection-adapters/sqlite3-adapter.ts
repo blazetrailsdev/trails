@@ -61,6 +61,7 @@ import { typeCastedBinds } from "./abstract/database-statements.js";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
+  castResult as sqliteCastResult,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
@@ -569,6 +570,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     binds: unknown[] = [],
     options: { prepare?: boolean; allowRetry?: boolean } = {},
   ): Promise<Result> {
+    // Rails' SQLite3Adapter has no `exec_query` override: `exec_query` lives on
+    // the abstract DatabaseStatements and funnels into `internal_exec_query`,
+    // which calls `perform_query` + `cast_result`. We mirror that here.
+    return this.internalExecQuery(sql, name, binds, options);
+  }
+
+  override async internalExecQuery(
+    sql: string,
+    name: string | null = "SQL",
+    binds: unknown[] = [],
+    options: { prepare?: boolean; allowRetry?: boolean } = {},
+  ): Promise<Result> {
     const processed = this.preprocessQuery(sql);
     await this.materializeTransactions();
     const driverBinds = (binds ?? []).map(_driverBind) as SqliteBinds;
@@ -593,17 +606,22 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         const stmt = await (prepare
           ? this._cachedStatement(processed)
           : this._freshStatement(processed));
+        let result: Result;
         if (!stmt.reader) {
           await stmt.run(driverBinds);
-          return Result.empty();
+          result = Result.empty();
+        } else {
+          const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+          payload.row_count = rows.length;
+          result =
+            rows.length > 0
+              ? Result.fromRowHashes(rows)
+              : new Result(
+                  stmt.columns().map((c) => c.name),
+                  [],
+                );
         }
-        const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-        payload.row_count = rows.length;
-        if (rows.length > 0) return Result.fromRowHashes(rows);
-        return new Result(
-          stmt.columns().map((c) => c.name),
-          [],
-        );
+        return this.castResult(result);
       } catch (e: any) {
         const translated = this._translateException(e, processed, binds);
         payload.exception = translated;
@@ -987,6 +1005,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   override buildTruncateStatement(tableName: string): string {
     return sqliteBuildTruncateStatement.call(this, tableName);
+  }
+
+  /** SQLite3's `perform_query` already returns an ActiveRecord::Result, so
+   *  `cast_result` is the identity. Mirrors SQLite3::DatabaseStatements#cast_result.
+   * @internal
+   */
+  castResult(result: Result): Result {
+    return sqliteCastResult(result);
   }
 
   /** Rails: `execute(build_truncate_statement(table_name), name)`. SQLite's

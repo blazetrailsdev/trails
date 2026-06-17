@@ -450,6 +450,15 @@ export interface AbstractAdapter {
     opts?: { materializeTransactions?: boolean },
   ): Promise<unknown>;
   /** @internal */
+  internalExecQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean; allowRetry?: boolean },
+  ): Promise<Result>;
+  /** @internal */
+  castResult?(rawResult: unknown): Result;
+  /** @internal */
   executeBatch(statements: string[], name?: string | null): Promise<void>;
   /** @internal */
   preprocessQuery(sql: string): string;
