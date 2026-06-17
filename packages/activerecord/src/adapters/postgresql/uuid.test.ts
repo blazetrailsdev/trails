@@ -9,7 +9,7 @@ import { SchemaStatements } from "../../connection-adapters/abstract/schema-stat
 import { RecordNotFound } from "../../errors.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
-import { Base, registerModel } from "../../index.js";
+import { Base, registerModel, Migration } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -808,13 +808,25 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("schema dumper for uuid primary key default in legacy migration", () => {
-      // BLOCKED: migration framework — ActiveRecord::Migration[5.0] legacy-flavor migration
-      // semantics are not implemented. Once an id: :uuid table is created via the legacy
-      // migrator (with implicit gen_random_uuid default), schema dump emission already
-      // works (see "schema dumper for uuid primary key default" above).
-      // SCOPE: Migration framework — separate multi-PR effort.
-      // DEFERRED (RFC 0030): tracked by legacy-migration-5-0-uuid-default — converge then un-skip.
+    it("schema dumper for uuid primary key default in legacy migration", async () => {
+      await adapter.exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_4`);
+      class CreateTable extends Migration.forVersion("5.0") {
+        async up() {
+          await this.createTable("pg_uuids_4", { id: "uuid" }, (t) => {
+            t.string("name");
+          });
+        }
+      }
+      try {
+        await new CreateTable().run(adapter, "up");
+        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_4");
+        expect(output).toMatch(
+          /createTable\("pg_uuids_4".*id: "uuid".*default: \(\) => "uuid_generate_v4\(\)"/,
+        );
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_4`);
+      }
     });
   });
 
@@ -854,12 +866,22 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("schema dumper for uuid primary key with default nil in legacy migration", () => {
-      // BLOCKED: migration framework — ActiveRecord::Migration[5.0] legacy-flavor migration
-      // semantics are not implemented. Schema dump emission for `id: :uuid, default: nil`
-      // is already covered by "schema dumper for uuid primary key with default override via nil".
-      // SCOPE: Migration framework — separate multi-PR effort.
-      // DEFERRED (RFC 0030): tracked by legacy-migration-5-0-uuid-default — converge then un-skip.
+    it("schema dumper for uuid primary key with default nil in legacy migration", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_nil_legacy`);
+      class CreateTable extends Migration.forVersion("5.0") {
+        async up() {
+          await this.createTable("pg_uuids_nil_legacy", { id: "uuid", default: null }, (t) => {
+            t.string("name");
+          });
+        }
+      }
+      try {
+        await new CreateTable().run(adapter, "up");
+        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_nil_legacy");
+        expect(output).toMatch(/createTable\("pg_uuids_nil_legacy".*id: "uuid".*default: null/);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_nil_legacy`);
+      }
     });
   });
 

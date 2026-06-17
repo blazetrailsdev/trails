@@ -3561,6 +3561,37 @@ export class Current extends Migration {
 registerVersion(CURRENT_VERSION, Current);
 
 /**
+ * Mirrors: ActiveRecord::Migration::Compatibility::V5_0
+ *
+ * Legacy 5.0-flavor migration semantics. The behavior ported here is the
+ * PostgreSQL uuid primary-key implicit default: a `create_table` with
+ * `id: :uuid` and no explicit `:default` receives `uuid_generate_v4()` — the
+ * 5.0-era default — whereas the modern path emits `gen_random_uuid()`. An
+ * explicit `default: nil` is honored verbatim (no implicit default applied).
+ */
+export class V5_0 extends Current {
+  override async createTable(
+    name: string,
+    optionsOrFn?: Parameters<Migration["createTable"]>[1],
+    fn?: (t: TableDefinition) => void,
+  ): Promise<void> {
+    if (
+      this._adapterName === "postgres" &&
+      optionsOrFn != null &&
+      typeof optionsOrFn !== "function" &&
+      optionsOrFn.id === "uuid" &&
+      !("default" in optionsOrFn)
+    ) {
+      return super.createTable(name, { ...optionsOrFn, default: () => "uuid_generate_v4()" }, fn);
+    }
+    return super.createTable(name, optionsOrFn, fn);
+  }
+}
+
+// Register the 5.0 legacy version so Migration.forVersion(5.0) works
+registerVersion("5.0", V5_0);
+
+/**
  * Mirrors: ActiveRecord::Migration::CheckPending
  *
  * Middleware that raises PendingMigrationError if migrations are pending.
