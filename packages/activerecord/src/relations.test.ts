@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from "vitest";
-import { Base, Relation, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
+import {
+  Base,
+  Relation,
+  Range,
+  RecordNotFound,
+  SoleRecordExceeded,
+  IrreversibleOrderError,
+} from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -5028,8 +5035,11 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order("title ASC NULLS FIRST").reverseOrder().toSql();
-    expect(sql).toContain("ORDER BY");
+    // Rails reverse_sql_order raises IrreversibleOrderError on "nulls first/last"
+    // (does_not_support_reverse?), since the reversed direction is ambiguous.
+    expect(() => Post.order("title ASC NULLS FIRST").reverseOrder().toSql()).toThrow(
+      IrreversibleOrderError,
+    );
   });
 
   it("default reverse order on table without primary key", async () => {

@@ -1356,12 +1356,18 @@ function reverseOrderBang(this: QueryMethodsHost): any {
         const reversed = reverseSqlOrder.call(this, [clause]) as string[];
         return { raw: reversed.join(", ") };
       }
-      if (/[(),]/.test(clause) || /\bCASE\b/i.test(clause)) {
-        throw new IrreversibleOrderError(
-          `Relation has a non-reversible order and cannot be reversed: ${clause}`,
-        );
+      // Bare column with no direction ("name") flips to a desc tuple so the
+      // column is quoted like Rails. Any other single-term string is a SQL
+      // expression ("LOWER(title)", "LENGTH(title) ASC"): route through
+      // reverseSqlOrder, the faithful port of Rails reverse_sql_order, which
+      // flips trailing ASC↔DESC (appends DESC otherwise) and raises
+      // IrreversibleOrderError only on "nulls first/last" — balanced-paren
+      // functions are reversible in Rails (does_not_support_reverse?).
+      if (/^[\w.]+$/.test(clause)) {
+        return [clause, "desc" as const];
       }
-      return [clause, "desc" as const];
+      const reversed = reverseSqlOrder.call(this, [clause]) as string[];
+      return { raw: reversed.join(", ") };
     }
     const [col, dir] = clause;
     return [col, dir === "asc" ? "desc" : "asc"] as [string, "asc" | "desc"];
