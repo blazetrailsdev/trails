@@ -1,8 +1,13 @@
+import type { Chef } from "./chef.js";
 // vendor/rails/activerecord/test/models/drink_designer.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class DrinkDesigner extends Base {
+  declare chef: Chef | null;
+  declare loadHasOne: (name: "chef") => Promise<Chef | null>;
+  declare name: string;
+
   static {
     this.hasOne("chef", { as: "employable" });
   }
@@ -11,6 +16,9 @@ export class DrinkDesigner extends Base {
 acceptsNestedAttributesFor(DrinkDesigner, "chef");
 
 export class DrinkDesignerWithPolymorphicDependentNullifyChef extends Base {
+  declare chef: Chef | null;
+  declare loadHasOne: (name: "chef") => Promise<Chef | null>;
+
   static {
     this.tableName = "drink_designers";
 
@@ -19,6 +27,9 @@ export class DrinkDesignerWithPolymorphicDependentNullifyChef extends Base {
 }
 
 export class DrinkDesignerWithPolymorphicTouchChef extends Base {
+  declare chef: Chef | null;
+  declare loadHasOne: (name: "chef") => Promise<Chef | null>;
+
   static {
     this.tableName = "drink_designers";
 

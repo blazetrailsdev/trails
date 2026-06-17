@@ -1,3 +1,4 @@
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 // vendor/rails/activerecord/test/models/book_encrypted.rb
 import { Base } from "../../base.js";
 
@@ -6,6 +7,14 @@ export class UnencryptedBook extends Base {
 }
 
 export class EncryptedBook extends Base {
+  declare author_id: number;
+  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare format: string;
+  declare logo: Uint8Array;
+  declare name: string | null;
+  declare original_name: string;
+  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
   static _tableName = "encrypted_books";
 
   static {
@@ -67,6 +76,8 @@ export class EncryptedBookNormalizedSecond extends Base {
 }
 
 export class EncryptedBookAttribute extends Base {
+  declare name: Temporal.PlainDate;
+
   static _tableName = "encrypted_books";
 
   static {

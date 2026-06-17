@@ -2,5 +2,7 @@
 import { Base } from "../../base.js";
 
 export class DlKeyedHasManyThrough extends Base {
+  declare through_key: number;
+
   static _primaryKey = "through_key";
 }

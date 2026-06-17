@@ -1,7 +1,23 @@
+import type { Relation } from "../../relation.js";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Company } from "./company.js";
+import type { Firm } from "./company.js";
 // vendor/rails/activerecord/test/models/account.rb
 import { Base } from "../../base.js";
 
 export class Account extends Base {
+  declare firm: Company | null;
+  declare unautosavedFirm: Firm | null;
+  declare static open: () => Relation<Account>;
+  declare static available: () => Relation<Account>;
+  declare loadBelongsTo: ((name: "firm") => Promise<Company | null>) &
+    ((name: "unautosavedFirm") => Promise<Firm | null>);
+  declare credit_limit: number;
+  declare firm_id: number;
+  declare firm_name: string;
+  declare status: string;
+  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
   static _destroyedAccountIds: Map<number | string, (number | string)[]> = new Map();
 
   static destroyedAccountIds(): Map<number | string, (number | string)[]> {

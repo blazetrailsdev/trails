@@ -1,8 +1,15 @@
+import type { Pirate } from "./pirate.js";
 // vendor/rails/activerecord/test/models/bird.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Bird extends Base {
+  declare pirate: Pirate | null;
+  declare loadBelongsTo: (name: "pirate") => Promise<Pirate | null>;
+  declare color: string;
+  declare name: string;
+  declare pirate_id: number;
+
   cancelSaveFromCallback: boolean = false;
   totalCount: number = 0;
   enableCount: boolean = false;

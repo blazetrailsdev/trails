@@ -1,7 +1,22 @@
+import type { Company } from "./company.js";
+import type { Developer } from "./developer.js";
+import type { Firm } from "./company.js";
+import type { SpecialDeveloper } from "./developer.js";
 // vendor/rails/activerecord/test/models/contract.rb
 import { Base } from "../../base.js";
 
 export class Contract extends Base {
+  declare company: Company | null;
+  declare developer: Developer | null;
+  declare firm: Firm | null;
+  declare metadata: unknown;
+  declare loadBelongsTo: ((name: "company") => Promise<Company | null>) &
+    ((name: "developer") => Promise<Developer | null>) &
+    ((name: "firm") => Promise<Firm | null>);
+  declare company_id: number;
+  declare count: number;
+  declare developer_id: number;
+
   hiCount = 0;
   byeCount = 0;
 
@@ -44,6 +59,11 @@ export class NewContract extends Contract {
 }
 
 export class SpecialContract extends Base {
+  declare company: Company | null;
+  declare specialDeveloper: SpecialDeveloper | null;
+  declare loadBelongsTo: ((name: "company") => Promise<Company | null>) &
+    ((name: "specialDeveloper") => Promise<SpecialDeveloper | null>);
+
   static {
     this._tableName = "contracts";
     this.belongsTo("company");

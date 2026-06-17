@@ -1,7 +1,16 @@
+import type { Pirate } from "./pirate.js";
 // vendor/rails/activerecord/test/models/matey.rb
 import { Base } from "../../base.js";
 
 export class Matey extends Base {
+  declare pirate: Pirate | null;
+  declare target: Pirate | null;
+  declare loadBelongsTo: ((name: "pirate") => Promise<Pirate | null>) &
+    ((name: "target") => Promise<Pirate | null>);
+  declare pirate_id: number;
+  declare target_id: number;
+  declare weight: number;
+
   // Rails creates the `mateys` table with `id: false`, so the model has no
   // primary key (operations like `find_signed` / `find_by_token_for` raise
   // UnknownPrimaryKey). The framework defaults `primaryKey` to "id" unless a

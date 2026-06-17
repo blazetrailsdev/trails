@@ -7,6 +7,9 @@ import { Base } from "../../base.js";
  * callback `history`, asserting validation-context-aware ordering.
  */
 export class ContextualCallbacksDeveloper extends Base {
+  declare name: string;
+  declare salary: number;
+
   history: string[] = [];
 
   static {

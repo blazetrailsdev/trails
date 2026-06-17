@@ -2,6 +2,15 @@
 import { Base } from "../../base.js";
 
 export class PriceEstimate extends Base {
+  declare estimateOf: Base | null;
+  declare thing: Base | null;
+  declare loadBelongsTo: ((name: "estimateOf") => Promise<Base | null>) &
+    ((name: "thing") => Promise<Base | null>);
+  declare currency: string;
+  declare estimate_of_id: number;
+  declare estimate_of_type: string;
+  declare price: number;
+
   static {
     this.belongsTo("estimateOf", { polymorphic: true });
     this.belongsTo("thing", { polymorphic: true });
