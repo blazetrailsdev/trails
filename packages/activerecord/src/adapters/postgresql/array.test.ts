@@ -7,7 +7,7 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
-import { Base, serialize, ColumnNotSerializableError } from "../../index.js";
+import { Base, serialize, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -203,15 +203,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((column as any).default).toBe("{}");
       expect((column as any).isArray()).toBe(true);
     });
-    it.skip("change column cant make non array column to array", async () => {
-      // BLOCKED: cross-cutting — DDL exec path does not translate driver errors.
-      // ROOT-CAUSE: schema statements run DDL via `exec()` (postgresql-adapter.ts:1986),
-      //   which is the bare driver call with no exception translation; only `execute()`
-      //   routes through `_translateException` → StatementInvalid. PG raises a raw 42804
-      //   ("cannot be cast automatically") here, so `assert_raises StatementInvalid` fails.
-      // SCOPE: adapter-wide — route schema-statement DDL through the translating path
-      //   (or wrap `exec`). Belongs in a DDL exception-translation story, not array OID.
-      // DEFERRED (RFC 0030): tracked by pg-ddl-exec-exception-translation — converge then un-skip.
+    it("change column cant make non array column to array", async () => {
+      await adapter.addColumn("pg_arrays", "a_string", "string");
+      // PG rejects casting a scalar column to an array (SQLSTATE 42804,
+      // "cannot be cast automatically"). The DDL runs via the bare `exec()`
+      // path, which now translates driver errors to StatementInvalid. Rails
+      // wraps the failing change_column in its own transaction so the abort
+      // is savepoint-scoped and the per-test fixture transaction survives.
+      await expect(
+        adapter.transaction(async () => {
+          await adapter.changeColumn("pg_arrays", "a_string", "string", { array: true });
+        }),
+      ).rejects.toThrow(StatementInvalid);
     });
     it("change column default with array", async () => {
       await adapter.changeColumnDefault("pg_arrays", "tags", []);
