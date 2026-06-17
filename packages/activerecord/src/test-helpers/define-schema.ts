@@ -857,10 +857,6 @@ async function _defineSchemaImpl(
     if (warm) await _warmSchemaCache(adapter, table);
   }
 
-  // Deallocate prepared statements cached against the now-replaced table
-  // shapes, mirroring Rails `clear_cache!`. PG would otherwise raise
-  // `cached plan must not change result type` on the first reuse of a stale
-  // plan; other adapters treat this as a harmless cache reset.
   if (issuedDdl) {
     adapter.clearCacheBang?.();
   }
