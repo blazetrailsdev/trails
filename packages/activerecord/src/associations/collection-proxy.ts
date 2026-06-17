@@ -1267,15 +1267,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
         return results.length;
       }
-      // Routed through shapes (non-disable-joins, AssociationScope can route)
-      // fall through to the generic `countFn.call(this.scope())` below. Since
-      // `_buildThroughScope` now returns the JOIN-based AssociationScope
-      // relation for exactly these shapes, that path emits the same
-      // `SELECT COUNT(*) ... INNER JOIN ...` Rails' `scope.count(:all)` does —
-      // preserving join-row multiplicity (a HABTM with three
-      // `developers_projects` rows for one project counts 3, see
-      // `test_distinct_after_the_fact`) and honoring DISTINCT when the
-      // association scope sets it.
+      // Routed shapes fall through to `countFn.call(this.scope())` below;
+      // `_buildThroughScope` returns the JOIN relation for them, so the count
+      // matches Rails' `scope.count(:all)` (join-row multiplicity preserved).
     }
     // On the diverged path `this` carries in-place proxy mutations
     // (whereBang etc.), so route through Relation.prototype.count to
@@ -2734,16 +2728,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _buildThroughScope(): any {
     const ctor = this._record.constructor as typeof Base;
-    // Rails' CollectionAssociation#scope is always the JOIN-based
-    // AssociationScope relation. Delegate to it (buildThroughJoinScope = the
-    // relation the loader runs) for the shapes AssociationScope can route, so
-    // scope() carries Rails' join-row multiplicity instead of the deduping
-    // `id IN (subquery)` the fallback below builds. Everything else keeps that
-    // pre-existing trails-only fallback — converging those shapes needs
-    // AssociationScope to grow the missing routing (separate work).
+    // Rails' scope IS the JOIN-based AssociationScope relation: delegate to it
+    // for the shapes it can route. Composite keys stay on the IN-subquery
+    // fallback below (they trip its ConfigurationError guards); other
+    // unroutable shapes (nested/polymorphic) do too.
     const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
-    // Composite keys can't be expressed by the single-column IN-subquery and
-    // trip its ConfigurationError guards below — keep them off the JOIN route.
     const ownerPkComposite = Array.isArray((ctor as any).primaryKey);
     const targetPkComposite = Array.isArray((this.model as any).primaryKey);
     if (
@@ -2753,9 +2742,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       _canRouteThroughViaAssociationScope(refl, this._assocDef.options)
     ) {
       const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
-      // null FK (unsaved owner / null PK) — same short-circuit the
-      // IN-subquery path uses below.
-      return joinRel ?? (this.model as any).all().none();
+      return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
     }
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
