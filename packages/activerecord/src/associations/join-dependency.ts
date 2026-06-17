@@ -183,18 +183,6 @@ export class JoinDependency {
     return this._joinRoot;
   }
 
-  /**
-   * Snapshot of this JoinDependency's AliasTracker counts (table name → use
-   * count), taken after tree construction so it reflects every node's resolved
-   * alias. Lets a caller seed one unified AliasTracker spanning all join buckets
-   * (mirroring Rails' single JoinDependency#alias_tracker) so a self-join added
-   * later is aliased relative to siblings already joined in any bucket.
-   * @internal
-   */
-  get aliasTrackerSnapshot(): Map<string, number> {
-    return new Map(this._aliasTracker.aliases);
-  }
-
   get nodes(): JoinPart[] {
     const result: JoinPart[] = [];
     this._joinRoot.each((part) => {

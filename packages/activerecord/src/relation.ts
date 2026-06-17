@@ -645,7 +645,8 @@ export class Relation<T extends Base> {
       const cloned = rel._clone();
       const ownerTable = (rel._modelClass as any).tableName;
       const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
-      const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(ownerTable);
+      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
+      const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
       let effectiveTable = target.table;
       for (const join of target.joins) {
         const alias = _addAssocJoin(
@@ -692,7 +693,8 @@ export class Relation<T extends Base> {
       const cloned = rel._clone();
       const ownerTable = (rel._modelClass as any).tableName;
       const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
-      const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(ownerTable);
+      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
+      const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
       let effectiveTable = target.table;
       for (const join of target.joins) {
         const alias = _addAssocJoin(
@@ -739,30 +741,45 @@ export class Relation<T extends Base> {
    * `joins(:readingListing)` and a left-outer `missing(:unreadListing)` both on
    * the books table).
    *
-   * The base table is excluded from the seed so a first true self-join (target
-   * == owner) keeps the owner unaliased, preserving the existing flat-path
-   * behavior. `jdJoins` carries each JoinDependency join's (table, association)
-   * for association-level dedup.
+   * The tracker is built with the adapter's `tableAliasLength` (mirroring
+   * Rails' `AliasTracker.create(connection, …)`) so long self-join aliases
+   * truncate identically to the JoinDependency/adapter path.
+   *
+   * It is seeded from the actual join *nodes* (each bucket's joined tables),
+   * not from a snapshot that includes the initial table: a table joined in any
+   * bucket — including the owner table itself via a self-join — is therefore
+   * claimed, so a later flat where-join on it aliases (`aliased_table_for`,
+   * alias_tracker.rb:58-77). A *standalone* true self-association (target ==
+   * owner with no prior join) is intentionally left unaliased: the flat path
+   * rebinds the ON predicate by table NAME (`_rebindTableInNode`), which cannot
+   * distinguish the owner side from the target side, so aliasing it here would
+   * rewrite both. That is the pre-existing deviation documented on
+   * `_rebindOperand`; converging it needs identity-based rebinding and is out of
+   * scope for this story. `jdJoins` carries each JoinDependency join's
+   * (table, association) for association-level dedup.
    *
    * @internal
    */
-  private _unifiedJoinAliasTracker(ownerTable: string): {
+  private _unifiedJoinAliasTracker(aliasLength: number): {
     tracker: AliasTracker;
     jdJoins: Array<{ table: string; assoc: string }>;
   } {
-    const seed = new Map<string, number>();
+    const tracker = new AliasTracker(aliasLength);
+    const ownerTable = (this._modelClass as any).tableName;
     const jdJoins: Array<{ table: string; assoc: string }> = [];
     const deps = _qm.buildJoinDependencies.call(this as any) as JoinDependency[];
     for (const jd of deps) {
-      for (const [name, count] of jd.aliasTrackerSnapshot) {
-        if (name === ownerTable) continue;
-        seed.set(name, Math.max(seed.get(name) ?? 0, count));
-      }
       for (const node of jd.nodes) {
-        jdJoins.push({ table: node.tableName, assoc: node.immediateAssocName });
+        const table = node.tableName;
+        // Claim the joined table. Mirrors aliased_table_for: the real table
+        // count never rises above 1 (first use keeps the real name); repeat
+        // joins are counted under their alias name so the next `_N` is correct.
+        if ((tracker.aliases.get(table) ?? 0) === 0) tracker.aliases.set(table, 1);
+        const eff = node.effectiveSqlName;
+        if (eff && eff !== table) tracker.aliases.set(eff, (tracker.aliases.get(eff) ?? 0) + 1);
+        jdJoins.push({ table, assoc: node.immediateAssocName });
       }
     }
-    const tracker = new AliasTracker(undefined, seed);
     // Replay flat where-joins already on this relation so a repeat self-join in
     // a later chained whereAssociated/whereMissing gets the next `_N` suffix.
     for (const c of this._joinClauses) {
