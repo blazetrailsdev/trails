@@ -15,12 +15,16 @@ import {
   RecordNotFound,
 } from "../index.js";
 import {
-  Company as HmCompany,
+  Company,
+  // `Firm` is aliased because a bespoke `class Firm extends Base` survives in
+  // the still-unconverted dependence describe below; a top-level `Firm` binding
+  // would make esbuild rename that class (→ `Firm2`, table `firm2s`) and break
+  // it. `Company`/`Client`/`Developer`/`Project` have no such collision.
   Firm as HmFirm,
-  Client as HmClient,
+  Client,
 } from "../test-helpers/models/company.js";
-import { Developer as HmDeveloper } from "../test-helpers/models/developer.js";
-import { Project as HmProject } from "../test-helpers/models/project.js";
+import { Developer } from "../test-helpers/models/developer.js";
+import { Project } from "../test-helpers/models/project.js";
 import {
   Associations,
   loadBelongsTo,
@@ -941,18 +945,18 @@ describe("HasManyAssociationsTest", () => {
       } as Schema,
       { dropExisting: true },
     );
-    await HmCompany.loadSchema();
-    await HmDeveloper.loadSchema();
-    await HmProject.loadSchema();
+    await Company.loadSchema();
+    await Developer.loadSchema();
+    await Project.loadSchema();
   });
-  registerModel(HmCompany);
+  registerModel(Company);
   registerModel(HmFirm);
-  registerModel(HmClient);
-  registerModel(HmDeveloper);
-  registerModel(HmProject);
-  enableSti(HmCompany);
+  registerModel(Client);
+  registerModel(Developer);
+  registerModel(Project);
+  enableSti(Company);
   registerSubclass(HmFirm);
-  registerSubclass(HmClient);
+  registerSubclass(Client);
 
   // -- Counting --
 
@@ -988,7 +992,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("find first", async () => {
     const firm = (await HmFirm.first()) as any;
-    const client2 = (await HmClient.find(2)) as any;
+    const client2 = (await Client.find(2)) as any;
     const first = (await firm.clients.first()) as any;
     const ordered = (await firm.clients.order("id").first()) as any;
     expect(first.id).toBe(ordered.id);
@@ -998,7 +1002,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("find in collection", async () => {
     const firm = companies("first_firm") as any;
-    expect(((await firm.clients.find(2)) as any).name).toBe(((await HmClient.find(2)) as any).name);
+    expect(((await firm.clients.find(2)) as any).name).toBe(((await Client.find(2)) as any).name);
     await expect(firm.clients.find(6)).rejects.toThrow(RecordNotFound);
   });
 
@@ -1014,7 +1018,7 @@ describe("HasManyAssociationsTest", () => {
     await expect(firm.clients.find()).rejects.toThrow(RecordNotFound);
 
     const client = (await firm.clients.find(2)) as any;
-    expect(client).toBeInstanceOf(HmClient);
+    expect(client).toBeInstanceOf(Client);
 
     const clientAry = (await firm.clients.find([2])) as any[];
     expect(Array.isArray(clientAry)).toBe(true);
@@ -1072,7 +1076,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("deleting by integer id", async () => {
-    const david = (await HmDeveloper.find(1)) as any;
+    const david = (await Developer.find(1)) as any;
     const before = await david.projects.count();
 
     const deleted = (await david.projects.delete(1)) as any[];
