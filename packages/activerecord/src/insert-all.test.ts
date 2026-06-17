@@ -804,13 +804,29 @@ describe("InsertAllTest", () => {
     });
   });
 
-  it.skip("upsert all implicitly sets timestamps even when columns are aliased", () => {
-    // BLOCKED: alias-form mismatch — the canonical Developer aliases the magic
-    // columns in camelCase (`createdAt` → `legacyCreatedAt`), but insert_all's
-    // _physicalTimestampCols resolves snake-case `created_at`, so it never maps
-    // to `legacy_created_at` and no timestamp is seeded. Needs snake-case
-    // alias resolution (or a snake alias on Developer).
-    // RFC 0030 d2-insert-all-canonical-models.
+  it("upsert all implicitly sets timestamps even when columns are aliased", async () => {
+    await Developer.upsertAll([{ id: 101, name: "Alice" }]);
+    const alice = (await Developer.find(101)) as any;
+
+    expect(alice.created_at).not.toBeNull();
+    expect(alice.created_on).not.toBeNull();
+    expect(alice.updated_at).not.toBeNull();
+    expect(alice.updated_on).not.toBeNull();
+
+    await alice.updateBang({
+      created_at: null,
+      created_on: null,
+      updated_at: null,
+      updated_on: null,
+    });
+
+    await Developer.upsertAll([{ id: alice.id, name: alice.name, salary: alice.salary * 2 }]);
+    await alice.reload();
+
+    expect(alice.created_at).toBeNull();
+    expect(alice.created_on).toBeNull();
+    expect(alice.updated_at).not.toBeNull();
+    expect(alice.updated_on).not.toBeNull();
   });
 
   it("insert all raises on unknown attribute", async () => {

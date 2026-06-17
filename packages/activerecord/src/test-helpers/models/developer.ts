@@ -80,6 +80,11 @@ export class Developer extends Base {
   static {
     this.ignoredColumns = ["first_name", "last_name"];
 
+    this.aliasAttribute("created_at", "legacy_created_at");
+    this.aliasAttribute("updated_at", "legacy_updated_at");
+    this.aliasAttribute("created_on", "legacy_created_on");
+    this.aliasAttribute("updated_on", "legacy_updated_on");
+
     this.hasAndBelongsToMany("projects", {
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
@@ -338,10 +343,10 @@ export class DeveloperOrderedBySalary extends Base {
 
   static {
     this.tableName = "developers";
-    this.aliasAttribute("createdAt", "legacyCreatedAt");
-    this.aliasAttribute("updatedAt", "legacyUpdatedAt");
-    this.aliasAttribute("createdOn", "legacyCreatedOn");
-    this.aliasAttribute("updatedOn", "legacyUpdatedOn");
+    this.aliasAttribute("created_at", "legacy_created_at");
+    this.aliasAttribute("updated_at", "legacy_updated_at");
+    this.aliasAttribute("created_on", "legacy_created_on");
+    this.aliasAttribute("updated_on", "legacy_updated_on");
     this.defaultScope((q: any) => q.order("salary DESC"));
     this.scope("byName", (q: any) => q.order("name DESC"));
   }
@@ -418,10 +423,10 @@ export class DeveloperCalledJamis extends Base {
 
   static {
     this.tableName = "developers";
-    this.aliasAttribute("createdAt", "legacyCreatedAt");
-    this.aliasAttribute("updatedAt", "legacyUpdatedAt");
-    this.aliasAttribute("createdOn", "legacyCreatedOn");
-    this.aliasAttribute("updatedOn", "legacyUpdatedOn");
+    this.aliasAttribute("created_at", "legacy_created_at");
+    this.aliasAttribute("updated_at", "legacy_updated_at");
+    this.aliasAttribute("created_on", "legacy_created_on");
+    this.aliasAttribute("updated_on", "legacy_updated_on");
     this.defaultScope((q: any) => q.where({ name: "Jamis" }));
     this.scope("poor", (q: any) => q.where("salary < 150000"));
     this.scope("david", (q: any) => q.where({ name: "David" }));
@@ -539,10 +544,10 @@ export class ThreadsafeDeveloper extends Base {
 export class CachedDeveloper extends Base {
   static {
     this.tableName = "developers";
-    this.aliasAttribute("createdAt", "legacyCreatedAt");
-    this.aliasAttribute("updatedAt", "legacyUpdatedAt");
-    this.aliasAttribute("createdOn", "legacyCreatedOn");
-    this.aliasAttribute("updatedOn", "legacyUpdatedOn");
+    this.aliasAttribute("created_at", "legacy_created_at");
+    this.aliasAttribute("updated_at", "legacy_updated_at");
+    this.aliasAttribute("created_on", "legacy_created_on");
+    this.aliasAttribute("updated_on", "legacy_updated_on");
   }
 }
 
