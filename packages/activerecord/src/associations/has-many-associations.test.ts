@@ -58,11 +58,11 @@ import { Subscription as HmSubscription } from "../test-helpers/models/subscript
 import { Post as HmPost, FirstPost as HmFirstPost } from "../test-helpers/models/post.js";
 import { Tag as HmTag } from "../test-helpers/models/tag.js";
 import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
-import { Comment as HmComment } from "../test-helpers/models/comment.js";
-import { Human as HmHuman } from "../test-helpers/models/human.js";
-import { Category as HmCategory } from "../test-helpers/models/category.js";
-import { TypedEssay as HmTypedEssay } from "../test-helpers/models/essay.js";
-import { PersonWithPolymorphicDependentNullifyComments as HmPersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Human } from "../test-helpers/models/human.js";
+import { Category } from "../test-helpers/models/category.js";
+import { TypedEssay } from "../test-helpers/models/essay.js";
+import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 const UNIVERSAL_HM_SCHEMA: Schema = {
@@ -612,51 +612,52 @@ describe("HasManyAssociationsTest", () => {
 
   beforeAll(async () => {
     registerModel(HmPost);
-    registerModel(HmComment);
-    registerModel(HmHuman);
-    registerModel(HmCategory);
+    registerModel(Comment);
+    registerModel(Human);
+    registerModel(Category);
     registerModel(HmEssay);
     registerModel(HmTag);
     registerModel(HmTagging);
-    registerModel(HmPersonWithPolymorphicDependentNullifyComments);
+    registerModel(PersonWithPolymorphicDependentNullifyComments);
     enableSti(HmEssay);
-    registerSubclass(HmTypedEssay);
+    registerSubclass(TypedEssay);
     await HmPost.loadSchema();
-    await HmComment.loadSchema();
-    await HmHuman.loadSchema();
-    await HmCategory.loadSchema();
+    await Comment.loadSchema();
+    await Human.loadSchema();
+    await Category.loadSchema();
     await HmEssay.loadSchema();
     await HmTag.loadSchema();
     await HmTagging.loadSchema();
   });
 
   it("depends and nullify on polymorphic assoc", async () => {
-    const author = await HmPersonWithPolymorphicDependentNullifyComments.create({
+    const author = await PersonWithPolymorphicDependentNullifyComments.create({
       first_name: "Laertis",
     });
-    const comment = (await (posts("welcome") as any).comments.first()) as HmComment;
+    const welcome = posts("welcome") as any;
+    const comment = (await welcome.comments.first()) as any;
     setBelongsTo(comment, "author", author, { polymorphic: true });
     await comment.save();
 
-    expect((comment as any).author_id).toBe(author.id);
-    expect((comment as any).author_type).toBe(author.constructor.name);
+    expect(comment.author_id).toBe(author.id);
+    expect(comment.author_type).toBe(author.constructor.name);
 
     await author.destroy();
-    const reloaded = await HmComment.find((comment as any).id as number);
+    const reloaded = (await Comment.find(comment.id)) as any;
 
-    expect((reloaded as any).author_id).toBeNull();
-    expect((reloaded as any).author_type).toBeNull();
+    expect(reloaded.author_id).toBeNull();
+    expect(reloaded.author_type).toBeNull();
   });
 
   it("joining through a polymorphic association with a where clause", async () => {
     const writer = humans("gordon");
     const category = categories("general");
-    const essay = HmTypedEssay.new();
+    const essay = TypedEssay.new();
     setBelongsTo(essay, "category", category, { primaryKey: "name" });
     setBelongsTo(essay, "writer", writer, { primaryKey: "name", polymorphic: true });
     await essay.save();
 
-    expect(await (HmCategory as any).joins("humanWritersOfTypedEssays").count()).toBe(1);
+    expect(await Category.joins("humanWritersOfTypedEssays").count()).toBe(1);
   });
 
   it("build with polymorphic has many does not allow to override type and id", async () => {
@@ -668,20 +669,20 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("build from polymorphic association sets inverse instance", async () => {
-    const post = HmPost.new();
-    const tagging = association(post, "taggings").build();
+    const post = HmPost.new() as any;
+    const tagging = post.taggings.build();
 
-    expect(await loadBelongsTo(tagging, "taggable", { polymorphic: true })).toBe(post);
+    expect(await tagging.taggable).toBe(post);
   });
 
   it("attributes are set when initialized from polymorphic has many null relationship", async () => {
-    const post = HmPost.new({ title: "title", body: "bar" });
+    const post = HmPost.new({ title: "title", body: "bar" }) as any;
     const tag = await HmTag.create({ name: "foo" });
 
-    const tagging = await (association(post, "taggings") as any).firstOrInitialize({ tag });
+    const tagging = await post.taggings.firstOrInitialize({ tag });
 
-    expect((tagging as any).tag_id).toBe(tag.id);
-    expect((tagging as any).taggable_type).toBe("Post");
+    expect(tagging.tag_id).toBe(tag.id);
+    expect(tagging.taggable_type).toBe("Post");
   });
 });
 
