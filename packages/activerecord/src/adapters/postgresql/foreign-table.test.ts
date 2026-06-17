@@ -6,7 +6,7 @@
  * foreign_server at the secondary "arunit2" database; loopback keeps the
  * test infra single-database.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
@@ -105,15 +105,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(ForeignProfessor.attributeNames()).toEqual(["id", "name"]);
     });
 
-    it.skip("does not have a primary key", async () => {
-      // BLOCKED: adapter-pg — trails Base.primaryKey defaults to "id" and does not consult
-      // schema introspection. Rails sets primary_key to nil when
-      // connection.schema_cache.primary_keys(table_name) returns nil (foreign
-      // tables have no PK constraint). Closing this gap requires wiring
-      // model-schema.loadSchema to call adapter.primaryKey(tableName) and
-      // store the result (incl. null) on _primaryKey — a cross-cutting
-      // change outside this PR's test-only scope.
-      // DEFERRED (RFC 0030): tracked by model-loadschema-nil-primary-key-from-introspection — converge then un-skip.
+    itIfSupports("foreign_tables", "does not have a primary key", async () => {
+      // loadSchema warms the schema cache's primary-key entry; a foreign table
+      // has no PK constraint, so introspection yields null and primary_key
+      // resolves to null rather than the "id" convention.
+      await ForeignProfessor.loadSchema();
+      expect(ForeignProfessor.primaryKey).toBeNull();
     });
 
     itIfSupports("foreign_tables", "attributes", async () => {
