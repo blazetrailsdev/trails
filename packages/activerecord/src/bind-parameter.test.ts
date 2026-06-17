@@ -198,7 +198,11 @@ describe("BindParameterTest", () => {
     const handle = Notifications.subscribe("sql.active_record", (e: Event) => subscriber.call(e));
     try {
       await conn.execQuery(sql, "SQL", binds);
-      const message = subscriber.events.find((e) => e.payload.sql === sql);
+      // Rails finds the message by `args[4][:sql] == sql`, but adapters that
+      // rewrite the placeholder (PostgreSQL turns "?" into "$1" in
+      // preprocessQuery) put the rewritten SQL on the payload, so match on the
+      // bind objects we passed — the thing actually under test — instead.
+      const message = subscriber.events.find((e) => e.payload.binds === binds);
       expect(message?.payload.binds).toBe(binds);
     } finally {
       Notifications.unsubscribe(handle);
