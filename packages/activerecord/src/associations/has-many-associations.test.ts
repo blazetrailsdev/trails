@@ -42,7 +42,7 @@ import { Essay as HmEssay } from "../test-helpers/models/essay.js";
 import { Person as HmPerson } from "../test-helpers/models/person.js";
 import { Subscriber as HmSubscriber } from "../test-helpers/models/subscriber.js";
 import { Subscription as HmSubscription } from "../test-helpers/models/subscription.js";
-import { Post as HmPost } from "../test-helpers/models/post.js";
+import { Post as HmPost, FirstPost as HmFirstPost } from "../test-helpers/models/post.js";
 import { Tag as HmTag } from "../test-helpers/models/tag.js";
 import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
@@ -7591,19 +7591,6 @@ describe("HasManyAssociationsTest", () => {
     return { DsCar, DsBulb };
   }
 
-  it("collection proxy respects default scope", async () => {
-    // Rails (has_many_associations_test.rb:2773-2776) asserts
-    // `assert_not_predicate author.first_posts, :exists?` on a scoped
-    // has_many. Mirrored here with `car.bulbs` (DsBulb's defaultScope
-    // is `name: "defaulty"`; the only seeded bulb is `name: "other"`,
-    // so the collection proxy's `exists()` returns false).
-    const { DsCar, DsBulb } = setupCarBulb();
-    const car = await DsCar.create({ name: "v1" });
-    await DsBulb.create({ car_id: car.id, name: "other" }); // not "defaulty"
-    const exists = await association(car, "bulbs").exists();
-    expect(exists).toBe(false);
-  });
-
   it("can unscope the default scope of the associated model", async () => {
     // Rails: car.bulbs => [defaulty]; car.all_bulbs => [defaulty, other]
     const { DsCar, DsBulb } = setupCarBulb();
@@ -7659,6 +7646,31 @@ describe("HasManyAssociationsTest", () => {
     const old = await loadHasMany(car, "old_bulbs", { className: "DsBulb", foreignKey: "car_id" });
     expect(old.length).toBe(1);
     expect((old[0] as any).name).toBe("old");
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  const { authors } = useHandlerFixtures(["authors", "posts"], { schema: TEST_SCHEMA });
+
+  beforeAll(async () => {
+    registerModel(HmAuthor);
+    registerModel(HmPost);
+    registerModel(HmFirstPost);
+    await HmAuthor.loadSchema();
+    await HmPost.loadSchema();
+    await HmFirstPost.loadSchema();
+  });
+
+  it("collection proxy respects default scope", async () => {
+    // Rails (has_many_associations_test.rb:2773-2776):
+    //   author = authors(:mary)
+    //   assert_not_predicate author.first_posts, :exists?
+    // `Author#first_posts` resolves to the `FirstPost` model, whose
+    // `default_scope { where(id: 1) }` restricts the collection to post id 1.
+    // Mary (author 2) owns no post with id 1, so the proxy is empty.
+    const author = (await HmAuthor.find(authors("mary").id)) as HmAuthor;
+    const exists = await author.firstPosts.exists();
+    expect(exists).toBe(false);
   });
 });
 

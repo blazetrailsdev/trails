@@ -1,7 +1,11 @@
 // vendor/rails/activerecord/test/models/author.rb
 import { Base } from "../../base.js";
+import type { CollectionProxy } from "../../associations/collection-proxy.js";
+import type { FirstPost } from "./post.js";
 
 export class Author extends Base {
+  declare firstPosts: CollectionProxy<FirstPost>;
+
   static namedExtension = {
     author() {
       return "lifo";
