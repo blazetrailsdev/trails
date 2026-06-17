@@ -20,6 +20,9 @@ function declareContactColumns(klass: typeof Base): void {
 }
 
 export class Contact extends Base {
+  declare alternative: Contact | null;
+  declare loadBelongsTo: (name: "alternative") => Promise<Contact | null>;
+
   static {
     declareContactColumns(this);
     this.serialize("preferences");
@@ -28,6 +31,10 @@ export class Contact extends Base {
 }
 
 export class ContactSti extends Base {
+  declare "type": string;
+  declare alternative: ContactSti | null;
+  declare loadBelongsTo: (name: "alternative") => Promise<ContactSti | null>;
+
   static {
     this._tableName = "contacts";
     declareContactColumns(this);

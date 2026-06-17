@@ -1,7 +1,29 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Face } from "./face.js";
+import type { Interest } from "./interest.js";
+import type { MixedCaseMonkey } from "./mixed-case-monkey.js";
 // vendor/rails/activerecord/test/models/human.rb
 import { Base } from "../../base.js";
 
 export class Human extends Base {
+  declare face: Face | null;
+  declare autosaveFace: Face | null;
+  declare polymorphicFace: Face | null;
+  declare polymorphicFaceWithoutInverse: Face | null;
+  declare interests: AssociationProxy<Interest>;
+  declare interestsWithCallbacks: AssociationProxy<Interest>;
+  declare polymorphicInterests: AssociationProxy<Interest>;
+  declare polymorphicInterestsWithCallbacks: AssociationProxy<Interest>;
+  declare confusedFace: Face | null;
+  declare secretInterests: AssociationProxy<Interest>;
+  declare mixedCaseMonkey: MixedCaseMonkey | null;
+  declare loadHasOne: ((name: "face") => Promise<Face | null>) &
+    ((name: "autosaveFace") => Promise<Face | null>) &
+    ((name: "polymorphicFace") => Promise<Face | null>) &
+    ((name: "polymorphicFaceWithoutInverse") => Promise<Face | null>) &
+    ((name: "confusedFace") => Promise<Face | null>) &
+    ((name: "mixedCaseMonkey") => Promise<MixedCaseMonkey | null>);
+
   static _tableName = "humans";
 
   declare addCallbackCalled: boolean;

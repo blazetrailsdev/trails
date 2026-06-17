@@ -1,8 +1,18 @@
+import type { Relation } from "../../relation.js";
+import type { Car } from "./car.js";
 // vendor/rails/activerecord/test/models/bulb.rb
 import { Base } from "../../base.js";
 import { association, loadBelongsTo } from "../../associations.js";
 
 export class Bulb extends Base {
+  declare car: Car | null;
+  declare static awesome: () => Relation<Bulb>;
+  declare loadBelongsTo: (name: "car") => Promise<Car | null>;
+  declare car_id: number;
+  declare frickinawesome: boolean | null;
+  declare ID: number;
+  declare name: string;
+
   scopeAfterInitialize: any;
   attributesAfterInitialize: any;
   countAfterCreate: number | undefined;

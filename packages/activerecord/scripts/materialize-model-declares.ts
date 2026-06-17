@@ -23,6 +23,7 @@ import { walk, type ClassInfo, type AssociationCall } from "../src/type-virtuali
 import { resolveAssociationTarget } from "../src/type-virtualization/resolve-target.js";
 import type { SchemaColumnValue } from "../src/type-virtualization/synthesize.js";
 import { TEST_SCHEMA } from "../src/test-helpers/test-schema.js";
+import { isWrappedSchema } from "../src/test-helpers/define-schema.js";
 import type { ColumnSpec, TableSchema } from "../src/test-helpers/define-schema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,10 +47,14 @@ type SchemaColumnsByTable = Record<string, Record<string, SchemaColumnValue>>;
 function normalizeSchema(schema: Record<string, TableSchema>): SchemaColumnsByTable {
   const out: SchemaColumnsByTable = {};
   for (const [table, value] of Object.entries(schema)) {
-    const cols =
-      "columns" in value && "primaryKey" in value
-        ? (value.columns as Record<string, ColumnSpec>)
-        : (value as Record<string, ColumnSpec>);
+    // Discriminate the wrapped `{ columns, primaryKey?, indexes? }` shape from
+    // the legacy `Record<col, ColumnSpec>` map using the canonical helper. The
+    // earlier `"columns" in value && "primaryKey" in value` check missed
+    // wrappers that carry `indexes` but no `primaryKey` (e.g. `books`), so it
+    // fell through and emitted `columns`/`indexes` as bogus column names.
+    const cols = isWrappedSchema(value)
+      ? (value.columns as Record<string, ColumnSpec>)
+      : (value as Record<string, ColumnSpec>);
     const normalized: Record<string, SchemaColumnValue> = {};
     for (const [col, spec] of Object.entries(cols)) {
       if (typeof spec === "string") {

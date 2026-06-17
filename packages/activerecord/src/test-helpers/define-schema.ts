@@ -97,7 +97,7 @@ export interface DefineSchemaOpts {
 const WRAPPER_KEYS = new Set(["columns", "primaryKey", "indexes"]);
 
 /** @internal */
-function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
+export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
   // The wrapper and the legacy `Record<colName, ColumnSpec>` shape both
   // permit a key called `columns`, so discrimination needs an unambiguous
   // signal. We use the presence of `primaryKey` — the wrapper's sole

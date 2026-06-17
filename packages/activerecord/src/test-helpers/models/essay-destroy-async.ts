@@ -1,9 +1,15 @@
+import type { BookDestroyAsync } from "./book-destroy-async.js";
 // vendor/rails/activerecord/test/models/essay_destroy_async.rb
 // Rails uses dependent: :destroy_async on both belongs_to associations.
 // Using "destroy" until AssociationOptions.dependent includes "destroyAsync".
 import { Base } from "../../base.js";
 
 export class EssayDestroyAsync extends Base {
+  declare book: BookDestroyAsync | null;
+  declare writer: Base | null;
+  declare loadBelongsTo: ((name: "book") => Promise<BookDestroyAsync | null>) &
+    ((name: "writer") => Promise<Base | null>);
+
   static _tableName = "essays";
 
   static {

@@ -1,7 +1,10 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
 // vendor/rails/activerecord/test/models/shop.rb
 import { Base } from "../../base.js";
 
 export class ShopCollection extends Base {
+  declare products: AssociationProxy<ShopProduct>;
+
   static {
     this.tableName = "collections";
 
@@ -14,6 +17,8 @@ export class ShopCollection extends Base {
 }
 
 export class ShopProductType extends Base {
+  declare products: AssociationProxy<ShopProduct>;
+
   static {
     this.tableName = "product_types";
 
@@ -22,6 +27,10 @@ export class ShopProductType extends Base {
 }
 
 export class ShopProduct extends Base {
+  declare variants: AssociationProxy<ShopVariant>;
+  declare "type": ShopProductType | null;
+  declare loadBelongsTo: (name: "type") => Promise<ShopProductType | null>;
+
   static {
     this.tableName = "products";
 

@@ -1,7 +1,18 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Comment } from "./comment.js";
+import type { Tagging } from "./tagging.js";
 // vendor/rails/activerecord/test/models/rating.rb
 import { Base } from "../../base.js";
 
 export class Rating extends Base {
+  declare comment: Comment | null;
+  declare taggings: AssociationProxy<Tagging>;
+  declare taggingsWithoutTag: AssociationProxy<Tagging>;
+  declare taggingsWithNoTag: AssociationProxy<Tagging>;
+  declare loadBelongsTo: (name: "comment") => Promise<Comment | null>;
+  declare comment_id: number;
+  declare value: number;
+
   static {
     this.belongsTo("comment");
     this.hasMany("taggings", { as: "taggable" });

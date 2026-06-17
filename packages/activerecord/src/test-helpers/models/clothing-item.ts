@@ -5,6 +5,12 @@ import { registerSubclass } from "../../inheritance.js";
 import { registerModel } from "../../associations.js";
 
 export class ClothingItem extends Base {
+  declare clothing_type: string;
+  declare color: string;
+  declare description: string;
+  declare size: string;
+  declare "type": string;
+
   static {
     queryConstraints.call(this, "clothing_type", "color");
   }

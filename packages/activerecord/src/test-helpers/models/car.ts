@@ -1,8 +1,49 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Relation } from "../../relation.js";
+import type { Bulb } from "./bulb.js";
+import type { Engine } from "./engine.js";
+import type { FailedBulb } from "./bulb.js";
+import type { FunkyBulb } from "./bulb.js";
+import type { Person } from "./person.js";
+import type { PriceEstimate } from "./price-estimate.js";
+import type { Tyre } from "./tyre.js";
+import type { Wheel } from "./wheel.js";
 // vendor/rails/activerecord/test/models/car.rb
 import { Base } from "../../base.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export class Car extends Base {
+  declare person: Person | null;
+  declare bulbs: AssociationProxy<Bulb>;
+  declare allBulbs: AssociationProxy<Bulb>;
+  declare allBulbs2: AssociationProxy<Bulb>;
+  declare otherBulbs: AssociationProxy<Bulb>;
+  declare oldBulbs: AssociationProxy<Bulb>;
+  declare funkyBulbs: AssociationProxy<FunkyBulb>;
+  declare failedBulbs: AssociationProxy<FailedBulb>;
+  declare fooBulbs: AssociationProxy<Bulb>;
+  declare awesomeBulbs: AssociationProxy<Bulb>;
+  declare bulb: Bulb | null;
+  declare tyres: AssociationProxy<Tyre>;
+  declare engines: AssociationProxy<Engine>;
+  declare wheels: AssociationProxy<Wheel>;
+  declare priceEstimates: AssociationProxy<PriceEstimate>;
+  declare static inclTyres: () => Relation<Car>;
+  declare static inclEngines: () => Relation<Car>;
+  declare static orderUsingNewStyle: () => Relation<Car>;
+  declare wheels_owned_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare loadBelongsTo: (name: "person") => Promise<Person | null>;
+  declare loadHasOne: (name: "bulb") => Promise<Bulb | null>;
+  declare bulbs_count: number;
+  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare custom_tyres_count: number;
+  declare engines_count: number;
+  declare lock_version: number;
+  declare name: string;
+  declare person_id: number;
+  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare wheels_count: number;
+
   static {
     this.belongsTo("person", { counterCache: true });
     this.hasMany("bulbs");
