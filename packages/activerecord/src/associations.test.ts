@@ -39,14 +39,27 @@ import { Preloader } from "./associations/preloader.js";
 import { Batch } from "./associations/preloader/batch.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // Mirrors Rails `assert_match(/#{Regexp.escape(quote_table_name(col))} =/, sql)`:
 // build the adapter's own quoted `"table"."column"` form so the assertion holds
-// across sqlite/pg/mysql quoting.
-function expectQuotedColumnInSql(sql: string, qualifiedColumn: string): void {
+// across sqlite/pg/mysql quoting. With `{ inWhere: true }` it mirrors Rails'
+// `/WHERE .*#{...} =/` form, requiring the predicate to live in the WHERE clause.
+function expectQuotedColumnInSql(
+  sql: string,
+  qualifiedColumn: string,
+  options: { inWhere?: boolean } = {},
+): void {
   const quoted = (Base.connection as { quoteTableName(n: string): string }).quoteTableName(
     qualifiedColumn,
   );
-  expect(sql).toContain(`${quoted} =`);
+  if (options.inWhere) {
+    expect(sql).toMatch(new RegExp(`WHERE[\\s\\S]*${escapeRegExp(quoted)} =`));
+  } else {
+    expect(sql).toContain(`${quoted} =`);
+  }
 }
 
 describe("AssociationsTest", () => {
@@ -4404,7 +4417,10 @@ describe("AssociationsTest", () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
 
     const loaded = await (comment as any).loadBelongsTo("blogPost");
+    // Rails asserts full-record equality (assert_equal(blog_post, comment.blog_post));
+    // check both composite-key components rather than just `id`.
     expect((loaded as any).id).toBe((blogPost as any).id);
+    expect((loaded as any).blog_id).toBe((blogPost as any).blog_id);
   });
 
   it("belongs to a model with composite primary key uses composite pk in sql", async () => {
@@ -4490,7 +4506,7 @@ describe("AssociationsTest", () => {
     });
     const sql = sqls.find((s) => /sharded_comments/.test(s))!;
 
-    expectQuotedColumnInSql(sql, "sharded_comments.blog_id");
+    expectQuotedColumnInSql(sql, "sharded_comments.blog_id", { inWhere: true });
     expect(comments).not.toHaveLength(0);
     expect(comments.map((c: any) => c.id).sort((a: number, b: number) => a - b)).toEqual(
       expectedComments.map((c: any) => c.id).sort((a: number, b: number) => a - b),
@@ -4504,7 +4520,9 @@ describe("AssociationsTest", () => {
     // Rails raises when the association is loaded (`.to_a`); trails derives the
     // foreign key eagerly when the proxy is built, so the throw surfaces here.
     expect(() => association(blogPost, "commentsWithoutQueryConstraints")).toThrow(
-      /more than 2 attributes/,
+      // Full Rails message tail (omitting the owner class name, which differs
+      // between Rails `Sharded::BlogPostWithRevision` and the trails class).
+      /has more than 2 attributes\. Active Record is unable to derive the query constraints for the association\. You need to explicitly define the query constraints for this association\./,
     );
   });
 
@@ -4526,8 +4544,12 @@ describe("AssociationsTest", () => {
       .preload("blogPostById")
       .toArray();
     const loaded = comments[0];
-    const byId = await (loaded as any).loadBelongsTo("blogPostById");
+    // Rails reads `comment.blog_post_by_id` from the preloaded cache and compares
+    // it to the directly-loaded `comment.blog_post`; read the preloaded record
+    // rather than re-querying so the preload path is what gets verified.
+    const preloaded = (loaded as any)._preloadedAssociations.get("blogPostById");
+    expect(preloaded).toBeDefined();
     const byCompositeKey = await (loaded as any).loadBelongsTo("blogPost");
-    expect((byId as any).id).toBe((byCompositeKey as any).id);
+    expect((preloaded as any).id).toBe((byCompositeKey as any).id);
   });
 });
