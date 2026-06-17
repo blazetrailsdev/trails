@@ -595,10 +595,25 @@ describe("RelationScopingTest", () => {
     expect(remaining[0].name).toBe("Bob");
   });
 
-  it.skip("scoping applies to reload with all queries", () => {
-    // BLOCKED: `Relation#scoping(all_queries: true)` is unsupported — the block
-    // variant takes no options, so reload() cannot pick up the class scope.
-    // Needs scoping(all_queries:) parity in scoping.ts.
+  it("scoping applies to reload with all queries", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+    const alice = (await Developer.where({ name: "Alice" }).first()) as Base;
+
+    // Without all_queries the scope is ignored by reload — a non-matching scope
+    // does not prevent the reload from locating the row.
+    await Developer.scoping(Developer.where({ salary: 1 }), async () => {
+      await (alice as any).reload();
+      expect(alice.name).toBe("Alice");
+    });
+
+    // With all_queries the scope applies to reload, so a non-matching scope
+    // makes reload raise RecordNotFound.
+    await expect(
+      Developer.scoping(Developer.where({ salary: 1 }), { allQueries: true }, async () => {
+        await (alice as any).reload();
+      }),
+    ).rejects.toThrow(RecordNotFound);
   });
 
   it("nested scoping applies with all queries set", async () => {
@@ -619,10 +634,20 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("raises error if all queries is set to false while nested", () => {
-    // BLOCKED: `Relation#scoping(all_queries:)` is unsupported, so the nested
-    // `all_queries: false` ArgumentError guard does not exist. Needs
-    // scoping(all_queries:) parity in scoping.ts.
+  it("raises error if all queries is set to false while nested", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "Alice", salary: 80000 });
+
+    await Developer.where({ salary: 80000 }).scoping({ allQueries: true }, async () => {
+      const all = await Developer.all().toArray();
+      expect(all.length).toBe(1);
+
+      await expect(
+        Developer.where({ salary: 80000 }).scoping({ allQueries: false }, async () => {}),
+      ).rejects.toThrow(
+        "Scoping is set to apply to all queries and cannot be unset in a nested block.",
+      );
+    });
   });
 
   it("default scope filters on joins", async () => {
@@ -1000,10 +1025,22 @@ describe("Static shorthands (Rails-guided)", () => {
       expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
     });
 
-    it.skip("scoping applies to all queries on has many when set", () => {
-      // BLOCKED: `Relation#scoping(all_queries: true)` is unsupported — the
-      // block variant does not thread an `all_queries` flag, so association
-      // reads cannot opt into the class scope. Needs scoping.ts parity.
+    it("scoping applies to all queries on has many when set", async () => {
+      const welcome = (await Post.find(1)) as Base;
+      await (welcome as any).comments.updateAll({ author_id: 1 });
+
+      const baseline = await (await (welcome as any).comments.reload()).toArray();
+      expect(baseline.length).toBeGreaterThan(0);
+
+      // A non-matching all_queries scope filters the has_many read.
+      await Comment.where({ author_id: 2 }).scoping({ allQueries: true }, async () => {
+        const scoped = await (await (welcome as any).comments.reload()).toArray();
+        expect(scoped.length).toBe(0);
+      });
+
+      // Outside the block the scope no longer applies.
+      const after = await (await (welcome as any).comments.reload()).toArray();
+      expect(after.length).toBe(baseline.length);
     });
   }); // HasManyScopingTest
 

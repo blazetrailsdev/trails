@@ -5597,14 +5597,56 @@ export class Relation<T extends Base> {
     return this.predicateBuilder.build(this._modelClass.arelTable.get(column), value);
   }
 
-  async scoping<R>(callback: () => R | Promise<R>): Promise<R> {
+  /**
+   * Execute a block with this relation installed as the current scope.
+   *
+   * With `{ allQueries: true }` the scope also applies to non-SELECT queries
+   * (update/delete/reload) and association reads, by installing it as the
+   * registry's global current scope. Once `allQueries` is set it cannot be
+   * unset in a nested block — passing `{ allQueries: false }` while a global
+   * scope is active raises ArgumentError, mirroring Rails.
+   *
+   * Mirrors: ActiveRecord::Relation#scoping(all_queries:, &block)
+   */
+  async scoping<R>(callback: () => R | Promise<R>): Promise<R>;
+  async scoping<R>(
+    options: { allQueries?: boolean | null },
+    callback: () => R | Promise<R>,
+  ): Promise<R>;
+  async scoping<R>(
+    optionsOrCallback: { allQueries?: boolean | null } | (() => R | Promise<R>),
+    maybeCallback?: () => R | Promise<R>,
+  ): Promise<R> {
+    const callback = (
+      typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback
+    ) as () => R | Promise<R>;
+    const allQueries =
+      typeof optionsOrCallback === "function" ? null : (optionsOrCallback.allQueries ?? null);
+
     const modelClass = this._modelClass as any;
-    const prev = ScopeRegistry.currentScope(modelClass);
-    ScopeRegistry.setCurrentScope(modelClass, this as any);
+    const registry = ScopeRegistry.instance();
+
+    // Rails: global_scope? && all_queries == false → raise.
+    if (registry.globalCurrentScope(modelClass, true) && allQueries === false) {
+      throw new ArgumentError(
+        "Scoping is set to apply to all queries and cannot be unset in a nested block.",
+      );
+    }
+
+    const prev = registry.currentScope(modelClass, true);
+    registry.setCurrentScope(modelClass, this as any);
+    let prevGlobal: any;
+    if (allQueries) {
+      prevGlobal = registry.globalCurrentScope(modelClass, true);
+      registry.setGlobalCurrentScope(modelClass, this as any);
+    }
     try {
       return await callback();
     } finally {
-      ScopeRegistry.setCurrentScope(modelClass, prev);
+      registry.setCurrentScope(modelClass, prev);
+      if (allQueries) {
+        registry.setGlobalCurrentScope(modelClass, prevGlobal);
+      }
     }
   }
 
