@@ -41,6 +41,15 @@
  * `adapter.`, `this.`, `conn.`, a SchemaMigration, …) — only a dynamic/computed
  * callee (`recv[fn](...)`) is invisible.
  *
+ * Teardown that iterates a statically-known list of table names also counts.
+ * `for (const t of TABLES) await conn.dropTable(t)` and
+ * `TABLES.forEach(t => conn.dropTable(t))` / `.map(...)` / `.flatMap(...)` are
+ * recognized when the iterated value resolves statically — either an inline
+ * array of literal names (`["a", "b"].forEach(...)`) or a `const TABLES = [...]`
+ * of literal names in the same file. Every static name in that list counts as
+ * dropped. A loop whose iterable can't be resolved statically (an imported
+ * const, a name built at runtime) still drops nothing, exactly as before.
+ *
  * `createTable("foo", { force: true })` is NOT exempt: `force` drops-then-recreates
  * on the *next* run, but the table still sits in the shared DB after this test
  * finishes, where a concurrent sibling fork can collide with it. The leak the
@@ -127,6 +136,59 @@ function droppedTableNames(call) {
   return call.arguments.map(staticString).filter((n) => n !== null);
 }
 
+/**
+ * Every statically-known string in an array-valued node, or null when the node
+ * isn't a resolvable array. An inline `["a", "b"]` resolves directly; a bare
+ * `TABLES` identifier resolves through `arrayConsts` (file-local
+ * `const TABLES = [...]`). Non-static elements are dropped silently — a partial
+ * list still credits the literal names it does contain.
+ */
+function arrayStrings(node, arrayConsts) {
+  if (!node) return null;
+  if (node.type === "ArrayExpression") {
+    return node.elements.map(staticString).filter((n) => n !== null);
+  }
+  if (node.type === "Identifier") return arrayConsts.get(node.name) ?? null;
+  return null;
+}
+
+/** The single declared loop variable name of a `for…of`, or null. */
+function forOfVarName(node) {
+  const left = node.left;
+  if (left.type !== "VariableDeclaration" || left.declarations.length !== 1) return null;
+  const id = left.declarations[0].id;
+  return id.type === "Identifier" ? id.name : null;
+}
+
+/**
+ * Walking up from a `dropTable(arg)` call whose argument is the identifier
+ * `argName`, the statically-known table names of the enclosing iteration that
+ * binds `argName` — a `for…of` over a resolvable array, or a
+ * `forEach`/`map`/`flatMap` callback whose first param is `argName`. Returns
+ * null when no such iteration is found or its iterable isn't static.
+ */
+function iterationStrings(callNode, argName, arrayConsts) {
+  for (let n = callNode.parent; n; n = n.parent) {
+    if (n.type === "ForOfStatement" && forOfVarName(n) === argName) {
+      return arrayStrings(n.right, arrayConsts);
+    }
+    if (
+      (n.type === "ArrowFunctionExpression" || n.type === "FunctionExpression") &&
+      n.params.length >= 1 &&
+      n.params[0].type === "Identifier" &&
+      n.params[0].name === argName &&
+      n.parent?.type === "CallExpression" &&
+      n.parent.callee.type === "MemberExpression" &&
+      !n.parent.callee.computed &&
+      n.parent.callee.property.type === "Identifier" &&
+      ["forEach", "map", "flatMap"].includes(n.parent.callee.property.name)
+    ) {
+      return arrayStrings(n.parent.callee.object, arrayConsts);
+    }
+  }
+  return null;
+}
+
 const rule = {
   meta: {
     type: "problem",
@@ -152,8 +214,19 @@ const rule = {
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
+    // File-local `const X = [...]` arrays of literal names, for loop teardown.
+    const arrayConsts = new Map();
+    // dropTable(arg) calls whose argument is an identifier (a loop variable):
+    // resolved against arrayConsts at Program:exit, once all consts are known.
+    const dynamicDrops = [];
 
     return {
+      VariableDeclarator(node) {
+        if (node.id.type === "Identifier" && node.init?.type === "ArrayExpression") {
+          arrayConsts.set(node.id.name, arrayStrings(node.init, arrayConsts));
+        }
+      },
+
       CallExpression(node) {
         // All three operations are matched identically whether invoked bare
         // (`createTable(...)`) or on a receiver (`ctx.createTable(...)`).
@@ -166,11 +239,21 @@ const rule = {
           if (table !== null && !created.has(table)) created.set(table, node);
         } else if (name === "dropTable") {
           for (const table of droppedTableNames(node)) dropped.add(table);
+          // Identifier args may be loop variables iterating a name array;
+          // defer resolution until every const declaration has been seen.
+          for (const arg of node.arguments) {
+            if (arg.type === "Identifier") dynamicDrops.push({ node, argName: arg.name });
+          }
         }
       },
 
       // Deferred so creates and drops in any order across the file are matched.
       "Program:exit"() {
+        for (const { node, argName } of dynamicDrops) {
+          const names = iterationStrings(node, argName, arrayConsts);
+          if (names) for (const table of names) dropped.add(table);
+        }
+
         for (const [name, node] of created) {
           if (dropped.has(name)) continue;
           context.report({

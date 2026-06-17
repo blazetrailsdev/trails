@@ -43,6 +43,22 @@ tester.run("require-table-teardown", rule, {
     "await ctx.createTable(`${schema}.widgets`, () => {});",
     // Bare (non-method) create + drop — receiver-agnostic for bare calls too.
     'await createTable("widgets", () => {});\nawait dropTable("widgets");',
+    // Loop teardown over a file-local const array of literal names.
+    'const TABLES = ["a", "b"];\nawait ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+      "for (const t of TABLES) await ctx.dropTable(t, { ifExists: true });",
+    // Loop teardown over an inline array literal.
+    'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+      'for (const t of ["a", "b"]) await ctx.dropTable(t);',
+    // forEach teardown over a const array.
+    'const TABLES = ["a", "b"];\nawait ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+      "TABLES.forEach((t) => ctx.dropTable(t));",
+    // map teardown over an inline array literal.
+    'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+      'await Promise.all(["a", "b"].map((t) => ctx.dropTable(t)));',
+    // Const array declared after the loop still resolves (deferred at exit).
+    'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+      "for (const t of TABLES) await ctx.dropTable(t);\n" +
+      'const TABLES = ["a", "b"];',
   ],
   invalid: [
     // Created, never dropped.
@@ -90,6 +106,20 @@ tester.run("require-table-teardown", rule, {
     {
       code: 'await createTable("widgets", () => {});',
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // Loop teardown over a const array that omits a created table flags it.
+    {
+      code:
+        'const TABLES = ["a"];\nawait ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
+        "for (const t of TABLES) await ctx.dropTable(t);",
+      errors: [{ messageId: "missingTeardown", data: { table: "b" } }],
+    },
+    // Loop over an unresolvable iterable (imported/runtime const) drops nothing.
+    {
+      code:
+        'import { TABLES } from "./tables.js";\nawait ctx.createTable("a", () => {});\n' +
+        "for (const t of TABLES) await ctx.dropTable(t);",
+      errors: [{ messageId: "missingTeardown", data: { table: "a" } }],
     },
     // dropAllTables is itself forbidden — bare form.
     {
