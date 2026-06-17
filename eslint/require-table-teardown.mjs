@@ -243,7 +243,13 @@ const rule = {
 
     return {
       VariableDeclarator(node) {
-        if (node.id.type === "Identifier" && unwrap(node.init)?.type === "ArrayExpression") {
+        // `const` only: a reassignable `let`/`var` could be rebound after the
+        // loop, so its initializer isn't a sound snapshot of what's iterated.
+        if (
+          node.parent?.kind === "const" &&
+          node.id.type === "Identifier" &&
+          unwrap(node.init)?.type === "ArrayExpression"
+        ) {
           arrayConsts.set(node.id.name, arrayStrings(node.init, arrayConsts));
         }
       },

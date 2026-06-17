@@ -120,6 +120,14 @@ tester.run("require-table-teardown", rule, {
         "for (const t of TABLES) await ctx.dropTable(t);",
       errors: [{ messageId: "missingTeardown", data: { table: "b" } }],
     },
+    // A `let` array is reassignable, so its initializer isn't trusted — the
+    // created table is still flagged (only `const` arrays resolve).
+    {
+      code:
+        'let TABLES = ["a"];\nawait ctx.createTable("a", () => {});\n' +
+        "for (const t of TABLES) await ctx.dropTable(t);",
+      errors: [{ messageId: "missingTeardown", data: { table: "a" } }],
+    },
     // Loop over an unresolvable iterable (imported/runtime const) drops nothing.
     {
       code:
