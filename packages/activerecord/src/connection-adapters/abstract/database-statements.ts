@@ -1493,7 +1493,24 @@ export const DatabaseStatements = {
     // here lets adapters that override execQuery (e.g. PostgreSQLAdapter,
     // which populates columnTypes via its type_map) have their override
     // picked up automatically.
-    return this.execQuery(sql, name, binds, { allowRetry: opts?.allowRetry ?? false });
+    //
+    // Rails' select_all runs `exec_query(sql, ..., prepare: preparable)` so a
+    // preparable SELECT lands in the connection's statement pool. trails encodes
+    // preparability as "compiled with binds": a preparable Arel yields
+    // placeholder SQL plus a bind array, while a non-preparable one (IN-list,
+    // SQL string literal) is inlined with no binds. So a non-empty bind array
+    // under prepared_statements is the prepared-statement signal — threading it
+    // as `prepare` routes equality SELECTs through the pooled statement path
+    // (SQLite `_cachedStatement`) while inlined queries use a fresh statement.
+    const prepare = !!(
+      (this as { preparedStatements?: boolean }).preparedStatements &&
+      binds &&
+      binds.length > 0
+    );
+    return this.execQuery(sql, name, binds, {
+      allowRetry: opts?.allowRetry ?? false,
+      prepare,
+    });
   },
 
   // select_one/value/values/rows delegate to select_all so the QueryCache

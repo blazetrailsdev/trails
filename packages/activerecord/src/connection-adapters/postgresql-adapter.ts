@@ -1229,8 +1229,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     } = {},
   ): Promise<R> {
     const { prepareOverride, onPrepared, ...queryExtra } = extra;
-    const prepare =
-      prepareOverride === false ? false : (prepareOverride ?? this._shouldPrepare(binds));
+    // `select_all` threads `prepare: true` for a preparable SELECT, but PG's own
+    // gates (prepared_statements, non-empty binds, a non-zero pool limit) still
+    // decide whether to actually prepare — so a `true` hint routes through
+    // `_shouldPrepare` rather than forcing a server-side PREPARE that a disabled
+    // (maxSize 0) pool would leak. Only an explicit `false` hard-disables.
+    const prepare = prepareOverride === false ? false : this._shouldPrepare(binds);
     const attempt = async (): Promise<R> => {
       if (prepare) {
         const stmtName = this._preparedNameFor(client, sql);

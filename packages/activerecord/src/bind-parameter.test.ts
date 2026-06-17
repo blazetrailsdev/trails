@@ -105,29 +105,133 @@ describe("BindParameterTest", () => {
     Base.filterAttributes = [];
   });
 
-  // BLOCKED: adapter — connection statement pool is never populated by query
-  // execution, so the `statement_cache`/`to_sql_key` assertions have nothing to
-  // observe. Tracked by RFC 0016 story
-  // `revisit-statement-cache-find-skips-after-cache-routing` (which supersedes
-  // the now-closed `f9-statement-cache-pool-introspection`).
-  // ROOT-CAUSE: empirically (e1-bind-parameter triage, 2026-06-16) `where`/`find`/
-  // `findBy` all leave `sqlite3Adapter._statementPool` empty even with
-  // preparedStatements=true — `_cachedStatement` (sqlite3-adapter.ts:357) is the
-  // only writer and the SELECT execution paths don't route through it. Compounded
-  // by `to_sql` inlining binds (connection-adapters/abstract/database-statements.ts:184-211),
-  // so `to_sql_key`
-  // yields `id = 1` not the placeholder `id = ?` a pool would key by, and there
-  // is no `sqlKey` accessor on the sqlite adapter (PG has one).
-  it.skip("statement cache", () => {});
-  it.skip("statement cache with query cache", () => {});
-  it.skip("statement cache with find", () => {
-    // The per-class `_findByStatementCache` half IS satisfiable now (find/findBy
-    // route through cachedFindByStatement, core.ts:707/905); the blocker is the
-    // `assert_includes statement_cache` half on the connection pool — see above.
+  // Rails' private helpers (bind_parameter_test.rb ll. 260-274):
+  //   statement_cache → @connection.instance_variable_get(:@statements).send(:cache)
+  //   to_sql_key(arel) → sql = @connection.to_sql(arel);
+  //                      @connection.respond_to?(:sql_key) ? sql_key(sql) : sql
+  // statement_cache → the connection statement pool's keys (`StatementPool#cache`).
+  function statementCacheKeys(conn: any): string[] {
+    return conn._statementPool.keys;
+  }
+  // Deliberate deviation: trails' `to_sql` inlines bind values (see the
+  // `bindParams` note below), so an arel can't be recompiled into the
+  // placeholder SQL the prepared-statement pool is keyed by. Instead we capture
+  // the SQL the connection actually executes — and therefore keys its pool by —
+  // from the `sql.active_record` payload, then run it through `sql_key`. That is
+  // exactly the string the pool stores (SQLite keys by the raw SQL, PG prefixes
+  // the schema search path), so `assert_includes`/`assert_not_includes` observe
+  // the real invariant Rails asserts: preparable SELECTs (find/find_by/where on a
+  // scalar — placeholder SQL + binds) populate the pool, while inlined queries
+  // (IN-clause arrays, SQL string literals — no binds) do not.
+  function captureSelectSql(): { sqls: string[]; stop: () => void } {
+    const sqls: string[] = [];
+    const isTopicsSelect = (sql: unknown): sql is string =>
+      typeof sql === "string" && /^\s*SELECT\b/i.test(sql) && /\btopics\b/.test(sql);
+    const sub = Notifications.subscribe("sql.active_record", (e: Event) => {
+      const sql = e.payload.sql;
+      if (isTopicsSelect(sql)) sqls.push(sql);
+    });
+    return { sqls, stop: () => Notifications.unsubscribe(sub) };
+  }
+
+  it("statement cache", async (ctx) => {
+    // Rails wraps the whole BindParameterTest in `if prepared_statements`
+    // (bind_parameter_test.rb:9); MySQL/MariaDB default it off, so mirror the
+    // class-level guard here (the statement pool is only populated when prepared
+    // statements are enabled).
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    conn.clearCache();
+
+    const cap = captureSelectSql();
+    const topics = Topic.where({ id: 1 });
+    expect((await topics.toArray()).map((t: any) => t.id)).toEqual([1]);
+    cap.stop();
+
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
   });
-  it.skip("statement cache with find by", () => {});
-  it.skip("statement cache with in clause", () => {});
-  it.skip("statement cache with sql string literal", () => {});
+
+  it("statement cache with query cache", async (ctx) => {
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    conn.enableQueryCacheBang();
+    conn.clearCache();
+    try {
+      const cap = captureSelectSql();
+      const topics = Topic.where({ id: 1 });
+      expect((await topics.toArray()).map((t: any) => t.id)).toEqual([1]);
+      cap.stop();
+
+      expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
+    } finally {
+      conn.disableQueryCacheBang();
+    }
+  });
+
+  it("statement cache with find", async (ctx) => {
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    conn.clearCache();
+
+    const cap = captureSelectSql();
+    expect((await Topic.find(1)).id).toBe(1);
+    // Rails: Topic.find_by_id(2) — find and find_by share the per-class
+    // `_findByStatementCache` keyed on `[:id]`, so both run the same
+    // `... WHERE "id" = ? LIMIT 1` statement (core.ts cachedFindByStatement).
+    expect((await Topic.findBy({ id: 2 }))!.id).toBe(2);
+    cap.stop();
+
+    // Rails asserts that cached find statement is keyed into the connection pool.
+    const findSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(findSql));
+  });
+
+  it("statement cache with find by", async (ctx) => {
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    conn.clearCache();
+
+    const cap = captureSelectSql();
+    expect((await Topic.findBy({ id: 1 }))!.id).toBe(1);
+    expect((await Topic.findByBang({ id: 2 })).id).toBe(2);
+    cap.stop();
+
+    const findSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(findSql));
+  });
+
+  it("statement cache with in clause", async (ctx) => {
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    conn.clearCache();
+
+    const cap = captureSelectSql();
+    const topics = Topic.where({ id: [1, 3] });
+    expect(
+      (await topics.toArray()).map((t: any) => t.id).sort((a: number, b: number) => a - b),
+    ).toEqual([1, 3]);
+    cap.stop();
+
+    // An IN-clause array is not preparable: trails inlines it (no binds), so the
+    // query runs on a fresh statement and never enters the pool. assert_not_includes
+    // passes for the right reason — the inlined SQL key is genuinely absent, not
+    // because the pool is empty (the prior tests prove it populates).
+    expect(statementCacheKeys(conn)).not.toContain(conn.sqlKey(cap.sqls.at(-1)));
+  });
+
+  it("statement cache with sql string literal", async (ctx) => {
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    conn.clearCache();
+
+    const cap = captureSelectSql();
+    const topics = Topic.where("topics.id = ?", 1);
+    expect((await topics.toArray()).map((t: any) => t.id)).toEqual([1]);
+    cap.stop();
+
+    // A SQL string literal is inlined with no binds, so it is not prepared/pooled.
+    expect(statementCacheKeys(conn)).not.toContain(conn.sqlKey(cap.sqls.at(-1)));
+  });
 
   it("too many binds", async () => {
     const conn = Topic.leaseConnection() as any;
