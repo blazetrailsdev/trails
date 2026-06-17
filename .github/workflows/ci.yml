@@ -520,6 +520,59 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm vitest run packages/tse-compiler
 
+  # Reporting-only code coverage. Runs the light (non-AR) packages together
+  # with v8 coverage and `--coverage.all` so untested files count toward the
+  # denominator, producing an honest baseline. There is NO threshold gate —
+  # `continue-on-error: true` plus the no-threshold vitest config mean this job
+  # can never block a merge. The summary is written to the run UI and the
+  # lcov/json reports are uploaded as artifacts. activerecord is deliberately
+  # excluded (its 6-fork suite dominates CI time); AR coverage is a follow-up.
+  # trails-tsc is also excluded: its watcher/build tests spawn subprocesses
+  # that are coverage-hostile under load and can trip vitest's worker-RPC
+  # timeout — which aborts the whole run and writes no report, voiding every
+  # other package's numbers. Not worth that risk for a tsc-plugin harness.
+  coverage:
+    name: Coverage (reporting-only)
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Run vitest with coverage (non-AR packages)
+        run: >
+          pnpm vitest run
+          packages/arel
+          packages/activemodel
+          packages/activesupport
+          packages/did-you-mean
+          packages/globalid
+          packages/nokogiri
+          packages/html-sanitizer
+          packages/rack
+          packages/actionpack
+          packages/actionview
+          packages/trailties
+          packages/tse-compiler
+          --coverage --coverage.all
+      - name: Write coverage summary to run UI
+        if: always()
+        run: node scripts/ci/coverage-summary.mjs
+      - name: Upload coverage report (lcov + json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          if-no-files-found: warn
+          retention-days: 14
+
   sqlite-tests:
     name: Active Record SQLite Tests
     needs: changes
