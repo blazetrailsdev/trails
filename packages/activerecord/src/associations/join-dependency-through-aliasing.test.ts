@@ -224,6 +224,32 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(sql).toMatch(/["`]posts["`]\s+["`]posts_authors_join["`]/);
   });
 
+  it("aliases a referenced through-target table to the reference name when free", () => {
+    // Mirrors Rails JoinDependency#make_constraints consuming `@references`
+    // uniformly across every reflection in the chain (join_dependency.rb:202):
+    // `Author.includes(:jdt_comments).references(:jdt_comments)` records the
+    // through-target name in `@references`, and when its join is emitted
+    // `aliased_table_for` uses the referenced name on first/free use
+    // (`jdt_comments AS jdtComments`). The aliasing is consumed lazily in
+    // `joinConstraints`/`makeConstraints`, so the through-target JoinAssociation
+    // is reference-aliased identically to a direct join target — without
+    // `_addThroughViaJoinAssociation` receiving `references` at build time.
+    const jd = new JoinDependency(JdtAuthor);
+    jd.addAssociation("jdtComments");
+    const target = jd.nodes.find((n) => n.immediateAssocName === "jdtComments")!;
+    expect(target.effectiveSqlName).toBe("jdt_comments");
+
+    // Lazily consume references; the free reference name renames the target.
+    jd.joinConstraints([], (jd as any)._aliasTracker, ["jdtComments"]);
+    expect(target.effectiveSqlName).toBe("jdtComments");
+    expect((target.arelTable as Table).name).toBe("jdt_comments");
+    expect((target.arelTable as Table).tableAlias).toBe("jdtComments");
+
+    // The intermediate `_through_` link is internal and never reference-aliased.
+    const throughNode = jd.nodes.find((n) => n.assocName.includes("_through_"))!;
+    expect(throughNode.effectiveSqlName).toBe("jdt_posts");
+  });
+
   it("uses the Rails alias_candidate with _join when the through real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
     jd.addAssociation("jdtPosts");
