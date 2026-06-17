@@ -88,6 +88,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     const names = cols.map((c) => c.name);
     expect(names).toContain("name");
     expect(names).toContain("quantity");
+    await adapter.dropTable("things");
   });
 
   it("dropTable removes the table", async () => {
@@ -106,6 +107,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(await adapter.columnExists("widgets", "title")).toBe(true);
     await adapter.addColumn("widgets", "color", "string");
     expect(await adapter.columnExists("widgets", "color")).toBe(true);
+    await adapter.dropTable("widgets");
   });
 
   it("delegating methods (foreignKeys, removeForeignKey) do not infinitely recurse on base adapter", async () => {
@@ -143,6 +145,8 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       ifNotExists: true,
     });
     expect((await adapter.foreignKeys("articles")).length).toBe(before);
+    await adapter.dropTable("articles");
+    await adapter.dropTable("authors");
   });
 
   it("addForeignKey with ifNotExists creates the FK when none exists", async () => {
@@ -154,6 +158,8 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       ifNotExists: true,
     });
     expect((await adapter.foreignKeys("articles")).length).toBe(1);
+    await adapter.dropTable("articles");
+    await adapter.dropTable("authors");
   });
 
   it("addForeignKey with ifNotExists creates a second FK to the same table on a different column", async () => {
@@ -172,5 +178,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     });
     const cols = (await adapter.foreignKeys("articles")).map((fk) => fk.column).sort();
     expect(cols).toEqual(["author_id", "editor_id"]);
+    await adapter.dropTable("articles");
+    await adapter.dropTable("authors");
   });
 });
