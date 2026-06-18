@@ -91,16 +91,28 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
-  it.skip("should property quote string primary keys", () => {
-    // BLOCKED: associations — HABTM `push` derives the owner-side join FK from
-    //   the owner's `id` attribute, not its primary key, so a custom string-PK
-    //   owner (Country#country_id) writes a null countries_treaties.country_id.
-    //   Tracked for convergence.
+  it("should property quote string primary keys", async () => {
+    const country = await Country.create({ country_id: "c1", name: "India" });
+    const treaty = Treaty.new({ treaty_id: "t1", name: "peace" });
+    await country.treaties.push(treaty);
+
+    const con = Base.connection;
+    const rows = await con.selectRows("select * from countries_treaties");
+    const record = rows[rows.length - 1] as string[];
+    expect(record[0]).toBe("c1");
+    expect(record[1]).toBe("t1");
   });
 
-  it.skip("proper usage of primary keys and join table", () => {
-    // BLOCKED: associations — see "should property quote string primary keys";
-    //   the `country.treaties << treaty` insert fails the same way.
+  it("proper usage of primary keys and join table", async () => {
+    const country = await Country.create({ country_id: "c1", name: "India" });
+    const treaty = Treaty.new({ treaty_id: "t1", name: "peace" });
+    await country.treaties.push(treaty);
+
+    expect(Country.primaryKey).toBe("country_id");
+    expect(Treaty.primaryKey).toBe("treaty_id");
+
+    const found = await Country.first();
+    expect(await found!.treaties.count()).toBe(1);
   });
 
   it("has and belongs to many", async () => {
