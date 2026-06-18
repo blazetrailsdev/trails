@@ -1713,11 +1713,11 @@ describe("HasManyAssociationsTest", () => {
     expect(bulb.car_id).toBe(car.id);
   });
 
-  it("include method in has many association should return true for instance added with build", () => {
+  it("include method in has many association should return true for instance added with build", async () => {
     const post = HmPost.new();
     const comments = (post as any).comments;
     const comment = comments.build();
-    expect(comments.target.includes(comment)).toBe(true);
+    expect(await comments.isInclude(comment)).toBe(true);
   });
 
   it("include uses array include after loaded", async () => {
@@ -1729,7 +1729,7 @@ describe("HasManyAssociationsTest", () => {
 
     await assertNoQueries(false, async () => {
       expect(clients.loaded).toBe(true);
-      expect(clients.target.includes(client)).toBe(true);
+      expect(await clients.isInclude(client)).toBe(true);
     });
   });
 });

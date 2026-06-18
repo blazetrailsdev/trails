@@ -775,7 +775,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    return this.build(attrs as Record<string, unknown>, block);
+    return Array.isArray(attrs) ? this.build(attrs, block) : this.build(attrs, block);
   }
 
   /**
