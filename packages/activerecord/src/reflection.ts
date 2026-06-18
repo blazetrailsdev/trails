@@ -337,7 +337,7 @@ export class AbstractReflection {
           (self.klass as any)._associations ?? [];
         const inverseHm = targetAssocs.find(
           (a) =>
-            (a.type === "hasMany" || a.type === "hasOne") &&
+            a.type === "hasMany" &&
             (a.options.className ?? camelize(singularize(a.name))) === ownerName,
         );
         if (inverseHm) return `${underscore(inverseHm.name)}_count`;
