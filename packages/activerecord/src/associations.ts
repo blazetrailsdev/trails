@@ -2433,7 +2433,9 @@ export function association<T extends Base = Base>(
   const ctor = record.constructor as typeof Base;
   const associations: AssociationDefinition[] = ctor._associations ?? [];
   // Most-derived override wins (subclass appends after the cloned parent
-  // entry), aligning with `_reflections`' keyed override semantics.
+  // entry), aligning with `_reflections`' keyed override semantics. Covered by
+  // has-one-associations.test.ts "nullification on association change" (a
+  // DependentFirm whose `account` override must beat the inherited Company one).
   const assocDef = associations
     .slice()
     .reverse()

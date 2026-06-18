@@ -193,9 +193,17 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("nullification on association change", async () => {
+    // rails_core is a DependentFirm, whose `account` has_one overrides
+    // Company's with `dependent: :nullify`. This asserts the displaced account
+    // is *nullified* (firm_id → null) rather than destroyed, which only holds
+    // if association resolution picks DependentFirm's override over the
+    // inherited Company#account (the slice().reverse().find() most-derived-wins
+    // fix in associations.ts / instance-methods.ts).
     const firm = companies("rails_core") as any;
     const oldAccountId = (await readHasOne(firm, "account")).id;
     firm.account = new Account({ credit_limit: 5 });
+    // DEVIATION: Rails persists the has_one write on assignment to a saved owner
+    // (no save() call); trails defers the displaced record's FK nullify to save().
     await firm.save();
     // account is dependent with nullify, therefore its firm_id should be nil
     expect((await Account.find(oldAccountId)).firm_id).toBeNull();
@@ -228,6 +236,9 @@ describe("HasOneAssociationsTest", () => {
   it("association change calls delete", async () => {
     const firm = companies("first_firm") as any;
     firm.deletableAccount = new Account({ credit_limit: 5 });
+    // DEVIATION: Rails persists the has_one write on assignment to a saved owner
+    // (no save() call); trails defers the displaced record's delete to save().
+    // dependent: :delete skips callbacks, so destroyed_account_ids stays empty.
     await firm.save();
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
   });
@@ -584,10 +595,23 @@ describe("HasOneAssociationsTest", () => {
     await assertNoQueries(false, async () => {
       company.account = account;
     });
+
     company.account = null;
-    await company.save();
     await assertNoQueries(false, async () => {
       company.account = null;
+    });
+
+    const account2 = await Account.find(2);
+    // DEVIATION: Rails persists has_one writes on assignment to a saved owner —
+    // `assert_queries_count(3) { company.account = account }`. trails defers the
+    // nullify-old + update-new writes to save(), so the assignment runs no
+    // queries (the 3 writes happen on the owner's next save()).
+    await assertNoQueries(false, async () => {
+      company.account = account2;
+    });
+
+    await assertNoQueries(false, async () => {
+      (new Firm() as any).account = account2;
     });
   });
 
