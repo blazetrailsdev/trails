@@ -1501,20 +1501,10 @@ export const DatabaseStatements = {
     // picked up automatically.
     //
     // Rails' select_all runs `exec_query(sql, ..., prepare: prepared_statements &&
-    // preparable)`, where `preparable` is the Arel collector's first-class flag.
-    // trails has no threaded `collector.preparable` yet, so it INFERS preparability
-    // from bind presence: a preparable Arel yields placeholder SQL plus a bind
-    // array, while an inlined one yields no binds. A non-empty bind array under
-    // prepared_statements is therefore the prepared-statement signal — it routes
-    // equality SELECTs through the pooled path (SQLite `_cachedStatement`) while
-    // inlined queries use a fresh statement.
-    //
-    // This matches Rails for every shape that carries binds, and for the no-bind
-    // IN-clause array (non-preparable in both). It diverges only for a no-bind but
-    // *preparable* query — a SQL string literal — which Rails caches and trails
-    // cannot distinguish from the inlined IN-clause. Converging that needs the real
-    // `collector.preparable` flag: RFC 0016 story
-    // `thread-collector-preparable-for-statement-cache`.
+    // preparable)`, where `preparable` is the Arel collector's first-class flag
+    // threaded through compileWithBinds → _compileSelectSql → opts.preparable.
+    // Callers that don't supply opts.preparable fall back to bind presence, which
+    // is correct for every shape that carries binds.
     const preparable = opts?.preparable ?? (binds != null && binds.length > 0);
     const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
     return this.execQuery(sql, name, binds, {
