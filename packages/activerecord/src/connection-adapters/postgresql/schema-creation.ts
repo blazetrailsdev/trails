@@ -83,9 +83,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
   ): string {
     if ((type as string) === "primary_key") {
-      // Rails: NATIVE_DATABASE_TYPES[:primary_key] = "bigserial primary key".
-      // The PG adapter's typeToSql doesn't handle :primary_key (keyed camelCase
-      // primaryKey) and the abstract base returns "SERIAL PRIMARY KEY" (int4).
+      // Rails NATIVE_DATABASE_TYPES[:primary_key] = "bigserial primary key"; can't delegate (adapter keys camelCase primaryKey).
       return "bigserial primary key";
     }
     // Delegate to the adapter's typeToSql when available (Rails parity:

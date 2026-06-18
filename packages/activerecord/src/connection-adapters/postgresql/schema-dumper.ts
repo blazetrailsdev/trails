@@ -43,8 +43,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
-    // Rails: schema_type(column) == :bigserial. Now that createTable emits BIGSERIAL,
-    // only bigserial is the default — serial (int4) must be preserved explicitly.
     return this.schemaType(column) === "bigserial";
   }
 
@@ -311,8 +309,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return adapter.tableOptions(tableName);
   }
 
-  // Returns the Rails default ("bigserial"/BIGSERIAL). Note that TS createTable
-  // currently emits SERIAL (int4) — see isDefaultPrimaryKey for the widening.
   defaultPrimaryKeyType(): string {
     return "bigserial";
   }
