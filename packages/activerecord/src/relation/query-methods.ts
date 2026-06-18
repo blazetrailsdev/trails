@@ -1685,9 +1685,12 @@ function normalizeBoundValue(value: unknown, modelClass: QueryMethodsHost["_mode
     typeof value === "object" &&
     typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
   ) {
-    return (value as { idForDatabase(): unknown }).idForDatabase();
+    return normalizeBoundValue((value as { idForDatabase(): unknown }).idForDatabase(), modelClass);
   }
-  return value;
+  // Apply adapter-level castBoundValue so that e.g. MySQL/MariaDB converts
+  // integers to strings before quoting — matching sanitizeSqlArray's cast step.
+  const conn = modelClass.connection as { castBoundValue?(v: unknown): unknown };
+  return conn.castBoundValue ? conn.castBoundValue(value) : value;
 }
 
 /** @internal */
