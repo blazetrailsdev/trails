@@ -1928,10 +1928,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           const targetPk = (record.constructor as typeof Base).primaryKey;
           let targetPkCol: string;
           if (Array.isArray(targetPk)) {
-            // Composite-PK target with scalar source FK: use the source reflection's
-            // associationPrimaryKey to find the single column the FK references.
-            // Mirrors BelongsToReflection#association_primary_key which returns
-            // options[:primary_key] when set, or "id" when it is part of the composite PK.
+            // Mirrors BelongsToReflection#association_primary_key: use options[:primary_key]
+            // when set, or fall back to "id" when it is part of the composite PK.
             const srcPk = sourceRefl?.associationPrimaryKey;
             if (typeof srcPk === "string") {
               targetPkCol = srcPk;
@@ -2910,15 +2908,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const targetFkStr = targetFk;
       let targetPkCol: string;
       if (Array.isArray(targetModel.primaryKey)) {
-        // When the target has a composite PK, use the source reflection's explicit
-        // primaryKey option to pick the single column the through-table FK references.
-        // Mirrors Rails' BelongsToReflection#association_primary_key, which returns
-        // options[:primary_key] when set, or falls back to "id" when "id" is part of
-        // the composite PK (the conventional scalar anchor for a single-column FK).
+        // Mirrors BelongsToReflection#association_primary_key: options[:primary_key]
+        // when set, else "id" when it is part of the composite PK.
         const srcPkOpt = sourceAssoc?.options?.primaryKey;
         if (typeof srcPkOpt === "string") {
           targetPkCol = srcPkOpt;
-        } else if (Array.isArray(targetModel.primaryKey) && targetModel.primaryKey.includes("id")) {
+        } else if (targetModel.primaryKey.includes("id")) {
           targetPkCol = "id";
         } else {
           throw new ConfigurationError(
