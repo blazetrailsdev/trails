@@ -720,13 +720,7 @@ describe("HasManyAssociationsTest", () => {
     expect((await Client.where(`firm_id=${firm.id}`).toArray()).length).toBe(0);
   });
 
-  // Skipped pending RFC 0019 convergence story
-  // hm-belongsto-inverse-cache-poisoned-after-collection-load: once
-  // `firm.dependentClientsOfFirm` is loaded, a freshly `Client.find`-ed record's
-  // `.firm` belongsTo getter returns a cached `null` (the inverse is seeded null
-  // on construction), even though `loadBelongsTo("firm")` resolves it. Rails'
-  // `Client.find(client_id).firm` must reload, so this assertion can't pass yet.
-  it.skip("delete all with option nullify", async () => {
+  it("delete all with option nullify", async () => {
     const firm = companies("first_firm") as any;
     const clientId = ((await firm.dependentClientsOfFirm.first()) as any).id;
     const count = await firm.dependentClientsOfFirm.count();

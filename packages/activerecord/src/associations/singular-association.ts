@@ -96,14 +96,20 @@ export class SingularAssociation extends Association {
       return this.target;
     }
 
-    // A DB load would be required to answer. Throw under strict
-    // loading; otherwise return the current `target` (null by default)
-    // to preserve the legacy silent-null behavior for opt-out users.
-    if (this.findTargetNeeded() && this._isStrictOnOwner()) {
-      strictLoadingViolationBang(this.owner, this.reflection.name, {
-        polymorphic: this.reflection.options?.polymorphic,
-        className: this.reflection.options?.className,
-      });
+    // A DB load would be required to answer.
+    if (this.findTargetNeeded()) {
+      if (this._isStrictOnOwner()) {
+        strictLoadingViolationBang(this.owner, this.reflection.name, {
+          polymorphic: this.reflection.options?.polymorphic,
+          className: this.reflection.options?.className,
+        });
+      }
+      // Rails lazily loads synchronously; Node.js requires async I/O.
+      // Return a Promise so `await record.assocName` triggers a DB load
+      // and resolves to the target — mirrors Rails' implicit lazy load.
+      // Sync access (without await) receives the Promise object; callers
+      // that need the loaded value must await or use loadBelongsTo/loadHasOne.
+      return this.loadTarget() as unknown as Base | null;
     }
     return this.target;
   }
