@@ -56,62 +56,6 @@ function expectQuotedColumnInSql(
   }
 }
 
-describe("AssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      cpk_orders: {
-        columns: { id: "integer", shop_id: "integer", status: "string" },
-        primaryKey: ["shop_id", "id"],
-      },
-      cpk_order_items: {
-        cpk_order_id: "integer",
-        cpk_order_shop_id: "integer",
-        name: "string",
-        order_id: "integer",
-        order_shop_id: "integer",
-      },
-    });
-  });
-
-  it("loading cpk association when persisted and in memory differ", async () => {
-    class CpkOrder extends Base {
-      static {
-        this._tableName = "cpk_orders";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    class CpkOrderItem extends Base {
-      static {
-        this._tableName = "cpk_order_items";
-        this.attribute("cpk_order_shop_id", "integer");
-        this.attribute("cpk_order_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(CpkOrder, "cpkOrderItems", {
-      foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
-      className: "CpkOrderItem",
-    });
-    registerModel("CpkOrder", CpkOrder);
-    registerModel("CpkOrderItem", CpkOrderItem);
-    const order = await CpkOrder.create({ shop_id: 1, id: 1, status: "open" });
-    await CpkOrderItem.create({ cpk_order_shop_id: 1, cpk_order_id: 1, name: "Widget" });
-    // Change in memory but don't persist
-    order.status = "closed";
-    // Loading association should still find items by persisted CPK
-    const items = await loadHasMany(order, "cpkOrderItems", {
-      foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
-      className: "CpkOrderItem",
-    });
-    expect(items.length).toBe(1);
-  });
-});
-
 describe("AssociationProxyTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
@@ -2701,11 +2645,6 @@ describe("PreloaderTest", () => {
 describe("OverridingAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      oa_brokens: { name: "string", nonexistent_id: "integer" },
-    });
-  });
   it("habtm association redefinition callbacks should differ and not inherited", () => {
     class OAParent extends Base {
       static {
@@ -2892,19 +2831,27 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("associations raise with name error if associated to classes that do not exist", async () => {
-    class OABroken extends Base {
+    // Rails: ModelAssociatedToClassesThatDoNotExist uses self.table_name = "accounts"
+    // and calls .new (no DB needed) — the registry lookup raises before any query.
+    class ModelAssociatedToClassesThatDoNotExist extends Base {
       static {
-        this._tableName = "oa_brokens";
-        this.attribute("name", "string");
-        this.attribute("nonexistent_id", "integer");
+        this._tableName = "accounts";
+        this.hasOne("nonExistentHasOneClass");
+        this.belongsTo("nonExistentBelongsToClass");
+        this.hasMany("nonExistentHasManyClasses");
       }
     }
-    Associations.belongsTo.call(OABroken, "nonexistent", { foreignKey: "nonexistent_id" });
-    registerModel("OABroken", OABroken);
-    const record = await OABroken.create({ name: "test", nonexistent_id: 1 });
-    await expect(
-      loadBelongsTo(record, "nonexistent", { foreignKey: "nonexistent_id" }),
-    ).rejects.toThrow(/not found in registry/);
+    registerModel("ModelAssociatedToClassesThatDoNotExist", ModelAssociatedToClassesThatDoNotExist);
+    const record = new ModelAssociatedToClassesThatDoNotExist();
+    await expect(loadHasOne(record, "nonExistentHasOneClass", {})).rejects.toThrow(
+      /not found in registry/,
+    );
+    await expect(loadBelongsTo(record, "nonExistentBelongsToClass", {})).rejects.toThrow(
+      /not found in registry/,
+    );
+    await expect(loadHasMany(record, "nonExistentHasManyClasses", {})).rejects.toThrow(
+      /not found in registry/,
+    );
   });
 });
 
@@ -3810,5 +3757,43 @@ describe("AssociationsTest", () => {
     ).toHaveLength(1);
     // Target tag itself is untouched.
     expect(await ShardedTag.where({ id: (tag as any).id })).not.toHaveLength(0);
+  });
+
+  it("loading cpk association when persisted and in memory differ", async () => {
+    class CpkOrderInline extends Base {
+      static {
+        this._tableName = "cpk_orders";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this._primaryKey = ["shop_id", "id"];
+        this.hasMany("cpkBooksInline", {
+          foreignKey: ["shop_id", "order_id"],
+          className: "CpkBookInline",
+        });
+      }
+    }
+    class CpkBookInline extends Base {
+      static {
+        this._tableName = "cpk_books";
+        this.attribute("author_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    registerModel("CpkOrderInline", CpkOrderInline);
+    registerModel("CpkBookInline", CpkBookInline);
+    const order = await CpkOrderInline.create({ shop_id: 99, id: 1, status: "open" });
+    await CpkBookInline.create({ author_id: 1, id: 1, shop_id: 99, order_id: 1, title: "Widget" });
+    // Change in memory but don't persist
+    (order as any).status = "closed";
+    // Loading association should still find books by persisted CPK
+    const books = await loadHasMany(order, "cpkBooksInline", {
+      foreignKey: ["shop_id", "order_id"],
+      className: "CpkBookInline",
+    });
+    expect(books.length).toBe(1);
   });
 });
