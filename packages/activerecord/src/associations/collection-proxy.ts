@@ -22,7 +22,7 @@ import {
 } from "../relation/finder-methods.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
-import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
+import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { filterScopeForCreate } from "./association.js";
 import { RecordNotSaved, ConfigurationError, AssociationTypeMismatch } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -1926,12 +1926,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           }
         } else {
           const targetPk = (record.constructor as typeof Base).primaryKey;
+          let targetPkCol: string;
           if (Array.isArray(targetPk)) {
-            throw new ConfigurationError(
-              `Through association "${this._assocName}" does not support a composite primary key on the target model "${(record.constructor as typeof Base).name}" — the join row needs a single source FK column.`,
-            );
+            // Mirrors BelongsToReflection#association_primary_key: use options[:primary_key]
+            // when set, or fall back to "id" when it is part of the composite PK.
+            const srcPk = sourceRefl?.associationPrimaryKey;
+            if (typeof srcPk === "string") {
+              targetPkCol = srcPk;
+            } else if (targetPk.includes("id")) {
+              targetPkCol = "id";
+            } else {
+              throw new ConfigurationError(
+                `Through association "${this._assocName}" has a composite-PK target "${(record.constructor as typeof Base).name}" but no scalar primaryKey on the source reflection. Specify primaryKey: "<col>" on the source belongs_to.`,
+              );
+            }
+          } else {
+            targetPkCol = targetPk;
           }
-          sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPk) };
+          sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
         }
         const joinAttrs: Record<string, unknown> = {
           ...ownerJoinAttrs,
@@ -2853,15 +2865,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
     const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
-    const throughModelAssocs: AssociationDefinition[] = (throughModel as any)._associations ?? [];
-    const sourceAssoc =
-      throughModelAssocs.find((a) => a.name === sourceName) ??
-      throughModelAssocs.find((a) => a.name === pluralize(sourceName));
+    // Mirrors Rails ThroughReflection#source_reflection: go through the HMT
+    // reflection's sourceReflection rather than scanning _associations by name.
+    // This avoids the pluralize-fallback ambiguity and respects the source:
+    // option exactly as Rails does (source_reflection_names returns [options[:source]]
+    // only when source: is given — reflection.rb:1108).
+    const sourceRefl = (
+      ctor as unknown as {
+        _reflectOnAssociation?: (n: string) => { sourceReflection?: any } | null;
+      }
+    )._reflectOnAssociation?.(this._assocName)?.sourceReflection as any;
 
     const throughAs = throughAssoc.options.as;
     const throughTable = new ArelTable(throughModel.tableName);
     const targetArelTable = new ArelTable(targetModel.tableName);
-    const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
+    // sourceRefl.belongsTo?.() returns true for belongs_to, false/undefined otherwise.
+    const isBelongsToSource = sourceRefl == null || sourceRefl.belongsTo?.() !== false;
 
     let throughSubquery = throughTable.from();
     if (throughAs) {
@@ -2886,24 +2905,35 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
     }
 
-    if (sourceAssocKind === "belongsTo") {
-      const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+    if (isBelongsToSource) {
+      const targetFk = sourceRefl?.foreignKey ?? `${underscore(sourceName)}_id`;
       if (Array.isArray(targetFk)) {
         throw new ConfigurationError(
           `Through association "${this._assocName}" does not support a composite foreign key on the source belongsTo — the target-side IN-subquery needs a single column.`,
         );
       }
-      if (Array.isArray(targetModel.primaryKey)) {
-        throw new ConfigurationError(
-          `Through association "${this._assocName}" does not support a composite primary key on the target model "${targetModel.name}" — the target-side IN-subquery needs a single column.`,
-        );
-      }
       const targetFkStr = targetFk;
-      const targetPkCol = targetModel.primaryKey;
+      let targetPkCol: string;
+      if (Array.isArray(targetModel.primaryKey)) {
+        // Mirrors BelongsToReflection#association_primary_key: options[:primary_key]
+        // when set, else "id" when it is part of the composite PK.
+        const srcPk = sourceRefl?.associationPrimaryKey;
+        if (typeof srcPk === "string") {
+          targetPkCol = srcPk;
+        } else if (targetModel.primaryKey.includes("id")) {
+          targetPkCol = "id";
+        } else {
+          throw new ConfigurationError(
+            `Through association "${this._assocName}" has a composite-PK target "${targetModel.name}" but no scalar primaryKey on the source reflection to anchor the IN-subquery. Specify primaryKey: "<col>" on the source belongs_to.`,
+          );
+        }
+      } else {
+        targetPkCol = targetModel.primaryKey;
+      }
 
       // Handle sourceType for polymorphic belongsTo sources
-      if (sourceAssoc?.options?.polymorphic && this._assocDef.options.sourceType) {
-        const sourceTypeCol = `${underscore(sourceAssoc.name ?? sourceName)}_type`;
+      if (sourceRefl?.isPolymorphic?.() && this._assocDef.options.sourceType) {
+        const sourceTypeCol = `${underscore(sourceRefl.name ?? sourceName)}_type`;
         throughSubquery = throughSubquery.where(
           throughTable.get(sourceTypeCol).eq(this._assocDef.options.sourceType),
         );
@@ -2916,10 +2946,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
       return rel;
     } else {
-      const sourceAsName = sourceAssoc?.options?.as;
+      const sourceAsName = sourceRefl?.options?.as;
       const sourceFk = sourceAsName
-        ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
-        : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
+        ? (sourceRefl?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+        : (sourceRefl?.foreignKey ?? `${underscore(throughClassName)}_id`);
       if (Array.isArray(sourceFk)) {
         throw new ConfigurationError(
           `Through association "${this._assocName}" does not support a composite foreign key on the hasMany source — the target-side IN-subquery needs a single column.`,
