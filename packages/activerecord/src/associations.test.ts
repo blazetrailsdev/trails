@@ -753,12 +753,16 @@ describe("PreloaderTest", () => {
     expect(loaded.length).toBe(Number(await Comment.where({ post_id: post.id }).count()));
   });
 
-  it("preload for hmt with conditions", async () => {
+  // STI filtering via className is not applied in ThroughAssociation preloader:
+  // both Category and SpecialCategory rows are returned instead of only SpecialCategory.
+  // Marked it.fails so the test is present and will auto-unmask when the gap is fixed.
+  it.fails("preload for hmt with conditions", async () => {
     const author = await Author.create({ name: "David" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    // hmtSpecialCategories: through categoryPosts → SpecialCategory (scoped whereNot name null).
-    // Only SpecialCategory rows are eligible (STI via className); linking a plain Category
-    // is not tested here because through-preloader STI filtering is tracked separately.
+    await CategoryPost.create({
+      category_id: (await Category.create({ name: "Normal" })).id,
+      post_id: post.id,
+    });
     const specialCat = await SpecialCategory.create({ name: "Special" });
     await CategoryPost.create({ category_id: specialCat.id, post_id: post.id });
     await new Preloader({ records: [post], associations: ["hmtSpecialCategories"] }).call();
