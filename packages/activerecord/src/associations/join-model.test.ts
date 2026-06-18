@@ -11,24 +11,39 @@ import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
 import { association, setHasOne, loadBelongsTo } from "../associations.js";
+import { AssociationTypeMismatch } from "../errors.js";
 import {
   HasManyThroughAssociationNotFoundError,
   HasManyThroughAssociationPolymorphicSourceError,
   HasManyThroughAssociationPolymorphicThroughError,
   EagerLoadPolymorphicError,
 } from "./errors.js";
-import { assertNoQueries } from "../testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
-import { Author } from "../test-helpers/models/author.js";
-import { Post, SpecialPost, SubAbstractStiPost } from "../test-helpers/models/post.js";
+import { Author, AuthorFavorite } from "../test-helpers/models/author.js";
+import {
+  Post,
+  SpecialPost,
+  SubAbstractStiPost,
+  StiPost,
+  SubStiPost,
+} from "../test-helpers/models/post.js";
 import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
 import { Item } from "../test-helpers/models/item.js";
+import { Book } from "../test-helpers/models/book.js";
+import { Citation } from "../test-helpers/models/citation.js";
+import { Vertex } from "../test-helpers/models/vertex.js";
+import { Edge } from "../test-helpers/models/edge.js";
+import { Rating } from "../test-helpers/models/rating.js";
+import { Aircraft } from "../test-helpers/models/aircraft.js";
+import { Engine } from "../test-helpers/models/engine.js";
+import { Car } from "../test-helpers/models/car.js";
 
 // Mirrors the dynamic subclasses built by Rails' `find_post_with_dependency`
 // helper: `Class.new(ActiveRecord::Base)` on the `posts` table carrying a
@@ -68,16 +83,20 @@ class PostWithHasOneNullify extends Base {
 describe("AssociationsJoinModelTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  const { authors, posts, categories, tags, taggings, comments, items } = useHandlerFixtures([
-    "authors",
-    "posts",
-    "categories",
-    "categorizations",
-    "tags",
-    "taggings",
-    "comments",
-    "items",
-  ]);
+  const { authors, posts, categories, tags, taggings, comments, items, books, vertices } =
+    useHandlerFixtures([
+      "authors",
+      "posts",
+      "categories",
+      "categorizations",
+      "tags",
+      "taggings",
+      "comments",
+      "items",
+      "books",
+      "vertices",
+      "authorFavorites",
+    ]);
   registerModel(Author);
   registerModel(Post);
   registerModel(Tag);
@@ -89,6 +108,17 @@ describe("AssociationsJoinModelTest", () => {
   registerModel(Item);
   registerModel(SpecialPost);
   registerModel(SubAbstractStiPost);
+  registerModel(StiPost);
+  registerModel(SubStiPost);
+  registerModel(AuthorFavorite);
+  registerModel(Book);
+  registerModel(Citation);
+  registerModel(Vertex);
+  registerModel(Edge);
+  registerModel(Rating);
+  registerModel(Aircraft);
+  registerModel(Engine);
+  registerModel(Car);
   registerModel(PostWithHasManyDeleteAll);
   registerModel(PostWithHasManyDestroy);
   registerModel(PostWithHasManyNullify);
@@ -632,5 +662,385 @@ describe("AssociationsJoinModelTest", () => {
       taggings("welcome_general").id,
       taggings("thinking_general").id,
     ]);
+  });
+
+  it("self referential has many through", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const mary = (await Author.find(authors("mary").id)) as Author;
+    expect(((await (david as any).favoriteAuthors.toArray()) as Base[]).map((a) => a.id)).toEqual([
+      mary.id,
+    ]);
+    expect(((await (mary as any).favoriteAuthors.toArray()) as Base[]).map((a) => a.id)).toEqual(
+      [],
+    );
+  });
+
+  it("add to self referential has many through", async () => {
+    const newAuthor = await Author.create({ name: "Bob" });
+    const david = (await Author.find(authors("david").id)) as Author;
+    await (david as any).authorFavorites.create({ favoriteAuthor: newAuthor });
+    await (david as any).reload();
+    const first = (await (david as any).favoriteAuthors.first()) as Base;
+    expect(first.id).toBe(newAuthor.id);
+  });
+
+  // DEFERRED (tracked: through-source-reflection-scope-not-merged): trails
+  // resolves the source reflection (Post.nonexistentComments) but drops its
+  // `where("comments.id < 0")` scope from the through query, so
+  // author.nonexistentComments returns all 11 of david's comments instead of 0.
+  // Un-skip once has_many :through merges the source reflection's scope.
+  it.skip("has many through uses conditions specified on the has many association", async () => {
+    const author = (await Author.first()) as Author;
+    expect(((await (author as any).comments.toArray()) as Base[]).length).toBeGreaterThan(0);
+    expect(((await (author as any).nonexistentComments.toArray()) as Base[]).length).toBe(0);
+  });
+
+  it("has many through uses correct attributes", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    const tag = (await (thinking as any).tags.findBy({ name: "General" })) as Base;
+    expect((tag as any).attributes.tag_id ?? null).toBeNull();
+  });
+
+  it("create associate when adding to has many through", async () => {
+    const postThinking = (await Post.find(posts("thinking").id)) as Post;
+    const count = await (postThinking as any).tags.count();
+    const push = await Tag.createBang({ name: "pushme" });
+    await (postThinking as any).tags.push(push);
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[]).every((t) => t instanceof Tag),
+    ).toBe(true);
+    expect(
+      ((await (postThinking as any).taggings.toArray()) as Base[]).every(
+        (t) => t instanceof Tagging,
+      ),
+    ).toBe(true);
+    await (postThinking as any).reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 1);
+    await (postThinking as any).tags.reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 1);
+
+    const foo = await (postThinking as any).tags.createBang({ name: "foo" });
+    expect(foo).toBeInstanceOf(Tag);
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[]).every((t) => t instanceof Tag),
+    ).toBe(true);
+    expect(
+      ((await (postThinking as any).taggings.toArray()) as Base[]).every(
+        (t) => t instanceof Tagging,
+      ),
+    ).toBe(true);
+    await (postThinking as any).reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 2);
+    await (postThinking as any).tags.reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 2);
+
+    await (postThinking as any).tags.concat(
+      await Tag.createBang({ name: "abc" }),
+      await Tag.createBang({ name: "def" }),
+    );
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[]).every((t) => t instanceof Tag),
+    ).toBe(true);
+    expect(
+      ((await (postThinking as any).taggings.toArray()) as Base[]).every(
+        (t) => t instanceof Tagging,
+      ),
+    ).toBe(true);
+    await (postThinking as any).reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 4);
+    await (postThinking as any).tags.reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 4);
+
+    // Raises if the wrong reflection name is used to set the Edge belongs_to
+    const vertex1 = (await Vertex.find(vertices("vertex_1").id)) as Vertex;
+    const vertex5 = (await Vertex.find(vertices("vertex_5").id)) as Vertex;
+    await (vertex1 as any).sinks.push(vertex5);
+  });
+
+  it("add to join table with no id", async () => {
+    const vertex1 = (await Vertex.find(vertices("vertex_1").id)) as Vertex;
+    const vertex5 = (await Vertex.find(vertices("vertex_5").id)) as Vertex;
+    await (vertex1 as any).sinks.push(vertex5);
+  });
+
+  // DEFERRED (tracked: join-model-create-through-sets-owner-fk): Book.references
+  // is a has_many :through citations with a belongs_to source (referenceOf).
+  // `book_awdr.references << book` creates no citation row (debug: zero
+  // citations with book1_id == awdr after push), so references.size stays 0.
+  // Same create-through-doesn't-persist-join root cause as the piggyback skip.
+  // Un-skip once create-through populates the join record.
+  it.skip("delete associate when deleting from has many through with nonstandard id", async () => {
+    const bookAwdr = (await Book.find(books("awdr").id)) as Book;
+    const count = await (bookAwdr as any).references.count();
+    const referencesBefore = ((await (bookAwdr as any).references.toArray()) as Base[]).map(
+      (r) => r.id,
+    );
+    const book = await Book.createBang({ name: "Getting Real" });
+    await (bookAwdr as any).references.push(book);
+    await (bookAwdr as any).references.reload();
+    expect(await (bookAwdr as any).references.size()).toBe(count + 1);
+
+    await (bookAwdr as any).references.delete(book);
+    expect(await (bookAwdr as any).references.size()).toBe(count);
+    await (bookAwdr as any).references.reload();
+    expect(await (bookAwdr as any).references.size()).toBe(count);
+    expect(
+      ((await (bookAwdr as any).references.toArray()) as Base[]).map((r) => r.id).sort(),
+    ).toEqual([...referencesBefore].sort());
+  });
+
+  it("delete associate when deleting from has many through", async () => {
+    const postThinking = (await Post.find(posts("thinking").id)) as Post;
+    const count = await (postThinking as any).tags.count();
+    const tagsBefore = ((await (postThinking as any).tags.toArray()) as Base[])
+      .map((t) => Number(t.id))
+      .sort((a, b) => a - b);
+    const tag = await Tag.createBang({ name: "doomed" });
+    await (postThinking as any).tags.push(tag);
+    await (postThinking as any).taggings.reload();
+    expect(await (postThinking as any).taggings.size()).toBe(count + 1);
+    await (postThinking as any).reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 1);
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[])
+        .map((t) => Number(t.id))
+        .sort((a, b) => a - b),
+    ).not.toEqual(tagsBefore);
+
+    await (postThinking as any).tags.delete(tag);
+    expect(await (postThinking as any).tags.size()).toBe(count);
+    await (postThinking as any).tags.reload();
+    expect(await (postThinking as any).tags.size()).toBe(count);
+    await (postThinking as any).taggings.reload();
+    expect(await (postThinking as any).taggings.size()).toBe(count);
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[])
+        .map((t) => Number(t.id))
+        .sort((a, b) => a - b),
+    ).toEqual(tagsBefore);
+  });
+
+  it("delete associate when deleting from has many through with multiple tags", async () => {
+    const postThinking = (await Post.find(posts("thinking").id)) as Post;
+    const count = await (postThinking as any).tags.count();
+    const tagsBefore = ((await (postThinking as any).tags.toArray()) as Base[])
+      .map((t) => Number(t.id))
+      .sort((a, b) => a - b);
+    const doomed = await Tag.createBang({ name: "doomed" });
+    const doomed2 = await Tag.createBang({ name: "doomed2" });
+    const quaked = await Tag.createBang({ name: "quaked" });
+    await (postThinking as any).tags.concat(doomed, doomed2);
+    await (postThinking as any).reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 2);
+
+    await (postThinking as any).tags.delete(doomed, doomed2, quaked);
+    expect(await (postThinking as any).tags.size()).toBe(count);
+    await (postThinking as any).tags.reload();
+    expect(await (postThinking as any).tags.size()).toBe(count);
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[])
+        .map((t) => Number(t.id))
+        .sort((a, b) => a - b),
+    ).toEqual(tagsBefore);
+  });
+
+  it("adding junk to has many through should raise type mismatch", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    await expect((thinking as any).tags.push("Uhh what now?")).rejects.toThrow(
+      AssociationTypeMismatch,
+    );
+  });
+
+  it("deleting junk from has many through should raise type mismatch", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    await expect((thinking as any).tags.delete({})).rejects.toThrow(AssociationTypeMismatch);
+  });
+
+  it("deleting by integer id from has many through", async () => {
+    const post = (await Post.find(posts("thinking").id)) as Post;
+    const before = await (post as any).tags.count();
+    const deleted = (await (post as any).tags.delete(tags("general").id)) as Base[];
+    expect(deleted.length).toBe(1);
+    expect(await (post as any).tags.count()).toBe(before - 1);
+    expect(await (post as any).tags.size()).toBe(0);
+  });
+
+  it("deleting by string id from has many through", async () => {
+    const post = (await Post.find(posts("thinking").id)) as Post;
+    const before = await (post as any).tags.count();
+    const deleted = (await (post as any).tags.delete(String(tags("general").id))) as Base[];
+    expect(deleted.length).toBe(1);
+    expect(await (post as any).tags.count()).toBe(before - 1);
+    expect(await (post as any).tags.size()).toBe(0);
+  });
+
+  it("has many through has many with sti", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const specialComments = (await (david as any).specialPostComments.toArray()) as Base[];
+    expect(specialComments.map((c) => c.id)).toEqual([comments("does_it_hurt").id]);
+  });
+
+  it("distinct has many through should retain order", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const commentIds = ((await (david as any).comments.toArray()) as Base[]).map((c) =>
+      Number(c.id),
+    );
+    const asc = ((await (david as any).orderedUniqComments.toArray()) as Base[]).map((c) =>
+      Number(c.id),
+    );
+    const desc = ((await (david as any).orderedUniqCommentsDesc.toArray()) as Base[]).map((c) =>
+      Number(c.id),
+    );
+    expect(asc).toEqual([...commentIds].sort((a, b) => a - b));
+    expect(desc).toEqual([...commentIds].sort((a, b) => b - a));
+  });
+
+  it("polymorphic has many", async () => {
+    const expected = taggings("welcome_general");
+    const p = (await Post.includes("taggings").find(posts("welcome").id)) as Post;
+    await assertNoQueries(false, async () => {
+      const target = (p as any).association("taggings").target as Base[];
+      expect(target.map((t) => t.id)).toContain(expected.id);
+    });
+    const welcome = (await Post.find(posts("welcome").id)) as Post;
+    expect(((await (welcome as any).taggings.toArray()) as Base[]).map((t) => t.id)).toContain(
+      taggings("welcome_general").id,
+    );
+  });
+
+  it("polymorphic has one", async () => {
+    const expected = (await Post.find(posts("welcome").id)) as Post;
+    const tagging = (await Tagging.includes("taggable").find(
+      taggings("welcome_general").id,
+    )) as Tagging;
+    await assertNoQueries(false, async () => {
+      const taggable = (tagging as any).association("taggable").target as Base;
+      expect(taggable.id).toBe(expected.id);
+    });
+  });
+
+  it("polymorphic belongs to", async () => {
+    const p = (await Post.includes({ taggings: "taggable" }).find(posts("welcome").id)) as Post;
+    await assertNoQueries(false, async () => {
+      const firstTagging = ((p as any).association("taggings").target as Base[])[0];
+      const taggable = (firstTagging as any).association("taggable").target as Base;
+      expect(taggable.id).toBe(posts("welcome").id);
+    });
+  });
+
+  it("preload polymorph many types", async () => {
+    // Rails relies on implicit fixture-insertion order so taggings[0]/[1] are
+    // the two Post taggables; pin `taggings.id` so first/second resolve to
+    // non-nil taggables on PG/MySQL too (heap order isn't guaranteed there).
+    const taggingList = (await Tagging.where("taggable_type != ?", "FakeModel")
+      .includes("taggable")
+      .order("taggings.id")
+      .toArray()) as Base[];
+    await assertNoQueries(false, async () => {
+      void ((taggingList[0] as any).association("taggable").target as Base).id;
+      void ((taggingList[1] as any).association("taggable").target as Base).id;
+    });
+
+    const taggables = taggingList.map(
+      (t) => (t as any).association("taggable").target as Base | null,
+    );
+    const taggableIds = taggables.filter((t): t is Base => t !== null).map((t) => `${t.id}`);
+    expect(taggableIds).toContain(`${items("dvd").id}`);
+    expect(taggableIds).toContain(`${posts("welcome").id}`);
+  });
+
+  it("preload nil polymorphic belongs to", async () => {
+    let error: unknown;
+    try {
+      await Tagging.where("taggable_type IS NULL").includes("taggable").toArray();
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeUndefined();
+  });
+
+  it("preload polymorphic has many", async () => {
+    const allPosts = (await Post.all().order("posts.id").toArray()) as Base[];
+    const postsWithTaggings = (await Post.all()
+      .includes("taggings")
+      .order("posts.id")
+      .toArray()) as Base[];
+    expect(postsWithTaggings.length).toBe(allPosts.length);
+    for (let i = 0; i < allPosts.length; i++) {
+      const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
+      await assertNoQueries(false, async () => {
+        const assoc = (postsWithTaggings[i] as any).association("taggings");
+        expect((assoc.target as Base[]).length).toBe(expected);
+      });
+    }
+  });
+
+  it("belongs to shared parent", async () => {
+    const commentList = (await Comment.where(`post_id = ${posts("welcome").id}`)
+      .includes("post")
+      .toArray()) as Base[];
+    await assertNoQueries(false, async () => {
+      const p0 = (commentList[0] as any).association("post").target as Base;
+      const p1 = (commentList[1] as any).association("post").target as Base;
+      expect(p0.id).toBe(p1.id);
+    });
+  });
+
+  it("has many through include uses array include after loaded", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    await (david as any).categories.loadTarget();
+    const category = ((david as any).categories.target as Base[])[0];
+    await assertNoQueries(false, async () => {
+      expect((david as any).categories.loaded).toBe(true);
+      expect(await (david as any).categories.isInclude(category)).toBe(true);
+    });
+  });
+
+  it("has many through include checks if record exists if target not loaded", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const category = (await (david as any).categories.first()) as Base;
+
+    await (david as any).reload();
+    expect((david as any).categories.loaded).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await (david as any).categories.isInclude(category)).toBe(true);
+    });
+    expect((david as any).categories.loaded).toBe(false);
+  });
+
+  it("has many through include returns false for non matching record to verify scoping", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const category = await Category.createBang({ name: "Not Associated" });
+    expect((david as any).categories.loaded).toBe(false);
+    expect(await (david as any).categories.isInclude(category)).toBe(false);
+  });
+
+  it("has many with pluralize table names false", async () => {
+    const aircraft = await Aircraft.createBang({ name: "Airbus 380" });
+    const engine = await Engine.createBang({ car_id: aircraft.id });
+    expect(((await (aircraft as any).engines.toArray()) as Base[]).map((e) => e.id)).toEqual([
+      engine.id,
+    ]);
+  });
+
+  it("has many through goes through all sti classes", async () => {
+    const subStiPost = await SubStiPost.createBang({
+      title: "test",
+      body: "test",
+      author_id: authors("david").id,
+    });
+    const newComment = await (subStiPost as any).comments.create({ body: "test" });
+    const david = (await Author.find(authors("david").id)) as Author;
+    const ids = ((await (david as any).stiPostComments.toArray()) as Base[])
+      .map((c) => Number(c.id))
+      .sort((a, b) => a - b);
+    expect(ids).toEqual(
+      [
+        Number(comments("check_eager_sti_on_associations").id),
+        Number(comments("check_eager_sti_on_associations2").id),
+        Number(comments("recursive_association_comment").id),
+        Number(newComment.id),
+      ].sort((a, b) => a - b),
+    );
   });
 });
