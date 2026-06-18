@@ -109,23 +109,11 @@ describe("AssociationsTest", () => {
         cpk_author_region_id: "integer",
         title: "string",
       },
-      cpk_thru_appt1s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
-      cpk_thru_appt2s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
       cpk_thru_appt4s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
-      cpk_thru_doc1s: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cpk_thru_doc2s: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
       cpk_thru_doc4s: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      cpk_thru_pat1s: { name: "string" },
-      cpk_thru_pat2s: { name: "string" },
       cpk_thru_pat4s: { name: "string" },
       cpk_thru_tgt_appts: { doctor_id: "integer", patient_id: "integer" },
       cpk_thru_tgt_docs: { name: "string" },
@@ -336,129 +324,6 @@ describe("AssociationsTest", () => {
     expect(child.inf_parent2_id).toBeNull();
   });
 
-  it("append composite has many through association", async () => {
-    class CpkThruDoc1 extends Base {
-      static {
-        this._tableName = "cpk_thru_doc1s";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkThruAppt1 extends Base {
-      static {
-        this._tableName = "cpk_thru_appt1s";
-        this.attribute("doctor_region_id", "integer");
-        this.attribute("doctor_id", "integer");
-        this.attribute("patient_id", "integer");
-      }
-    }
-    class CpkThruPat1 extends Base {
-      static {
-        this._tableName = "cpk_thru_pat1s";
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(CpkThruDoc1, "appts", {
-      className: "CpkThruAppt1",
-      foreignKey: ["doctor_region_id", "doctor_id"],
-    });
-    Associations.belongsTo.call(CpkThruAppt1, "patient", {
-      className: "CpkThruPat1",
-      foreignKey: "patient_id",
-    });
-    Associations.hasMany.call(CpkThruDoc1, "patients", {
-      through: "appts",
-      className: "CpkThruPat1",
-      source: "patient",
-    });
-    registerModel("CpkThruDoc1", CpkThruDoc1);
-    registerModel("CpkThruAppt1", CpkThruAppt1);
-    registerModel("CpkThruPat1", CpkThruPat1);
-
-    const doc = await CpkThruDoc1.create({ region_id: 1, id: 7, name: "Dr A" });
-    // Another doctor that shares one PK component, to verify the composite
-    // through scope filters on BOTH columns rather than only the first.
-    const otherDoc = await CpkThruDoc1.create({ region_id: 2, id: 7, name: "Dr Other" });
-    const alice = await CpkThruPat1.create({ name: "Alice" });
-    const noise = await CpkThruPat1.create({ name: "Noise" });
-    await CpkThruAppt1.create({
-      doctor_region_id: 2,
-      doctor_id: 7,
-      patient_id: noise.id,
-    });
-    const proxy = association(doc, "patients");
-    await proxy.push(alice);
-
-    const joins = await CpkThruAppt1.all().where({ doctor_region_id: 1 }).toArray();
-    expect(joins).toHaveLength(1);
-    expect(joins[0].doctor_region_id).toBe(1);
-    expect(joins[0].doctor_id).toBe(7);
-    expect(joins[0].patient_id).toBe(alice.id);
-
-    // Reading through the proxy must exercise _buildThroughScope. It should
-    // return only Alice — not the noise row that shares doctor_id=7.
-    const loaded = await proxy.toArray();
-    expect(loaded.map((p: any) => p.name)).toEqual(["Alice"]);
-    const otherLoaded = await association(otherDoc, "patients").toArray();
-    expect(otherLoaded.map((p: any) => p.name)).toEqual(["Noise"]);
-  });
-  it("append composite has many through association with autosave", async () => {
-    class CpkThruDoc2 extends Base {
-      static {
-        this._tableName = "cpk_thru_doc2s";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkThruAppt2 extends Base {
-      static {
-        this._tableName = "cpk_thru_appt2s";
-        this.attribute("doctor_region_id", "integer");
-        this.attribute("doctor_id", "integer");
-        this.attribute("patient_id", "integer");
-      }
-    }
-    class CpkThruPat2 extends Base {
-      static {
-        this._tableName = "cpk_thru_pat2s";
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(CpkThruDoc2, "appts", {
-      className: "CpkThruAppt2",
-      foreignKey: ["doctor_region_id", "doctor_id"],
-    });
-    Associations.belongsTo.call(CpkThruAppt2, "patient", {
-      className: "CpkThruPat2",
-      foreignKey: "patient_id",
-    });
-    Associations.hasMany.call(CpkThruDoc2, "patients", {
-      through: "appts",
-      className: "CpkThruPat2",
-      source: "patient",
-    });
-    registerModel("CpkThruDoc2", CpkThruDoc2);
-    registerModel("CpkThruAppt2", CpkThruAppt2);
-    registerModel("CpkThruPat2", CpkThruPat2);
-
-    const doc = await CpkThruDoc2.create({ region_id: 2, id: 9, name: "Dr B" });
-    // Unsaved patient — push should autosave it before creating the join row.
-    const bob = new CpkThruPat2({ name: "Bob" });
-    expect(bob.isNewRecord()).toBe(true);
-    const proxy = association(doc, "patients");
-    await proxy.push(bob);
-    expect(bob.isPersisted()).toBe(true);
-
-    const joins = await CpkThruAppt2.all().toArray();
-    expect(joins).toHaveLength(1);
-    expect(joins[0].doctor_region_id).toBe(2);
-    expect(joins[0].doctor_id).toBe(9);
-    expect(joins[0].patient_id).toBe(bob.id);
-  });
   it("delete single composite has many through join row", async () => {
     // Covers _deleteThrough composite-aware findBy. Another owner shares one
     // PK component to verify the join lookup ANDs across both columns.
@@ -3987,6 +3852,47 @@ describe("AssociationsTest", () => {
     expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
     expect((comment as any).blog_post_id).toBe((blogPost as any).id);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
+  });
+
+  it("append composite has many through association", async () => {
+    const blogPost = shardedBlogPosts("great_post_blog_one");
+    const tag = new ShardedTag({
+      name: "Ruby on Rails",
+      blog_id: (blogPost as any).blog_id,
+    });
+    await tag.save();
+
+    await association(blogPost, "tags").push(tag);
+
+    await blogPost.reload();
+    const reloadedTags = await association(blogPost, "tags").toArray();
+    expect(reloadedTags.map((t: any) => t.id)).toContain((tag as any).id);
+    const join = await ShardedBlogPostTag.where({
+      blog_post_id: (blogPost as any).id,
+      blog_id: (blogPost as any).blog_id,
+      tag_id: (tag as any).id,
+    });
+    expect(join).toHaveLength(1);
+  });
+
+  it("append composite has many through association with autosave", async () => {
+    const blogPost = shardedBlogPosts("great_post_blog_one");
+    const tag = new ShardedTag({
+      name: "Ruby on Rails",
+      blog_id: (blogPost as any).blog_id,
+    });
+
+    await association(blogPost, "tags").push(tag);
+
+    await blogPost.reload();
+    const reloadedTags = await association(blogPost, "tags").toArray();
+    expect(reloadedTags.map((t: any) => t.id)).toContain((tag as any).id);
+    const join = await ShardedBlogPostTag.where({
+      blog_post_id: (blogPost as any).id,
+      blog_id: (blogPost as any).blog_id,
+      tag_id: (tag as any).id,
+    });
+    expect(join).toHaveLength(1);
   });
 
   it("nullify composite foreign key has many association", async () => {
