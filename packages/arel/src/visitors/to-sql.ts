@@ -1282,9 +1282,6 @@ export class ToSql extends Visitor {
     if (!(node as { retryableFlag?: boolean }).retryableFlag) {
       collector.retryable = false;
     }
-    // Mirrors to_sql.rb:764-767: plain SqlLiteral is non-preparable.
-    // where("col = ?", val) now creates BoundSqlLiteral (which stays preparable).
-    collector.preparable = false;
     collector.append(node.value);
     return collector;
   }
@@ -1705,13 +1702,13 @@ export class ToSql extends Visitor {
    *
    * Mirrors: Rails' compilation with Arel::Collectors::Composite
    */
-  compileWithBinds(node: Node): [string, unknown[], boolean, boolean] {
+  compileWithBinds(node: Node): [string, unknown[], boolean] {
     const sqlCollector = new SQLString();
     const bindCollector = new Bind();
     const composite = new Composite(sqlCollector, bindCollector);
     this.visit(node, composite as unknown as SQLString);
     const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
-    return [sqlCollector.value, binds, sqlCollector.retryable, composite.preparable];
+    return [sqlCollector.value, binds, sqlCollector.retryable];
   }
 
   protected emitOptimizerHints(node: Nodes.SelectCore, collector: SQLString): void {
@@ -1786,15 +1783,10 @@ export class ToSql extends Visitor {
     if (value instanceof Node) {
       this.visit(value, collector);
     } else if (Array.isArray(value)) {
-      // Mirrors to_sql.rb:777-782: empty array → NULL (IN () is invalid SQL).
-      if (value.length === 0) {
-        collector.append("NULL");
-      } else {
-        value.forEach((v, i) => {
-          if (i > 0) collector.append(", ");
-          this.visitBindValue(v, collector);
-        });
-      }
+      value.forEach((v, i) => {
+        if (i > 0) collector.append(", ");
+        this.visitBindValue(v, collector);
+      });
     } else {
       collector.append(this.quote(value));
     }

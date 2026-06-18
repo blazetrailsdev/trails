@@ -884,23 +884,28 @@ export function buildWhereClause(
     const isNamedBinds =
       rest.length === 1 && isPlainObject(firstBind) && hasNamedToken && !hasPositional;
 
+    let sql: string;
     if (isNamedBinds) {
-      // Mirrors build_named_bound_sql_literal (query_methods.rb:1702-1717).
-      const rawNamed = firstBind as Record<string, unknown>;
-      const mc = (this as any)._modelClass;
-      const namedBinds = Object.fromEntries(
-        Object.entries(rawNamed).map(([k, v]) => [k, normalizeBoundValue(v, mc)]),
-      );
-      const node = new Nodes.Grouping(new Nodes.BoundSqlLiteral(opts, [], namedBinds));
-      return new WhereClause([node]);
+      sql = opts;
+      const namedBinds = firstBind as Record<string, unknown>;
+      const adapter = connectionFor((this as any)._modelClass);
+      for (const [name, value] of Object.entries(namedBinds)) {
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const replacement = Array.isArray(value)
+          ? value.map((v) => adapter.quote(v)).join(", ")
+          : adapter.quote(value);
+        // Named-bind substitution on a user-supplied SQL fragment, not an arel
+        // AST — mirrors Rails `sanitize_sql` → `replace_named_bind_variables`
+        // (sanitization.rb), which likewise `gsub`s `:name` tokens with quoted
+        // values. There is no AST to build here; the fragment is opaque text.
+        // eslint-disable-next-line blazetrails/no-raw-sql
+        sql = sql.replace(new RegExp(`(?<!:):${escaped}\\b`, "g"), () => replacement);
+      }
     } else if (rest.length > 0) {
-      // Route through buildBoundSqlLiteral for Rails-faithful normalization:
-      // Arel nodes → SQL strings, id_for_database records → their id.
-      // Empty arrays are left as-is; visitBindValue renders them as NULL.
-      const node = new Nodes.Grouping(buildBoundSqlLiteral.call(this, opts, rest));
-      return new WhereClause([node]);
+      sql = this._modelClass.sanitizeSqlArray(opts, ...rest);
+    } else {
+      sql = opts;
     }
-    const sql = opts;
     return new WhereClause(sql.trim() ? [new Nodes.SqlLiteral(sql)] : []);
   }
 
@@ -1662,45 +1667,17 @@ export function buildBoundSqlLiteral(
   statement: string,
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
-  // Mirrors build_bound_sql_literal (query_methods.rb:1682-1697).
-  // castBoundValue is applied here (positional path) to match sanitizeSqlArray's
-  // cast step — e.g. MySQL/MariaDB converts integers to strings before quoting.
-  // Named-bind path skips castBoundValue (old adapter.quote() path did not cast).
-  const conn = this._modelClass.connection as { castBoundValue?(v: unknown): unknown };
-  const cast = conn.castBoundValue?.bind(conn);
-  const positionalBinds = values.map((v) => normalizeBoundValue(v, this._modelClass, cast));
+  const positionalBinds = values.map((value) => {
+    if (value instanceof Nodes.Node) {
+      return arelSql(this._modelClass.connection.toSql(value));
+    }
+    return value;
+  });
   try {
-    return new Nodes.BoundSqlLiteral(statement, positionalBinds, {});
+    return new Nodes.BoundSqlLiteral(`(${statement})`, positionalBinds, {});
   } catch (e: any) {
     throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
   }
-}
-
-function normalizeBoundValue(
-  value: unknown,
-  modelClass: QueryMethodsHost["_modelClass"],
-  castBoundValue?: (v: unknown) => unknown,
-): unknown {
-  if (value instanceof Nodes.Node) {
-    return arelSql(modelClass.connection.toSql(value));
-  }
-  // Mirrors build_bound_sql_literal's Array branch (query_methods.rb:1689-1694):
-  // map each element so model records in arrays are unwrapped to their db id.
-  if (Array.isArray(value)) {
-    return value.map((v) => normalizeBoundValue(v, modelClass, castBoundValue));
-  }
-  if (
-    value !== null &&
-    typeof value === "object" &&
-    typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
-  ) {
-    return normalizeBoundValue(
-      (value as { idForDatabase(): unknown }).idForDatabase(),
-      modelClass,
-      castBoundValue,
-    );
-  }
-  return castBoundValue ? castBoundValue(value) : value;
 }
 
 /** @internal */

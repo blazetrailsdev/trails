@@ -22,18 +22,12 @@ export async function findBySql<T extends typeof Base>(
   binds: unknown[] = [],
   // Rails' allow_retry: keyword defaults false, so a nil/absent value is the
   // default. We accept null/undefined for the same reason and coalesce below.
-  opts:
-    | { allowRetry?: boolean; preparable?: boolean | null }
-    | ((record: InstanceType<T>) => void)
-    | null = {},
+  opts: { allowRetry?: boolean } | ((record: InstanceType<T>) => void) | null = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
   const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
   const resolvedBlock = typeof opts === "function" ? opts : block;
-  const rows = await _queryBySql.call(this, sql, binds, {
-    allowRetry: resolvedOpts.allowRetry,
-    preparable: resolvedOpts.preparable,
-  });
+  const rows = await _queryBySql.call(this, sql, binds, { allowRetry: resolvedOpts.allowRetry });
   return _loadFromSql.call<T, [Record<string, unknown>[], typeof resolvedBlock], InstanceType<T>[]>(
     this,
     rows,
@@ -49,10 +43,7 @@ export async function asyncFindBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  opts:
-    | { allowRetry?: boolean; preparable?: boolean | null }
-    | ((record: InstanceType<T>) => void)
-    | null = {},
+  opts: { allowRetry?: boolean } | ((record: InstanceType<T>) => void) | null = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
   return findBySql.call<T, Parameters<typeof findBySql<T>>, Promise<InstanceType<T>[]>>(
@@ -105,16 +96,9 @@ export async function _queryBySql(
   // Rails: connection.select_all(sanitize_sql(sql), "#{name} Load", binds, allow_retry:)
   const resolvedSql = Array.isArray(sql) ? (this.sanitizeSql(sql) ?? "") : sql;
   const resolvedBinds = Array.isArray(sql) ? [] : binds;
-  const selectOpts: { allowRetry: boolean; preparable?: boolean | null } = {
+  const result = await this.connection.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, {
     allowRetry: opts.allowRetry ?? false,
-  };
-  if (opts.preparable != null) selectOpts.preparable = opts.preparable;
-  const result = await this.connection.selectAll(
-    resolvedSql,
-    `${this.name} Load`,
-    resolvedBinds,
-    selectOpts,
-  );
+  });
   return result.toArray();
 }
 

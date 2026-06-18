@@ -250,11 +250,11 @@ export class StatementCache {
     // find_by_sql the array is empty and the unprepared query log carries no
     // bind payload. (Our sqlFor copies the array, so we drop it explicitly.)
     if (this._queryBuilder instanceof PartialQuery) {
-      return this._model.findBySql(sql, [], { allowRetry, preparable: true });
+      return this._model.findBySql(sql, [], { allowRetry });
     }
     // Type-cast bind objects to primitives for the adapter
     const castedBinds = bindValues.map((b) => (b instanceof Attribute ? b.valueForDatabase : b));
-    return this._model.findBySql(sql, castedBinds, { allowRetry, preparable: true });
+    return this._model.findBySql(sql, castedBinds, { allowRetry });
   }
 
   /**
