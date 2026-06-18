@@ -2910,9 +2910,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (Array.isArray(targetModel.primaryKey)) {
         // Mirrors BelongsToReflection#association_primary_key: options[:primary_key]
         // when set, else "id" when it is part of the composite PK.
-        const sourceReflHere =
-          (throughModel as any)._reflectOnAssociation?.(sourceName) ??
-          (throughModel as any)._reflectOnAssociation?.(pluralize(sourceName));
+        const sourceReflHere = (
+          ctor as unknown as {
+            _reflectOnAssociation?: (n: string) => {
+              sourceReflection?: { associationPrimaryKey?: string | string[] };
+            } | null;
+          }
+        )._reflectOnAssociation?.(this._assocName)?.sourceReflection;
         const srcPk = (sourceReflHere as any)?.associationPrimaryKey;
         if (typeof srcPk === "string") {
           targetPkCol = srcPk;
