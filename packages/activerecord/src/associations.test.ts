@@ -696,7 +696,6 @@ describe("PreloaderTest", () => {
   });
 
   beforeEach(() => {
-    if (!Author) return;
     registerModel("Author", Author);
     registerModel("Post", Post);
     registerModel("CategoryPost", CategoryPost);
@@ -746,6 +745,9 @@ describe("PreloaderTest", () => {
     const author = await Author.create({ name: "David" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
     await Comment.create({ post_id: post.id, body: "A new comment" });
+    // Preload once (mirrors Rails' post.comments.create! which loads the association)
+    await new Preloader({ records: [post], associations: ["comments"] }).call();
+    // Preload again on the same record — a naive concat-on-top would double the count
     await new Preloader({ records: [post], associations: ["comments"] }).call();
     const loaded = (post as any)._preloadedAssociations.get("comments");
     expect(loaded.length).toBe(Number(await Comment.where({ post_id: post.id }).count()));
