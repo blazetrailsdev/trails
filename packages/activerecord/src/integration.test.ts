@@ -1,22 +1,24 @@
+// vendor/rails/activerecord/test/cases/integration_test.rb
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { describe, it, expect } from "vitest";
+import { CachedDeveloper, Developer } from "./test-helpers/models/developer.js";
+import { Client, Firm } from "./test-helpers/models/company.js";
+import { Owner } from "./test-helpers/models/owner.js";
+import { Pet } from "./test-helpers/models/pet.js";
+import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
+import { registerModel } from "./associations.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { withTimezoneConfig } from "./test-helper.js";
 
-function withCacheVersioning(klass: typeof Base, fn: () => void) {
-  const original = klass.cacheVersioning;
-  klass.cacheVersioning = true;
-  try {
-    fn();
-  } finally {
-    klass.cacheVersioning = original;
-  }
-}
+// Pet `belongs_to :owner, touch: true` resolves Owner through the association
+// registry when touched.
+registerModel(Owner);
+registerModel(Pet);
 
-function expectedUsec(ts: Temporal.Instant): string {
+// Rails' `Time#to_fs(:usec)` → "YYYYMMDDHHMMSSuuuuuu" (20 chars) and
+// `:number` → "YYYYMMDDHHMMSS" (14 chars). Mirrors `dev.updated_at.utc.to_fs(...)`.
+function toFs(ts: unknown, fmt: "usec" | "number"): string {
+  if (!(ts instanceof Temporal.Instant)) throw new Error("expected an Instant");
   const dt = ts.toZonedDateTimeISO("UTC");
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
@@ -24,491 +26,278 @@ function expectedUsec(ts: Temporal.Instant): string {
   const h = dt.hour.toString().padStart(2, "0");
   const mi = dt.minute.toString().padStart(2, "0");
   const s = dt.second.toString().padStart(2, "0");
+  const head = `${y}${mo}${day}${h}${mi}${s}`;
+  if (fmt === "number") return head;
   const us = (dt.millisecond * 1000 + dt.microsecond).toString().padStart(6, "0");
-  return `${y}${mo}${day}${h}${mi}${s}${us}`;
+  return `${head}${us}`;
 }
 
-const TEST_SCHEMA = {
-  clients: { name: "string" },
-  firms: { name: "text" },
-  developers: { name: "string", updated_at: "string", updated_on: "string" },
-  cached_developers: { name: "string", updated_at: "string" },
-} as const;
-
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+// Rails' IntegrationTest#with_cache_versioning helper.
+async function withCacheVersioning(fn: () => Promise<void> | void): Promise<void> {
+  const original = Developer.cacheVersioning;
+  Developer.cacheVersioning = true;
+  try {
+    await fn();
+  } finally {
+    Developer.cacheVersioning = original;
+  }
+}
 
 describe("IntegrationTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  const { owners, pets } = useHandlerFixtures(["companies", "developers", "owners", "pets"]);
 
   it("to param should return string", async () => {
-    class Client extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const record = await Client.create({ name: "Alice" });
-    expect(typeof record.toParam()).toBe("string");
+    expect(typeof (await Client.first())!.toParam()).toBe("string");
   });
 
   it("to param returns nil if not persisted", () => {
-    class Client extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(new Client().toParam()).toBeNull();
+    const client = new Client();
+    expect(client.toParam()).toBeNull();
   });
 
   it("to param returns id if not persisted but id is set", () => {
-    class Client extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const c = new Client();
-    c.writeAttribute("id", 1);
-    expect(c.toParam()).toBe("1");
+    const client = new Client();
+    client.writeAttribute("id", 1);
+    expect(client.toParam()).toBe("1");
   });
 
   it("to param class method", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "Flamboyant Software" });
-    expect(firm.toParam()).toBe(`${firm.id}-flamboyant-software`);
+    const firm = await Firm.find(4);
+    expect(firm.toParam()).toBe("4-flamboyant-software");
   });
 
   it("to param class method truncates words properly", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "Flamboyant Software, Inc." });
-    expect(firm.toParam()).toBe(`${firm.id}-flamboyant-software`);
+    const firm = await Firm.find(4);
+    // Rails `firm.name << ", Inc."` — append to the existing fixture name.
+    firm.name = (firm.readAttribute("name") as string) + ", Inc.";
+    expect(firm.toParam()).toBe("4-flamboyant-software");
   });
 
   it("to param class method truncates after parameterize", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "Huey, Dewey, & Louie LLC" });
-    expect(firm.toParam()).toBe(`${firm.id}-huey-dewey-louie-llc`);
+    const firm = await Firm.find(4);
+    firm.name = "Huey, Dewey, & Louie LLC";
+    expect(firm.toParam()).toBe("4-huey-dewey-louie-llc");
   });
 
   it("to param class method truncates after parameterize with hyphens", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "Door-to-Door Wash-n-Fold Service" });
-    expect(firm.toParam()).toBe(`${firm.id}-door-to-door-wash-n`);
+    const firm = await Firm.find(4);
+    firm.name = "Door-to-Door Wash-n-Fold Service";
+    expect(firm.toParam()).toBe("4-door-to-door-wash-n");
   });
 
   it("to param class method truncates", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "a ".repeat(100) });
-    expect(firm.toParam()).toBe(`${firm.id}-a-a-a-a-a-a-a-a-a-a`);
+    const firm = await Firm.find(4);
+    firm.name = "a ".repeat(100);
+    expect(firm.toParam()).toBe("4-a-a-a-a-a-a-a-a-a-a");
   });
 
   it("to param class method truncates edge case", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "David HeinemeierHansson" });
-    expect(firm.toParam()).toBe(`${firm.id}-david`);
+    const firm = await Firm.find(4);
+    firm.name = "David HeinemeierHansson";
+    expect(firm.toParam()).toBe("4-david");
   });
 
   it("to param class method truncates case shown in doc", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "David Heinemeier Hansson" });
-    expect(firm.toParam()).toBe(`${firm.id}-david-heinemeier`);
+    const firm = await Firm.find(4);
+    firm.name = "David Heinemeier Hansson";
+    expect(firm.toParam()).toBe("4-david-heinemeier");
   });
 
   it("to param class method squishes", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "ab \n".repeat(100) });
-    expect(firm.toParam()).toBe(`${firm.id}-ab-ab-ab-ab-ab-ab-ab`);
+    const firm = await Firm.find(4);
+    firm.name = "ab \n".repeat(100);
+    expect(firm.toParam()).toBe("4-ab-ab-ab-ab-ab-ab-ab");
   });
 
   it("to param class method multibyte character", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({ name: "戦場ヶ原 ひたぎ" });
-    expect(firm.toParam()).toBe(`${firm.id}`);
+    const firm = await Firm.find(4);
+    firm.name = "戦場ヶ原 ひたぎ";
+    expect(firm.toParam()).toBe("4");
   });
 
   it("to param class method uses default if blank", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = await Firm.create({});
-    expect(firm.toParam()).toBe(`${firm.id}`);
-    firm.writeAttribute("name", " ");
-    expect(firm.toParam()).toBe(`${firm.id}`);
+    const firm = await Firm.find(4);
+    firm.writeAttribute("name", null);
+    expect(firm.toParam()).toBe("4");
+    firm.name = " ";
+    expect(firm.toParam()).toBe("4");
   });
 
   it("to param class method uses default if not persisted", () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.toParam("name");
-      }
-    }
-    const firm = new Firm();
-    firm.writeAttribute("name", "Fancy Shirts");
+    const firm = new Firm({ name: "Fancy Shirts" });
     expect(firm.toParam()).toBeNull();
   });
 
   it("to param with no arguments", () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     expect(Firm.toParam()).toBe("Firm");
   });
 
   it("to param for a composite primary key model", () => {
-    class Order extends Base {
-      static {
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    const order = new Order();
-    order.writeAttribute("shop_id", 1);
-    order.writeAttribute("id", 123);
-    (order as any)._newRecord = false;
-    expect(order.toParam()).toBe("1_123");
+    expect(new CpkOrder({ id: [1, 123] }).toParam()).toBe("1_123");
   });
 
   it("param delimiter changes delimiter used in to param", () => {
-    class Order extends Base {
-      static {
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    const original = Order.paramDelimiter;
-    Order.paramDelimiter = ",";
+    const original = CpkOrder.paramDelimiter;
+    CpkOrder.paramDelimiter = ",";
     try {
-      const order = new Order();
-      order.writeAttribute("shop_id", 1);
-      order.writeAttribute("id", 123);
-      (order as any)._newRecord = false;
-      expect(order.toParam()).toBe("1,123");
+      expect(new CpkOrder({ id: [1, 123] }).toParam()).toBe("1,123");
     } finally {
-      Order.paramDelimiter = original;
+      CpkOrder.paramDelimiter = original;
     }
   });
 
   it("param delimiter is defined per class", () => {
-    class Order extends Base {
-      static {
-        this.primaryKey = ["shop_id", "id"];
-        this.paramDelimiter = ",";
-      }
+    const originalOrder = CpkOrder.paramDelimiter;
+    const originalBook = CpkBook.paramDelimiter;
+    CpkOrder.paramDelimiter = ",";
+    CpkBook.paramDelimiter = ";";
+    try {
+      expect(new CpkOrder({ id: [1, 123] }).toParam()).toBe("1,123");
+      expect(new CpkBook({ id: [1, 123] }).toParam()).toBe("1;123");
+    } finally {
+      CpkOrder.paramDelimiter = originalOrder;
+      CpkBook.paramDelimiter = originalBook;
     }
-    class Book extends Base {
-      static {
-        this.primaryKey = ["shop_id", "id"];
-        this.paramDelimiter = ";";
-      }
-    }
-    const o = new Order();
-    o.writeAttribute("shop_id", 1);
-    o.writeAttribute("id", 123);
-    (o as any)._newRecord = false;
-    const b = new Book();
-    b.writeAttribute("shop_id", 1);
-    b.writeAttribute("id", 123);
-    (b as any)._newRecord = false;
-    expect(o.toParam()).toBe("1,123");
-    expect(b.toParam()).toBe("1;123");
   });
 
   it("cache key for existing record is not timezone dependent", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t = instant("2024-01-15T10:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", t);
-    const key = dev.cacheKey();
-    expect(key).toBe(`developers/${dev.id}-${expectedUsec(t)}`);
-    expect(key).toBe(dev.cacheKey());
+    const utcKey = (await Developer.first())!.cacheKey();
+    // Rails uses `with_timezone_config zone: "EST"` (an ActiveSupport zone
+    // alias); the canonical IANA name is America/New_York.
+    await withTimezoneConfig({ zone: "America/New_York" }, async () => {
+      const estKey = (await Developer.first())!.cacheKey();
+      expect(estKey).toBe(utcKey);
+    });
   });
 
   it("cache key format for existing record with updated at", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const updatedAt = instant("2024-01-15T10:46:00.123Z");
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", updatedAt);
-    expect(dev.cacheKey()).toBe(`developers/${dev.id}-${expectedUsec(updatedAt)}`);
+    const dev = await Developer.first();
+    expect(dev!.cacheKey()).toBe(
+      `developers/${dev!.id}-${toFs(dev!.readAttribute("updated_at"), "usec")}`,
+    );
   });
 
   it("cache key format for existing record with updated at and custom cache timestamp format", async () => {
-    class CachedDeveloper extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-        this.cacheTimestampFormat = "number";
-      }
-    }
-    const updatedAt = instant("2024-01-15T10:46:00Z");
-    const dev = await CachedDeveloper.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", updatedAt);
-    expect(dev.cacheKey()).toBe(`cached_developers/${dev.id}-20240115104600`);
+    const dev = await CachedDeveloper.first();
+    expect(dev!.cacheKey()).toBe(
+      `cached_developers/${dev!.id}-${toFs(dev!.readAttribute("updated_at"), "number")}`,
+    );
   });
 
   it("cache key changes when child touched", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t1 = instant("2024-01-15T10:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", t1);
-    const key1 = dev.cacheKey();
-    dev.writeAttribute("updated_at", instant("2024-01-15T10:00:01.000Z"));
-    expect(dev.cacheKey()).not.toBe(key1);
+    const owner = owners("blackbeard");
+    const pet = pets("parrot");
+
+    const now = Temporal.Now.instant();
+    await owner.updateColumn("updated_at", now);
+    const key = owner.cacheKey();
+
+    // Rails `travel(1.second) { assert pet.touch }` — Pet `belongs_to :owner,
+    // touch: true`, so touching the pet bumps the owner's updated_at.
+    expect(await pet.touch({ time: now.add({ seconds: 1 }) })).toBe(true);
+    await owner.reload();
+    expect(owner.cacheKey()).not.toBe(key);
   });
 
   it("cache key format for existing record with nil updated timestamps", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-        this.attribute("updated_on", "datetime");
-      }
-    }
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", null);
-    dev.writeAttribute("updated_on", null);
-    expect(dev.cacheKey()).toBe(`developers/${dev.id}`);
+    const dev = await Developer.first();
+    await dev!.updateColumns({ updated_at: null, updated_on: null });
+    expect(dev!.cacheKey()).toMatch(new RegExp(`/${dev!.id}$`));
   });
 
   it("cache key for updated on", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_on", "datetime");
-      }
-    }
-    const updatedOn = instant("2024-03-20T08:00:00.456Z");
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_on", updatedOn);
-    expect(dev.cacheKey()).toBe(`developers/${dev.id}-${expectedUsec(updatedOn)}`);
+    const dev = await Developer.first();
+    dev!.writeAttribute("updated_at", null);
+    expect(dev!.cacheKey()).toBe(
+      `developers/${dev!.id}-${toFs(dev!.readAttribute("updated_on"), "usec")}`,
+    );
   });
 
   it("cache key for newer updated at", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-        this.attribute("updated_on", "datetime");
-      }
-    }
-    const t1 = instant("2024-01-15T10:00:00.000Z");
-    const t2 = instant("2024-01-15T11:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", t2);
-    dev.writeAttribute("updated_on", t1);
-    expect(dev.cacheKey()).toBe(`developers/${dev.id}-${expectedUsec(t2)}`);
+    const dev = await Developer.first();
+    const updatedAt = (dev!.readAttribute("updated_at") as Temporal.Instant).add({ seconds: 3600 });
+    dev!.writeAttribute("updated_at", updatedAt);
+    expect(dev!.cacheKey()).toBe(`developers/${dev!.id}-${toFs(updatedAt, "usec")}`);
   });
 
   it("cache key for newer updated on", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-        this.attribute("updated_on", "datetime");
-      }
-    }
-    const t1 = instant("2024-01-15T10:00:00.000Z");
-    const t2 = instant("2024-01-15T11:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", t1);
-    dev.writeAttribute("updated_on", t2);
-    expect(dev.cacheKey()).toBe(`developers/${dev.id}-${expectedUsec(t2)}`);
+    const dev = await Developer.first();
+    const updatedOn = (dev!.readAttribute("updated_on") as Temporal.Instant).add({ seconds: 3600 });
+    dev!.writeAttribute("updated_on", updatedOn);
+    expect(dev!.cacheKey()).toBe(`developers/${dev!.id}-${toFs(updatedOn, "usec")}`);
   });
 
   it("cache key format is precise enough", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t1 = instant("2024-01-15T10:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", t1);
-    const key1 = dev.cacheKey();
-    dev.writeAttribute(
-      "updated_at",
-      Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 1),
-    );
-    expect(dev.cacheKey()).not.toBe(key1);
+    const dev = await Developer.first();
+    const key = dev!.cacheKey();
+    // Rails `travel_to dev.updated_at + 0.000001 do dev.touch end`.
+    await dev!.touch({
+      time: (dev!.readAttribute("updated_at") as Temporal.Instant).add({ microseconds: 1 }),
+    });
+    expect(dev!.cacheKey()).not.toBe(key);
   });
 
   it("cache key format is not too precise", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t = instant("2024-01-15T10:00:00.123Z");
-    const dev = await Developer.create({ name: "Dev" });
-    dev.writeAttribute("updated_at", t);
-    expect(dev.cacheKey()).toBe(dev.cacheKey());
+    const dev = await Developer.first();
+    await dev!.touch();
+    const key = dev!.cacheKey();
+    await dev!.reload();
+    expect(dev!.cacheKey()).toBe(key);
   });
 
   it("cache version format is precise enough", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t1 = instant("2024-01-15T10:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    withCacheVersioning(Developer, () => {
-      dev.writeAttribute("updated_at", t1);
-      const v1 = dev.cacheVersion();
-      dev.writeAttribute(
-        "updated_at",
-        Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 1),
-      );
-      expect(dev.cacheVersion()).not.toBe(v1);
+    await withCacheVersioning(async () => {
+      const dev = await Developer.first();
+      const version = dev!.cacheVersion();
+      await dev!.touch({
+        time: (dev!.readAttribute("updated_at") as Temporal.Instant).add({ microseconds: 1 }),
+      });
+      expect(dev!.cacheVersion()).not.toBe(version);
     });
   });
 
   it("cache version format is not too precise", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t = instant("2024-01-15T10:00:00.123Z");
-    const dev = await Developer.create({ name: "Dev" });
-    withCacheVersioning(Developer, () => {
-      dev.writeAttribute("updated_at", t);
-      expect(dev.cacheVersion()).toBe(dev.cacheVersion());
+    await withCacheVersioning(async () => {
+      const dev = await Developer.first();
+      await dev!.touch();
+      const key = dev!.cacheVersion();
+      await dev!.reload();
+      expect(dev!.cacheVersion()).toBe(key);
     });
   });
 
   it("cache key is stable with versioning on", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t1 = instant("2024-01-15T10:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    withCacheVersioning(Developer, () => {
-      dev.writeAttribute("updated_at", t1);
-      const key1 = dev.cacheKey();
-      dev.writeAttribute(
-        "updated_at",
-        Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 10000),
-      );
-      expect(dev.cacheKey()).toBe(key1);
+    await withCacheVersioning(async () => {
+      const developer = await Developer.first();
+      const firstKey = developer!.cacheKey();
+      await developer!.touch();
+      const secondKey = developer!.cacheKey();
+      expect(secondKey).toBe(firstKey);
     });
   });
 
   it("cache version changes with versioning on", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t1 = instant("2024-01-15T10:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    withCacheVersioning(Developer, () => {
-      dev.writeAttribute("updated_at", t1);
-      const v1 = dev.cacheVersion();
-      dev.writeAttribute(
-        "updated_at",
-        Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 10000),
-      );
-      expect(dev.cacheVersion()).not.toBe(v1);
+    await withCacheVersioning(async () => {
+      const developer = await Developer.first();
+      const firstVersion = developer!.cacheVersion();
+      // Rails `travel 10.seconds do developer.touch end`.
+      await developer!.touch({
+        time: (developer!.readAttribute("updated_at") as Temporal.Instant).add({ seconds: 10 }),
+      });
+      const secondVersion = developer!.cacheVersion();
+      expect(secondVersion).not.toBe(firstVersion);
     });
   });
 
   it("cache key retains version when custom timestamp is used", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t1 = instant("2024-01-15T10:00:00.000Z");
-    const dev = await Developer.create({ name: "Dev" });
-    withCacheVersioning(Developer, () => {
-      dev.writeAttribute("updated_at", t1);
-      const kv1 = dev.cacheKeyWithVersion();
-      dev.writeAttribute(
-        "updated_at",
-        Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 10000),
-      );
-      expect(dev.cacheKeyWithVersion()).not.toBe(kv1);
+    await withCacheVersioning(async () => {
+      const developer = await Developer.first();
+      const firstKey = developer!.cacheKeyWithVersion();
+      await developer!.touch({
+        time: (developer!.readAttribute("updated_at") as Temporal.Instant).add({ seconds: 10 }),
+      });
+      const secondKey = developer!.cacheKeyWithVersion();
+      expect(secondKey).not.toBe(firstKey);
     });
   });
 });

@@ -544,6 +544,8 @@ export class ThreadsafeDeveloper extends Base {
 export class CachedDeveloper extends Base {
   static {
     this.tableName = "developers";
+    // Rails developer.rb:351 — `self.cache_timestamp_format = :number`.
+    this.cacheTimestampFormat = "number";
     this.aliasAttribute("created_at", "legacy_created_at");
     this.aliasAttribute("updated_at", "legacy_updated_at");
     this.aliasAttribute("created_on", "legacy_created_on");
