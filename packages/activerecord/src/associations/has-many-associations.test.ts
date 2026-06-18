@@ -7147,60 +7147,56 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-const TAIL_PRIMARY_KEYS_SCHEMA: Schema = {
-  cpk_authors: { name: "string" },
-  cpk_posts: { author_id: "integer", title: "string" },
-  cpk_asg_authors: { name: "string" },
-  cpk_asg_posts: { author_id: "integer", title: "string" },
-};
-
 describe("HasManyAssociationsTestPrimaryKeys", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const { authors, people } = useHandlerFixtures([
+    "authors",
+    "authorAddresses",
+    "essays",
+    "people",
+  ]);
 
   beforeAll(async () => {
-    await defineSchema(TAIL_PRIMARY_KEYS_SCHEMA);
+    registerModel(HmAuthor);
+    registerModel(HmAuthorAddress);
+    registerModel(HmEssay);
+    registerModel(HmPerson);
+    await HmAuthor.loadSchema();
+    await HmEssay.loadSchema();
+    await HmPerson.loadSchema();
   });
 
   it("has many custom primary key", async () => {
-    class CpkAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class CpkPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(CpkAuthor);
-    registerModel(CpkPost);
-    const author = await CpkAuthor.create({ name: "Alice" });
-    await CpkPost.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "cpk_posts", {
-      className: "CpkPost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
+    // Rails (has_many_associations_test.rb:84-87):
+    //   david = authors(:david)
+    //   assert_equal Essay.where(writer_id: "David"), david.essays
+    // `Author#essays` uses primary_key :name (as: :writer), so David's
+    // essays are exactly those with writer_id == "David".
+    const david = authors("david") as HmAuthor;
+    const expected = (await HmEssay.where({ writer_id: "David" }).toArray())
+      .map((e) => e.id)
+      .sort();
+    const actual = ((await association(david, "essays").toArray()) as Base[])
+      .map((e) => e.id)
+      .sort();
+    expect(actual).toEqual(expected);
   });
+
   it("has many assignment with custom primary key", async () => {
-    class CpkAsgAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class CpkAsgPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(CpkAsgAuthor);
-    registerModel(CpkAsgPost);
-    const author = await CpkAsgAuthor.create({ name: "Alice" });
-    const post = await CpkAsgPost.create({ author_id: author.id, title: "A" });
-    expect((post as any).author_id).toBe(author.id);
+    // Rails (has_many_associations_test.rb:100-106):
+    //   david = people(:david)
+    //   assert_equal ["A Modest Proposal"], david.essays.map(&:name)
+    //   david.essays = [Essay.create!(name: "Remote Work")]
+    //   assert_equal ["Remote Work"], david.essays.map(&:name)
+    // `Person#essays` uses primary_key :first_name, foreign_key :writer_id.
+    const david = people("david") as HmPerson;
+    const names = ((await association(david, "essays").toArray()) as HmEssay[]).map((e) => e.name);
+    expect(names).toEqual(["A Modest Proposal"]);
+
+    const remote = await HmEssay.create({ name: "Remote Work" });
+    await association(david, "essays").replace([remote]);
+
+    const names2 = ((await association(david, "essays").toArray()) as HmEssay[]).map((e) => e.name);
+    expect(names2).toEqual(["Remote Work"]);
   });
 });
 
