@@ -87,20 +87,8 @@ describe("AssociationsTest", () => {
         columns: { region_id: "integer", id: "integer", name: "string" },
         primaryKey: ["region_id", "id"],
       },
-      as_cpk_childs: { label: "string", parent_id: "integer", parent_region_id: "integer" },
-      as_cpk_items: { label: "string", owner_id: "integer", owner_region_id: "integer" },
-      as_cpk_owners: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      as_cpk_parents: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
       b_comments: { b_post_id: "integer", body: "string" },
       b_posts: { title: "string" },
-      bt_nqc_blog_posts: { blog_id: "integer", title: "string" },
-      bt_nqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
       c_comments: { body: "string", c_post_id: "integer" },
       c_posts: { title: "string" },
       cfk_line_items: { name: "string", order_id: "integer", order_shop_id: "integer" },
@@ -117,10 +105,6 @@ describe("AssociationsTest", () => {
         primaryKey: ["shop_id", "id"],
       },
       cpk_chapters: { cpk_book_id: "integer", cpk_book_shop_id: "integer", number: "integer" },
-      cpk_child2s: { label: "string", parent_id: "integer", parent_region_id: "integer" },
-      cpk_child3s: { label: "string", parent_id: "integer", parent_region_id: "integer" },
-      cpk_childs: { label: "string", parent_id: "integer", parent_region_id: "integer" },
-      cpk_item2s: { label: "string", owner_id: "integer", owner_region_id: "integer" },
       cpk_items: { label: "string", owner_id: "integer", owner_region_id: "integer" },
       cpk_order_items: {
         cpk_order_id: "integer",
@@ -133,19 +117,7 @@ describe("AssociationsTest", () => {
         columns: { id: "integer", shop_id: "integer", status: "string" },
         primaryKey: ["shop_id", "id"],
       },
-      cpk_owner2s: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
       cpk_owners: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cpk_parent2s: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cpk_parent3s: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
@@ -206,12 +178,6 @@ describe("AssociationsTest", () => {
       inf_parents: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
-      },
-      pbt_blog_posts: {
-        blog_id: "integer",
-        parent_id: "integer",
-        parent_type: "string",
-        title: "string",
       },
       qc_multi_blog_posts: { revision: "integer", title: "string" },
       qc_multi_comments: { blog_post_id: "integer" },
@@ -418,222 +384,6 @@ describe("AssociationsTest", () => {
     });
     expect((comment as Nrfqc1Comment | null)?.body).toBe("Only");
   });
-  it("belongs to association does not use parent query constraints if not configured to", async () => {
-    // Rails: test_belongs_to_association_does_not_use_parent_query_constraints_if_not_configured_to
-    // When belongs_to has explicit single FK/PK, it bypasses query_constraints derivation.
-    class BtNqcBlogPost extends Base {
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    class BtNqcComment extends Base {
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("blog_post_id", "integer");
-        this.attribute("body", "string");
-        // Comment has query_constraints, but the belongs_to uses explicit single FK/PK
-        (this as any)._queryConstraintsList = ["blog_id", "id"];
-        (this as any)._hasQueryConstraints = true;
-      }
-    }
-    registerModel("BtNqcBlogPost", BtNqcBlogPost);
-    registerModel("BtNqcComment", BtNqcComment);
-    Associations.belongsTo.call(BtNqcComment, "btNqcBlogPostById", {
-      foreignKey: "blog_post_id",
-      primaryKey: "id",
-      className: "BtNqcBlogPost",
-    });
-    const post = await BtNqcBlogPost.create({ blog_id: 1, title: "Following best practices" });
-    const comment = await BtNqcComment.create({ blog_id: 1, body: "Hello" });
-    setBelongsTo(comment, "btNqcBlogPostById", post, {
-      foreignKey: "blog_post_id",
-      primaryKey: "id",
-      className: "BtNqcBlogPost",
-    });
-    // Only blog_post_id is set to post's scalar id; blog_id is unchanged
-    expect(comment.blog_post_id).toBe(post.id);
-    await comment.save();
-    const loaded = await loadBelongsTo(comment, "btNqcBlogPostById", {
-      foreignKey: "blog_post_id",
-      primaryKey: "id",
-      className: "BtNqcBlogPost",
-    });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.title).toBe("Following best practices");
-  });
-  it("polymorphic belongs to uses parent query constraints", async () => {
-    // Rails: test_polymorphic_belongs_to_uses_parent_query_constraints (associations_test.rb:279).
-    // Owner has query_constraints :blog_id, :id. Polymorphic belongs_to :parent must derive
-    // the composite FK [blog_id, parent_id] and resolve against the target's
-    // [blog_id, id] query-constraints key — not just scalar parent_id.
-    class PbtBlogPost extends Base {
-      static {
-        this._tableName = "pbt_blog_posts";
-        this.attribute("blog_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.attribute("parent_id", "integer");
-        this.attribute("parent_type", "string");
-        // Match Rails sharded_blog_posts: single auto-increment PK; the
-        // composite key is enforced at the model layer via query_constraints
-        // only. derive_fk_query_constraints in Rails reflection.rb:865-868
-        // depends on primary_key being a string for the first_key/last_key
-        // comparison, so an array PK would break the FK derivation entirely.
-        (this as any)._queryConstraintsList = ["blog_id", "id"];
-        (this as any)._hasQueryConstraints = true;
-      }
-    }
-    registerModel("PbtBlogPost", PbtBlogPost);
-    Associations.belongsTo.call(PbtBlogPost, "parent", { polymorphic: true });
-    const parent = await PbtBlogPost.create({ blog_id: 1, id: 10, title: "Parent" });
-    const child = await PbtBlogPost.create({
-      blog_id: 1,
-      id: 11,
-      title: "Child",
-      parent_id: parent.id,
-      parent_type: "PbtBlogPost",
-    });
-    const loaded = await loadBelongsTo(child, "parent", { polymorphic: true });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.id).toBe(parent.id);
-    expect(loaded!.title).toBe("Parent");
-    // Cross-tenant negative case: a child in blog 2 pointing at parent_id=10
-    // must NOT resolve to the blog-1 parent — proves blog_id participates
-    // (a buggy lookup using only parent_id would return the blog-1 parent).
-    const fakeChild = await PbtBlogPost.create({
-      blog_id: 2,
-      id: 12,
-      title: "WrongTenant",
-      parent_id: parent.id,
-      parent_type: "PbtBlogPost",
-    });
-    const wrong = await loadBelongsTo(fakeChild, "parent", { polymorphic: true });
-    expect(wrong).toBeNull();
-  });
-  it("nullify composite foreign key has many association", async () => {
-    class CpkOwner2 extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkItem2 extends Base {
-      static {
-        this.attribute("owner_region_id", "integer");
-        this.attribute("owner_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("CpkOwner2", CpkOwner2);
-    registerModel("CpkItem2", CpkItem2);
-    Associations.hasMany.call(CpkOwner2, "cpkItems2", {
-      className: "CpkItem2",
-      foreignKey: ["owner_region_id", "owner_id"],
-    });
-    const owner = await CpkOwner2.create({ region_id: 1, id: 10, name: "Owner" });
-    const item = await CpkItem2.create({ owner_region_id: 1, owner_id: 10, label: "Item" });
-    const proxy = association(owner, "cpkItems2");
-    await proxy.delete(item);
-    expect(item.owner_region_id).toBeNull();
-    expect(item.owner_id).toBeNull();
-  });
-  it("assign persisted composite foreign key belongs to association", async () => {
-    class CpkParent extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkChild extends Base {
-      static {
-        this.attribute("parent_region_id", "integer");
-        this.attribute("parent_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("CpkParent", CpkParent);
-    registerModel("CpkChild", CpkChild);
-    Associations.belongsTo.call(CpkChild, "cpkParent", {
-      foreignKey: ["parent_region_id", "parent_id"],
-      className: "CpkParent",
-    });
-    const parent = await CpkParent.create({ region_id: 1, id: 20, name: "Parent" });
-    const child = await CpkChild.create({ label: "Child" });
-    setBelongsTo(child, "cpkParent", parent, {
-      foreignKey: ["parent_region_id", "parent_id"],
-      className: "CpkParent",
-    });
-    expect(child.parent_region_id).toBe(1);
-    expect(child.parent_id).toBe(20);
-  });
-
-  it("nullify composite foreign key belongs to association", async () => {
-    class CpkParent2 extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkChild2 extends Base {
-      static {
-        this.attribute("parent_region_id", "integer");
-        this.attribute("parent_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("CpkParent2", CpkParent2);
-    registerModel("CpkChild2", CpkChild2);
-    Associations.belongsTo.call(CpkChild2, "cpkParent2", {
-      foreignKey: ["parent_region_id", "parent_id"],
-      className: "CpkParent2",
-    });
-    const child = await CpkChild2.create({ parent_region_id: 1, parent_id: 20, label: "Child" });
-    setBelongsTo(child, "cpkParent2", null, {
-      foreignKey: ["parent_region_id", "parent_id"],
-      className: "CpkParent2",
-    });
-    expect(child.parent_region_id).toBeNull();
-    expect(child.parent_id).toBeNull();
-  });
-
-  it("assign composite foreign key belongs to association", async () => {
-    class CpkParent3 extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkChild3 extends Base {
-      static {
-        this.attribute("parent_region_id", "integer");
-        this.attribute("parent_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("CpkParent3", CpkParent3);
-    registerModel("CpkChild3", CpkChild3);
-    Associations.belongsTo.call(CpkChild3, "cpkParent3", {
-      foreignKey: ["parent_region_id", "parent_id"],
-      className: "CpkParent3",
-    });
-    const parent = await CpkParent3.create({ region_id: 2, id: 30, name: "Parent" });
-    const child = new CpkChild3({ label: "Child" });
-    setBelongsTo(child, "cpkParent3", parent, {
-      foreignKey: ["parent_region_id", "parent_id"],
-      className: "CpkParent3",
-    });
-    expect(child.parent_region_id).toBe(2);
-    expect(child.parent_id).toBe(30);
-  });
   it("setBelongsTo infers composite foreign key from target primary key", async () => {
     class InfParent extends Base {
       static {
@@ -767,72 +517,6 @@ describe("AssociationsTest", () => {
     });
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toEqual([2, 7]);
-  });
-  it("append composite foreign key has many association with autosave", async () => {
-    class AsCpkOwner extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class AsCpkItem extends Base {
-      static {
-        this.attribute("owner_region_id", "integer");
-        this.attribute("owner_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("AsCpkOwner", AsCpkOwner);
-    registerModel("AsCpkItem", AsCpkItem);
-    Associations.hasMany.call(AsCpkOwner, "asCpkItems", {
-      className: "AsCpkItem",
-      foreignKey: ["owner_region_id", "owner_id"],
-    });
-    const owner = await AsCpkOwner.create({ region_id: 1, id: 10, name: "Owner" });
-    const item = new AsCpkItem({ label: "New" });
-    expect(item.isNewRecord()).toBe(true);
-    const proxy = association(owner, "asCpkItems");
-    await proxy.push(item);
-    expect(item.isPersisted()).toBe(true);
-    expect(item.owner_region_id).toBe(1);
-    expect(item.owner_id).toBe(10);
-  });
-  it("assign composite foreign key belongs to association with autosave", async () => {
-    class AsCpkParent extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class AsCpkChild extends Base {
-      static {
-        this.attribute("parent_region_id", "integer");
-        this.attribute("parent_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("AsCpkParent", AsCpkParent);
-    registerModel("AsCpkChild", AsCpkChild);
-    Associations.belongsTo.call(AsCpkChild, "asCpkParent", {
-      foreignKey: ["parent_region_id", "parent_id"],
-      className: "AsCpkParent",
-      autosave: true,
-    });
-    const child = await AsCpkChild.create({ label: "Child" });
-    const parent = new AsCpkParent({ region_id: 2, id: 30, name: "Parent" });
-    expect(parent.isNewRecord()).toBe(true);
-    setBelongsTo(child, "asCpkParent", parent, {
-      foreignKey: ["parent_region_id", "parent_id"],
-      className: "AsCpkParent",
-    });
-    await child.save();
-    expect(parent.isPersisted()).toBe(true);
-    expect(child.parent_region_id).toBe(2);
-    expect(child.parent_id).toBe(30);
   });
   it("append composite has many through association", async () => {
     class CpkThruDoc1 extends Base {
@@ -4210,19 +3894,20 @@ describe("WithAnnotationsTest", () => {
 describe("AssociationsTest", () => {
   // `authorFavorites` is declared so its rows are loaded (Rails: `fixtures
   // :author_favorites`); the subselect test reads them through the association.
-  const { companies, authors, shardedBlogPosts, shardedComments } = useHandlerFixtures(
-    [
-      "companies",
-      "authors",
-      "authorFavorites",
-      "shardedBlogs",
-      "shardedBlogPosts",
-      "shardedComments",
-    ],
-    {
-      schema: canonicalSchema,
-    },
-  );
+  const { companies, authors, shardedBlogs, shardedBlogPosts, shardedComments } =
+    useHandlerFixtures(
+      [
+        "companies",
+        "authors",
+        "authorFavorites",
+        "shardedBlogs",
+        "shardedBlogPosts",
+        "shardedComments",
+      ],
+      {
+        schema: canonicalSchema,
+      },
+    );
 
   let Author: typeof AuthorT;
   let AuthorFavorite: typeof Base;
@@ -4552,5 +4237,126 @@ describe("AssociationsTest", () => {
     expect(preloaded).toBeDefined();
     const byCompositeKey = await (loaded as any).loadBelongsTo("blogPost");
     expect((preloaded as any).id).toBe((byCompositeKey as any).id);
+  });
+
+  it("append composite foreign key has many association with autosave", async () => {
+    const blogPost = shardedBlogPosts("great_post_blog_one");
+    const comment = new ShardedComment({ body: "Great post! :clap:" });
+    await association(blogPost, "comments").push(comment);
+
+    expect(comment.isPersisted()).toBe(true);
+    const comments = await association(blogPost, "comments").toArray();
+    expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
+    expect((comment as any).blog_post_id).toBe((blogPost as any).id);
+    expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
+  });
+
+  it("nullify composite foreign key has many association", async () => {
+    const blogPost = shardedBlogPosts("great_post_blog_one");
+    let comment = shardedComments("great_comment_blog_post_one");
+
+    expect(await association(blogPost, "comments").toArray()).not.toHaveLength(0);
+    await association(blogPost, "comments").replace([]);
+
+    comment = (await ShardedComment.find((comment as any).id)) as never;
+    expect((comment as any).blog_post_id).toBeNull();
+    expect((comment as any).blog_id).toBeNull();
+
+    expect(await association(blogPost, "comments").toArray()).toHaveLength(0);
+    await blogPost.reload();
+    expect(await association(blogPost, "comments").toArray()).toHaveLength(0);
+  });
+
+  it("assign persisted composite foreign key belongs to association", async () => {
+    const comment = shardedComments("great_comment_blog_post_one");
+    const anotherBlog = shardedBlogs("sharded_blog_two");
+    expect((comment as any).blog_id).not.toBe((anotherBlog as any).id);
+
+    const blogPost = new ShardedBlogPost({ title: "New post", blog_id: (anotherBlog as any).id });
+    await blogPost.save();
+    (comment.association("blogPost") as any).writer(blogPost);
+
+    const loaded = await (comment as any).loadBelongsTo("blogPost");
+    expect((loaded as any).id).toBe((blogPost as any).id);
+    expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
+    expect((comment as any).blog_id).toBe((anotherBlog as any).id);
+    expect((comment as any).blog_post_id).toBe((blogPost as any).id);
+  });
+
+  it("nullify composite foreign key belongs to association", async () => {
+    const comment = shardedComments("great_comment_blog_post_one");
+    expect(await (comment as any).loadBelongsTo("blogPost")).not.toBeNull();
+
+    (comment.association("blogPost") as any).writer(null);
+    expect((comment as any).blog_id).toBeNull();
+    expect((comment as any).blog_post_id).toBeNull();
+
+    await comment.save();
+    expect(await (comment as any).loadBelongsTo("blogPost")).toBeNull();
+    const reloaded = await ShardedComment.find((comment as any).id);
+    expect(await (reloaded as any).loadBelongsTo("blogPost")).toBeNull();
+  });
+
+  it("assign composite foreign key belongs to association", async () => {
+    const comment = shardedComments("great_comment_blog_post_one");
+    const anotherBlog = shardedBlogs("sharded_blog_two");
+    expect((comment as any).blog_id).not.toBe((anotherBlog as any).id);
+
+    const blogPost = new ShardedBlogPost({ title: "New post", blog_id: (anotherBlog as any).id });
+    (comment.association("blogPost") as any).writer(blogPost);
+
+    // Rails `comment.blog_post` returns the just-assigned in-memory target
+    // (the new record is unsaved, so reading is from the association cache).
+    const loaded = (comment.association("blogPost") as any).target;
+    expect(loaded).toBe(blogPost);
+    expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
+    expect((comment as any).blog_id).toBe((anotherBlog as any).id);
+  });
+
+  it("assign composite foreign key belongs to association with autosave", async () => {
+    const comment = shardedComments("great_comment_blog_post_one");
+    const anotherBlog = shardedBlogs("sharded_blog_two");
+    expect((comment as any).blog_id).not.toBe((anotherBlog as any).id);
+
+    const blogPost = new ShardedBlogPost({ title: "New post", blog_id: (anotherBlog as any).id });
+    (comment.association("blogPost") as any).writer(blogPost);
+    await comment.save();
+
+    expect(blogPost.isPersisted()).toBe(true);
+    const loaded = await (comment as any).loadBelongsTo("blogPost");
+    expect((loaded as any).id).toBe((blogPost as any).id);
+    expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
+    expect((comment as any).blog_id).toBe((anotherBlog as any).id);
+    expect((comment as any).blog_post_id).toBe((blogPost as any).id);
+  });
+
+  it("belongs to association does not use parent query constraints if not configured to", async () => {
+    const comment = shardedComments("great_comment_blog_post_one");
+    const blogPost = new ShardedBlogPost({
+      blog_id: (comment as any).blog_id,
+      title: "Following best practices",
+    });
+
+    (comment.association("blogPostById") as any).writer(blogPost);
+    await comment.save();
+
+    expect(blogPost.isPersisted()).toBe(true);
+    const loaded = await (comment as any).loadBelongsTo("blogPostById");
+    expect((loaded as any).id).toBe((blogPost as any).id);
+  });
+
+  it("polymorphic belongs to uses parent query constraints", async () => {
+    const parentPost = shardedBlogPosts("great_post_blog_one");
+    const childPost = new ShardedBlogPost({
+      title: "Child post",
+      blog_id: (parentPost as any).blog_id,
+    });
+    (childPost.association("parent") as any).writer(parentPost);
+    await childPost.save();
+
+    // reload to forget the parent association
+    const reloaded = await ShardedBlogPost.find((childPost as any).id);
+    const loaded = await (reloaded as any).loadBelongsTo("parent");
+    expect((loaded as any).id).toBe((parentPost as any).id);
   });
 });
