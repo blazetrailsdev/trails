@@ -3,6 +3,7 @@ import type { AssociationDefinition } from "../associations.js";
 import { loadBelongsTo, resolveModel, reflectLockVersionBump } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
+import { hasQueryConstraints, queryConstraintsList } from "../persistence.js";
 import { SingularAssociation } from "./singular-association.js";
 
 /**
@@ -299,6 +300,23 @@ export class BelongsToAssociation extends SingularAssociation {
     if (typeof fk === "string") return [fk];
     if (Array.isArray(fk)) return fk;
 
+    // When the owner uses query_constraints, the foreign key is derived from
+    // them (Rails `derive_fk_query_constraints`), not from the target's primary
+    // key — e.g. a `Sharded::Comment` belongs_to whose owner constraints are
+    // `[blog_id, id]` carries `[blog_id, blog_post_id]`. The rich reflection's
+    // computed `foreignKey` already does this; the scalar-PK fallback below
+    // would drop the `blog_id` component. `this.reflection` is the lightweight
+    // `AssociationDefinition` (`{ type, name, options }`) — it has no computed
+    // `foreignKey` getter — so resolve the rich `AssociationReflection` (which
+    // carries the cached `deriveFkQueryConstraints` value) via the registry.
+    if (hasQueryConstraints.call(this.owner.constructor as never)) {
+      const ctor = this.owner.constructor as {
+        _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | null;
+      };
+      const computed = ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
+      if (computed) return Array.isArray(computed) ? computed : [computed];
+    }
+
     // Derive composite FKs when target has composite PK (mirrors loadBelongsTo).
     // Prefer the already-loaded target's class for the PK lookup so seeding an
     // inverse target (which marks the holder loaded → staleState → here) reads
@@ -317,6 +335,22 @@ export class BelongsToAssociation extends SingularAssociation {
     const configured = this.reflection.options.primaryKey;
     if (configured) {
       return Array.isArray(configured) ? configured : [configured];
+    }
+    // Mirrors Rails `BelongsToReflection#association_primary_key`
+    // (reflection.rb:926-934): when the *target* (`klass`) uses
+    // query_constraints — or the association configures `query_constraints:` —
+    // the association primary key is the target's `composite_query_constraints_list`,
+    // regardless of column count. This makes the composite FK columns zip against
+    // the right target columns (e.g. `[blog_id, blog_post_id]` ← target
+    // `[blog_id, id]`, not `[id, id]`). Gate on the target, not the owner, exactly
+    // as Rails branches on `(klass || self.klass).has_query_constraints?`.
+    const targetCtor = (record?.constructor ?? this.klass) as never;
+    if (
+      targetCtor &&
+      (hasQueryConstraints.call(targetCtor) || this.reflection.options.queryConstraints)
+    ) {
+      const qc = queryConstraintsList.call(targetCtor);
+      if (qc) return qc;
     }
     if (record) {
       const pk = (record.constructor as any).primaryKey;
