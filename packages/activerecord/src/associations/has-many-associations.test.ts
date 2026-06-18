@@ -1423,6 +1423,11 @@ describe("HasManyAssociationsTest", () => {
     await Car.loadSchema();
     await Bulb.loadSchema();
     await Company.loadSchema();
+    // Anchor the canonical `bulbs` primary key explicitly (path-1 `_primaryKey`)
+    // so `Bulb.primaryKey` cannot fall through to the shared schema cache — which
+    // a concurrent sibling worker's `defineSchema` on `bulbs` could invalidate
+    // mid-suite — and silently default to `"id"`, breaking the ids_reader on PG.
+    Bulb.primaryKey = "ID";
   });
   registerModel(Car);
   registerModel(Bulb);
