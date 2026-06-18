@@ -7,7 +7,7 @@ import { RecordNotFound, registerModel } from "./index.js";
 import { User } from "./test-helpers/models/user.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { Room } from "./test-helpers/models/room.js";
-import { CpkBook } from "./test-helpers/models/cpk/book.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { generatesTokenFor, setTokenForSecret } from "./token-for.js";
