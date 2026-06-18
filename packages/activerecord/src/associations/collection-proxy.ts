@@ -1926,12 +1926,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           }
         } else {
           const targetPk = (record.constructor as typeof Base).primaryKey;
+          let targetPkCol: string;
           if (Array.isArray(targetPk)) {
-            throw new ConfigurationError(
-              `Through association "${this._assocName}" does not support a composite primary key on the target model "${(record.constructor as typeof Base).name}" — the join row needs a single source FK column.`,
-            );
+            // Composite-PK target with scalar source FK: use the source reflection's
+            // associationPrimaryKey to find the single column the FK references.
+            // Mirrors BelongsToReflection#association_primary_key which returns
+            // options[:primary_key] when set, or "id" when it is part of the composite PK.
+            const srcPk = sourceRefl?.associationPrimaryKey;
+            if (typeof srcPk === "string") {
+              targetPkCol = srcPk;
+            } else if (targetPk.includes("id")) {
+              targetPkCol = "id";
+            } else {
+              throw new ConfigurationError(
+                `Through association "${this._assocName}" has a composite-PK target "${(record.constructor as typeof Base).name}" but no scalar primaryKey on the source reflection. Specify primaryKey: "<col>" on the source belongs_to.`,
+              );
+            }
+          } else {
+            targetPkCol = targetPk;
           }
-          sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPk) };
+          sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
         }
         const joinAttrs: Record<string, unknown> = {
           ...ownerJoinAttrs,
@@ -2893,13 +2907,27 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           `Through association "${this._assocName}" does not support a composite foreign key on the source belongsTo — the target-side IN-subquery needs a single column.`,
         );
       }
-      if (Array.isArray(targetModel.primaryKey)) {
-        throw new ConfigurationError(
-          `Through association "${this._assocName}" does not support a composite primary key on the target model "${targetModel.name}" — the target-side IN-subquery needs a single column.`,
-        );
-      }
       const targetFkStr = targetFk;
-      const targetPkCol = targetModel.primaryKey;
+      let targetPkCol: string;
+      if (Array.isArray(targetModel.primaryKey)) {
+        // When the target has a composite PK, use the source reflection's explicit
+        // primaryKey option to pick the single column the through-table FK references.
+        // Mirrors Rails' BelongsToReflection#association_primary_key, which returns
+        // options[:primary_key] when set, or falls back to "id" when "id" is part of
+        // the composite PK (the conventional scalar anchor for a single-column FK).
+        const srcPkOpt = sourceAssoc?.options?.primaryKey;
+        if (typeof srcPkOpt === "string") {
+          targetPkCol = srcPkOpt;
+        } else if (Array.isArray(targetModel.primaryKey) && targetModel.primaryKey.includes("id")) {
+          targetPkCol = "id";
+        } else {
+          throw new ConfigurationError(
+            `Through association "${this._assocName}" has a composite-PK target "${targetModel.name}" but no scalar primaryKey on the source reflection to anchor the IN-subquery. Specify primaryKey: "<col>" on the source belongs_to.`,
+          );
+        }
+      } else {
+        targetPkCol = targetModel.primaryKey;
+      }
 
       // Handle sourceType for polymorphic belongsTo sources
       if (sourceAssoc?.options?.polymorphic && this._assocDef.options.sourceType) {

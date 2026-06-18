@@ -5,10 +5,13 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, RecordInvalid } from "../index.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
 import { CollectionProxy } from "./collection-proxy.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { CpkTag, CpkOrder, CpkOrderTag } from "../test-helpers/models/cpk.js";
 
 const TEST_SCHEMA: Schema = {
   acc_posts: { title: "string" },
@@ -1923,78 +1926,34 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     expect(items).toHaveLength(0);
   });
-  it("destroy all on composite primary key model", async () => {
-    class CpkItem extends Base {
-      static {
-        this._tableName = "cpk_da_items";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    registerModel("CpkItem", CpkItem);
-    await CpkItem.create({ shop_id: 1, id: 1, name: "A" });
-    await CpkItem.create({ shop_id: 1, id: 2, name: "B" });
-    const count = await CpkItem.count();
-    expect(count).toBe(2);
-    const items = await CpkItem.all().toArray();
-    for (const item of items) {
-      await item.destroy();
-    }
-    expect(await CpkItem.count()).toBe(0);
-  });
-  it("composite primary key join table", async () => {
-    class CpkJtOwner extends Base {
-      static {
-        this._tableName = "cpk_jt_owners";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkJtJoin extends Base {
-      static {
-        this._tableName = "cpk_jt_joins";
-        this.attribute("cpk_jt_owner_region_id", "integer");
-        this.attribute("cpk_jt_owner_id", "integer");
-        this.attribute("cpk_jt_item_id", "integer");
-      }
-    }
-    class CpkJtItem extends Base {
-      static {
-        this._tableName = "cpk_jt_items";
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(CpkJtOwner, "cpkJtJoins", {
-      foreignKey: ["cpk_jt_owner_region_id", "cpk_jt_owner_id"],
-      className: "CpkJtJoin",
+  describe("composite PK through associations (canonical)", () => {
+    registerModel([CpkTag, CpkOrder, CpkOrderTag]);
+    const { cpkTags } = useHandlerFixtures(["cpkTags", "cpkOrders", "cpkOrderTags"], {
+      schema: canonicalSchema,
     });
-    Associations.belongsTo.call(CpkJtJoin, "cpkJtItem", { className: "CpkJtItem" });
-    Associations.hasMany.call(CpkJtOwner, "cpkJtItems", {
-      through: "cpkJtJoins",
-      className: "CpkJtItem",
-      source: "cpkJtItem",
+
+    it("destroy all on composite primary key model", async () => {
+      const tag = cpkTags("cpk_tag_loyal_customer") as CpkTag;
+      const orders = await (tag as any).orders.toArray();
+      expect(orders.length).toBeGreaterThan(0);
+      await (tag as any).orders.destroyAll();
+      expect(await (tag as any).orders.toArray()).toHaveLength(0);
+      await (tag as any).orders.reload();
+      expect(await (tag as any).orders.toArray()).toHaveLength(0);
     });
-    registerModel("CpkJtOwner", CpkJtOwner);
-    registerModel("CpkJtJoin", CpkJtJoin);
-    registerModel("CpkJtItem", CpkJtItem);
-    const owner = await CpkJtOwner.create({ region_id: 1, id: 1, name: "Owner" });
-    const item = await CpkJtItem.create({ name: "Widget" });
-    await CpkJtJoin.create({
-      cpk_jt_owner_region_id: 1,
-      cpk_jt_owner_id: 1,
-      cpk_jt_item_id: item.id,
+
+    it("composite primary key join table", async () => {
+      const tag = cpkTags("cpk_tag_loyal_customer") as CpkTag;
+      const order = await CpkOrder.create({ shop_id: 1, status: "open" });
+      const initialOrders = await (tag as any).orders.toArray();
+      const initialCount = initialOrders.length;
+      await (tag as any).orders.push(order);
+      const updatedOrders = await (tag as any).orders.toArray();
+      expect(updatedOrders).toHaveLength(initialCount + 1);
+      expect(updatedOrders.some((o: any) => (o as any).idValue === (order as any).idValue)).toBe(
+        true,
+      );
     });
-    const items = await loadHasManyThrough(owner, "cpkJtItems", {
-      through: "cpkJtJoins",
-      className: "CpkJtItem",
-      source: "cpkJtItem",
-    });
-    expect(items.length).toBe(1);
-    expect(items[0].name).toBe("Widget");
   });
   it("destroy all on association clears scope", async () => {
     class HmtDaClrOwner extends Base {
