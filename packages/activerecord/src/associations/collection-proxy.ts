@@ -38,6 +38,7 @@ import { getInheritanceColumn, findStiClass, stiEnabled, polymorphicName } from 
 import {
   hasQueryConstraints as ownerHasQueryConstraints,
   queryConstraintsList as ownerQueryConstraintsList,
+  compositeQueryConstraintsList,
 } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
@@ -2076,18 +2077,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
     if (persistedRecords.length > 0) {
       const nullUpdates = this._buildNullifyUpdates();
-      const childPk = ((this as any)._modelClass as typeof Base).primaryKey as string | string[];
+      // Mirror Rails delete_records else-branch: scope to the specific records via
+      // composite_query_constraints_list (persistence.rb:234). Single-column: use
+      // `where({col: ids})`; composite: use `where(cols, tuples)` (OR-of-AND) to
+      // avoid the cartesian-product that `AND col1 IN (...) AND col2 IN (...)` produces.
+      const queryCols = compositeQueryConstraintsList.call(
+        (this as any)._modelClass as typeof Base,
+      );
+      const readCol = (r: Base, col: string) => (r as any)._readAttribute(col);
       let scope = this.scope();
-      if (Array.isArray(childPk)) {
-        for (const pkCol of childPk) {
-          scope = scope.where({
-            [pkCol]: persistedRecords.map((r) => (r as any)._readAttribute(pkCol)),
-          });
-        }
-      } else {
+      if (queryCols.length === 1) {
         scope = scope.where({
-          [childPk]: persistedRecords.map((r) => (r as any)._readAttribute(childPk)),
+          [queryCols[0]]: persistedRecords.map((r) => readCol(r, queryCols[0])),
         });
+      } else {
+        const tuples = persistedRecords.map((r) => queryCols.map((col) => readCol(r, col)));
+        scope = scope.where(queryCols, tuples);
       }
       await scope.updateAll(nullUpdates);
       for (const record of persistedRecords) {
