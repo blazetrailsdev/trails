@@ -68,13 +68,6 @@ describe("AssociationsTest", () => {
   beforeAll(async () => {
     await defineSchema({
       as_cpk_children: { parent_region_id: "integer", parent_id: "integer", label: "string" },
-      cpk_children: {
-        parent_region_id: "integer",
-        parent_id: "integer",
-        label: "string",
-        cpk_parent_id: "integer",
-        cpk_parent_region_id: "integer",
-      },
       cpk_poly_owners_a: {
         columns: { region_id: "integer", id: "integer", name: "string" },
         primaryKey: ["region_id", "id"],
@@ -91,20 +84,10 @@ describe("AssociationsTest", () => {
       b_posts: { title: "string" },
       c_comments: { body: "string", c_post_id: "integer" },
       c_posts: { title: "string" },
-      cfk_line_items: { name: "string", order_id: "integer", order_shop_id: "integer" },
-      cfk_orders: {
-        columns: { id: "integer", shop_id: "integer", status: "string" },
-        primaryKey: ["shop_id", "id"],
-      },
       cpk_authors: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      cpk_books: {
-        columns: { id: "integer", shop_id: "integer", title: "string" },
-        primaryKey: ["shop_id", "id"],
-      },
-      cpk_chapters: { cpk_book_id: "integer", cpk_book_shop_id: "integer", number: "integer" },
       cpk_items: { label: "string", owner_id: "integer", owner_region_id: "integer" },
       cpk_order_items: {
         cpk_order_id: "integer",
@@ -121,21 +104,12 @@ describe("AssociationsTest", () => {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      cpk_parents: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
       cpk_posts: {
         author_id: "integer",
         author_region_id: "integer",
         cpk_author_id: "integer",
         cpk_author_region_id: "integer",
         title: "string",
-      },
-      cpk_refs: { cpk_target_id: "integer", cpk_target_shop_id: "integer" },
-      cpk_targets: {
-        columns: { id: "integer", name: "string", shop_id: "integer" },
-        primaryKey: ["shop_id", "id"],
       },
       cpk_thru_appt1s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
       cpk_thru_appt2s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
@@ -281,40 +255,6 @@ describe("AssociationsTest", () => {
     // Re-query through proxy should find the new record
     const reloaded = await proxy.toArray();
     expect(reloaded.length).toBe(1);
-  });
-  it("belongs to a cpk model by id attribute", async () => {
-    class CpkBook extends Base {
-      static {
-        this._tableName = "cpk_books";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    class CpkChapter extends Base {
-      static {
-        this._tableName = "cpk_chapters";
-        this.attribute("cpk_book_shop_id", "integer");
-        this.attribute("cpk_book_id", "integer");
-        this.attribute("number", "integer");
-      }
-    }
-    Associations.belongsTo.call(CpkChapter, "cpkBook", {
-      foreignKey: ["cpk_book_shop_id", "cpk_book_id"],
-      className: "CpkBook",
-    });
-    registerModel("CpkBook", CpkBook);
-    registerModel("CpkChapter", CpkChapter);
-    const book = await CpkBook.create({ shop_id: 1, id: 10, title: "CPK Guide" });
-    const chapter = await CpkChapter.create({ cpk_book_shop_id: 1, cpk_book_id: 10, number: 1 });
-    const loaded = await loadBelongsTo(chapter, "cpkBook", {
-      foreignKey: ["cpk_book_shop_id", "cpk_book_id"],
-      className: "CpkBook",
-    });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.title).toBe("CPK Guide");
-    expect(loaded!.id).toEqual([1, 10]);
   });
   it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
     // No-reflection fallback: loadHasMany invoked with a composite FK against a
@@ -485,38 +425,6 @@ describe("AssociationsTest", () => {
     const refl = reflectOnAssociation(QcMultiBlogPost, "qcMultiComments")!;
     expect(() => refl.foreignKey).toThrow(ConfigurationError);
     expect(() => refl.foreignKey).toThrow("does not include the primary key");
-  });
-  it("assign belongs to cpk model by id attribute", async () => {
-    class CpkTarget extends Base {
-      static {
-        this._tableName = "cpk_targets";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    class CpkRef extends Base {
-      static {
-        this._tableName = "cpk_refs";
-        this.attribute("cpk_target_shop_id", "integer");
-        this.attribute("cpk_target_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(CpkRef, "cpkTarget", {
-      foreignKey: ["cpk_target_shop_id", "cpk_target_id"],
-      className: "CpkTarget",
-    });
-    registerModel("CpkTarget", CpkTarget);
-    registerModel("CpkRef", CpkRef);
-    const target = await CpkTarget.create({ shop_id: 2, id: 7, name: "test" });
-    const ref = await CpkRef.create({ cpk_target_shop_id: 2, cpk_target_id: 7 });
-    const loaded = await loadBelongsTo(ref, "cpkTarget", {
-      foreignKey: ["cpk_target_shop_id", "cpk_target_id"],
-      className: "CpkTarget",
-    });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.id).toEqual([2, 7]);
   });
   it("append composite has many through association", async () => {
     class CpkThruDoc1 extends Base {
@@ -909,74 +817,6 @@ describe("AssociationsTest", () => {
       const owner = await Owner.create({ region_id: 1, id: 7, name: "O" });
       expect(() => association(owner, "articles")).not.toThrow();
     }
-  });
-  it("belongs to with explicit composite foreign key", async () => {
-    class CfkOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    class CfkLineItem extends Base {
-      static {
-        this.attribute("order_shop_id", "integer");
-        this.attribute("order_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("CfkOrder", CfkOrder);
-    registerModel("CfkLineItem", CfkLineItem);
-    Associations.belongsTo.call(CfkLineItem, "cfkOrder", {
-      foreignKey: ["order_shop_id", "order_id"],
-      className: "CfkOrder",
-    });
-    const order = await CfkOrder.create({ shop_id: 1, id: 100, status: "active" });
-    const item = await CfkLineItem.create({ order_shop_id: 1, order_id: 100, name: "Widget" });
-    const loaded = await loadBelongsTo(item, "cfkOrder", {
-      foreignKey: ["order_shop_id", "order_id"],
-      className: "CfkOrder",
-    });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.status).toBe("active");
-    expect(loaded!.id).toEqual([1, 100]);
-  });
-
-  it("cpk model has many records by id attribute", async () => {
-    class CpkParent extends Base {
-      static {
-        this._tableName = "cpk_parents";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkChild extends Base {
-      static {
-        this._tableName = "cpk_children";
-        this.attribute("cpk_parent_region_id", "integer");
-        this.attribute("cpk_parent_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    Associations.hasMany.call(CpkParent, "cpkChildren", {
-      foreignKey: ["cpk_parent_region_id", "cpk_parent_id"],
-      className: "CpkChild",
-    });
-    registerModel("CpkParent", CpkParent);
-    registerModel("CpkChild", CpkChild);
-    const parent = await CpkParent.create({ region_id: 1, id: 1, name: "P" });
-    await CpkChild.create({ cpk_parent_region_id: 1, cpk_parent_id: 1, label: "A" });
-    await CpkChild.create({ cpk_parent_region_id: 1, cpk_parent_id: 1, label: "B" });
-    await CpkChild.create({ cpk_parent_region_id: 2, cpk_parent_id: 1, label: "C" }); // different region
-    const children = await loadHasMany(parent, "cpkChildren", {
-      foreignKey: ["cpk_parent_region_id", "cpk_parent_id"],
-      className: "CpkChild",
-    });
-    expect(children.length).toBe(2);
-    expect(children.map((c) => c.label).sort()).toEqual(["A", "B"]);
   });
 });
 
@@ -3894,7 +3734,7 @@ describe("WithAnnotationsTest", () => {
 describe("AssociationsTest", () => {
   // `authorFavorites` is declared so its rows are loaded (Rails: `fixtures
   // :author_favorites`); the subselect test reads them through the association.
-  const { companies, authors, shardedBlogs, shardedBlogPosts, shardedComments } =
+  const { companies, authors, shardedBlogs, shardedBlogPosts, shardedComments, cpkOrders } =
     useHandlerFixtures(
       [
         "companies",
@@ -3903,6 +3743,7 @@ describe("AssociationsTest", () => {
         "shardedBlogs",
         "shardedBlogPosts",
         "shardedComments",
+        "cpkOrders",
       ],
       {
         schema: canonicalSchema,
@@ -3928,6 +3769,10 @@ describe("AssociationsTest", () => {
   let Electron: typeof Base;
   let Ship: typeof Base;
   let ShipPart: typeof Base;
+  let CpkOrder: typeof Base;
+  let CpkOrderAgreement: typeof Base;
+  let CpkCar: typeof Base;
+  let CpkCarReview: typeof Base;
 
   beforeAll(async () => {
     const shardedMod = await import("./test-helpers/models/sharded.js");
@@ -3963,6 +3808,11 @@ describe("AssociationsTest", () => {
     const shipMod = await import("./test-helpers/models/ship.js");
     Ship = shipMod.Ship as never;
     ShipPart = (await import("./test-helpers/models/ship-part.js")).ShipPart as never;
+    const cpkMod = await import("./test-helpers/models/cpk.js");
+    CpkOrder = cpkMod.CpkOrder as never;
+    CpkOrderAgreement = cpkMod.CpkOrderAgreement as never;
+    CpkCar = cpkMod.CpkCar as never;
+    CpkCarReview = cpkMod.CpkCarReview as never;
   });
 
   // Earlier describe blocks in this file create `companies` / `authors` with
@@ -3996,6 +3846,10 @@ describe("AssociationsTest", () => {
     registerModel("Electron", Electron);
     registerModel("Ship", Ship);
     registerModel("ShipPart", ShipPart);
+    registerModel("CpkOrder", CpkOrder);
+    registerModel("CpkOrderAgreement", CpkOrderAgreement);
+    registerModel("CpkCar", CpkCar);
+    registerModel("CpkCarReview", CpkCarReview);
   });
 
   it("eager loading should not change count of children", async () => {
@@ -4358,5 +4212,60 @@ describe("AssociationsTest", () => {
     const reloaded = await ShardedBlogPost.find((childPost as any).id);
     const loaded = await (reloaded as any).loadBelongsTo("parent");
     expect((loaded as any).id).toBe((parentPost as any).id);
+  });
+
+  it("belongs to a cpk model by id attribute", async () => {
+    const order = cpkOrders("cpk_groceries_order_1");
+    const orderId = (order as any).id[1];
+    const agreement = await CpkOrderAgreement.create({ order_id: orderId, signature: "signed" });
+
+    const loaded = await (agreement as any).loadBelongsTo("order");
+    expect((loaded as any).id).toEqual((order as any).id);
+  });
+
+  it("belongs to with explicit composite foreign key", async () => {
+    const car = await CpkCar.create({ make: "Tesla", model: "Model S" });
+    const review = await CpkCarReview.create({ car, comment: "Great car!", rating: 5 });
+
+    await review.reload();
+
+    let loaded: any;
+    const sqls = await captureSql(async () => {
+      loaded = await (review as any).loadBelongsTo("car");
+    });
+    expect((loaded as any).id).toEqual((car as any).id);
+
+    const sql = sqls.find((s) => /cpk_cars/.test(s))!;
+    expectQuotedColumnInSql(sql, "cpk_cars.make");
+    expectQuotedColumnInSql(sql, "cpk_cars.model");
+  });
+
+  it("cpk model has many records by id attribute", async () => {
+    const order = cpkOrders("cpk_groceries_order_1");
+    const orderId = (order as any).id[1];
+    const agreements = [];
+    for (let i = 0; i < 2; i++) {
+      agreements.push(await CpkOrderAgreement.create({ order_id: orderId, signature: "signed" }));
+    }
+
+    const loaded = await (order as any).orderAgreements.toArray();
+    expect(loaded.map((a: any) => a.id).sort()).toEqual(agreements.map((a: any) => a.id).sort());
+  });
+
+  it("assign belongs to cpk model by id attribute", async () => {
+    const order = cpkOrders("cpk_groceries_order_1");
+    const agreement = new CpkOrderAgreement({ signature: "signed" });
+
+    (agreement.association("order") as any).writer(order);
+    await agreement.save();
+
+    await agreement.reload();
+    const loaded = await (agreement as any).loadBelongsTo("order");
+    expect(loaded).not.toBeNull();
+    expect((agreement as any).order_id).not.toBeNull();
+
+    expect((loaded as any).id).toEqual((order as any).id);
+    const orderId = (order as any).id[1];
+    expect((agreement as any).order_id).toBe(orderId);
   });
 });
