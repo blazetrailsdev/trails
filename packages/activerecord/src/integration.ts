@@ -6,7 +6,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { squish, parameterize, truncate } from "@blazetrails/activesupport";
+import { squish, parameterize, truncate, tableize } from "@blazetrails/activesupport";
 
 interface Identifiable {
   id: unknown;
@@ -112,7 +112,10 @@ function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
  */
 export function cacheKey(this: Identifiable): string {
   const klass = this.constructor as any;
-  const modelKey: string = klass.tableName;
+  // Rails uses `model_name.cache_key` (tableize of the class name), not the
+  // table name — so a model whose table is overridden (e.g. CachedDeveloper,
+  // `self.table_name = "developers"`) still keys on `cached_developers`.
+  const modelKey: string = klass.name ? tableize(klass.name) : klass.tableName;
   const pk = this.id;
 
   if (this.isNewRecord()) {
@@ -196,7 +199,12 @@ export function toParamClass(
   klass.prototype.toParam = function (this: any): string | null {
     const base: string | null = Object.getPrototypeOf(klass.prototype).toParam?.call(this) ?? null;
     if (!base) return base;
-    const member = this[methodName];
+    // Rails `send(method_name)` resolves to the attribute reader for column
+    // names; fall back to readAttribute when no generated accessor is present.
+    let member = this[methodName];
+    if (member === undefined && typeof this.readAttribute === "function") {
+      member = this.readAttribute(methodName);
+    }
     const raw: string = String((typeof member === "function" ? member.call(this) : member) ?? "");
     const slug = truncate(parameterize(squish(raw)), 20, { separator: /-/, omission: "" });
     return slug ? `${base}-${slug}` : base;

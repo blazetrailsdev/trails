@@ -1052,8 +1052,18 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   // SQL identifier position. Primary-key columns are implicit on Base and
   // aren't always in _attributeDefinitions, so allow them through.
   const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
+  // Rails resolves attribute aliases before writing (update_columns flows
+  // through the alias-aware attribute layer), so a model aliasing e.g.
+  // updated_at → legacy_updated_at can be updated by its public name.
+  const aliases: Record<string, string> =
+    (
+      ctor as unknown as {
+        _attributeAliases?: Record<string, string>;
+      }
+    )._attributeAliases ?? {};
   const setPairs: Array<[unknown, unknown]> = [];
-  for (const [key, value] of Object.entries(attrs)) {
+  for (const [rawKey, value] of Object.entries(attrs)) {
+    const key = aliases[rawKey] ?? rawKey;
     const def = ctor._attributeDefinitions.get(key);
     if (!def && !pkCols.includes(key)) {
       throw new UnknownAttributeError(this, key);
