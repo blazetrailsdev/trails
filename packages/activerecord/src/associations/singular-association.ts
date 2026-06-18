@@ -39,8 +39,8 @@ export class SingularAssociation extends Association {
   }
 
   /**
-   * Sync reader for belongsTo / hasOne. Returns the currently loaded
-   * target (record or null).
+   * Reader for belongsTo / hasOne. Returns the loaded target, or a
+   * Promise (when the FK is present but unloaded — use `await`).
    *
    * Phase R.3: under strict loading, sync access that would trigger a
    * lazy DB load throws `StrictLoadingViolationError` — pointing
@@ -104,11 +104,8 @@ export class SingularAssociation extends Association {
           className: this.reflection.options?.className,
         });
       }
-      // Rails lazily loads synchronously; Node.js requires async I/O.
-      // Return a Promise so `await record.assocName` triggers a DB load
-      // and resolves to the target — mirrors Rails' implicit lazy load.
-      // Sync access (without await) receives the Promise object; callers
-      // that need the loaded value must await or use loadBelongsTo/loadHasOne.
+      // Rails loads synchronously; Node.js requires async I/O. Return a
+      // Promise — sync access without await receives the Promise object.
       return this.loadTarget() as unknown as Base | null;
     }
     return this.target;
@@ -134,6 +131,8 @@ export class SingularAssociation extends Association {
    * record — e.g. `face.create_human` would INSERT with the loaded fixture's
    * id and collide (`UNIQUE constraint failed: humans.id`). Stripping the
    * klass primary key(s) is exactly how Rails avoids that.
+   *
+   * @internal
    */
   override scopeForCreate(): Record<string, unknown> {
     const attrs = super.scopeForCreate();
