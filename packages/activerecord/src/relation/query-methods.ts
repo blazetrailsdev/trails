@@ -885,16 +885,18 @@ export function buildWhereClause(
       rest.length === 1 && isPlainObject(firstBind) && hasNamedToken && !hasPositional;
 
     if (isNamedBinds) {
-      // Rails: build_bound_sql_literal wraps in Grouping(BoundSqlLiteral)
-      // (query_methods.rb:1620-1628); named collector.preparable stays true.
+      // Mirrors build_named_bound_sql_literal (query_methods.rb:1702-1717).
+      // Named binds: no positional normalization needed; values are quoted
+      // by visitBindValue when the node is visited.
       const node = new Nodes.Grouping(
         new Nodes.BoundSqlLiteral(opts, [], firstBind as Record<string, unknown>),
       );
       return new WhereClause([node]);
     } else if (rest.length > 0) {
-      // Rails: positional `where("col = ?", val)` → BoundSqlLiteral so
-      // collector.preparable stays true (visitor does not set it false).
-      const node = new Nodes.Grouping(new Nodes.BoundSqlLiteral(opts, rest));
+      // Route through buildBoundSqlLiteral for Rails-faithful normalization:
+      // Arel nodes → SQL strings, id_for_database records → their id.
+      // Empty arrays are left as-is; visitBindValue renders them as NULL.
+      const node = new Nodes.Grouping(buildBoundSqlLiteral.call(this, opts, rest));
       return new WhereClause([node]);
     }
     const sql = opts;
@@ -1659,14 +1661,18 @@ export function buildBoundSqlLiteral(
   statement: string,
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
+  // Mirrors build_bound_sql_literal (query_methods.rb:1682-1697).
   const positionalBinds = values.map((value) => {
     if (value instanceof Nodes.Node) {
       return arelSql(this._modelClass.connection.toSql(value));
     }
+    if (value !== null && typeof value === "object" && "id_for_database" in value) {
+      return (value as { id_for_database: unknown }).id_for_database;
+    }
     return value;
   });
   try {
-    return new Nodes.BoundSqlLiteral(`(${statement})`, positionalBinds, {});
+    return new Nodes.BoundSqlLiteral(statement, positionalBinds, {});
   } catch (e: any) {
     throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
   }

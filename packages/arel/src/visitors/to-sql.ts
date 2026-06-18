@@ -1786,10 +1786,15 @@ export class ToSql extends Visitor {
     if (value instanceof Node) {
       this.visit(value, collector);
     } else if (Array.isArray(value)) {
-      value.forEach((v, i) => {
-        if (i > 0) collector.append(", ");
-        this.visitBindValue(v, collector);
-      });
+      // Mirrors to_sql.rb:777-782: empty array → NULL (IN () is invalid SQL).
+      if (value.length === 0) {
+        collector.append("NULL");
+      } else {
+        value.forEach((v, i) => {
+          if (i > 0) collector.append(", ");
+          this.visitBindValue(v, collector);
+        });
+      }
     } else {
       collector.append(this.quote(value));
     }
