@@ -3789,7 +3789,7 @@ describe("AssociationsTest", () => {
     registerModel("CpkOrderInline", CpkOrderInline);
     registerModel("CpkBookInline", CpkBookInline);
     const order = await CpkOrderInline.create({ shop_id: 1, id: 2, status: "paid" });
-    const book = await CpkBookInline.create({
+    await CpkBookInline.create({
       author_id: 3,
       id: 4,
       shop_id: 1,
@@ -3797,10 +3797,10 @@ describe("AssociationsTest", () => {
       title: "Book",
     });
     await CpkBookInline.where({ author_id: 3, id: 4 }).updateAll({ title: "A different title" });
-    await loadHasMany(order, "cpkBooksInline", {
+    const books = await loadHasMany(order, "cpkBooksInline", {
       foreignKey: ["shop_id", "order_id"],
       className: "CpkBookInline",
     });
-    expect(book.id).toEqual([3, 4]);
+    expect(books[0].id).toEqual([3, 4]);
   });
 });
