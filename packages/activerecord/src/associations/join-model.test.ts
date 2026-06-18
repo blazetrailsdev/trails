@@ -10,7 +10,14 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
-import { setHasOne, loadBelongsTo } from "../associations.js";
+import { association, setHasOne, loadBelongsTo } from "../associations.js";
+import {
+  HasManyThroughAssociationNotFoundError,
+  HasManyThroughAssociationPolymorphicSourceError,
+  HasManyThroughAssociationPolymorphicThroughError,
+  EagerLoadPolymorphicError,
+} from "./errors.js";
+import { assertNoQueries } from "../testing/query-assertions.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -20,6 +27,8 @@ import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
+import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
+import { Item } from "../test-helpers/models/item.js";
 
 // Mirrors the dynamic subclasses built by Rails' `find_post_with_dependency`
 // helper: `Class.new(ActiveRecord::Base)` on the `posts` table carrying a
@@ -59,13 +68,15 @@ class PostWithHasOneNullify extends Base {
 describe("AssociationsJoinModelTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  const { authors, posts, categories, tags, taggings } = useHandlerFixtures([
+  const { authors, posts, categories, tags, taggings, comments, items } = useHandlerFixtures([
     "authors",
     "posts",
     "categories",
     "categorizations",
     "tags",
     "taggings",
+    "comments",
+    "items",
   ]);
   registerModel(Author);
   registerModel(Post);
@@ -73,6 +84,9 @@ describe("AssociationsJoinModelTest", () => {
   registerModel(Tagging);
   registerModel(Category);
   registerModel(Categorization);
+  registerModel(Comment);
+  registerModel(SpecialComment);
+  registerModel(Item);
   registerModel(SpecialPost);
   registerModel(SubAbstractStiPost);
   registerModel(PostWithHasManyDeleteAll);
@@ -347,5 +361,276 @@ describe("AssociationsJoinModelTest", () => {
     expect(((await Post.find(posts("welcome").id)) as any).tags_count).toBe(2);
     await (tagging as any).destroy();
     expect(((await Post.find(posts("welcome").id)) as any).tags_count).toBe(1);
+  });
+
+  it("has many with piggyback", async () => {
+    const stiTest = (await Category.find(categories("sti_test").id)) as Category;
+    const first = (await (stiTest as any).authorsWithSelect.first()) as Base;
+    // Rails surfaces the piggybacked `categorizations.post_id` select column via
+    // method_missing as `first.post_id`; Author declares no such attribute, so
+    // read it through `readAttribute` (the canonical-fixture id replaces the
+    // Rails literal 2).
+    expect(String((first as any).readAttribute("post_id"))).toBe(String(posts("thinking").id));
+  });
+
+  // DEFERRED (tracked: join-model-create-through-sets-owner-fk): trails'
+  // create-through-has_many builds the join record but leaves the owner foreign
+  // key (categorizations.category_id) null, so the created Ernie never appears
+  // back through the association. Un-skip once create-through populates the
+  // owner key.
+  it.skip("create through has many with piggyback", async () => {
+    const category = (await Category.find(categories("sti_test").id)) as Category;
+    const ernie = await (category as any).authorsWithSelect.create({ name: "Ernie" });
+    // assert_nothing_raised { ... category.authors_with_select.detect { |a| a.name == "Ernie" } }
+    const detected = (await (category as any).authorsWithSelect.toArray()).find(
+      (a: Base) => (a as any).name === "Ernie",
+    );
+    expect((detected as Base).id).toBe(ernie.id);
+  });
+
+  it("include has many through", async () => {
+    const allPosts = (await Post.all().order("posts.id").toArray()) as Base[];
+    const postsWithAuthors = (await Post.all()
+      .includes("authors")
+      .order("posts.id")
+      .toArray()) as Base[];
+    expect(postsWithAuthors.length).toBe(allPosts.length);
+    for (let i = 0; i < allPosts.length; i++) {
+      const expected = ((await (allPosts[i] as any).authors.toArray()) as Base[]).length;
+      await assertNoQueries(false, async () => {
+        const assoc = (postsWithAuthors[i] as any).association("authors");
+        expect((assoc.target as Base[]).length).toBe(expected);
+      });
+    }
+  });
+
+  it("include polymorphic has one", async () => {
+    const post = (await Post.includes("tagging").find(posts("welcome").id)) as Post;
+    const tagging = taggings("welcome_general");
+    await assertNoQueries(false, async () => {
+      const target = (post as any).association("tagging").target as Base;
+      expect(target.id).toBe(tagging.id);
+    });
+  });
+
+  it("include polymorphic has one defined in abstract parent", async () => {
+    const item = (await Item.includes("tagging").find(items("dvd").id)) as Item;
+    const tagging = taggings("godfather");
+    await assertNoQueries(false, async () => {
+      const target = (item as any).association("tagging").target as Base;
+      expect(target.id).toBe(tagging.id);
+    });
+  });
+
+  it("include polymorphic has many through", async () => {
+    const allPosts = (await Post.all().order("posts.id").toArray()) as Base[];
+    const postsWithTags = (await Post.all().includes("tags").order("posts.id").toArray()) as Base[];
+    expect(postsWithTags.length).toBe(allPosts.length);
+    for (let i = 0; i < allPosts.length; i++) {
+      const expected = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;
+      await assertNoQueries(false, async () => {
+        const assoc = (postsWithTags[i] as any).association("tags");
+        expect((assoc.target as Base[]).length).toBe(expected);
+      });
+    }
+  });
+
+  it("include polymorphic has many", async () => {
+    const allPosts = (await Post.all().order("posts.id").toArray()) as Base[];
+    const postsWithTaggings = (await Post.all()
+      .includes("taggings")
+      .order("posts.id")
+      .toArray()) as Base[];
+    expect(postsWithTaggings.length).toBe(allPosts.length);
+    for (let i = 0; i < allPosts.length; i++) {
+      const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
+      await assertNoQueries(false, async () => {
+        const assoc = (postsWithTaggings[i] as any).association("taggings");
+        expect((assoc.target as Base[]).length).toBe(expected);
+      });
+    }
+  });
+
+  it("has many going through join model with custom foreign key", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    expect(((await (thinking as any).authors.toArray()) as Base[]).map((a) => a.id)).toEqual([
+      authors("bob").id,
+    ]);
+    const authorless = (await Post.find(posts("authorless").id)) as Post;
+    expect(((await (authorless as any).authors.toArray()) as Base[]).map((a) => a.id)).toEqual([
+      authors("mary").id,
+    ]);
+  });
+
+  it("has many going through join model with custom primary key", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    expect(
+      ((await (thinking as any).authorsUsingAuthorId.toArray()) as Base[]).map((a) => a.id),
+    ).toEqual([authors("david").id]);
+  });
+
+  it("has many going through polymorphic join model with custom primary key", async () => {
+    const eagerOther = (await Post.find(posts("eager_other").id)) as Post;
+    expect(
+      ((await (eagerOther as any).tagsUsingAuthorId.toArray()) as Base[]).map((t) => t.id),
+    ).toEqual([tags("general").id]);
+  });
+
+  // DEFERRED (tracked: canonical-fixture-ref-resolves-explicit-id): this test
+  // relies on a cross-table id coincidence (Rails authors.author_address_extra_id
+  // == categorizations.author_id == 2). In the canonical fixtures
+  // `ref("author_addresses", "david_address_extra")` resolves to a label-hash
+  // (1006418192) rather than the explicit `id: 2` pinned in the author_addresses
+  // fixture, so the belongs_to custom-primary_key join never matches. Un-skip once
+  // refs resolve to the target fixture's explicit id.
+  it.skip("has many through with custom primary key on belongs to source", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    expect(
+      ((await (thinking as any).authorUsingCustomPk.toArray()) as Base[]).map((a) => a.id),
+    ).toEqual([authors("david").id, authors("david").id]);
+  });
+
+  it("has many through with custom primary key on has many source", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    const authorsUsingCustomPk = (await (thinking as any).authorsUsingCustomPk
+      .order("authors.id")
+      .toArray()) as Base[];
+    expect(authorsUsingCustomPk.map((a) => a.id)).toEqual([authors("david").id, authors("bob").id]);
+  });
+
+  it("unavailable through reflection", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    expect(() => association(david, "nothings")).toThrow(HasManyThroughAssociationNotFoundError);
+  });
+
+  it("exceptions have suggestions for fix", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    let error: HasManyThroughAssociationNotFoundError | undefined;
+    try {
+      association(david, "nothings");
+    } catch (e) {
+      error = e as HasManyThroughAssociationNotFoundError;
+    }
+    expect(error).toBeInstanceOf(HasManyThroughAssociationNotFoundError);
+    expect((error as any).detailedMessage()).toContain("Did you mean?");
+  });
+
+  it("has many through join model with conditions", async () => {
+    const welcome = (await Post.find(posts("welcome").id)) as Post;
+    expect((await (welcome as any).invalidTaggings.toArray()) as Base[]).toEqual([]);
+    expect((await (welcome as any).invalidTags.toArray()) as Base[]).toEqual([]);
+  });
+
+  it("has many polymorphic", async () => {
+    const general = (await Tag.find(tags("general").id)) as Tag;
+    expect(() => association(general, "taggables")).toThrow(
+      HasManyThroughAssociationPolymorphicSourceError,
+    );
+
+    const welcomeGeneral = (await Tagging.find(taggings("welcome_general").id)) as Tagging;
+    expect(() => association(welcomeGeneral, "things")).toThrow(
+      HasManyThroughAssociationPolymorphicThroughError,
+    );
+
+    await expect(
+      (general as any).taggings
+        .includes("taggable")
+        .where("bogus_table.column = 1")
+        .references("bogus_table")
+        .toArray(),
+    ).rejects.toThrow(EagerLoadPolymorphicError);
+  });
+
+  it("has many polymorphic with source type", async () => {
+    const general = (await Tag.find(tags("general").id)) as Tag;
+    const taggedPosts = (await (general as any).taggedPosts.toArray()) as Base[];
+    expect(taggedPosts.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [posts("welcome").id, posts("thinking").id].sort((a: any, b: any) => Number(a) - Number(b)),
+    );
+  });
+
+  it("has many polymorphic associations merges through scope", async () => {
+    // Rails defines null_taggings / null_tagged_posts inline here; the canonical
+    // Tag model carries them so we needn't mutate the shared class at runtime.
+    const general = (await Tag.find(tags("general").id)) as Tag;
+    expect((await (general as any).nullTaggedPosts.toArray()) as Base[]).toEqual([]);
+    expect(((await (general as any).taggedPosts.toArray()) as Base[]).length).not.toBe(0);
+  });
+
+  it("eager has many polymorphic with source type", async () => {
+    const tagWithInclude = (await Tag.all()
+      .includes("taggedPosts")
+      .find(tags("general").id)) as Tag;
+    const desired = [posts("welcome").id, posts("thinking").id].sort(
+      (a: any, b: any) => Number(a) - Number(b),
+    );
+    await assertNoQueries(false, async () => {
+      const target = (tagWithInclude as any).association("taggedPosts").target as Base[];
+      expect(target.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+        desired,
+      );
+    });
+    expect(((await (tagWithInclude as any).taggings.toArray()) as Base[]).length).toBe(5);
+  });
+
+  it("has many through has many find all", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const first = ((await (david as any).comments.order("comments.id").toArray()) as Base[])[0];
+    expect(first.id).toBe(comments("greetings").id);
+  });
+
+  it("has many through has many find all with custom class", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const first = (
+      (await (david as any).funkyComments.order("comments.id").toArray()) as Base[]
+    )[0];
+    expect(first.id).toBe(comments("greetings").id);
+  });
+
+  it("has many through has many find first", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const first = (await (david as any).comments.order("comments.id").first()) as Base;
+    expect(first.id).toBe(comments("greetings").id);
+  });
+
+  it("has many through has many find conditions", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const first = (await (david as any).comments
+      .where("comments.type = 'SpecialComment'")
+      .order("comments.id")
+      .first()) as Base;
+    expect(first.id).toBe(comments("does_it_hurt").id);
+  });
+
+  it("has many through has many find by id", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const comment = (await (david as any).comments.find(2)) as Base;
+    expect(comment.id).toBe(comments("more_greetings").id);
+  });
+
+  // DEFERRED (tracked: through-polymorphic-source-applies-type-condition): when a
+  // has_many :through walks a polymorphic `as: :taggable` source (Post.taggings),
+  // trails omits the `taggable_type = 'Post'` predicate, so author.taggings_2 /
+  // author.taggings return every tagging whose taggable_id collides with the
+  // owner's post ids (e.g. Rating/Item/FakeModel rows). Un-skip once the
+  // polymorphic type condition is threaded through the source reflection.
+  it.skip("has many through polymorphic has one", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const taggings2 = (await (david as any).taggings_2.toArray()) as Base[];
+    // Rails: Tagging.find(1, 2).sort_by(&:id) — welcome_general + thinking_general.
+    expect(taggings2.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [taggings("welcome_general").id, taggings("thinking_general").id].sort(
+        (a: any, b: any) => Number(a) - Number(b),
+      ),
+    );
+  });
+
+  it.skip("has many through polymorphic has many", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const davidTaggings = (await (david as any).taggings.distinct().toArray()) as Base[];
+    expect(davidTaggings.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual([
+      taggings("welcome_general").id,
+      taggings("thinking_general").id,
+    ]);
   });
 });
