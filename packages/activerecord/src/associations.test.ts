@@ -4225,9 +4225,7 @@ describe("AssociationsTest", () => {
 
   it("belongs to with explicit composite foreign key", async () => {
     const car = await CpkCar.create({ make: "Tesla", model: "Model S" });
-    const review = new CpkCarReview({ comment: "Great car!", rating: 5 });
-    (review.association("car") as any).writer(car);
-    await review.save();
+    const review = await CpkCarReview.create({ car, comment: "Great car!", rating: 5 });
 
     await review.reload();
 
