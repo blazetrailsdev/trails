@@ -1313,7 +1313,7 @@ export async function loadHasOne(
       const typeCol = `${underscore(options.as)}_type`;
       result = await targetModel.findBy({
         [foreignKey as string]: record._readAttribute(primaryKey as string),
-        [typeCol]: ctor.name,
+        [typeCol]: polymorphicName(ctor),
       });
     } else if (options.scope) {
       let rel = targetModel
@@ -1362,7 +1362,7 @@ export function buildHasOne(
     [foreignKey as string]: record._readAttribute(primaryKey as string),
   };
   if (options.as) {
-    buildAttrs[`${underscore(options.as)}_type`] = ctor.name;
+    buildAttrs[`${underscore(options.as)}_type`] = polymorphicName(ctor);
   }
 
   let targetModel = resolveAssocClass(record, _assocName, className);
@@ -1551,7 +1551,7 @@ export async function loadHasMany(
       const typeCol = `${underscore(options.as)}_type`;
       rel = targetModel.all().where({
         [foreignKey as string]: record._readAttribute(primaryKey as string),
-        [typeCol]: ctor.name,
+        [typeCol]: polymorphicName(ctor),
       });
     } else {
       rel = targetModel
@@ -1625,7 +1625,7 @@ export function computeHasManyWhere(
     const pkValue = record._readAttribute(primaryKey as string);
     if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
-    return { [foreignKey as string]: pkValue, [typeCol]: ctor.name };
+    return { [foreignKey as string]: pkValue, [typeCol]: polymorphicName(ctor) };
   }
 
   // Prefer the reflection's foreign key, which is derived from the class that
@@ -2293,7 +2293,7 @@ export function buildThroughAssociation(
       ? (throughAssoc.options.foreignKey as string)
       : `${underscore(throughAssoc.options.as)}_id`;
     throughAttrs[polyFk] = record._readAttribute(ownerPk);
-    throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
+    throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
   } else {
     throughAttrs[ownerFk] = record._readAttribute(ownerPk);
   }
@@ -2385,7 +2385,7 @@ export async function createThroughAssociation(
       }
       target._writeAttribute(targetFk as string, through._readAttribute(throughPk as string));
       if (sourceAsName) {
-        target._writeAttribute(`${underscore(sourceAsName)}_type`, throughCtor.name);
+        target._writeAttribute(`${underscore(sourceAsName)}_type`, polymorphicName(throughCtor));
       }
       const targetSaved = await target.save();
       if (!targetSaved) throw new Rollback();

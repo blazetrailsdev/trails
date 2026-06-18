@@ -191,6 +191,20 @@ describe("AssociationsJoinModelTest", () => {
     expect(tagging.taggable_type).toBe("Post");
   });
 
+  it("polymorphic has many going through join model with inheritance", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    expect(thinking).toBeInstanceOf(SpecialPost);
+    const tag = (await (thinking as any).tags.first()) as Base;
+    expect(tag.id).toBe(tags("general").id);
+  });
+
+  it("polymorphic has many going through join model with inheritance with custom class name", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    expect(thinking).toBeInstanceOf(SpecialPost);
+    const tag = (await (thinking as any).funkyTags.first()) as Base;
+    expect(tag.id).toBe(tags("general").id);
+  });
+
   it("polymorphic has one create model with inheritance", async () => {
     const misc = (await Tag.find(tags("misc").id)) as Tag;
     const thinking = (await Post.find(posts("thinking").id)) as Post;
