@@ -375,6 +375,15 @@ describe("NamedScopingTest", () => {
     const expected = sortedIds(await Topic.where("title LIKE '% %'").toArray());
     const got = sortedIds(await (Topic as any)["title containing space"]({ space: " " }).toArray());
     expect(got).toEqual(expected);
+    // (2) chained onto an already-constrained relation: the space-named scope
+    // must not reset the prior `approved` condition.
+    const chainedExpected = sortedIds(
+      await (Topic as any).approved().where("title LIKE '% %'").toArray(),
+    );
+    const chainedGot = sortedIds(
+      await (Topic as any).approved()["title containing space"]({ space: " " }).toArray(),
+    );
+    expect(chainedGot).toEqual(chainedExpected);
   });
 
   // Rails asserts `to_a.select(&:approved) == to_a.find_all(&:approved)` — i.e.
@@ -532,14 +541,15 @@ describe("NamedScopingTest", () => {
   // scope, so there is no faithful body to assert against yet.
   it.skip("scopes to get newest", () => {});
 
-  it("scopes are reset on association reload", async () => {
-    const welcome = posts("welcome");
-    const post = (await Post.find(welcome.id)) as any;
-    const before = post.comments.containingTheLetterE();
-    await post.comments.reload();
-    const after = post.comments.containingTheLetterE();
-    expect(before).not.toBe(after);
-  });
+  // Rails iterates [:destroy_all, :reset, :delete_all] and asserts the cached
+  // named-scope relation object differs after each (the association proxy
+  // caches scope relations and must invalidate them). trails does not cache
+  // named-scope relations on association proxies — each `post.comments.<scope>()`
+  // call rebuilds a fresh relation (verified: two consecutive calls are already
+  // `!==` with no reload), so there is no cache to reset and the `assert_not_same`
+  // assertion cannot catch a stale cache. Tracked with the association
+  // scope-cache work in RFC 0030.
+  it.skip("scopes are reset on association reload", () => {});
 
   // Rails requires "models/without_table" to prove scopes are lazy when the
   // table is absent; trails has no without_table fixture model.
