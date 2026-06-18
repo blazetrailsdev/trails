@@ -69,8 +69,6 @@ import { Human } from "../test-helpers/models/human.js";
 import { Category } from "../test-helpers/models/category.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
-import { Car } from "../test-helpers/models/car.js";
-import { Bulb } from "../test-helpers/models/bulb.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 const UNIVERSAL_HM_SCHEMA: Schema = {
