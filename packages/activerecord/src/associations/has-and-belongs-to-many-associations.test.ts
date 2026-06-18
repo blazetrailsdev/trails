@@ -93,7 +93,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("should property quote string primary keys", async () => {
     const country = await Country.create({ country_id: "c1", name: "India" });
-    const treaty = await Treaty.create({ treaty_id: "t1", name: "peace" });
+    const treaty = Treaty.new({ treaty_id: "t1", name: "peace" });
     await country.treaties.push(treaty);
 
     const con = Base.connection;
@@ -105,7 +105,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("proper usage of primary keys and join table", async () => {
     const country = await Country.create({ country_id: "c1", name: "India" });
-    const treaty = await Treaty.create({ treaty_id: "t1", name: "peace" });
+    const treaty = Treaty.new({ treaty_id: "t1", name: "peace" });
     await country.treaties.push(treaty);
 
     expect(Country.primaryKey).toBe("country_id");
