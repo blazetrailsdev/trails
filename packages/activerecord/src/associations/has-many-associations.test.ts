@@ -27,6 +27,7 @@ import {
 } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 import { Car } from "../test-helpers/models/car.js";
+import { Bulb } from "../test-helpers/models/bulb.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
 import {
@@ -1651,18 +1652,24 @@ describe("HasManyAssociationsTest", () => {
         companies: TEST_SCHEMA.companies,
         posts: TEST_SCHEMA.posts,
         comments: TEST_SCHEMA.comments,
+        cars: TEST_SCHEMA.cars,
+        bulbs: TEST_SCHEMA.bulbs,
       } as Schema,
       { dropExisting: true },
     );
     await Company.loadSchema();
     await HmPost.loadSchema();
     await Comment.loadSchema();
+    await Car.loadSchema();
+    await Bulb.loadSchema();
   });
   registerModel(Company);
   registerModel(HmFirm);
   registerModel(Client);
   registerModel(HmPost);
   registerModel(Comment);
+  registerModel(Car);
+  registerModel(Bulb);
   enableSti(Company);
   registerSubclass(HmFirm);
   registerSubclass(Client);
@@ -1684,13 +1691,7 @@ describe("HasManyAssociationsTest", () => {
     }
   });
 
-  // Rails' `test_association_keys_bypass_attribute_protection` uses canonical
-  // Car/Bulb. Creating a canonical `Bulb` currently throws
-  // `this.readAttribute is not a function` (the public read/write aliases are
-  // declared on Base but never bound). Skipped pending RFC 0030
-  // `canonical-bulb-public-attribute-accessors`, which binds them and un-skips
-  // this test.
-  it.skip("association keys bypass attribute protection", async () => {
+  it("association keys bypass attribute protection", async () => {
     const car = (await Car.create({ name: "honda" })) as any;
 
     let bulb = car.bulbs.new();

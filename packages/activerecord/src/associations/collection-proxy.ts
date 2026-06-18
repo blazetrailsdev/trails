@@ -768,6 +768,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return record;
   }
 
+  /** Rails `CollectionProxy#new` — `alias_method :new, :build`. */
+  new(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
+  new(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  new(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): T | T[] {
+    return this.build(attrs as Record<string, unknown>, block);
+  }
+
   /**
    * Add an already-persisted record to the in-memory target, mirroring Rails'
    * `association.add_to_target(existing_record, skip_callbacks: true)` in
