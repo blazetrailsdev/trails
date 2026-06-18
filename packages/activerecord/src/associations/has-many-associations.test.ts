@@ -880,14 +880,8 @@ describe("HasManyAssociationsTest", () => {
 
   // -- Deleting --
 
-  // The three `clients_of_firm` delete/build tests below are converted to
-  // canonical `Firm`/`Client` but skipped pending RFC 0019 follow-up
-  // `hm-clients-of-firm-delete-async-validate`: canonical `Client`'s
-  // `validate(async () => await this.firm)` callback trips trails' synchronous
-  // `runValidationsBang` chain on the has_many delete-nullify path, because
-  // `collection-proxy.ts` saves each record instead of Rails' `update_all`.
-  it.skip("deleting", async () => {
-    const firm = (await HmFirm.first()) as any;
+  it("deleting", async () => {
+    const firm = companies("first_firm") as any;
     await firm.clientsOfFirm.toArray();
 
     const first = (await firm.clientsOfFirm.first()) as any;
@@ -897,8 +891,8 @@ describe("HasManyAssociationsTest", () => {
     expect(await firm.clientsOfFirm.size()).toBe(1);
   });
 
-  it.skip("deleting a collection", async () => {
-    const firm = (await HmFirm.first()) as any;
+  it("deleting a collection", async () => {
+    const firm = companies("first_firm") as any;
     await firm.clientsOfFirm.toArray();
 
     await firm.clientsOfFirm.create({ name: "Another Client" });
@@ -921,7 +915,7 @@ describe("HasManyAssociationsTest", () => {
     expect(await david.projects.size()).toBe(1);
   });
 
-  it.skip("deleting before save", async () => {
+  it("deleting before save", async () => {
     const newFirm = HmFirm.new({ name: "A New Firm, Inc." }) as any;
     const newClient = newFirm.clientsOfFirm.build({ name: "Another Client" });
     expect(await newFirm.clientsOfFirm.size()).toBe(1);

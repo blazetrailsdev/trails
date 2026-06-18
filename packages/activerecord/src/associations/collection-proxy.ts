@@ -2063,20 +2063,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ? (records as T[])
       : ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[]);
 
-    const ctor = this._record.constructor as typeof Base;
-    const asName = this._assocDef.options.as;
-    const ownerPk = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-    const foreignKey = asName
-      ? (this._assocDef.options.foreignKey ??
-        this._reflectionForeignKey() ??
-        `${underscore(asName)}_id`)
-      : (this._assocDef.options.foreignKey ??
-        this._reflectionForeignKey() ??
-        this._assocDef.options.queryConstraints ??
-        (Array.isArray(ownerPk)
-          ? ownerPk.map((col: string) => `${underscore(ctor.name)}_${col}`)
-          : `${underscore(ctor.name)}_id`));
-    const typeCol = asName ? `${underscore(asName)}_type` : null;
     // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
     // return` (collection_association.rb#remove_records): if any record's
     // before_remove halts, the entire operation aborts and nothing is deleted.
@@ -2085,20 +2071,39 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         return [];
     }
     const removed: Base[] = [];
-    for (const record of modelRecords) {
-      if (Array.isArray(foreignKey)) {
-        for (const fk of foreignKey) {
-          record._writeAttribute(fk, null);
+    // Split persisted vs new-record. New-record children have no DB row —
+    // just remove from in-memory target. Persisted children are nullified via
+    // update_all (Rails delete_records else-branch), which bypasses validations
+    // and callbacks — matching Rails' has_many nullify semantics.
+    const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
+    const newRecords = modelRecords.filter((r) => r.isNewRecord());
+    if (persistedRecords.length > 0) {
+      const nullUpdates = this._buildNullifyUpdates();
+      const childPk = ((this as any)._modelClass as typeof Base).primaryKey as string | string[];
+      let scope = this.scope();
+      if (Array.isArray(childPk)) {
+        for (const pkCol of childPk) {
+          scope = scope.where({
+            [pkCol]: persistedRecords.map((r) => (r as any)._readAttribute(pkCol)),
+          });
         }
       } else {
-        record._writeAttribute(foreignKey as string, null);
+        scope = scope.where({
+          [childPk]: persistedRecords.map((r) => (r as any)._readAttribute(childPk)),
+        });
       }
-      if (typeCol) record._writeAttribute(typeCol, null);
-      const saved = await record.save();
-      if (saved) {
+      await scope.updateAll(nullUpdates);
+      for (const record of persistedRecords) {
+        for (const [col, val] of Object.entries(nullUpdates)) {
+          record._writeAttribute(col, val);
+        }
         removed.push(record);
         fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
       }
+    }
+    for (const record of newRecords) {
+      removed.push(record);
+      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
     this._removeFromTarget(removed);
     return removed;
