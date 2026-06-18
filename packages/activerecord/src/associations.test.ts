@@ -80,8 +80,6 @@ describe("AssociationsTest", () => {
         columns: { region_id: "integer", id: "integer", name: "string" },
         primaryKey: ["region_id", "id"],
       },
-      b_comments: { b_post_id: "integer", body: "string" },
-      b_posts: { title: "string" },
       c_comments: { body: "string", c_post_id: "integer" },
       c_posts: { title: "string" },
       cpk_authors: {
@@ -195,37 +193,6 @@ describe("AssociationsTest", () => {
     });
     expect(items.length).toBe(1);
   });
-  it("should construct new finder sql after create", async () => {
-    class BPost extends Base {
-      static {
-        this._tableName = "b_posts";
-        this.attribute("title", "string");
-      }
-    }
-    class BComment extends Base {
-      static {
-        this._tableName = "b_comments";
-        this.attribute("body", "string");
-        this.attribute("b_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(BPost, "bComments", {
-      foreignKey: "b_post_id",
-      className: "BComment",
-    });
-    registerModel("BPost", BPost);
-    registerModel("BComment", BComment);
-    const post = await BPost.create({ title: "test" });
-    const proxy = association(post, "bComments");
-    // Before creating any comments, the proxy should return empty
-    const before = await proxy.toArray();
-    expect(before.length).toBe(0);
-    // After creating a comment, the proxy should find it
-    await BComment.create({ body: "hi", b_post_id: post.id });
-    const after = await proxy.toArray();
-    expect(after.length).toBe(1);
-  });
-
   it("force reload", async () => {
     class CPost extends Base {
       static {
@@ -3773,6 +3740,9 @@ describe("AssociationsTest", () => {
   let CpkOrderAgreement: typeof Base;
   let CpkCar: typeof Base;
   let CpkCarReview: typeof Base;
+  let Person: typeof Base;
+  let Reader: typeof Base;
+  let Post: typeof Base;
 
   beforeAll(async () => {
     const shardedMod = await import("./test-helpers/models/sharded.js");
@@ -3813,6 +3783,9 @@ describe("AssociationsTest", () => {
     CpkOrderAgreement = cpkMod.CpkOrderAgreement as never;
     CpkCar = cpkMod.CpkCar as never;
     CpkCarReview = cpkMod.CpkCarReview as never;
+    Person = (await import("./test-helpers/models/person.js")).Person as never;
+    Reader = (await import("./test-helpers/models/reader.js")).Reader as never;
+    Post = (await import("./test-helpers/models/post.js")).Post as never;
   });
 
   // Earlier describe blocks in this file create `companies` / `authors` with
@@ -3850,6 +3823,9 @@ describe("AssociationsTest", () => {
     registerModel("CpkOrderAgreement", CpkOrderAgreement);
     registerModel("CpkCar", CpkCar);
     registerModel("CpkCarReview", CpkCarReview);
+    registerModel("Person", Person);
+    registerModel("Reader", Reader);
+    registerModel("Post", Post);
   });
 
   it("eager loading should not change count of children", async () => {
@@ -3863,6 +3839,17 @@ describe("AssociationsTest", () => {
       .where("molecules.id is not null")
       .toArray();
     expect((await (liquids[0] as any).molecules.toArray()).length).toBe(1);
+  });
+
+  it("should construct new finder sql after create", async () => {
+    const person = Person.new({ first_name: "clark" });
+    expect(await association(person, "readers").toArray()).toEqual([]);
+    await person.save();
+    const reader = await Reader.create({
+      person,
+      post: Post.new({ title: "foo", body: "bar" }),
+    });
+    expect(await association(person, "readers").find((reader as any).id)).toBeTruthy();
   });
 
   it("subselect", async () => {

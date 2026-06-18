@@ -2530,15 +2530,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const inverseOf = this._assocDef.options.inverseOf;
     const useCache = !!inverseOf && this._targetLoaded;
     if (!useCache) {
-      // Non-cache path hits the DB — enforce strict-loading the same
-      // way the other query-executing proxy methods do. super.find
-      // goes through Relation.where(...).toArray(), which wraps CP
-      // as the `this` of its intermediate relations; the strict-
-      // loading guard lives on AssociationRelation.toArray(), not
-      // here. For the direct-on-CP call we check explicitly so
-      // owner.strictLoadingBang() can't be bypassed via proxy.find.
+      // Non-cache path mirrors Rails `CollectionAssociation#find` →
+      // `scope.find(*args)`: it queries through a FRESH association
+      // scope built from the owner's current foreign-key state, never
+      // the (possibly stale) loaded target. Routing `super.find` on the
+      // proxy itself would scan `this`'s loaded `_records` when the
+      // collection was loaded earlier (e.g. an empty `to_a` before the
+      // owner was saved), so a record created later via belongs_to
+      // assignment is missed even though it is persisted with the FK.
+      // `scope()` rebuilds the WHERE from the live owner, so the DB
+      // query finds it. Enforce strict-loading the same way the other
+      // query-executing proxy methods do.
       this._checkStrictLoading();
-      return (await super.find(...args)) as T | T[];
+      return (await this.scope().find(...args)) as T | T[];
     }
 
     const targetModel = this.model as typeof Base;
