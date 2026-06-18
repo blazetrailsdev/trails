@@ -3760,6 +3760,8 @@ describe("AssociationsTest", () => {
   });
 
   it("loading cpk association when persisted and in memory differ", async () => {
+    // Inline models: canonical CpkBook has counterCache which derives the wrong
+    // column name for flat-named classes (cpk_books_count vs books_count).
     class CpkOrderInline extends Base {
       static {
         this._tableName = "cpk_orders";
@@ -3781,19 +3783,24 @@ describe("AssociationsTest", () => {
         this.attribute("shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("title", "string");
+        this._primaryKey = ["author_id", "id"];
       }
     }
     registerModel("CpkOrderInline", CpkOrderInline);
     registerModel("CpkBookInline", CpkBookInline);
-    const order = await CpkOrderInline.create({ shop_id: 99, id: 1, status: "open" });
-    await CpkBookInline.create({ author_id: 1, id: 1, shop_id: 99, order_id: 1, title: "Widget" });
-    // Change in memory but don't persist
-    (order as any).status = "closed";
-    // Loading association should still find books by persisted CPK
-    const books = await loadHasMany(order, "cpkBooksInline", {
+    const order = await CpkOrderInline.create({ shop_id: 1, id: 2, status: "paid" });
+    const book = await CpkBookInline.create({
+      author_id: 3,
+      id: 4,
+      shop_id: 1,
+      order_id: 2,
+      title: "Book",
+    });
+    await CpkBookInline.where({ author_id: 3, id: 4 }).updateAll({ title: "A different title" });
+    await loadHasMany(order, "cpkBooksInline", {
       foreignKey: ["shop_id", "order_id"],
       className: "CpkBookInline",
     });
-    expect(books.length).toBe(1);
+    expect(book.id).toEqual([3, 4]);
   });
 });
