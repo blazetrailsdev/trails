@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/cpk/
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
@@ -35,7 +36,7 @@ export class CpkBook extends Base {
     this.belongsTo("author", { className: "CpkAuthor" });
     this.hasMany("chapters", { className: "CpkChapter", foreignKey: ["author_id", "book_id"] });
     this.beforeDestroy(function (this: CpkBook) {
-      if (this.failDestroy) throw "abort";
+      if (this.failDestroy) throwAbort();
     });
   }
 }

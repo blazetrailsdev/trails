@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/pirate.rb
 import { Base } from "../../base.js";
 
@@ -76,7 +77,7 @@ export class Pirate extends Base {
   private _shipLog?: string[];
 
   cancelSaveCallbackMethod() {
-    throw "abort";
+    throwAbort();
   }
 
   private log(record: any, callback: string) {

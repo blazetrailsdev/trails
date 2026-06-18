@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/post.rb
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
@@ -575,7 +576,7 @@ export class PostWithDestroyCallback extends Base {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
     this.beforeDestroy(async function (this: any) {
-      if (this.id === 1) throw "abort";
+      if (this.id === 1) throwAbort();
     });
   }
 }

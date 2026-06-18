@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { underscore } from "@blazetrails/activesupport";
+import { underscore, isAbortSignal } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
@@ -982,8 +982,25 @@ function replaceOnTarget(
  * @internal
  */
 function callback(assoc: CollectionAssociation, kind: string, record: Base): boolean {
+  // Rails wraps only `before_add`/`before_remove` in `catch(:abort)`
+  // (collection_association.rb:400-402, 462-464); after callbacks run outside
+  // the catch (:408, :485), so a `throw :abort` from after_add/after_remove
+  // propagates rather than being silently swallowed.
+  const catchAbort = kind.startsWith("before");
   for (const cb of callbacksFor(assoc, kind)) {
-    if (typeof cb === "function" && (cb as any)(assoc.owner, record) === false) return false;
+    if (typeof cb !== "function") continue;
+    // A before callback halts the add/remove by throwing the abort sentinel
+    // (faithful `throw :abort`) or, as a supported alias, returning false.
+    if (catchAbort) {
+      try {
+        if ((cb as any)(assoc.owner, record) === false) return false;
+      } catch (e) {
+        if (!isAbortSignal(e)) throw e;
+        return false;
+      }
+    } else if ((cb as any)(assoc.owner, record) === false) {
+      return false;
+    }
   }
   return true;
 }

@@ -1,5 +1,33 @@
 export type CallbackKind = "before" | "after" | "around";
 
+/**
+ * Identity-checked abort sentinel — the faithful port of Ruby's `throw :abort`.
+ *
+ * Modern Rails (5+) halts a before-callback chain via non-local control flow
+ * (`throw(:abort)` caught by the default terminator's `catch(:abort)`), NOT by
+ * returning `false`. JavaScript has no catch/throw, so we model it with a
+ * dedicated symbol thrown by {@link throwAbort} and caught **by identity** in
+ * the before-callback runner. A bare `throw "abort"` is deliberately NOT
+ * recognized — catching strings risks swallowing genuine errors.
+ *
+ * Relationship to `return false`: trails keeps `return false` as a supported
+ * **alias** for halting (Rails ≤4 behavior), in addition to this sentinel.
+ * Both halt the chain and make `save`/`destroy` return false; only these two
+ * halt — any other thrown value (Error subclasses, etc.) propagates unchanged,
+ * matching Rails' `raise`-in-callback semantics.
+ */
+const ABORT = Symbol("blazetrails.activesupport.callbacks.abort");
+
+/** Halt the running before-callback chain — the port of Ruby `throw :abort`. */
+export function throwAbort(): never {
+  throw ABORT;
+}
+
+/** True iff `e` is the abort sentinel thrown by {@link throwAbort} (identity). */
+export function isAbortSignal(e: unknown): boolean {
+  return e === ABORT;
+}
+
 export type CallbackCondition<T extends object = object> = (target: T) => boolean;
 
 export interface CallbackOptions<T extends object = object> {
@@ -11,8 +39,10 @@ export interface CallbackOptions<T extends object = object> {
 export interface DefineCallbacksOptions<T extends object = object> {
   /**
    * Mirrors Rails' :terminator option. Pass a function `(target, fn) => boolean` (returns true
-   * to halt) or `false` to disable halting entirely. Defaults to halting when a before callback
-   * returns `false`.
+   * to halt) or `false` to disable halting entirely. With the default terminator a before
+   * callback halts the chain either by throwing the abort sentinel ({@link throwAbort} — the
+   * faithful port of Ruby `throw :abort`) or, as a supported alias, by returning `false`
+   * (Rails ≤4 behavior, kept for ergonomics). Any other thrown value propagates unchanged.
    *
    * **Async constraint**: async before callbacks (those returning a Promise) are only supported
    * with the default terminator. Registering a custom terminator function and then running an
@@ -783,15 +813,32 @@ export class CallbackChain {
       // terminator controls whether the callback runs at all (its API contract).
       let cbResult: unknown;
       let terminatorHalted = false;
+      let aborted = false;
       if (terminatorFn === false) {
         cbResult = cb.call(target, target);
       } else if (terminatorFn) {
+        // Custom terminator owns the halt decision. Rails scopes `catch(:abort)`
+        // to the default terminator (callbacks.rb#default_terminator), so the
+        // sentinel is NOT caught here — it propagates unless the terminator
+        // itself catches it, matching Rails' caller-supplied terminator contract.
         terminatorHalted = terminatorFn(target, () => {
           cbResult = cb.call(target, target);
           return cbResult;
         });
       } else {
-        cbResult = cb.call(target, target);
+        // Default terminator: Rails wraps the call in `catch(:abort)`. Halt the
+        // chain on the sentinel, no exception escapes; real errors propagate.
+        try {
+          cbResult = cb.call(target, target);
+        } catch (e) {
+          if (!isAbortSignal(e)) throw e;
+          aborted = true;
+        }
+      }
+
+      if (aborted) {
+        halted = true;
+        break;
       }
 
       if (isThenable(cbResult)) {
@@ -825,7 +872,18 @@ export class CallbackChain {
         // calling it a second time with the resolved value.
         const asyncHalted = (v: unknown) => terminatorFn !== false && v === false;
         return (async () => {
-          if (asyncHalted(await cbResult))
+          let firstResolved: unknown;
+          try {
+            firstResolved = await cbResult;
+          } catch (e) {
+            // Default terminator only (custom terminators already threw above;
+            // `terminator: false` never halts, so it must NOT swallow abort —
+            // Rails scopes `catch(:abort)` to the default terminator). An async
+            // before rejecting with the sentinel halts; real errors propagate.
+            if (!isAbortSignal(e) || terminatorFn === false) throw e;
+            return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+          }
+          if (asyncHalted(firstResolved))
             return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
           for (const rem of remaining) {
             if (!Value.check(rem.options, target)) continue;
@@ -833,17 +891,28 @@ export class CallbackChain {
             // the terminator retains invocation control (it may choose not to call fn).
             let remVal: unknown;
             let remSyncHalt = false;
-            if (terminatorFn === false) {
-              remVal = (rem.filter as BeforeCallback).call(target, target);
-            } else if (terminatorFn) {
-              remSyncHalt = terminatorFn(target, () => {
+            try {
+              if (terminatorFn === false) {
                 remVal = (rem.filter as BeforeCallback).call(target, target);
-                return remVal;
-              });
-            } else {
-              remVal = (rem.filter as BeforeCallback).call(target, target);
+              } else if (terminatorFn) {
+                remSyncHalt = terminatorFn(target, () => {
+                  remVal = (rem.filter as BeforeCallback).call(target, target);
+                  return remVal;
+                });
+              } else {
+                remVal = (rem.filter as BeforeCallback).call(target, target);
+              }
+            } catch (e) {
+              if (!isAbortSignal(e) || terminatorFn === false) throw e;
+              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
             }
-            const resolved = isThenable(remVal) ? await remVal : remVal;
+            let resolved: unknown;
+            try {
+              resolved = isThenable(remVal) ? await remVal : remVal;
+            } catch (e) {
+              if (!isAbortSignal(e) || terminatorFn === false) throw e;
+              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+            }
             if (remSyncHalt || asyncHalted(resolved))
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
           }

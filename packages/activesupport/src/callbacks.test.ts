@@ -7,6 +7,7 @@ import {
   runCallbacks,
   CallbacksMixin,
   CallTemplate,
+  throwAbort,
 } from "./callbacks.js";
 
 describe("Callbacks", () => {
@@ -136,6 +137,77 @@ describe("Callbacks", () => {
   });
 
   describe("halting", () => {
+    it("halts when a before callback throws the abort sentinel", () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "before", (t: any) => {
+        t.log.push("before1");
+        throwAbort();
+      });
+      setCallback(target, "save", "before", (t: any) => {
+        t.log.push("should-not-run");
+      });
+
+      const result = runCallbacks(target, "save", () => {
+        target.log.push("block");
+      });
+
+      expect(result).toBe(false);
+      expect(target.log).toEqual(["before1"]);
+    });
+
+    it("propagates non-sentinel errors thrown by a before callback", () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "before", () => {
+        throw new Error("boom");
+      });
+      setCallback(target, "save", "before", (t: any) => {
+        t.log.push("should-not-run");
+      });
+
+      expect(() =>
+        runCallbacks(target, "save", () => {
+          target.log.push("block");
+        }),
+      ).toThrow("boom");
+      expect(target.log).toEqual([]);
+    });
+
+    it("halts when an async before callback rejects with the abort sentinel", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "before", async (t: any) => {
+        t.log.push("before1");
+        throwAbort();
+      });
+      setCallback(target, "save", "before", (t: any) => {
+        t.log.push("should-not-run");
+      });
+
+      const result = await runCallbacks(target, "save", () => {
+        target.log.push("block");
+      });
+
+      expect(result).toBe(false);
+      expect(target.log).toEqual(["before1"]);
+    });
+
+    it("propagates a non-sentinel rejection from an async before callback", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "before", async () => {
+        throw new Error("async-boom");
+      });
+
+      await expect(
+        runCallbacks(target, "save", () => {
+          target.log.push("block");
+        }),
+      ).rejects.toThrow("async-boom");
+      expect(target.log).toEqual([]);
+    });
+
     it("halts when before callback returns false", () => {
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
@@ -150,6 +222,28 @@ describe("Callbacks", () => {
 
       expect(result).toBe(false);
       expect(target.log).toEqual([]);
+    });
+
+    it("does not swallow the abort sentinel when terminator is disabled", () => {
+      // Rails scopes `catch(:abort)` to the default terminator; with the
+      // terminator disabled the sentinel must propagate, not halt the chain.
+      const target = {};
+      defineCallbacks(target, "save", { terminator: false });
+      setCallback(target, "save", "before", () => throwAbort());
+
+      expect(() => runCallbacks(target, "save", () => {})).toThrow();
+    });
+
+    it("does not swallow the abort sentinel for a custom terminator", () => {
+      // A custom terminator owns the halt decision; unless it catches the
+      // sentinel itself, throwAbort() propagates past it.
+      const target = {};
+      defineCallbacks(target, "save", {
+        terminator: (_t, fn) => fn() === false,
+      });
+      setCallback(target, "save", "before", () => throwAbort());
+
+      expect(() => runCallbacks(target, "save", () => {})).toThrow();
     });
 
     it("does not halt when terminator is disabled", () => {

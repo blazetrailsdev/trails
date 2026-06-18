@@ -78,6 +78,7 @@ import {
   pluralize,
   camelize,
   foreignKey as deriveForeignKey,
+  isAbortSignal,
 } from "@blazetrails/activesupport";
 import {
   getInheritanceColumn,
@@ -2207,11 +2208,25 @@ export function fireAssocCallbacks(
     | undefined,
   owner: Base,
   record: Base,
+  catchAbort = false,
 ): boolean {
   if (!cbs) return true;
   const arr = Array.isArray(cbs) ? cbs : [cbs];
   for (const cb of arr) {
-    if (cb(owner, record) === false) return false;
+    // Rails wraps only `before_add`/`before_remove` in `catch(:abort)`
+    // (collection_association.rb:400-402, 462-464). Those callers pass
+    // `catchAbort=true`; an after callback runs outside the catch, so a
+    // `throw :abort` from after_add/after_remove propagates (Rails parity).
+    if (catchAbort) {
+      try {
+        if (cb(owner, record) === false) return false;
+      } catch (e) {
+        if (!isAbortSignal(e)) throw e;
+        return false;
+      }
+    } else if (cb(owner, record) === false) {
+      return false;
+    }
   }
   return true;
 }
