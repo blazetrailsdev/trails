@@ -143,9 +143,17 @@ describe("NamedScopingTest", () => {
 
   it("procedural scopes", async () => {
     const third = topics("third");
+    const second = topics("second");
     const beforeThird = sortedIds(await Topic.where("written_on < ?", third.written_on).toArray());
+    const beforeSecond = sortedIds(
+      await Topic.where("written_on < ?", second.written_on).toArray(),
+    );
+    expect(beforeThird).not.toEqual(beforeSecond);
     expect(sortedIds(await (Topic as any).writtenBefore(third.written_on).toArray())).toEqual(
       beforeThird,
+    );
+    expect(sortedIds(await (Topic as any).writtenBefore(second.written_on).toArray())).toEqual(
+      beforeSecond,
     );
   });
 
@@ -496,6 +504,16 @@ describe("NamedScopingTest", () => {
       collected.push(t);
     }
     expect(collected.length).toBe(approvedCount);
+
+    // Rails also exercises find_in_batches(batch_size: 2) over the same scope.
+    const grouped: any[] = [];
+    for await (const group of (Topic as any).approved().findInBatches({ batchSize: 2 })) {
+      for (const t of group) {
+        expect(t.approved).toBe(true);
+        grouped.push(t);
+      }
+    }
+    expect(grouped.length).toBe(approvedCount);
   });
 
   it("table names for chaining scopes with and without table name included", async () => {
