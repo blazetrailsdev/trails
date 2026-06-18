@@ -10,9 +10,11 @@
  *
  * Algorithm, per Rails-mirroring package:
  *   1. For each Ruby file, resolve its expected TS file via `rubyFileToTs`.
- *   2. Collect Ruby public methods declared in (or `include`d into) the
- *      entities in that Ruby file. Map each to its TS-candidate name set
- *      via `rubyMethodToTs`. Union = the "allowed" TS name set.
+ *   2. Collect Ruby methods declared in (or `include`d into) the entities in
+ *      that Ruby file — any visibility, since a TS method mirroring a
+ *      Rails-private method exists in Rails (a visibility divergence, not
+ *      extra surface). Map each to its TS-candidate name set via
+ *      `rubyMethodToTs`. Union = the "allowed" TS name set.
  *   3. Collect public TS names declared in the matching TS file — each
  *      class/module's *own* methods (skipping inherited surface so the
  *      diff measures this file's drift, not its ancestor's) plus top-level
@@ -336,7 +338,10 @@ function collectAllowedNames(
 
   const addMethods = (methods: MethodInfo[]): void => {
     for (const m of methods) {
-      if (m.internal === true) continue;
+      // Private/protected Ruby methods (internal) still count: a TS method
+      // mirroring a Rails-private method isn't *extra* surface, it's a
+      // visibility divergence — the method exists in Rails. Excluding them
+      // here would mislabel every public-port-of-a-private-method as drift.
       const candidates = rubyMethodToTs(m.name);
       if (!candidates) continue;
       for (const c of candidates) allowed.add(c);
@@ -373,6 +378,11 @@ function collectAllowedNames(
  * Build the global "all Ruby method candidate names anywhere in Rails-land"
  * set, used to classify each extra as novel (nowhere in Rails) vs moved
  * (somewhere in Rails, just not in the matched file).
+ *
+ * Includes private/protected (internal) Ruby methods: a TS name mirroring a
+ * Rails-private method that lives in a *different* `.rb` is "moved" (it exists
+ * in Rails, just elsewhere), not "novel". Treating private mirrors as novel
+ * would inflate the high-signal tier with methods Rails actually defines.
  */
 export function buildGlobalRubyCandidates(ruby: ApiManifest): Set<string> {
   const all = new Set<string>();
@@ -380,7 +390,6 @@ export function buildGlobalRubyCandidates(ruby: ApiManifest): Set<string> {
     const entities = [...Object.values(pkg.classes), ...Object.values(pkg.modules)] as ClassInfo[];
     for (const e of entities) {
       for (const m of [...e.instanceMethods, ...e.classMethods]) {
-        if (m.internal === true) continue;
         const candidates = rubyMethodToTs(m.name);
         if (!candidates) continue;
         for (const c of candidates) all.add(c);

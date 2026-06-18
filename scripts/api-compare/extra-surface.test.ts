@@ -61,7 +61,7 @@ describe("parseArgs", () => {
 });
 
 describe("buildGlobalRubyCandidates", () => {
-  it("unions public Ruby method TS-candidates across all packages, skipping internal", () => {
+  it("unions Ruby method TS-candidates across all packages, including internal", () => {
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -91,7 +91,9 @@ describe("buildGlobalRubyCandidates", () => {
     const set = buildGlobalRubyCandidates(ruby);
     expect(set.has("publicOne")).toBe(true);
     expect(set.has("saveBangBang")).toBe(true);
-    expect(set.has("privateOne")).toBe(false);
+    // Private Ruby methods are included: a TS public method mirroring one is a
+    // visibility divergence (the method exists in Rails), not novel surface.
+    expect(set.has("privateOne")).toBe(true);
   });
 });
 
@@ -176,6 +178,72 @@ describe("buildReport — novel vs moved classification", () => {
     expect(pkg.totalNovel).toBe(1);
     expect(pkg.totalMoved).toBe(0);
     expect(pkg.extraFiles[0].extras.map((e) => e.name)).toEqual(["tsOnlyHelper"]);
+  });
+
+  it("a TS public method mirroring a Rails-PRIVATE method is not extra surface", () => {
+    // Rails foo.rb has private `same_file_secret`; baz.rb has private
+    // `other_file_secret`. TS foo.ts exposes both publicly plus a true novel.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("bar"), method("same_file_secret", true)],
+            }),
+            "ActiveModel::Baz": rubyClass({
+              name: "Baz",
+              file: "baz.rb",
+              instance: [method("other_file_secret", true)],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Foo: {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [
+                method("bar"),
+                method("sameFileSecret"),
+                method("otherFileSecret"),
+                method("trulyNovel"),
+              ],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const pkg = report.packages[0];
+    // sameFileSecret: matched file's private method → allowed, not extra at all.
+    // otherFileSecret: private method elsewhere in Rails → moved, not novel.
+    // trulyNovel: nowhere in Rails → novel.
+    expect(pkg.extraFiles[0].extras.map((e) => [e.name, e.kind])).toEqual([
+      ["trulyNovel", "novel"],
+      ["otherFileSecret", "moved"],
+    ]);
+    expect(pkg.totalNovel).toBe(1);
+    expect(pkg.totalMoved).toBe(1);
   });
 
   it("skips _-prefixed and internal TS members, doesn't flag them as extras", () => {
