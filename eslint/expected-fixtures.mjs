@@ -187,14 +187,14 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require activerecord test files to load via `useFixtures` every fixture set their Rails counterpart actually dereferences (e.g. `customers(:david)`). Scaffolding-only fixture declarations are ignored.",
+        "Require activerecord test files to load via `useFixtures` or `useHandlerFixtures` every fixture set their Rails counterpart actually dereferences (e.g. `customers(:david)`). Scaffolding-only fixture declarations are ignored.",
     },
     schema: [],
     messages: {
       missing:
-        "Expected `useFixtures({ … })` declaring fixture set(s) [{{names}}] — Rails source {{rails}} dereferences records from them.",
+        "Expected `useFixtures({ … })` or `useHandlerFixtures([…])` declaring fixture set(s) [{{names}}] — Rails source {{rails}} dereferences records from them.",
       incomplete:
-        "`useFixtures(...)` is missing fixture set(s) [{{names}}] dereferenced by Rails source {{rails}}.",
+        "`useFixtures`/`useHandlerFixtures` is missing fixture set(s) [{{names}}] dereferenced by Rails source {{rails}}.",
     },
   },
   create(context) {
