@@ -246,18 +246,21 @@ describe("BindParameterTest", () => {
     expect(statementCacheKeys(conn)).not.toContain(conn.sqlKey(cap.sqls.at(-1)));
   });
 
-  // DEVIATION (tracked): Rails asserts the SQL string literal IS cached
-  // (bind_parameter_test.rb:100-107, `assert_includes`): `sanitize_sql` bakes the
-  // value into an `Arel::Nodes::SqlLiteral`, leaving `collector.preparable = true`
-  // (no unpreparable node), so a no-bind-but-preparable SELECT is pooled. trails
-  // infers preparability from bind presence (see the note in
-  // database-statements.ts `selectAll`), and this query inlines to zero binds —
-  // indistinguishable from the genuinely-non-preparable IN-clause array above —
-  // so it is NOT pooled. Asserting `not.toContain` here would ratify that
-  // inversion, so the case stays skipped pending the collector.preparable
-  // threading that converges it to Rails' `assert_includes`. Tracked by RFC 0016
-  // story `thread-collector-preparable-for-statement-cache`.
-  it.skip("statement cache with sql string literal", () => {});
+  it("statement cache with sql string literal", async (ctx) => {
+    const conn = Topic.leaseConnection() as any;
+    ctx.skip(!conn.preparedStatements);
+    conn.clearCache();
+
+    const cap = captureSelectSql();
+    const topics = Topic.where("topics.id = ?", 1);
+    expect((await topics.toArray()).map((t: any) => t.id)).toEqual([1]);
+    cap.stop();
+
+    // Rails: assert_includes statement_cache, to_sql_key(topics.arel)
+    // sanitize_sql bakes the value into an Arel SqlLiteral, so no unpreparable
+    // node is visited → collector.preparable stays true → the query IS pooled.
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
+  });
 
   it("too many binds", async () => {
     const conn = Topic.leaseConnection() as any;

@@ -328,7 +328,7 @@ export interface DatabaseAdapter {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean },
   ): Promise<Result>;
   selectOne(
     sql: string,

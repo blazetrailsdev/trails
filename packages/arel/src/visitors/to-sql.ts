@@ -1702,13 +1702,13 @@ export class ToSql extends Visitor {
    *
    * Mirrors: Rails' compilation with Arel::Collectors::Composite
    */
-  compileWithBinds(node: Node): [string, unknown[], boolean] {
+  compileWithBinds(node: Node): [string, unknown[], boolean, boolean] {
     const sqlCollector = new SQLString();
     const bindCollector = new Bind();
     const composite = new Composite(sqlCollector, bindCollector);
     this.visit(node, composite as unknown as SQLString);
     const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
-    return [sqlCollector.value, binds, sqlCollector.retryable];
+    return [sqlCollector.value, binds, sqlCollector.retryable, composite.preparable];
   }
 
   protected emitOptimizerHints(node: Nodes.SelectCore, collector: SQLString): void {
