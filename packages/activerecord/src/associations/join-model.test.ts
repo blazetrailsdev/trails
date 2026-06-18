@@ -603,9 +603,12 @@ describe("AssociationsJoinModelTest", () => {
   it.skip("has many through polymorphic has one", async () => {
     const david = (await Author.find(authors("david").id)) as Author;
     const taggings2 = (await (david as any).taggings_2.toArray()) as Base[];
-    expect(taggings2.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual([
-      1, 2,
-    ]);
+    // Rails: Tagging.find(1, 2).sort_by(&:id) — welcome_general + thinking_general.
+    expect(taggings2.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [taggings("welcome_general").id, taggings("thinking_general").id].sort(
+        (a: any, b: any) => Number(a) - Number(b),
+      ),
+    );
   });
 
   it.skip("has many through polymorphic has many", async () => {
