@@ -1282,6 +1282,13 @@ export class ToSql extends Visitor {
     if (!(node as { retryableFlag?: boolean }).retryableFlag) {
       collector.retryable = false;
     }
+    // Rails: visit_Arel_Nodes_SqlLiteral sets collector.preparable = false
+    // (to_sql.rb:764-767). In trails, where("col = ?", val) inlines the value
+    // into a SqlLiteral (sanitizeSqlArray → string → Nodes.SqlLiteral) instead
+    // of creating a BoundSqlLiteral, so we cannot yet apply the flag here —
+    // doing so would make the `statement cache with sql string literal` test
+    // non-preparable, inverting the accepted assertion. Converging requires
+    // where(string, *binds) to produce BoundSqlLiteral nodes (separate story).
     collector.append(node.value);
     return collector;
   }

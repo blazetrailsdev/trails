@@ -446,11 +446,12 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
       binds ?? [],
     );
     binds = resolvedBinds;
-    // Rails query_cache.rb:242/248: reassigns `sql, binds, preparable, allow_retry =
-    // to_sql_and_binds(...)` and passes `preparable:` to super. Caller-supplied
-    // opts.preparable (from relation._lastSelectPreparable) takes precedence; the
-    // compiled value from toSqlAndBinds covers the Arel-node path.
-    const resolvedPreparable = opts?.preparable ?? compiledPreparable;
+    // Rails query_cache.rb:242/248: to_sql_and_binds replaces the incoming
+    // preparable with collector.preparable for Arel inputs, and query_cache
+    // forwards that returned value to super. Mirror that: compiledPreparable
+    // (non-null only for Arel inputs via the visitor) wins; opts.preparable
+    // (relation._lastSelectPreparable for string inputs) is the fallback.
+    const resolvedPreparable = compiledPreparable ?? opts?.preparable;
     const forwardOpts = { ...opts, preparable: resolvedPreparable };
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
