@@ -13,6 +13,7 @@
     "guides:typecheck": "tsx scripts/guides-typecheck/check.ts",
     "prelint": "pnpm tsx scripts/build-rails-privates-manifest.ts && pnpm tsx scripts/build-rails-error-manifest.ts && pnpm tsx scripts/build-rails-tosql-manifest.ts && pnpm tsx scripts/build-rails-file-structure-manifest.ts && pnpm tsx scripts/test-deps/rails-test-deps.ts >/dev/null",
     "lint": "eslint .",
+    "lint:no-explicit-any:allowlist": "node scripts/generate-no-explicit-any-allowlist.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:types": "vitest run --config vitest.dx-tests.config.ts",
