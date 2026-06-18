@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Developer } from "./developer.js";
@@ -46,7 +47,7 @@ export class Ship extends Base {
   }
 
   cancelSaveCallbackMethod() {
-    throw "abort";
+    throwAbort();
   }
 }
 

@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 import type { Relation } from "../../relation.js";
 import type { Car } from "./car.js";
 // vendor/rails/activerecord/test/models/bulb.rb
@@ -75,7 +76,7 @@ export class FunkyBulb extends Bulb {
 export class FailedBulb extends Bulb {
   static {
     this.beforeDestroy(async function () {
-      throw "abort";
+      throwAbort();
     });
   }
 }

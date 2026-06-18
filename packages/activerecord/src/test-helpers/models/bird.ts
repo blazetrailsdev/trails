@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 import type { Pirate } from "./pirate.js";
 // vendor/rails/activerecord/test/models/bird.rb
 import { Base } from "../../base.js";
@@ -40,7 +41,7 @@ export class Bird extends Base {
   }
 
   cancelSaveCallbackMethod() {
-    throw "abort";
+    throwAbort();
   }
 }
 

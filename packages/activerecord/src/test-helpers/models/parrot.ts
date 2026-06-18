@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
@@ -53,7 +54,7 @@ export class Parrot extends Base {
   }
 
   cancelSaveCallbackMethod() {
-    throw "abort";
+    throwAbort();
   }
 
   incrementUpdatedCount() {

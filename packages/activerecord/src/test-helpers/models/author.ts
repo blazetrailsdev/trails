@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/author.rb
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -261,13 +262,13 @@ export class Author extends Base {
     this.hasMany("postsWithThrownCallbacks", {
       className: "Post",
       beforeAdd: (_owner: any, _r: any) => {
-        throw "abort";
+        throwAbort();
       },
       afterAdd: (_owner: any, _r: any) => {
         throw new Error("ensure_not_called");
       },
       beforeRemove: (_owner: any, _r: any) => {
-        throw "abort";
+        throwAbort();
       },
       afterRemove: (_owner: any, _r: any) => {
         throw new Error("ensure_not_called");

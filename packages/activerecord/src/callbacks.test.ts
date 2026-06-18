@@ -11,6 +11,7 @@ import {
   registerSubclass,
   registerModel,
 } from "./index.js";
+import { throwAbort } from "@blazetrails/activesupport";
 
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -377,7 +378,7 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.beforeCreate(() => false);
+        this.beforeCreate(() => throwAbort());
       }
     }
     const p = new CbPost({ title: "test" });
@@ -392,7 +393,7 @@ describe("CallbacksTest", () => {
       }
     }
     const p = await CbPost.create({ title: "test" });
-    CbPost.beforeUpdate(() => false);
+    CbPost.beforeUpdate(() => throwAbort());
     p.title = "changed";
     const result = await p.save();
     expect(result).toBe(false);
@@ -402,24 +403,43 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.beforeDestroy(() => false);
+        this.beforeDestroy(() => throwAbort());
       }
     }
     const p = await CbPost.create({ title: "test" });
     const result = await p.destroy();
     expect(result).toBe(false);
+    // Halting destroy leaves the record persisted (no exception escapes).
+    expect(p.isDestroyed()).toBe(false);
+    expect(await CbPost.exists(p.id)).toBe(true);
   });
 
   it("callback throwing abort", async () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.beforeSave(() => false);
+        this.beforeSave(() => throwAbort());
       }
     }
     const p = new CbPost({ title: "test" });
     const result = await p.save();
     expect(result).toBe(false);
+    expect(p.isNewRecord()).toBe(true);
+  });
+
+  it("callback raising a real error aborts the save and propagates", async () => {
+    class CbPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.beforeSave(() => {
+          throw new Error("boom");
+        });
+      }
+    }
+    const p = new CbPost({ title: "test" });
+    // Unlike `throw :abort`, a genuine exception is NOT swallowed — it
+    // surfaces to the caller (Rails `raise`-in-callback semantics).
+    await expect(p.save()).rejects.toThrow("boom");
     expect(p.isNewRecord()).toBe(true);
   });
 });
@@ -907,7 +927,7 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.beforeCreate(() => false);
+        this.beforeCreate(() => throwAbort());
       }
     }
     const g = new Guarded({ name: "test" });
@@ -920,7 +940,7 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.beforeSave(() => false);
+        this.beforeSave(() => throwAbort());
       }
     }
     const g = new Guarded({ name: "test" });
@@ -932,7 +952,7 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.beforeUpdate(() => false);
+        this.beforeUpdate(() => throwAbort());
       }
     }
     const g = await Guarded.create({ name: "test" });
@@ -1155,7 +1175,7 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.beforeSave(() => false);
+        this.beforeSave(() => throwAbort());
       }
     }
 

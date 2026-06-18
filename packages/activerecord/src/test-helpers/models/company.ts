@@ -1,3 +1,4 @@
+import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/company.rb
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
@@ -326,7 +327,7 @@ export class Client extends Company {
       if (this.raiseOnSave) throw new Client.RaisedOnSave();
     });
     this.beforeSave(async function (this: Client) {
-      if (this.throwOnSave) throw "abort";
+      if (this.throwOnSave) throwAbort();
     });
     this.afterSave(async function (this: Client) {
       if (this.rollbackOnSave) throw new Rollback();

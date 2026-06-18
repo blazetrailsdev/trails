@@ -282,6 +282,8 @@ export {
   getCallbackChains,
   peekCallbackChain,
   CallbacksMixin,
+  throwAbort,
+  isAbortSignal,
 } from "./callbacks.js";
 export type {
   CallbackKind,

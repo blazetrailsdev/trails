@@ -78,6 +78,7 @@ import {
   pluralize,
   camelize,
   foreignKey as deriveForeignKey,
+  isAbortSignal,
 } from "@blazetrails/activesupport";
 import {
   getInheritanceColumn,
@@ -2211,7 +2212,14 @@ export function fireAssocCallbacks(
   if (!cbs) return true;
   const arr = Array.isArray(cbs) ? cbs : [cbs];
   for (const cb of arr) {
-    if (cb(owner, record) === false) return false;
+    // Rails `catch(:abort)`: a before_add/before_remove halts by throwing the
+    // abort sentinel (faithful `throw :abort`) or returning false (alias).
+    try {
+      if (cb(owner, record) === false) return false;
+    } catch (e) {
+      if (!isAbortSignal(e)) throw e;
+      return false;
+    }
   }
   return true;
 }
