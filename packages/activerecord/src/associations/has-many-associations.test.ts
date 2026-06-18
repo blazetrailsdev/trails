@@ -1412,6 +1412,14 @@ describe("HasManyAssociationsTest", () => {
       } as Schema,
       { dropExisting: true },
     );
+    // A sibling test file may have warmed the shared schema cache for `bulbs`
+    // with a default lowercase `id` PK (e.g. base.test.ts / reflection.test.ts
+    // declare `bulbs: { car_id }`). Canonical `bulbs` uses `primary_key: "ID"`,
+    // so reset the memoized column/PK information before reflecting the rebuilt
+    // table — otherwise the ids_reader plucks a non-existent `id` column on PG.
+    Car.resetColumnInformation();
+    Bulb.resetColumnInformation();
+    Company.resetColumnInformation();
     await Car.loadSchema();
     await Bulb.loadSchema();
     await Company.loadSchema();
