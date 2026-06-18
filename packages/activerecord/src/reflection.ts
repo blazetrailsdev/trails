@@ -333,13 +333,28 @@ export class AbstractReflection {
       // demodulized plural form (CpkOrder.books → books_count).
       try {
         const ownerName = self.activeRecord?.name ?? "";
+        // FK on the child table that points to the target (e.g. "dog_lover_id").
+        // CPK models normalize foreignKey into queryConstraints in the reflection.
+        const btFk =
+          self.options?.foreignKey ??
+          self.options?.queryConstraints ??
+          `${underscore(self.name)}_id`;
+        const normFk = (fk: unknown): string[] =>
+          Array.isArray(fk) ? fk.map(String) : [String(fk)];
+        const btFkNorm = normFk(btFk);
         const targetAssocs: Array<{ type: string; name: string; options: any }> =
           (self.klass as any)._associations ?? [];
-        const inverseHm = targetAssocs.find(
-          (a) =>
-            a.type === "hasMany" &&
-            (a.options.className ?? camelize(singularize(a.name))) === ownerName,
-        );
+        // Match on both class name AND FK so that when a target declares multiple
+        // hasManyS to the same class with different FKs (e.g. DogLover has
+        // hasMany("trainedDogs") and hasMany("dogs")), we pick the one whose FK
+        // matches the belongsTo's FK rather than the first class-name match.
+        const hmDefaultFk = `${underscore((self.klass as any).name)}_id`;
+        const inverseHm = targetAssocs.find((a) => {
+          if (a.type !== "hasMany") return false;
+          if ((a.options.className ?? camelize(singularize(a.name))) !== ownerName) return false;
+          const hmFkNorm = normFk(a.options.foreignKey ?? hmDefaultFk);
+          return hmFkNorm.length === btFkNorm.length && hmFkNorm.every((k, i) => k === btFkNorm[i]);
+        });
         if (inverseHm) return `${underscore(inverseHm.name)}_count`;
         return belongsToCounterCacheColumn(counterCache, ownerName);
       } catch {
