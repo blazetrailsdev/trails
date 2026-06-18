@@ -209,6 +209,7 @@ export class CpkOrderAgreement extends Base {
 // cpk/order_tag.rb
 export class CpkOrderTag extends Base {
   static _tableName = "cpk_order_tags";
+  static _primaryKey = ["order_id", "tag_id"];
 
   static {
     this.belongsTo("tag", { className: "CpkTag" });

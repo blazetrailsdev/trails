@@ -1943,16 +1943,24 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     it("composite primary key join table", async () => {
-      const tag = cpkTags("cpk_tag_loyal_customer") as CpkTag;
       const order = await CpkOrder.create({ shop_id: 1, status: "open" });
-      const initialOrders = await (tag as any).orders.toArray();
-      const initialCount = initialOrders.length;
-      await (tag as any).orders.push(order);
-      const updatedOrders = await (tag as any).orders.toArray();
-      expect(updatedOrders).toHaveLength(initialCount + 1);
-      expect(updatedOrders.some((o: any) => (o as any).idValue === (order as any).idValue)).toBe(
-        true,
-      );
+      const tag = cpkTags("cpk_tag_loyal_customer") as CpkTag;
+      const orderTag = await CpkOrderTag.create({
+        order_id: (order as any).idValue,
+        tag_id: (tag as any).id,
+        attached_by: "Nikita",
+      });
+      // Rails: assert_equal order, order_tag.order
+      // `reader` is sync (returns null if not preloaded); use loadTarget() for the async DB load.
+      // AR == compares by class + id; compare idValue (the scalar "id" column) instead of toEqual.
+      const loadedOrder = (await (orderTag as any).association("order").loadTarget()) as any;
+      expect(loadedOrder?.idValue).toBe((order as any).idValue);
+      const loadedTag = (await (orderTag as any).association("tag").loadTarget()) as any;
+      expect(loadedTag?.id).toBe((tag as any).id);
+      await (orderTag as any).update({ attached_reason: "This is our loyal customer" });
+      const orderTags = await (order as any).orderTags.toArray();
+      const found = orderTags.find((ot: any) => (ot as any).tag_id === (tag as any).id);
+      expect((found as any).attached_reason).toBe("This is our loyal customer");
     });
   });
   it("destroy all on association clears scope", async () => {
