@@ -3313,7 +3313,6 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     registerModel(Treasure);
     registerModel(CanonicalShip);
     acceptsNestedAttributesFor(CanonicalShip, "parts", { allowDestroy: true });
-    acceptsNestedAttributesFor(CanonicalShip, "treasures");
 
     const ship = new CanonicalShip({ name: "The Black Rock" });
     const part = (ship.parts as any).build({ name: "Stern" });
