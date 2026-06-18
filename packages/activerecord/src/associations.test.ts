@@ -35,6 +35,7 @@ import type { Tag as TagT } from "./test-helpers/models/tag.js";
 import type { Tagging as TaggingT } from "./test-helpers/models/tagging.js";
 import type { Developer as DeveloperT } from "./test-helpers/models/developer.js";
 import { Associations, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
@@ -154,12 +155,14 @@ describe("AssociationProxyTest", () => {
   it("test_push_does_not_lose_additions_to_new_record", async () => {
     const p = (new Author({ name: "Josh" }) as any).posts;
     await p.push(new Post({ title: "New on Edge", body: "More cool stuff!" }));
+    expect(p.loaded).toBe(true);
     expect(await p.size()).toBe(1);
   });
 
   it("test_append_behaves_like_push", async () => {
     const p = (new Author({ name: "Josh" }) as any).posts;
     await p.append(new Post({ title: "New on Edge", body: "More cool stuff!" }));
+    expect(p.loaded).toBe(true);
     expect(await p.size()).toBe(1);
   });
 
@@ -222,15 +225,15 @@ describe("AssociationProxyTest", () => {
 
   it("test_reload_returns_association", async () => {
     const d = await Developer.find(developers("david").id);
-    try {
-      expect(await d.projects.reload()).toBe(d.projects);
-    } catch {
-      /* assert_nothing_raised */
-    }
+    const first = await d.projects.reload();
+    expect(await (first as any).reload()).toBe(d.projects);
   });
 
   it("test_proxy_association_accessor", async () => {
     const d = await Developer.find(developers("david").id);
+    // Rails: assert_equal david.association(:projects), david.projects.proxy_association
+    // In trails the proxy IS the association object; verify the accessor wires to the same proxy.
+    expect(association(d, "projects")).toBe(d.projects);
     expect(d.projects.proxyAssociation.owner).toBe(d);
   });
 
@@ -261,33 +264,43 @@ describe("AssociationProxyTest", () => {
     const human = await Human.create({});
     await (human as any).interests.create({});
     const found: any = await Human.find((human as any).id);
-    const subset = await found.interests.where("1=1").first();
-    expect(subset).not.toBeNull();
-    expect((subset as any)._associationCache("human")?.target).toBe(found);
+    await assertQueriesCount(1, false, async () => {
+      const subset: any = await found.interests.where("1=1").first();
+      expect(subset).not.toBeNull();
+      expect(subset.human).toBe(found);
+    });
   });
 
   it("first! works on loaded associations", async () => {
     const david = await Author.find(authors("david").id);
     const first = await david.firstPosts.first();
     await david.firstPosts.reload();
-    expect(((await david.firstPosts.firstBang()) as any).id).toBe((first as any).id);
     expect(david.firstPosts.loaded).toBe(true);
+    await assertNoQueries(false, async () => {
+      expect(((await david.firstPosts.firstBang()) as any).id).toBe((first as any).id);
+    });
   });
 
   it("test_pluck_uses_loaded_target", async () => {
     const david = await Author.find(authors("david").id);
-    const afterLoad = await david.firstPosts.load().then((r) => r.map((p: any) => p.title));
-    expect(await david.firstPosts.pluck("title")).toEqual(afterLoad);
+    const beforeLoad = await david.firstPosts.pluck("title");
+    await david.firstPosts.load();
+    expect(await david.firstPosts.pluck("title")).toEqual(beforeLoad);
     expect(david.firstPosts.loaded).toBe(true);
+    await assertNoQueries(false, async () => {
+      await david.firstPosts.pluck("title");
+    });
   });
 
   it("test_pick_uses_loaded_target", async () => {
     const david = await Author.find(authors("david").id);
-    const afterLoad = await david.firstPosts
-      .load()
-      .then((r) => (r[0] ? (r[0] as any).title : null));
-    expect(await david.firstPosts.pick("title")).toBe(afterLoad);
+    const beforeLoad = await david.firstPosts.pick("title");
+    await david.firstPosts.load();
+    expect(await david.firstPosts.pick("title")).toBe(beforeLoad);
     expect(david.firstPosts.loaded).toBe(true);
+    await assertNoQueries(false, async () => {
+      await david.firstPosts.pick("title");
+    });
   });
 
   it("test_reset_unloads_target", async () => {
@@ -323,7 +336,6 @@ describe("AssociationProxyTest", () => {
     const ms = await Membership.create({ member_id: member.id, favorite: false });
     expect((await member.favoriteMemberships.toArray()).length).toBe(0);
     await ms.update({ favorite: true });
-    member.favoriteMemberships.reset();
     expect((await member.favoriteMemberships.toArray()).length).toBeGreaterThan(0);
   });
 
