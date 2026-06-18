@@ -23,7 +23,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
-import { Comment } from "../test-helpers/models/comment.js";
+import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Developer } from "../test-helpers/models/developer.js";
 
@@ -32,6 +32,7 @@ registerModel(Reply);
 registerModel(Post);
 registerModel(SpecialPost);
 registerModel(Comment);
+registerModel(SpecialComment);
 registerModel(Author);
 registerModel(Developer);
 
@@ -89,13 +90,15 @@ describe("NamedScopingTest", () => {
   });
 
   it("method missing priority when delegating", async () => {
-    // klazz.to.since vs klazz.since.to — both produce the same conjunction.
-    const since = (Topic as any).where(
-      "written_on >= ?",
-      Temporal.Instant.fromEpochMilliseconds(0),
+    // Rails: klazz.to.since.to_a == klazz.since.to.to_a — chaining the two
+    // scopes in either order yields the same conjunction/result set.
+    const epoch = Temporal.Instant.fromEpochMilliseconds(0);
+    const now = Temporal.Now.instant();
+    Topic.scope("since", (q: any) => q.where("written_on >= ?", epoch));
+    Topic.scope("to", (q: any) => q.where("written_on <= ?", now));
+    expect(sortedIds(await (Topic as any).to().since().toArray())).toEqual(
+      sortedIds(await (Topic as any).since().to().toArray()),
     );
-    const to = since.where("written_on <= ?", Temporal.Now.instant());
-    expect(to.toSql()).toContain("written_on");
   });
 
   it("define scope for reserved words", async () => {
@@ -363,14 +366,22 @@ describe("NamedScopingTest", () => {
   // all/public/... should raise; existing-method names should not).
   it.skip("reserved scope names", () => {});
 
-  // Engine gap: scopes whose names contain spaces are defined via
-  // `Object.defineProperty` and not callable through `public_send(:"a b")`.
-  it.skip("spaces in scope names", () => {});
-
-  it("find all should behave like select", async () => {
-    const all = await (Topic as any).base().toArray();
-    expect(all.filter((t: any) => t.approved)).toEqual(all.filter((t: any) => t.approved));
+  it("spaces in scope names", async () => {
+    // Rails defines `scope :"title containing space", ->(space: " ") { ... }`
+    // and dispatches via `public_send(:"title containing space", space: " ")`.
+    Topic.scope("title containing space", (q: any, opts: { space?: string } = {}) =>
+      q.where(`title LIKE '%${opts.space ?? " "}%'`),
+    );
+    const expected = sortedIds(await Topic.where("title LIKE '% %'").toArray());
+    const got = sortedIds(await (Topic as any)["title containing space"]({ space: " " }).toArray());
+    expect(got).toEqual(expected);
   });
+
+  // Rails asserts `to_a.select(&:approved) == to_a.find_all(&:approved)` — i.e.
+  // Ruby Array#select and Array#find_all are aliases. trails materializes to a
+  // plain JS array with only `.filter`, so there is no distinct relation method
+  // to compare; the case has no meaningful trails analog.
+  it.skip("find all should behave like select", () => {});
 
   it("rand should select a random object from proxy", async () => {
     const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";
@@ -457,10 +468,10 @@ describe("NamedScopingTest", () => {
     );
   });
 
-  it("nested scoping", async () => {
-    const expected = sortedIds(await (Reply as any).approved().toArray());
-    expect(expected).toEqual(expected);
-  });
+  // Rails: `Topic.rejected.nested_scoping(expected)` where `nested_scoping`
+  // wraps a `scoping { Reply.approved }` block. The canonical Topic carries no
+  // `nested_scoping` scope and trails has no `relation.scoping { }` block form.
+  it.skip("nested scoping", () => {});
 
   it("scopes batch finders", async () => {
     const approvedCount = await (Topic as any).approved().count();
@@ -473,9 +484,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("table names for chaining scopes with and without table name included", async () => {
-    // assert_nothing_raised: Comment.for_first_post.for_first_author
-    await (Comment as any).forFirstPost().forFirstAuthor().toArray();
-    expect(true).toBe(true);
+    // Rails assert_nothing_raised: the chained scopes (one bare column, one
+    // table-qualified) must build and execute without raising.
+    const rows = await (Comment as any).forFirstPost().forFirstAuthor().toArray();
+    expect(Array.isArray(rows)).toBe(true);
   });
 
   it("scopes on relations", async () => {
@@ -509,14 +521,10 @@ describe("NamedScopingTest", () => {
   it.skip("scopes are cached on associations", () => {});
   it.skip("scopes with arguments are cached on associations", () => {});
 
-  it("scopes to get newest", async () => {
-    const welcome = posts("welcome");
-    const post = (await Post.find(welcome.id)) as any;
-    const oldNewest = (await post.comments.orderedByPostId().first()) as any;
-    const created = await post.comments.create({ body: "My new comment" });
-    expect(created).toBeDefined();
-    expect(oldNewest).toBeDefined();
-  });
+  // Rails: `post.comments.newest` (scope `order("id DESC").first`) must change
+  // after creating a new comment. The canonical Comment carries no `newest`
+  // scope, so there is no faithful body to assert against yet.
+  it.skip("scopes to get newest", () => {});
 
   it("scopes are reset on association reload", async () => {
     const welcome = posts("welcome");
@@ -536,10 +544,9 @@ describe("NamedScopingTest", () => {
   // `Scoping::Default::ClassMethods#default_scope`).
   it.skip("eager default scope relations are remove", () => {});
 
-  // Rails: SpecialComment.where(body: "go wild").created — relies on the
-  // `created` scope merging through an STI subclass with a body fixture not
-  // present in the trails comments fixtures.
-  it.skip("subclass merges scopes properly", () => {});
+  it("subclass merges scopes properly", async () => {
+    expect(await (SpecialComment as any).where({ body: "go wild" }).created().count()).toBe(1);
+  });
 
   // Rails: Comment.unscoped.oops_comments.destroy_all raises OopsError from a
   // scope extension method; trails has no oops_comments extension.
