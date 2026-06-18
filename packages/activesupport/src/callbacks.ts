@@ -814,22 +814,26 @@ export class CallbackChain {
       let cbResult: unknown;
       let terminatorHalted = false;
       let aborted = false;
-      try {
-        if (terminatorFn === false) {
+      if (terminatorFn === false) {
+        cbResult = cb.call(target, target);
+      } else if (terminatorFn) {
+        // Custom terminator owns the halt decision. Rails scopes `catch(:abort)`
+        // to the default terminator (callbacks.rb#default_terminator), so the
+        // sentinel is NOT caught here — it propagates unless the terminator
+        // itself catches it, matching Rails' caller-supplied terminator contract.
+        terminatorHalted = terminatorFn(target, () => {
           cbResult = cb.call(target, target);
-        } else if (terminatorFn) {
-          terminatorHalted = terminatorFn(target, () => {
-            cbResult = cb.call(target, target);
-            return cbResult;
-          });
-        } else {
+          return cbResult;
+        });
+      } else {
+        // Default terminator: Rails wraps the call in `catch(:abort)`. Halt the
+        // chain on the sentinel, no exception escapes; real errors propagate.
+        try {
           cbResult = cb.call(target, target);
+        } catch (e) {
+          if (!isAbortSignal(e)) throw e;
+          aborted = true;
         }
-      } catch (e) {
-        // Rails `throw :abort`: halt the chain, no exception escapes. Anything
-        // else (real errors) propagates unchanged.
-        if (!isAbortSignal(e)) throw e;
-        aborted = true;
       }
 
       if (aborted) {
@@ -872,9 +876,11 @@ export class CallbackChain {
           try {
             firstResolved = await cbResult;
           } catch (e) {
-            // An async before that rejects with the abort sentinel halts the
-            // chain (Rails `throw :abort`); real errors keep propagating.
-            if (!isAbortSignal(e)) throw e;
+            // Default terminator only (custom terminators already threw above;
+            // `terminator: false` never halts, so it must NOT swallow abort —
+            // Rails scopes `catch(:abort)` to the default terminator). An async
+            // before rejecting with the sentinel halts; real errors propagate.
+            if (!isAbortSignal(e) || terminatorFn === false) throw e;
             return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
           }
           if (asyncHalted(firstResolved))
@@ -897,14 +903,14 @@ export class CallbackChain {
                 remVal = (rem.filter as BeforeCallback).call(target, target);
               }
             } catch (e) {
-              if (!isAbortSignal(e)) throw e;
+              if (!isAbortSignal(e) || terminatorFn === false) throw e;
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
             }
             let resolved: unknown;
             try {
               resolved = isThenable(remVal) ? await remVal : remVal;
             } catch (e) {
-              if (!isAbortSignal(e)) throw e;
+              if (!isAbortSignal(e) || terminatorFn === false) throw e;
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
             }
             if (remSyncHalt || asyncHalted(resolved))

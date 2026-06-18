@@ -224,6 +224,28 @@ describe("Callbacks", () => {
       expect(target.log).toEqual([]);
     });
 
+    it("does not swallow the abort sentinel when terminator is disabled", () => {
+      // Rails scopes `catch(:abort)` to the default terminator; with the
+      // terminator disabled the sentinel must propagate, not halt the chain.
+      const target = {};
+      defineCallbacks(target, "save", { terminator: false });
+      setCallback(target, "save", "before", () => throwAbort());
+
+      expect(() => runCallbacks(target, "save", () => {})).toThrow();
+    });
+
+    it("does not swallow the abort sentinel for a custom terminator", () => {
+      // A custom terminator owns the halt decision; unless it catches the
+      // sentinel itself, throwAbort() propagates past it.
+      const target = {};
+      defineCallbacks(target, "save", {
+        terminator: (_t, fn) => fn() === false,
+      });
+      setCallback(target, "save", "before", () => throwAbort());
+
+      expect(() => runCallbacks(target, "save", () => {})).toThrow();
+    });
+
     it("does not halt when terminator is disabled", () => {
       const target = { log: [] as string[] };
       defineCallbacks(target, "save", { terminator: false });
