@@ -4,6 +4,7 @@ import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";
 import { Rollback } from "../../errors.js";
 import { Base } from "../../base.js";
+import type { CollectionProxy } from "../../associations/collection-proxy.js";
 
 export class AbstractCompany extends Base {
   static {
@@ -59,6 +60,7 @@ export class NamespacedClient extends Company {}
 
 export class Firm extends Company {
   _log: string[] = [];
+  declare clients: CollectionProxy<Client>;
 
   static {
     this.toParam("name");
@@ -313,8 +315,11 @@ export class Client extends Company {
     this.hasMany("accounts", { through: "firm", source: "accounts" });
     this.belongsTo("account");
 
-    this.validate(async function (this: Client) {
-      await (this as any).firm;
+    // Rails `validate do firm end` (company.rb:153) synchronously references
+    // the firm association and discards the result. The dotted `this.firm`
+    // getter is the sync association reader, so the validate block stays sync.
+    this.validate(function (this: Client) {
+      void (this as { firm?: unknown }).firm;
     });
 
     this.beforeSave(async function (this: Client) {

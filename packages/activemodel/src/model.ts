@@ -491,12 +491,17 @@ export class Model {
     options: ConditionalOptions = {},
   ): void {
     const fn: CallbackFn = (record: object) => {
-      // Return the underlying result so an `async` validator's Promise flows
+      // Return the underlying result so a Promise-returning validator flows
       // into the callback runner, where strict-sync mode (on the `validate`
-      // event) will throw instead of dropping it as an unhandled rejection.
+      // event) throws instead of dropping it as an unhandled rejection.
+      // Validations are synchronous in trails — an async `validate` callback
+      // is an authoring bug; move the async work to before_save/after_save.
       const r = record as T & Record<string, unknown>;
       if (typeof methodOrFn === "function") {
-        return methodOrFn(r) as void;
+        // Bind `this` to the record so block validators written as
+        // `function () { this.foo }` (Rails `instance_exec`) resolve `this`,
+        // while arrow validators reading the `record` arg keep working.
+        return methodOrFn.call(r, r) as void;
       } else if (typeof r[methodOrFn] === "function") {
         return (r[methodOrFn] as () => void)();
       }
