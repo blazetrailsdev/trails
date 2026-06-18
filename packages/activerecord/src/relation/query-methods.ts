@@ -886,11 +886,12 @@ export function buildWhereClause(
 
     if (isNamedBinds) {
       // Mirrors build_named_bound_sql_literal (query_methods.rb:1702-1717).
-      // Named binds: no positional normalization needed; values are quoted
-      // by visitBindValue when the node is visited.
-      const node = new Nodes.Grouping(
-        new Nodes.BoundSqlLiteral(opts, [], firstBind as Record<string, unknown>),
+      const rawNamed = firstBind as Record<string, unknown>;
+      const mc = (this as any)._modelClass;
+      const namedBinds = Object.fromEntries(
+        Object.entries(rawNamed).map(([k, v]) => [k, normalizeBoundValue(v, mc)]),
       );
+      const node = new Nodes.Grouping(new Nodes.BoundSqlLiteral(opts, [], namedBinds));
       return new WhereClause([node]);
     } else if (rest.length > 0) {
       // Route through buildBoundSqlLiteral for Rails-faithful normalization:
@@ -1662,20 +1663,26 @@ export function buildBoundSqlLiteral(
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
   // Mirrors build_bound_sql_literal (query_methods.rb:1682-1697).
-  const positionalBinds = values.map((value) => {
-    if (value instanceof Nodes.Node) {
-      return arelSql(this._modelClass.connection.toSql(value));
-    }
-    if (value !== null && typeof value === "object" && "id_for_database" in value) {
-      return (value as { id_for_database: unknown }).id_for_database;
-    }
-    return value;
-  });
+  const positionalBinds = values.map((v) => normalizeBoundValue(v, this._modelClass));
   try {
     return new Nodes.BoundSqlLiteral(statement, positionalBinds, {});
   } catch (e: any) {
     throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
   }
+}
+
+function normalizeBoundValue(value: unknown, modelClass: QueryMethodsHost["_modelClass"]): unknown {
+  if (value instanceof Nodes.Node) {
+    return arelSql(modelClass.connection.toSql(value));
+  }
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
+  ) {
+    return (value as { idForDatabase(): unknown }).idForDatabase();
+  }
+  return value;
 }
 
 /** @internal */
