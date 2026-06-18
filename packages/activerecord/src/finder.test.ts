@@ -2500,7 +2500,7 @@ describe("FinderTest", () => {
       id: [new Range(id(0), id(1)), id(2), id(4), new Range(id(5), id(7)), id(8)],
     }).toArray();
 
-    const got = results.map((p: any) => p.id).sort((a, b) => a - b);
+    const got = results.map((p: any) => p.id).sort((a, b) => Number(a) - Number(b));
     const expected = [0, 1, 2, 4, 5, 6, 7, 8].map(id);
     expect(got).toEqual(expected);
     expect(got).not.toContain(id(3));
