@@ -755,10 +755,39 @@ export function loadSchema(this: SchemaHost): void {
   // qualification only — it does not define prototype accessors. `_schemaLoaded`
   // is set at the end (matching the synthesize path), so a later async load
   // won't re-reflect; that mirrors the pre-existing fallback's contract.
+  // True when a partially-declared model still lacks a typed primary-key def
+  // after this cache-miss recovery. Such a model must NOT mark the load
+  // terminal: the implicit PK got no registered type, so `_castAttributeValue`
+  // would fall through to `parseInt` (→ number) while the read path
+  // deserializes the live int8 PK to BigInt on PG — input-cast and read
+  // diverge. Leaving `_schemaLoaded` unset lets the next load (at instantiate,
+  // after the find SELECT has warmed the schema cache) reflect the real PK
+  // type. Adapter-correct by construction: the reflected def carries the real
+  // column type (mysql→number, sqlite→number, PG-bigint→BigInt) — never
+  // hardcoded.
+  let pkStillMissing = false;
   if (workHost._attributeDefinitions.size === 0) {
     const borrowed = borrowSameTableColumns(workHost);
     if (borrowed) {
       workHost._attributeDefinitions = borrowed;
+    }
+  } else {
+    const pks = Array.isArray(workHost.primaryKey)
+      ? workHost.primaryKey
+      : workHost.primaryKey != null
+        ? [workHost.primaryKey]
+        : [];
+    const missingPk = pks.filter((pk) => !workHost._attributeDefinitions.has(pk));
+    if (missingPk.length > 0) {
+      // Best-effort sync recovery: borrow the missing PK def from an
+      // already-reflected same-table sibling (no DB round-trip). Covers
+      // pure-cast paths that never run a query to warm the cache.
+      const borrowed = borrowSameTableColumns(workHost);
+      for (const pk of missingPk) {
+        const def = borrowed?.get(pk);
+        if (def != null) workHost._attributeDefinitions.set(pk, def);
+        else pkStillMissing = true;
+      }
     }
   }
 
@@ -782,7 +811,7 @@ export function loadSchema(this: SchemaHost): void {
     }
     workHost._columnsHash = hash;
   }
-  workHost._schemaLoaded = true;
+  if (!pkStillMissing) workHost._schemaLoaded = true;
 }
 
 /**
