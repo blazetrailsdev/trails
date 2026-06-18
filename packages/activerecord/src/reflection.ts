@@ -323,7 +323,28 @@ export class AbstractReflection {
     const self = this._concrete();
     const counterCache = self.options?.counterCache;
     if (this.belongsTo()) {
-      return belongsToCounterCacheColumn(counterCache, self.activeRecord?.name ?? "");
+      const explicit = counterCacheColumnOption(counterCache);
+      if (explicit) return explicit;
+      if (!counterCache) return null;
+      // Rails: `active_record.name.demodulize.underscore.pluralize + "_count"`.
+      // Trails class names are flat (CpkBook vs Cpk::Book), so demodulize is a
+      // no-op and produces cpk_books_count instead of books_count. Fall back to
+      // the inverse hasMany's name on the target, which is already the
+      // demodulized plural form (CpkOrder.books → books_count).
+      try {
+        const ownerName = self.activeRecord?.name ?? "";
+        const targetAssocs: Array<{ type: string; name: string; options: any }> =
+          (self.klass as any)._associations ?? [];
+        const inverseHm = targetAssocs.find(
+          (a) =>
+            (a.type === "hasMany" || a.type === "hasOne") &&
+            (a.options.className ?? camelize(singularize(a.name))) === ownerName,
+        );
+        if (inverseHm) return `${underscore(inverseHm.name)}_count`;
+        return belongsToCounterCacheColumn(counterCache, ownerName);
+      } catch {
+        return belongsToCounterCacheColumn(counterCache, self.activeRecord?.name ?? "");
+      }
     }
     return counterCacheColumnOption(counterCache) || `${self.name}_count`;
   }

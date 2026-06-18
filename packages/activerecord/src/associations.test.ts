@@ -2828,6 +2828,7 @@ describe("AssociationsTest", () => {
         "shardedTags",
         "shardedBlogPostsTags",
         "cpkOrders",
+        "cpkBooks",
       ],
       {
         schema: canonicalSchema,
@@ -2856,6 +2857,7 @@ describe("AssociationsTest", () => {
   let Ship: typeof Base;
   let ShipPart: typeof Base;
   let CpkOrder: typeof Base;
+  let CpkBook: typeof Base;
   let CpkOrderAgreement: typeof Base;
   let CpkCar: typeof Base;
   let CpkCarReview: typeof Base;
@@ -2901,6 +2903,7 @@ describe("AssociationsTest", () => {
     ShipPart = (await import("./test-helpers/models/ship-part.js")).ShipPart as never;
     const cpkMod = await import("./test-helpers/models/cpk.js");
     CpkOrder = cpkMod.CpkOrder as never;
+    CpkBook = cpkMod.CpkBook as never;
     CpkOrderAgreement = cpkMod.CpkOrderAgreement as never;
     CpkCar = cpkMod.CpkCar as never;
     CpkCarReview = cpkMod.CpkCarReview as never;
@@ -2943,6 +2946,7 @@ describe("AssociationsTest", () => {
     registerModel("Ship", Ship);
     registerModel("ShipPart", ShipPart);
     registerModel("CpkOrder", CpkOrder);
+    registerModel("CpkBook", CpkBook);
     registerModel("CpkOrderAgreement", CpkOrderAgreement);
     registerModel("CpkCar", CpkCar);
     registerModel("CpkCarReview", CpkCarReview);
@@ -3600,5 +3604,22 @@ describe("AssociationsTest", () => {
     ).toHaveLength(1);
     // Target tag itself is untouched.
     expect(await ShardedTag.where({ id: (tag as any).id })).not.toHaveLength(0);
+  });
+
+  it("loading cpk association when persisted and in memory differ", async () => {
+    const order = await CpkOrder.create({ shop_id: 1, id: 2, status: "paid" });
+    await CpkBook.create({
+      author_id: 3,
+      id: 4,
+      shop_id: 1,
+      order_id: 2,
+      title: "Book",
+    });
+    await CpkBook.where({ author_id: 3, id: 4 }).updateAll({ title: "A different title" });
+    const books = await loadHasMany(order, "books", {
+      foreignKey: ["shop_id", "order_id"],
+      className: "CpkBook",
+    });
+    expect(books[0].id).toEqual([3, 4]);
   });
 });
