@@ -204,6 +204,11 @@ function runCases(tester) {
         code: `// nothing\n`,
       },
       {
+        name: "useHandlerFixtures object form satisfies required keys",
+        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        code: `useHandlerFixtures({ customers: [C, {}], "warehouse-things": [W, {}] });\n`,
+      },
+      {
         name: "useHandlerFixtures array form satisfies required keys",
         filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
         code: `useHandlerFixtures(["customers", "warehouse-things"]);\n`,
