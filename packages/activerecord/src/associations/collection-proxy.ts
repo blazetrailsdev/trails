@@ -1865,9 +1865,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // wrong column and leaves the actual FK null (join row never matches).
     const sourceRefl = (
       ctor as unknown as {
-        _reflectOnAssociation?: (
-          n: string,
-        ) => { sourceReflection?: { foreignKey?: string } } | null;
+        _reflectOnAssociation?: (n: string) => {
+          sourceReflection?: {
+            foreignKey?: string | string[];
+            associationPrimaryKey?: string | string[];
+          };
+        } | null;
       }
     )._reflectOnAssociation?.(this._assocName)?.sourceReflection;
     const sourceFk = sourceRefl?.foreignKey ?? `${underscore(sourceName)}_id`;
@@ -1898,16 +1901,40 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             return false;
           }
         }
-        // Create the join record
-        const targetPk = (record.constructor as typeof Base).primaryKey;
-        if (Array.isArray(targetPk)) {
-          throw new ConfigurationError(
-            `Through association "${this._assocName}" does not support a composite primary key on the target model "${(record.constructor as typeof Base).name}" — the join row needs a single source FK column.`,
-          );
+        // Create the join record. A composite source FK arises when the join's
+        // source belongs_to resolves a multi-column key — e.g. `belongs_to :tag`
+        // where Sharded::Tag declares `query_constraints [blog_id, id]`, so the
+        // source FK is `[blog_id, tag_id]`. Pair each source-FK column with the
+        // source reflection's association_primary_key column read off the target
+        // (mirroring the composite-owner branch); the single-column write would
+        // otherwise stringify the array into one bogus key and leave tag_id null.
+        let sourceJoinAttrs: Record<string, unknown>;
+        if (Array.isArray(sourceFk)) {
+          const sourcePk = sourceRefl?.associationPrimaryKey;
+          const sourcePkCols = Array.isArray(sourcePk) ? sourcePk : sourcePk ? [sourcePk] : [];
+          if (sourcePkCols.length !== sourceFk.length) {
+            throw new ConfigurationError(
+              `Through association "${this._assocName}" has a composite source foreign key ` +
+                `(${sourceFk.join(", ")}) whose length does not match the target primary key ` +
+                `(${sourcePkCols.join(", ")}).`,
+            );
+          }
+          sourceJoinAttrs = {};
+          for (let i = 0; i < sourceFk.length; i++) {
+            sourceJoinAttrs[sourceFk[i]] = record._readAttribute(sourcePkCols[i] as string);
+          }
+        } else {
+          const targetPk = (record.constructor as typeof Base).primaryKey;
+          if (Array.isArray(targetPk)) {
+            throw new ConfigurationError(
+              `Through association "${this._assocName}" does not support a composite primary key on the target model "${(record.constructor as typeof Base).name}" — the join row needs a single source FK column.`,
+            );
+          }
+          sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPk) };
         }
         const joinAttrs: Record<string, unknown> = {
           ...ownerJoinAttrs,
-          [sourceFk]: record._readAttribute(targetPk),
+          ...sourceJoinAttrs,
         };
         // Polymorphic through: ownerJoinAttrs already has the polymorphic
         // _id column from _throughOwnerPolymorphic; just add the _type.
