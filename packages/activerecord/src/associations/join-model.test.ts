@@ -41,6 +41,9 @@ import { Citation } from "../test-helpers/models/citation.js";
 import { Vertex } from "../test-helpers/models/vertex.js";
 import { Edge } from "../test-helpers/models/edge.js";
 import { Rating } from "../test-helpers/models/rating.js";
+import { Aircraft } from "../test-helpers/models/aircraft.js";
+import { Engine } from "../test-helpers/models/engine.js";
+import { Car } from "../test-helpers/models/car.js";
 
 // Mirrors the dynamic subclasses built by Rails' `find_post_with_dependency`
 // helper: `Class.new(ActiveRecord::Base)` on the `posts` table carrying a
@@ -113,6 +116,9 @@ describe("AssociationsJoinModelTest", () => {
   registerModel(Vertex);
   registerModel(Edge);
   registerModel(Rating);
+  registerModel(Aircraft);
+  registerModel(Engine);
+  registerModel(Car);
   registerModel(PostWithHasManyDeleteAll);
   registerModel(PostWithHasManyDestroy);
   registerModel(PostWithHasManyNullify);
@@ -890,6 +896,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("preload polymorph many types", async () => {
+    // Rails relies on implicit fixture-insertion order so taggings[0]/[1] are
+    // the two Post taggables; pin `taggings.id` so first/second resolve to
+    // non-nil taggables on PG/MySQL too (heap order isn't guaranteed there).
     const taggingList = (await Tagging.where("taggable_type != ?", "FakeModel")
       .includes("taggable")
       .order("taggings.id")
@@ -959,6 +968,14 @@ describe("AssociationsJoinModelTest", () => {
     const category = await Category.createBang({ name: "Not Associated" });
     expect((david as any).categories.loaded).toBe(false);
     expect(await (david as any).categories.isInclude(category)).toBe(false);
+  });
+
+  it("has many with pluralize table names false", async () => {
+    const aircraft = await Aircraft.createBang({ name: "Airbus 380" });
+    const engine = await Engine.createBang({ car_id: aircraft.id });
+    expect(((await (aircraft as any).engines.toArray()) as Base[]).map((e) => e.id)).toEqual([
+      engine.id,
+    ]);
   });
 
   it("has many through goes through all sti classes", async () => {
