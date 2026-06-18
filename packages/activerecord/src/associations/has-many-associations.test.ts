@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import {
   SubclassNotFound,
   Base,
@@ -25,6 +26,8 @@ import {
   RestrictedWithErrorFirm,
 } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
+import { Car } from "../test-helpers/models/car.js";
+import { Bulb } from "../test-helpers/models/bulb.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
 import {
@@ -1641,95 +1644,93 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const { companies } = useHandlerFixtures(["companies"]);
   beforeAll(async () => {
-    await defineSchema({
-      authors: { name: "string" },
-      posts: { author_id: "integer", title: "string" },
-    });
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        companies: TEST_SCHEMA.companies,
+        posts: TEST_SCHEMA.posts,
+        comments: TEST_SCHEMA.comments,
+        cars: TEST_SCHEMA.cars,
+        bulbs: TEST_SCHEMA.bulbs,
+      } as Schema,
+      { dropExisting: true },
+    );
+    await Company.loadSchema();
+    await HmPost.loadSchema();
+    await Comment.loadSchema();
+    await Car.loadSchema();
+    await Bulb.loadSchema();
   });
+  registerModel(Company);
+  registerModel(HmFirm);
+  registerModel(Client);
+  registerModel(HmPost);
+  registerModel(Comment);
+  registerModel(Car);
+  registerModel(Bulb);
+  enableSti(Company);
+  registerSubclass(HmFirm);
+  registerSubclass(Client);
+
   // -- Association definition --
 
   it("dangerous association name raises ArgumentError", () => {
-    class MyModel extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+    for (const name of ["errors", "save"]) {
+      expect(() => {
+        class Anon extends Base {
+          static {
+            this.hasMany(name);
+          }
+        }
+        // Reference Anon so the class definition (and its static block) is not
+        // elided as dead code.
+        void Anon;
+      }).toThrow(ArgumentError);
     }
-    // 'save' is a dangerous name as it would conflict with built-in methods
-    // In our implementation, defining it should still work (we don't block it)
-    // but the test just verifies the registration doesn't crash
-    expect(() => {
-      Associations.hasMany.call(MyModel, "items", {});
-    }).not.toThrow();
   });
 
   it("association keys bypass attribute protection", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    // FK is set even if it's "protected"
-    const post = await Post.create({ author_id: author.id, title: "Test" });
-    expect((post as any).author_id).toBe(author.id);
+    const car = (await Car.create({ name: "honda" })) as any;
+
+    let bulb = car.bulbs.new();
+    expect(bulb.car_id).toBe(car.id);
+
+    bulb = car.bulbs.new({ car_id: car.id + 1 });
+    expect(bulb.car_id).toBe(car.id);
+
+    bulb = car.bulbs.build();
+    expect(bulb.car_id).toBe(car.id);
+
+    bulb = car.bulbs.build({ car_id: car.id + 1 });
+    expect(bulb.car_id).toBe(car.id);
+
+    bulb = await car.bulbs.create();
+    expect(bulb.car_id).toBe(car.id);
+
+    bulb = await car.bulbs.create({ car_id: car.id + 1 });
+    expect(bulb.car_id).toBe(car.id);
   });
 
   it("include method in has many association should return true for instance added with build", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = await Post.create({ author_id: author.id, title: "Built" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.some((p: any) => p.id === post.id)).toBe(true);
+    const post = HmPost.new();
+    const comments = (post as any).comments;
+    const comment = comments.build();
+    expect(await comments.isInclude(comment)).toBe(true);
   });
 
   it("include uses array include after loaded", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = await Post.create({ author_id: author.id, title: "Loaded" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
+    const firm = companies("first_firm") as any;
+    const clients = firm.clients;
+    await clients.loadTarget();
+
+    const client = clients.target[0];
+
+    await assertNoQueries(false, async () => {
+      expect(clients.loaded).toBe(true);
+      expect(await clients.isInclude(client)).toBe(true);
     });
-    const found = posts.find((p: any) => p.id === post.id);
-    expect(found).toBeDefined();
   });
 });
 
