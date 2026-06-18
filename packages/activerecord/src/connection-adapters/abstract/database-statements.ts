@@ -87,7 +87,7 @@ export interface DatabaseStatementsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result>;
   /** @internal */
   internalExecute?(
@@ -1415,7 +1415,7 @@ interface DatabaseStatementsDefaultsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result>;
   selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   execQuery(
@@ -1493,7 +1493,7 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result> {
     // Rails: select_all → internal_exec_query → exec_query. Delegating
     // here lets adapters that override execQuery (e.g. PostgreSQLAdapter,
