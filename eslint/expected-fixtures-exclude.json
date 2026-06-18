@@ -30,7 +30,6 @@
   "packages/activerecord/src/excluding.test.ts",
   "packages/activerecord/src/finder.test.ts",
   "packages/activerecord/src/insert-all.test.ts",
-  "packages/activerecord/src/integration.test.ts",
   "packages/activerecord/src/locking.test.ts",
   "packages/activerecord/src/nested-attributes.test.ts",
   "packages/activerecord/src/persistence.test.ts",

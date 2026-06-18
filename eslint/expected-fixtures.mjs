@@ -120,8 +120,12 @@ function repoRel(filename) {
 }
 
 /**
- * Inspect a single `useFixtures(...)` call expression and push its
- * ObjectExpression keys into the supplied Set.
+ * Inspect a single `useFixtures(...)` or `useHandlerFixtures(...)` call
+ * expression and push its declared fixture-set keys into the supplied Set.
+ *
+ * Supported argument forms:
+ *   - ObjectExpression  `{ owners: [...], pets: [...] }`  (useFixtures)
+ *   - ArrayExpression   `["owners", "pets"]`               (useHandlerFixtures)
  */
 function harvestUseFixturesCall(node, keys) {
   if (
@@ -129,7 +133,7 @@ function harvestUseFixturesCall(node, keys) {
     node.type !== "CallExpression" ||
     !node.callee ||
     node.callee.type !== "Identifier" ||
-    node.callee.name !== "useFixtures"
+    (node.callee.name !== "useFixtures" && node.callee.name !== "useHandlerFixtures")
   ) {
     return false;
   }
@@ -140,6 +144,10 @@ function harvestUseFixturesCall(node, keys) {
       const k = p.key;
       if (k.type === "Identifier") keys.add(k.name);
       else if (k.type === "Literal" && typeof k.value === "string") keys.add(k.value);
+    }
+  } else if (arg && arg.type === "ArrayExpression") {
+    for (const el of arg.elements) {
+      if (el && el.type === "Literal" && typeof el.value === "string") keys.add(el.value);
     }
   }
   return true;
@@ -179,14 +187,14 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require activerecord test files to load via `useFixtures` every fixture set their Rails counterpart actually dereferences (e.g. `customers(:david)`). Scaffolding-only fixture declarations are ignored.",
+        "Require activerecord test files to load via `useFixtures` or `useHandlerFixtures` every fixture set their Rails counterpart actually dereferences (e.g. `customers(:david)`). Scaffolding-only fixture declarations are ignored.",
     },
     schema: [],
     messages: {
       missing:
-        "Expected `useFixtures({ … })` declaring fixture set(s) [{{names}}] — Rails source {{rails}} dereferences records from them.",
+        "Expected `useFixtures({ … })` or `useHandlerFixtures([…])` declaring fixture set(s) [{{names}}] — Rails source {{rails}} dereferences records from them.",
       incomplete:
-        "`useFixtures(...)` is missing fixture set(s) [{{names}}] dereferenced by Rails source {{rails}}.",
+        "`useFixtures`/`useHandlerFixtures` is missing fixture set(s) [{{names}}] dereferenced by Rails source {{rails}}.",
     },
   },
   create(context) {

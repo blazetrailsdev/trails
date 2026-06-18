@@ -118,6 +118,20 @@ describe("collectUseFixturesKeys", () => {
     expect([...keys].sort()).toEqual(["customers", "posts", "warehouse-things"]);
   });
 
+  it("recognizes useHandlerFixtures array form and unions keys with useFixtures calls", async () => {
+    const { parser } = await import("typescript-eslint");
+    const parse = (s) => parser.parseForESLint(s, { loc: true, range: true }).ast;
+    const src = [
+      'useHandlerFixtures(["owners", "pets"]);',
+      'describe("B", () => { useFixtures({ posts: z }); });',
+      "unrelated({ ignored: 1 });",
+    ].join("\n");
+    const ast = parse(src);
+    const { found, keys } = collectUseFixturesKeys(ast);
+    expect(found).toBe(true);
+    expect([...keys].sort()).toEqual(["owners", "pets", "posts"]);
+  });
+
   it("returns found=false when there are no useFixtures calls", async () => {
     const { parser } = await import("typescript-eslint");
     const parse = (s) => parser.parseForESLint(s, { loc: true, range: true }).ast;
@@ -189,6 +203,26 @@ function runCases(tester) {
         filename: path.join(ROOT, "packages/arel/src/foo.test.ts"),
         code: `// nothing\n`,
       },
+      {
+        name: "useHandlerFixtures object form satisfies required keys",
+        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        code: `useHandlerFixtures({ customers: [C, {}], "warehouse-things": [W, {}] });\n`,
+      },
+      {
+        name: "useHandlerFixtures array form satisfies required keys",
+        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        code: `useHandlerFixtures(["customers", "warehouse-things"]);\n`,
+      },
+      {
+        name: "useHandlerFixtures array form with extra keys allowed",
+        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        code: `useHandlerFixtures(["customers", "warehouse-things", "extras"]);\n`,
+      },
+      {
+        name: "useHandlerFixtures mixed with useFixtures unions keys",
+        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        code: `useHandlerFixtures(["customers"]); useFixtures({ "warehouse-things": [W, {}] });\n`,
+      },
     ],
     invalid: [
       {
@@ -201,6 +235,12 @@ function runCases(tester) {
         name: "useFixtures present but missing a key",
         filename: path.join(ROOT, "packages/activerecord/src/associations/eager.test.ts"),
         code: `const fx = useFixtures({ posts: [P, {}] });\n`,
+        errors: [{ messageId: "incomplete" }],
+      },
+      {
+        name: "useHandlerFixtures array form missing a key",
+        filename: path.join(ROOT, "packages/activerecord/src/associations/eager.test.ts"),
+        code: `useHandlerFixtures(["posts"]);\n`,
         errors: [{ messageId: "incomplete" }],
       },
     ],
