@@ -944,10 +944,18 @@ function loadRubyModelsManifest(): RubyFileEntry[] {
   return JSON.parse(out) as RubyFileEntry[];
 }
 
+// Models consolidated from per-file subdirectories into a single file.
+const MODEL_PATH_REMAPS: Record<string, string> = {
+  "cpk/": "cpk.ts",
+};
+
 // Infer TS filename from Ruby file path. `test/models/post.rb` → `post.ts`;
 // `test/models/admin/account.rb` → `admin/account.ts` (preserving subdir).
 export function tsModelPath(rubyFile: string): string {
   const rel = rubyFile.replace(/^test\/models\//, "").replace(/\.rb$/, ".ts");
+  for (const [prefix, target] of Object.entries(MODEL_PATH_REMAPS)) {
+    if (rel.startsWith(prefix)) return path.join(MODELS_TS_DIR, target);
+  }
   return path.join(MODELS_TS_DIR, rel.replace(/_/g, "-"));
 }
 
