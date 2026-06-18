@@ -1835,7 +1835,18 @@ export class Base extends Model {
   /** @internal Cast a value through an attribute's type, with parseInt fallback for the default PK. */
   static _castAttributeValue(key: string, value: unknown): unknown {
     if (typeof value !== "string") return value;
-    const def = this._attributeDefinitions.get(key);
+    let def = this._attributeDefinitions.get(key);
+    if (!def && typeof this.primaryKey === "string" && key === this.primaryKey) {
+      // A partially-declared model that synthesized its schema during a
+      // cache-miss window may lack the implicit PK def. Force a sync schema
+      // (re)load so the PK picks up its adapter-resolved type from the warm
+      // cache before the parseInt fallback — mirroring Rails, where `find`
+      // casts the id through the column type that `load_schema!` always
+      // populates (model_schema.rb load_schema!/_default_attributes). Keeps
+      // input-cast aligned with the read path (PG int8→BigInt, not number).
+      (ModelSchema.loadSchema as any).call(this);
+      def = this._attributeDefinitions.get(key);
+    }
     if (def) return def.type.cast(value);
     if (typeof this.primaryKey === "string" && key === this.primaryKey) {
       const parsed = parseInt(value, 10);
