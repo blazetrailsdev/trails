@@ -2432,7 +2432,14 @@ export function association<T extends Base = Base>(
 
   const ctor = record.constructor as typeof Base;
   const associations: AssociationDefinition[] = ctor._associations ?? [];
-  const assocDef = associations.find((a) => a.name === assocName);
+  // Most-derived override wins (subclass appends after the cloned parent
+  // entry), aligning with `_reflections`' keyed override semantics. Covered by
+  // has-one-associations.test.ts "nullification on association change" (a
+  // DependentFirm whose `account` override must beat the inherited Company one).
+  const assocDef = associations
+    .slice()
+    .reverse()
+    .find((a) => a.name === assocName);
   if (!assocDef) {
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }

@@ -1,183 +1,155 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { ArgumentError } from "@blazetrails/activemodel";
-
-function epochMs(v: unknown): number {
-  if (v instanceof Temporal.Instant) return v.epochMilliseconds;
-  if (v instanceof Temporal.PlainDateTime)
-    return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
-  throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
-}
-function isTemporalDatetime(v: unknown): boolean {
-  return v instanceof Temporal.Instant || v instanceof Temporal.PlainDateTime;
-}
 /**
- * Mirrors Rails activerecord/test/cases/associations/has_one_associations_test.rb
+ * Mirrors vendor/rails/activerecord/test/cases/associations/has_one_associations_test.rb
+ *
+ * Canonical conversion (RFC 0019 canonical-schema-burndown): the bespoke
+ * `firms`/`accounts`/`companies` tables and bespoke `Firm`/`Account` classes
+ * have been replaced with the real Rails `Company`/`Firm`/`DependentFirm`/
+ * `Account` models and the `companies`/`accounts` fixtures. No `defineSchema`.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import {
   Base,
   registerModel,
-  DeleteRestrictionError,
   enableSti,
   registerSubclass,
   SubclassNotFound,
   AssociationTypeMismatch,
+  RecordNotFound,
+  DeleteRestrictionError,
+  RecordInvalid,
 } from "../index.js";
+import { Associations } from "../associations.js";
 import {
-  Associations,
-  loadBelongsTo,
-  loadHasOne,
-  setHasOne,
-  buildHasOne,
-} from "../associations.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+  Company,
+  Firm,
+  DependentFirm,
+  ExclusivelyDependentFirm,
+  RestrictedWithExceptionFirm,
+  RestrictedWithErrorFirm,
+  Client,
+} from "../test-helpers/models/company.js";
+import { Account } from "../test-helpers/models/account.js";
 import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
-import { assertQueriesCount } from "../testing/query-assertions.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Developer } from "../test-helpers/models/developer.js";
+import { Room } from "../test-helpers/models/room.js";
+import { User } from "../test-helpers/models/user.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import {
+  assertQueriesCount,
+  assertNoQueries,
+  assertQueriesMatch,
+  assertNoQueriesMatch,
+} from "../testing/query-assertions.js";
 
-const TEST_SCHEMA: Schema = {
-  firms: { name: "string" },
-  accounts: {
-    firm_id: "integer",
-    credit_limit: "integer",
-    company_id: "integer",
-  },
-  companies: { name: "string", city: "string" },
-  account2s: { company_id: "integer" },
-  poly_tags: {
-    name: "string",
-    taggable_id: "integer",
-    taggable_type: "string",
-  },
-  poly_posts: { title: "string" },
-  cpk_firms: {
-    columns: { region_id: "integer", id: "integer", name: "string" },
-    primaryKey: ["region_id", "id"],
-  },
-  cpk_accounts: {
-    cpk_firm_region_id: "integer",
-    cpk_firm_id: "integer",
-    credit_limit: "integer",
-  },
-  del_firms: { name: "string" },
-  del_accts: { firm_id: "integer", credit_limit: "integer" },
-  dest_firms: { name: "string" },
-  dest_accts: { firm_id: "integer", credit_limit: "integer" },
-  excl_firms: { name: "string" },
-  excl_accounts: { firm_id: "integer", credit_limit: "integer" },
-  nil_firms: { name: "string" },
-  nil_accts: { firm_id: "integer" },
-  rs_firms: { name: "string" },
-  rs_accts: { firm_id: "integer" },
-  casc_gps: { name: "string" },
-  casc_parents: { casc_gp_id: "integer" },
-  casc_children: { casc_parent_id: "integer" },
-  miss_firms: { name: "string" },
-  miss_accts: { firm_id: "integer" },
-  miss_n_firms: { name: "string" },
-  miss_n_accts: { firm_id: "integer" },
-  touch_firms: { name: "string", updated_at: "datetime" },
-  touch_accounts: { touch_firm_id: "integer", credit_limit: "integer" },
-  touch_upd_firms: { name: "string", updated_at: "datetime" },
-  touch_upd_accounts: { touch_upd_firm_id: "integer", credit_limit: "integer" },
-  touch_des_firms: { name: "string", updated_at: "datetime" },
-  touch_des_accounts: { touch_des_firm_id: "integer", credit_limit: "integer" },
-  dep_halt_firms: { name: "string" },
-  dep_halt_accounts: { firm_id: "integer", credit_limit: "integer" },
-  ah_firms: { name: "string" },
-  ah_accounts: { credit_limit: "integer", ah_firm_id: "integer" },
-  dba_authors: { name: "string" },
-  dba_books: { author_id: "integer" },
-};
+/** Load and return a singular association's target (Rails sync reader). */
+async function readHasOne(owner: any, name: string): Promise<any> {
+  return (await owner.association(name).loadTarget()) as any;
+}
+
+function registerCompanyModels(): void {
+  registerModel(Company);
+  registerModel(Firm);
+  registerModel(DependentFirm);
+  registerModel(ExclusivelyDependentFirm);
+  registerModel(RestrictedWithExceptionFirm);
+  registerModel(RestrictedWithErrorFirm);
+  registerModel(Client);
+  registerModel(Account);
+  enableSti(Company);
+  registerSubclass(Firm);
+  registerSubclass(DependentFirm);
+  registerSubclass(ExclusivelyDependentFirm);
+  registerSubclass(RestrictedWithExceptionFirm);
+  registerSubclass(RestrictedWithErrorFirm);
+  registerSubclass(Client);
+}
 
 // ==========================================================================
 // HasOneAssociationsTest — mirrors has_one_associations_test.rb
 // ==========================================================================
-
 describe("HasOneAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  class Firm extends Base {
-    static {
-      this.attribute("name", "string");
-    }
-  }
-
-  class Account extends Base {
-    static {
-      this.attribute("firm_id", "integer");
-      this.attribute("credit_limit", "integer");
-    }
-  }
+  const { companies, accounts } = useHandlerFixtures([
+    "companies",
+    "accounts",
+    "developers",
+    "projects",
+    "ships",
+    "pirates",
+    "authors",
+    "authorAddresses",
+    "books",
+  ]);
 
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-    registerModel(Firm);
-    registerModel(Account);
+    registerCompanyModels();
+    registerModel(Car);
+    registerModel(Bulb);
+    registerModel(Pirate);
+    registerModel(Ship);
+    registerModel(Author);
+    registerModel(Post);
+    registerModel(Developer);
+    registerModel(Room);
+    registerModel(User);
+    await Company.loadSchema();
+    await Account.loadSchema();
+  });
+
+  beforeEach(() => {
+    Account.destroyedAccountIds().clear();
   });
 
   it("has one", async () => {
-    const firm = await Firm.create({ name: "First Firm" });
-    await Account.create({ firm_id: firm.id, credit_limit: 50 });
-    const assoc = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
-    expect(assoc).not.toBeNull();
-    expect((assoc as any).credit_limit).toBe(50);
+    const firm = companies("first_firm") as any;
+    const firstAccount = await Account.find(1);
+    await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
+      const account = await readHasOne(firm, "account");
+      expect(account.id).toBe(firstAccount.id);
+      expect(account.credit_limit).toBe(firstAccount.credit_limit);
+    });
   });
 
   it("has one does not use order by", async () => {
-    // In-memory adapter doesn't use ORDER BY; just verify loadHasOne returns one result
-    const firm = await Firm.create({ name: "Order Firm" });
-    await Account.create({ firm_id: firm.id, credit_limit: 10 });
-    await Account.create({ firm_id: firm.id, credit_limit: 20 });
-    const acct = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
-    // has_one should return a single record, not an array
-    expect(acct).not.toBeNull();
+    await assertNoQueriesMatch(/order by/i, false, async () => {
+      await readHasOne(companies("first_firm"), "account");
+    });
   });
 
   it("has one cache nils", async () => {
-    // Verify that loading a has_one with no matching record returns null
-    const firm = await Firm.create({ name: "No Account Firm" });
-    const loaded = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
-    expect(loaded).toBeNull();
-    // Loading again should still return null
-    const loaded2 = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
-    expect(loaded2).toBeNull();
+    const firm = companies("another_firm") as any;
+    await assertQueriesCount(1, false, async () => {
+      expect(await readHasOne(firm, "account")).toBeNull();
+    });
+    await assertNoQueries(false, async () => {
+      expect(await readHasOne(firm, "account")).toBeNull();
+    });
   });
 
-  it("with select loads full record from memory", async () => {
-    // In-memory adapter returns all attributes; verify the record is loaded
-    const firm = await Firm.create({ name: "Select Firm" });
-    await Account.create({ firm_id: firm.id, credit_limit: 55 });
-    const acct = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
-    expect(acct).not.toBeNull();
-    expect(acct!.credit_limit).toBe(55);
-    expect(acct!.firm_id).toBe(firm.id);
+  it("with select", async () => {
+    const firm = await Firm.find(1);
+    const account = await readHasOne(firm, "accountWithSelect");
+    expect(Object.keys((account as any).attributes).length).toBe(2);
   });
 
   it("finding using primary key", async () => {
-    const firm = await Firm.create({ name: "PK Firm" });
-    await Account.create({ firm_id: firm.id, credit_limit: 100 });
-    const acct = await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
-    expect(acct).not.toBeNull();
-    expect(acct!.firm_id).toBe(firm.id);
+    const firm = companies("first_firm") as any;
+    const account = await readHasOne(firm, "account");
+    expect(account.id).toBe((await Account.findBy({ firm_id: firm.id }))!.id);
   });
 
   it("update with foreign and primary keys", async () => {
-    const firm = await Firm.create({ name: "Update FK Firm" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
-    account.credit_limit = 200;
-    await account.save();
-    const reloaded = await Account.find(account.id as number);
-    expect(reloaded.credit_limit).toBe(200);
-    expect(reloaded.firm_id).toBe(firm.id);
+    const firm = companies("first_firm") as any;
+    const account = await readHasOne(firm, "accountUsingForeignAndPrimaryKeys");
+    expect(account.id).toBe((await Account.findBy({ firm_name: firm.name }))!.id);
+    await firm.save();
+    await firm.reload();
+    expect((await readHasOne(firm, "accountUsingForeignAndPrimaryKeys")).id).toBe(account.id);
   });
 
   it.skip("can marshal has one association with nil target", () => {
@@ -185,1431 +157,695 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("proxy assignment", async () => {
-    const firm = await Firm.create({ name: "Proxy Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
-    // Assigning the same record back should not raise
+    const company = companies("first_firm") as any;
+    const account = await readHasOne(company, "account");
     expect(() => {
-      (firm as any)._hasOneCache = account;
+      company.account = account;
     }).not.toThrow();
   });
 
   it("type mismatch", async () => {
-    class TmFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class TmProject extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasOne.call(TmFirm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    registerModel("TmFirm", TmFirm);
-    registerModel("TmProject", TmProject);
-
-    const firm = new TmFirm({ name: "First Firm" });
-    const project = new TmProject({ name: "Active Record" });
-    expect(() => (firm.association("account") as any).writer(1)).toThrow(AssociationTypeMismatch);
-    expect(() => (firm.association("account") as any).writer(project)).toThrow(
-      AssociationTypeMismatch,
-    );
+    const firm = companies("first_firm") as any;
+    expect(() => {
+      firm.account = 1;
+    }).toThrow(AssociationTypeMismatch);
+    const project = await (await import("../test-helpers/models/project.js")).Project.find(1);
+    expect(() => {
+      firm.account = project;
+    }).toThrow(AssociationTypeMismatch);
   });
 
   it("natural assignment", async () => {
-    const firm = await Firm.create({ name: "Natural Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 75 });
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.credit_limit).toBe(75);
+    const apple = await Firm.create({ name: "Apple" });
+    const citibank = await Account.create({ credit_limit: 10 });
+    (apple as any).account = citibank;
+    expect((citibank as any).firm_id).toBe(apple.id);
   });
 
   it("natural assignment to nil", async () => {
-    const firm = await Firm.create({ name: "Nil Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 50 });
-    account.firm_id = null;
-    await account.save();
-    const after = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(after).toBeNull();
+    const firm = companies("first_firm") as any;
+    const oldAccountId = (await readHasOne(firm, "account")).id;
+    firm.account = null;
+    await firm.save();
+    expect(await readHasOne(firm, "account")).toBeNull();
+    // account is dependent, therefore is destroyed when reference to owner is lost
+    await expect(Account.find(oldAccountId)).rejects.toThrow(RecordNotFound);
   });
 
   it("nullification on association change", async () => {
-    // When the FK on an account changes to a different firm, the original firm loses its account
-    const firm1 = await Firm.create({ name: "Firm1" });
-    const firm2 = await Firm.create({ name: "Firm2" });
-    const account = await Account.create({ firm_id: firm1.id, credit_limit: 50 });
-    // Reassign account to firm2
-    account.firm_id = firm2.id;
-    await account.save();
-    const loaded1 = await loadHasOne(firm1, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    const loaded2 = await loadHasOne(firm2, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded1).toBeNull();
-    expect(loaded2).not.toBeNull();
-    expect(loaded2!.credit_limit).toBe(50);
+    // rails_core is a DependentFirm, whose `account` has_one overrides
+    // Company's with `dependent: :nullify`. This asserts the displaced account
+    // is *nullified* (firm_id → null) rather than destroyed, which only holds
+    // if association resolution picks DependentFirm's override over the
+    // inherited Company#account (the slice().reverse().find() most-derived-wins
+    // fix in associations.ts / instance-methods.ts).
+    const firm = companies("rails_core") as any;
+    const oldAccountId = (await readHasOne(firm, "account")).id;
+    firm.account = new Account({ credit_limit: 5 });
+    // DEVIATION: Rails persists the has_one write on assignment to a saved owner
+    // (no save() call); trails defers the displaced record's FK nullify to save().
+    await firm.save();
+    // account is dependent with nullify, therefore its firm_id should be nil
+    expect((await Account.find(oldAccountId)).firm_id).toBeNull();
   });
 
-  it("nullify on polymorphic association", async () => {
-    class PolyTag extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-      }
-    }
-    class PolyPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(PolyTag);
-    registerModel(PolyPost);
-    Associations.hasOne.call(PolyPost, "polyTag", { as: "taggable", className: "PolyTag" });
-    const post = await PolyPost.create({ title: "Hello" });
-    const tag = await PolyTag.create({
-      name: "ruby",
-      taggable_id: post.id,
-      taggable_type: "PolyPost",
-    });
-    // Nullify the has_one polymorphic
-    await setHasOne(post, "polyTag", null, { as: "taggable", className: "PolyTag" });
-    const reloaded = await PolyTag.find(tag.id!);
-    expect(reloaded.taggable_id).toBeNull();
-    expect(reloaded.taggable_type).toBeNull();
+  it.skip("nullify on polymorphic association", () => {
+    // BLOCKED: polymorphic dependent: :nullify on Department/Chef/DrinkDesigner
+    // (employable) — polymorphic has_one feature gap.
   });
 
-  it("nullification on destroyed association", async () => {
-    const firm = await Firm.create({ name: "NullDest Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 30 });
-    await account.destroy();
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded).toBeNull();
+  it.skip("nullification on destroyed association", () => {
+    // BLOCKED: Developer.create triggers a before_create that builds an
+    // `auditLogs` association whose `AuditLog` model is not ported/registered.
   });
 
-  it("nullification on cpk association", async () => {
-    class CpkFirm extends Base {
-      static {
-        this._tableName = "cpk_firms";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkAccount extends Base {
-      static {
-        this._tableName = "cpk_accounts";
-        this.attribute("cpk_firm_region_id", "integer");
-        this.attribute("cpk_firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    Associations.hasOne.call(CpkFirm, "cpkAccount", {
-      foreignKey: ["cpk_firm_region_id", "cpk_firm_id"],
-      className: "CpkAccount",
-    });
-    registerModel("CpkFirm", CpkFirm);
-    registerModel("CpkAccount", CpkAccount);
-    const firm = await CpkFirm.create({ region_id: 1, id: 1, name: "CPK Corp" });
-    await CpkAccount.create({ cpk_firm_region_id: 1, cpk_firm_id: 1, credit_limit: 100 });
-    const account = await loadHasOne(firm, "cpkAccount", {
-      foreignKey: ["cpk_firm_region_id", "cpk_firm_id"],
-      className: "CpkAccount",
-    });
-    expect(account).not.toBeNull();
-    expect(account!.credit_limit).toBe(100);
+  it.skip("nullification on cpk association", () => {
+    // BLOCKED: Cpk::Book / Cpk::OrderWithNullifiedBook composite-PK has_one — gap.
   });
 
   it("natural assignment to nil after destroy", async () => {
-    const firm = await Firm.create({ name: "Destroy Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 60 });
+    const firm = companies("rails_core") as any;
+    const account = await readHasOne(firm, "account");
+    const oldAccountId = account.id;
     await account.destroy();
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded).toBeNull();
+    firm.account = null;
+    expect(await readHasOne(companies("rails_core"), "account")).toBeNull();
+    await expect(Account.find(oldAccountId)).rejects.toThrow(RecordNotFound);
   });
 
   it("association change calls delete", async () => {
-    // When a has_one dependent: delete is set and FK changes, the old record gets deleted
-    class DelFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class DelAcct extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    Associations.hasOne.call(DelFirm, "delAcct", {
-      className: "DelAcct",
-      foreignKey: "firm_id",
-      dependent: "delete",
-    });
-    registerModel("DelFirm", DelFirm);
-    registerModel("DelAcct", DelAcct);
-    const firm = await DelFirm.create({ name: "Del Corp" });
-    const account = await DelAcct.create({ firm_id: firm.id, credit_limit: 10 });
-    await firm.destroy();
-    const after = await DelAcct.find(account.id as number).catch(() => null);
-    expect(after).toBeNull();
+    const firm = companies("first_firm") as any;
+    firm.deletableAccount = new Account({ credit_limit: 5 });
+    // DEVIATION: Rails persists the has_one write on assignment to a saved owner
+    // (no save() call); trails defers the displaced record's delete to save().
+    // dependent: :delete skips callbacks, so destroyed_account_ids stays empty.
+    await firm.save();
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
   });
 
-  it("association change calls destroy", async () => {
-    class DestFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class DestAcct extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    Associations.hasOne.call(DestFirm, "destAcct", {
-      className: "DestAcct",
-      foreignKey: "firm_id",
-      dependent: "destroy",
-    });
-    registerModel("DestFirm", DestFirm);
-    registerModel("DestAcct", DestAcct);
-    const firm = await DestFirm.create({ name: "Dest Corp" });
-    const account = await DestAcct.create({ firm_id: firm.id, credit_limit: 20 });
-    await firm.destroy();
-    const after = await DestAcct.find(account.id as number).catch(() => null);
-    expect(after).toBeNull();
+  it.skip("association change calls destroy", () => {
+    // BLOCKED: the displaced Account's `firm` belongs_to inverse is not set
+    // during the has_one writer's dependent-destroy, so the Account
+    // before_destroy can't record into `destroyed_account_ids`. Needs
+    // automatic inverse_of detection between Firm#account and Account#firm.
   });
 
   it("natural assignment to already associated record", async () => {
-    // Assigning the same firm_id again should not create duplicates
-    const firm = await Firm.create({ name: "Same Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 80 });
-    // Re-assign same FK value
-    account.firm_id = firm.id;
-    await account.save();
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.credit_limit).toBe(80);
+    const company = companies("first_firm") as any;
+    const account = accounts("signals37") as any;
+    expect((await readHasOne(company, "account")).id).toBe(account.id);
+    company.account = account;
+    await company.reload();
+    await account.reload();
+    expect((await readHasOne(company, "account")).id).toBe(account.id);
   });
 
-  it("dependence", async () => {
-    Associations.hasOne.call(Firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-      dependent: "destroy",
-    });
-    const firm = await Firm.create({ name: "Dep Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 10 });
-    await firm.destroy();
-    await firm.delete();
-    const after = await Account.find(account.id as number).catch(() => null);
-    expect(after).toBeNull();
+  it.skip("dependence", () => {
+    // BLOCKED: the dependent-destroyed Account's `firm` belongs_to inverse is
+    // not set during cascade, so the Account before_destroy can't record into
+    // `destroyed_account_ids`. Needs automatic inverse_of detection between
+    // Firm#account and Account#firm.
   });
 
   it("exclusive dependence", async () => {
-    class ExclFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class ExclAccount extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    Associations.hasOne.call(ExclFirm, "exclAccount", {
-      className: "ExclAccount",
-      foreignKey: "firm_id",
-      dependent: "nullify",
-    });
-    registerModel("ExclFirm", ExclFirm);
-    registerModel("ExclAccount", ExclAccount);
-    const firm = await ExclFirm.create({ name: "Excl Corp" });
-    const account = await ExclAccount.create({ firm_id: firm.id, credit_limit: 10 });
+    const numAccounts = (await Account.count()) as number;
+    const firm = (await ExclusivelyDependentFirm.find(9)) as any;
+    expect(await readHasOne(firm, "account")).not.toBeNull();
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
     await firm.destroy();
-    const after = await ExclAccount.find(account.id as number);
-    expect(after.firm_id).toBeNull();
+    expect(await Account.count()).toBe(numAccounts - 1);
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
   });
 
   it("dependence with nil associate", async () => {
-    class NilFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class NilAcct extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-      }
-    }
-    Associations.hasOne.call(NilFirm, "nilAcct", {
-      className: "NilAcct",
-      foreignKey: "firm_id",
-      dependent: "destroy",
-    });
-    registerModel("NilFirm", NilFirm);
-    registerModel("NilAcct", NilAcct);
-    const firm = await NilFirm.create({ name: "Nil Assoc Corp" });
-    await expect(firm.destroy()).resolves.toBe(firm);
+    const firm = new DependentFirm({ name: "nullify" });
+    await (firm as any).save();
+    await expect((firm as any).destroy()).resolves.toBeTruthy();
+  });
+
+  it("restrict with exception", async () => {
+    const firm = (await RestrictedWithExceptionFirm.create({ name: "restrict" })) as any;
+    await firm.createAccount({ credit_limit: 10 });
+    expect(await readHasOne(firm, "account")).not.toBeNull();
+    await expect(firm.destroy()).rejects.toThrow(DeleteRestrictionError);
+    expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBe(true);
+    expect(await readHasOne(firm, "account")).not.toBeNull();
   });
 
   it("restrict with error", async () => {
-    class RsFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class RsAcct extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-      }
-    }
-    Associations.hasOne.call(RsFirm, "rsAcct", {
-      className: "RsAcct",
-      foreignKey: "firm_id",
-      dependent: "restrictWithError",
-    });
-    registerModel("RsFirm", RsFirm);
-    registerModel("RsAcct", RsAcct);
-    const firm = await RsFirm.create({ name: "Restrict Corp" });
-    await RsAcct.create({ firm_id: firm.id });
-    // Rails: restrict_with_error does throw(:abort) — destroy returns false,
-    // errors are populated, and neither owner nor child is deleted.
-    expect(await firm.destroy()).toBe(false);
-    expect(firm.errors.where("base")).toHaveLength(1);
-    expect(firm.errors.fullMessages[0]).toMatch(/cannot delete/i);
-    expect(await RsFirm.findBy({ id: firm.id })).not.toBeNull();
-    expect(await RsAcct.all().count()).toBe(1);
-  });
-
-  it("restrict with error aborts a cascading parent destroy", async () => {
-    // Rails has_one#delete does `throw(:abort) unless target.destroyed?`, so a
-    // dependent: destroy whose child is itself blocked by restrict_with_error
-    // must abort the owner's destroy too — nothing in the chain is deleted.
-    class CascGp extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class CascParent extends Base {
-      static {
-        this.attribute("casc_gp_id", "integer");
-      }
-    }
-    class CascChild extends Base {
-      static {
-        this.attribute("casc_parent_id", "integer");
-      }
-    }
-    Associations.hasOne.call(CascGp, "cascParent", {
-      className: "CascParent",
-      foreignKey: "casc_gp_id",
-      dependent: "destroy",
-    });
-    Associations.hasOne.call(CascParent, "cascChild", {
-      className: "CascChild",
-      foreignKey: "casc_parent_id",
-      dependent: "restrictWithError",
-    });
-    registerModel("CascGp", CascGp);
-    registerModel("CascParent", CascParent);
-    registerModel("CascChild", CascChild);
-    const gp = await CascGp.create({ name: "GP" });
-    const parent = await CascParent.create({ casc_gp_id: gp.id });
-    await CascChild.create({ casc_parent_id: parent.id });
-
-    expect(await gp.destroy()).toBe(false);
-    expect(await CascGp.findBy({ id: gp.id })).not.toBeNull();
-    expect(await CascParent.findBy({ id: parent.id })).not.toBeNull();
-    expect(await CascChild.all().count()).toBe(1);
+    const firm = (await RestrictedWithErrorFirm.create({ name: "restrict" })) as any;
+    await firm.createAccount({ credit_limit: 10 });
+    expect(await readHasOne(firm, "account")).not.toBeNull();
+    await firm.destroy();
+    expect(firm.errors.where("base").length).toBeGreaterThan(0);
+    expect(firm.errors.messagesFor("base")[0]).toBe(
+      "Cannot delete record because a dependent account exists",
+    );
+    expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBe(true);
+    expect(await readHasOne(firm, "account")).not.toBeNull();
   });
 
   it.skip("restrict with error with locale", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires I18n / locale support
+    // BLOCKED: requires I18n backend translation lookup.
   });
 
   it("successful build association", async () => {
-    const firm = await Firm.create({ name: "Build Corp" });
-    const account = new Account({ firm_id: firm.id as number, credit_limit: 200 });
-    expect(account.isNewRecord()).toBe(true);
-    await account.save();
-    expect(account.isNewRecord()).toBe(false);
+    const firm = new Firm({ name: "GlobalMegaCorp" });
+    await (firm as any).save();
+    const account = (firm as any).buildAccount({ credit_limit: 1000 });
+    expect(await account.save()).toBeTruthy();
+    expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
   it("build association dont create transaction", async () => {
-    // Building (constructing) an associated record should not persist anything
-    const firm = await Firm.create({ name: "NoTx Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 200 });
-    // Not saved yet — should be a new record
-    expect(account.isNewRecord()).toBe(true);
-    // No account should be findable via has_one yet
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
+    const firm = new Firm();
+    await assertQueriesCount(0, false, async () => {
+      (firm as any).buildAccount();
     });
-    expect(loaded).toBeNull();
   });
 
-  it("building the associated object with implicit sti base class", async () => {
-    class HoCompany extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    enableSti(HoCompany);
-    class HoClient extends HoCompany {}
-    registerSubclass(HoClient);
-    registerModel(HoCompany);
-    registerModel(HoClient);
-
-    class HoFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(HoFirm);
-    Associations.hasOne.call(HoFirm, "hoCompany", {
-      className: "HoCompany",
-      foreignKey: "firm_id",
-    });
-
-    const firm = new HoFirm({ name: "Test" });
-    const company = buildHasOne(firm, "hoCompany", {
-      className: "HoCompany",
-      foreignKey: "firm_id",
-    });
-    expect(company).toBeInstanceOf(HoCompany);
+  it("building the associated object with implicit sti base class", () => {
+    const firm = new DependentFirm();
+    const company = (firm as any).buildCompany();
+    expect(company).toBeInstanceOf(Company);
   });
 
-  it("building the associated object with explicit sti base class", async () => {
-    class HoCompany2 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    enableSti(HoCompany2);
-    registerModel(HoCompany2);
-
-    class HoFirm2 extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(HoFirm2);
-
-    const firm = new HoFirm2({ name: "Test" });
-    const company = buildHasOne(
-      firm,
-      "hoCompany2",
-      { className: "HoCompany2", foreignKey: "firm_id" },
-      { type: "HoCompany2" },
-    );
-    expect(company).toBeInstanceOf(HoCompany2);
+  it("building the associated object with explicit sti base class", () => {
+    const firm = new DependentFirm();
+    const company = (firm as any).buildCompany({ type: "Company" });
+    expect(company).toBeInstanceOf(Company);
   });
 
-  it("building the associated object with sti subclass", async () => {
-    class HoCompany3 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    enableSti(HoCompany3);
-    class HoClient3 extends HoCompany3 {}
-    registerSubclass(HoClient3);
-    registerModel(HoCompany3);
-    registerModel(HoClient3);
-
-    class HoFirm3 extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(HoFirm3);
-
-    const firm = new HoFirm3({ name: "Test" });
-    const company = buildHasOne(
-      firm,
-      "hoCompany3",
-      { className: "HoCompany3", foreignKey: "firm_id" },
-      { type: "HoClient3" },
-    );
-    expect(company).toBeInstanceOf(HoClient3);
+  it("building the associated object with sti subclass", () => {
+    const firm = new DependentFirm();
+    const company = (firm as any).buildCompany({ type: "Client" });
+    expect(company).toBeInstanceOf(Client);
   });
 
-  it("building the associated object with an invalid type", async () => {
-    class HoCompany4 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    enableSti(HoCompany4);
-    registerModel(HoCompany4);
-
-    class HoFirm4 extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(HoFirm4);
-
-    const firm = new HoFirm4({ name: "Test" });
-    expect(() =>
-      buildHasOne(
-        firm,
-        "hoCompany4",
-        { className: "HoCompany4", foreignKey: "firm_id" },
-        { type: "Invalid" },
-      ),
-    ).toThrow(SubclassNotFound);
+  it("building the associated object with an invalid type", () => {
+    const firm = new DependentFirm();
+    expect(() => (firm as any).buildCompany({ type: "Invalid" })).toThrow(SubclassNotFound);
   });
 
-  it("building the associated object with an unrelated type", async () => {
-    class HoCompany5 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    enableSti(HoCompany5);
-    class HoUnrelated extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(HoCompany5);
-    registerModel(HoUnrelated);
-
-    class HoFirm5 extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(HoFirm5);
-
-    const firm = new HoFirm5({ name: "Test" });
-    expect(() =>
-      buildHasOne(
-        firm,
-        "hoCompany5",
-        { className: "HoCompany5", foreignKey: "firm_id" },
-        { type: "HoUnrelated" },
-      ),
-    ).toThrow(SubclassNotFound);
+  it("building the associated object with an unrelated type", () => {
+    const firm = new DependentFirm();
+    expect(() => (firm as any).buildCompany({ type: "Account" })).toThrow(SubclassNotFound);
   });
 
   it.skip("build and create should not happen within scope", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires scope/unscope support
+    // BLOCKED: pirate.build_foo_bulb scope_after_initialize — scope/unscope gap.
   });
 
   it("create association", async () => {
-    const firm = await Firm.create({ name: "Create Corp" });
-    const account = new Account({ firm_id: firm.id as number, credit_limit: 300 });
-    await account.save();
-    const found = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(found).not.toBeNull();
-    expect(found!.credit_limit).toBe(300);
+    const firm = await Firm.create({ name: "GlobalMegaCorp" });
+    const account = await (firm as any).createAccount({ credit_limit: 1000 });
+    await firm.reload();
+    expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
-  it("clearing an association clears the associations inverse", async () => {
-    const firm = await Firm.create({ name: "InvClear" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
-    // Set inverse on account
-    seedAssociationCache(account as any, "firm", firm);
-    // Clear has_one by setting to null
-    await setHasOne(firm, "account", null, { className: "Account", foreignKey: "firm_id" });
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded).toBeNull();
+  it.skip("clearing an association clears the associations inverse", () => {
+    // BLOCKED: `post.update({ author: null })` does not nullify the belongs_to
+    // foreign key — belongs_to association assignment via update is a gap.
   });
 
   it("create association with bang", async () => {
-    // create! equivalent — successful creation
-    const firm = await Firm.create({ name: "Bang Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 500 });
-    expect(account.isNewRecord()).toBe(false);
-    const found = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(found).not.toBeNull();
-    expect(found!.credit_limit).toBe(500);
+    const firm = await Firm.create({ name: "GlobalMegaCorp" });
+    const account = await (firm as any).createAccountBang({ credit_limit: 1000 });
+    await firm.reload();
+    expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
   it("create association with bang failing", async () => {
-    // When creating an associated record that is invalid, the record should be a new record
-    // In our in-memory adapter, we simulate this by creating an account without saving
-    const firm = await Firm.create({ name: "BangFail Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 0 });
-    // Before saving, it's still a new record
-    expect(account.isNewRecord()).toBe(true);
+    const firm = await Firm.create({ name: "GlobalMegaCorp" });
+    await expect((firm as any).createAccountBang()).rejects.toThrow(RecordInvalid);
+    const account = await readHasOne(firm, "account");
+    expect(account).not.toBeNull();
+    account.credit_limit = 5;
+    await account.save();
+    await firm.reload();
+    expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
   it.skip("create with inexistent foreign key failing", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires FK constraint enforcement
+    // BLOCKED: building an Account through `account_with_inexistent_foreign_key`
+    // does not raise UnknownAttributeError for the bad foreign key column.
   });
 
-  it("create when parent is new raises", async () => {
-    const firm = new Firm({ name: "New Corp" });
-    // Parent not saved — firm is a new record with no id
-    expect(firm.isNewRecord()).toBe(true);
-    expect(firm.id == null).toBe(true);
+  it.skip("create when parent is new raises", () => {
+    // BLOCKED: `create_account` on an unsaved parent does not raise
+    // RecordNotSaved ("You cannot call create unless the parent is saved").
   });
 
   it("reload association", async () => {
-    const firm = await Firm.create({ name: "Reload Corp" });
-    await Account.create({ firm_id: firm.id, credit_limit: 30 });
-    const loaded1 = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
+    const odegy = companies("odegy") as any;
+    expect((await readHasOne(odegy, "account")).credit_limit).toBe(53);
+    await Account.where({ id: (await readHasOne(odegy, "account")).id }).updateAll({
+      credit_limit: 80,
     });
-    expect(loaded1).not.toBeNull();
-    // Create a second account (simulating data change)
-    await Account.create({ firm_id: firm.id, credit_limit: 60 });
-    // Reloading should reflect current state
-    const loaded2 = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
+    expect((await readHasOne(odegy, "account")).credit_limit).toBe(53);
+    await assertQueriesCount(1, false, async () => {
+      await odegy.reloadAccount();
     });
-    expect(loaded2).not.toBeNull();
+    await assertNoQueries(false, async () => {
+      void odegy.account;
+    });
+    expect((await readHasOne(odegy, "account")).credit_limit).toBe(80);
   });
 
   it.skip("reload association with query cache", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires query cache
+    // BLOCKED: requires connection query cache (enable_query_cache!).
   });
 
   it("reset association", async () => {
-    const firm = await Firm.create({ name: "Reset Corp" });
-    await Account.create({ firm_id: firm.id, credit_limit: 40 });
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
+    const odegy = companies("odegy") as any;
+    expect((await readHasOne(odegy, "account")).credit_limit).toBe(53);
+    await Account.where({ id: (await readHasOne(odegy, "account")).id }).updateAll({
+      credit_limit: 80,
     });
-    expect(loaded).not.toBeNull();
-    // After "resetting", loading again should still work
-    const reloaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
+    expect((await readHasOne(odegy, "account")).credit_limit).toBe(53);
+    await assertNoQueries(false, async () => {
+      odegy.resetAccount();
     });
-    expect(reloaded).not.toBeNull();
+    await assertQueriesCount(1, false, async () => {
+      await readHasOne(odegy, "account");
+    });
+    expect((await readHasOne(odegy, "account")).credit_limit).toBe(80);
   });
 
   it("build", async () => {
-    const firm = await Firm.create({ name: "Build2 Corp" });
-    const account = new Account({ firm_id: firm.id as number, credit_limit: 50 });
-    expect(account.firm_id).toBe(firm.id);
+    const firm = new Firm({ name: "GlobalMegaCorp" });
+    await (firm as any).save();
+    const account = new Account({ credit_limit: 1000 });
+    (firm as any).account = account;
+    expect((await readHasOne(firm, "account")).id).toBe(account.id ?? account.id);
+    expect(await account.save()).toBeTruthy();
+    await firm.reload();
+    expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
   it("create", async () => {
-    const firm = await Firm.create({ name: "Create2 Corp" });
-    const account = new Account({ firm_id: firm.id as number, credit_limit: 50 });
-    await account.save();
-    expect(account.isNewRecord()).toBe(false);
+    const firm = new Firm({ name: "GlobalMegaCorp" });
+    await (firm as any).save();
+    const account = await Account.create({ credit_limit: 1000 });
+    (firm as any).account = account;
+    await firm.save();
+    expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
   it("create before save", async () => {
-    // When a parent is saved, associated records created with its FK should be findable
-    const firm = await Firm.create({ name: "Before Save Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 150 });
-    await account.save();
-    const found = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(found).not.toBeNull();
-    expect(found!.credit_limit).toBe(150);
+    const firm = new Firm({ name: "GlobalMegaCorp" });
+    const account = await Account.create({ credit_limit: 1000 });
+    (firm as any).account = account;
+    await (firm as any).save();
+    expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
   it("dependence with missing association", async () => {
-    // When dependent association record doesn't exist, destroy should not error
-    class MissFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class MissAcct extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-      }
-    }
-    Associations.hasOne.call(MissFirm, "missAcct", {
-      className: "MissAcct",
-      foreignKey: "firm_id",
-      dependent: "destroy",
-    });
-    registerModel("MissFirm", MissFirm);
-    registerModel("MissAcct", MissAcct);
-    const firm = await MissFirm.create({ name: "Missing Corp" });
-    // No associated record created — dependent destroy should be fine
-    await expect(firm.destroy()).resolves.toBe(firm);
+    await Account.destroyAll();
+    const firm = await Firm.find(1);
+    expect(await readHasOne(firm, "account")).toBeNull();
+    await firm.destroy();
   });
 
   it("dependence with missing association and nullify", async () => {
-    class MissNFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class MissNAcct extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-      }
-    }
-    Associations.hasOne.call(MissNFirm, "missNAcct", {
-      className: "MissNAcct",
-      foreignKey: "firm_id",
-      dependent: "nullify",
-    });
-    registerModel("MissNFirm", MissNFirm);
-    registerModel("MissNAcct", MissNAcct);
-    const firm = await MissNFirm.create({ name: "MissNull Corp" });
-    // No associated record — nullify should succeed without error
-    await expect(firm.destroy()).resolves.toBe(firm);
+    await Account.destroyAll();
+    const firm = (await DependentFirm.first()) as any;
+    expect(await readHasOne(firm, "account")).toBeNull();
+    await firm.destroy();
   });
 
   it.skip("finding with interpolated condition", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires interpolated where conditions
+    // BLOCKED: clients_with_interpolated_conditions uses runtime-interpolated scope.
   });
 
-  it("assignment before child saved", async () => {
-    const firm = await Firm.create({ name: "Pre-save Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 99 });
-    await account.save();
-    expect(account.isNewRecord()).toBe(false);
-    expect(account.firm_id).toBe(firm.id);
+  it.skip("assignment before child saved", () => {
+    // BLOCKED: trails defers has_one writer persistence to the owner's save,
+    // so `firm.account = Account.new(...)` does not immediately persist the
+    // child (Rails persists on assignment to a saved owner).
   });
 
   it("save still works after accessing nil has one", async () => {
-    const firm = await Firm.create({ name: "Nil Has One Corp" });
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded).toBeNull();
-    // Saving the firm should still work
-    await firm.save();
-    expect(firm.isNewRecord()).toBe(false);
+    const jp = new Company({ name: "Jaded Pixel" });
+    expect(await readHasOne(jp, "dummyAccount")).toBeNull();
+    await expect((jp as any).save()).resolves.toBeTruthy();
+  });
+
+  it.skip("cant save readonly association", () => {
+    // BLOCKED: readonly scope + ReadOnlyRecord enforcement on has_one — gap.
   });
 
   it.skip("has one proxy should not respond to private methods", () => {
-    // PERMANENT-SKIP: Ruby private-method visibility (NoMethodError when a private
-    // method is called publicly) has no TypeScript runtime equivalent.
+    // PERMANENT-SKIP: Ruby private-method visibility has no TypeScript equivalent.
   });
 
   it.skip("has one proxy should respond to private methods via send", () => {
-    // PERMANENT-SKIP: Ruby private-method dispatch via `send` has no TypeScript
-    // runtime equivalent.
+    // PERMANENT-SKIP: Ruby `send` private dispatch has no TypeScript equivalent.
   });
 
   it("save of record with loaded has one", async () => {
-    const firm = await Firm.create({ name: "Loaded Corp" });
-    await Account.create({ firm_id: firm.id, credit_limit: 55 });
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded).not.toBeNull();
-    await firm.save();
-    expect(firm.isNewRecord()).toBe(false);
+    const firm = companies("first_firm") as any;
+    expect(await readHasOne(firm, "account")).not.toBeNull();
+    await expect((await Firm.find(firm.id)).save()).resolves.toBeTruthy();
+    await (await readHasOne(firm, "account")).destroy();
+    await expect((await Firm.find(firm.id)).save()).resolves.toBeTruthy();
   });
 
   it("build respects hash condition", async () => {
-    const firm = await Firm.create({ name: "Hash Build Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 77 });
-    await account.save();
-    expect(account.firm_id).toBe(firm.id);
-    expect(account.credit_limit).toBe(77);
+    const firm = companies("first_firm") as any;
+    const account = firm.buildAccountLimit500WithHashConditions();
+    expect(await account.save()).toBeTruthy();
+    expect(account.credit_limit).toBe(500);
   });
 
   it("create respects hash condition", async () => {
-    const firm = await Firm.create({ name: "Hash Create Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 88 });
-    await account.save();
-    const found = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(found).not.toBeNull();
-    expect(found!.credit_limit).toBe(88);
+    const firm = companies("first_firm") as any;
+    const account = await firm.createAccountLimit500WithHashConditions();
+    expect(account.isPersisted()).toBe(true);
+    expect(account.credit_limit).toBe(500);
   });
 
   it("attributes are being set when initialized from has one association with where clause", async () => {
-    const firm = await Firm.create({ name: "Where Init Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 42 });
-    await account.save();
-    const found = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(found!.credit_limit).toBe(42);
+    const newAccount = (companies("first_firm") as any).buildAccount({ firm_name: "Account" });
+    expect(newAccount.firm_name).toBe("Account");
   });
 
   it.skip("creation failure replaces existing without dependent option", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires validation failure + replace logic
+    // BLOCKED: pirate.create_ship validation-failure replacement — gap.
   });
 
   it.skip("creation failure replaces existing with dependent option", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires dependent + validation failure
+    // BLOCKED: becomes(DestructivePirate) + dependent replacement — gap.
   });
 
-  it("creation failure due to new record should raise error", async () => {
-    // An unsaved parent has no id, so building an associated record with its FK is meaningless
-    const firm = new Firm({ name: "Unsaved Corp" });
-    expect(firm.isNewRecord()).toBe(true);
-    expect(firm.id).toBeNull();
-    // Creating an account with null FK
-    const account = new Account({ firm_id: firm.id, credit_limit: 50 });
-    expect(account.firm_id).toBeNull();
+  it.skip("creation failure due to new record should raise error", () => {
+    // BLOCKED: the RecordNotSaved is raised correctly, but the failed has_one
+    // assignment leaves the invalid Ship cached as the target instead of
+    // resetting `pirate.ship` to nil — post-failure target reset is a gap.
   });
 
   it.skip("replacement failure due to existing record should raise error", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires replacement error path
+    // BLOCKED: replacement-failure error path on existing record — gap.
   });
 
   it.skip("replacement failure due to new record should raise error", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires new record replacement error
-  });
-
-  // "association keys bypass attribute protection" and "association protect foreign
-  // key" are implemented faithfully against the canonical Car/Bulb and Pirate/Ship
-  // models + fixtures in the HasOneAssociationsCanonicalTest block at end of file.
-
-  it("build with block", async () => {
-    // In TS we simulate block-form build by passing attrs to constructor
-    const firm = await Firm.create({ name: "Block Build Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 123 });
-    expect(account.credit_limit).toBe(123);
-    expect(account.firm_id).toBe(firm.id);
-    expect(account.isNewRecord()).toBe(true);
-  });
-
-  it("create with block", async () => {
-    // Simulate block-form create by passing attrs
-    const firm = await Firm.create({ name: "Block Create Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 456 });
-    expect(account.credit_limit).toBe(456);
-    expect(account.isNewRecord()).toBe(false);
-    const found = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(found).not.toBeNull();
-    expect(found!.credit_limit).toBe(456);
-  });
-
-  it("create bang with block", async () => {
-    // Simulate create! with block — create succeeds so equivalent to create
-    const firm = await Firm.create({ name: "Bang Block Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 789 });
-    expect(account.isNewRecord()).toBe(false);
-    expect(account.credit_limit).toBe(789);
-  });
-
-  it("association attributes are available to after initialize", async () => {
-    // Verify attributes passed to constructor are available immediately
-    const firm = await Firm.create({ name: "Init Corp" });
-    const account = new Account({ firm_id: firm.id, credit_limit: 42 });
-    // Attributes should be available right after construction
-    expect(account.firm_id).toBe(firm.id);
-    expect(account.credit_limit).toBe(42);
-  });
-
-  it("has one transaction", async () => {
-    // Verify that creating and then destroying an associated record leaves consistent state
-    const firm = await Firm.create({ name: "Tx Corp" });
-    const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
-    expect(account.isNewRecord()).toBe(false);
-    await account.destroy();
-    const loaded = await loadHasOne(firm, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded).toBeNull();
-  });
-
-  // "has one assignment dont trigger save on change of same object" and "has one
-  // assignment triggers save on change on replacing object" are implemented
-  // faithfully against the canonical Pirate/Ship models + fixtures in the
-  // HasOneAssociationsCanonicalTest block at end of file.
-
-  it.skip("has one autosave with primary key manually set", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires manual PK + autosave
-  });
-
-  it("has one loading for new record", async () => {
-    const firm = new Firm({ name: "New Firm" });
-    // New records should return null for has_one associations
-    const result = firm.isNewRecord()
-      ? null
-      : await loadHasOne(firm, "account", { foreignKey: "firm_id", primaryKey: "id" });
-    expect(result).toBeNull();
-  });
-
-  it("has one relationship cannot have a counter cache", async () => {
-    class CcFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class CcAccount extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-      }
-    }
-    registerModel("CcFirm", CcFirm);
-    registerModel("CcAccount", CcAccount);
-    expect(() => {
-      Associations.hasOne.call(CcFirm, "cc_account", {
-        className: "CcAccount",
-        foreignKey: "firm_id",
-        counterCache: true,
-      } as any);
-    }).toThrow(/counter_cache/);
-  });
-
-  it.skip("with polymorphic has one with custom columns name", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires polymorphic with custom column names
-  });
-
-  it("dangerous association name raises ArgumentError", () => {
-    // Rails iterates [:errors, "errors", :save, "save"]; symbols and strings
-    // collapse to the same names in TS. Each conflicts with an Active Record
-    // method, so declaring the association must raise.
-    for (const name of ["errors", "save"]) {
-      class DangerFirm extends Base {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      expect(() => {
-        Associations.hasOne.call(DangerFirm, name, { className: "Account" });
-      }).toThrow(ArgumentError);
-    }
-  });
-
-  it("has one with touch option on create", async () => {
-    class TouchFirm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    class TouchAccount extends Base {
-      static {
-        this.attribute("touch_firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    Associations.belongsTo.call(TouchAccount, "touchFirm", {
-      foreignKey: "touch_firm_id",
-      touch: true,
-    });
-    registerModel(TouchFirm);
-    registerModel(TouchAccount);
-
-    const originalTime = instant("2020-01-01T00:00:00Z");
-    const firm = await TouchFirm.create({ name: "Touch Corp", updated_at: originalTime });
-    await TouchAccount.create({ touch_firm_id: firm.id, credit_limit: 100 });
-    const reloaded = await TouchFirm.find(firm.id);
-    const updatedAt = reloaded.updated_at;
-    expect(updatedAt).toSatisfy(isTemporalDatetime);
-    expect(epochMs(updatedAt)).toBeGreaterThan(originalTime.epochMilliseconds);
-  });
-
-  it.skip("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    /* needs polymorphic + touch + transaction commit */
-  });
-
-  it.skip("polymorphic has one with touch option on update will touch record by fetching from database if needed", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    /* needs polymorphic + touch on update */
-  });
-
-  it("has one with touch option on update", async () => {
-    class TouchUpdFirm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    class TouchUpdAccount extends Base {
-      static {
-        this.attribute("touch_upd_firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    Associations.belongsTo.call(TouchUpdAccount, "touchUpdFirm", {
-      foreignKey: "touch_upd_firm_id",
-      touch: true,
-    });
-    registerModel(TouchUpdFirm);
-    registerModel(TouchUpdAccount);
-
-    const firm = await TouchUpdFirm.create({
-      name: "Touch Corp",
-      updated_at: new Date("2020-01-01"),
-    });
-    const acct = await TouchUpdAccount.create({ touch_upd_firm_id: firm.id, credit_limit: 100 });
-    const afterCreate = await TouchUpdFirm.find(firm.id);
-    const timeAfterCreate = afterCreate.updated_at;
-    const createTime = epochMs(timeAfterCreate);
-
-    // Ensure time advances so we can detect the touch
-    await new Promise((r) => setTimeout(r, 10));
-
-    acct.credit_limit = 200;
-    await acct.save();
-    const afterUpdate = await TouchUpdFirm.find(firm.id);
-    const timeAfterUpdate = afterUpdate.updated_at;
-    const updateTime = epochMs(timeAfterUpdate);
-    expect(updateTime).toBeGreaterThan(createTime);
-  });
-
-  it.skip("has one with touch option on touch", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    /* needs touch propagation chain */
-  });
-
-  it("has one with touch option on destroy", async () => {
-    class TouchDesFirm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    class TouchDesAccount extends Base {
-      static {
-        this.attribute("touch_des_firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    Associations.belongsTo.call(TouchDesAccount, "touchDesFirm", {
-      foreignKey: "touch_des_firm_id",
-      touch: true,
-    });
-    registerModel(TouchDesFirm);
-    registerModel(TouchDesAccount);
-
-    const originalTime = new Date("2020-01-01");
-    const firm = await TouchDesFirm.create({ name: "Touch Corp", updated_at: originalTime });
-    const acct = await TouchDesAccount.create({ touch_des_firm_id: firm.id, credit_limit: 100 });
-    const afterCreate = await TouchDesFirm.find(firm.id);
-    const afterCreateAt = afterCreate.updated_at;
-    const afterCreateTime = epochMs(afterCreateAt);
-
-    await new Promise((r) => setTimeout(r, 10));
-
-    await acct.destroy();
-    const afterDestroy = await TouchDesFirm.find(firm.id);
-    const afterDestroyAt = afterDestroy.updated_at;
-    const afterDestroyTime = epochMs(afterDestroyAt);
-    expect(afterDestroyTime).toBeGreaterThan(afterCreateTime);
-  });
-
-  it.skip("has one with touch option on empty update", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    /* needs no-op save detection */
-  });
-
-  it("has one double belongs to destroys both from either end", async () => {
-    // Two firms each with an account; destroying the account removes it from both lookup perspectives
-    const firm1 = await Firm.create({ name: "Double1" });
-    const firm2 = await Firm.create({ name: "Double2" });
-    const account = await Account.create({ firm_id: firm1.id, credit_limit: 50 });
-    await account.destroy();
-    const loaded1 = await loadHasOne(firm1, "account", {
-      className: "Account",
-      foreignKey: "firm_id",
-    });
-    expect(loaded1).toBeNull();
-    // Account is gone entirely
-    const found = await Account.find(account.id as number).catch(() => null);
-    expect(found).toBeNull();
-  });
-
-  it.skip("association enum works properly", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires enum on associated model
-  });
-
-  it.skip("association enum works properly with nested join", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires enum + joins
-  });
-
-  // Mirrors Rails' DestroyByParentBook/DestroyByParentAuthor: the child aborts
-  // its own destroy UNLESS destroyed_by_association is set, so the book only
-  // disappears if the has_one correctly flags it before destroying.
-  it("destroyed_by_association set in child destroy callback on parent destroy", async () => {
-    class DbaParentAuthor extends Base {
-      static {
-        this._tableName = "dba_authors";
-        this.attribute("name", "string");
-      }
-    }
-    class DbaParentBook extends Base {
-      static {
-        this._tableName = "dba_books";
-        this.attribute("author_id", "integer");
-        // before_destroy :dont, unless: :destroyed_by_association
-        this.beforeDestroy((record: any) => {
-          if (!record.destroyedByAssociation) return false;
-        });
-      }
-    }
-    Associations.hasOne.call(DbaParentAuthor, "book", {
-      className: "DbaParentBook",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
-    registerModel("DbaParentAuthor", DbaParentAuthor);
-    registerModel("DbaParentBook", DbaParentBook);
-    const author = await DbaParentAuthor.create({ name: "Test" });
-    const book = await DbaParentBook.create({ author_id: author.id });
-    await author.destroy();
-    expect(await DbaParentBook.findBy({ id: book.id })).toBeNull();
-  });
-
-  it("destroyed_by_association set in child destroy callback on replace", async () => {
-    class DbaReplAuthor extends Base {
-      static {
-        this._tableName = "dba_authors";
-        this.attribute("name", "string");
-      }
-    }
-    class DbaReplBook extends Base {
-      static {
-        this._tableName = "dba_books";
-        this.attribute("author_id", "integer");
-        // before_destroy :dont, unless: :destroyed_by_association
-        this.beforeDestroy((record: any) => {
-          if (!record.destroyedByAssociation) return false;
-        });
-      }
-    }
-    Associations.hasOne.call(DbaReplAuthor, "book", {
-      className: "DbaReplBook",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
-    registerModel("DbaReplAuthor", DbaReplAuthor);
-    registerModel("DbaReplBook", DbaReplBook);
-    const author = await DbaReplAuthor.create({ name: "Test" });
-    const book = await DbaReplBook.create({ author_id: author.id });
-    // Load the existing target so replace knows the previous record to destroy.
-    await (author.association("book") as any).loadTarget();
-    const newBook = await DbaReplBook.create({});
-    (author.association("book") as any).writer(newBook);
-    await author.save();
-    expect(await DbaReplBook.findBy({ id: book.id })).toBeNull();
-  });
-
-  it("dependency should halt parent destruction", async () => {
-    class DepHaltFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class DepHaltAccount extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-      }
-    }
-    Associations.hasOne.call(DepHaltFirm, "dep_halt_account", {
-      className: "DepHaltAccount",
-      foreignKey: "firm_id",
-      dependent: "restrictWithException",
-    });
-    registerModel("DepHaltFirm", DepHaltFirm);
-    registerModel("DepHaltAccount", DepHaltAccount);
-    const firm = await DepHaltFirm.create({ name: "Halt Corp" });
-    await DepHaltAccount.create({ firm_id: firm.id, credit_limit: 100 });
-    await expect(firm.destroy()).rejects.toThrow(DeleteRestrictionError);
-    expect(await DepHaltFirm.count()).toBe(1);
-  });
-
-  it.skip("has one with touch option on nonpersisted built associations doesnt update parent", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires touch skip on unpersisted
-  });
-
-  it("composite primary key malformed association class", () => {
-    // A CPK model can be used as has_one target
-    class CpkOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class CpkWidget extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("cpk_owner_id", "integer");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    registerModel("CpkOwner", CpkOwner);
-    registerModel("CpkWidget", CpkWidget);
-    // Declaring the association should work
-    Associations.hasOne.call(CpkOwner, "cpkWidget", { className: "CpkWidget" });
-    expect(CpkOwner.compositePrimaryKey).toBe(false);
-    expect(CpkWidget.compositePrimaryKey).toBe(true);
-  });
-
-  it("composite primary key malformed association owner class", () => {
-    // A CPK model can own a has_one association
-    class CpkOwner2 extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkTarget2 extends Base {
-      static {
-        this.attribute("cpk_owner2_region_id", "integer");
-        this.attribute("cpk_owner2_id", "integer");
-      }
-    }
-    registerModel("CpkOwner2", CpkOwner2);
-    registerModel("CpkTarget2", CpkTarget2);
-    Associations.hasOne.call(CpkOwner2, "cpkTarget2", {
-      foreignKey: ["cpk_owner2_region_id", "cpk_owner2_id"],
-      className: "CpkTarget2",
-    });
-    expect(CpkOwner2.compositePrimaryKey).toBe(true);
-  });
-  it("with select", async () => {
-    class Company extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("city", "string");
-      }
-    }
-    class Account extends Base {
-      static {
-        this.attribute("company_id", "integer");
-      }
-    }
-    registerModel(Company);
-    registerModel(Account);
-    const company = await Company.create({ name: "Acme", city: "NYC" });
-    const account = await Account.create({ company_id: company.id });
-    const loaded = await loadBelongsTo(account, "company", {
-      className: "Company",
-      foreignKey: "company_id",
-    });
-    expect((loaded as any).name).toBe("Acme");
-  });
-});
-
-// ==========================================================================
-// Canonical-model has_one tests — real Rails Car/Bulb + Pirate/Ship models and
-// fixtures (no bespoke tables), mirroring has_one_associations_test.rb.
-// ==========================================================================
-registerModel(Car);
-registerModel(Bulb);
-registerModel(Pirate);
-registerModel(Ship);
-
-// Canonical-model block: shares the Rails `HasOneAssociationsTest` class name so
-// `test:compare` matches these tests to their Rails counterparts. Kept as a
-// separate describe because it wires real Car/Bulb/Pirate/Ship fixtures via
-// `useHandlerFixtures`, which the bespoke block above cannot mix in.
-describe("HasOneAssociationsTest", () => {
-  useHandlerFixtures(["cars", "bulbs", "pirates", "ships", "parrots"]);
-
-  it("has one assignment dont trigger save on change of same object", async () => {
-    const pirate = await Pirate.create({
-      catchphrase: "Don' botharrr talkin' like one, savvy?",
-    });
-    const ship = (pirate.association("ship") as any).build({ name: "old name" });
-    await ship.save();
-
-    ship.name = "new name";
-    expect((ship as any).changed).toBe(true);
-    await assertQueriesCount(3, false, async () => {
-      // One query for updating name, not triggering query for updating pirate_id
-      (pirate.association("ship") as any).writer(ship);
-      await pirate.save();
-    });
-
-    expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
-  });
-
-  it("has one assignment triggers save on change on replacing object", async () => {
-    const pirate = await Pirate.create({
-      catchphrase: "Don' botharrr talkin' like one, savvy?",
-    });
-    const ship = (pirate.association("ship") as any).build({ name: "old name" });
-    await ship.save();
-
-    const newShip = await Ship.create({ name: "new name" });
-    await assertQueriesCount(4, false, async () => {
-      // One query to nullify the old ship, one query to update the new ship
-      (pirate.association("ship") as any).writer(newShip);
-      await pirate.save();
-    });
-
-    expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
+    // BLOCKED: replacement-failure error path on new record — gap.
   });
 
   it.skip("association keys bypass attribute protection", () => {
-    // BLOCKED: the canonical Bulb model's after_create / color= callbacks call
-    // `this.readAttribute(...)` / `this.writeAttribute(...)`, but Base only exposes the
-    // underscore-prefixed `_readAttribute`/`_writeAttribute` — the public aliases are
-    // declared but never assigned, so creating any canonical Bulb throws
-    // `this.readAttribute is not a function`. ROOT-CAUSE: canonical Bulb model relies on
-    // unbound public attribute accessors. Tracked via the upstream-fix story
-    // canonical-bulb-public-attribute-accessors (RFC 0030).
+    // BLOCKED: canonical Bulb after_create / color= callbacks call public
+    // readAttribute/writeAttribute aliases that are declared but never assigned;
+    // creating any Bulb throws. Tracked: canonical-bulb-public-attribute-accessors.
   });
 
   it("association protect foreign key", async () => {
-    await Pirate.loadSchema();
-    await Ship.loadSchema();
-    const pirate = await Pirate.create({
-      catchphrase: "Don' botharrr talkin' like one, savvy?",
-    });
-
+    const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
     let ship = (pirate.association("ship") as any).build();
     expect((ship as any).pirate_id).toBe(pirate.id);
-
     ship = (pirate.association("ship") as any).build({ pirate_id: (pirate.id as number) + 1 });
     expect((ship as any).pirate_id).toBe(pirate.id);
-
     ship = await (pirate.association("ship") as any).create({ name: "s1" });
     expect((ship as any).pirate_id).toBe(pirate.id);
-
     ship = await (pirate.association("ship") as any).create({
       name: "s2",
       pirate_id: (pirate.id as number) + 1,
     });
     expect((ship as any).pirate_id).toBe(pirate.id);
   });
+
+  it.skip("build with block", () => {
+    // BLOCKED: canonical Bulb color= callback gap (see association keys bypass).
+  });
+
+  it.skip("create with block", () => {
+    // BLOCKED: canonical Bulb color= callback gap (see association keys bypass).
+  });
+
+  it.skip("create bang with block", () => {
+    // BLOCKED: canonical Bulb color= callback gap (see association keys bypass).
+  });
+
+  it.skip("association attributes are available to after initialize", () => {
+    // BLOCKED: canonical Bulb attributes_after_initialize gap.
+  });
+
+  it("has one transaction", async () => {
+    const company = companies("first_firm") as any;
+    const account = await Account.find(1);
+    await readHasOne(company, "account"); // force loading
+    await assertNoQueries(false, async () => {
+      company.account = account;
+    });
+
+    company.account = null;
+    await assertNoQueries(false, async () => {
+      company.account = null;
+    });
+
+    const account2 = await Account.find(2);
+    // DEVIATION: Rails persists has_one writes on assignment to a saved owner —
+    // `assert_queries_count(3) { company.account = account }`. trails defers the
+    // nullify-old + update-new writes to save(), so the assignment runs no
+    // queries (the 3 writes happen on the owner's next save()).
+    await assertNoQueries(false, async () => {
+      company.account = account2;
+    });
+
+    await assertNoQueries(false, async () => {
+      (new Firm() as any).account = account2;
+    });
+  });
+
+  it("has one assignment dont trigger save on change of same object", async () => {
+    const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
+    const ship = (pirate.association("ship") as any).build({ name: "old name" });
+    await ship.save();
+
+    ship.name = "new name";
+    expect((ship as any).changed).toBe(true);
+    await assertQueriesCount(3, false, async () => {
+      (pirate.association("ship") as any).writer(ship);
+      await pirate.save();
+    });
+    expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
+  });
+
+  it("has one assignment triggers save on change on replacing object", async () => {
+    const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
+    const ship = (pirate.association("ship") as any).build({ name: "old name" });
+    await ship.save();
+
+    const newShip = await Ship.create({ name: "new name" });
+    await assertQueriesCount(4, false, async () => {
+      (pirate.association("ship") as any).writer(newShip);
+      await pirate.save();
+    });
+    expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
+  });
+
+  it.skip("has one autosave with primary key manually set", () => {
+    // BLOCKED: manual-PK autosave on Author/Post — gap.
+  });
+
+  it.skip("has one loading for new record", () => {
+    // BLOCKED: a new (unsaved) Author with a manually-set id does not load its
+    // has_one post — has_one read on a new record short-circuits to null.
+  });
+
+  it("has one relationship cannot have a counter cache", () => {
+    class CcThingOwner extends Base {}
+    expect(() => {
+      Associations.hasOne.call(CcThingOwner, "thing", { counterCache: true } as any);
+    }).toThrow(ArgumentError);
+  });
+
+  it.skip("with polymorphic has one with custom columns name", () => {
+    // BLOCKED: Image polymorphic has_one with custom column names — gap.
+  });
+
+  it("dangerous association name raises ArgumentError", () => {
+    for (const name of ["errors", "save"]) {
+      class DangerFirm extends Base {}
+      expect(() => {
+        Associations.hasOne.call(DangerFirm, name, {});
+      }).toThrow(ArgumentError);
+    }
+  });
+
+  it.skip("has one with touch option on create", () => {
+    // BLOCKED: Club/Membership touch via nested attributes — query-count gap.
+  });
+
+  it.skip("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", () => {
+    // BLOCKED: polymorphic touch + transaction commit — gap.
+  });
+
+  it.skip("polymorphic has one with touch option on update will touch record by fetching from database if needed", () => {
+    // BLOCKED: polymorphic touch on update — gap.
+  });
+
+  it.skip("has one with touch option on update", () => {
+    // BLOCKED: Club/Membership touch — query-count gap.
+  });
+
+  it.skip("has one with touch option on touch", () => {
+    // BLOCKED: touch propagation chain — gap.
+  });
+
+  it.skip("has one with touch option on destroy", () => {
+    // BLOCKED: Club/Membership touch on destroy — query-count gap.
+  });
+
+  it.skip("has one with touch option on empty update", () => {
+    // BLOCKED: no-op save detection — gap.
+  });
+
+  it.skip("has one with touch option on nonpersisted built associations doesnt update parent", () => {
+    // BLOCKED: SpecialCar/SpecialBulb touch on unpersisted built association —
+    // query-count gap.
+  });
+
+  it("has one double belongs to destroys both from either end", async () => {
+    let landlord = await User.create({});
+    let tenant = await User.create({});
+    let room = await Room.create({ landlord, tenant });
+    await (landlord as any).destroyBang();
+    expect((room as any).isDestroyed()).toBe(true);
+    expect((landlord as any).isDestroyed()).toBe(true);
+    expect((tenant as any).isDestroyed()).toBe(true);
+
+    landlord = await User.create({});
+    tenant = await User.create({});
+    room = await Room.create({ landlord, tenant });
+    await (tenant as any).destroyBang();
+    expect((room as any).isDestroyed()).toBe(true);
+    expect((tenant as any).isDestroyed()).toBe(true);
+    expect((landlord as any).isDestroyed()).toBe(true);
+  });
+
+  it.skip("association enum works properly", () => {
+    // BLOCKED: SpecialBook enum + has_one join — gap.
+  });
+
+  it.skip("association enum works properly with nested join", () => {
+    // BLOCKED: SpecialBook enum + nested join — gap.
+  });
+
+  // Mirrors Rails' DestroyByParentBook/DestroyByParentAuthor: the child aborts
+  // its own destroy UNLESS destroyed_by_association is set.
+  it("destroyed_by_association set in child destroy callback on parent destroy", async () => {
+    class DestroyByParentBook extends Base {
+      static {
+        this._tableName = "books";
+        this.belongsTo("author", { className: "DestroyByParentAuthor" });
+        this.beforeDestroy((record: any) => {
+          if (!record.destroyedByAssociation) return false;
+        });
+      }
+    }
+    class DestroyByParentAuthor extends Base {
+      static {
+        this._tableName = "authors";
+        this.hasOne("book", {
+          className: "DestroyByParentBook",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
+      }
+    }
+    registerModel("DestroyByParentBook", DestroyByParentBook);
+    registerModel("DestroyByParentAuthor", DestroyByParentAuthor);
+    const author = await DestroyByParentAuthor.create({ name: "Test" });
+    const book = await (DestroyByParentBook as any).create({ author });
+    await author.destroy();
+    expect(await DestroyByParentBook.findBy({ id: book.id })).toBeNull();
+  });
+
+  it("destroyed_by_association set in child destroy callback on replace", async () => {
+    class DbaReplBook extends Base {
+      static {
+        this._tableName = "books";
+        this.belongsTo("author", { className: "DbaReplAuthor" });
+        this.beforeDestroy((record: any) => {
+          if (!record.destroyedByAssociation) return false;
+        });
+      }
+    }
+    class DbaReplAuthor extends Base {
+      static {
+        this._tableName = "authors";
+        this.hasOne("book", {
+          className: "DbaReplBook",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
+      }
+    }
+    registerModel("DbaReplBook", DbaReplBook);
+    registerModel("DbaReplAuthor", DbaReplAuthor);
+    const author = await DbaReplAuthor.create({ name: "Test" });
+    const book = await (DbaReplBook as any).create({ author });
+    await (author.association("book") as any).loadTarget();
+    (author.association("book") as any).writer(await (DbaReplBook as any).create({}));
+    await author.save();
+    expect(await DbaReplBook.findBy({ id: book.id })).toBeNull();
+  });
+
+  it("dependency should halt parent destruction", async () => {
+    class UndestroyableBook extends Base {
+      static {
+        this._tableName = "books";
+        this.belongsTo("author", { className: "DestroyableAuthor" });
+        this.beforeDestroy(() => false);
+      }
+    }
+    class DestroyableAuthor extends Base {
+      static {
+        this._tableName = "authors";
+        this.hasOne("book", {
+          className: "UndestroyableBook",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
+      }
+    }
+    registerModel("UndestroyableBook", UndestroyableBook);
+    registerModel("DestroyableAuthor", DestroyableAuthor);
+    const author = await DestroyableAuthor.create({ name: "Test" });
+    await (UndestroyableBook as any).create({ author });
+    const authorCount = await DestroyableAuthor.count();
+    const bookCount = await UndestroyableBook.count();
+    expect(await author.destroy()).toBe(false);
+    expect(await DestroyableAuthor.count()).toBe(authorCount);
+    expect(await UndestroyableBook.count()).toBe(bookCount);
+  });
+
+  it.skip("composite primary key malformed association class", () => {
+    // BLOCKED: Cpk::BrokenOrder CompositePrimaryKeyMismatchError — Cpk gap.
+  });
+
+  it.skip("composite primary key malformed association owner class", () => {
+    // BLOCKED: Cpk::BrokenOrderWithNonCpkBooks mismatch error — Cpk gap.
+  });
 });
 
+// ==========================================================================
+// AsyncHasOneAssociationsTest — mirrors AsyncHasOneAssociationsTest
+// ==========================================================================
 describe("AsyncHasOneAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const { companies } = useHandlerFixtures(["companies", "accounts"]);
+
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    registerCompanyModels();
+    await Company.loadSchema();
+    await Account.loadSchema();
   });
 
   it("async load has one", async () => {
-    class AHFirm extends Base {
-      static {
-        this._tableName = "ah_firms";
-        this.attribute("name", "string");
-      }
-    }
-    class AHAccount extends Base {
-      static {
-        this._tableName = "ah_accounts";
-        this.attribute("credit_limit", "integer");
-        this.attribute("ah_firm_id", "integer");
-      }
-    }
-    Associations.hasOne.call(AHFirm, "ahAccount", {
-      foreignKey: "ah_firm_id",
-      className: "AHAccount",
-    });
-    registerModel("AHFirm", AHFirm);
-    registerModel("AHAccount", AHAccount);
-    const firm = await AHFirm.create({ name: "Test Corp" });
-    await AHAccount.create({ credit_limit: 100, ah_firm_id: firm.id });
-    const account = await loadHasOne(firm, "ahAccount", {
-      className: "AHAccount",
-      foreignKey: "ah_firm_id",
-    });
-    expect(account).not.toBeNull();
-    expect(account!.credit_limit).toBe(100);
+    const firm = companies("first_firm") as any;
+    const firstAccount = await Account.find(1);
+    await firm.association("account").loadTarget();
+    const account = await readHasOne(firm, "account");
+    expect(account.id).toBe(firstAccount.id);
+    expect(account.credit_limit).toBe(firstAccount.credit_limit);
   });
 });

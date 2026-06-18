@@ -10,7 +10,6 @@
   "packages/activerecord/src/associations/has-many-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-disable-joins-associations.test.ts",
-  "packages/activerecord/src/associations/has-one-associations.test.ts",
   "packages/activerecord/src/associations/has-one-through-associations.test.ts",
   "packages/activerecord/src/associations/has-one-through-disable-joins-associations.test.ts",
   "packages/activerecord/src/associations/inner-join-association.test.ts",

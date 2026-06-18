@@ -70,7 +70,10 @@ function assertSingularAssociation(
   expected: "belongsTo" | "hasOne",
 ): AssocDef {
   const ctor = this.constructor as typeof Base;
-  const assocDef = ctor._associations?.find((a) => a.name === name);
+  const assocDef = ctor._associations
+    ?.slice()
+    .reverse()
+    .find((a) => a.name === name);
   if (!assocDef) {
     throw _associationNotFound(this, name);
   }
@@ -115,7 +118,13 @@ export function association(this: Base, name: string): AssociationInstance {
   }
 
   const ctor = this.constructor as typeof Base;
-  const assocDef = ctor._associations?.find((a) => a.name === name);
+  // A subclass that overrides an inherited association appends its own
+  // definition after the cloned parent entry, so the most-derived override
+  // is the *last* match — mirroring `_reflections` (keyed, override-wins).
+  const assocDef = ctor._associations
+    ?.slice()
+    .reverse()
+    .find((a) => a.name === name);
   if (!assocDef) {
     throw _associationNotFound(this, name);
   }

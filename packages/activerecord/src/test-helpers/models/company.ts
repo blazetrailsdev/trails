@@ -176,7 +176,7 @@ export class Firm extends Company {
     this.hasOne("client", { foreignKey: "client_of" });
 
     this.hasOne("accountLimit500WithHashConditions", {
-      scope: (q: any) => q.where({ creditLimit: 500 }),
+      scope: (q: any) => q.where({ credit_limit: 500 }),
       foreignKey: "firm_id",
       className: "Account",
     });
