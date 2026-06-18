@@ -3768,7 +3768,7 @@ describe("AssociationsTest", () => {
         this.attribute("shop_id", "integer");
         this.attribute("id", "integer");
         this.attribute("status", "string");
-        this._primaryKey = ["shop_id", "id"];
+        this.primaryKey = ["shop_id", "id"];
         this.hasMany("cpkBooksInline", {
           foreignKey: ["shop_id", "order_id"],
           className: "CpkBookInline",
@@ -3783,7 +3783,7 @@ describe("AssociationsTest", () => {
         this.attribute("shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("title", "string");
-        this._primaryKey = ["author_id", "id"];
+        this.primaryKey = ["author_id", "id"];
       }
     }
     registerModel("CpkOrderInline", CpkOrderInline);
