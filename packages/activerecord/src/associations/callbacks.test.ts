@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
+import { throwAbort } from "@blazetrails/activesupport";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
@@ -485,7 +486,7 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("has many callbacks halt execution when abort is trown when adding to association", async () => {
-    const { Post, Comment } = makePostWithCallbacks({ beforeAdd: () => false as const });
+    const { Post, Comment } = makePostWithCallbacks({ beforeAdd: () => throwAbort() });
     const post = await Post.create({ title: "hello" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "abc", post_id: post.id });
@@ -494,7 +495,7 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("has many callbacks halt execution when abort is trown when removing from association", async () => {
-    const { Post, Comment } = makePostWithCallbacks({ beforeRemove: () => false as const });
+    const { Post, Comment } = makePostWithCallbacks({ beforeRemove: () => throwAbort() });
     const post = await Post.create({ title: "hello" });
     const c = await (Comment as any).create({ body: "abc", post_id: post.id });
     const proxy = association(post, "comments");
@@ -573,6 +574,19 @@ describe("AssociationCallbacksTest", () => {
       // swallowed, like Rails' `rescue Exception`
     }
     expect((await proxy.toArray()).length).toBe(0);
+  });
+
+  it("after_add callback throwing abort propagates (not swallowed)", async () => {
+    // Rails wraps only before_add/before_remove in catch(:abort); after_add
+    // runs outside it (collection_association.rb:485), so a thrown abort
+    // surfaces to the caller rather than being silently swallowed.
+    const { Post, Comment } = makePostWithCallbacks({
+      afterAdd: () => throwAbort(),
+    });
+    const post = await Post.create({ title: "Post" });
+    const proxy = association(post, "comments");
+    const c = new (Comment as any)({ body: "abc", post_id: post.id });
+    await expect(proxy.push(c)).rejects.toBeDefined();
   });
 });
 

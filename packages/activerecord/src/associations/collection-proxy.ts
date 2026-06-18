@@ -1062,7 +1062,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const index = this._targetReplaceIndex(record, replace);
     if (
       !skipCallbacks &&
-      !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)
+      !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record, true)
     ) {
       return null;
     }
@@ -1089,7 +1089,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const index = this._targetReplaceIndex(record, replace);
     if (
       !skipCallbacks &&
-      !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)
+      !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record, true)
     ) {
       return null;
     }
@@ -2067,7 +2067,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     const removed: Base[] = [];
     for (const record of modelRecords) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
+      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true))
+        continue;
       if (Array.isArray(foreignKey)) {
         for (const fk of foreignKey) {
           record._writeAttribute(fk, null);
@@ -2142,7 +2143,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const removed: Base[] = [];
     for (const record of records) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
+      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true))
+        continue;
       const targetPk = record._readAttribute(
         (record.constructor as typeof Base).primaryKey as string,
       );
@@ -3016,7 +3018,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
       const record = this._buildThrough(attrs) as T;
       if (block) block(record);
-      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
+      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record, true)) {
         throw new RecordNotSaved("Callback prevented record creation", record);
       }
       const saved = await record.save();
