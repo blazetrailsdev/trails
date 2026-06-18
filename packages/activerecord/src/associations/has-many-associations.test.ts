@@ -732,11 +732,7 @@ describe("HasManyAssociationsTest", () => {
     expect(await ((await Client.find(clientId)) as any).firm).toBeNull();
   });
 
-  // Rails raises ArgumentError because delete_all only accepts :nullify or
-  // :delete_all; trails' CollectionProxy#deleteAll also maps :destroy/:delete
-  // to the delete strategy instead of rejecting them. Un-skip once the
-  // convergence story hm-delete-all-rejects-destroy-dependent lands.
-  it.skip("delete all accepts limited parameters", async () => {
+  it("delete all accepts limited parameters", async () => {
     const firm = companies("first_firm") as any;
     await expect(firm.dependentClientsOfFirm.deleteAll("destroy")).rejects.toThrow();
   });
