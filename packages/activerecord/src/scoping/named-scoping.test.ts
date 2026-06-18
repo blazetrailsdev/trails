@@ -552,11 +552,11 @@ describe("NamedScopingTest", () => {
   // scope extension method; trails has no oops_comments extension.
   it.skip("model class should respond to extending", () => {});
 
-  it("model class should respond to none", async () => {
-    expect(await Topic.isAny()).toBe(true);
-    await Topic.deleteAll();
-    expect(await Topic.isAny()).toBe(false);
-  });
+  // Rails asserts `Topic.none?` (true only when no records exist) — the
+  // semantic opposite of `any?`. trails implements no `isNone` predicate at the
+  // relation/Querying layers and `base.ts` delegates `isAny`/`isMany`/`isOne`
+  // but not `isNone`, so there is no faithful body for this case yet.
+  it.skip("model class should respond to none", () => {});
 
   it("model class should respond to one", async () => {
     expect(await Topic.isOne()).toBe(false);
