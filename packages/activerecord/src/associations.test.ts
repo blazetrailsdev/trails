@@ -3862,11 +3862,25 @@ describe("AssociationsTest", () => {
     });
     await tag.save();
 
+    // Noise join row that collides on blog_post_id but not blog_id: a tag on a
+    // different blog wired to this post's id via a deliberately cross-blog join
+    // row. The composite through scope keys on [blog_id, blog_post_id], so it
+    // must AND both columns — a regression to single-column (blog_post_id-only)
+    // filtering would leak this row into `blogPost.tags`.
+    const otherBlogId = (shardedBlogs("sharded_blog_two") as any).id;
+    const noiseTag = await ShardedTag.create({ name: "Other Blog Tag", blog_id: otherBlogId });
+    await ShardedBlogPostTag.create({
+      blog_id: otherBlogId,
+      blog_post_id: (blogPost as any).id,
+      tag_id: (noiseTag as any).id,
+    });
+
     await association(blogPost, "tags").push(tag);
 
     await blogPost.reload();
     const reloadedTags = await association(blogPost, "tags").toArray();
     expect(reloadedTags.map((t: any) => t.id)).toContain((tag as any).id);
+    expect(reloadedTags.map((t: any) => t.id)).not.toContain((noiseTag as any).id);
     const join = await ShardedBlogPostTag.where({
       blog_post_id: (blogPost as any).id,
       blog_id: (blogPost as any).blog_id,
@@ -3881,9 +3895,15 @@ describe("AssociationsTest", () => {
       name: "Ruby on Rails",
       blog_id: (blogPost as any).blog_id,
     });
+    // The autosave variant exists to prove `<<` saves the unsaved target before
+    // building the join row (matching the canonical `append composite foreign key
+    // has many association with autosave` above); assert that transition so the
+    // test can't pass with a pre-persisted tag.
+    expect(tag.isNewRecord()).toBe(true);
 
     await association(blogPost, "tags").push(tag);
 
+    expect(tag.isPersisted()).toBe(true);
     await blogPost.reload();
     const reloadedTags = await association(blogPost, "tags").toArray();
     expect(reloadedTags.map((t: any) => t.id)).toContain((tag as any).id);
