@@ -414,7 +414,13 @@ export class SubStiPost extends StiPost {
   }
 }
 
-export class SubAbstractStiPost extends AbstractStiPost {}
+export class SubAbstractStiPost extends AbstractStiPost {
+  static {
+    // Rails inherits `posts` through the abstract parent; trails derives a
+    // table from the (own) base class name, so pin it explicitly.
+    this._tableName = "posts";
+  }
+}
 
 export class NullPost extends Post {
   static {

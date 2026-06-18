@@ -7,6 +7,7 @@ import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotSaved, Rollback } from "../errors.js";
 import { raiseNotFoundAll } from "../relation/finder-methods.js";
+import { polymorphicName } from "../inheritance.js";
 
 /**
  * Base class for has_many and has_and_belongs_to_many associations.
@@ -603,10 +604,13 @@ export class CollectionAssociation extends Association {
 
     if (this.reflection.options.as) {
       const typeCol = `${underscore(this.reflection.options.as)}_type`;
+      // Rails writes `owner.class.base_class.name` (polymorphic_name) for the
+      // `as:` type column, so STI subclasses store their base class name.
+      const typeName = polymorphicName(ctor as typeof Base);
       if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(typeCol, ctor.name);
+        (record as any)._writeAttribute(typeCol, typeName);
       } else {
-        (record as any)[typeCol] = ctor.name;
+        (record as any)[typeCol] = typeName;
       }
     }
   }

@@ -1,6 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { resolveModel, loadBelongsTo, modelRegistry } from "../associations.js";
+import { baseClass } from "../inheritance.js";
 import { underscore } from "@blazetrails/activesupport";
 import { BelongsToAssociation } from "./belongs-to-association.js";
 
@@ -170,7 +171,12 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    * registry key, falling back to constructor.name.
    */
   private polymorphicTypeName(record: Base): string {
-    const ctor = record.constructor as { name: string; _registryKeys?: string[] };
+    // Rails: `record.class.polymorphic_name` resolves to the STI base class
+    // name (`base_class.name`), so subclass records store their base type.
+    const ctor = baseClass.call(record.constructor as typeof Base) as typeof Base & {
+      name: string;
+      _registryKeys?: string[];
+    };
     const matching = (ctor._registryKeys ?? []).filter((k) => modelRegistry.get(k) === ctor);
     if (matching.length > 0) {
       const existing = this.readForeignType();

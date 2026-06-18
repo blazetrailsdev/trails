@@ -79,7 +79,13 @@ import {
   camelize,
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
-import { getInheritanceColumn, findStiClass, stiEnabled, registerSubclass } from "./inheritance.js";
+import {
+  getInheritanceColumn,
+  findStiClass,
+  stiEnabled,
+  registerSubclass,
+  polymorphicName,
+} from "./inheritance.js";
 import { flushPendingCounterCacheColumns, _foreignKeysEqual } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
@@ -2866,12 +2872,15 @@ export async function setHasOne(
     ? (options.foreignKey ?? `${underscore(asName)}_id`)
     : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
   const typeCol = asName ? `${underscore(asName)}_type` : null;
+  // Rails writes `owner.class.polymorphic_name` (the STI base class name) to
+  // the `as:` type column, so STI subclass owners store their base type.
+  const polyType = polymorphicName(ctor);
 
   // Nullify old target
   const className = options.className ?? camelize(assocName);
   const targetModel = resolveModel(className);
   const findConditions: Record<string, unknown> = { [foreignKey as string]: pkValue };
-  if (typeCol) findConditions[typeCol] = ctor.name;
+  if (typeCol) findConditions[typeCol] = polyType;
   const existing = await targetModel.findBy(findConditions);
   if (existing && existing !== target) {
     existing._writeAttribute(foreignKey as string, null);
@@ -2881,7 +2890,7 @@ export async function setHasOne(
 
   if (target) {
     target._writeAttribute(foreignKey as string, pkValue);
-    if (typeCol) target._writeAttribute(typeCol, ctor.name);
+    if (typeCol) target._writeAttribute(typeCol, polyType);
     if (target.isPersisted()) await target.save();
   }
 

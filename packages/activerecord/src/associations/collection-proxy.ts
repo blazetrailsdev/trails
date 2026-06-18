@@ -34,7 +34,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
   HasManyThroughOrderError,
 } from "./errors.js";
-import { getInheritanceColumn, findStiClass, stiEnabled } from "../inheritance.js";
+import { getInheritanceColumn, findStiClass, stiEnabled, polymorphicName } from "../inheritance.js";
 import {
   hasQueryConstraints as ownerHasQueryConstraints,
   queryConstraintsList as ownerQueryConstraintsList,
@@ -835,7 +835,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       [foreignKey as string]: this._record._readAttribute(primaryKey as string),
     };
     if (asName) {
-      buildAttrs[`${underscore(asName)}_type`] = ctor.name;
+      buildAttrs[`${underscore(asName)}_type`] = polymorphicName(ctor);
     }
 
     let targetModel = this.model as typeof Base;
@@ -1622,7 +1622,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const pkValue = this._record._readAttribute(primaryKey as string);
         record._writeAttribute(foreignKey as string, pkValue);
       }
-      if (typeCol) record._writeAttribute(typeCol, ctor.name);
+      if (typeCol) record._writeAttribute(typeCol, polymorphicName(ctor));
 
       return record.save();
     };
@@ -1939,7 +1939,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         // Polymorphic through: ownerJoinAttrs already has the polymorphic
         // _id column from _throughOwnerPolymorphic; just add the _type.
         if (throughAssoc.options.as) {
-          joinAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
+          joinAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
         }
         let joinRecord: Base;
         if (bang) {
