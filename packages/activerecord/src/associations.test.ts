@@ -4260,9 +4260,11 @@ describe("AssociationsTest", () => {
     await agreement.save();
 
     await agreement.reload();
-    expect(await (agreement as any).loadBelongsTo("order")).not.toBeNull();
+    const loaded = await (agreement as any).loadBelongsTo("order");
+    expect(loaded).not.toBeNull();
     expect((agreement as any).order_id).not.toBeNull();
 
+    expect((loaded as any).id).toEqual((order as any).id);
     const orderId = (order as any).id[1];
     expect((agreement as any).order_id).toBe(orderId);
   });
