@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/activemodel";
 import { SingularAssociation } from "./singular-association.js";
 import { afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
@@ -34,7 +35,7 @@ export class HasOne extends SingularAssociation {
       scope = null;
     }
     if (options.counterCache) {
-      throw new Error("has_one associations do not support counter_cache");
+      throw new ArgumentError("has_one associations do not support counter_cache");
     }
     return super.build(model, name, scope, options);
   }
