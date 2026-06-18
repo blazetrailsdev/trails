@@ -543,6 +543,7 @@ export class Relation<T extends Base> {
   // visitor's collector. Read by toArray() to set allowRetry and pass binds.
   private _lastSelectRetryable = false;
   private _lastSelectBinds: unknown[] = [];
+  private _lastSelectPreparable = true;
 
   private _table: Table | null = null;
 
@@ -2549,7 +2550,7 @@ export class Relation<T extends Base> {
         sql,
         `${this._modelClass.name} Load`,
         this._lastSelectBinds,
-        { allowRetry },
+        { allowRetry, preparable: this._lastSelectPreparable },
       );
       if (token !== this._loadToken) return [];
       const rows = result.toArray();
@@ -2737,6 +2738,7 @@ export class Relation<T extends Base> {
         sql,
         "Eager Load",
         this._lastSelectBinds,
+        { preparable: this._lastSelectPreparable },
       );
       this._records = this._instrumentInstantiation(result.toArray());
       await this._preloadAssociationsForRecords(this._records, eagerAssociations);
@@ -4490,9 +4492,10 @@ export class Relation<T extends Base> {
   private _toSqlSetOperation(): string {
     const node = this._buildSetOperationNode();
     const v = this._arelVisitor();
-    const [raw, binds, retryable] = v.compileWithBinds(node);
+    const [raw, binds, retryable, preparable] = v.compileWithBinds(node);
     this._lastSelectRetryable = retryable;
     this._lastSelectBinds = this._typeCastBinds(binds);
+    this._lastSelectPreparable = preparable;
     // The set-operation visitors wrap the compound SELECT in `( ... )` for
     // embedded use (subquery / derived table). As a standalone statement
     // SQLite rejects the leading paren, so strip the single enclosing pair the
@@ -4909,9 +4912,10 @@ export class Relation<T extends Base> {
 
   private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
     const v = this._arelVisitor();
-    const [sql, binds, retryable] = v.compileWithBinds(manager.ast);
+    const [sql, binds, retryable, preparable] = v.compileWithBinds(manager.ast);
     this._lastSelectRetryable = retryable;
     this._lastSelectBinds = this._typeCastBinds(binds);
+    this._lastSelectPreparable = preparable;
     return sql;
   }
 

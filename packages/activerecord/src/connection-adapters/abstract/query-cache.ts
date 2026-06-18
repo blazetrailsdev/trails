@@ -410,7 +410,7 @@ type BaseSelectAll = (
   arel: string | unknown,
   name?: string | null,
   binds?: unknown[],
-  opts?: { allowRetry?: boolean },
+  opts?: { allowRetry?: boolean; preparable?: boolean | null },
 ) => Promise<Result>;
 
 /**
@@ -433,19 +433,26 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     arel: string | unknown,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result> {
     // Rails' QueryCache#select_all first unwraps a Relation to its Arel AST
     // (`arel = arel_from_relation(arel)`), then converts the Arel node to
     // SQL + binds via `to_sql_and_binds` before consulting the cache. A SQL
     // string passes through both steps unchanged with its binds intact.
     arel = arelFromRelation(arel);
-    const [sql, resolvedBinds] = toSqlAndBinds.call(
+    const [sql, resolvedBinds, compiledPreparable] = toSqlAndBinds.call(
       this as DatabaseStatementsHost,
       arel,
       binds ?? [],
     );
     binds = resolvedBinds;
+    // Rails query_cache.rb:242/248: to_sql_and_binds replaces the incoming
+    // preparable with collector.preparable for Arel inputs, and query_cache
+    // forwards that returned value to super. Mirror that: compiledPreparable
+    // (non-null only for Arel inputs via the visitor) wins; opts.preparable
+    // (relation._lastSelectPreparable for string inputs) is the fallback.
+    const resolvedPreparable = compiledPreparable ?? opts?.preparable;
+    const forwardOpts = { ...opts, preparable: resolvedPreparable };
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
       const cached = lookupSqlCache.call(this, sql, name, binds ?? []);
@@ -453,12 +460,12 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
         return Result.fromRowHashes(cached.map((r) => ({ ...r })));
       }
       const rows = await cacheSql.call(this, sql, name, binds ?? [], async () => {
-        const result = await original.call(this, sql, name, binds, opts);
+        const result = await original.call(this, sql, name, binds, forwardOpts);
         return result.toArray();
       });
       return Result.fromRowHashes(rows);
     }
-    return original.call(this, sql, name, binds, opts);
+    return original.call(this, sql, name, binds, forwardOpts);
   };
 }
 

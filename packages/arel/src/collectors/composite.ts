@@ -18,7 +18,7 @@ type CollectorLike = {
 export class Composite {
   private left: CollectorLike;
   private right: CollectorLike;
-  preparable = false;
+  preparable = true;
 
   constructor(left: CollectorLike, right: CollectorLike) {
     this.left = left;

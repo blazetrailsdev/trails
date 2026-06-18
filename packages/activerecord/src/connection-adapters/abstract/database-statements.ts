@@ -87,7 +87,7 @@ export interface DatabaseStatementsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result>;
   /** @internal */
   internalExecute?(
@@ -250,13 +250,14 @@ export function toSqlAndBinds(
     }
     const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
     if (visitor && node instanceof Nodes.Node) {
-      const [sql, extractedBinds, compiledAllowRetry] = visitor.compileWithBinds(node);
+      const [sql, extractedBinds, compiledAllowRetry, compiledPreparable] =
+        visitor.compileWithBinds(node);
       // Type-cast bind objects (QueryAttribute) to primitive values
       // for adapter execution, matching Rails' type_casted_binds
       const castedBinds = extractedBinds.map((b) =>
         b instanceof ModelAttribute ? b.valueForDatabase : b,
       );
-      return [sql, castedBinds, preparable, compiledAllowRetry];
+      return [sql, castedBinds, compiledPreparable, compiledAllowRetry];
     }
     const sql = (node as any).toSql();
     return [sql, [], preparable, allowRetry];
@@ -1410,7 +1411,12 @@ interface DatabaseStatementsDefaultsHost {
     opts?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
-  selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  selectAll(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
+  ): Promise<Result>;
   selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   execQuery(
     sql: string,
@@ -1487,7 +1493,7 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result> {
     // Rails: select_all → internal_exec_query → exec_query. Delegating
     // here lets adapters that override execQuery (e.g. PostgreSQLAdapter,
@@ -1495,25 +1501,12 @@ export const DatabaseStatements = {
     // picked up automatically.
     //
     // Rails' select_all runs `exec_query(sql, ..., prepare: prepared_statements &&
-    // preparable)`, where `preparable` is the Arel collector's first-class flag.
-    // trails has no threaded `collector.preparable` yet, so it INFERS preparability
-    // from bind presence: a preparable Arel yields placeholder SQL plus a bind
-    // array, while an inlined one yields no binds. A non-empty bind array under
-    // prepared_statements is therefore the prepared-statement signal — it routes
-    // equality SELECTs through the pooled path (SQLite `_cachedStatement`) while
-    // inlined queries use a fresh statement.
-    //
-    // This matches Rails for every shape that carries binds, and for the no-bind
-    // IN-clause array (non-preparable in both). It diverges only for a no-bind but
-    // *preparable* query — a SQL string literal — which Rails caches and trails
-    // cannot distinguish from the inlined IN-clause. Converging that needs the real
-    // `collector.preparable` flag: RFC 0016 story
-    // `thread-collector-preparable-for-statement-cache`.
-    const prepare = !!(
-      (this as { preparedStatements?: boolean }).preparedStatements &&
-      binds &&
-      binds.length > 0
-    );
+    // preparable)`, where `preparable` is the Arel collector's first-class flag
+    // threaded through compileWithBinds → _compileSelectSql → opts.preparable.
+    // Callers that don't supply opts.preparable fall back to bind presence, which
+    // is correct for every shape that carries binds.
+    const preparable = opts?.preparable ?? (binds != null && binds.length > 0);
+    const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
     return this.execQuery(sql, name, binds, {
       allowRetry: opts?.allowRetry ?? false,
       prepare,

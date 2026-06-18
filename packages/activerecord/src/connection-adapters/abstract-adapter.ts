@@ -363,7 +363,7 @@ export interface AbstractAdapter {
     arel: string | unknown,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result>;
   selectOne(
     sql: string,
