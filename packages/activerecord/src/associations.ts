@@ -2015,10 +2015,6 @@ function createHabtmJoinModel(
   JoinModel._tableName = joinTableName;
   JoinModel.primaryKey = [ownerFk, targetFk];
 
-  // Define FK attributes
-  JoinModel.attribute(ownerFk, "integer");
-  JoinModel.attribute(targetFk, "integer");
-
   // Delegate connection to the left (declaring) model
   Object.defineProperty(JoinModel, "connection", {
     get() {

@@ -91,16 +91,33 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
-  it.skip("should property quote string primary keys", () => {
-    // BLOCKED: associations — HABTM `push` derives the owner-side join FK from
-    //   the owner's `id` attribute, not its primary key, so a custom string-PK
-    //   owner (Country#country_id) writes a null countries_treaties.country_id.
-    //   Tracked for convergence.
+  it("should property quote string primary keys", async () => {
+    const country = await Country.create({ country_id: "US", name: "United States" });
+    const treaty = await Treaty.create({ treaty_id: "NATO", name: "North Atlantic Treaty" });
+
+    await country.treaties.push(treaty);
+
+    const reloaded = await Country.find("US");
+    const treaties = await reloaded.treaties.toArray();
+    expect(treaties.length).toBe(1);
+    expect(treaties[0].treaty_id).toBe("NATO");
   });
 
-  it.skip("proper usage of primary keys and join table", () => {
-    // BLOCKED: associations — see "should property quote string primary keys";
-    //   the `country.treaties << treaty` insert fails the same way.
+  it("proper usage of primary keys and join table", async () => {
+    const country = await Country.create({ country_id: "CA", name: "Canada" });
+    const treaty1 = await Treaty.create({ treaty_id: "NAFTA", name: "North American Free Trade" });
+    const treaty2 = await Treaty.create({
+      treaty_id: "CUSMA",
+      name: "Canada United States Mexico",
+    });
+
+    await country.treaties.push(treaty1);
+    await country.treaties.push(treaty2);
+
+    await country.treaties.reload();
+    const treaties = await country.treaties.toArray();
+    expect(treaties.length).toBe(2);
+    expect(treaties.map((t: Treaty) => t.treaty_id).sort()).toEqual(["CUSMA", "NAFTA"]);
   });
 
   it("has and belongs to many", async () => {
