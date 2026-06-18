@@ -303,9 +303,12 @@ export class BelongsToAssociation extends SingularAssociation {
     // When the owner uses query_constraints, the foreign key is derived from
     // them (Rails `derive_fk_query_constraints`), not from the target's primary
     // key — e.g. a `Sharded::Comment` belongs_to whose owner constraints are
-    // `[blog_id, id]` carries `[blog_id, blog_post_id]`. The reflection's
+    // `[blog_id, id]` carries `[blog_id, blog_post_id]`. The rich reflection's
     // computed `foreignKey` already does this; the scalar-PK fallback below
-    // would drop the `blog_id` component.
+    // would drop the `blog_id` component. `this.reflection` is the lightweight
+    // `AssociationDefinition` (`{ type, name, options }`) — it has no computed
+    // `foreignKey` getter — so resolve the rich `AssociationReflection` (which
+    // carries the cached `deriveFkQueryConstraints` value) via the registry.
     if (hasQueryConstraints.call(this.owner.constructor as never)) {
       const ctor = this.owner.constructor as {
         _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | null;
@@ -333,14 +336,21 @@ export class BelongsToAssociation extends SingularAssociation {
     if (configured) {
       return Array.isArray(configured) ? configured : [configured];
     }
-    // With a query_constraints owner the association primary key is the
-    // target's query_constraints (Rails `association_primary_key`), so the
-    // composite FK columns zip against the right target columns — e.g.
-    // `[blog_id, blog_post_id]` ← target `[blog_id, id]`, not `[id, id]`.
-    if (hasQueryConstraints.call(this.owner.constructor as never)) {
-      const targetCtor = (record?.constructor ?? this.klass) as never;
-      const qc = targetCtor ? queryConstraintsList.call(targetCtor) : null;
-      if (qc && qc.length > 1) return qc;
+    // Mirrors Rails `BelongsToReflection#association_primary_key`
+    // (reflection.rb:926-934): when the *target* (`klass`) uses
+    // query_constraints — or the association configures `query_constraints:` —
+    // the association primary key is the target's `composite_query_constraints_list`,
+    // regardless of column count. This makes the composite FK columns zip against
+    // the right target columns (e.g. `[blog_id, blog_post_id]` ← target
+    // `[blog_id, id]`, not `[id, id]`). Gate on the target, not the owner, exactly
+    // as Rails branches on `(klass || self.klass).has_query_constraints?`.
+    const targetCtor = (record?.constructor ?? this.klass) as never;
+    if (
+      targetCtor &&
+      (hasQueryConstraints.call(targetCtor) || this.reflection.options.queryConstraints)
+    ) {
+      const qc = queryConstraintsList.call(targetCtor);
+      if (qc) return qc;
     }
     if (record) {
       const pk = (record.constructor as any).primaryKey;
