@@ -63,6 +63,26 @@ export class Association {
     validateThroughReflection(owner.constructor as typeof Base, reflection.name);
   }
 
+  /**
+   * Eagerly resolve the target class name — mirrors the Rails path
+   * `check_validity! → klass → compute_class` that raises NameError the first
+   * time an association is loaded (not merely accessed for metadata operations
+   * like setTarget, isLoaded, etc.).
+   *
+   * Called at the top of loadTarget() so new records without FK values still
+   * raise when load is attempted. Skipped for polymorphic, through, and
+   * anonymous-class associations (HABTM join model side).
+   */
+  protected checkKlass(): void {
+    const opts = this.reflection.options as AssociationOptions & { anonymousClass?: unknown };
+    if (opts.polymorphic || opts.through || opts.anonymousClass) return;
+    const name = this.reflection.name;
+    const className =
+      (opts.className as string | undefined) ??
+      camelize(this.reflection.type === "hasMany" ? singularize(name) : name);
+    resolveModel(className);
+  }
+
   get name(): string {
     return this.reflection.name;
   }
@@ -286,6 +306,7 @@ export class Association {
    * Mirrors: ActiveRecord::Associations::Association#load_target
    */
   async loadTarget(): Promise<Base | Base[] | null> {
+    this.checkKlass();
     if (this.isStaleTarget() || this.findTargetNeeded()) {
       const cached = this.doFindTarget();
       if (cached !== undefined) {

@@ -60,7 +60,22 @@ export class CollectionAssociation extends Association {
         ? [options[callbackName]]
         : [];
 
-    if (callbackValues.length === 0) return;
+    const fullCallbackName = `${callbackName}For${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+
+    // Mirrors Rails: `method_defined = model.respond_to?(full_callback_name)` —
+    // respond_to? checks the full inheritance chain, so `in` is the JS analogue.
+    const isMethodDefined = fullCallbackName in model;
+
+    // Rails: `return if callback_values.empty? && !method_defined`
+    if (callbackValues.length === 0) {
+      if (!isMethodDefined) return;
+      // Inherited but redefining without callbacks — shadow with own [] so the
+      // subclass doesn't inherit the parent's callback list.
+      if (!Object.prototype.hasOwnProperty.call(model, fullCallbackName)) {
+        model[fullCallbackName] = [];
+      }
+      return;
+    }
 
     const normalized = callbackValues.map((callback: any) => {
       if (typeof callback === "string" || typeof callback === "symbol") {
@@ -72,8 +87,6 @@ export class CollectionAssociation extends Association {
       }
     });
 
-    // Store on model class for Rails parity (class_attribute pattern)
-    const fullCallbackName = `${callbackName}For${name.charAt(0).toUpperCase()}${name.slice(1)}`;
     const existing = Object.prototype.hasOwnProperty.call(model, fullCallbackName)
       ? model[fullCallbackName]
       : undefined;

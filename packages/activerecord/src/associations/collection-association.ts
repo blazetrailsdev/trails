@@ -447,6 +447,7 @@ export class CollectionAssociation extends Association {
    * Load target from database and merge with in-memory records.
    */
   override async loadTarget(): Promise<Base[]> {
+    this.checkKlass();
     if (this.findTargetNeeded()) {
       const cached = this.doFindTarget();
       if (cached !== undefined && Array.isArray(cached)) {

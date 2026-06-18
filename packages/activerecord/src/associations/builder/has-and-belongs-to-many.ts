@@ -308,6 +308,13 @@ export class HasAndBelongsToMany {
       name,
       options: habtmOptions,
     });
+    // Register before/after_add/remove class properties for Rails parity —
+    // mirrors CollectionAssociation.defineCallbacks for has_many. The bug-fix
+    // in defineCallback ensures a subclass that redefines the HABTM without
+    // callbacks shadows the parent's array (own [] vs inherited [fn]).
+    for (const callbackName of ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const) {
+      CollectionAssociationBuilder.defineCallback(model, callbackName, name, habtmOptions);
+    }
     // Pull `scope:` off the options bag and forward it as the dedicated
     // scope arg on the reflection. Mirrors Rails' Builder::Association,
     // which captures `scope` as a positional arg to `has_and_belongs_to_many`

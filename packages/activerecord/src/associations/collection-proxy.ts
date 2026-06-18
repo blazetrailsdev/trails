@@ -1069,7 +1069,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
     if (save && !(await save())) return record;
     this._commitToTarget(record, index);
-    if (this._record.isNewRecord()) this._targetLoaded = true;
     if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     return record;
   }
