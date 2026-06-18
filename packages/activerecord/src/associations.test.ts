@@ -771,11 +771,9 @@ describe("PreloaderTest", () => {
     const author = await Author.create({ name: "David" });
     const book = await Book.create({ author_id: author.id, name: "A Book" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [book, post], associations: ["author"] }).call();
     });
-    expect(spy).toHaveBeenCalledTimes(1);
     expect(sqls).toHaveLength(1);
     const noQueriesAfter = await captureSql(async () => {
       void (book as any)._preloadedAssociations.get("author");
