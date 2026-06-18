@@ -755,7 +755,7 @@ describe("PreloaderTest", () => {
 
   // STI filtering via className is not applied in ThroughAssociation preloader:
   // both Category and SpecialCategory rows are returned instead of only SpecialCategory.
-  // Marked it.fails so the test is present and will auto-unmask when the gap is fixed.
+  // TODO(store-full-sti-class-name): remove it.fails when that story fixes the gap.
   it.fails("preload for hmt with conditions", async () => {
     const author = await Author.create({ name: "David" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
