@@ -322,9 +322,10 @@ function hasReversibleOrder(rel: FinderRelation): boolean {
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
   if (this._isNone) return n !== undefined ? [] : null;
   // CollectionProxy tracks loaded state separately (_targetLoaded / _target).
-  // Mirror pluck/pick's fast path so first!/first on a loaded proxy avoids re-querying.
+  // Mirror Rails' loaded? branch: use @target as-is, including built/unsaved records.
+  // Only first! reaches here (CollectionProxy overrides first to go through toArray).
   if ((this as any)._targetLoaded) {
-    const records: any[] = ((this as any)._target as any[]).filter((r: any) => !r.isNewRecord());
+    const records: any[] = (this as any)._target;
     return n !== undefined ? records.slice(0, n) : (records[0] ?? null);
   }
   // Rails: Relation#first returns from the already-loaded records (no re-query),
