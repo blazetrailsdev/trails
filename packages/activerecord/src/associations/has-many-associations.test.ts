@@ -67,6 +67,8 @@ import { Human } from "../test-helpers/models/human.js";
 import { Category } from "../test-helpers/models/category.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
+import { Car } from "../test-helpers/models/car.js";
+import { Bulb } from "../test-helpers/models/bulb.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 const UNIVERSAL_HM_SCHEMA: Schema = {
@@ -1402,244 +1404,122 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
+  const { companies } = useHandlerFixtures(["companies"]);
   beforeAll(async () => {
-    await defineSchema({
-      authors: { name: "string" },
-      posts: { author_id: "integer", title: "string" },
-      size_un_authors: { name: "string" },
-      size_un_posts: { author_id: "integer", title: "string" },
-      size_ld_authors: { name: "string" },
-      size_ld_posts: { author_id: "integer", title: "string" },
-      empty_un_authors: { name: "string" },
-      empty_un_posts: { author_id: "integer", title: "string" },
-      empty_ld_authors: { name: "string" },
-      empty_ld_posts: { author_id: "integer", title: "string" },
-    });
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        cars: TEST_SCHEMA.cars,
+        bulbs: TEST_SCHEMA.bulbs,
+        companies: TEST_SCHEMA.companies,
+      } as Schema,
+      { dropExisting: true },
+    );
+    // A sibling test file may have warmed the shared schema cache for `bulbs`
+    // with a default lowercase `id` PK (e.g. base.test.ts / reflection.test.ts
+    // declare `bulbs: { car_id }`). Canonical `bulbs` uses `primary_key: "ID"`,
+    // so reset the memoized column/PK information before reflecting the rebuilt
+    // table — otherwise the ids_reader plucks a non-existent `id` column on PG.
+    Car.resetColumnInformation();
+    Bulb.resetColumnInformation();
+    Company.resetColumnInformation();
+    await Car.loadSchema();
+    await Bulb.loadSchema();
+    await Company.loadSchema();
+    // Anchor the canonical `bulbs` primary key explicitly (path-1 `_primaryKey`)
+    // so `Bulb.primaryKey` cannot fall through to the shared schema cache — which
+    // a concurrent sibling worker's `defineSchema` on `bulbs` could invalidate
+    // mid-suite — and silently default to `"id"`, breaking the ids_reader on PG.
+    Bulb.primaryKey = "ID";
   });
+  registerModel(Car);
+  registerModel(Bulb);
+  registerModel(Company);
+  registerModel(HmFirm);
+  registerModel(Client);
+  enableSti(Company);
+  registerSubclass(HmFirm);
+  registerSubclass(Client);
   // -- Calling size/empty --
 
   it("calling size on an association that has not been loaded performs a query", async () => {
-    class SizeUnAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class SizeUnPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(SizeUnAuthor, "sizeUnPosts", {
-      className: "SizeUnPost",
-      foreignKey: "author_id",
-    });
-    registerModel("SizeUnAuthor", SizeUnAuthor);
-    registerModel("SizeUnPost", SizeUnPost);
-    const author = await SizeUnAuthor.create({ name: "Alice" });
-    await SizeUnPost.create({ author_id: author.id, title: "A" });
-    const author2 = await SizeUnAuthor.create({ name: "Bob" });
-    const proxy = association(author, "sizeUnPosts");
-    const proxy2 = association(author2, "sizeUnPosts");
-    expect(proxy.loaded).toBe(false);
+    const car = (await Car.create({})) as any;
+    await Bulb.create({ car_id: car.id });
+    const carTwo = (await Car.create({})) as any;
     await assertQueriesCount(1, false, async () => {
-      expect(await proxy.size()).toBe(1);
+      expect(await car.bulbs.size()).toBe(1);
     });
     await assertQueriesCount(1, false, async () => {
-      expect(await proxy2.size()).toBe(0);
+      expect(await carTwo.bulbs.size()).toBe(0);
     });
-    expect(proxy.loaded).toBe(false);
   });
 
   it("calling size on an association that has been loaded does not perform query", async () => {
-    class SizeLdAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class SizeLdPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(SizeLdAuthor, "sizeLdPosts", {
-      className: "SizeLdPost",
-      foreignKey: "author_id",
-    });
-    registerModel("SizeLdAuthor", SizeLdAuthor);
-    registerModel("SizeLdPost", SizeLdPost);
-    const author = await SizeLdAuthor.create({ name: "Alice" });
-    await SizeLdPost.create({ author_id: author.id, title: "A" });
-    const author2 = await SizeLdAuthor.create({ name: "Bob" });
-    const proxy = association(author, "sizeLdPosts");
-    const proxy2 = association(author2, "sizeLdPosts");
-    await proxy.load();
-    await proxy2.load();
-    expect(proxy.loaded).toBe(true);
-    expect(proxy2.loaded).toBe(true);
+    const car = (await Car.create({})) as any;
+    await Bulb.create({ car_id: car.id });
+    await car.bulbIds;
+    const carTwo = (await Car.create({})) as any;
+    await carTwo.bulbIds;
     await assertNoQueries(false, async () => {
-      expect(await proxy.size()).toBe(1);
-      expect(await proxy2.size()).toBe(0);
+      expect(await car.bulbs.size()).toBe(1);
+    });
+    await assertNoQueries(false, async () => {
+      expect(await carTwo.bulbs.size()).toBe(0);
     });
   });
 
   it("calling empty on an association that has not been loaded performs a query", async () => {
-    class EmptyUnAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EmptyUnPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(EmptyUnAuthor, "emptyUnPosts", {
-      className: "EmptyUnPost",
-      foreignKey: "author_id",
-    });
-    registerModel("EmptyUnAuthor", EmptyUnAuthor);
-    registerModel("EmptyUnPost", EmptyUnPost);
-    const author = await EmptyUnAuthor.create({ name: "Alice" });
-    await EmptyUnPost.create({ author_id: author.id, title: "A" });
-    const author2 = await EmptyUnAuthor.create({ name: "Bob" });
-    const proxy = association(author, "emptyUnPosts");
-    const proxy2 = association(author2, "emptyUnPosts");
-    expect(proxy.loaded).toBe(false);
+    const car = (await Car.create({})) as any;
+    await Bulb.create({ car_id: car.id });
+    const carTwo = (await Car.create({})) as any;
     await assertQueriesCount(1, false, async () => {
-      expect(await proxy.isEmpty()).toBe(false);
+      expect(await car.bulbs.isEmpty()).toBe(false);
     });
     await assertQueriesCount(1, false, async () => {
-      expect(await proxy2.isEmpty()).toBe(true);
+      expect(await carTwo.bulbs.isEmpty()).toBe(true);
     });
-    expect(proxy.loaded).toBe(false);
   });
 
   it("calling empty on an association that has been loaded does not performs query", async () => {
-    class EmptyLdAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EmptyLdPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(EmptyLdAuthor, "emptyLdPosts", {
-      className: "EmptyLdPost",
-      foreignKey: "author_id",
-    });
-    registerModel("EmptyLdAuthor", EmptyLdAuthor);
-    registerModel("EmptyLdPost", EmptyLdPost);
-    const author = await EmptyLdAuthor.create({ name: "Alice" });
-    await EmptyLdPost.create({ author_id: author.id, title: "A" });
-    const author2 = await EmptyLdAuthor.create({ name: "Bob" });
-    const proxy = association(author, "emptyLdPosts");
-    const proxy2 = association(author2, "emptyLdPosts");
-    await proxy.load();
-    await proxy2.load();
-    expect(proxy.loaded).toBe(true);
-    expect(proxy2.loaded).toBe(true);
+    const car = (await Car.create({})) as any;
+    await Bulb.create({ car_id: car.id });
+    await car.bulbIds;
+    const carTwo = (await Car.create({})) as any;
+    await carTwo.bulbIds;
     await assertNoQueries(false, async () => {
-      expect(await proxy.isEmpty()).toBe(false);
-      expect(await proxy2.isEmpty()).toBe(true);
+      expect(await car.bulbs.isEmpty()).toBe(false);
+    });
+    await assertNoQueries(false, async () => {
+      expect(await carTwo.bulbs.isEmpty()).toBe(true);
     });
   });
 
   it("calling many should return false if none or one", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "Only" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length > 1).toBe(false);
+    let firm = companies("another_firm") as any;
+    expect(await firm.clientsLikeMs.many()).toBe(false);
+    expect(await firm.clientsLikeMs.size()).toBe(0);
+
+    firm = companies("first_firm") as any;
+    expect(await firm.limitedClients.many()).toBe(false);
+    expect(await firm.limitedClients.size()).toBe(1);
   });
 
   it("calling many should return true if more than one", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    await Post.create({ author_id: author.id, title: "B" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length > 1).toBe(true);
+    const firm = companies("first_firm") as any;
+    expect(await firm.clients.many()).toBe(true);
+    expect(await firm.clients.size()).toBe(3);
   });
 
   it("calling none should return true if none", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length === 0).toBe(true);
+    const firm = companies("another_firm") as any;
+    expect(await firm.clientsLikeMs.isNone()).toBe(true);
+    expect(await firm.clientsLikeMs.size()).toBe(0);
   });
 
   it("calling none should return false if any", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length === 0).toBe(false);
+    const firm = companies("first_firm") as any;
+    expect(await firm.limitedClients.isNone()).toBe(false);
+    expect(await firm.limitedClients.size()).toBe(1);
   });
 });
 
