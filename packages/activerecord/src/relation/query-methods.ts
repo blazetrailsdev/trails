@@ -884,28 +884,20 @@ export function buildWhereClause(
     const isNamedBinds =
       rest.length === 1 && isPlainObject(firstBind) && hasNamedToken && !hasPositional;
 
-    let sql: string;
     if (isNamedBinds) {
-      sql = opts;
-      const namedBinds = firstBind as Record<string, unknown>;
-      const adapter = connectionFor((this as any)._modelClass);
-      for (const [name, value] of Object.entries(namedBinds)) {
-        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const replacement = Array.isArray(value)
-          ? value.map((v) => adapter.quote(v)).join(", ")
-          : adapter.quote(value);
-        // Named-bind substitution on a user-supplied SQL fragment, not an arel
-        // AST — mirrors Rails `sanitize_sql` → `replace_named_bind_variables`
-        // (sanitization.rb), which likewise `gsub`s `:name` tokens with quoted
-        // values. There is no AST to build here; the fragment is opaque text.
-        // eslint-disable-next-line blazetrails/no-raw-sql
-        sql = sql.replace(new RegExp(`(?<!:):${escaped}\\b`, "g"), () => replacement);
-      }
+      // Rails: build_bound_sql_literal wraps in Grouping(BoundSqlLiteral)
+      // (query_methods.rb:1620-1628); named collector.preparable stays true.
+      const node = new Nodes.Grouping(
+        new Nodes.BoundSqlLiteral(opts, [], firstBind as Record<string, unknown>),
+      );
+      return new WhereClause([node]);
     } else if (rest.length > 0) {
-      sql = this._modelClass.sanitizeSqlArray(opts, ...rest);
-    } else {
-      sql = opts;
+      // Rails: positional `where("col = ?", val)` → BoundSqlLiteral so
+      // collector.preparable stays true (visitor does not set it false).
+      const node = new Nodes.Grouping(new Nodes.BoundSqlLiteral(opts, rest));
+      return new WhereClause([node]);
     }
+    const sql = opts;
     return new WhereClause(sql.trim() ? [new Nodes.SqlLiteral(sql)] : []);
   }
 
