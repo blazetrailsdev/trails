@@ -355,7 +355,15 @@ export class AbstractReflection {
           const hmFkNorm = normFk(a.options.foreignKey ?? hmDefaultFk);
           return hmFkNorm.length === btFkNorm.length && hmFkNorm.every((k, i) => k === btFkNorm[i]);
         });
-        if (inverseHm) return `${underscore(inverseHm.name)}_count`;
+        // Only use the inverse hasMany's name when its singular camelCase form is
+        // a suffix of the owner class name. This covers CPK flat-prefix cases
+        // (CpkBook ends with "Book" ← singularize("books")) while correctly
+        // rejecting aliased hasManyS (Comment does NOT end with "LatestComment"
+        // ← singularize("latestComments")), for which Rails still derives from
+        // the child model name (comments_count, not latest_comments_count).
+        if (inverseHm && ownerName.endsWith(camelize(singularize(inverseHm.name)))) {
+          return `${underscore(inverseHm.name)}_count`;
+        }
         return belongsToCounterCacheColumn(counterCache, ownerName);
       } catch {
         return belongsToCounterCacheColumn(counterCache, self.activeRecord?.name ?? "");
