@@ -7,6 +7,16 @@ export class Tag extends Base {
     this.hasMany("taggables", { through: "taggings" });
     this.hasOne("tagging");
     this.hasMany("taggedPosts", { through: "taggings", source: "taggable", sourceType: "Post" });
+
+    // Defined inline in join_model_test.rb's
+    // test_has_many_polymorphic_associations_merges_through_scope; carried on the
+    // canonical model so the test needn't mutate the shared class at runtime.
+    this.hasMany("nullTaggings", { scope: (q: any) => q.none(), className: "Tagging" });
+    this.hasMany("nullTaggedPosts", {
+      through: "nullTaggings",
+      source: "taggable",
+      sourceType: "Post",
+    });
   }
 }
 
