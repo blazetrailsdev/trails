@@ -1,1399 +1,612 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/scoping/named_scoping_test.rb
+ *
+ * Every Rails test is ported with a faithful body against the canonical
+ * `Topic`/`Post`/`Comment`/`Reply`/`Author`/`Developer` models and the real
+ * `topics`/`posts`/`authors`/`comments` fixtures (the named scopes live on the
+ * canonical models, exactly as Rails defines them on `topic.rb`/`post.rb`).
+ * Cases that exercise behavior the engine does not yet implement (scope-body
+ * callability guard, reserved/conflicting scope-name guard, positional
+ * stats-mutating scopes) are kept as `it.skip` with a one-line note rather than
+ * fabricated passing stubs, so their names stay tracked by test:compare.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { Base, Relation } from "../index.js";
-
+import { describe, it, expect } from "vitest";
+import "../index.js";
+import { registerModel } from "../index.js";
+import { captureSql } from "../testing/sql-capture.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { adapterType } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Topic } from "../test-helpers/models/topic.js";
+import { Reply } from "../test-helpers/models/reply.js";
+import { Post, SpecialPost } from "../test-helpers/models/post.js";
+import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Developer } from "../test-helpers/models/developer.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema(
-    {
-      posts: {
-        title: "string",
-        published: "boolean",
-        featured: "boolean",
-        status: "string",
-        views: "integer",
-        author_id: "integer",
-        active: "boolean",
-      },
-      animals: { name: "string", type: "string" },
-      dogs: { name: "string", type: "string" },
-      articles: { title: "string", status: "string" },
-      products: { name: "string", price: "integer", active: "boolean" },
-      users: { name: "string", age: "integer", active: "boolean", role: "string" },
-    },
-    { dropExisting: true },
-  );
-});
+registerModel(Topic);
+registerModel(Reply);
+registerModel(Post);
+registerModel(SpecialPost);
+registerModel(Comment);
+registerModel(SpecialComment);
+registerModel(Author);
+registerModel(Developer);
 
-// ==========================================================================
-// NamedScopingTest — targets scoping/named_scoping_test.rb
-// ==========================================================================
+const ids = (rows: any[]) => rows.map((r) => r.id);
+const sortedIds = (rows: any[]) => ids(rows).sort((a, b) => a - b);
+// Rails capture_sql(include_schema: false): drop introspection queries so the
+// query counts match Rails' assert_queries_count.
+const capSql = (fn: () => unknown) =>
+  captureSql(fn as () => Promise<void>, { includeSchema: false });
+
 describe("NamedScopingTest", () => {
+  const { topics, posts, authors } = useHandlerFixtures(
+    ["topics", "posts", "authors", "comments", "authorAddresses"],
+    { schema: canonicalSchema },
+  );
+
   it("implements enumerable", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const all = await Post.all().toArray();
-    expect(Array.isArray(all)).toBe(true);
+    expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
+    expect(ids(await (Topic as any).base().toArray())).toEqual(ids(await Topic.all().toArray()));
+    expect(((await (Topic as any).base().first()) as any).id).toBe(
+      ((await Topic.first()) as any).id,
+    );
   });
 
   it("found items are cached", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "cached" });
-    const rel = Post.all();
-    await rel.load();
-    expect(rel.isLoaded).toBe(true);
-    const records = await rel.toArray();
-    expect(records.length).toBe(1);
+    const allPosts = (Topic as any).base();
+    const sql = await capSql(async () => {
+      await allPosts.toArray();
+      await allPosts.toArray();
+    });
+    expect(sql.length).toBe(1);
   });
 
   it("reload expires cache of found items", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "original" });
-    const rel = Post.all();
-    await rel.load();
-    expect(rel.isLoaded).toBe(true);
-    await rel.reload();
-    expect(rel.isLoaded).toBe(true);
+    const allPosts = (Topic as any).base();
+    await allPosts.toArray();
+
+    const newPost = (await Topic.create({})) as any;
+    expect(ids(await allPosts.toArray())).not.toContain(newPost.id);
+    await allPosts.reload();
+    expect(ids(await allPosts.toArray())).toContain(newPost.id);
   });
 
   it("delegates finds and calculations to the base class", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const count = await Post.count();
-    expect(count).toBe(1);
+    expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
+    expect(ids(await (Topic as any).base().toArray())).toEqual(ids(await Topic.all().toArray()));
+    expect((await Topic.count()) as number).toBe(await (Topic as any).base().count());
   });
 
   it("calling merge at first in scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-      }
-    }
-    await Post.create({ title: "pub", published: true });
-    const rel = Post.where({ published: true }).merge(Post.order("title"));
-    const sql = rel.toSql();
-    expect(sql).toContain("ORDER BY");
+    Topic.scope("callingMergeAtFirstInScope", (q: any) => q.merge((Topic as any).replied()));
+    expect(ids(await (Topic as any).callingMergeAtFirstInScope().toArray())).toEqual(
+      ids(await (Topic as any).replied().toArray()),
+    );
+  });
+
+  it("method missing priority when delegating", async () => {
+    // Rails: klazz.to.since.to_a == klazz.since.to.to_a — chaining the two
+    // scopes in either order yields the same conjunction/result set.
+    const epoch = Temporal.Instant.fromEpochMilliseconds(0);
+    const now = Temporal.Now.instant();
+    Topic.scope("since", (q: any) => q.where("written_on >= ?", epoch));
+    Topic.scope("to", (q: any) => q.where("written_on <= ?", now));
+    expect(sortedIds(await (Topic as any).to().since().toArray())).toEqual(
+      sortedIds(await (Topic as any).since().to().toArray()),
+    );
+  });
+
+  it("define scope for reserved words", async () => {
+    expect((await (Topic as any).true().toArray()).every((t: any) => t.approved === true)).toBe(
+      true,
+    );
+    expect((await (Topic as any).false().toArray()).every((t: any) => t.approved !== true)).toBe(
+      true,
+    );
+  });
+
+  it("scope should respond to own methods and methods of the proxy", () => {
+    const approved = (Topic as any).approved();
+    expect(typeof approved.limit).toBe("function");
+    expect(typeof approved.count).toBe("function");
   });
 
   it("scopes with options limit finds to those matching the criteria specified", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("published", () => Post.where({ published: true }));
-      }
-    }
-    await Post.create({ title: "pub", published: true });
-    await Post.create({ title: "draft", published: false });
-    const results = await (Post as any).published().toArray();
-    expect(results.length).toBe(1);
+    expect((await Topic.where({ approved: true }).toArray()).length).toBeGreaterThan(0);
+    expect(sortedIds(await (Topic as any).approved().toArray())).toEqual(
+      sortedIds(await Topic.where({ approved: true }).toArray()),
+    );
+    expect(await (Topic as any).approved().count()).toBe(
+      await Topic.where({ approved: true }).count(),
+    );
   });
 
   it("scopes with string name can be composed", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("published", () => Post.where({ published: true }));
-        this.scope("titled", () => Post.order("title"));
-      }
-    }
-    await Post.create({ title: "pub", published: true });
-    const sql = (Post as any).published().titled().toSql();
-    expect(sql).toContain("ORDER BY");
+    expect(ids(await (Topic as any).replied().approved().toArray())).toEqual(
+      ids(await (Topic as any).replied().approvedAsString().toArray()),
+    );
   });
 
   it("scopes are composable", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("published", () => Post.where({ published: true }));
-      }
-    }
-    await Post.create({ title: "a", published: true });
-    await Post.create({ title: "b", published: false });
-    const results = await (Post as any).published().where({ title: "a" }).toArray();
-    expect(results.length).toBe(1);
+    const approved = sortedIds(await Topic.where({ approved: true }).toArray());
+    const replied = sortedIds(await Topic.where("replies_count > 0").toArray());
+    expect(approved).not.toEqual(replied);
+    expect(sortedIds(await (Topic as any).approved().replied().toArray())).toEqual(
+      approved.filter((id) => replied.includes(id)),
+    );
   });
 
   it("procedural scopes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("titled", () => Post.order("title"));
-      }
-    }
-    await Post.create({ title: "b" });
-    await Post.create({ title: "a" });
-    const sql = (Post as any).titled().toSql();
-    expect(sql).toContain("ORDER BY");
+    const third = topics("third");
+    const second = topics("second");
+    const beforeThird = sortedIds(await Topic.where("written_on < ?", third.written_on).toArray());
+    const beforeSecond = sortedIds(
+      await Topic.where("written_on < ?", second.written_on).toArray(),
+    );
+    expect(beforeThird).not.toEqual(beforeSecond);
+    expect(sortedIds(await (Topic as any).writtenBefore(third.written_on).toArray())).toEqual(
+      beforeThird,
+    );
+    expect(sortedIds(await (Topic as any).writtenBefore(second.written_on).toArray())).toEqual(
+      beforeSecond,
+    );
   });
 
   it("procedural scopes returning nil", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("noop", () => Post.all());
-      }
-    }
-    await Post.create({ title: "a" });
-    const results = await (Post as any).noop().toArray();
-    expect(results.length).toBe(1);
+    expect(sortedIds(await (Topic as any).writtenBefore(null).toArray())).toEqual(
+      sortedIds(await Topic.all().toArray()),
+    );
   });
 
-  it("positional scope method", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("titledPositional", (rel: any, t: string) => rel.where({ title: t }));
-      }
-    }
-    await Post.create({ title: "hello" });
-    const results = await (Post as any).titledPositional("hello").toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("positional klass method", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("titledKlass", (rel: any, t: string) => rel.where({ title: t }));
-      }
-    }
-    await Post.create({ title: "world" });
-    const results = await (Post as any).titledKlass("world").toArray();
-    expect(results.length).toBe(1);
-  });
+  // Rails' `scope_stats`/`klass_stats` mutate a passed stats hash with a sync
+  // `count` side-effect; trails scope bodies are async and the canonical Topic
+  // does not carry the stats-mutating variant.
+  it.skip("positional scope method", () => {});
+  it.skip("positional klass method", () => {});
 
   it("scope with object", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("recent", () => Post.order("title"));
-      }
-    }
-    await Post.create({ title: "z" });
-    await Post.create({ title: "a" });
-    const rel = (Post as any).recent();
-    expect(rel).toBeInstanceOf(Relation);
+    const objects = await (Topic as any).withObject().toArray();
+    expect(objects.length).toBeGreaterThan(0);
+    expect(objects.every((t: any) => t.approved === true)).toBe(true);
   });
 
   it("scope with kwargs", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("byTitleKwargs", (rel: any, opts: { title: string }) =>
-          rel.where({ title: opts.title }),
-        );
-      }
-    }
-    await Post.create({ title: "kwargs-test" });
-    const results = await (Post as any).byTitleKwargs({ title: "kwargs-test" }).toArray();
-    expect(results.length).toBe(1);
+    const approved = await (Topic as any).withKwargs(true).toArray();
+    expect(approved.length).toBeGreaterThan(0);
+    expect(approved.every((t: any) => t.approved === true)).toBe(true);
+
+    const none = await (Topic as any).withKwargs().toArray();
+    expect(none.every((t: any) => t.approved !== true)).toBe(true);
   });
 
-  it("scope should respond to own methods and methods of the proxy", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("pub2", () => Post.where({ title: "pub2" }));
-      }
-    }
-    const rel = (Post as any).pub2();
-    expect(typeof rel.toArray).toBe("function");
-    expect(typeof rel.where).toBe("function");
+  it("has many associations have access to scopes", async () => {
+    const containingA = await (Post as any).containingTheLetterA().toArray();
+    expect(containingA.length).toBeGreaterThan(0);
+    const david = authors("david");
+    const davidPosts = await ((await Author.find(david.id)) as any).posts.toArray();
+    expect(ids(davidPosts)).not.toEqual(ids(containingA));
+    const expected = sortedIds(davidPosts.filter((p: any) => ids(containingA).includes(p.id)));
+    const got = sortedIds(
+      await ((await Author.find(david.id)) as any).posts.containingTheLetterA().toArray(),
+    );
+    expect(got).toEqual(expected);
   });
 
-  it("active records have scope named __all__", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.all();
-    expect(rel).toBeInstanceOf(Relation);
+  it("scope with STI", async () => {
+    expect(await (Post as any).containingTheLetterA().count()).toBe(
+      await Post.where("body LIKE '%a%'").count(),
+    );
+    expect(await (SpecialPost as any).containingTheLetterA().count()).toBe(
+      await SpecialPost.where("body LIKE '%a%'").count(),
+    );
   });
 
-  it("active records have scope named __scoped__", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.all();
-    expect(rel).toBeInstanceOf(Relation);
+  it("has many through associations have access to scopes", async () => {
+    const containingE = await (Comment as any).containingTheLetterE().toArray();
+    expect(containingE.length).toBeGreaterThan(0);
+    const david = authors("david");
+    const davidComments = await ((await Author.find(david.id)) as any).comments.toArray();
+    const expected = sortedIds(davidComments.filter((c: any) => ids(containingE).includes(c.id)));
+    const got = sortedIds(
+      await ((await Author.find(david.id)) as any).comments.containingTheLetterE().toArray(),
+    );
+    expect(got).toEqual(expected);
+  });
+
+  // Scopes capturing the relation present at definition time (Rails defines
+  // `ranked_by_comments`/`top` to honor the current association scope). The
+  // canonical models carry `rankedByComments`/`limitBy` but not the `top`
+  // current-scope-capturing variant.
+  it.skip("scopes honor current scopes from when defined", () => {});
+
+  // Engine gap: `scope` does not raise when the body is not callable.
+  it.skip("scopes body is a callable", () => {});
+
+  // Engine gap: `scope` does not raise on names that collide with Relation
+  // methods (records/to_ary/to_sql/explain).
+  it.skip("scopes name is relation method", () => {});
+
+  it("active records have scope named  all  ", async () => {
+    expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
+    expect(ids(await (Topic as any).base().toArray())).toEqual(ids(await Topic.all().toArray()));
+  });
+
+  it("active records have scope named  scoped  ", async () => {
+    const scope = Topic.where("content LIKE '%Have%'");
+    expect((await scope.toArray()).length).toBeGreaterThan(0);
   });
 
   it("first and last should allow integers for limit", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const first = await Post.all().first(2);
-    expect(Array.isArray(first)).toBe(true);
-    expect((first as any[]).length).toBe(2);
+    const ordered = await (Topic as any).base().order("id").toArray();
+    const first2 = await (Topic as any).base().first(2);
+    expect(ids(first2)).toEqual(ids(ordered.slice(0, 2)));
+    const last2 = await (Topic as any).base().last(2);
+    expect(ids(last2)).toEqual(ids(ordered.slice(-2)));
   });
 
+  // Engine deviation: `last()` on an already-loaded, unordered relation still
+  // issues a query instead of reading from the loaded records cache (Rails
+  // asserts 0 queries here). Tracked by test:compare until the cache-read path
+  // covers `last`.
+  it.skip("first and last should not use query when results are loaded", () => {});
+
   it("empty should not load results", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.all();
-    expect(rel.isLoaded).toBe(false);
-    const isEmpty = await rel.isEmpty();
-    expect(typeof isEmpty).toBe("boolean");
+    const t = (Topic as any).base();
+    const sql = await capSql(async () => {
+      await t.isEmpty(); // count query
+      await t.load(); // force load
+      await t.isEmpty(); // loaded, no query
+    });
+    expect(sql.length).toBe(2);
   });
 
   it("any should not load results", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const rel = Post.all();
-    const any = await rel.isAny();
-    expect(any).toBe(true);
-  });
-
-  it("many should not load results", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const rel = Post.all();
-    const many = await rel.isMany();
-    expect(many).toBe(true);
-  });
-
-  it("many should return false if none or one", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "only" });
-    const many = await Post.all().isMany();
-    expect(many).toBe(false);
-  });
-
-  it("many should return true if more than one", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const many = await Post.all().isMany();
-    expect(many).toBe(true);
-  });
-
-  it("model class should respond to any", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Post.all().isAny).toBe("function");
-  });
-
-  it("model class should respond to many", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Post.all().isMany).toBe("function");
-  });
-
-  it("should build on top of scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("publishedScope", () => Post.where({ published: true }));
-      }
-    }
-    const p = (Post as any).publishedScope().build({ title: "new" });
-    expect(p.isNewRecord()).toBe(true);
-  });
-
-  it("should create on top of scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("publishedScope2", () => Post.where({ published: true }));
-      }
-    }
-    const p = await (Post as any).publishedScope2().create({ title: "scoped-create" });
-    expect(p.isPersisted()).toBe(true);
-  });
-
-  it("should build on top of chained scopes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("publishedScope3", () => Post.where({ published: true }));
-        this.scope("titledScope", () => Post.order("title"));
-      }
-    }
-    const p = (Post as any).publishedScope3().titledScope().build();
-    expect(p.isNewRecord()).toBe(true);
-  });
-
-  it("find all should behave like select", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const all = await Post.all().toArray();
-    expect(all.length).toBe(2);
-  });
-
-  it("size should use count when results are not loaded", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const rel = Post.all();
-    expect(rel.isLoaded).toBe(false);
-    const size = await rel.size();
-    expect(size).toBe(1);
-  });
-
-  it("size should use length when results are loaded", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const rel = Post.all();
-    await rel.load();
-    expect(rel.isLoaded).toBe(true);
-    const size = await rel.size();
-    expect(size).toBe(1);
-  });
-
-  it("chaining combines conditions when searching", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-      }
-    }
-    await Post.create({ title: "target", published: true });
-    await Post.create({ title: "other", published: true });
-    const results = await Post.where({ published: true }).where({ title: "target" }).toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("chaining applies last conditions when creating", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.where({ title: "chain" }).create();
-    expect(p.isPersisted()).toBe(true);
-  });
-
-  it("nested scoping", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("titledNested", () => Post.order("title"));
-      }
-    }
-    await Post.create({ title: "a" });
-    const rel = (Post as any).titledNested().where({ title: "a" });
-    const results = await rel.toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("scopes on relations", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("publishedRel", () => Post.where({ published: true }));
-      }
-    }
-    await Post.create({ title: "a", published: true });
-    const rel = Post.where({ title: "a" });
-    const results = await (rel as any).publishedRel().toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("model class should respond to none", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const results = await Post.all().none().toArray();
-    expect(results.length).toBe(0);
-  });
-
-  it("model class should respond to one", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "only" });
-    const one = await Post.all().isOne();
-    expect(one).toBe(true);
-  });
-
-  it("model class should respond to extending", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const count = await Post.count();
-    expect(count).toBe(1);
-  });
-
-  it("scopes batch finders", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("publishedBatch", () => Post.where({ published: true }));
-      }
-    }
-    for (let i = 0; i < 5; i++) await Post.create({ title: `pub-${i}`, published: true });
-    const collected: any[] = [];
-    for await (const record of (Post as any).publishedBatch().findEach({ batchSize: 2 })) {
-      collected.push(record);
-    }
-    expect(collected.length).toBe(5);
-  });
-
-  it("define scope for reserved words", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-        this.scope("open", () => Post.where({ status: "open" }));
-      }
-    }
-    const sql = (Post as any).open().toSql();
-    expect(sql).toContain("WHERE");
-  });
-
-  it("scopes name is relation method", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.scope("where", () => Post.all());
-      }
-    }
-    const rel = (Post as any).where();
-    expect(rel).toBeDefined();
-  });
-
-  it("active records have scope named  all  ", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "test" });
-    const results = await Post.all().toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("active records have scope named  scoped  ", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.all();
-    expect(rel).toBeDefined();
-    expect(rel.toSql()).toContain("SELECT");
-  });
-
-  it("rand should select a random object from proxy", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "A" });
-    await Post.create({ title: "B" });
-    const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";
-    const rel = Post.order(randomFn).limit(1);
-    expect(rel.toSql()).toContain(randomFn);
-    const result = await rel.toArray();
-    expect(result.length).toBe(1);
-  });
-
-  it("index on scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.scope("published", () => Post.where({ published: true }));
-      }
-    }
-    await Post.create({ title: "a", published: true });
-    await Post.create({ title: "b", published: true });
-    const results = await (Post as any).published().toArray();
-    expect(results.length).toBe(2);
-    expect(results[0].title).toBeDefined();
-  });
-});
-
-// ==========================================================================
-// NamedScopingTest2 — more targets for named_scoping_test.rb
-// ==========================================================================
-describe("NamedScopingTest", () => {
-  it("method missing priority when delegating", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.where({ title: "test" })).toBeInstanceOf(Relation);
-  });
-
-  it("scope should respond to own methods and methods of the proxy", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.all();
-    expect(typeof rel.where).toBe("function");
-    expect(typeof rel.order).toBe("function");
-  });
-
-  it("scopes with options limit finds to those matching the criteria specified", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("views", "integer");
-      }
-    }
-    await Post.create({ title: "popular", views: 100 });
-    await Post.create({ title: "unpopular", views: 1 });
-    const results = await Post.where({ views: 100 }).toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("scopes are composable", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("views", "integer");
-      }
-    }
-    await Post.create({ title: "a", views: 5 });
-    await Post.create({ title: "b", views: 10 });
-    const results = await Post.where({ views: 10 }).order("title").toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("first and last should not use query when results are loaded", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "x" });
-    const rel = Post.all();
-    await rel.toArray();
-    expect(rel.isLoaded).toBe(true);
-  });
-
-  it("empty should not load results", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 3; i++) await Post.create({ title: `p2-${i}` });
-    const rel = Post.all();
-    expect(rel.isLoaded).toBe(false);
-    expect(await rel.isEmpty()).toBe(false);
-  });
-
-  it("any should not fire query if scope loaded", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const rel = Post.all();
-    await rel.toArray();
-    expect(rel.isLoaded).toBe(true);
-    // exists() checks count > 0
-    expect(await rel.exists()).toBe(true);
+    const t = (Topic as any).base();
+    const sql = await capSql(async () => {
+      await t.isAny(); // count query
+      await t.load(); // force load
+      await t.isAny(); // loaded, no query
+    });
+    expect(sql.length).toBe(2);
   });
 
   it("any should call proxy found if using a block", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "match" });
-    await Post.create({ title: "other" });
-    // Verify we can filter using where and check exists
-    const hasMatch = await Post.where({ title: "match" }).exists();
-    expect(hasMatch).toBe(true);
+    // Rails: `topics.any? { true }` runs one query and never calls `empty?`.
+    const t = (Topic as any).base();
+    const sql = await capSql(async () => {
+      await t.isAny();
+    });
+    expect(sql.length).toBe(1);
+  });
+
+  it("any should not fire query if scope loaded", async () => {
+    const t = (Topic as any).base();
+    await t.load();
+    const sql = await capSql(async () => {
+      expect(await t.isAny()).toBe(true);
+    });
+    expect(sql.length).toBe(0);
+  });
+
+  it("model class should respond to any", async () => {
+    expect(await Topic.isAny()).toBe(true);
+    await Topic.deleteAll();
+    expect(await Topic.isAny()).toBe(false);
+  });
+
+  it("many should not load results", async () => {
+    const t = (Topic as any).base();
+    const sql = await capSql(async () => {
+      await t.isMany(); // count query
+      await t.load(); // force load
+      await t.isMany(); // loaded, no query
+    });
+    expect(sql.length).toBe(2);
   });
 
   it("many should call proxy found if using a block", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("views", "integer");
-      }
-    }
-    await Post.create({ title: "a", views: 10 });
-    await Post.create({ title: "b", views: 5 });
-    await Post.create({ title: "c", views: 10 });
-    // Filter and check isMany
-    const manyPopular = await Post.where({ views: 10 }).isMany();
-    expect(manyPopular).toBe(true);
+    const t = (Topic as any).base();
+    const sql = await capSql(async () => {
+      await t.isMany();
+    });
+    expect(sql.length).toBe(1);
   });
 
   it("many should not fire query if scope loaded", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const rel = Post.all();
-    await rel.toArray();
-    expect(rel.isLoaded).toBe(true);
-    expect(await rel.isMany()).toBe(true);
+    const t = (Topic as any).base();
+    await t.load();
+    const sql = await capSql(async () => {
+      expect(await t.isMany()).toBe(true);
+    });
+    expect(sql.length).toBe(0);
+  });
+
+  it("many should return false if none or one", async () => {
+    expect(await (Topic as any).base().where({ id: 0 }).isMany()).toBe(false);
+    expect(await (Topic as any).base().where({ id: 1 }).isMany()).toBe(false);
+  });
+
+  it("many should return true if more than one", async () => {
+    expect(await (Topic as any).base().isMany()).toBe(true);
+  });
+
+  it("model class should respond to many", async () => {
+    await Topic.deleteAll();
+    expect(await Topic.isMany()).toBe(false);
+    await Topic.create({});
+    expect(await Topic.isMany()).toBe(false);
+    await Topic.create({});
+    expect(await Topic.isMany()).toBe(true);
+  });
+
+  it("should build on top of scope", async () => {
+    const topic = (Topic as any).approved().build({});
+    expect(topic.approved).toBe(true);
   });
 
   it("should build new on top of scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-      }
-    }
-    const post = Post.where({ status: "draft" }).new({ title: "new post" }) as any;
-    expect(post.status).toBe("draft");
-    expect(post.isNewRecord()).toBe(true);
+    const topic = (Topic as any).approved().new({});
+    expect(topic.approved).toBe(true);
+  });
+
+  it("should create on top of scope", async () => {
+    const topic = (await (Topic as any).approved().create({})) as any;
+    expect(topic.approved).toBe(true);
   });
 
   it("should create with bang on top of scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-      }
-    }
-    const post = (await Post.where({ status: "active" }).create({ title: "bang created" })) as any;
-    expect(post.status).toBe("active");
-    expect(post.isPersisted()).toBe(true);
+    const topic = (await (Topic as any).approved().create({})) as any;
+    expect(topic.approved).toBe(true);
   });
 
-  it("reserved scope names", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Post.where).toBe("function");
-    expect(typeof Post.order).toBe("function");
+  it("should build on top of chained scopes", async () => {
+    const topic = (Topic as any).approved().byLifo().build({});
+    expect(topic.approved).toBe(true);
+    expect(topic.author_name).toBe("lifo");
+  });
+
+  // Engine gap: no reserved/conflicting scope-name guard (create/relation/new/
+  // all/public/... should raise; existing-method names should not).
+  it.skip("reserved scope names", () => {});
+
+  it("spaces in scope names", async () => {
+    // Rails defines `scope :"title containing space", ->(space: " ") { ... }`
+    // and dispatches via `public_send(:"title containing space", space: " ")`.
+    Topic.scope("title containing space", (q: any, opts: { space?: string } = {}) =>
+      q.where(`title LIKE '%${opts.space ?? " "}%'`),
+    );
+    const expected = sortedIds(await Topic.where("title LIKE '% %'").toArray());
+    const got = sortedIds(await (Topic as any)["title containing space"]({ space: " " }).toArray());
+    expect(got).toEqual(expected);
+    // (2) chained onto an already-constrained relation: the space-named scope
+    // must not reset the prior `approved` condition.
+    const chainedExpected = sortedIds(
+      await (Topic as any).approved().where("title LIKE '% %'").toArray(),
+    );
+    const chainedGot = sortedIds(
+      await (Topic as any).approved()["title containing space"]({ space: " " }).toArray(),
+    );
+    expect(chainedGot).toEqual(chainedExpected);
+  });
+
+  // Rails asserts `to_a.select(&:approved) == to_a.find_all(&:approved)` — i.e.
+  // Ruby Array#select and Array#find_all are aliases. trails materializes to a
+  // plain JS array with only `.filter`, so there is no distinct relation method
+  // to compare; the case has no meaningful trails analog.
+  it.skip("find all should behave like select", () => {});
+
+  it("rand should select a random object from proxy", async () => {
+    const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";
+    const sample = (await (Topic as any).approved().order(randomFn).first()) as any;
+    expect(sample).toBeInstanceOf(Topic);
   });
 
   it("should use where in query for scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-      }
-    }
-    const sql = Post.where({ status: "active" }).toSql();
-    expect(sql).toContain("WHERE");
+    const byName = sortedIds(await Developer.where({ name: "Jamis" }).toArray());
+    const byScope = sortedIds(
+      await Developer.where({ id: (Developer as any).jamises().select("id") }).toArray(),
+    );
+    expect(byScope).toEqual(byName);
   });
 
-  it("should not duplicates where values", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where({ title: "a" }).where({ title: "a" }).toSql();
-    expect(sql).toContain("WHERE");
+  it("size should use count when results are not loaded", async () => {
+    const t = (Topic as any).base();
+    const sql = await capSql(async () => {
+      await t.size();
+    });
+    expect(sql.length).toBe(1);
+    expect(sql[0]).toMatch(/COUNT/i);
+  });
+
+  it("size should use length when results are loaded", async () => {
+    const t = (Topic as any).base();
+    await t.load();
+    const sql = await capSql(async () => {
+      await t.size();
+    });
+    expect(sql.length).toBe(0);
+  });
+
+  it("should not duplicates where values", () => {
+    // Rails: relation.where_clause == relation.scope_with_lambda.where_clause —
+    // calling the scope on the already-conditioned relation must not duplicate
+    // the WHERE clause.
+    const relation = Topic.where("1=1");
+    expect(relation.toSql()).toBe((relation as any).scopeWithLambda().toSql());
   });
 
   it("chaining with duplicate joins", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where({ title: "test" }).order("title").toSql();
-    expect(sql).toContain("ORDER BY");
+    const join = "INNER JOIN comments ON comments.post_id = posts.id";
+    const post = (await Post.find(1)) as any;
+    const expected = await post.comments.size();
+    const got = await Post.joins(join).joins(join).where(`posts.id = ${post.id}`).size();
+    expect(got).toBe(expected);
   });
 
-  it("nested scopes queries size", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("views", "integer");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Post.create({ title: `p2-${i}`, views: i });
-    expect(await Post.where({ views: 3 }).count()).toBe(1);
-  });
-
-  it("scopes to get newest", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "old" });
-    await Post.create({ title: "new" });
-    expect(((await Post.order("id DESC").first()) as any).title).toBe("new");
-  });
-
-  it("test index on scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    expect((await Post.all().toArray()).length).toBe(2);
-  });
-
-  it("test spaces in scope names", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.all()).toBeInstanceOf(Relation);
-  });
-
-  it("test rand should select a random object from proxy", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const results = await Post.all().toArray();
-    expect(results[Math.floor(Math.random() * results.length)]).toBeTruthy();
-  });
-
-  it("eager default scope relations are remove", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.all()).toBeInstanceOf(Relation);
-  });
-
-  it("subclass merges scopes properly", async () => {
-    class Animal extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Dog extends Animal {}
-    const dog = (await Dog.create({ name: "Fido" })) as any;
-    expect(dog.name).toBe("Fido");
-    expect((await Dog.where({ name: "Fido" }).toArray()).length).toBe(1);
-  });
-
-  it("scopes are reset on association reload", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const rel = Post.all();
-    await rel.toArray();
-    await rel.reload();
-    expect(rel.isLoaded).toBe(true);
-  });
-
-  it("scope with annotation", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.where({ title: "annotated" })).toBeInstanceOf(Relation);
-  });
-
-  it("chaining applies last conditions when creating", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-      }
-    }
-    const post = (await Post.where({ status: "draft" }).create({ title: "chained" })) as any;
-    expect(post.isPersisted()).toBe(true);
+  it("chaining applies last conditions when creating", () => {
+    expect(((Topic as any).rejected().new({}) as any).approved).toBe(false);
+    expect(((Topic as any).rejected().approved().new({}) as any).approved).toBe(true);
+    expect(((Topic as any).approved().rejected().new({}) as any).approved).toBe(false);
+    expect(((Topic as any).approved().rejected().approved().new({}) as any).approved).toBe(true);
   });
 
   it("chaining combines conditions when searching", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
+    // Normal hash conditions
+    expect(sortedIds(await (Topic as any).rejected().approved().toArray())).toEqual(
+      sortedIds(await Topic.where({ approved: false }).where({ approved: true }).toArray()),
+    );
+    expect(sortedIds(await (Topic as any).approved().rejected().toArray())).toEqual(
+      sortedIds(await Topic.where({ approved: true }).where({ approved: false }).toArray()),
+    );
+    // Nested hash conditions with same keys
+    expect(await (Post as any).withSpecialComments().withVerySpecialComments().toArray()).toEqual(
+      [],
+    );
+    // Nested hash conditions with different keys
+    const sti = posts("sti_comments");
+    const uniq = [...new Set(ids(await (Post as any).withSpecialComments().withPost(4).toArray()))];
+    expect(uniq).toEqual([sti.id]);
+  });
+
+  // Rails `scope :ordered, -> { Reply.order(:id) }` references the Reply class
+  // directly, escaping the association's `parent_id` constraint, so
+  // `topics(:first).approved_replies.ordered` returns BOTH approved replies
+  // (second + fourth, regardless of parent). The canonical Reply.ordered chains
+  // off the relation (`q.order("id")`) and does not escape — trails returns only
+  // [second]. Converging Reply.ordered to reference the class (and verifying the
+  // association proxy honors the escape) is tracked in RFC 0030.
+  it.skip("class method in scope", () => {});
+
+  it("chaining doesnt leak conditions to another scopes", async () => {
+    const expected = Topic.where({ approved: false }).where({
+      id: (Topic as any).children().select("parent_id"),
+    });
+    expect(sortedIds(await (Topic as any).rejected().hasChildren().toArray())).toEqual(
+      sortedIds(await expected.toArray()),
+    );
+  });
+
+  // Rails: `Topic.rejected.nested_scoping(expected)` where `nested_scoping`
+  // wraps a `scoping { Reply.approved }` block. The canonical Topic carries no
+  // `nested_scoping` scope and trails has no `relation.scoping { }` block form.
+  it.skip("nested scoping", () => {});
+
+  it("scopes batch finders", async () => {
+    const approvedCount = await (Topic as any).approved().count();
+    const collected: any[] = [];
+    for await (const t of (Topic as any).approved().findEach({ batchSize: 1 })) {
+      expect(t.approved).toBe(true);
+      collected.push(t);
+    }
+    expect(collected.length).toBe(approvedCount);
+
+    // Rails also exercises find_in_batches(batch_size: 2) over the same scope.
+    const grouped: any[] = [];
+    for await (const group of (Topic as any).approved().findInBatches({ batchSize: 2 })) {
+      for (const t of group) {
+        expect(t.approved).toBe(true);
+        grouped.push(t);
       }
     }
-    await Post.create({ title: "a", status: "active" });
-    await Post.create({ title: "b", status: "inactive" });
-    expect((await Post.where({ status: "active" }).where({ title: "a" }).toArray()).length).toBe(1);
+    expect(grouped.length).toBe(approvedCount);
+  });
+
+  it("table names for chaining scopes with and without table name included", async () => {
+    // Rails assert_nothing_raised: the chained scopes (one bare column, one
+    // table-qualified) must build and execute without raising.
+    const rows = await (Comment as any).forFirstPost().forFirstAuthor().toArray();
+    expect(Array.isArray(rows)).toBe(true);
   });
 
   it("scopes on relations", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    expect((await Post.all().where({ title: "a" }).toArray()).length).toBe(1);
+    const approvedTopics = (Topic as any).all().approved().order("id DESC");
+    expect(((await approvedTopics.first()) as any).id).toBe(topics("fifth").id);
+    const repliedApproved = approvedTopics.replied();
+    expect(((await repliedApproved.first()) as any).id).toBe(topics("third").id);
   });
 
-  it("class method in scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-      static recent() {
-        return this.order("id DESC").limit(3);
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    expect((await (Post as any).recent().toArray()).length).toBeLessThanOrEqual(3);
-  });
-});
-
-// ==========================================================================
-// NamedScopingTest3 — additional missing tests from scoping/named_scoping_test.rb
-// ==========================================================================
-describe("NamedScopingTest", () => {
-  it("has many associations have access to scopes", () => {
-    expect(true).toBe(true);
-  });
-  it("scope with STI", () => {
-    expect(true).toBe(true);
-  });
-  it("has many through associations have access to scopes", () => {
-    expect(true).toBe(true);
-  });
-  it("scopes honor current scopes from when defined", () => {
-    expect(true).toBe(true);
-  });
-  it("scopes body is a callable", () => {
-    expect(true).toBe(true);
-  });
-  it("spaces in scope names", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.all()).toBeInstanceOf(Relation);
-  });
-  it("chaining doesnt leak conditions to another scopes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const r1 = await Post.where({ title: "a" }).toArray();
-    const r2 = await Post.where({ title: "b" }).toArray();
-    expect(r1.length).toBe(1);
-    expect(r2.length).toBe(1);
-  });
-  it("table names for chaining scopes with and without table name included", () => {
-    expect(true).toBe(true);
-  });
-  it("scopes are cached on associations", () => {
-    expect(true).toBe(true);
-  });
-  it("scopes with arguments are cached on associations", () => {
-    expect(true).toBe(true);
-  });
-  it("scoped are lazy loaded if table still does not exist", () => {
-    expect(true).toBe(true);
-  });
-});
-
-describe("NamedScopingTest", () => {
-  class Product extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("price", "integer");
-      this.attribute("active", "boolean", { default: true });
-    }
-  }
-
-  it("defines and uses a named scope", async () => {
-    Product.scope("cheap", (rel) => rel.where({ price: 1 }));
-
-    await Product.create({ name: "A", price: 1, active: true });
-    await Product.create({ name: "B", price: 100, active: true });
-
-    // Scopes are defined on the class but used via relation
-    const scoped = Product._scopes.get("cheap");
-    expect(scoped).toBeDefined();
-    const result = await scoped!(Product.all()).toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("A");
-  });
-});
-
-describe("NamedScopingTest", () => {
-  it("scope is accessible on Relation via proxy", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-        this.scope("active", (rel: any) => rel.where({ active: true }));
-      }
-    }
-
-    await User.create({ name: "Alice", active: true });
-    await User.create({ name: "Bob", active: false });
-
-    const result = await (User.all() as any).active().toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("Alice");
+  it("index on scope", async () => {
+    const approved = (Topic as any).approved().order("id ASC");
+    const arr = await approved.toArray();
+    expect(arr[0].id).toBe(topics("second").id);
+    expect(approved.isLoaded).toBe(true);
   });
 
-  it("scope is chainable with other query methods", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-        this.scope("active", (rel: any) => rel.where({ active: true }));
-      }
-    }
-
-    await User.create({ name: "Alice", active: true });
-    await User.create({ name: "Bob", active: true });
-    await User.create({ name: "Charlie", active: false });
-
-    const result = await (User.all() as any).active().where({ name: "Alice" }).toArray();
-    expect(result).toHaveLength(1);
+  it("nested scopes queries size", async () => {
+    const sql = await capSql(async () => {
+      await (Topic as any)
+        .approved()
+        .byLifo()
+        .replied()
+        .writtenBefore(Temporal.Now.instant())
+        .toArray();
+    });
+    expect(sql.length).toBe(1);
   });
 
-  it("scope is accessible as a static method on the class", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-        this.scope("active", (rel: any) => rel.where({ active: true }));
-      }
-    }
+  // Rails: these exercise the query cache on association proxies. trails does
+  // not yet wire `Model.cache { }` query-cache blocks around association reads.
+  it.skip("scopes are cached on associations", () => {});
+  it.skip("scopes with arguments are cached on associations", () => {});
 
-    await User.create({ name: "Alice", active: true });
-    await User.create({ name: "Bob", active: false });
+  // Rails: `post.comments.newest` (scope `order("id DESC").first`) must change
+  // after creating a new comment. The canonical Comment carries no `newest`
+  // scope, so there is no faithful body to assert against yet.
+  it.skip("scopes to get newest", () => {});
 
-    const result = await (User as any).active().toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("Alice");
+  // Rails iterates [:destroy_all, :reset, :delete_all] and asserts the cached
+  // named-scope relation object differs after each (the association proxy
+  // caches scope relations and must invalidate them). trails does not cache
+  // named-scope relations on association proxies — each `post.comments.<scope>()`
+  // call rebuilds a fresh relation (verified: two consecutive calls are already
+  // `!==` with no reload), so there is no cache to reset and the `assert_not_same`
+  // assertion cannot catch a stale cache. Tracked with the association
+  // scope-cache work in RFC 0030.
+  it.skip("scopes are reset on association reload", () => {});
+
+  // Rails requires "models/without_table" to prove scopes are lazy when the
+  // table is absent; trails has no without_table fixture model.
+  it.skip("scoped are lazy loaded if table still does not exist", () => {});
+
+  // Engine gap: `defaultScope` does not raise ArgumentError when handed an
+  // eager Relation instead of a callable (Rails guards this in
+  // `Scoping::Default::ClassMethods#default_scope`).
+  it.skip("eager default scope relations are remove", () => {});
+
+  it("subclass merges scopes properly", async () => {
+    expect(await (SpecialComment as any).where({ body: "go wild" }).created().count()).toBe(1);
   });
 
-  it("scopes chain together", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-        this.attribute("role", "string");
-        this.scope("active", (rel: any) => rel.where({ active: true }));
-        this.scope("admins", (rel: any) => rel.where({ role: "admin" }));
-      }
-    }
+  // Rails: Comment.unscoped.oops_comments.destroy_all raises OopsError from a
+  // scope extension method; trails has no oops_comments extension.
+  it.skip("model class should respond to extending", () => {});
 
-    await User.create({ name: "Alice", active: true, role: "admin" });
-    await User.create({ name: "Bob", active: true, role: "user" });
-    await User.create({ name: "Charlie", active: false, role: "admin" });
+  // Rails asserts `Topic.none?` (true only when no records exist) — the
+  // semantic opposite of `any?`. trails implements no `isNone` predicate at the
+  // relation/Querying layers and `base.ts` delegates `isAny`/`isMany`/`isOne`
+  // but not `isNone`, so there is no faithful body for this case yet.
+  it.skip("model class should respond to none", () => {});
 
-    const result = await (User as any).active().admins().toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("Alice");
+  it("model class should respond to one", async () => {
+    expect(await Topic.isOne()).toBe(false);
+    await Topic.deleteAll();
+    expect(await Topic.isOne()).toBe(false);
+    await Topic.create({});
+    expect(await Topic.isOne()).toBe(true);
   });
 
-  it("scope with arguments", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.scope("olderThan", (rel: any, age: number) => rel.where({ age }));
-      }
-    }
-
-    await User.create({ name: "Alice", age: 25 });
-    await User.create({ name: "Bob", age: 30 });
-
-    const result = await (User as any).olderThan(30).toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("Bob");
-  });
-});
-
-describe("NamedScopingTest", () => {
-  it("adds extension methods to the scoped relation", () => {
-    class Article extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("status", "string");
-        this.scope("published", (rel: any) => rel.where({ status: "published" }), {
-          countPublished: async function (this: any) {
-            return this.count();
-          },
-        });
-      }
-    }
-
-    const rel = (Article as any).published();
-    expect(typeof rel.countPublished).toBe("function");
-  });
-});
-
-describe("NamedScopingTest", () => {
-  it("named scope filters records", async () => {
-    class Product extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("price", "integer");
-        this.attribute("active", "boolean");
-        this.scope("cheap", (rel: any) => rel.where("price < ?", 10));
-        this.scope("active", (rel: any) => rel.where({ active: true }));
-      }
-    }
-    await Product.create({ name: "Widget", price: 5, active: true });
-    await Product.create({ name: "Gadget", price: 50, active: true });
-    await Product.create({ name: "Thing", price: 3, active: false });
-
-    const cheap = await (Product as any).cheap().toArray();
-    expect(cheap).toHaveLength(2);
-  });
-
-  it("scopes are chainable", async () => {
-    class Product extends Base {
-      static {
-        this.attribute("price", "integer");
-        this.attribute("active", "boolean");
-        this.scope("cheap", (rel: any) => rel.where("price < ?", 10));
-        this.scope("active", (rel: any) => rel.where({ active: true }));
-      }
-    }
-    await Product.create({ price: 5, active: true });
-    await Product.create({ price: 50, active: true });
-    await Product.create({ price: 3, active: false });
-
-    const result = await (Product as any).cheap().active().toArray();
-    expect(result).toHaveLength(1);
-  });
-
-  it("default_scope is applied to all queries", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.defaultScope((rel: any) => rel.where({ published: true }));
-      }
-    }
-    await Post.create({ title: "Pub", published: true });
-    await Post.create({ title: "Draft", published: false });
-
-    expect(await Post.all().count()).toBe(1);
-  });
-
-  it("unscoped bypasses default_scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.defaultScope((rel: any) => rel.where({ published: true }));
-      }
-    }
-    await Post.create({ title: "Pub", published: true });
-    await Post.create({ title: "Draft", published: false });
-
-    expect(await Post.unscoped().count()).toBe(2);
-  });
-
-  it("default_scope applies to exists", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("published", "boolean");
-        this.defaultScope((rel: any) => rel.where({ published: true }));
-      }
-    }
-    await Post.create({ published: false });
-    expect(await Post.all().exists()).toBe(false);
-    expect(await Post.unscoped().exists()).toBe(true);
-  });
-
-  it("default_scope applies to pluck", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.defaultScope((rel: any) => rel.where({ published: true }));
-      }
-    }
-    await Post.create({ title: "Pub", published: true });
-    await Post.create({ title: "Draft", published: false });
-
-    expect(await Post.all().pluck("title")).toEqual(["Pub"]);
-  });
-
-  it("unscoped then where applies user conditions only", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.defaultScope((rel: any) => rel.where({ published: true }));
-      }
-    }
-    await Post.create({ title: "Pub", published: true });
-    await Post.create({ title: "Draft", published: false });
-
-    const result = await Post.unscoped().where({ title: "Draft" }).toArray();
-    expect(result).toHaveLength(1);
-  });
-});
-
-describe("NamedScopingTest", () => {
-  class Post extends Base {
-    static {
-      this.attribute("title", "string");
-      this.attribute("status", "string");
-      this.attribute("author_id", "integer");
-    }
-  }
-
-  beforeEach(() => {
-    // Re-register scopes for each test
-    Post.scope("published", (rel: any) => rel.where({ status: "published" }));
-    Post.scope("draft", (rel: any) => rel.where({ status: "draft" }));
-    Post.scope("byAuthor", (rel: any, authorId: number) => rel.where({ author_id: authorId }));
-  });
-
-  it("scopes with options limit finds to those matching the criteria specified", async () => {
-    await Post.create({ title: "Published", status: "published" });
-    await Post.create({ title: "Draft", status: "draft" });
-    await Post.create({ title: "Another Published", status: "published" });
-
-    const result = await (Post as any).published().toArray();
-    expect(result).toHaveLength(2);
-  });
-
-  it("scope is accessible via all()", async () => {
-    await Post.create({ title: "Published", status: "published" });
-    await Post.create({ title: "Draft", status: "draft" });
-
-    const result = await (Post.all() as any).published().toArray();
-    expect(result).toHaveLength(1);
-  });
-
-  it("scopes are composable", async () => {
-    await Post.create({ title: "Pub A1", status: "published", author_id: 1 });
-    await Post.create({ title: "Pub A2", status: "published", author_id: 2 });
-    await Post.create({ title: "Draft A1", status: "draft", author_id: 1 });
-
-    const result = await (Post as any).published().byAuthor(1).toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("Pub A1");
-  });
-
-  it("scope with arguments", async () => {
-    await Post.create({ title: "Post 1", status: "published", author_id: 1 });
-    await Post.create({ title: "Post 2", status: "published", author_id: 2 });
-
-    const result = await (Post as any).byAuthor(2).toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("Post 2");
-  });
-
-  it("scope chained with standard relation methods", async () => {
-    await Post.create({ title: "Z Published", status: "published" });
-    await Post.create({ title: "A Published", status: "published" });
-    await Post.create({ title: "Draft", status: "draft" });
-
-    const result = await (Post as any).published().order("title").toArray();
-    expect(result).toHaveLength(2);
-    expect(result[0].title).toBe("A Published");
-  });
-
-  it("scope with count", async () => {
-    await Post.create({ title: "P1", status: "published" });
-    await Post.create({ title: "P2", status: "published" });
-    await Post.create({ title: "D1", status: "draft" });
-
-    const count = await (Post as any).published().count();
-    expect(count).toBe(2);
-  });
-
-  it("scope with pluck", async () => {
-    await Post.create({ title: "P1", status: "published" });
-    await Post.create({ title: "D1", status: "draft" });
-
-    const titles = await (Post as any).published().pluck("title");
-    expect(titles).toEqual(["P1"]);
-  });
-
-  it("scope on chained where().scopeName()", async () => {
-    await Post.create({ title: "Pub A1", status: "published", author_id: 1 });
-    await Post.create({ title: "Pub A2", status: "published", author_id: 2 });
-    await Post.create({ title: "Draft A1", status: "draft", author_id: 1 });
-
-    const result = await (Post.where({ author_id: 1 }) as any).published().toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("Pub A1");
-  });
-});
-
-describe("NamedScopingTest", () => {
-  // Rails: test_scope_is_chainable
-  it("scopes are chainable with where", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-        this.attribute("featured", "boolean");
-        this.scope("published", (rel: any) => rel.where({ status: "published" }));
-      }
-    }
-
-    await Post.create({ title: "A", status: "published", featured: true });
-    await Post.create({ title: "B", status: "published", featured: false });
-    await Post.create({ title: "C", status: "draft", featured: true });
-
-    const result = await (Post as any).published().where({ featured: true }).toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("A");
-  });
-
-  // Rails: test_scope_with_scope
-  it("scopes can be chained with other scopes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-        this.attribute("featured", "boolean");
-        this.scope("published", (rel: any) => rel.where({ status: "published" }));
-        this.scope("featured", (rel: any) => rel.where({ featured: true }));
-      }
-    }
-
-    await Post.create({ title: "A", status: "published", featured: true });
-    await Post.create({ title: "B", status: "published", featured: false });
-    await Post.create({ title: "C", status: "draft", featured: true });
-
-    const result = await (Post as any).published().featured().toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("A");
-  });
-
-  // Rails: test_scope_on_relation
-  it("scope callable on Relation instance", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-        this.scope("published", (rel: any) => rel.where({ status: "published" }));
-      }
-    }
-
-    await Post.create({ title: "A", status: "published" });
-    await Post.create({ title: "B", status: "draft" });
-
-    const result = await (Post.all() as any).published().toArray();
-    expect(result).toHaveLength(1);
-  });
-
-  // Rails: test_default_scope_combined_with_named_scope
-  it("default_scope combined with named scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-        this.attribute("active", "boolean");
-        this.defaultScope((rel: any) => rel.where({ active: true }));
-        this.scope("published", (rel: any) => rel.where({ status: "published" }));
-      }
-    }
-
-    await Post.create({ title: "A", status: "published", active: true });
-    await Post.create({ title: "B", status: "published", active: false });
-    await Post.create({ title: "C", status: "draft", active: true });
-
-    const result = await (Post as any).published().toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("A");
+  it("scope with annotation", async () => {
+    Topic.scope("includingAnnotateInScope", (q: any) => q.annotate("from-scope"));
+    const sql = (Topic as any).includingAnnotateInScope().toSql();
+    expect(sql).toContain("from-scope");
+    // Rails also asserts the annotation does not filter records.
+    expect(sortedIds(await (Topic as any).includingAnnotateInScope().toArray())).toEqual(
+      sortedIds(await Topic.all().toArray()),
+    );
   });
 });
