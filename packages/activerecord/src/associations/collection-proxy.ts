@@ -1529,7 +1529,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // hasActiveCachedCounter can throw when referenced models are not yet
       // registered (e.g. inverseWhichUpdatesCounterCache calls c.klass).
     }
-    if (this._cachedAssociationIds() !== null || activeCachedCounter) {
+    // Rails empty? → size.zero?, and size returns @association_ids.length when
+    // a prior ids_reader cached them (no query). Only fall back to count_records
+    // when the size comes from a counter cache rather than cached ids.
+    const cachedIds = this._cachedAssociationIds();
+    if (cachedIds !== null) {
+      return cachedIds.length === 0;
+    }
+    if (activeCachedCounter) {
       return (await this._countRecords()) === 0;
     }
     return !(await this.exists());
