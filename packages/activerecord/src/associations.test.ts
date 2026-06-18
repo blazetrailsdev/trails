@@ -724,16 +724,22 @@ describe("PreloaderTest", () => {
   it("preload makes correct number of queries on array", async () => {
     const author = await Author.create({ name: "David" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    await new Preloader({ records: [post], associations: ["comments"] }).call();
-    expect((post as any)._preloadedAssociations.has("comments")).toBe(true);
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [post], associations: ["comments"] }).call();
+    });
+    expect(sqls).toHaveLength(1);
   });
 
   it("preload makes correct number of queries on relation", async () => {
     const author = await Author.create({ name: "David" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    const posts = await Post.where({ id: post.id }).includes("comments").toArray();
-    expect(posts).toHaveLength(1);
-    expect((posts[0] as any)._preloadedAssociations.has("comments")).toBe(true);
+    let posts: any[];
+    const sqls = await captureSql(async () => {
+      posts = await Post.where({ id: post.id }).includes("comments").toArray();
+    });
+    expect(posts!).toHaveLength(1);
+    expect((posts![0] as any)._preloadedAssociations.has("comments")).toBe(true);
+    expect(sqls).toHaveLength(2);
   });
 
   it("preload does not concatenate duplicate records", async () => {
@@ -764,9 +770,16 @@ describe("PreloaderTest", () => {
     const book = await Book.create({ author_id: author.id, name: "A Book" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({ records: [book, post], associations: ["author"] }).call();
-    // Both Book and Post have belongs_to :author with the same scope/key → coalesced into 1 batch call
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [book, post], associations: ["author"] }).call();
+    });
     expect(spy).toHaveBeenCalledTimes(1);
+    expect(sqls).toHaveLength(1);
+    const noQueriesAfter = await captureSql(async () => {
+      void (book as any)._preloadedAssociations.get("author");
+      void (post as any)._preloadedAssociations.get("author");
+    });
+    expect(noQueriesAfter).toHaveLength(0);
     expect((book as any)._preloadedAssociations.get("author").id).toBe(author.id);
     expect((post as any)._preloadedAssociations.get("author").id).toBe(author.id);
   });
@@ -775,14 +788,16 @@ describe("PreloaderTest", () => {
     const author = await Author.create({ name: "David" });
     const book = await Book.create({ author_id: author.id, name: "A Book" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    // Pre-load book's author; book and post share the same author_id
     const bookLoaded = (await Book.where({ id: book.id }).includes("author").toArray())[0]!;
     const postFresh = (await Post.where({ id: post.id }).toArray())[0]!;
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({ records: [bookLoaded, postFresh], associations: ["author"] }).call();
-    // book's author already in association cache; post shares the same author_id →
-    // loadRecordsForKeys called with 0 keys (already-loaded map covers the shared id)
-    expect(spy.mock.calls[0]?.[0]).toHaveLength(0);
+    // book's author already loaded; post shares the same author_id →
+    // the Preloader finds the key in alreadyLoadedByKey and issues 0 DB queries
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [bookLoaded, postFresh], associations: ["author"] }).call();
+      void (bookLoaded as any)._preloadedAssociations.get("author");
+      void (postFresh as any)._preloadedAssociations.get("author");
+    });
+    expect(sqls).toHaveLength(0);
     expect((bookLoaded as any)._preloadedAssociations.get("author").id).toBe(author.id);
     expect((postFresh as any)._preloadedAssociations.get("author").id).toBe(author.id);
   });
