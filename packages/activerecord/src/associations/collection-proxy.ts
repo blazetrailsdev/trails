@@ -2070,13 +2070,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true))
         return [];
     }
-    const removed: Base[] = [];
-    // Split persisted vs new-record. New-record children have no DB row —
-    // just remove from in-memory target. Persisted children are nullified via
-    // update_all (Rails delete_records else-branch), which bypasses validations
-    // and callbacks — matching Rails' has_many nullify semantics.
+    // Persisted children are nullified via update_all (Rails delete_records
+    // else-branch), bypassing validations/callbacks. New-record children have
+    // no DB row — skip the DB call.
     const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
-    const newRecords = modelRecords.filter((r) => r.isNewRecord());
     if (persistedRecords.length > 0) {
       const nullUpdates = this._buildNullifyUpdates();
       const childPk = ((this as any)._modelClass as typeof Base).primaryKey as string | string[];
@@ -2097,16 +2094,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         for (const [col, val] of Object.entries(nullUpdates)) {
           record._writeAttribute(col, val);
         }
-        removed.push(record);
-        fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
       }
     }
-    for (const record of newRecords) {
-      removed.push(record);
+    // Mirror Rails remove_records: remove from target first, then fire after_remove
+    // for all records (collection_association.rb#remove_records).
+    this._removeFromTarget(modelRecords as Base[]);
+    for (const record of modelRecords) {
       fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
     }
-    this._removeFromTarget(removed);
-    return removed;
+    return modelRecords as Base[];
   }
 
   private _removeFromTarget(records: Base[]): void {
