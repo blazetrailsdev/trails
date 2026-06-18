@@ -719,6 +719,14 @@ describe("AssociationsJoinModelTest", () => {
 
     const foo = await (postThinking as any).tags.createBang({ name: "foo" });
     expect(foo).toBeInstanceOf(Tag);
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[]).every((t) => t instanceof Tag),
+    ).toBe(true);
+    expect(
+      ((await (postThinking as any).taggings.toArray()) as Base[]).every(
+        (t) => t instanceof Tagging,
+      ),
+    ).toBe(true);
     await (postThinking as any).reload();
     expect(await (postThinking as any).tags.size()).toBe(count + 2);
 
@@ -726,6 +734,14 @@ describe("AssociationsJoinModelTest", () => {
       await Tag.createBang({ name: "abc" }),
       await Tag.createBang({ name: "def" }),
     );
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[]).every((t) => t instanceof Tag),
+    ).toBe(true);
+    expect(
+      ((await (postThinking as any).taggings.toArray()) as Base[]).every(
+        (t) => t instanceof Tagging,
+      ),
+    ).toBe(true);
     await (postThinking as any).reload();
     expect(await (postThinking as any).tags.size()).toBe(count + 4);
 
@@ -773,6 +789,11 @@ describe("AssociationsJoinModelTest", () => {
     expect(await (postThinking as any).taggings.size()).toBe(count + 1);
     await (postThinking as any).reload();
     expect(await (postThinking as any).tags.size()).toBe(count + 1);
+    expect(
+      ((await (postThinking as any).tags.toArray()) as Base[])
+        .map((t) => Number(t.id))
+        .sort((a, b) => a - b),
+    ).not.toEqual(tagsBefore);
 
     await (postThinking as any).tags.delete(tag);
     expect(await (postThinking as any).tags.size()).toBe(count);
