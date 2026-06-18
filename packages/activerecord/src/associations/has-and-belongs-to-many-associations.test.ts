@@ -92,32 +92,27 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("should property quote string primary keys", async () => {
-    const country = await Country.create({ country_id: "US", name: "United States" });
-    const treaty = await Treaty.create({ treaty_id: "NATO", name: "North Atlantic Treaty" });
-
+    const country = await Country.create({ country_id: "c1", name: "India" });
+    const treaty = await Treaty.create({ treaty_id: "t1", name: "peace" });
     await country.treaties.push(treaty);
 
-    const reloaded = await Country.find("US");
-    const treaties = await reloaded.treaties.toArray();
-    expect(treaties.length).toBe(1);
-    expect(treaties[0].treaty_id).toBe("NATO");
+    const con = Base.connection;
+    const rows = await con.selectRows("select * from countries_treaties");
+    const record = rows[rows.length - 1] as string[];
+    expect(record[0]).toBe("c1");
+    expect(record[1]).toBe("t1");
   });
 
   it("proper usage of primary keys and join table", async () => {
-    const country = await Country.create({ country_id: "CA", name: "Canada" });
-    const treaty1 = await Treaty.create({ treaty_id: "NAFTA", name: "North American Free Trade" });
-    const treaty2 = await Treaty.create({
-      treaty_id: "CUSMA",
-      name: "Canada United States Mexico",
-    });
+    const country = await Country.create({ country_id: "c1", name: "India" });
+    const treaty = await Treaty.create({ treaty_id: "t1", name: "peace" });
+    await country.treaties.push(treaty);
 
-    await country.treaties.push(treaty1);
-    await country.treaties.push(treaty2);
+    expect(Country.primaryKey).toBe("country_id");
+    expect(Treaty.primaryKey).toBe("treaty_id");
 
-    await country.treaties.reload();
-    const treaties = await country.treaties.toArray();
-    expect(treaties.length).toBe(2);
-    expect(treaties.map((t: Treaty) => t.treaty_id).sort()).toEqual(["CUSMA", "NAFTA"]);
+    const found = await Country.first();
+    expect(await found!.treaties.count()).toBe(1);
   });
 
   it("has and belongs to many", async () => {
