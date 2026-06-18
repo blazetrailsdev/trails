@@ -567,11 +567,13 @@ export function resolveCounterColumn(
       if (typeof belongsTo.options.counterCache === "string") {
         return belongsTo.options.counterCache;
       }
-      // Rails demodulizes the child model name before underscoring/pluralizing
-      // (Cpk::Book → Book → books_count). Trails class names are flat (CpkBook),
-      // so we use the hasMany association name instead, which matches the
-      // demodulized convention (assoc "books" → books_count).
-      return `${underscore(assoc.name)}_count`;
+      // Delegate to the belongs_to reflection's counterCacheColumn(), which
+      // handles flat class names (CpkBook → books_count) via inverse lookup.
+      const col = (childModel as any)
+        ._reflectOnAssociation?.(belongsTo.name)
+        ?.counterCacheColumn?.();
+      if (col) return col;
+      return `${pluralize(underscore(childModel.name))}_count`;
     }
   }
   return `${assoc.name}_count`;
