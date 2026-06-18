@@ -43,12 +43,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
-    // Rails only recognises :bigserial here because Rails createTable emits BIGSERIAL.
-    // TS createTable emits SERIAL (int4) for postgres (schema-definitions.ts), so both
-    // must be treated as "default" to suppress the id: option in dumps and keep
-    // round-trips consistent within the TS schema lifecycle.
-    const st = this.schemaType(column);
-    return st === "bigserial" || st === "serial";
+    // Rails: schema_type(column) == :bigserial. Now that createTable emits BIGSERIAL,
+    // only bigserial is the default — serial (int4) must be preserved explicitly.
+    return this.schemaType(column) === "bigserial";
   }
 
   /**
