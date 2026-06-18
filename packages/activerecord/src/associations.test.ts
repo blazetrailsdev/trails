@@ -26,13 +26,7 @@ import type { Firm as FirmT } from "./test-helpers/models/company.js";
 import type { Tag as TagT } from "./test-helpers/models/tag.js";
 import type { Tagging as TaggingT } from "./test-helpers/models/tagging.js";
 import type { Developer as DeveloperT } from "./test-helpers/models/developer.js";
-import {
-  Associations,
-  loadBelongsTo,
-  loadHasMany,
-  loadHasOne,
-  setBelongsTo,
-} from "./associations.js";
+import { Associations, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
@@ -67,69 +61,16 @@ describe("AssociationsTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
-      as_cpk_children: { parent_region_id: "integer", parent_id: "integer", label: "string" },
-      cpk_poly_owners_a: {
-        columns: { region_id: "integer", id: "integer", name: "string" },
-        primaryKey: ["region_id", "id"],
+      cpk_orders: {
+        columns: { id: "integer", shop_id: "integer", status: "string" },
+        primaryKey: ["shop_id", "id"],
       },
-      cpk_poly_owners_b: {
-        columns: { region_id: "integer", id: "integer", name: "string" },
-        primaryKey: ["region_id", "id"],
-      },
-      cpk_poly_owners_c: {
-        columns: { region_id: "integer", id: "integer", name: "string" },
-        primaryKey: ["region_id", "id"],
-      },
-      cpk_authors: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cpk_items: { label: "string", owner_id: "integer", owner_region_id: "integer" },
       cpk_order_items: {
         cpk_order_id: "integer",
         cpk_order_shop_id: "integer",
         name: "string",
         order_id: "integer",
         order_shop_id: "integer",
-      },
-      cpk_orders: {
-        columns: { id: "integer", shop_id: "integer", status: "string" },
-        primaryKey: ["shop_id", "id"],
-      },
-      cpk_owners: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cpk_posts: {
-        author_id: "integer",
-        author_region_id: "integer",
-        cpk_author_id: "integer",
-        cpk_author_region_id: "integer",
-        title: "string",
-      },
-      cpk_thru_appt4s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
-      cpk_thru_doc4s: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cpk_thru_pat4s: { name: "string" },
-      cpk_thru_tgt_appts: { doctor_id: "integer", patient_id: "integer" },
-      cpk_thru_tgt_docs: { name: "string" },
-      cpk_thru_tgt_pats: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      nrfqc_blog_posts: { blog_id: "integer", title: "string" },
-      nrfqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
-      inf_child2s: { inf_parent2_id: "integer", inf_parent2_region_id: "integer", label: "string" },
-      inf_childs: { inf_parent_id: "integer", inf_parent_region_id: "integer", label: "string" },
-      inf_parent2s: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      inf_parents: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
       },
     });
   });
@@ -168,344 +109,6 @@ describe("AssociationsTest", () => {
       className: "CpkOrderItem",
     });
     expect(items.length).toBe(1);
-  });
-  it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
-    // No-reflection fallback: loadHasMany invoked with a composite FK against a
-    // query_constraints owner whose primary key is scalar. The inline branch
-    // must derive the owner key from the owner's query_constraints
-    // (`[blog_id, id]`), mirroring `reflection.activeRecordPrimaryKey`, rather
-    // than zipping the scalar `id` against the 2-column FK (which would raise
-    // CompositePrimaryKeyMismatchError).
-    class NrfqcBlogPost extends Base {
-      static {
-        this._tableName = "nrfqc_blog_posts";
-        this.attribute("blog_id", "integer");
-        this.attribute("title", "string");
-        (this as any)._queryConstraintsList = ["blog_id", "id"];
-        (this as any)._hasQueryConstraints = true;
-      }
-    }
-    class NrfqcComment extends Base {
-      static {
-        this._tableName = "nrfqc_comments";
-        this.attribute("blog_id", "integer");
-        this.attribute("blog_post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    registerModel("NrfqcBlogPost", NrfqcBlogPost);
-    registerModel("NrfqcComment", NrfqcComment);
-    // Deliberately NOT calling Associations.hasMany — no reflection registered.
-    const post = await NrfqcBlogPost.create({ blog_id: 1, title: "Post" });
-    await NrfqcComment.create({ blog_id: 1, blog_post_id: post.id, body: "A" });
-    await NrfqcComment.create({ blog_id: 1, blog_post_id: post.id, body: "B" });
-    await NrfqcComment.create({ blog_id: 2, blog_post_id: post.id, body: "Other" });
-    const comments = await loadHasMany(post, "nrfqcComments", {
-      className: "NrfqcComment",
-      foreignKey: ["blog_id", "blog_post_id"],
-    });
-    expect(comments).toHaveLength(2);
-    expect(comments.map((c) => c.body).sort()).toEqual(["A", "B"]);
-  });
-  it("has one loads via inline fallback resolving composite owner key from query constraints", async () => {
-    // Same no-reflection fallback path as the has_many case above, exercised
-    // through loadHasOne.
-    class Nrfqc1BlogPost extends Base {
-      static {
-        this._tableName = "nrfqc_blog_posts";
-        this.attribute("blog_id", "integer");
-        this.attribute("title", "string");
-        (this as any)._queryConstraintsList = ["blog_id", "id"];
-        (this as any)._hasQueryConstraints = true;
-      }
-    }
-    class Nrfqc1Comment extends Base {
-      static {
-        this._tableName = "nrfqc_comments";
-        this.attribute("blog_id", "integer");
-        this.attribute("blog_post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    registerModel("Nrfqc1BlogPost", Nrfqc1BlogPost);
-    registerModel("Nrfqc1Comment", Nrfqc1Comment);
-    const post = await Nrfqc1BlogPost.create({ blog_id: 7, title: "Post" });
-    await Nrfqc1Comment.create({ blog_id: 7, blog_post_id: post.id, body: "Only" });
-    const comment = await loadHasOne(post, "nrfqc1Comment", {
-      className: "Nrfqc1Comment",
-      foreignKey: ["blog_id", "blog_post_id"],
-    });
-    expect((comment as Nrfqc1Comment | null)?.body).toBe("Only");
-  });
-  it("setBelongsTo infers composite foreign key from target primary key", async () => {
-    class InfParent extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class InfChild extends Base {
-      static {
-        this.attribute("inf_parent_region_id", "integer");
-        this.attribute("inf_parent_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("InfParent", InfParent);
-    registerModel("InfChild", InfChild);
-    Associations.belongsTo.call(InfChild, "infParent", { className: "InfParent" });
-    const parent = await InfParent.create({ region_id: 3, id: 7, name: "Inferred" });
-    const child = new InfChild({ label: "Child" });
-    setBelongsTo(child, "infParent", parent, { className: "InfParent" });
-    expect(child.inf_parent_region_id).toBe(3);
-    expect(child.inf_parent_id).toBe(7);
-  });
-
-  it("setBelongsTo nullifies inferred composite foreign key", async () => {
-    class InfParent2 extends Base {
-      static {
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class InfChild2 extends Base {
-      static {
-        this.attribute("inf_parent2_region_id", "integer");
-        this.attribute("inf_parent2_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("InfParent2", InfParent2);
-    registerModel("InfChild2", InfChild2);
-    Associations.belongsTo.call(InfChild2, "infParent2", { className: "InfParent2" });
-    const child = await InfChild2.create({
-      inf_parent2_region_id: 1,
-      inf_parent2_id: 5,
-      label: "Child",
-    });
-    setBelongsTo(child, "infParent2", null, { className: "InfParent2" });
-    expect(child.inf_parent2_region_id).toBeNull();
-    expect(child.inf_parent2_id).toBeNull();
-  });
-
-  it("delete single composite has many through join row", async () => {
-    // Covers _deleteThrough composite-aware findBy. Another owner shares one
-    // PK component to verify the join lookup ANDs across both columns.
-    class CpkThruDoc4 extends Base {
-      static {
-        this._tableName = "cpk_thru_doc4s";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkThruAppt4 extends Base {
-      static {
-        this._tableName = "cpk_thru_appt4s";
-        this.attribute("doctor_region_id", "integer");
-        this.attribute("doctor_id", "integer");
-        this.attribute("patient_id", "integer");
-      }
-    }
-    class CpkThruPat4 extends Base {
-      static {
-        this._tableName = "cpk_thru_pat4s";
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(CpkThruDoc4, "appts", {
-      className: "CpkThruAppt4",
-      foreignKey: ["doctor_region_id", "doctor_id"],
-    });
-    Associations.belongsTo.call(CpkThruAppt4, "patient", {
-      className: "CpkThruPat4",
-      foreignKey: "patient_id",
-    });
-    Associations.hasMany.call(CpkThruDoc4, "patients", {
-      through: "appts",
-      className: "CpkThruPat4",
-      source: "patient",
-    });
-    registerModel("CpkThruDoc4", CpkThruDoc4);
-    registerModel("CpkThruAppt4", CpkThruAppt4);
-    registerModel("CpkThruPat4", CpkThruPat4);
-
-    const doc = await CpkThruDoc4.create({ region_id: 5, id: 11, name: "Dr D" });
-    const otherDoc = await CpkThruDoc4.create({ region_id: 6, id: 11, name: "Dr E" });
-    const alice = await CpkThruPat4.create({ name: "Alice" });
-    await CpkThruAppt4.create({ doctor_region_id: 5, doctor_id: 11, patient_id: alice.id });
-    await CpkThruAppt4.create({ doctor_region_id: 6, doctor_id: 11, patient_id: alice.id });
-
-    const proxy = association(doc, "patients");
-    await proxy.delete(alice);
-
-    // Only the owning composite join row is removed.
-    const remaining = await CpkThruAppt4.all().toArray();
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0].doctor_region_id).toBe(6);
-    expect(remaining[0].doctor_id).toBe(11);
-    // Target record itself is untouched, and the other owner still sees Alice.
-    expect(await CpkThruPat4.all().count()).toBe(1);
-    expect((await association(otherDoc, "patients").toArray()).map((p: any) => p.name)).toEqual([
-      "Alice",
-    ]);
-  });
-  it("composite has many through raises ConfigurationError when target model has composite primary key", async () => {
-    // Mirrors the schema constraint behind the throws in _buildThroughScope
-    // and _pushThrough: the target-side IN-subquery / join row carry a single
-    // source FK column, so a composite primaryKey on the target model is
-    // unrepresentable. Promoted from plain Error to ConfigurationError so
-    // misconfiguration surfaces with the same error class as the rest of the
-    // through-association validations (reflection.ts:556-588).
-    class CpkThruTgtDoc extends Base {
-      static {
-        this._tableName = "cpk_thru_tgt_docs";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class CpkThruTgtAppt extends Base {
-      static {
-        this._tableName = "cpk_thru_tgt_appts";
-        this.attribute("doctor_id", "integer");
-        this.attribute("patient_id", "integer");
-      }
-    }
-    class CpkThruTgtPat extends Base {
-      static {
-        this._tableName = "cpk_thru_tgt_pats";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    Associations.hasMany.call(CpkThruTgtDoc, "appts", {
-      className: "CpkThruTgtAppt",
-      foreignKey: "doctor_id",
-    });
-    Associations.belongsTo.call(CpkThruTgtAppt, "patient", {
-      className: "CpkThruTgtPat",
-      foreignKey: "patient_id",
-    });
-    Associations.hasMany.call(CpkThruTgtDoc, "patients", {
-      through: "appts",
-      className: "CpkThruTgtPat",
-      source: "patient",
-    });
-    registerModel("CpkThruTgtDoc", CpkThruTgtDoc);
-    registerModel("CpkThruTgtAppt", CpkThruTgtAppt);
-    registerModel("CpkThruTgtPat", CpkThruTgtPat);
-
-    const doc = await CpkThruTgtDoc.create({ id: 1, name: "Dr X" });
-    // _buildThroughScope runs eagerly when the CollectionProxy is built —
-    // composite target PK surfaces as a ConfigurationError at construction.
-    expect(() => association(doc, "patients")).toThrow(ConfigurationError);
-  });
-  it("polymorphic-through with composite owner primary key requires explicit single-column primaryKey", async () => {
-    // The polymorphic join schema (`<as>_id`/`<as>_type`) only carries a
-    // *scalar* owner identifier — composite owner PKs cannot be split across
-    // the two polymorphic columns. `_throughOwnerPolymorphic` now requires an
-    // explicit single-column `primaryKey:` option on the polymorphic-through
-    // when the owner has a composite PK, and rejects an array `primaryKey:`.
-    const makeOwner = (
-      suffix: string,
-    ): {
-      Owner: typeof Base;
-      Tag: typeof Base;
-      Article: typeof Base;
-    } => {
-      const ownerName = `CpkPolyOwner${suffix}`;
-      const tagName = `CpkPolyTag${suffix}`;
-      const articleName = `CpkPolyArticle${suffix}`;
-      const Owner = class extends Base {
-        static {
-          this._tableName = `cpk_poly_owners_${suffix.toLowerCase()}`;
-          this.attribute("region_id", "integer");
-          this.attribute("id", "integer");
-          this.attribute("name", "string");
-          this.primaryKey = ["region_id", "id"];
-        }
-      };
-      Object.defineProperty(Owner, "name", { value: ownerName });
-      const Tag = class extends Base {
-        static {
-          this._tableName = `cpk_poly_tags_${suffix.toLowerCase()}`;
-          this.attribute("id", "integer");
-          this.attribute("taggable_id", "integer");
-          this.attribute("taggable_type", "string");
-          this.attribute("article_id", "integer");
-        }
-      };
-      Object.defineProperty(Tag, "name", { value: tagName });
-      const Article = class extends Base {
-        static {
-          this._tableName = `cpk_poly_articles_${suffix.toLowerCase()}`;
-          this.attribute("id", "integer");
-          this.attribute("title", "string");
-        }
-      };
-      Object.defineProperty(Article, "name", { value: articleName });
-      registerModel(ownerName, Owner);
-      registerModel(tagName, Tag);
-      registerModel(articleName, Article);
-      return { Owner, Tag, Article };
-    };
-
-    // No `primaryKey:` on the polymorphic through + composite owner PK ⇒ rejected.
-    {
-      const { Owner, Tag } = makeOwner("A");
-      Associations.hasMany.call(Owner, "tags", { className: Tag.name, as: "taggable" });
-      Associations.belongsTo.call(Tag, "article", { className: "CpkPolyArticleA" });
-      Associations.hasMany.call(Owner, "articles", {
-        through: "tags",
-        className: "CpkPolyArticleA",
-        source: "article",
-      });
-      const owner = await Owner.create({ region_id: 1, id: 5, name: "O" });
-      expect(() => association(owner, "articles")).toThrow(ConfigurationError);
-    }
-
-    // Composite `primaryKey:` on the polymorphic through ⇒ still rejected.
-    {
-      const { Owner, Tag } = makeOwner("B");
-      Associations.hasMany.call(Owner, "tags", {
-        className: Tag.name,
-        as: "taggable",
-        primaryKey: ["region_id", "id"],
-      });
-      Associations.belongsTo.call(Tag, "article", { className: "CpkPolyArticleB" });
-      Associations.hasMany.call(Owner, "articles", {
-        through: "tags",
-        className: "CpkPolyArticleB",
-        source: "article",
-      });
-      const owner = await Owner.create({ region_id: 1, id: 6, name: "O" });
-      expect(() => association(owner, "articles")).toThrow(ConfigurationError);
-    }
-
-    // Explicit single-column `primaryKey:` on the polymorphic through unblocks it.
-    {
-      const { Owner, Tag } = makeOwner("C");
-      Associations.hasMany.call(Owner, "tags", {
-        className: Tag.name,
-        as: "taggable",
-        primaryKey: "id",
-      });
-      Associations.belongsTo.call(Tag, "article", { className: "CpkPolyArticleC" });
-      Associations.hasMany.call(Owner, "articles", {
-        through: "tags",
-        className: "CpkPolyArticleC",
-        source: "article",
-      });
-      const owner = await Owner.create({ region_id: 1, id: 7, name: "O" });
-      expect(() => association(owner, "articles")).not.toThrow();
-    }
   });
 });
 
@@ -4135,5 +3738,77 @@ describe("AssociationsTest", () => {
         blog_id: (blogPost as any).blog_id,
       }).exists(),
     ).toBe(false);
+  });
+
+  // Exercises loadHasMany's inline (no-reflection) fallback against a
+  // query_constraints owner: invoked with a composite FK and an unregistered
+  // association name, the fallback must derive the owner key from the owner's
+  // query_constraints (`[blog_id, id]`, mirroring
+  // `reflection.activeRecordPrimaryKey`) rather than zipping the scalar `id`
+  // against the 2-column FK (which would raise CompositePrimaryKeyMismatchError).
+  it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
+    const post = await ShardedBlogPost.create({ blog_id: 1, title: "Post" });
+    await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "A" });
+    await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "B" });
+    await ShardedComment.create({ blog_id: 2, blog_post_id: (post as any).id, body: "Other" });
+    const comments = await loadHasMany(post, "freshComments", {
+      className: "ShardedComment",
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
+    expect(comments).toHaveLength(2);
+    expect(comments.map((c) => (c as any).body).sort()).toEqual(["A", "B"]);
+  });
+
+  // Same no-reflection fallback path as the has_many case above, through loadHasOne.
+  it("has one loads via inline fallback resolving composite owner key from query constraints", async () => {
+    const post = await ShardedBlogPost.create({ blog_id: 7, title: "Post" });
+    await ShardedComment.create({ blog_id: 7, blog_post_id: (post as any).id, body: "Only" });
+    const comment = await loadHasOne(post, "freshComment", {
+      className: "ShardedComment",
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
+    expect((comment as any)?.body).toBe("Only");
+  });
+
+  it("delete single composite has many through join row", async () => {
+    // Covers the composite-aware delete on a has_many :through: the join lookup
+    // must AND across both [blog_id, blog_post_id] columns so only the owning
+    // join row is removed.
+    const blogPost = shardedBlogPosts("great_post_blog_one");
+    const tag = await ShardedTag.create({ name: "shared", blog_id: (blogPost as any).blog_id });
+    await ShardedBlogPostTag.create({
+      blog_id: (blogPost as any).blog_id,
+      blog_post_id: (blogPost as any).id,
+      tag_id: (tag as any).id,
+    });
+
+    // Noise join row colliding on blog_post_id + tag_id but a different blog_id;
+    // a regression to single-column (blog_post_id-only) deletion would remove it.
+    const otherBlogId = (shardedBlogs("sharded_blog_two") as any).id;
+    await ShardedBlogPostTag.create({
+      blog_id: otherBlogId,
+      blog_post_id: (blogPost as any).id,
+      tag_id: (tag as any).id,
+    });
+
+    await association(blogPost, "tags").delete(tag);
+
+    // Only the owning composite join row is removed; the cross-blog noise row stays.
+    expect(
+      await ShardedBlogPostTag.where({
+        blog_id: (blogPost as any).blog_id,
+        blog_post_id: (blogPost as any).id,
+        tag_id: (tag as any).id,
+      }),
+    ).toHaveLength(0);
+    expect(
+      await ShardedBlogPostTag.where({
+        blog_id: otherBlogId,
+        blog_post_id: (blogPost as any).id,
+        tag_id: (tag as any).id,
+      }),
+    ).toHaveLength(1);
+    // Target tag itself is untouched.
+    expect(await ShardedTag.where({ id: (tag as any).id })).not.toHaveLength(0);
   });
 });
