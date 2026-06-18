@@ -246,6 +246,61 @@ describe("buildReport — novel vs moved classification", () => {
     expect(pkg.totalMoved).toBe(1);
   });
 
+  it("doesn't flag predicate-Q, column-DSL, value-method, or JS-protocol names as novel", () => {
+    // Rails foo.rb defines a `?` predicate; the column-type DSL, Relation
+    // value-method accessors, and JS-protocol methods are all generated /
+    // language-level and invisible to the static extractor.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("connected_to?"), method("bar")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            Foo: {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [
+                method("bar"),
+                method("connectedToQ"), // predicate `?` → Q suffix
+                method("integer"), // define_column_methods macro
+                method("limitValue"), // Relation::VALUE_METHODS accessor
+                method("catch"), // JS Promise protocol
+                method("genuinelyNovel"), // the only real extra
+              ],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles[0].extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
+  });
+
   it("skips _-prefixed and internal TS members, doesn't flag them as extras", () => {
     const { ruby } = makeManifests();
     const ts: ApiManifest = {
