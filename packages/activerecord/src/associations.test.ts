@@ -113,7 +113,6 @@ describe("AssociationsTest", () => {
       },
       cpk_thru_appt1s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
       cpk_thru_appt2s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
-      cpk_thru_appt3s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
       cpk_thru_appt4s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
       cpk_thru_doc1s: {
         columns: { id: "integer", name: "string", region_id: "integer" },
@@ -123,17 +122,12 @@ describe("AssociationsTest", () => {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      cpk_thru_doc3s: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
       cpk_thru_doc4s: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
       cpk_thru_pat1s: { name: "string" },
       cpk_thru_pat2s: { name: "string" },
-      cpk_thru_pat3s: { name: "string" },
       cpk_thru_pat4s: { name: "string" },
       cpk_thru_tgt_appts: { doctor_id: "integer", patient_id: "integer" },
       cpk_thru_tgt_docs: { name: "string" },
@@ -153,10 +147,6 @@ describe("AssociationsTest", () => {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      qc_multi_blog_posts: { revision: "integer", title: "string" },
-      qc_multi_comments: { blog_post_id: "integer" },
-      qc_single_blog_posts: { title: "string" },
-      qc_single_comments: { blog_post_id: "integer" },
     });
   });
 
@@ -379,53 +369,6 @@ describe("AssociationsTest", () => {
     expect(child.inf_parent2_id).toBeNull();
   });
 
-  it("query constraints that dont include the primary key raise with a single column", async () => {
-    class QcSingleBlogPost extends Base {
-      static {
-        this.attribute("title", "string");
-        (this as any)._queryConstraintsList = ["title"];
-        (this as any)._hasQueryConstraints = true;
-      }
-    }
-    class QcSingleComment extends Base {
-      static {
-        this.attribute("blog_post_id", "integer");
-      }
-    }
-    registerModel("QcSingleBlogPost", QcSingleBlogPost);
-    registerModel("QcSingleComment", QcSingleComment);
-    Associations.hasMany.call(QcSingleBlogPost, "qcSingleComments", {
-      className: "QcSingleComment",
-      primaryKey: ["blog_id", "id"],
-    });
-    const refl = reflectOnAssociation(QcSingleBlogPost, "qcSingleComments")!;
-    expect(() => refl.foreignKey).toThrow(ConfigurationError);
-    expect(() => refl.foreignKey).toThrow("does not include the primary key");
-  });
-  it("query constraints that dont include the primary key raise with multiple columns", async () => {
-    class QcMultiBlogPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("revision", "integer");
-        (this as any)._queryConstraintsList = ["title", "revision"];
-        (this as any)._hasQueryConstraints = true;
-      }
-    }
-    class QcMultiComment extends Base {
-      static {
-        this.attribute("blog_post_id", "integer");
-      }
-    }
-    registerModel("QcMultiBlogPost", QcMultiBlogPost);
-    registerModel("QcMultiComment", QcMultiComment);
-    Associations.hasMany.call(QcMultiBlogPost, "qcMultiComments", {
-      className: "QcMultiComment",
-      primaryKey: ["blog_id", "id"],
-    });
-    const refl = reflectOnAssociation(QcMultiBlogPost, "qcMultiComments")!;
-    expect(() => refl.foreignKey).toThrow(ConfigurationError);
-    expect(() => refl.foreignKey).toThrow("does not include the primary key");
-  });
   it("append composite has many through association", async () => {
     class CpkThruDoc1 extends Base {
       static {
@@ -548,60 +491,6 @@ describe("AssociationsTest", () => {
     expect(joins[0].doctor_region_id).toBe(2);
     expect(joins[0].doctor_id).toBe(9);
     expect(joins[0].patient_id).toBe(bob.id);
-  });
-  it("nullify composite has many through association", async () => {
-    class CpkThruDoc3 extends Base {
-      static {
-        this._tableName = "cpk_thru_doc3s";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkThruAppt3 extends Base {
-      static {
-        this._tableName = "cpk_thru_appt3s";
-        this.attribute("doctor_region_id", "integer");
-        this.attribute("doctor_id", "integer");
-        this.attribute("patient_id", "integer");
-      }
-    }
-    class CpkThruPat3 extends Base {
-      static {
-        this._tableName = "cpk_thru_pat3s";
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(CpkThruDoc3, "appts", {
-      className: "CpkThruAppt3",
-      foreignKey: ["doctor_region_id", "doctor_id"],
-    });
-    Associations.belongsTo.call(CpkThruAppt3, "patient", {
-      className: "CpkThruPat3",
-      foreignKey: "patient_id",
-    });
-    Associations.hasMany.call(CpkThruDoc3, "patients", {
-      through: "appts",
-      className: "CpkThruPat3",
-      source: "patient",
-    });
-    registerModel("CpkThruDoc3", CpkThruDoc3);
-    registerModel("CpkThruAppt3", CpkThruAppt3);
-    registerModel("CpkThruPat3", CpkThruPat3);
-
-    const doc = await CpkThruDoc3.create({ region_id: 3, id: 4, name: "Dr C" });
-    const p1 = await CpkThruPat3.create({ name: "Alice" });
-    const p2 = await CpkThruPat3.create({ name: "Bob" });
-    await CpkThruAppt3.create({ doctor_region_id: 3, doctor_id: 4, patient_id: p1.id });
-    await CpkThruAppt3.create({ doctor_region_id: 3, doctor_id: 4, patient_id: p2.id });
-
-    const proxy = association(doc, "patients");
-    const count = await proxy.deleteAll("nullify");
-    expect(count).toBe(2);
-    // Join rows removed, target patients still exist.
-    expect(await CpkThruAppt3.all().count()).toBe(0);
-    expect(await CpkThruPat3.all().count()).toBe(2);
   });
   it("delete single composite has many through join row", async () => {
     // Covers _deleteThrough composite-aware findBy. Another owner shares one
@@ -3743,6 +3632,8 @@ describe("AssociationsTest", () => {
         "shardedBlogs",
         "shardedBlogPosts",
         "shardedComments",
+        "shardedTags",
+        "shardedBlogPostsTags",
         "cpkOrders",
       ],
       {
@@ -3762,6 +3653,8 @@ describe("AssociationsTest", () => {
   let ShardedBlogPost: typeof Base;
   let ShardedBlogPostWithRevision: typeof Base;
   let ShardedComment: typeof Base;
+  let ShardedTag: typeof Base;
+  let ShardedBlogPostTag: typeof Base;
   let Company: typeof Base;
   let Account: typeof Base;
   let Liquid: typeof Base;
@@ -3790,6 +3683,8 @@ describe("AssociationsTest", () => {
       });
     }
     ShardedComment = shardedMod.ShardedComment as never;
+    ShardedTag = shardedMod.ShardedTag as never;
+    ShardedBlogPostTag = shardedMod.ShardedBlogPostTag as never;
     const authorMod = await import("./test-helpers/models/author.js");
     Author = authorMod.Author as never;
     AuthorFavorite = authorMod.AuthorFavorite as never;
@@ -3839,6 +3734,8 @@ describe("AssociationsTest", () => {
     registerModel("ShardedBlogPost", ShardedBlogPost);
     registerModel("ShardedBlogPostWithRevision", ShardedBlogPostWithRevision);
     registerModel("ShardedComment", ShardedComment);
+    registerModel("ShardedTag", ShardedTag);
+    registerModel("ShardedBlogPostTag", ShardedBlogPostTag);
     registerModel("Company", Company);
     registerModel("Account", Account);
     registerModel("Liquid", Liquid);
@@ -4267,5 +4164,72 @@ describe("AssociationsTest", () => {
     expect((loaded as any).id).toEqual((order as any).id);
     const orderId = (order as any).id[1];
     expect((agreement as any).order_id).toBe(orderId);
+  });
+
+  it("query constraints that dont include the primary key raise with a single column", async () => {
+    const original = (ShardedBlogPost as any)._queryConstraintsList;
+    try {
+      (ShardedBlogPost as any)._queryConstraintsList = ["title"];
+      (ShardedBlogPost as any)._hasQueryConstraints = true;
+      if (!reflectOnAssociation(ShardedBlogPost, "commentsWithoutSingleColumnQueryConstraints")) {
+        (ShardedBlogPost as any).hasMany("commentsWithoutSingleColumnQueryConstraints", {
+          primaryKey: ["blog_id", "id"],
+          className: "ShardedComment",
+        });
+      }
+      const blogPost = shardedBlogPosts("great_post_blog_one");
+      let error: unknown;
+      try {
+        await association(blogPost, "commentsWithoutSingleColumnQueryConstraints").toArray();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ConfigurationError);
+      expect((error as Error).message).toContain("does not include the primary key");
+    } finally {
+      (ShardedBlogPost as any)._queryConstraintsList = original;
+    }
+  });
+
+  it("query constraints that dont include the primary key raise with multiple columns", async () => {
+    const original = (ShardedBlogPost as any)._queryConstraintsList;
+    try {
+      (ShardedBlogPost as any)._queryConstraintsList = ["title", "revision"];
+      (ShardedBlogPost as any)._hasQueryConstraints = true;
+      if (!reflectOnAssociation(ShardedBlogPost, "commentsWithoutMultipleColumnQueryConstraints")) {
+        (ShardedBlogPost as any).hasMany("commentsWithoutMultipleColumnQueryConstraints", {
+          primaryKey: ["blog_id", "id"],
+          className: "ShardedComment",
+        });
+      }
+      const blogPost = shardedBlogPosts("great_post_blog_one");
+      let error: unknown;
+      try {
+        await association(blogPost, "commentsWithoutMultipleColumnQueryConstraints").toArray();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ConfigurationError);
+      expect((error as Error).message).toContain("does not include the primary key");
+    } finally {
+      (ShardedBlogPost as any)._queryConstraintsList = original;
+    }
+  });
+
+  it("nullify composite has many through association", async () => {
+    const blogPost = shardedBlogPosts("great_post_blog_one");
+    expect((await association(blogPost, "tags").toArray()).length).toBeGreaterThan(0);
+
+    await association(blogPost, "tags").replace([]);
+
+    expect(await association(blogPost, "tags").toArray()).toEqual([]);
+    await association(blogPost, "tags").reload();
+    expect(await association(blogPost, "tags").toArray()).toEqual([]);
+    expect(
+      await ShardedBlogPostTag.where({
+        blog_post_id: (blogPost as any).id,
+        blog_id: (blogPost as any).blog_id,
+      }).exists(),
+    ).toBe(false);
   });
 });
