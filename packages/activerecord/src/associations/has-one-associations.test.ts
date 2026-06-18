@@ -675,6 +675,11 @@ describe("HasOneAssociationsTest", () => {
     // BLOCKED: no-op save detection — gap.
   });
 
+  it.skip("has one with touch option on nonpersisted built associations doesnt update parent", () => {
+    // BLOCKED: SpecialCar/SpecialBulb touch on unpersisted built association —
+    // query-count gap.
+  });
+
   it("has one double belongs to destroys both from either end", async () => {
     let landlord = await User.create({});
     let tenant = await User.create({});
