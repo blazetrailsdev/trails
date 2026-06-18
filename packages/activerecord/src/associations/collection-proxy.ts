@@ -775,6 +775,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
+    // The two branches read identically but are NOT redundant: each narrows
+    // `attrs` (array vs single record) so overload resolution selects the
+    // matching `build` overload. A bare `this.build(attrs, block)` on the union
+    // type fails (TS2769 — no overload accepts `T | T[]`), and casting would
+    // mis-type the return. This is the cast-free delegation Rails expresses as
+    // `alias_method :new, :build` (collection_proxy.rb:321).
     return Array.isArray(attrs) ? this.build(attrs, block) : this.build(attrs, block);
   }
 
