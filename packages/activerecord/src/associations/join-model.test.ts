@@ -18,7 +18,7 @@ import {
   HasManyThroughAssociationPolymorphicThroughError,
   EagerLoadPolymorphicError,
 } from "./errors.js";
-import { assertNoQueries } from "../testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -716,6 +716,8 @@ describe("AssociationsJoinModelTest", () => {
     ).toBe(true);
     await (postThinking as any).reload();
     expect(await (postThinking as any).tags.size()).toBe(count + 1);
+    await (postThinking as any).tags.reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 1);
 
     const foo = await (postThinking as any).tags.createBang({ name: "foo" });
     expect(foo).toBeInstanceOf(Tag);
@@ -728,6 +730,8 @@ describe("AssociationsJoinModelTest", () => {
       ),
     ).toBe(true);
     await (postThinking as any).reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 2);
+    await (postThinking as any).tags.reload();
     expect(await (postThinking as any).tags.size()).toBe(count + 2);
 
     await (postThinking as any).tags.concat(
@@ -743,6 +747,8 @@ describe("AssociationsJoinModelTest", () => {
       ),
     ).toBe(true);
     await (postThinking as any).reload();
+    expect(await (postThinking as any).tags.size()).toBe(count + 4);
+    await (postThinking as any).tags.reload();
     expect(await (postThinking as any).tags.size()).toBe(count + 4);
 
     // Raises if the wrong reflection name is used to set the Edge belongs_to
@@ -982,6 +988,18 @@ describe("AssociationsJoinModelTest", () => {
       expect((david as any).categories.loaded).toBe(true);
       expect(await (david as any).categories.isInclude(category)).toBe(true);
     });
+  });
+
+  it("has many through include checks if record exists if target not loaded", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    const category = (await (david as any).categories.first()) as Base;
+
+    await (david as any).reload();
+    expect((david as any).categories.loaded).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await (david as any).categories.isInclude(category)).toBe(true);
+    });
+    expect((david as any).categories.loaded).toBe(false);
   });
 
   it("has many through include returns false for non matching record to verify scoping", async () => {
