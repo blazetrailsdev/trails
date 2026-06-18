@@ -504,6 +504,24 @@ describe("AssociationCallbacksTest", () => {
     expect((await proxy.toArray()).length).toBe(1);
   });
 
+  it("before_remove abort halts the whole removal, not just the current record", async () => {
+    // Rails wraps the entire before_remove loop in one catch(:abort), so an
+    // abort on any record leaves ALL records (including earlier ones) in place.
+    const { Post, Comment } = makePostWithCallbacks({
+      beforeRemove: (_owner: any, record: any) => {
+        if (record.body === "keep") throwAbort();
+      },
+    });
+    const post = await Post.create({ title: "hello" });
+    const c1 = await (Comment as any).create({ body: "removable", post_id: post.id });
+    const c2 = await (Comment as any).create({ body: "keep", post_id: post.id });
+    const proxy = association(post, "comments");
+    expect((await proxy.toArray()).length).toBe(2);
+    await proxy.delete(c1, c2);
+    // c1 must NOT have been removed even though its own before_remove passed.
+    expect((await proxy.toArray()).length).toBe(2);
+  });
+
   it("has many callbacks with create!", async () => {
     const log: string[] = [];
     const { Post } = makePostWithCallbacks({
