@@ -2995,6 +2995,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async deleteAll(dependent?: string): Promise<number> {
     this._ensureThroughWritable();
+    // Rails' `delete_all(dependent = nil)` only permits an explicit `:nullify`
+    // or `:delete_all` from a caller; any other symbol raises ArgumentError
+    // (collection_association.rb:151-153). The camelCase `"deleteAll"` and the
+    // `:destroy`/`:delete` mappings below apply only to the internal *option*
+    // default (`options.dependent`), never to a user-passed argument.
+    if (dependent !== undefined && dependent !== "nullify" && dependent !== "delete_all") {
+      throw new ArgumentError("Valid values are :nullify or :delete_all");
+    }
     // Rails normalizes dependent: :destroy → :delete_all for deleteAll,
     // because deleteAll should never run destroy callbacks (use destroyAll for that).
     const raw = dependent ?? (this._assocDef.options.dependent as string | undefined);
