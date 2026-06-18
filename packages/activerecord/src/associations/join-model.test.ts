@@ -757,6 +757,12 @@ describe("AssociationsJoinModelTest", () => {
     await (vertex1 as any).sinks.push(vertex5);
   });
 
+  it("add to join table with no id", async () => {
+    const vertex1 = (await Vertex.find(vertices("vertex_1").id)) as Vertex;
+    const vertex5 = (await Vertex.find(vertices("vertex_5").id)) as Vertex;
+    await (vertex1 as any).sinks.push(vertex5);
+  });
+
   // DEFERRED (tracked: join-model-create-through-sets-owner-fk): Book.references
   // is a has_many :through citations with a belongs_to source (referenceOf).
   // `book_awdr.references << book` creates no citation row (debug: zero
