@@ -586,5 +586,9 @@ describe("NamedScopingTest", () => {
     Topic.scope("includingAnnotateInScope", (q: any) => q.annotate("from-scope"));
     const sql = (Topic as any).includingAnnotateInScope().toSql();
     expect(sql).toContain("from-scope");
+    // Rails also asserts the annotation does not filter records.
+    expect(sortedIds(await (Topic as any).includingAnnotateInScope().toArray())).toEqual(
+      sortedIds(await Topic.all().toArray()),
+    );
   });
 });
