@@ -252,6 +252,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     string,
     string | { name?: string; limit?: number }
   > = {
+    primary_key: "bigserial primary key",
     primaryKey: "bigserial primary key",
     string: { name: "character varying" },
     text: { name: "text" },

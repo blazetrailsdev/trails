@@ -82,10 +82,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
     type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
     options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
   ): string {
-    if ((type as string) === "primary_key") {
-      // Rails NATIVE_DATABASE_TYPES[:primary_key] = "bigserial primary key"; can't delegate (adapter keys camelCase primaryKey).
-      return "bigserial primary key";
-    }
     // Delegate to the adapter's typeToSql when available (Rails parity:
     // `delegate :type_to_sql, to: :@conn`). Fall back to the abstract
     // implementation when no real adapter is present (e.g. unit-test context
