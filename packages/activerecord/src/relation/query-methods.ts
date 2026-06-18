@@ -1663,7 +1663,12 @@ export function buildBoundSqlLiteral(
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
   // Mirrors build_bound_sql_literal (query_methods.rb:1682-1697).
-  const positionalBinds = values.map((v) => normalizeBoundValue(v, this._modelClass));
+  // castBoundValue is applied here (positional path) to match sanitizeSqlArray's
+  // cast step — e.g. MySQL/MariaDB converts integers to strings before quoting.
+  // Named-bind path skips castBoundValue (old adapter.quote() path did not cast).
+  const conn = this._modelClass.connection as { castBoundValue?(v: unknown): unknown };
+  const cast = conn.castBoundValue?.bind(conn);
+  const positionalBinds = values.map((v) => normalizeBoundValue(v, this._modelClass, cast));
   try {
     return new Nodes.BoundSqlLiteral(statement, positionalBinds, {});
   } catch (e: any) {
@@ -1671,26 +1676,31 @@ export function buildBoundSqlLiteral(
   }
 }
 
-function normalizeBoundValue(value: unknown, modelClass: QueryMethodsHost["_modelClass"]): unknown {
+function normalizeBoundValue(
+  value: unknown,
+  modelClass: QueryMethodsHost["_modelClass"],
+  castBoundValue?: (v: unknown) => unknown,
+): unknown {
   if (value instanceof Nodes.Node) {
     return arelSql(modelClass.connection.toSql(value));
   }
   // Mirrors build_bound_sql_literal's Array branch (query_methods.rb:1689-1694):
   // map each element so model records in arrays are unwrapped to their db id.
   if (Array.isArray(value)) {
-    return value.map((v) => normalizeBoundValue(v, modelClass));
+    return value.map((v) => normalizeBoundValue(v, modelClass, castBoundValue));
   }
   if (
     value !== null &&
     typeof value === "object" &&
     typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
   ) {
-    return normalizeBoundValue((value as { idForDatabase(): unknown }).idForDatabase(), modelClass);
+    return normalizeBoundValue(
+      (value as { idForDatabase(): unknown }).idForDatabase(),
+      modelClass,
+      castBoundValue,
+    );
   }
-  // Apply adapter-level castBoundValue so that e.g. MySQL/MariaDB converts
-  // integers to strings before quoting — matching sanitizeSqlArray's cast step.
-  const conn = modelClass.connection as { castBoundValue?(v: unknown): unknown };
-  return conn.castBoundValue ? conn.castBoundValue(value) : value;
+  return castBoundValue ? castBoundValue(value) : value;
 }
 
 /** @internal */
