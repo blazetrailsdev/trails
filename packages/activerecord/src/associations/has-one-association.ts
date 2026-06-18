@@ -6,6 +6,7 @@ import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { ForeignAssociation } from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
+import { polymorphicName } from "../inheritance.js";
 
 /**
  * Manages has_one associations. Handles dependent destruction,
@@ -148,6 +149,11 @@ export class HasOneAssociation extends SingularAssociation {
         } else {
           this._pendingReplace = { record, previousTarget: displaced };
         }
+      } else if (save && record && (this.owner as any).isNewRecord?.()) {
+        // New owner: the foreign key isn't known yet, so defer persistence
+        // until the owner is saved (`flushPendingReplaces`), mirroring Rails'
+        // default has_one save-on-create autosave.
+        this._pendingReplace = { record, previousTarget: null };
       }
     }
     this.target = record;
@@ -174,6 +180,10 @@ export class HasOneAssociation extends SingularAssociation {
         }
       }
       if (pending.record && typeof (pending.record as any).save === "function") {
+        // Re-derive the foreign key from the owner: on the new-owner path the
+        // owner's PK was unknown when `replace` ran, so set it now that the
+        // owner has been persisted.
+        this.setOwnerAttributes(pending.record);
         const saved = await (pending.record as any).save();
         if (!saved) {
           this.nullifyOwnerAttributes(pending.record);
@@ -237,10 +247,13 @@ export class HasOneAssociation extends SingularAssociation {
 
     if (this.reflection.options.as) {
       const typeCol = `${underscore(this.reflection.options.as)}_type`;
+      // Rails writes `owner.class.base_class.name` (polymorphic_name), so STI
+      // subclasses store their base class name in the `as:` type column.
+      const typeName = polymorphicName(ctor as typeof Base);
       if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(typeCol, ctor.name);
+        (record as any)._writeAttribute(typeCol, typeName);
       } else {
-        (record as any)[typeCol] = ctor.name;
+        (record as any)[typeCol] = typeName;
       }
     }
   }
