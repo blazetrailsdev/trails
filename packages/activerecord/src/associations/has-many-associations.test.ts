@@ -58,6 +58,8 @@ import { Subscriber as HmSubscriber } from "../test-helpers/models/subscriber.js
 import { Subscription as HmSubscription } from "../test-helpers/models/subscription.js";
 import { Post as HmPost, FirstPost as HmFirstPost } from "../test-helpers/models/post.js";
 import { Tag as HmTag } from "../test-helpers/models/tag.js";
+import { Car as HmCar } from "../test-helpers/models/car.js";
+import { Bulb as HmBulb } from "../test-helpers/models/bulb.js";
 import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -7174,112 +7176,58 @@ describe("HasManyAssociationsTest", () => {
 // the Car associations that exercise scope chaining: `:bulbs` (default
 // scope applies), `:all_bulbs` (unscope where:name), `:other_bulbs`
 // (unscope + rewrite), `:old_bulbs` (rewhere).
-const DEFAULT_SCOPE_SCHEMA: Schema = {
-  ds_cars: { name: "string" },
-  ds_bulbs: { car_id: "integer", name: "string" },
-};
-
 describe("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(DEFAULT_SCOPE_SCHEMA);
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      { cars: TEST_SCHEMA.cars, bulbs: TEST_SCHEMA.bulbs },
+      { dropExisting: true },
+    );
+    registerModel(HmCar);
+    registerModel(HmBulb);
+    await HmCar.loadSchema();
+    await HmBulb.loadSchema();
   });
-
-  function setupCarBulb() {
-    class DsCar extends Base {
-      static {
-        this._tableName = "ds_cars";
-        this.attribute("name", "string");
-      }
-    }
-    class DsBulb extends Base {
-      static {
-        this._tableName = "ds_bulbs";
-        this.attribute("car_id", "integer");
-        this.attribute("name", "string");
-        this.defaultScope((rel: any) => rel.where({ name: "defaulty" }));
-      }
-    }
-    registerModel("DsCar", DsCar);
-    registerModel("DsBulb", DsBulb);
-    Associations.hasMany.call(DsCar, "bulbs", {
-      className: "DsBulb",
-      foreignKey: "car_id",
-    });
-    Associations.hasMany.call(DsCar, "all_bulbs", {
-      className: "DsBulb",
-      foreignKey: "car_id",
-      scope: (rel: any) => rel.unscope({ where: "name" }),
-    });
-    Associations.hasMany.call(DsCar, "other_bulbs", {
-      className: "DsBulb",
-      foreignKey: "car_id",
-      scope: (rel: any) => rel.unscope({ where: "name" }).where({ name: "other" }),
-    });
-    Associations.hasMany.call(DsCar, "old_bulbs", {
-      className: "DsBulb",
-      foreignKey: "car_id",
-      scope: (rel: any) => rel.rewhere({ name: "old" }),
-    });
-    return { DsCar, DsBulb };
-  }
 
   it("can unscope the default scope of the associated model", async () => {
     // Rails: car.bulbs => [defaulty]; car.all_bulbs => [defaulty, other]
-    const { DsCar, DsBulb } = setupCarBulb();
-    const car = await DsCar.create({ name: "v1" });
-    await DsBulb.create({ car_id: car.id, name: "defaulty" });
-    await DsBulb.create({ car_id: car.id, name: "other" });
-    const bulbs = await loadHasMany(car, "bulbs", { className: "DsBulb", foreignKey: "car_id" });
-    expect(bulbs.length).toBe(1);
-    // Reflection.scope's terminal `unscope({where: "name"})` does NOT
-    // strip the default_scope's where when invoked through
-    // AssociationScope (verified: omitting `options.scope` returns 1;
-    // the chained variants `unscope.where(...)` and `rewhere(...)` in
-    // the other tests below DO work because the trailing predicate
-    // re-binds the relation). Pass the same lambda inline so the
-    // assertion exercises the unscope path that Rails users see; the
-    // reflection-scope gap is a separate follow-up (no double-apply —
-    // `applyAssociationScope` checks `scope === reflectionScope`, but
-    // the reflection-scope path is the one that's silently no-op'ing).
-    const allBulbs = await loadHasMany(car, "all_bulbs", {
-      className: "DsBulb",
-      foreignKey: "car_id",
-      scope: (rel: any) => rel.unscope({ where: "name" }),
-    });
-    expect(allBulbs.length).toBe(2);
+    const car = await HmCar.create({});
+    await HmBulb.create({ name: "defaulty", car_id: car.id });
+    await HmBulb.create({ name: "other", car_id: car.id });
+
+    const bulbs = await (car as any).bulbs.toArray();
+    expect(bulbs.map((b: any) => b.name)).toEqual(["defaulty"]);
+
+    const allBulbs = await (car as any).allBulbs.toArray();
+    expect(allBulbs.map((b: any) => b.name).sort()).toEqual(["defaulty", "other"]);
   });
 
   it("can unscope and where the default scope of the associated model", async () => {
     // Rails: car.bulbs => [defaulty]; car.other_bulbs => [other]
-    const { DsCar, DsBulb } = setupCarBulb();
-    const car = await DsCar.create({ name: "v1" });
-    await DsBulb.create({ car_id: car.id, name: "defaulty" });
-    await DsBulb.create({ car_id: car.id, name: "other" });
-    const bulbs = await loadHasMany(car, "bulbs", { className: "DsBulb", foreignKey: "car_id" });
-    expect(bulbs.length).toBe(1);
-    expect((bulbs[0] as any).name).toBe("defaulty");
-    const others = await loadHasMany(car, "other_bulbs", {
-      className: "DsBulb",
-      foreignKey: "car_id",
-    });
-    expect(others.length).toBe(1);
-    expect((others[0] as any).name).toBe("other");
+    const car = await HmCar.create({});
+    await HmBulb.create({ name: "defaulty", car_id: car.id });
+    await HmBulb.create({ name: "other", car_id: car.id });
+
+    const bulbs = await (car as any).bulbs.toArray();
+    expect(bulbs.map((b: any) => b.name)).toEqual(["defaulty"]);
+
+    const others = await (car as any).otherBulbs.toArray();
+    expect(others.map((b: any) => b.name)).toEqual(["other"]);
   });
 
   it("can rewhere the default scope of the associated model", async () => {
     // Rails: car.bulbs => [defaulty]; car.old_bulbs => [old]
-    const { DsCar, DsBulb } = setupCarBulb();
-    const car = await DsCar.create({ name: "v1" });
-    await DsBulb.create({ car_id: car.id, name: "defaulty" });
-    await DsBulb.create({ car_id: car.id, name: "old" });
-    const bulbs = await loadHasMany(car, "bulbs", { className: "DsBulb", foreignKey: "car_id" });
-    expect(bulbs.length).toBe(1);
-    expect((bulbs[0] as any).name).toBe("defaulty");
-    const old = await loadHasMany(car, "old_bulbs", { className: "DsBulb", foreignKey: "car_id" });
-    expect(old.length).toBe(1);
-    expect((old[0] as any).name).toBe("old");
+    const car = await HmCar.create({});
+    await HmBulb.create({ name: "defaulty", car_id: car.id });
+    await HmBulb.create({ name: "old", car_id: car.id });
+
+    const bulbs = await (car as any).bulbs.toArray();
+    expect(bulbs.map((b: any) => b.name)).toEqual(["defaulty"]);
+
+    const old = await (car as any).oldBulbs.toArray();
+    expect(old.map((b: any) => b.name)).toEqual(["old"]);
   });
 });
 
