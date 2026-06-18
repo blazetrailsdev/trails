@@ -1675,6 +1675,11 @@ function normalizeBoundValue(value: unknown, modelClass: QueryMethodsHost["_mode
   if (value instanceof Nodes.Node) {
     return arelSql(modelClass.connection.toSql(value));
   }
+  // Mirrors build_bound_sql_literal's Array branch (query_methods.rb:1689-1694):
+  // map each element so model records in arrays are unwrapped to their db id.
+  if (Array.isArray(value)) {
+    return value.map((v) => normalizeBoundValue(v, modelClass));
+  }
   if (
     value !== null &&
     typeof value === "object" &&
