@@ -125,12 +125,14 @@ export class MyAppBillingAccount extends Base {
     });
     this.belongsTo("nestedUnqualifiedBillingFirm", { ...opts, className: "Nested::Firm" });
 
-    this.validate(async function (this: MyAppBillingAccount) {
-      await this.checkEmptyCreditLimit();
+    // Rails `validate :check_empty_credit_limit` (company_in_module.rb:91).
+    // Sync validation — the check only reads an attribute, no async work.
+    this.validate(function (this: MyAppBillingAccount) {
+      this.checkEmptyCreditLimit();
     });
   }
 
-  private async checkEmptyCreditLimit(): Promise<void> {
+  private checkEmptyCreditLimit(): void {
     const creditCard = this.readAttribute("credit_card");
     if (creditCard == null || creditCard === "") {
       this.errors.add("credit_card", "blank");

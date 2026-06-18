@@ -797,8 +797,15 @@ export class CallbackChain {
       if (isThenable(cbResult)) {
         if (opts?.strict === "sync") {
           swallowRejection(cbResult);
+          // The `validate` chain is intentionally synchronous (Rails validations
+          // run sync; `valid?`/`isValid` return a boolean, not a Promise). An
+          // async validate callback is an authoring bug: rewrite it
+          // synchronously (e.g. read a loaded association via its sync reader),
+          // or, if the work is genuinely async, move it to a beforeSave /
+          // afterSave callback — those chains run async.
           throw new Error(
-            `Async callback on sync chain "${this.name}" — before returned a Promise`,
+            `Async callback on sync chain "${this.name}" — before returned a Promise. ` +
+              `Validations are synchronous; move async work to a beforeSave/afterSave callback.`,
           );
         }
         // Custom terminators receive fn()'s return value to decide halting, but async

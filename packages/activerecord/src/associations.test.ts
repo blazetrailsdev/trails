@@ -80,8 +80,6 @@ describe("AssociationsTest", () => {
         columns: { region_id: "integer", id: "integer", name: "string" },
         primaryKey: ["region_id", "id"],
       },
-      c_comments: { body: "string", c_post_id: "integer" },
-      c_posts: { title: "string" },
       cpk_authors: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
@@ -170,36 +168,6 @@ describe("AssociationsTest", () => {
       className: "CpkOrderItem",
     });
     expect(items.length).toBe(1);
-  });
-  it("force reload", async () => {
-    class CPost extends Base {
-      static {
-        this._tableName = "c_posts";
-        this.attribute("title", "string");
-      }
-    }
-    class CComment extends Base {
-      static {
-        this._tableName = "c_comments";
-        this.attribute("body", "string");
-        this.attribute("c_post_id", "integer");
-      }
-    }
-    Associations.hasMany.call(CPost, "cComments", {
-      foreignKey: "c_post_id",
-      className: "CComment",
-    });
-    registerModel("CPost", CPost);
-    registerModel("CComment", CComment);
-    const post = await CPost.create({ title: "test" });
-    const proxy = association(post, "cComments");
-    const first = await proxy.toArray();
-    expect(first.length).toBe(0);
-    // Add a comment directly (bypassing proxy)
-    await CComment.create({ body: "sneaky", c_post_id: post.id });
-    // Re-query through proxy should find the new record
-    const reloaded = await proxy.toArray();
-    expect(reloaded.length).toBe(1);
   });
   it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
     // No-reflection fallback: loadHasMany invoked with a composite FK against a
@@ -3686,6 +3654,29 @@ describe("AssociationsTest", () => {
     const firm = companies("first_firm");
     const scope = association(firm, "associationWithReferences").scope();
     expect((scope as any)._referencesValues).toEqual(["foo"]);
+  });
+
+  it("force reload", async () => {
+    const firm = new Firm({ name: "A New Firm, Inc" });
+    await firm.save();
+    // forcing to load all clients
+    for (const _ of await firm.clients.toArray()) {
+      void _;
+    }
+    expect(await firm.clients.isEmpty()).toBe(true);
+    expect(await firm.clients.size()).toBe(0);
+
+    const client = new Client({ name: "TheClient.com", firm_id: firm.id });
+    await client.save();
+
+    // New firm should have cached no client objects / zero count.
+    expect(await firm.clients.isEmpty()).toBe(true);
+    expect(await firm.clients.size()).toBe(0);
+
+    await firm.clients.reload();
+
+    expect(await firm.clients.isEmpty()).toBe(false);
+    expect(await firm.clients.size()).toBe(1);
   });
 
   it("append composite foreign key has many association", async () => {
