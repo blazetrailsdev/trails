@@ -443,8 +443,6 @@ const UNIVERSAL_HM_SCHEMA: Schema = {
   pre_cpk_posts: { author_id: "integer", title: "string" },
   del_all_opt_authors: { name: "string" },
   del_all_opt_posts: { author_id: "integer", title: "string" },
-  ds_cars: { name: "string" },
-  ds_bulbs: { car_id: "integer", name: "string" },
   cpk_asg_authors: { name: "string" },
   cpk_asg_posts: { author_id: "integer", title: "string" },
   no_cb_authors: { name: "string" },
@@ -7202,6 +7200,18 @@ describe("HasManyAssociationsTest", () => {
 
     const allBulbs = await (car as any).allBulbs.toArray();
     expect(allBulbs.map((b: any) => b.name).sort()).toEqual(["defaulty", "other"]);
+
+    const includesCar = (await HmCar.includes("allBulbs").find(car.id)) as any;
+    expect((await includesCar.allBulbs.toArray()).map((b: any) => b.name).sort()).toEqual([
+      "defaulty",
+      "other",
+    ]);
+
+    const eagerCar = (await HmCar.eagerLoad("allBulbs").find(car.id)) as any;
+    expect((await eagerCar.allBulbs.toArray()).map((b: any) => b.name).sort()).toEqual([
+      "defaulty",
+      "other",
+    ]);
   });
 
   it("can unscope and where the default scope of the associated model", async () => {
