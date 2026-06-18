@@ -26,6 +26,11 @@ import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { CpkBook } from "./test-helpers/models/cpk/book.js";
 import { CpkChapter } from "./test-helpers/models/cpk/chapter.js";
+import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
+import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
+import { Ship as CanonicalShip } from "./test-helpers/models/ship.js";
+import { ShipPart } from "./test-helpers/models/ship-part.js";
+import { Treasure } from "./test-helpers/models/treasure.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
@@ -40,16 +45,6 @@ const TEST_SCHEMA = {
   tags: { name: "string", article_id: "integer" },
   ant_tags: { name: "string", ant_article_id: "integer" },
   birds: { name: "string", pirate_id: "integer" },
-  cid_pirates: { catchphrase: "string" },
-  cid_birds: { name: "string", cid_pirate_id: "integer" },
-  cr_ships: { name: "string" },
-  cr_parts: { name: "string", cr_ship_id: "integer" },
-  cr_treasures: {
-    name: "string",
-    cr_ship_id: "integer",
-    looter_id: "integer",
-    looter_type: "string",
-  },
   comments: { body: "string", post_id: "integer" },
   dt_comments: { body: "string" },
   dt_comments2: { body: "string", dt_entry2_id: "integer" },
@@ -2470,32 +2465,15 @@ describe("should take a hash with composite id keys and assign the attributes to
     await defineSchema(TEST_SCHEMA);
   });
   it("should take a hash with composite id keys and assign the attributes to the associated models", async () => {
-    class CidBird extends Base {
-      static {
-        this._tableName = "cid_birds";
-        this.attribute("name", "string");
-        this.attribute("cid_pirate_id", "integer");
-      }
-    }
-    class CidPirate extends Base {
-      static {
-        this._tableName = "cid_pirates";
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasMany.call(CidPirate, "birds", {
-      className: "CidBird",
-      foreignKey: "cid_pirate_id",
-    });
-    acceptsNestedAttributesFor(CidPirate, "birds");
-    registerModel(CidBird);
-    registerModel(CidPirate);
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
 
-    const pirate = await CidPirate.create({ catchphrase: "Aye" });
-    await CidBird.create({ name: "Posideons Killer", cid_pirate_id: pirate.id });
-    await CidBird.create({ name: "Killer bird", cid_pirate_id: pirate.id });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Aye" });
+    await CanonicalBird.create({ name: "Posideons Killer", pirate_id: pirate.id });
+    await CanonicalBird.create({ name: "Killer bird", pirate_id: pirate.id });
     await (pirate as any).birds.load();
-    const [child1, child2] = (pirate as any).birds.target as CidBird[];
+    const [child1, child2] = (pirate as any).birds.target as any[];
     // Rails stubs the children's `id` methods to non-integer composite ids
     // (`@child_1.stub(:id, "ABC1X")`); mirror with a getter spy.
     vi.spyOn(child1, "id", "get").mockReturnValue("ABC1X" as any);
@@ -3331,40 +3309,13 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   });
 
   it("circular references do not perform unnecessary queries", async () => {
-    class CrTreasure extends Base {
-      static {
-        this._tableName = "cr_treasures";
-        this.attribute("name", "string");
-        this.attribute("cr_ship_id", "integer");
-        this.belongsTo("looter", { polymorphic: true });
-        this.belongsTo("ship", { className: "CrShip", foreignKey: "cr_ship_id" });
-      }
-    }
-    class CrPart extends Base {
-      static {
-        this._tableName = "cr_parts";
-        this.attribute("name", "string");
-        this.attribute("cr_ship_id", "integer");
-        this.belongsTo("ship", { className: "CrShip", foreignKey: "cr_ship_id" });
-        this.validates("name", { presence: true });
-      }
-    }
-    class CrShip extends Base {
-      static {
-        this._tableName = "cr_ships";
-        this.attribute("name", "string");
-        this.hasMany("parts", { className: "CrPart", foreignKey: "cr_ship_id" });
-        this.hasMany("treasures", { className: "CrTreasure", foreignKey: "cr_ship_id" });
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel(CrTreasure);
-    registerModel(CrPart);
-    registerModel(CrShip);
-    acceptsNestedAttributesFor(CrShip, "parts");
-    acceptsNestedAttributesFor(CrShip, "treasures");
+    registerModel(ShipPart);
+    registerModel(Treasure);
+    registerModel(CanonicalShip);
+    acceptsNestedAttributesFor(CanonicalShip, "parts", { allowDestroy: true });
+    acceptsNestedAttributesFor(CanonicalShip, "treasures");
 
-    const ship = new CrShip({ name: "The Black Rock" });
+    const ship = new CanonicalShip({ name: "The Black Rock" });
     const part = (ship.parts as any).build({ name: "Stern" });
     (ship.treasures as any).build({ looter: part });
 
@@ -3421,28 +3372,11 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
     Notifications.unsubscribeAll();
   });
 
-  function makeModels() {
-    class Bird extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasMany.call(Pirate, "birds", { className: "Bird", foreignKey: "pirate_id" });
-    registerModel("Bird", Bird);
-    registerModel("Pirate", Pirate);
-    acceptsNestedAttributesFor(Pirate, "birds");
-    return { Bird, Pirate };
-  }
-
   it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
-    const { Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", [{ id: 1234567890, name: "Ghost Bird" }]);
     await expect(pirate.save()).rejects.toThrow(RecordNotFound);
   });
