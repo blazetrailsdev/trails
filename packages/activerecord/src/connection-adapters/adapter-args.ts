@@ -12,7 +12,20 @@
  * @internal
  */
 
-import { isRemoteLibsqlUrl } from "../sqlite/libsql.js";
+/**
+ * Returns true for URL schemes that identify a remote libsql/Turso endpoint.
+ * Inlined here (rather than imported from sqlite/libsql.ts) so adapter-args
+ * does not transitively load the optional `libsql` native peer dependency.
+ */
+function isRemoteLibsqlUrl(url: string): boolean {
+  return (
+    url.startsWith("libsql://") ||
+    url.startsWith("https://") ||
+    url.startsWith("http://") ||
+    url.startsWith("wss://") ||
+    url.startsWith("ws://")
+  );
+}
 
 /**
  * Normalize adapter aliases to their canonical name.
@@ -87,7 +100,9 @@ export function buildAdapterArg(
     // local filename. For local adapters, prefer `database` over `url` so
     // caller-mutated configs (e.g. autoConnect per-worker slots) win.
     const resolvedUrl = url !== undefined && isRemoteLibsqlUrl(url) ? url : undefined;
-    const filename = parseSqliteUrl(resolvedUrl ?? database ?? url ?? ":memory:");
+    // Use `||` (not `??`) so empty-string database/url values fall through to
+    // the next candidate, matching the pre-existing behaviour of this function.
+    const filename = parseSqliteUrl(resolvedUrl || database || url || ":memory:");
     // Keep only the SQLite3Adapter constructor's `options` keys so we don't
     // forward unrelated database.yml entries (pool, host, etc.) into the
     // options object. The adapter ignores unknown keys today but accepting

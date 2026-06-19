@@ -8,8 +8,9 @@ import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
  *
  * Remote handles are network-backed; construction goes through the async-open
  * path (`AbstractSQLite3Adapter.openAsync()` / `completeAsyncConnect()`). Pass
- * `authToken` in adapter options — it is forwarded to the libsql `Database`
- * constructor via `driverOptions`.
+ * credentials as `driverOptions: { authToken }` in adapter options, or provide
+ * `authToken` as a top-level key in a database.yml config (it is lifted into
+ * `driverOptions` by `buildAdapterArg`).
  *
  * Thin subclass of `AbstractSQLite3Adapter`: all SQLite dialect, quoting, and
  * schema logic lives in the abstract base.

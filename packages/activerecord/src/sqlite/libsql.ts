@@ -169,7 +169,8 @@ function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
   // driverOptions carries authToken (and any other driver-specific keys).
   // Unlike the local openDatabase, we don't force readonly here — remote
   // Turso connections don't expose a read-only open mode.
-  const opts = { ...(config.driverOptions as Database.Options | undefined) };
+  const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
+  if (config.timeout !== undefined) opts.timeout = config.timeout;
   return new Database(config.database, opts);
 }
 
