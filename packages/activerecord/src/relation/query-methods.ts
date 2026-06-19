@@ -892,8 +892,9 @@ export function buildWhereClause(
       for (const [name, value] of Object.entries(namedBinds)) {
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         // A Relation bind inlines its SQL as a subquery rather than being
-        // quoted as a scalar — mirrors Rails' Arel-node branch in
-        // `replace_named_bind_variables` (sanitization.rb).
+        // quoted as a scalar — mirrors the `ActiveRecord::Relation === value`
+        // branch of Rails' `replace_bind_variable` (sanitization.rb:211-216),
+        // which `replace_named_bind_variables` delegates to per token.
         const replacement = isRelationLike(value)
           ? (value as { toSql(): string }).toSql()
           : Array.isArray(value)
@@ -1652,6 +1653,13 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  * `Arel.sql(value.to_sql)` so `where("id IN (?)", SomeRelation)` produces a
  * subquery rather than reaching `visitBindValue`'s `quote()`. Arel nodes are
  * rendered to SQL the same way (trails passes nodes here where Rails would not).
+ *
+ * NOTE: `buildBoundSqlLiteral` / `buildNamedBoundSqlLiteral` are not yet wired
+ * into `buildWhereClause` — trails' `where` still routes `?`/`:name` fragments
+ * through `sanitizeSqlArray` / the named-bind substitution loop above, where the
+ * same Relation handling lives. Converging `buildWhereClause` onto these
+ * `BoundSqlLiteral` builders (as Rails' `build_where_clause` does) is tracked by
+ * the `converge-build-where-clause-bound-sql-literal` story.
  * @internal
  */
 function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
