@@ -24,7 +24,7 @@ import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
-import { CpkBook, CpkChapter } from "./test-helpers/models/cpk.js";
+import { CpkBook, CpkChapter, CpkOrder } from "./test-helpers/models/cpk.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
 import { Ship as CanonicalShip } from "./test-helpers/models/ship.js";
@@ -1519,6 +1519,7 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(Number(await Interest.count()) - before).toBe(1);
   });
   it("updating models with cpk provided as strings", async () => {
+    registerModel(CpkOrder);
     registerModel(CpkBook);
     registerModel(CpkChapter);
     const book = await CpkBook.createBang({ id: [1, 2], shop_id: 3 });
