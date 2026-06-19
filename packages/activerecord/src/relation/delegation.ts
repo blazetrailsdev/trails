@@ -190,7 +190,6 @@ const DELEGATED_ARRAY_METHODS = new Set<string>([
   "every", // all?
   "includes", // include?
   "reduce", // inject / reduce
-  "reduceRight",
   "sort",
   "flatMap", // flat_map
 ]);
