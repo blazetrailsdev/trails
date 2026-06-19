@@ -1509,6 +1509,7 @@ describe("PreloaderTest", () => {
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     expect(queryCalls).toHaveLength(1);
+    expect(association(author, "essayCategory").loaded).toBe(true);
     const preloaded = (author as any)._preloadedAssociations.get("essayCategory");
     expect(preloaded.id).toBe(general.id);
     expect(categories.map((c: any) => c.id)).toContain(preloaded.id);
@@ -1541,10 +1542,13 @@ describe("PreloaderTest", () => {
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     expect(queryCalls).toHaveLength(2);
-    const maryCat = (mary as any)._preloadedAssociations.get("essayCategory");
-    const daveCat = (dave as any)._preloadedAssociations.get("essayCategory");
-    expect(maryCat.id).toBe(tech.id);
-    expect(daveCat.id).toBe(general.id);
+    // Mirrors Rails' assert_no_queries: preloaded associations are served from
+    // cache on read, so the singular reader must not hit the DB.
+    const reads = await captureSql(async () => {
+      expect((association(mary, "essayCategory").reader as any).id).toBe(tech.id);
+      expect((association(dave, "essayCategory").reader as any).id).toBe(general.id);
+    });
+    expect(reads).toHaveLength(0);
   });
 
   it("preload with available records with multiple classes", async () => {
