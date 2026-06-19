@@ -38,10 +38,8 @@ import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
 // be materialized up front rather than auto-derived by the test adapter.
 const TEST_SCHEMA = {
-  ant_articles: { title: "string" },
   articles: { title: "string" },
   tags: { name: "string", article_id: "integer" },
-  ant_tags: { name: "string", ant_article_id: "integer" },
   birds: { name: "string", pirate_id: "integer" },
   comments: { body: "string", post_id: "integer" },
   dt_comments: { body: "string" },
@@ -68,8 +66,6 @@ const TEST_SCHEMA = {
   ggd_comments: { body: "string", ggd_post_id: "integer" },
   ggd_posts: { title: "string" },
   ggd_replies: { text: "string", ggd_comment_id: "integer" },
-  hi_articles: { title: "string" },
-  hi_tags: { name: "string", hi_article_id: "integer" },
   ien_tags: { name: "string", ien_article_id: "integer" },
   ier_articles: { title: "string" },
   ier_tags: { name: "string", ier_article_id: "integer" },
@@ -98,78 +94,40 @@ const TEST_SCHEMA = {
   n_tag7s: { name: "string", narticle7_id: "integer" },
   n_tag8s: { name: "string", narticle8_id: "integer" },
   n_tag9s: { name: "string", narticle9_id: "integer" },
-  nad_articles: { title: "string" },
-  nad_tags: { name: "string", nad_article_id: "integer" },
-  narr_articles: { title: "string" },
-  narr_tags: { name: "string", narr_article_id: "integer" },
-  nbuild_articles: { title: "string" },
-  nbuild_tags: { name: "string", nbuild_article_id: "integer" },
-  nd_articles: { title: "string" },
-  nd_tags: { name: "string", nd_article_id: "integer" },
-  nh_articles: { title: "string" },
-  nh_tags: { name: "string", nh_article_id: "integer" },
-  nil_articles: { title: "string" },
-  nil_tags: { name: "string", nil_article_id: "integer" },
-  nlu_articles: { title: "string" },
-  nlu_tags: { name: "string", nlu_article_id: "integer" },
-  nsave_articles: { title: "string" },
-  nsave_tags: { name: "string", nsave_article_id: "integer" },
-  nsh_articles: { title: "string" },
-  nsh_tags: { name: "string", nsh_article_id: "integer" },
-  nsym_articles: { title: "string" },
-  nsym_tags: { name: "string", nsym_article_id: "integer" },
-  num_posts: { title: "string", score: "integer" },
-  nupd_articles: { title: "string" },
-  nupd_tags: { name: "string", nupd_article_id: "integer" },
-  mol_pirates: { catchphrase: "string" },
-  mol_birds: { name: "string", mol_pirate_id: "integer" },
+  ov_pirates: { catchphrase: "string" },
+  ov_ships: { name: "string", ov_pirate_id: "integer" },
   parts: { name: "string", ship_id: "integer" },
   pirates: { catchphrase: "string" },
   plains: { name: "string" },
   posts: { title: "string" },
-  rae_articles: { title: "string" },
-  rae_tags: { name: "string", rae_article_id: "integer" },
-  rnf_articles: { title: "string" },
-  rnf_tags: { name: "string", rnf_article_id: "integer" },
   ships: { name: "string", pirate_id: "integer" },
-  uahm_articles: { title: "string" },
-  uahm_tags: { name: "string", uahm_article_id: "integer" },
 } as const;
 
-// Shared models for the "merge unsaved nested updates with DB rows on load"
-// tests (Rails: NestedAttributesOnACollectionAssociationTests). The collection
-// loader must merge the in-memory target (unsaved nested updates / scheduled
-// destroys, populated synchronously by the `*Attributes=` writer) with the DB
-// rows rather than overwriting them — mirroring CollectionAssociation#load_target
-// (target_records_from_association / merge_target_lists).
-class MolBird extends Base {
-  static {
-    this._tableName = "mol_birds";
-    this.attribute("name", "string");
-    this.attribute("mol_pirate_id", "integer");
-  }
-}
-class MolPirate extends Base {
-  static {
-    this._tableName = "mol_pirates";
-    this.attribute("catchphrase", "string");
-  }
-}
-Associations.hasMany.call(MolPirate, "molBirds", {
-  className: "MolBird",
-  foreignKey: "mol_pirate_id",
-});
-acceptsNestedAttributesFor(MolPirate, "molBirds", { allowDestroy: true });
-registerModel(MolBird);
-registerModel(MolPirate);
-
 // Seed a fresh, unloaded pirate with two persisted birds (mirrors the
-// @pirate / @child_1 / @child_2 fixtures Rails reloads before each test).
-async function seedMolPirate(): Promise<{ pirate: MolPirate; child1: MolBird; child2: MolBird }> {
-  const created = await MolPirate.create({ catchphrase: "Arrr" });
-  const child1 = await MolBird.create({ name: "Posideons Killer", mol_pirate_id: created.id });
-  const child2 = await MolBird.create({ name: "Killer bird", mol_pirate_id: created.id });
-  const pirate = await MolPirate.find(created.id);
+// @pirate / @child_1 / @child_2 fixtures Rails' has-many collection tests
+// reload before each test). Configures `accepts_nested_attributes_for :birds`
+// with allow_destroy so the "scheduled destroys"/"load_target merge" tests
+// (Rails: NestedAttributesOnACollectionAssociationTests) can exercise the
+// in-memory target merge — the collection loader must merge the unsaved nested
+// updates / scheduled destroys populated synchronously by the `*Attributes=`
+// writer with the DB rows rather than overwriting them.
+async function seedPirate(): Promise<{
+  pirate: CanonicalPirate;
+  child1: CanonicalBird;
+  child2: CanonicalBird;
+}> {
+  registerModel(CanonicalBird);
+  registerModel(CanonicalPirate);
+  acceptsNestedAttributesFor(CanonicalPirate, "birds", { allowDestroy: true });
+  const created = await CanonicalPirate.create({
+    catchphrase: "Don' botharrr talkin' like one, savvy?",
+  });
+  const child1 = await CanonicalBird.create({ name: "Posideons Killer", pirate_id: created.id });
+  const child2 = await CanonicalBird.create({
+    name: "Killer bandita Dionne",
+    pirate_id: created.id,
+  });
+  const pirate = await CanonicalPirate.find(created.id);
   return { pirate, child1, child2 };
 }
 
@@ -1590,32 +1548,15 @@ describe("assigning nested attributes target", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("assigning nested attributes target", async () => {
-    class ANTTag extends Base {
-      static {
-        this._tableName = "ant_tags";
-        this.attribute("name", "string");
-        this.attribute("ant_article_id", "integer");
-      }
-    }
-    class ANTArticle extends Base {
-      static {
-        this._tableName = "ant_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(ANTArticle, "antTags", {
-      className: "ANTTag",
-      foreignKey: "ant_article_id",
-    });
-    acceptsNestedAttributesFor(ANTArticle, "antTags");
-    registerModel(ANTTag);
-    registerModel(ANTArticle);
-    const article = await ANTArticle.create({ title: "target test" });
-    assignNestedAttributes(article, "antTags", [{ name: "assigned" }]);
-    await article.save();
-    const tags = await ANTTag.where({ ant_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
-    expect(tags[0].name).toBe("assigned");
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "target test" });
+    assignNestedAttributes(pirate, "birds", [{ name: "assigned" }]);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
+    expect(birds[0].name).toBe("assigned");
   });
 });
 
@@ -1626,34 +1567,17 @@ describe("assigning nested attributes target with nil placeholder for rejected i
     await defineSchema(TEST_SCHEMA);
   });
   it("assigning nested attributes target with nil placeholder for rejected item", async () => {
-    class NilTag extends Base {
-      static {
-        this._tableName = "nil_tags";
-        this.attribute("name", "string");
-        this.attribute("nil_article_id", "integer");
-      }
-    }
-    class NilArticle extends Base {
-      static {
-        this._tableName = "nil_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NilArticle, "nilTags", {
-      className: "NilTag",
-      foreignKey: "nil_article_id",
-    });
-    acceptsNestedAttributesFor(NilArticle, "nilTags", {
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
       rejectIf: (attrs) => !attrs.name || attrs.name === "",
     });
-    registerModel(NilTag);
-    registerModel(NilArticle);
-    const article = await NilArticle.create({ title: "test" });
-    assignNestedAttributes(article, "nilTags", [{ name: "keep" }, { name: "" }]);
-    await article.save();
-    const tags = await NilTag.where({ nil_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
-    expect(tags[0].name).toBe("keep");
+    const pirate = await CanonicalPirate.create({ catchphrase: "test" });
+    assignNestedAttributes(pirate, "birds", [{ name: "keep" }, { name: "" }]);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
+    expect(birds[0].name).toBe("keep");
   });
 });
 
@@ -1666,31 +1590,17 @@ describe("can use symbols as object identifier", () => {
   it("can use symbols as object identifier", async () => {
     // In TypeScript there are no symbols-as-keys in the Ruby sense,
     // but string keys should work as identifiers for nested attributes
-    class NSymTag extends Base {
-      static {
-        this._tableName = "nsym_tags";
-        this.attribute("name", "string");
-        this.attribute("nsym_article_id", "integer");
-      }
-    }
-    class NSymArticle extends Base {
-      static {
-        this._tableName = "nsym_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NSymArticle, "nsymTags", {
-      className: "NSymTag",
-      foreignKey: "nsym_article_id",
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "sym test" });
+    assignNestedAttributes(pirate, "birds", {
+      foo: { name: "Lovely Day" },
+      bar: { name: "Blown Away" },
     });
-    acceptsNestedAttributesFor(NSymArticle, "nsymTags");
-    registerModel(NSymTag);
-    registerModel(NSymArticle);
-    const article = await NSymArticle.create({ title: "sym test" });
-    assignNestedAttributes(article, "nsymTags", [{ name: "sym-tag" }]);
-    await article.save();
-    const tags = await NSymTag.where({ nsym_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(2);
   });
 });
 
@@ -1701,20 +1611,20 @@ describe("numeric column changes from zero to no empty string", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("numeric column changes from zero to no empty string", async () => {
-    class NumPost extends Base {
-      static {
-        this._tableName = "num_posts";
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    const post = await NumPost.create({ title: "test", score: 0 });
-    expect(post.score).toBe(0);
-    // Setting to empty string should not be treated as 0
-    post.score = "";
-    const val = post.score;
-    // Type casting empty string to integer typically yields null or 0
-    expect(val === null || val === 0 || val === "").toBe(true);
+    registerModel(Human);
+    registerModel(Interest);
+    acceptsNestedAttributesFor(Human, "interests");
+
+    await repairValidations(Interest, async () => {
+      Interest.validates("zine_id", { numericality: true });
+      const human = await Human.create({ name: "John" });
+      const interest = await (human as any).interests.create({ topic: "bar", zine_id: 0 });
+      expect(await interest.save()).toBe(true);
+      const updated = await human.update({
+        interestsAttributes: { id: interest.id, zine_id: "foo" },
+      });
+      expect(updated).toBe(false);
+    });
   });
 });
 
@@ -1725,33 +1635,13 @@ describe("should also work with a HashWithIndifferentAccess", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("should also work with a HashWithIndifferentAccess", async () => {
-    class HITag extends Base {
-      static {
-        this._tableName = "hi_tags";
-        this.attribute("name", "string");
-        this.attribute("hi_article_id", "integer");
-      }
-    }
-    class HIArticle extends Base {
-      static {
-        this._tableName = "hi_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(HIArticle, "hiTags", {
-      className: "HITag",
-      foreignKey: "hi_article_id",
-    });
-    acceptsNestedAttributesFor(HIArticle, "hiTags");
-    registerModel(HITag);
-    registerModel(HIArticle);
-    const article = await HIArticle.create({ title: "indifferent" });
-    // JS objects already have indifferent string keys
-    assignNestedAttributes(article, "hiTags", { "0": { name: "tag1" } });
-    await article.save();
-    const tags = await HITag.where({ hi_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
-    expect(tags[0].name).toBe("tag1");
+    // JS objects already have indifferent string keys, so a plain object
+    // stands in for Rails' HashWithIndifferentAccess.
+    const { pirate, child1 } = await seedPirate();
+    assignNestedAttributes(pirate, "birds", { foo: { id: child1.id, name: "Grace OMalley" } });
+    await pirate.save();
+    const reloaded = await CanonicalBird.find(child1.id);
+    expect(reloaded.name).toBe("Grace OMalley");
   });
 });
 
@@ -1762,34 +1652,20 @@ describe("should automatically build new associated models for each entry in a h
     await defineSchema(TEST_SCHEMA);
   });
   it("should automatically build new associated models for each entry in a hash where the id is missing", async () => {
-    class NBuildTag extends Base {
-      static {
-        this._tableName = "nbuild_tags";
-        this.attribute("name", "string");
-        this.attribute("nbuild_article_id", "integer");
-      }
-    }
-    class NBuildArticle extends Base {
-      static {
-        this._tableName = "nbuild_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NBuildArticle, "nbuildTags", {
-      className: "NBuildTag",
-      foreignKey: "nbuild_article_id",
-    });
-    acceptsNestedAttributesFor(NBuildArticle, "nbuildTags");
-    registerModel(NBuildTag);
-    registerModel(NBuildArticle);
-    const article = await NBuildArticle.create({ title: "build test" });
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "build test" });
     // Entries without id should build new records
-    assignNestedAttributes(article, "nbuildTags", [{ name: "new1" }, { name: "new2" }]);
-    await article.save();
-    const tags = await NBuildTag.where({ nbuild_article_id: article.id }).toArray();
-    expect(tags.length).toBe(2);
-    const names = tags.map((t: any) => t.name).sort();
-    expect(names).toEqual(["new1", "new2"]);
+    assignNestedAttributes(pirate, "birds", {
+      foo: { name: "Grace OMalley" },
+      bar: { name: "Privateers Greed" },
+    });
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(2);
+    const names = birds.map((b: any) => b.name).sort();
+    expect(names).toEqual(["Grace OMalley", "Privateers Greed"]);
   });
 });
 
@@ -1800,33 +1676,16 @@ describe("should not assign destroy key to a record", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("should not assign destroy key to a record", async () => {
-    class NADTag extends Base {
-      static {
-        this._tableName = "nad_tags";
-        this.attribute("name", "string");
-        this.attribute("nad_article_id", "integer");
-      }
-    }
-    class NADArticle extends Base {
-      static {
-        this._tableName = "nad_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NADArticle, "nadTags", {
-      className: "NADTag",
-      foreignKey: "nad_article_id",
-    });
-    acceptsNestedAttributesFor(NADArticle, "nadTags");
-    registerModel(NADTag);
-    registerModel(NADArticle);
-    const article = await NADArticle.create({ title: "no destroy key" });
-    assignNestedAttributes(article, "nadTags", [{ name: "keep" }]);
-    await article.save();
-    const tags = await NADTag.where({ nad_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "no destroy key" });
+    assignNestedAttributes(pirate, "birds", [{ name: "keep" }]);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
     // The _destroy key should not be assigned as an attribute
-    expect(tags[0].readAttribute("_destroy" as any)).toBeFalsy();
+    expect(birds[0].readAttribute("_destroy" as any)).toBeFalsy();
   });
 });
 
@@ -1837,34 +1696,17 @@ describe("should not destroy the associated model until the parent is saved", ()
     await defineSchema(TEST_SCHEMA);
   });
   it("should not destroy the associated model until the parent is saved", async () => {
-    class NDTag extends Base {
-      static {
-        this._tableName = "nd_tags";
-        this.attribute("name", "string");
-        this.attribute("nd_article_id", "integer");
-      }
-    }
-    class NDArticle extends Base {
-      static {
-        this._tableName = "nd_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NDArticle, "ndTags", {
-      className: "NDTag",
-      foreignKey: "nd_article_id",
-    });
-    acceptsNestedAttributesFor(NDArticle, "ndTags", { allowDestroy: true });
-    registerModel(NDTag);
-    registerModel(NDArticle);
-    const article = await NDArticle.create({ title: "parent" });
-    const tag = await NDTag.create({ name: "child", nd_article_id: article.id });
-    assignNestedAttributes(article, "ndTags", [{ id: tag.id, _destroy: true }]);
-    // Before save, the tag should still exist
-    const beforeSave = await NDTag.find(tag.id);
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", { allowDestroy: true });
+    const pirate = await CanonicalPirate.create({ catchphrase: "parent" });
+    const bird = await CanonicalBird.create({ name: "child", pirate_id: pirate.id });
+    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true }]);
+    // Before save, the bird should still exist
+    const beforeSave = await CanonicalBird.find(bird.id);
     expect(beforeSave).toBeDefined();
-    await article.save();
-    const afterSave = await NDTag.where({ nd_article_id: article.id }).toArray();
+    await pirate.save();
+    const afterSave = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
     expect(afterSave.length).toBe(0);
   });
 });
@@ -1876,32 +1718,15 @@ describe("should not load association when updating existing records", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("should not load association when updating existing records", async () => {
-    class NLUTag extends Base {
-      static {
-        this._tableName = "nlu_tags";
-        this.attribute("name", "string");
-        this.attribute("nlu_article_id", "integer");
-      }
-    }
-    class NLUArticle extends Base {
-      static {
-        this._tableName = "nlu_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NLUArticle, "nluTags", {
-      className: "NLUTag",
-      foreignKey: "nlu_article_id",
-    });
-    acceptsNestedAttributesFor(NLUArticle, "nluTags");
-    registerModel(NLUTag);
-    registerModel(NLUArticle);
-    const article = await NLUArticle.create({ title: "original" });
-    const tag = await NLUTag.create({ name: "existing", nlu_article_id: article.id });
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "original" });
+    const bird = await CanonicalBird.create({ name: "existing", pirate_id: pirate.id });
     // Update existing record via nested attributes
-    assignNestedAttributes(article, "nluTags", [{ id: tag.id, name: "updated" }]);
-    await article.save();
-    const reloaded = await NLUTag.find(tag.id);
+    assignNestedAttributes(pirate, "birds", [{ id: bird.id, name: "updated" }]);
+    await pirate.save();
+    const reloaded = await CanonicalBird.find(bird.id);
     expect(reloaded.name).toBe("updated");
   });
 });
@@ -1913,10 +1738,10 @@ describe("should not overwrite unsaved updates when loading association", () => 
     await defineSchema(TEST_SCHEMA);
   });
   it("should not overwrite unsaved updates when loading association", async () => {
-    const { pirate, child1 } = await seedMolPirate();
-    (pirate as any).molBirdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
-    const target = await collectionProxyFor(pirate, "molBirds").loadTarget();
-    const found = target.find((r: MolBird) => String(r.id) === String(child1.id));
+    const { pirate, child1 } = await seedPirate();
+    (pirate as any).birdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
+    const target = await collectionProxyFor(pirate, "birds").loadTarget();
+    const found = target.find((r) => String(r.id) === String(child1.id));
     expect(found!.name).toBe("Grace OMalley");
   });
 });
@@ -1928,10 +1753,10 @@ describe("should not remove scheduled destroys when loading association", () => 
     await defineSchema(TEST_SCHEMA);
   });
   it("should not remove scheduled destroys when loading association", async () => {
-    const { pirate, child1 } = await seedMolPirate();
-    (pirate as any).molBirdsAttributes = [{ id: child1.id, _destroy: "1" }];
-    const target = await collectionProxyFor(pirate, "molBirds").loadTarget();
-    const found = target.find((r: MolBird) => String(r.id) === String(child1.id));
+    const { pirate, child1 } = await seedPirate();
+    (pirate as any).birdsAttributes = [{ id: child1.id, _destroy: "1" }];
+    const target = await collectionProxyFor(pirate, "birds").loadTarget();
+    const found = target.find((r) => String(r.id) === String(child1.id));
     expect(isMarkedForDestruction(found!)).toBe(true);
   });
 });
@@ -1943,9 +1768,9 @@ describe("should preserve order when not overwriting unsaved updates", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("should preserve order when not overwriting unsaved updates", async () => {
-    const { pirate, child1 } = await seedMolPirate();
-    (pirate as any).molBirdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
-    const target = await collectionProxyFor(pirate, "molBirds").loadTarget();
+    const { pirate, child1 } = await seedPirate();
+    (pirate as any).birdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
+    const target = await collectionProxyFor(pirate, "birds").loadTarget();
     expect(String(target[0].id)).toBe(String(child1.id));
   });
 });
@@ -1957,30 +1782,13 @@ describe("should raise RecordNotFound if an id belonging to a different record i
     await defineSchema(TEST_SCHEMA);
   });
   it("should raise RecordNotFound if an id belonging to a different record is given", async () => {
-    class RNFTag extends Base {
-      static {
-        this._tableName = "rnf_tags";
-        this.attribute("name", "string");
-        this.attribute("rnf_article_id", "integer");
-      }
-    }
-    class RNFArticle extends Base {
-      static {
-        this._tableName = "rnf_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(RNFArticle, "rnfTags", {
-      className: "RNFTag",
-      foreignKey: "rnf_article_id",
-    });
-    acceptsNestedAttributesFor(RNFArticle, "rnfTags");
-    registerModel(RNFTag);
-    registerModel(RNFArticle);
-    const article = await RNFArticle.create({ title: "test" });
-    // Use a non-existent id
-    assignNestedAttributes(article, "rnfTags", [{ id: 999999, name: "ghost" }]);
-    await expect(article.save()).rejects.toThrow(RecordNotFound);
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "test" });
+    // An id that belongs to no bird of this pirate must not resolve.
+    assignNestedAttributes(pirate, "birds", [{ id: 999999, name: "ghost" }]);
+    await expect(pirate.save()).rejects.toThrow(RecordNotFound);
   });
 });
 
@@ -1991,29 +1799,12 @@ describe("should raise an UnknownAttributeError for non existing nested attribut
     await defineSchema(TEST_SCHEMA);
   });
   it("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
-    class UAHMTag extends Base {
-      static {
-        this._tableName = "uahm_tags";
-        this.attribute("name", "string");
-        this.attribute("uahm_article_id", "integer");
-      }
-    }
-    class UAHMArticle extends Base {
-      static {
-        this._tableName = "uahm_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(UAHMArticle, "uahmTags", {
-      className: "UAHMTag",
-      foreignKey: "uahm_article_id",
-    });
-    acceptsNestedAttributesFor(UAHMArticle, "uahmTags");
-    registerModel(UAHMTag);
-    registerModel(UAHMArticle);
-    const article = await UAHMArticle.create({ title: "test" });
-    assignNestedAttributes(article, "uahmTags", [{ name: "ok", bogusAttr: "bad" }]);
-    await expect(article.save()).rejects.toThrow(/unknown attribute/);
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "test" });
+    assignNestedAttributes(pirate, "birds", [{ name: "ok", bogusAttr: "bad" }]);
+    await expect(pirate.save()).rejects.toThrow(/unknown attribute/);
   });
 });
 
@@ -2024,28 +1815,11 @@ describe("should raise an argument error if something else than a hash is passed
     await defineSchema(TEST_SCHEMA);
   });
   it("should raise an argument error if something else than a hash is passed", async () => {
-    class RAETag extends Base {
-      static {
-        this._tableName = "rae_tags";
-        this.attribute("name", "string");
-        this.attribute("rae_article_id", "integer");
-      }
-    }
-    class RAEArticle extends Base {
-      static {
-        this._tableName = "rae_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(RAEArticle, "raeTags", {
-      className: "RAETag",
-      foreignKey: "rae_article_id",
-    });
-    acceptsNestedAttributesFor(RAEArticle, "raeTags");
-    registerModel(RAETag);
-    registerModel(RAEArticle);
-    const article = new RAEArticle({ title: "test" });
-    expect(() => assignNestedAttributes(article, "raeTags", "not a hash" as any)).toThrow(
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = new CanonicalPirate({ catchphrase: "test" });
+    expect(() => assignNestedAttributes(pirate, "birds", "not a hash" as any)).toThrow(
       /Hash or Array expected/,
     );
   });
@@ -2058,9 +1832,9 @@ describe("should refresh saved records when not overwriting unsaved updates", ()
     await defineSchema(TEST_SCHEMA);
   });
   it("should refresh saved records when not overwriting unsaved updates", async () => {
-    const { pirate } = await seedMolPirate();
-    const proxy = collectionProxyFor(pirate, "molBirds") as any;
-    const record = new MolBird({ name: "Grace OMalley", mol_pirate_id: pirate.id });
+    const { pirate } = await seedPirate();
+    const proxy = collectionProxyFor(pirate, "birds") as any;
+    const record = new CanonicalBird({ name: "Grace OMalley", pirate_id: pirate.id });
     await proxy.push(record);
     await record.save();
     const loaded = await proxy.loadTarget();
@@ -2078,32 +1852,15 @@ describe("should save only one association on create", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("should save only one association on create", async () => {
-    class NSaveTag extends Base {
-      static {
-        this._tableName = "nsave_tags";
-        this.attribute("name", "string");
-        this.attribute("nsave_article_id", "integer");
-      }
-    }
-    class NSaveArticle extends Base {
-      static {
-        this._tableName = "nsave_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NSaveArticle, "nsaveTags", {
-      className: "NSaveTag",
-      foreignKey: "nsave_article_id",
-    });
-    acceptsNestedAttributesFor(NSaveArticle, "nsaveTags");
-    registerModel(NSaveTag);
-    registerModel(NSaveArticle);
-    const article = await NSaveArticle.create({ title: "one assoc" });
-    assignNestedAttributes(article, "nsaveTags", [{ name: "only-one" }]);
-    await article.save();
-    const tags = await NSaveTag.where({ nsave_article_id: article.id }).toArray();
-    expect(tags.length).toBe(1);
-    expect(tags[0].name).toBe("only-one");
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "one assoc" });
+    assignNestedAttributes(pirate, "birds", { foo: { name: "Grace OMalley" } });
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
+    expect(birds[0].name).toBe("Grace OMalley");
   });
 });
 
@@ -2114,38 +1871,23 @@ describe("should sort the hash by the keys before building new associated models
     await defineSchema(TEST_SCHEMA);
   });
   it("should sort the hash by the keys before building new associated models", async () => {
-    class NSHTag extends Base {
-      static {
-        this._tableName = "nsh_tags";
-        this.attribute("name", "string");
-        this.attribute("nsh_article_id", "integer");
-      }
-    }
-    class NSHArticle extends Base {
-      static {
-        this._tableName = "nsh_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NSHArticle, "nshTags", {
-      className: "NSHTag",
-      foreignKey: "nsh_article_id",
-    });
-    acceptsNestedAttributesFor(NSHArticle, "nshTags");
-    registerModel(NSHTag);
-    registerModel(NSHArticle);
-    const article = await NSHArticle.create({ title: "sort test" });
-    assignNestedAttributes(article, "nshTags", {
+    registerModel(CanonicalBird);
+    registerModel(CanonicalPirate);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
+    const pirate = await CanonicalPirate.create({ catchphrase: "sort test" });
+    // Keys are sorted before the new birds are built, so the out-of-order
+    // hash yields birds in key order.
+    assignNestedAttributes(pirate, "birds", {
       "2": { name: "third" },
       "0": { name: "first" },
       "1": { name: "second" },
     });
-    await article.save();
-    const tags = await NSHTag.where({ nsh_article_id: article.id }).toArray();
-    expect(tags.length).toBe(3);
-    expect(tags[0].name).toBe("first");
-    expect(tags[1].name).toBe("second");
-    expect(tags[2].name).toBe("third");
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(3);
+    expect(birds[0].name).toBe("first");
+    expect(birds[1].name).toBe("second");
+    expect(birds[2].name).toBe("third");
   });
 });
 
@@ -2156,32 +1898,14 @@ describe("should take a hash and assign the attributes to the associated models"
     await defineSchema(TEST_SCHEMA);
   });
   it("should take a hash and assign the attributes to the associated models", async () => {
-    class NHTag extends Base {
-      static {
-        this._tableName = "nh_tags";
-        this.attribute("name", "string");
-        this.attribute("nh_article_id", "integer");
-      }
-    }
-    class NHArticle extends Base {
-      static {
-        this._tableName = "nh_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NHArticle, "nhTags", {
-      className: "NHTag",
-      foreignKey: "nh_article_id",
-    });
-    acceptsNestedAttributesFor(NHArticle, "nhTags");
-    registerModel(NHTag);
-    registerModel(NHArticle);
-    const article = await NHArticle.create({ title: "nested" });
-    const tag = await NHTag.create({ name: "ruby", nh_article_id: article.id });
-    assignNestedAttributes(article, "nhTags", [{ id: tag.id, name: "rails" }]);
-    await article.save();
-    const reloaded = await NHTag.find(tag.id);
-    expect(reloaded.name).toBe("rails");
+    const { pirate, child1, child2 } = await seedPirate();
+    (pirate as any).birdsAttributes = {
+      foo: { id: child1.id, name: "Grace OMalley" },
+      bar: { id: child2.id, name: "Privateers Greed" },
+    };
+    const birds = await collectionProxyFor(pirate, "birds").loadTarget();
+    expect(birds[0].name).toBe("Grace OMalley");
+    expect(birds[birds.length - 1].name).toBe("Privateers Greed");
   });
 });
 
@@ -2223,31 +1947,14 @@ describe("should take an array and assign the attributes to the associated model
     await defineSchema(TEST_SCHEMA);
   });
   it("should take an array and assign the attributes to the associated models", async () => {
-    class NArrTag extends Base {
-      static {
-        this._tableName = "narr_tags";
-        this.attribute("name", "string");
-        this.attribute("narr_article_id", "integer");
-      }
-    }
-    class NArrArticle extends Base {
-      static {
-        this._tableName = "narr_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NArrArticle, "narrTags", {
-      className: "NArrTag",
-      foreignKey: "narr_article_id",
-    });
-    acceptsNestedAttributesFor(NArrArticle, "narrTags");
-    registerModel(NArrTag);
-    registerModel(NArrArticle);
-    const article = await NArrArticle.create({ title: "array test" });
-    assignNestedAttributes(article, "narrTags", [{ name: "ruby" }, { name: "rails" }]);
-    await article.save();
-    const tags = await NArrTag.where({ narr_article_id: article.id }).toArray();
-    expect(tags.length).toBe(2);
+    const { pirate, child1, child2 } = await seedPirate();
+    (pirate as any).birdsAttributes = [
+      { id: child1.id, name: "Grace OMalley" },
+      { id: child2.id, name: "Privateers Greed" },
+    ];
+    await pirate.save();
+    expect((await CanonicalBird.find(child1.id)).name).toBe("Grace OMalley");
+    expect((await CanonicalBird.find(child2.id)).name).toBe("Privateers Greed");
   });
 });
 
@@ -2258,33 +1965,12 @@ describe("should work with update as well", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("should work with update as well", async () => {
-    class NUpdTag extends Base {
-      static {
-        this._tableName = "nupd_tags";
-        this.attribute("name", "string");
-        this.attribute("nupd_article_id", "integer");
-      }
-    }
-    class NUpdArticle extends Base {
-      static {
-        this._tableName = "nupd_articles";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NUpdArticle, "nupdTags", {
-      className: "NUpdTag",
-      foreignKey: "nupd_article_id",
+    const { pirate, child1 } = await seedPirate();
+    await pirate.update({
+      catchphrase: "Arr",
+      birdsAttributes: { foo: { id: child1.id, name: "Grace OMalley" } },
     });
-    acceptsNestedAttributesFor(NUpdArticle, "nupdTags");
-    registerModel(NUpdTag);
-    registerModel(NUpdArticle);
-    const article = await NUpdArticle.create({ title: "update test" });
-    const tag = await NUpdTag.create({ name: "old", nupd_article_id: article.id });
-    // Update existing record via nested attributes
-    assignNestedAttributes(article, "nupdTags", [{ id: tag.id, name: "updated" }]);
-    await article.save();
-    const reloaded = await NUpdTag.find(tag.id);
-    expect(reloaded.name).toBe("updated");
+    expect((await CanonicalBird.find(child1.id)).name).toBe("Grace OMalley");
   });
 });
 
