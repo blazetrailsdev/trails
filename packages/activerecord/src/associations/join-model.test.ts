@@ -22,7 +22,7 @@ import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
-import { Author, AuthorFavorite } from "../test-helpers/models/author.js";
+import { Author, AuthorAddress, AuthorFavorite } from "../test-helpers/models/author.js";
 import {
   Post,
   SpecialPost,
@@ -34,7 +34,7 @@ import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
-import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
+import { Comment, SpecialComment, VerySpecialComment } from "../test-helpers/models/comment.js";
 import { Item } from "../test-helpers/models/item.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Citation } from "../test-helpers/models/citation.js";
@@ -87,6 +87,7 @@ describe("AssociationsJoinModelTest", () => {
   const { authors, posts, categories, tags, taggings, comments, items, books, vertices } =
     useHandlerFixtures([
       "authors",
+      "authorAddresses",
       "posts",
       "categories",
       "categorizations",
@@ -107,6 +108,8 @@ describe("AssociationsJoinModelTest", () => {
   registerModel(Categorization);
   registerModel(Comment);
   registerModel(SpecialComment);
+  registerModel(VerySpecialComment);
+  registerModel(AuthorAddress);
   registerModel(Item);
   registerModel(SpecialPost);
   registerModel(SubAbstractStiPost);
@@ -1042,6 +1045,204 @@ describe("AssociationsJoinModelTest", () => {
 
     const loadedTags = (await (order as any).orderTagNames.toArray()) as Base[];
     expect(loadedTags.map((t) => (t as any).id)).toEqual([(tag as any).id]);
+  });
+
+
+  it("has many distinct through count", async () => {
+    const author = (await Author.find(authors("mary").id)) as Author;
+    expect((author as any).uniqueCategorizedPosts.loaded).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await (author as any).uniqueCategorizedPosts.count()).toBe(1);
+    });
+    await assertQueriesCount(1, false, async () => {
+      expect(await (author as any).uniqueCategorizedPosts.count("title")).toBe(1);
+    });
+    await assertQueriesCount(1, false, async () => {
+      expect(
+        await (author as any).uniqueCategorizedPosts.where({ title: null }).count("title"),
+      ).toBe(0);
+    });
+    expect((author as any).uniqueCategorizedPosts.loaded).toBe(false);
+  });
+
+  it("polymorphic has many going through join model", async () => {
+    const post = (await Post.includes("tags").find(posts("welcome").id)) as Post;
+    const tag = ((post as any).tags.target as Base[])[0];
+    expect(tag.id).toBe(tags("general").id);
+    await assertNoQueries(false, async () => {
+      void (tag as any).tagging;
+    });
+  });
+
+  it("polymorphic has many going through join model with find", async () => {
+    const post = (await Post.includes("tags").find(posts("welcome").id)) as Post;
+    const tag = ((post as any).tags.target as Base[])[0];
+    expect(tag.id).toBe(tags("general").id);
+    await assertNoQueries(false, async () => {
+      void (tag as any).tagging;
+    });
+  });
+
+  it("polymorphic has many going through join model with include on source reflection", async () => {
+    const post = (await Post.includes("funkyTags").find(posts("welcome").id)) as Post;
+    const tag = ((post as any).funkyTags.target as Base[])[0];
+    expect(tag.id).toBe(tags("general").id);
+    await assertNoQueries(false, async () => {
+      void (tag as any).tagging;
+    });
+  });
+
+  it("polymorphic has many going through join model with include on source reflection with find", async () => {
+    const post = (await Post.includes("funkyTags").find(posts("welcome").id)) as Post;
+    const tag = ((post as any).funkyTags.target as Base[])[0];
+    expect(tag.id).toBe(tags("general").id);
+    await assertNoQueries(false, async () => {
+      void (tag as any).tagging;
+    });
+  });
+
+  it.skip("polymorphic has many going through join model with custom select and joins", async () => {
+    // trails does not support association extension blocks (add_joins_and_select)
+  });
+
+  it("polymorphic has many going through join model with custom foreign key", async () => {
+    const tagging = (await Tagging.find(taggings("welcome_general").id)) as Tagging;
+    const superTag = (await loadBelongsTo(tagging, "superTag", {
+      className: "Tag",
+      foreignKey: "super_tag_id",
+    })) as Base;
+    expect(superTag.id).toBe(tags("misc").id);
+    const post = (await Post.find(posts("welcome").id)) as Post;
+    const superTagsList = (await (post as any).superTags.toArray()) as Base[];
+    expect(superTagsList[0].id).toBe(tags("misc").id);
+  });
+
+  it("include has many through polymorphic has many", async () => {
+    const author = (await Author.includes("taggings").find(authors("david").id)) as Author;
+    const expectedIds = [taggings("welcome_general").id, taggings("thinking_general").id]
+      .map(Number)
+      .sort((a, b) => a - b);
+    await assertNoQueries(false, async () => {
+      const actual = ((author as any).taggings.target as Base[])
+        .map((t) => Number(t.id))
+        .sort((a, b) => a - b);
+      expect(actual).toEqual(expectedIds);
+    });
+  });
+
+  it("eager load has many through has many", async () => {
+    const author = (await Author.where({ name: "David" })
+      .includes("comments")
+      .order("comments.id")
+      .first()) as Author;
+    SpecialComment.new();
+    VerySpecialComment.new();
+    await assertNoQueries(false, async () => {
+      const ids = ((author as any).comments.target as Base[]).map((c) => Number(c.id));
+      expect(ids).toEqual([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 13]);
+    });
+  });
+
+  it("eager load has many through has many with conditions", async () => {
+    const post = (await Post.includes("invalidTags").first()) as Post;
+    await assertNoQueries(false, async () => {
+      await (post as any).invalidTags.toArray();
+    });
+  });
+
+  it("eager belongs to and has one not singularized", async () => {
+    await expect(Author.includes("authorAddress").first()).resolves.not.toThrow();
+    await expect(AuthorAddress.includes("author").first()).resolves.not.toThrow();
+  });
+
+  it("associating unsaved records with has many through", async () => {
+    const savedPost = (await Post.find(posts("thinking").id)) as Post;
+    const newTag = Tag.new({ name: "new" }) as Tag;
+
+    await (savedPost as any).tags.push(newTag);
+    expect((newTag as any).isPersisted()).toBe(true);
+    expect((savedPost as any).isPersisted()).toBe(true);
+    expect(((savedPost as any).tags.target as Base[]).map((t) => t.id)).toContain(newTag.id);
+
+    expect((newTag as any).isPersisted()).toBe(true);
+    await (savedPost as any).reload();
+    await (savedPost as any).tags.reload();
+    expect(((savedPost as any).tags.target as Base[]).map((t) => t.id)).toContain(newTag.id);
+
+    const newPost = Post.new({
+      title: "Association replacement works!",
+      body: "You best believe it.",
+    }) as Post;
+    const savedTag = (await Tag.find(tags("general").id)) as Tag;
+
+    await (newPost as any).tags.push(savedTag);
+    expect((newPost as any).isPersisted()).toBe(false);
+    expect((savedTag as any).isPersisted()).toBe(true);
+    expect(((newPost as any).tags.target as Base[]).map((t) => t.id)).toContain(savedTag.id);
+
+    await (newPost as any).save();
+    expect((newPost as any).isPersisted()).toBe(true);
+    await (newPost as any).reload();
+    await (newPost as any).tags.reload();
+    expect(((newPost as any).tags.target as Base[]).map((t) => t.id)).toContain(savedTag.id);
+
+    expect(((savedPost as any).tags.build() as any).isPersisted()).toBe(false);
+    expect(((savedPost as any).tags.new() as any).isPersisted()).toBe(false);
+  });
+
+  it("has many through collection size doesnt load target if not loaded", async () => {
+    const author = (await Author.find(authors("david").id)) as Author;
+    expect(await (author as any).comments.size()).toBe(11);
+    expect((author as any).comments.loaded).toBe(false);
+  });
+
+  it("has many through collection size uses counter cache if it exists", async () => {
+    const c = (await Category.find(categories("general").id)) as Category;
+    (c as any)._writeAttribute("categorizations_count", 100);
+    expect(await (c as any).categorizations.size()).toBe(100);
+    expect((c as any).categorizations.loaded).toBe(false);
+  });
+
+  it.skip("adding to has many through should return self", async () => {
+    // trails: CollectionProxy#push returns void, not self — convergence tracked in RFC 0023
+  });
+
+  it("has many through sum uses calculations", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    await expect((david as any).comments.sum("post_id")).resolves.not.toThrow();
+  });
+
+  it("calculations on has many through should disambiguate fields", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    await expect((david as any).categories.maximum("id")).resolves.not.toThrow();
+  });
+
+  it("calculations on has many through should not disambiguate fields unless necessary", async () => {
+    const david = (await Author.find(authors("david").id)) as Author;
+    await expect((david as any).categories.maximum("categories.id")).resolves.not.toThrow();
+  });
+
+  it("preload polymorphic has many through", async () => {
+    const posts = (await Post.order("posts.id").toArray()) as Base[];
+    const postsWithTags = (await Post.includes("tags").order("posts.id").toArray()) as Base[];
+    expect(posts.length).toBe(postsWithTags.length);
+    for (let i = 0; i < posts.length; i++) {
+      const expectedLen = ((await (posts[i] as any).tags.toArray()) as Base[]).length;
+      await assertNoQueries(false, async () => {
+        const len = ((postsWithTags[i] as any).tags.target as Base[]).length;
+        expect(len).toBe(expectedLen);
+      });
+    }
+  });
+
+  it.skip("proper error message for eager load and includes association errors", async () => {
+    // trails: throws ArgumentError not ConfigurationError for unknown associations —
+    // convergence tracked in RFC 0023
+  });
+
+  it.skip("eager association with scope with string joins", async () => {
+    // trails: scope string joins in hasOne association scopes produce invalid SQL on SQLite —
+    // convergence tracked in RFC 0023
   });
 
   it("has many through goes through all sti classes", async () => {
