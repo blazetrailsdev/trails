@@ -1892,7 +1892,7 @@ describe("attribute_alias arelTable integration", () => {
 
 describe("AttributeMethodsTest", () => {
   // Rails: a model that overrides only the writer still gets the generated reader
-  // (activerecord/test/cases/attribute_methods_test.rb — bulb color= fixture).
+  // (activerecord/test/models/bulb.rb:27-29 — color= override, no explicit reader).
   it("setter-only override does not suppress generated reader", () => {
     class Widget extends Base {
       static {
