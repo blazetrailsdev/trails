@@ -22,6 +22,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Base } from "../base.js";
 import { registerModel } from "../associations.js";
 import * as associationsModule from "../associations.js";
+import { CompositePrimaryKeyMismatchError } from "./errors.js";
 
 class CompositePkParent extends Base {
   static _tableName = "cpk_seed_parents";
@@ -126,8 +127,6 @@ describe("belongs_to to a composite-PK target without an id column", () => {
     // `Association#initialize` (now mirrored in the `Association` constructor),
     // so this misconfiguration raises on first `association()` access rather
     // than being silently inferred.
-    expect(() => child.association("tenantPkParent")).toThrow(
-      /composite primary key \/ foreign key length mismatch/,
-    );
+    expect(() => child.association("tenantPkParent")).toThrow(CompositePrimaryKeyMismatchError);
   });
 });

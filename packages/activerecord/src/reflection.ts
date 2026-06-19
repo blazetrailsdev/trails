@@ -37,6 +37,7 @@ import {
   HasOneThroughCantAssociateThroughCollection,
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
+  CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
 import { isFinderNeedsTypeCondition, polymorphicName, typeCondition } from "./inheritance.js";
 
@@ -1061,19 +1062,16 @@ export class AssociationReflection extends MacroReflection {
         Array.isArray(this.foreignKey))
     ) {
       const fk = this.foreignKey;
+      // Rails raises `CompositePrimaryKeyMismatchError` here (reflection.rb:618).
+      // has_one/collection compare against the owner's active_record_primary_key;
+      // belongs_to against the target's association_primary_key.
       if (this.hasOne() || this.isCollection()) {
         if (arrayLen(this.activeRecordPrimaryKey) !== arrayLen(fk)) {
-          throw new Error(
-            `Association ${this.name}: composite primary key / foreign key length mismatch ` +
-              `(${arrayLen(this.activeRecordPrimaryKey)} primary key column(s) vs ${arrayLen(fk)} foreign key column(s))`,
-          );
+          throw new CompositePrimaryKeyMismatchError(this.activeRecord.name, this.name);
         }
       } else if (this.belongsTo()) {
         if (arrayLen(this.associationPrimaryKey) !== arrayLen(fk)) {
-          throw new Error(
-            `Association ${this.name}: composite primary key / foreign key length mismatch ` +
-              `(${arrayLen(this.associationPrimaryKey)} primary key column(s) vs ${arrayLen(fk)} foreign key column(s))`,
-          );
+          throw new CompositePrimaryKeyMismatchError(this.activeRecord.name, this.name);
         }
       }
     }
