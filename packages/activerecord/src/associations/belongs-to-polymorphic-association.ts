@@ -114,7 +114,8 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     // target, so this branch applies to polymorphic belongs_to too — without it
     // a scalar `<name>_id` FK would zip against the 2-column target PK.
     if (record) {
-      return inferCompositePrimaryKey((record.constructor as any).primaryKey);
+      const recordPk = (record.constructor as any).primaryKey;
+      if (recordPk) return inferCompositePrimaryKey(recordPk);
     }
     // Polymorphic belongs_to: this.klass is dynamic — resolved at runtime
     // from the _type column. Preserve the base class's klass-fallback for
