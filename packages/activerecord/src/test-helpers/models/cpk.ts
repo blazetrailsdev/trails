@@ -272,6 +272,7 @@ export class CpkReview extends Base {
 // cpk/car.rb
 export class CpkCar extends Base {
   static _tableName = "cpk_cars";
+  static _demodulizedName = "Car";
 
   static {
     this.hasMany("carReviews", {
@@ -284,6 +285,12 @@ export class CpkCar extends Base {
 // cpk/car_review.rb
 export class CpkCarReview extends Base {
   static _tableName = "cpk_car_reviews";
+  static _demodulizedName = "CarReview";
+  // Rails sets `automatically_invert_plural_associations = true` globally in
+  // test/cases/helper.rb; localized here so the belongs_to :car inverse
+  // (Car#car_reviews, plural) is discoverable. Tracked for global convergence:
+  // story automatically-invert-plural-global-config.
+  static automaticallyInvertPluralAssociations = true;
 
   static {
     this.belongsTo("car", { className: "CpkCar", foreignKey: ["car_make", "car_model"] });

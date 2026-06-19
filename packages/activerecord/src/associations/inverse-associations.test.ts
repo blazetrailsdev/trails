@@ -21,6 +21,7 @@ import { Interest } from "../test-helpers/models/interest.js";
 import { Zine } from "../test-helpers/models/zine.js";
 import { MixedCaseMonkey } from "../test-helpers/models/mixed-case-monkey.js";
 import { Car } from "../test-helpers/models/car.js";
+import { CpkCar, CpkCarReview } from "../test-helpers/models/cpk.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Rating } from "../test-helpers/models/rating.js";
@@ -110,6 +111,8 @@ describe("AutomaticInverseFindingTests", () => {
       SpecialContract,
       Book,
       Subscription,
+      CpkCar,
+      CpkCarReview,
     ].forEach((m) => registerModel(m));
   });
 
@@ -267,8 +270,9 @@ describe("AutomaticInverseFindingTests", () => {
   });
 
   it.skip("belongs to should find inverse has many automatically", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs
-    // automatically_invert_plural_associations + Book/Subscriber round-trip.
+    // Tracked: story inverse-hmt-build-through-plural-invert. Needs
+    // Subscription.automaticallyInvertPluralAssociations + has_many-:through
+    // build (book.subscribers.new round-trip).
   });
 
   it("polymorphic and has many through relationships should not have inverses", () => {
@@ -284,14 +288,16 @@ describe("AutomaticInverseFindingTests", () => {
     expect(humanReflection.hasInverse()).toBe(true);
   });
 
-  it.skip("has many inverse of derived automatically despite of composite foreign key", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs the Cpk::Car /
-    // Cpk::CarReview canonical models + demodulize-based inverse derivation.
+  it("has many inverse of derived automatically despite of composite foreign key", () => {
+    const carReviewReflection = (CpkCar as any).reflectOnAssociation("carReviews");
+    expect(carReviewReflection.hasInverse()).toBe(true);
+    expect(carReviewReflection.inverseOf()).toBe((CpkCarReview as any).reflectOnAssociation("car"));
   });
 
-  it.skip("belongs to inverse of derived automatically despite of composite foreign key", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs the Cpk::Car /
-    // Cpk::CarReview canonical models + demodulize-based inverse derivation.
+  it("belongs to inverse of derived automatically despite of composite foreign key", () => {
+    const carReflection = (CpkCarReview as any).reflectOnAssociation("car");
+    expect(carReflection.hasInverse()).toBe(true);
+    expect(carReflection.inverseOf()).toBe((CpkCar as any).reflectOnAssociation("carReviews"));
   });
 });
 
@@ -354,7 +360,7 @@ describe("InverseAssociationTests", () => {
   });
 
   it.skip("this inverse stuff", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs Firm/Project/
+    // Tracked: story inverse-hasone-through-inverse-of. Needs Firm/Project/
     // Developer canonical models + has_one :through inverse_of (lead_developer).
   });
 });
@@ -690,7 +696,7 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("inverse should be set on composite primary key child", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs Cpk::Author /
+    // Tracked: story inverse-cpk-build-composite-pk-child. Needs Cpk::Author /
     // Cpk::Book / Cpk::Order canonical models + composite-PK build inverse.
   });
 
@@ -938,12 +944,12 @@ describe("InverseBelongsToTests", () => {
   });
 
   it.skip("unscope does not set inverse when incorrect", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs relation
+    // Tracked: story inverse-relation-or-unscope-guard. Needs relation
     // .or()/.unscope() inversable? guard semantics.
   });
 
   it.skip("or does not set inverse when incorrect", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs relation
+    // Tracked: story inverse-relation-or-unscope-guard. Needs relation
     // .or()/.unscope() inversable? guard semantics.
   });
 
@@ -1010,7 +1016,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it.skip("eager loaded child instance should be shared with parent on find", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Polymorphic eager
+    // Tracked: story inverse-polymorphic-eager-load-preload. Polymorphic eager
     // load via includes() throws EagerLoadPolymorphicError — preloading
     // (separate queries per type, as Rails does) is not yet implemented.
   });
