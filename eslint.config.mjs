@@ -558,4 +558,21 @@ export default defineConfig(
       "no-undef": "off",
     },
   },
+
+  // ── no-unnecessary-type-assertion (typed lint, scoped) ──
+  // Requires TypeScript program wiring (projectService) to detect provably-
+  // redundant casts/non-null assertions. Kept in its own block so we don't
+  // pull in all of recommendedTypeChecked — only this one rule runs typed.
+  {
+    files: ["**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+    },
+  },
 );

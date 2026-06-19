@@ -3,7 +3,7 @@ import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 
 const stubSource: SchemaSource = { tables: () => [], columns: () => [], indexes: () => [] };
-const make = () => SchemaDumper.create(stubSource) as SchemaDumper;
+const make = () => SchemaDumper.create(stubSource);
 const col = (
   o: {
     name?: string;

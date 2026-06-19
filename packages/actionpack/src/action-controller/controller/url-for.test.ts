@@ -280,7 +280,7 @@ describe("UrlForTest", () => {
       only_path: true,
       params: { query: { person: { name: "Bob", position: "prof" }, hobby: "piercing" } },
     });
-    const params = url.split("?")[1]!.split("&").sort();
+    const params = url.split("?")[1].split("&").sort();
     expect(params).toContain("query%5Bhobby%5D=piercing");
     expect(params).toContain("query%5Bperson%5D%5Bname%5D=Bob");
     expect(params).toContain("query%5Bperson%5D%5Bposition%5D=prof");
@@ -295,7 +295,7 @@ describe("UrlForTest", () => {
       },
     });
     expect(url).toMatch(/^\/c\/a\/101/);
-    const params = url.split("?")[1]!.split("&").sort();
+    const params = url.split("?")[1].split("&").sort();
     expect(params).toContain("query%5Bhobby%5D=piercing");
     expect(params).toContain("query%5Bperson%5D%5Bname%5D=Bob");
     expect(params).toContain("query%5Bperson%5D%5Bposition%5D%5B%5D=prof");

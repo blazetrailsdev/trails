@@ -348,7 +348,7 @@ export class IndexDefinition {
     this.lengths =
       typeof options.lengths === "number"
         ? options.lengths
-        : this.conciseOptions((options.lengths ?? {}) as Record<string, number>);
+        : this.conciseOptions(options.lengths ?? {});
     this.opclasses = this.conciseOptions(options.opclasses ?? {});
     this.type = options.type;
     this.using = options.using;
@@ -413,7 +413,7 @@ export class IndexDefinition {
   private conciseOptions<T>(options: Record<string, T>): Record<string, T> | T {
     const values = Object.values(options);
     if (this.columns.length === values.length && new Set(values).size === 1) {
-      return values[0] as T;
+      return values[0];
     }
     return options;
   }
@@ -480,7 +480,7 @@ export class ReferenceDefinition {
 
   addTo(table: TableDefinition): void {
     for (const [colName, colType, colOpts] of this._columns()) {
-      table.column(colName, colType as ColumnType, colOpts as ColumnOptions);
+      table.column(colName, colType, colOpts);
     }
     if (this.index) {
       table.index(this.columnNames(), this.indexOptions(table.tableName));
@@ -716,7 +716,7 @@ export class TableDefinition {
         // Hash form: id: { type: "string", collation: "utf8mb4_bin" }
         // Mirrors Rails set_primary_key: outer options (incl. default) merge first,
         // then id.except(:type) merges on top, so hash wins on collision.
-        const { type: idType, ...idRest } = this._id as IdHashOptions;
+        const { type: idType, ...idRest } = this._id;
         // Use truthiness so any falsy value (empty string, null) falls back, matching
         // Rails' `id.delete(:type) || :primary_key`.
         pkType = (idType || "primary_key") as string as ColumnType;
@@ -759,7 +759,7 @@ export class TableDefinition {
     if (id === false || this.as) return;
 
     const pkName = primaryKey ?? "id";
-    const pkType = (typeof id === "string" ? id : "primary_key") as ColumnType;
+    const pkType = typeof id === "string" ? id : "primary_key";
     this.columns.unshift(this.newColumnDefinition(pkName, pkType, { primaryKey: true }));
   }
 
@@ -1200,7 +1200,7 @@ export class Table {
   ): NonNullable<SchemaStatementsLike[K]> {
     const fn = this._schema[method];
     if (!fn) throw new Error(`${method} is not supported by the current schema backend`);
-    return fn as NonNullable<SchemaStatementsLike[K]>;
+    return fn;
   }
 
   async isIndexExists(

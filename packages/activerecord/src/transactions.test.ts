@@ -1141,7 +1141,7 @@ describe("TransactionTest", () => {
     registerModel(FrozenReply);
 
     const topic = (await FrozenTopic.create({})) as any;
-    const reply = await (topic.replies as any).create({});
+    const reply = await topic.replies.create({});
 
     await FrozenTopic.transaction(async () => {
       await topic.destroy(); // calls destroy on reply (dependent: destroy)
@@ -1331,7 +1331,7 @@ describe("TransactionTest", () => {
     }
     const post = (await Post.create({ title: "test" })) as any;
     await post.destroy();
-    expect((post as any).isDestroyed?.() ?? true).toBe(true);
+    expect(post.isDestroyed?.() ?? true).toBe(true);
   });
 
   it("restore active record state for all records in a transaction", async () => {

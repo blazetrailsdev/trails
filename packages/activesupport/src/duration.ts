@@ -251,7 +251,7 @@ export class Duration {
   compareTo(other: Duration | number | unknown): number {
     if (typeof other !== "number" && !(other instanceof Duration)) return NaN;
     const a = this.inSeconds();
-    const b = typeof other === "number" ? other : (other as Duration).inSeconds();
+    const b = typeof other === "number" ? other : other.inSeconds();
     if (a < b) return -1;
     if (a > b) return 1;
     return 0;

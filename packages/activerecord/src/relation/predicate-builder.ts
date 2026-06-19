@@ -100,8 +100,8 @@ export class PredicateBuilder {
           block,
         ).predicateBuilder;
         const innerNodes = negated
-          ? assocPb.buildNegatedFromHash(value as Record<string, unknown>)
-          : assocPb.buildFromHash(value as Record<string, unknown>);
+          ? assocPb.buildNegatedFromHash(value)
+          : assocPb.buildFromHash(value);
         nodes.push(...innerNodes);
       } else if (
         !isPlainObject(value) &&
@@ -489,12 +489,12 @@ export class PredicateBuilder {
         const rel = (attribute as unknown as { relation?: unknown }).relation;
         return (rel as { typeForAttribute?(n: string): TypeLike } | undefined)?.typeForAttribute?.(
           attribute.name,
-        ) as TypeLike;
+        );
       },
       () =>
         (
           this._tableContext as { typeForAttribute?(n: string): TypeLike } | null
-        )?.typeForAttribute?.(attribute.name) as TypeLike,
+        )?.typeForAttribute?.(attribute.name),
       () => this.table.typeForAttribute(attribute.name) as TypeLike,
     ];
     for (const lookup of lookups) {
@@ -573,7 +573,7 @@ export class PredicateBuilder {
           const colName = key.slice(dot + 1);
           const existing = converted[tableName];
           if (existing && isPlainObject(existing)) {
-            (existing as Record<string, unknown>)[colName] = value;
+            existing[colName] = value;
           } else {
             converted[tableName] = { [colName]: value };
           }

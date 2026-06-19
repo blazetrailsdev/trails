@@ -1667,13 +1667,13 @@ describe("BasicsTest", () => {
     const ref = Post.columnsHash()["author_id"];
     // author_id is explicitly declared as integer — its type must be defined
     expect(ref).toBeDefined();
-    expect(ref!.type).toBeDefined();
+    expect(ref.type).toBeDefined();
     // The pk column is loaded from the schema after create; type may vary by adapter
     // but ref must always be integer-typed.
-    expect(ref!.type).toMatch(/integer|bigint|int/i);
+    expect(ref.type).toMatch(/integer|bigint|int/i);
     // When pk.type is populated, Rails requires pk.sql_type == ref.sql_type.
-    const pkTypes = pk?.type == null ? [ref!.type] : [pk.type];
-    expect(pkTypes[0]).toBe(ref!.type);
+    const pkTypes = pk?.type == null ? [ref.type] : [pk.type];
+    expect(pkTypes[0]).toBe(ref.type);
   });
   it("invalid limit", () => {
     class User extends Base {

@@ -261,7 +261,7 @@ class I18nService {
         locale: options?.locale ?? this._locale,
       };
       return this.resolve(
-        (value as TranslationLambda)(key, effectiveOptions as Record<string, unknown>),
+        value(key, effectiveOptions as Record<string, unknown>),
         key,
         effectiveOptions,
       );
@@ -335,7 +335,7 @@ const defaultEnTranslations: TranslationTree = {
   },
   errors: {
     format: "%{attribute} %{message}",
-    messages: deepDup(messages) as TranslationTree,
+    messages: deepDup(messages),
     attributes: {},
   },
 };

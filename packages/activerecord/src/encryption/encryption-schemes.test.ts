@@ -82,7 +82,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const Author = makeEncryptedAuthor(await freshAdapter());
     new Author();
     const author = await Author.create({ name: "david" });
-    const currentType = (Author as any).typeForAttribute("name") as EncryptedAttributeType;
+    const currentType = Author.typeForAttribute("name") as EncryptedAttributeType;
     const prevType = currentType.previousTypes[0];
     expect(prevType).toBeDefined();
     // Write the ciphertext produced by the previous scheme directly — bypass
@@ -141,7 +141,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     expect(authorReloaded.encryptedAttribute("name")).toBe(true);
     // Write plaintext directly to DB (simulates an unencrypted legacy row).
     const RawModel = await makeFreshModel(adp, { id: "integer", name: "string" });
-    RawModel._tableName = (EncryptedAuthor2 as any)._tableName;
+    RawModel._tableName = EncryptedAuthor2._tableName;
     new RawModel();
     const rawRecord = await RawModel.find(author.id);
     await rawRecord.update({ name: "1" });
@@ -341,12 +341,11 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       expect(found).not.toBeNull();
       expect(found!.name).toBe("alice");
     } finally {
-      Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
+      Relation.prototype.where = savedMethods.where;
       (Relation.prototype as any).exists = savedMethods.exists;
       (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
       (Base as any).findBy = savedMethods.findBy;
-      EncryptedAttributeType.prototype.serialize =
-        savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
+      EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
       (ExtendedDeterministicQueries as any)._installed = false;
       ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
       Configurable.config.extendQueries = savedExtendQueries;

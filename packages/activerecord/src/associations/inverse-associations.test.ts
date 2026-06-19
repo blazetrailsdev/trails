@@ -531,11 +531,11 @@ describe("InverseHasManyTests", () => {
     let human = (await Human.where({ name: "Gordon" }).includes("interests").toArray())[0];
     let interests = (human as any).interests;
     for (const interest of await interests.toArray()) {
-      expect((interest as any).human.name).toBe((human as any).name);
+      expect(interest.human.name).toBe((human as any).name);
       (human as any).name = "Bongo";
-      expect((interest as any).human.name).toBe((human as any).name);
-      (interest as any).human.name = "Mungo";
-      expect((interest as any).human.name).toBe((human as any).name);
+      expect(interest.human.name).toBe((human as any).name);
+      interest.human.name = "Mungo";
+      expect(interest.human.name).toBe((human as any).name);
     }
 
     human = (
@@ -543,11 +543,11 @@ describe("InverseHasManyTests", () => {
     )[0];
     interests = (human as any).interests;
     for (const interest of await interests.toArray()) {
-      expect((interest as any).human.name).toBe((human as any).name);
+      expect(interest.human.name).toBe((human as any).name);
       (human as any).name = "Bongo";
-      expect((interest as any).human.name).toBe((human as any).name);
-      (interest as any).human.name = "Mungo";
-      expect((interest as any).human.name).toBe((human as any).name);
+      expect(interest.human.name).toBe((human as any).name);
+      interest.human.name = "Mungo";
+      expect(interest.human.name).toBe((human as any).name);
     }
   });
 
@@ -715,9 +715,9 @@ describe("InverseHasManyTests", () => {
     await proxy.load();
     const err = await (proxy as any).find().catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Error);
-    expect((err as any).name).toBe("RecordNotFound");
-    expect((err as any).model).toBe("Interest");
-    expect((err as any).primaryKey).toBe("id");
+    expect(err.name).toBe("RecordNotFound");
+    expect(err.model).toBe("Interest");
+    expect(err.primaryKey).toBe("id");
   });
 
   it("trying to use inverses that dont exist should raise an error", async () => {
@@ -864,9 +864,7 @@ describe("InverseBelongsToTests", () => {
     // Rails: human.interests.detect { |_iz| _iz.id == interest.id } — block-find
     // over the CollectionProxy (Enumerable#detect loads the target), not the AR
     // PK finder.
-    const iz = (await (human as any).interests.detect(
-      (i: any) => i.id === (interest as any).id,
-    )) as any;
+    const iz = await (human as any).interests.detect((i: any) => i.id === (interest as any).id);
     expect(iz).toBeDefined();
     expect(iz.topic).toBe((interest as any).topic);
     (interest as any).topic = "Eating cheese with a spoon";
@@ -880,7 +878,7 @@ describe("InverseBelongsToTests", () => {
       const interest = interests("trainspotting");
       const human = (await loadBelongsTo(interest, "human", { inverseOf: "interests" })) as any;
       const cached = human._associationCache("interests")?.target as any[];
-      const iz = cached.find((i: any) => i.id === (interest as any).id) as any;
+      const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
       expect(iz.topic).toBe((interest as any).topic);
       (interest as any).topic = "Eating cheese with a spoon";
@@ -1056,7 +1054,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     const human = await Human.createBang({});
     await Face.createBang({ human_id: (human as any).id });
     const faceAssoc = (human as any).association("autosaveFace");
-    const face = (await faceAssoc.loadTarget()) as any;
+    const face = await faceAssoc.loadTarget();
 
     await face.reload(); // clear cached load of autosave_human
     face.description = "new description";
@@ -1075,9 +1073,7 @@ describe("InversePolymorphicBelongsToTests", () => {
       inverseOf: "polymorphicInterests",
     })) as any;
     // Rails: human.polymorphic_interests.detect { |_iz| _iz.id == interest.id }
-    const iz = (await (human as any).polymorphicInterests.detect(
-      (i: any) => i.id === (interest as any).id,
-    )) as any;
+    const iz = await human.polymorphicInterests.detect((i: any) => i.id === (interest as any).id);
     expect(iz).toBeDefined();
     expect(iz.topic).toBe((interest as any).topic);
     (interest as any).topic = "Eating cheese with a spoon";
@@ -1094,7 +1090,7 @@ describe("InversePolymorphicBelongsToTests", () => {
         inverseOf: "polymorphicInterests",
       })) as any;
       const cached = human._associationCache("polymorphicInterests")?.target as any[];
-      const iz = cached.find((i: any) => i.id === (interest as any).id) as any;
+      const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
       expect(iz.topic).toBe((interest as any).topic);
       (interest as any).topic = "Eating cheese with a spoon";
@@ -1107,7 +1103,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("llama_wrangling");
-      const human = (await (interest as any).loadBelongsTo("polymorphicHumanWithCallbacks")) as any;
+      const human = await (interest as any).loadBelongsTo("polymorphicHumanWithCallbacks");
       expect(human.addCallbackCalled).toBe(false);
     });
   });
@@ -1180,15 +1176,15 @@ describe("InverseBelongsToTests", () => {
       const main = await Branch.create({});
       const feature = (await association(main, "branches").create({})) as any;
       const topic = association(feature, "branches").build({}) as any;
-      expect((topic.branch as any).branch).toBe(main);
+      expect(topic.branch.branch).toBe(main);
     });
   });
 
   it("recursive inverse on recursive model has many inversing", async () => {
     await withHasManyInversing(BrokenBranch, async () => {
       const main = await BrokenBranch.create({});
-      const feature = (await association(main, "branches").create({})) as Base;
-      const topic = association(feature, "branches").build({}) as Base;
+      const feature = await association(main, "branches").create({});
+      const topic = association(feature, "branches").build({});
       const err = await loadBelongsTo(topic, "branch", {
         className: "BrokenBranch",
         inverseOf: "branch",

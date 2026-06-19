@@ -110,12 +110,12 @@ describe("MultiDbMigratorTest", () => {
     ];
 
     listA.forEach(([version, name], i) => {
-      expect(Number(migratorA.migrations[i]!.version)).toBe(version);
-      expect(migratorA.migrations[i]!.name).toBe(name);
+      expect(Number(migratorA.migrations[i].version)).toBe(version);
+      expect(migratorA.migrations[i].name).toBe(name);
     });
     listB.forEach(([version, name], i) => {
-      expect(Number(migratorB.migrations[i]!.version)).toBe(version);
-      expect(migratorB.migrations[i]!.name).toBe(name);
+      expect(Number(migratorB.migrations[i].version)).toBe(version);
+      expect(migratorB.migrations[i].name).toBe(name);
     });
   });
 
@@ -188,7 +188,7 @@ describe("MultiDbMigratorTest", () => {
     const migratorA = new Migrator(adapterA, listA);
     const pendingA = await migratorA.pendingMigrations();
     expect(pendingA.length).toBe(1);
-    expect(pendingA[0]!.name).toBe("Bar");
+    expect(pendingA[0].name).toBe("Bar");
 
     await smB.createVersion("1");
     const listB = [
@@ -206,7 +206,7 @@ describe("MultiDbMigratorTest", () => {
     const migratorB = new Migrator(adapterB, listB);
     const pendingB = await migratorB.pendingMigrations();
     expect(pendingB.length).toBe(1);
-    expect(pendingB[0]!.name).toBe("Bar");
+    expect(pendingB[0].name).toBe("Bar");
   });
 
   it("migrator db has no schema migrations table", async () => {

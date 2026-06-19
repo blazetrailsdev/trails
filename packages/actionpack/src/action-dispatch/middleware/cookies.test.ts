@@ -45,7 +45,7 @@ describe("Cookies middleware", () => {
     expect(typeof setCookie).toBe("string");
     expect(setCookie).toContain("session=abc");
     expect(setCookie).toContain("stale=");
-    expect(setCookie!.split("\n")).toHaveLength(2);
+    expect(setCookie.split("\n")).toHaveLength(2);
   });
 
   it("does not double-flush a jar that was already committed", async () => {
@@ -69,7 +69,7 @@ describe("Cookies middleware", () => {
       return [200, { "set-cookie": "a=1; path=/" }, bodyFromString("")];
     });
     const [, headers] = await cookies.call({});
-    const lines = headers["set-cookie"]!.split("\n");
+    const lines = headers["set-cookie"].split("\n");
     expect(lines[0]).toBe("a=1; path=/");
     expect(lines[1]).toContain("b=2");
   });
@@ -89,7 +89,7 @@ describe("Cookies middleware", () => {
       ];
     });
     const [, headers] = await cookies.call({});
-    const setCookie = headers["set-cookie"]!;
+    const setCookie = headers["set-cookie"];
     expect(setCookie).not.toContain(",");
     expect(setCookie.split("\n")).toEqual([
       "a=1; path=/",
@@ -109,7 +109,7 @@ describe("Cookies middleware", () => {
     // The non-lowercase key is dropped; the merged canonical lowercase
     // header carries both cookies.
     expect(headers["Set-Cookie"]).toBeUndefined();
-    const lines = headers["set-cookie"]!.split("\n");
+    const lines = headers["set-cookie"].split("\n");
     expect(lines[0]).toBe("a=1; path=/");
     expect(lines[1]).toContain("b=2");
   });

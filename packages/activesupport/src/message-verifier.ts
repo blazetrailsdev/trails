@@ -107,7 +107,7 @@ export class MessageVerifier {
       const decoded = this.decode(encoded);
       const parsed = this.serializer.load(decoded.toString());
 
-      if (typeof parsed !== "object" || parsed === null || !("value" in (parsed as object))) {
+      if (typeof parsed !== "object" || parsed === null || !("value" in parsed)) {
         throw new InvalidSignature("Missing value key");
       }
 

@@ -336,7 +336,7 @@ export class MimeType {
 
     if (!acceptHeader.includes(",")) {
       const sepMatch = acceptHeader.match(PARAMETER_SEPARATOR_REGEXP);
-      const header = sepMatch ? acceptHeader.slice(0, sepMatch.index!).trim() : acceptHeader.trim();
+      const header = sepMatch ? acceptHeader.slice(0, sepMatch.index).trim() : acceptHeader.trim();
       if (header === "") return [];
       const trailing = MimeType.parseTrailingStar(header);
       if (trailing) return trailing;
@@ -351,7 +351,7 @@ export class MimeType {
       let params: string;
       let q: string | null = null;
       if (sep) {
-        params = raw.slice(0, sep.index!);
+        params = raw.slice(0, sep.index);
         q = raw.slice(sep.index! + sep[0].length).replace(/"$/, "");
       } else {
         params = raw;
@@ -375,79 +375,79 @@ export class MimeType {
   // the singleton registered by that file.
 
   static get HTML(): MimeType {
-    return MimeType.lookup("html")!;
+    return MimeType.lookup("html");
   }
   static get TEXT(): MimeType {
-    return MimeType.lookup("text")!;
+    return MimeType.lookup("text");
   }
   static get JS(): MimeType {
-    return MimeType.lookup("js")!;
+    return MimeType.lookup("js");
   }
   static get CSS(): MimeType {
-    return MimeType.lookup("css")!;
+    return MimeType.lookup("css");
   }
   static get ICS(): MimeType {
-    return MimeType.lookup("ics")!;
+    return MimeType.lookup("ics");
   }
   static get CSV(): MimeType {
-    return MimeType.lookup("csv")!;
+    return MimeType.lookup("csv");
   }
   static get VCF(): MimeType {
-    return MimeType.lookup("vcf")!;
+    return MimeType.lookup("vcf");
   }
   static get PNG(): MimeType {
-    return MimeType.lookup("png")!;
+    return MimeType.lookup("png");
   }
   static get JPEG(): MimeType {
-    return MimeType.lookup("jpeg")!;
+    return MimeType.lookup("jpeg");
   }
   static get GIF(): MimeType {
-    return MimeType.lookup("gif")!;
+    return MimeType.lookup("gif");
   }
   static get BMP(): MimeType {
-    return MimeType.lookup("bmp")!;
+    return MimeType.lookup("bmp");
   }
   static get TIFF(): MimeType {
-    return MimeType.lookup("tiff")!;
+    return MimeType.lookup("tiff");
   }
   static get SVG(): MimeType {
-    return MimeType.lookup("svg")!;
+    return MimeType.lookup("svg");
   }
   static get WEBP(): MimeType {
-    return MimeType.lookup("webp")!;
+    return MimeType.lookup("webp");
   }
   static get MPEG(): MimeType {
-    return MimeType.lookup("mpeg")!;
+    return MimeType.lookup("mpeg");
   }
   static get XML(): MimeType {
-    return MimeType.lookup("xml")!;
+    return MimeType.lookup("xml");
   }
   static get RSS(): MimeType {
-    return MimeType.lookup("rss")!;
+    return MimeType.lookup("rss");
   }
   static get ATOM(): MimeType {
-    return MimeType.lookup("atom")!;
+    return MimeType.lookup("atom");
   }
   static get YAML(): MimeType {
-    return MimeType.lookup("yaml")!;
+    return MimeType.lookup("yaml");
   }
   static get MULTIPART_FORM(): MimeType {
-    return MimeType.lookup("multipart_form")!;
+    return MimeType.lookup("multipart_form");
   }
   static get URL_ENCODED_FORM(): MimeType {
-    return MimeType.lookup("url_encoded_form")!;
+    return MimeType.lookup("url_encoded_form");
   }
   static get JSON(): MimeType {
-    return MimeType.lookup("json")!;
+    return MimeType.lookup("json");
   }
   static get PDF(): MimeType {
-    return MimeType.lookup("pdf")!;
+    return MimeType.lookup("pdf");
   }
   static get ZIP(): MimeType {
-    return MimeType.lookup("zip")!;
+    return MimeType.lookup("zip");
   }
   static get GZIP(): MimeType {
-    return MimeType.lookup("gzip")!;
+    return MimeType.lookup("gzip");
   }
 
   static readonly ALL = new MimeType("*/*", "all");

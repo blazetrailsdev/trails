@@ -162,10 +162,7 @@ function renderLoaderOverloads(info: ClassInfo): RenderedLine[] {
   const hasOneOverloads: string[] = [];
   for (const call of info.calls) {
     if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
-    const target =
-      (call as AssociationCall).options["polymorphic"] === "true"
-        ? "Base"
-        : resolveTarget(call as AssociationCall);
+    const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call);
     const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
     if (call.kind === "belongsTo") belongsToOverloads.push(overload);
     else hasOneOverloads.push(overload);
@@ -186,7 +183,7 @@ function joinOverloads(overloads: string[]): string {
   // Single-overload case: drop the outer parens for readability.
   // Multiple: TS treats A & B where A and B are callable as an
   // overloaded function type.
-  return overloads.length === 1 ? overloads[0]!.slice(1, -1) : overloads.join(" & ");
+  return overloads.length === 1 ? overloads[0].slice(1, -1) : overloads.join(" & ");
 }
 
 interface RenderedLine {

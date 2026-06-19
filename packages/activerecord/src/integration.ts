@@ -92,7 +92,7 @@ function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
   // Mirrors Rails timestamp.rb:163-167 — reads `timestamp_attributes_for_update_in_model`,
   // which maps updated_at/updated_on through `attribute_aliases` to the real
   // column (e.g. Developer's updated_at → legacy_updated_at) before reading.
-  const aliases: Record<string, string> = (record.constructor as any)?._attributeAliases ?? {};
+  const aliases: Record<string, string> = record.constructor?._attributeAliases ?? {};
   const candidates: TemporalTimestamp[] = [];
   for (const name of ["updated_at", "updated_on"] as const) {
     const col = aliases[name] ?? name;

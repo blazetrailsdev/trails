@@ -361,12 +361,11 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     };
 
     let configs = DatabaseConfigurations.fromRaw(config);
-    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })[0]!
-      .configurationHash;
+    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })[0].configurationHash;
     expect(actual).toEqual({ adapter: "postgresql", database: "foo", host: "localhost", pool: 5 });
 
     configs = DatabaseConfigurations.fromRaw(config);
-    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })[0]!.configurationHash;
+    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })[0].configurationHash;
     expect(actual).toEqual({ adapter: "abstract", pool: 5 });
   });
 
@@ -383,12 +382,11 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     };
 
     let configs = DatabaseConfigurations.fromRaw(config);
-    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })[0]!
-      .configurationHash;
+    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })[0].configurationHash;
     expect(actual.database).toBe("primary");
 
     configs = DatabaseConfigurations.fromRaw(config);
-    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })[0]!.configurationHash;
+    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })[0].configurationHash;
     expect(actual.database).toBe("animals");
   });
 

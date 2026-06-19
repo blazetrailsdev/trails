@@ -52,9 +52,9 @@ export class MessageEncryptor {
       typeof signSecretOrOptions === "object" &&
       !Buffer.isBuffer(signSecretOrOptions)
     ) {
-      opts = signSecretOrOptions as MessageEncryptorOptions;
+      opts = signSecretOrOptions;
     } else if (signSecretOrOptions !== undefined) {
-      signSecret = signSecretOrOptions as string | Buffer;
+      signSecret = signSecretOrOptions;
       opts = options ?? {};
     }
 

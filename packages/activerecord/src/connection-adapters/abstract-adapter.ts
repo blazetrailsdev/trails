@@ -1215,9 +1215,7 @@ export class AbstractAdapter implements Quoting {
           // `ApplicationRecord.connected_to(...)` scope targets the primary
           // pool without leaking into unrelated abstract-class pools.
           const targetName =
-            typeof (k as any).primaryClassQ === "function" && (k as any).primaryClassQ()
-              ? "Base"
-              : k.name;
+            typeof k.primaryClassQ === "function" && k.primaryClassQ() ? "Base" : k.name;
           if (targetName === ownerName) nameMatches = true;
         }
       }

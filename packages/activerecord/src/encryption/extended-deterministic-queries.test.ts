@@ -452,7 +452,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const hash = rel.whereValuesHash();
     expect(Array.isArray(hash.email)).toBe(true);
     expect((hash.email as unknown[])[0]).toBeInstanceOf(AdditionalValue);
-    expect(((hash.email as AdditionalValue[])[0] as AdditionalValue).value).toBe(avCurrent.value);
+    expect((hash.email as AdditionalValue[])[0].value).toBe(avCurrent.value);
 
     const scope = RelationQueries.scopeForCreate(() => ({}), rel);
     expect(scope.email).toBeInstanceOf(AdditionalValue);

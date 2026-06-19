@@ -87,7 +87,7 @@ function lastInsertedId(result: any): never {
  */
 export function multiStatementsEnabled(this: MultiStatementsHost): boolean {
   const flags = this._config?.flags;
-  if (Array.isArray(flags)) return (flags as string[]).includes("MULTI_STATEMENTS");
+  if (Array.isArray(flags)) return flags.includes("MULTI_STATEMENTS");
   if (typeof flags === "number") return (flags & MULTI_STATEMENTS_BIT) !== 0;
   return false;
 }
@@ -179,7 +179,7 @@ export async function performQuery(
     fieldList = (fields ?? []) as Array<{ name: string }>;
     affectedRows = rows.length;
   } else {
-    affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+    affectedRows = result.affectedRows ?? 0;
   }
 
   this._affectedRowsBeforeWarnings = affectedRows;

@@ -116,7 +116,7 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
   emitDeclarations(shimPaths);
   const registryEntries = Array.from(registryMap, ([key, types]) => ({
     key,
-    localsType: types.length === 1 ? types[0]! : types.map((t) => `(${t})`).join(" & "),
+    localsType: types.length === 1 ? types[0] : types.map((t) => `(${t})`).join(" & "),
   }));
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "views-manifest.ts"), emitManifest(files));
@@ -172,7 +172,7 @@ function manifestKey(rel: string): string {
  */
 function partialRegistryKey(rel: string): string | null {
   const parts = rel.replace(/\.tse$/u, "").split("/");
-  const filename = parts[parts.length - 1]!;
+  const filename = parts[parts.length - 1];
   if (!filename.startsWith("_")) return null;
   const nameWithoutUnderscore = filename.slice(1).replace(/\.[^.]+$/u, "");
   return [...parts.slice(0, -1), nameWithoutUnderscore].join("/");

@@ -79,7 +79,7 @@ ${cases}
         ? "src/config/routes.js"
         : null;
     if (!routesFile) return;
-    const controllerSegment = dasherize(underscore(namespaceParts[namespaceParts.length - 1]!));
+    const controllerSegment = dasherize(underscore(namespaceParts[namespaceParts.length - 1]));
 
     if (namespaceParts.length > 1) {
       const namespaces = namespaceParts.slice(0, -1).map((p) => underscore(p));

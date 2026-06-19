@@ -158,7 +158,7 @@ describe("CollectionRenderer", () => {
     );
     expect(calls[0]).toMatchObject({ user: "a", user_counter: 0 });
     expect(calls[1]).toMatchObject({ user: "b", user_counter: 1 });
-    expect(calls[0]!["user_iteration"]).toBeInstanceOf(PartialIteration);
+    expect(calls[0]["user_iteration"]).toBeInstanceOf(PartialIteration);
   });
 
   it("uses as: option to name the collection variable", async () => {

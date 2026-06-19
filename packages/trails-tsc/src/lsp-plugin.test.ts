@@ -10,7 +10,7 @@ function makeHost(files: Record<string, string>): ts.LanguageServiceHost {
     getScriptFileNames: () => Object.keys(files),
     getScriptVersion: () => "1",
     getScriptSnapshot: (f) =>
-      files[f] !== undefined ? ts.ScriptSnapshot.fromString(files[f]!) : undefined,
+      files[f] !== undefined ? ts.ScriptSnapshot.fromString(files[f]) : undefined,
     getCurrentDirectory: () => "/",
     getCompilationSettings: () => ({}),
     getDefaultLibFileName: (o) => ts.getDefaultLibFilePath(o),
@@ -32,19 +32,19 @@ describe("lspPluginInit", () => {
     const host = makeHost({ "/views/home.html.tse": "<%= name %>", "/x.ts": "export const x=1;" });
     init({ typescript: ts }).create(baseInfo(host));
 
-    const read = host.readFile!("/views/home.html.tse")!;
+    const read = host.readFile("/views/home.html.tse")!;
     expect(read).toContain("_ob.append(name)");
     const snap = host.getScriptSnapshot("/views/home.html.tse")!;
     expect(snap.getText(0, snap.getLength())).toContain("_ob.append(name)");
     expect(host.getScriptKind!("/views/home.html.tse")).toBe(ts.ScriptKind.TS);
-    expect(host.readFile!("/x.ts")).toBe("export const x=1;");
+    expect(host.readFile("/x.ts")).toBe("export const x=1;");
   });
 
   it("emits error shim on invalid .tse and getExternalFiles walks app/views", () => {
     const host = makeHost({ "/views/bad.html.tse": "<%# locals: (1bad:) %>" });
     const plugin = init({ typescript: ts });
     plugin.create(baseInfo(host));
-    expect(host.readFile!("/views/bad.html.tse")).toContain("__tseFailure");
+    expect(host.readFile("/views/bad.html.tse")).toContain("__tseFailure");
 
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-lsp-"));
     fs.mkdirSync(path.join(root, "app/views/users"), { recursive: true });

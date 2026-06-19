@@ -45,7 +45,7 @@ function _downcaseLikeRails(v: unknown): unknown {
   if (v instanceof Uint8Array) {
     const out = new Uint8Array(v.length);
     for (let i = 0; i < v.length; i++) {
-      const b = v[i]!;
+      const b = v[i];
       out[i] = b >= 0x41 && b <= 0x5a ? b + 0x20 : b;
     }
     return out;

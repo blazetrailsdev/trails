@@ -22,7 +22,7 @@ function displayEditorHint(invocation: string): void {
 // freshly-written key from `file.change()` later in the same edit pass.
 async function ensureKeyFile(file: EncryptedFile): Promise<void> {
   const fs = await getFsAsync();
-  if (await fs.exists!(file.keyPath)) return;
+  if (await fs.exists(file.keyPath)) return;
   await fs.writeFile!(file.keyPath, `${EncryptedFile.generateKey()}\n`, { mode: 0o600 });
 }
 

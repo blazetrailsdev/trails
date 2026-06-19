@@ -21,7 +21,7 @@ export abstract class Node {
   /** Visit every descendant whose constructor is `klass`. Rails `node.grep(Klass)`. */
   grep<T extends Node>(klass: new (...args: never[]) => T): T[] {
     const out: T[] = [];
-    for (const n of this) if (n instanceof klass) out.push(n as T);
+    for (const n of this) if (n instanceof klass) out.push(n);
     return out;
   }
 
@@ -224,7 +224,7 @@ export class Or extends Node {
   private readonly _children: readonly Node[];
 
   constructor(children: readonly Node[]) {
-    super(children[0]!);
+    super(children[0]);
     this._children = children;
     this.children = () => this._children;
   }

@@ -93,11 +93,11 @@ describe("virtualizeTse", () => {
     const [head, foot] = deltas;
     expect(head?.insertedAtLine).toBe(-1);
     const lines = ts.split("\n");
-    expect(lines[head!.lineCount - 1]).toContain("const _ob");
+    expect(lines[head.lineCount - 1]).toContain("const _ob");
     // Footer delta marks the line BEFORE the trailing `return _ob;`
     // (remapLine treats `injectedStart` as exclusive); the footer
     // block then spans `lineCount` lines starting at injectedStart+1.
-    expect(lines[foot!.insertedAtLine + 1]).toContain("return _ob");
+    expect(lines[foot.insertedAtLine + 1]).toContain("return _ob");
   });
 
   it("counts multi-line `<% %>` chunks as multiple virtual lines for the footer offset", () => {
@@ -106,7 +106,7 @@ describe("virtualizeTse", () => {
     const lines = ts.split("\n");
     // The footer's `return _ob;` should sit immediately after the
     // body, regardless of how many node-array entries the body has.
-    expect(lines[foot!.insertedAtLine + 1]).toContain("return _ob");
+    expect(lines[foot.insertedAtLine + 1]).toContain("return _ob");
   });
 
   it("throws on unbalanced brackets in the locals signature", () => {

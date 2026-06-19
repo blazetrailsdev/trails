@@ -11,10 +11,10 @@ import { Info, PropertyList } from "./info.js";
 const { TestCase } = ActionController;
 
 function exactResults(tc: InstanceType<typeof TestCase>): string[] {
-  return (JSON.parse(tc.response.body as string) as { exact: string[] }).exact;
+  return (JSON.parse(tc.response.body) as { exact: string[] }).exact;
 }
 function fuzzyResults(tc: InstanceType<typeof TestCase>): string[] {
-  return (JSON.parse(tc.response.body as string) as { fuzzy: string[] }).fuzzy;
+  return (JSON.parse(tc.response.body) as { fuzzy: string[] }).fuzzy;
 }
 
 describe("InfoControllerTest", () => {

@@ -53,7 +53,7 @@ export class PublicExceptions {
 
     const body: ErrorBody = {
       status,
-      error: HTTP_STATUS_CODES[status as keyof typeof HTTP_STATUS_CODES] ?? HTTP_STATUS_CODES[500],
+      error: HTTP_STATUS_CODES[status] ?? HTTP_STATUS_CODES[500],
     };
 
     return this.render(status, contentType, body);

@@ -215,7 +215,7 @@ export class HasAndBelongsToMany {
       model.prototype,
       HABTM_WRAPPED_NAMES,
     )
-      ? (model.prototype as any)[HABTM_WRAPPED_NAMES]
+      ? model.prototype[HABTM_WRAPPED_NAMES]
       : Object.defineProperty(model.prototype, HABTM_WRAPPED_NAMES, {
           value: new Set<string>(),
           configurable: true,

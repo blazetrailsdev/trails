@@ -20,12 +20,7 @@ export function resolveValue(record: unknown, value: unknown): unknown {
       ? (value as () => unknown)()
       : (value as (r: unknown) => unknown)(record);
   }
-  if (
-    typeof value === "string" &&
-    record &&
-    typeof record === "object" &&
-    value in (record as object)
-  ) {
+  if (typeof value === "string" && record && typeof record === "object" && value in record) {
     const method = (record as Record<string, unknown>)[value];
     if (typeof method === "function") {
       return (method as () => unknown).call(record);

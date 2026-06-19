@@ -2769,8 +2769,8 @@ describe("MigrationTest", () => {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
         // Copied version must be renumbered past the future destination version.
-        expect(BigInt(copied[0]!.version) > BigInt(futureVersion)).toBe(true);
-        expect(fs.existsSync(copied[0]!.filename!)).toBe(true);
+        expect(BigInt(copied[0].version) > BigInt(futureVersion)).toBe(true);
+        expect(fs.existsSync(copied[0].filename!)).toBe(true);
         // Second copy must detect the renumbered migration as a duplicate.
         const copied2 = await Migration.copy(dst, { bukkits: src });
         expect(copied2).toHaveLength(0);
@@ -2797,7 +2797,7 @@ describe("MigrationTest", () => {
       try {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
-        const body = fs.readFileSync(copied[0]!.filename!, "utf8");
+        const body = fs.readFileSync(copied[0].filename!, "utf8");
         // Expected layout: directive + blank line + provenance + rest
         expect(body).toMatch(/^\/\/ @ts-nocheck\n\n\/\/ This migration comes from/);
         // Second copy must find the file as a duplicate and return nothing.
@@ -2854,7 +2854,7 @@ describe("MigrationTest", () => {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
         expect(fs.existsSync(dst)).toBe(true);
-        expect(fs.existsSync(copied[0]!.filename!)).toBe(true);
+        expect(fs.existsSync(copied[0].filename!)).toBe(true);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
@@ -3245,7 +3245,7 @@ describe("Migrator DDL transaction wrapping", () => {
           return async () => {
             calls.push("rollback");
           };
-        return (target as any)[prop];
+        return target[prop];
       },
     });
   }
@@ -3265,7 +3265,7 @@ describe("Migrator DDL transaction wrapping", () => {
         }),
       },
     ];
-    const migrator = new Migrator(adapter as any, migrations as any);
+    const migrator = new Migrator(adapter, migrations as any);
     await migrator.migrate(null);
     expect(calls).toContain("begin");
     expect(calls).toContain("up");
@@ -3290,7 +3290,7 @@ describe("Migrator DDL transaction wrapping", () => {
         }),
       },
     ];
-    const migrator = new Migrator(adapter as any, migrations as any);
+    const migrator = new Migrator(adapter, migrations as any);
     await migrator.migrate(null);
     expect(calls).toContain("up");
     expect(calls).not.toContain("begin");
@@ -3312,7 +3312,7 @@ describe("Migrator DDL transaction wrapping", () => {
         }),
       },
     ];
-    const migrator = new Migrator(adapter as any, migrations as any);
+    const migrator = new Migrator(adapter, migrations as any);
     await migrator.migrate(null);
     expect(calls).toContain("up");
     expect(calls).not.toContain("begin");
@@ -3333,7 +3333,7 @@ describe("Migrator DDL transaction wrapping", () => {
         }),
       },
     ];
-    const migrator = new Migrator(adapter as any, migrations as any);
+    const migrator = new Migrator(adapter, migrations as any);
     await expect(migrator.migrate(null)).rejects.toThrow("boom");
     expect(calls).toContain("begin");
     expect(calls).toContain("rollback");
@@ -3613,9 +3613,9 @@ describe("MigrationProperTableNameAndCopy", () => {
         expect(body).toContain(`// This migration comes from bukkits (originally`);
       }
       // Strict monotonicity across the copy iteration.
-      expect(BigInt(copied[1]!.version) > BigInt(copied[0]!.version)).toBe(true);
+      expect(BigInt(copied[1].version) > BigInt(copied[0].version)).toBe(true);
       // Renumbered above the pre-existing destination migration.
-      expect(BigInt(copied[0]!.version) > 20100101000000n).toBe(true);
+      expect(BigInt(copied[0].version) > 20100101000000n).toBe(true);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -3641,7 +3641,7 @@ describe("MigrationProperTableNameAndCopy", () => {
 
       expect(copied).toHaveLength(0);
       expect(onSkip).toHaveBeenCalledTimes(1);
-      expect(onSkip.mock.calls[0]![0]).toBe("bukkits");
+      expect(onSkip.mock.calls[0][0]).toBe("bukkits");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

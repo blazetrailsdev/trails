@@ -63,8 +63,8 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   let member: Member;
 
   beforeEach(async () => {
-    member = members("groucho") as Member;
-    const organization = organizations("discordians") as Organization;
+    member = members("groucho");
+    const organization = organizations("discordians");
     (member.association("organization") as any).writer(organization);
     await member.save();
     await member.reload();
@@ -90,7 +90,7 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("nil on disable joins through", async () => {
-    const blarpy = members("blarpy_winkup") as Member;
+    const blarpy = members("blarpy_winkup");
     let org: unknown;
     let orgNoJoins: unknown;
     const joins = await captureSql(async () => {
@@ -107,7 +107,7 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
 
   it("preload on disable joins through", async () => {
     const loaded = await Member.preload("organization", "organizationWithoutJoins").toArray();
-    const first = loaded[0] as Member;
+    const first = loaded[0];
     // preload must have populated both holders — assert they read as loaded so the
     // zero-query checks below actually exercise the preload path (a sync `.target`
     // read never queries regardless of whether preload ran).

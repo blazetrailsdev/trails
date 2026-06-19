@@ -554,7 +554,7 @@ describe("PreloaderTest", () => {
       posts = await Post.where({ id: post.id }).includes("comments").toArray();
     });
     expect(posts!).toHaveLength(1);
-    expect((posts![0] as any)._preloadedAssociations.has("comments")).toBe(true);
+    expect(posts![0]._preloadedAssociations.has("comments")).toBe(true);
     expect(sqls).toHaveLength(2);
   });
 
@@ -609,8 +609,8 @@ describe("PreloaderTest", () => {
     const author = await Author.create({ name: "David" });
     const book = await Book.create({ author_id: author.id, name: "A Book" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    const bookLoaded = (await Book.where({ id: book.id }).includes("author").toArray())[0]!;
-    const postFresh = (await Post.where({ id: post.id }).toArray())[0]!;
+    const bookLoaded = (await Book.where({ id: book.id }).includes("author").toArray())[0];
+    const postFresh = (await Post.where({ id: post.id }).toArray())[0];
     // book's author already loaded; post shares the same author_id →
     // the Preloader finds the key in alreadyLoadedByKey and issues 0 DB queries
     const sqls = await captureSql(async () => {
@@ -677,14 +677,14 @@ describe("PreloaderTest", () => {
     await Tagging.create({ taggable_id: post1.id, taggable_type: "Post", tag_id: tag1.id });
     await Tagging.create({ taggable_id: post2.id, taggable_type: "Post", tag_id: tag2.id });
     // Pre-load middle records (taggings) for post1 only
-    const p1 = (await Post.where({ title: "P1" }).includes("taggings").toArray())[0]!;
-    const p2 = (await Post.where({ title: "P2" }).toArray())[0]!;
+    const p1 = (await Post.where({ title: "P1" }).includes("taggings").toArray())[0];
+    const p2 = (await Post.where({ title: "P2" }).toArray())[0];
     // Preload tags for both posts. The through-preloader's tagging loader finds p1's key
     // already loaded (LoaderRecords merge path) and only queries DB for p2's taggings
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({ records: [p1, p2], associations: ["tags"] }).call();
     // First call is for taggings: only p2's key goes to DB (p1's already loaded)
-    const taggingKeys = spy.mock.calls[0]?.[0] as unknown[];
+    const taggingKeys = spy.mock.calls[0]?.[0];
     expect(taggingKeys).toHaveLength(1);
     expect((p1 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
       "ruby",
@@ -1127,7 +1127,7 @@ describe("PreloaderTest", () => {
     }
     const maryFavs = (mary as any)._preloadedAssociations.get("favoriteAuthors");
     expect(maryFavs.map((a: any) => a.id)).toEqual([bob.id]);
-    const bobSimilar = (maryFavs[0] as any)._preloadedAssociations.get("similarPosts");
+    const bobSimilar = maryFavs[0]._preloadedAssociations.get("similarPosts");
     expect(bobSimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
     for (const post of bobSimilar) {
       expect(post._preloadedAssociations.get("comments").length).toBe(1);
@@ -1323,7 +1323,7 @@ describe("PreloaderTest", () => {
       associations: "essay",
       availableRecords: [[essaySpecial]],
     }).call();
-    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     expect(queryCalls).toHaveLength(0);
     const preloaded = (book as any)._preloadedAssociations.get("essay");
     expect(preloaded).toBe(essaySpecial);
@@ -1401,7 +1401,7 @@ describe("PreloaderTest", () => {
       associations: "essayCategory",
       availableRecords: categories,
     }).call();
-    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     expect(queryCalls).toHaveLength(1);
     expect(association(author, "essayCategory").loaded).toBe(true);
     // Mirrors Rails' __id__ check: the preloaded category is the *same instance*
@@ -1435,7 +1435,7 @@ describe("PreloaderTest", () => {
       associations: "essayCategory",
       availableRecords: [tech],
     }).call();
-    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     expect(queryCalls).toHaveLength(2);
     // Mirrors Rails' assert_no_queries: preloaded associations are served from
     // cache on read, so the singular reader must not hit the DB. mary's category
@@ -1485,7 +1485,7 @@ describe("PreloaderTest", () => {
       scope: Author.where({ name: "David" }) as any,
       availableRecords: [david],
     }).call();
-    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     // Scope present → availableRecords ignored, runs the query
     expect(queryCalls).toHaveLength(1);
     // The author is loaded from the query, NOT the supplied instance (Rails'
@@ -1505,7 +1505,7 @@ describe("PreloaderTest", () => {
       associations: "comments",
       availableRecords: comments,
     }).call();
-    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     // Collection association → availableRecords skipped, runs the query
     expect(queryCalls).toHaveLength(1);
     // The loaded comments come from the query, sharing no object identity with
@@ -1527,7 +1527,7 @@ describe("PreloaderTest", () => {
       associations: "author",
       availableRecords: [bob],
     }).call();
-    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     // Bob doesn't match david's key → still 1 query
     expect(queryCalls).toHaveLength(1);
     const preloaded = post.association("author").target as any;
@@ -2336,8 +2336,8 @@ describe("AssociationsTest", () => {
   it("eager loading should not change count of children", async () => {
     const liquid = await Liquid.create({ name: "salty" });
     const molecule = await (liquid as any).molecules.create({ name: "molecule_1" });
-    await (molecule as any).electrons.create({ name: "electron_1" });
-    await (molecule as any).electrons.create({ name: "electron_2" });
+    await molecule.electrons.create({ name: "electron_1" });
+    await molecule.electrons.create({ name: "electron_2" });
 
     const liquids = await Liquid.includes({ molecules: "electrons" })
       .references("molecules")
@@ -2381,7 +2381,7 @@ describe("AssociationsTest", () => {
     const ship = await Ship.create({ name: "The good ship Dollypop" });
     const part = await (ship as any).parts.create({ name: "Mast" });
     markForDestruction(part);
-    const reloaded = await ShipPart.find((part as any).id as number);
+    const reloaded = await ShipPart.find(part.id as number);
     await reloaded.updateColumn("name", "Deck");
     const parts = await (ship as any).parts.toArray();
     expect(parts[0].name).toBe("Deck");
@@ -2429,7 +2429,7 @@ describe("AssociationsTest", () => {
   it("association with references", async () => {
     const firm = companies("first_firm");
     const scope = association(firm, "associationWithReferences").scope();
-    expect((scope as any)._referencesValues).toEqual(["foo"]);
+    expect(scope._referencesValues).toEqual(["foo"]);
   });
 
   it("force reload", async () => {
@@ -2474,8 +2474,8 @@ describe("AssociationsTest", () => {
     const loaded = await (comment as any).loadBelongsTo("blogPost");
     // Rails asserts full-record equality (assert_equal(blog_post, comment.blog_post));
     // check both composite-key components rather than just `id`.
-    expect((loaded as any).id).toBe((blogPost as any).id);
-    expect((loaded as any).blog_id).toBe((blogPost as any).blog_id);
+    expect(loaded.id).toBe((blogPost as any).id);
+    expect(loaded.blog_id).toBe((blogPost as any).blog_id);
   });
 
   it("belongs to a model with composite primary key uses composite pk in sql", async () => {
@@ -2549,10 +2549,10 @@ describe("AssociationsTest", () => {
 
   it("has many association from a model with query constraints different from the association", async () => {
     let blogPost: any = shardedBlogPosts("great_post_blog_one");
-    blogPost = await ShardedBlogPostWithRevision.find((blogPost as any).id);
+    blogPost = await ShardedBlogPostWithRevision.find(blogPost.id);
     const expectedComments = await ShardedComment.where({
-      blog_id: (blogPost as any).blog_id,
-      blog_post_id: (blogPost as any).id,
+      blog_id: blogPost.blog_id,
+      blog_post_id: blogPost.id,
     });
 
     let comments: any[] = [];
@@ -2570,7 +2570,7 @@ describe("AssociationsTest", () => {
 
   it("query constraints over three without defining explicit foreign key query constraints raises", async () => {
     let blogPost: any = shardedBlogPosts("great_post_blog_one");
-    blogPost = await ShardedBlogPostWithRevision.find((blogPost as any).id);
+    blogPost = await ShardedBlogPostWithRevision.find(blogPost.id);
 
     // Rails raises when the association is loaded (`.to_a`); trails derives the
     // foreign key eagerly when the proxy is built, so the throw surfaces on the
@@ -2606,7 +2606,7 @@ describe("AssociationsTest", () => {
     const preloaded = (loaded as any)._preloadedAssociations.get("blogPostById");
     expect(preloaded).toBeDefined();
     const byCompositeKey = await (loaded as any).loadBelongsTo("blogPost");
-    expect((preloaded as any).id).toBe((byCompositeKey as any).id);
+    expect(preloaded.id).toBe(byCompositeKey.id);
   });
 
   it("append composite foreign key has many association with autosave", async () => {
@@ -2708,7 +2708,7 @@ describe("AssociationsTest", () => {
     (comment.association("blogPost") as any).writer(blogPost);
 
     const loaded = await (comment as any).loadBelongsTo("blogPost");
-    expect((loaded as any).id).toBe((blogPost as any).id);
+    expect(loaded.id).toBe((blogPost as any).id);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
     expect((comment as any).blog_id).toBe((anotherBlog as any).id);
     expect((comment as any).blog_post_id).toBe((blogPost as any).id);
@@ -2755,7 +2755,7 @@ describe("AssociationsTest", () => {
 
     expect(blogPost.isPersisted()).toBe(true);
     const loaded = await (comment as any).loadBelongsTo("blogPost");
-    expect((loaded as any).id).toBe((blogPost as any).id);
+    expect(loaded.id).toBe((blogPost as any).id);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
     expect((comment as any).blog_id).toBe((anotherBlog as any).id);
     expect((comment as any).blog_post_id).toBe((blogPost as any).id);
@@ -2773,7 +2773,7 @@ describe("AssociationsTest", () => {
 
     expect(blogPost.isPersisted()).toBe(true);
     const loaded = await (comment as any).loadBelongsTo("blogPostById");
-    expect((loaded as any).id).toBe((blogPost as any).id);
+    expect(loaded.id).toBe((blogPost as any).id);
   });
 
   it("polymorphic belongs to uses parent query constraints", async () => {
@@ -2788,7 +2788,7 @@ describe("AssociationsTest", () => {
     // reload to forget the parent association
     const reloaded = await ShardedBlogPost.find((childPost as any).id);
     const loaded = await (reloaded as any).loadBelongsTo("parent");
-    expect((loaded as any).id).toBe((parentPost as any).id);
+    expect(loaded.id).toBe((parentPost as any).id);
   });
 
   it("belongs to a cpk model by id attribute", async () => {
@@ -2797,7 +2797,7 @@ describe("AssociationsTest", () => {
     const agreement = await CpkOrderAgreement.create({ order_id: orderId, signature: "signed" });
 
     const loaded = await (agreement as any).loadBelongsTo("order");
-    expect((loaded as any).id).toEqual((order as any).id);
+    expect(loaded.id).toEqual((order as any).id);
   });
 
   it("belongs to with explicit composite foreign key", async () => {
@@ -2810,7 +2810,7 @@ describe("AssociationsTest", () => {
     const sqls = await captureSql(async () => {
       loaded = await (review as any).loadBelongsTo("car");
     });
-    expect((loaded as any).id).toEqual((car as any).id);
+    expect(loaded.id).toEqual((car as any).id);
 
     const sql = sqls.find((s) => /cpk_cars/.test(s))!;
     expectQuotedColumnInSql(sql, "cpk_cars.make");
@@ -2841,7 +2841,7 @@ describe("AssociationsTest", () => {
     expect(loaded).not.toBeNull();
     expect((agreement as any).order_id).not.toBeNull();
 
-    expect((loaded as any).id).toEqual((order as any).id);
+    expect(loaded.id).toEqual((order as any).id);
     const orderId = (order as any).id[1];
     expect((agreement as any).order_id).toBe(orderId);
   });

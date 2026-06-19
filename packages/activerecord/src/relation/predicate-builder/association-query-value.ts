@@ -56,7 +56,7 @@ export class AssociationQueryValue {
         // component is in its column independently rather than as a tuple — but
         // mirrors the subquery approach used for non-CPK Relations (Batch 71).
         const pks = this.primaryKey() as string[];
-        const fkCols = fk as string[];
+        const fkCols = fk;
         const baseRelation = ids as any;
         return [
           fkCols.reduce<Record<string, unknown>>((acc, fkCol, i) => {
@@ -73,17 +73,17 @@ export class AssociationQueryValue {
       return idList.map((idsSet: any) => {
         if (!Array.isArray(idsSet)) {
           throw new Error(
-            `Composite foreign key association requires tuple values matching [${(fk as string[]).join(", ")}]. ` +
+            `Composite foreign key association requires tuple values matching [${fk.join(", ")}]. ` +
               "Pass an array of [value1, value2, ...] tuples (Slot B).",
           );
         }
-        if (idsSet.length !== (fk as string[]).length) {
+        if (idsSet.length !== fk.length) {
           throw new Error(
-            `Composite FK tuple arity mismatch: expected ${(fk as string[]).length} values ` +
-              `([${(fk as string[]).join(", ")}]) but got ${idsSet.length}.`,
+            `Composite FK tuple arity mismatch: expected ${fk.length} values ` +
+              `([${fk.join(", ")}]) but got ${idsSet.length}.`,
           );
         }
-        return (fk as string[]).reduce((acc: Record<string, unknown>, k: string, i: number) => {
+        return fk.reduce((acc: Record<string, unknown>, k: string, i: number) => {
           acc[k] = idsSet[i];
           return acc;
         }, {});
@@ -167,8 +167,8 @@ export class AssociationQueryValue {
       });
     }
     if (typeof pk === "string" && typeof value === "object" && value !== null) {
-      if (pk in (value as object)) return (value as any)[pk];
-      if ("id" in (value as object)) return (value as any).id;
+      if (pk in value) return (value as any)[pk];
+      if ("id" in value) return (value as any).id;
     }
     return value;
   }

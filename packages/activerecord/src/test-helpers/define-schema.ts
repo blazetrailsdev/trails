@@ -168,7 +168,7 @@ function serialIdType(spec: ColumnSpec | undefined, adapterName: string): string
 
 /** @internal */
 export function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
-  return isWrappedSchema(table) ? table.columns : (table as Record<string, ColumnSpec>);
+  return isWrappedSchema(table) ? table.columns : table;
 }
 
 /** @internal */

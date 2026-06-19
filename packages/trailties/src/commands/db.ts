@@ -512,7 +512,7 @@ function sanitizeUrl(url: string): string {
 function displayNameFor(config: HashConfig, raw: RawConfig): string {
   return (
     config.database ??
-    (raw.database as string | undefined) ??
+    raw.database ??
     (typeof raw.url === "string" ? sanitizeUrl(raw.url) : undefined) ??
     `${config.adapter ?? "unknown"} database`
   );

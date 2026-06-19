@@ -53,7 +53,7 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     expect(migrationEntry, "generated migration file should exist").toBeTruthy();
 
     const migrationPath = join(migrateDir, migrationEntry!);
-    const version = migrationEntry!.split("_")[0]!;
+    const version = migrationEntry!.split("_")[0];
 
     // 4. Patch the generated migration — overwrite with a plain MigrationLike
     //    object that creates the users table via this.connection (the adapter).

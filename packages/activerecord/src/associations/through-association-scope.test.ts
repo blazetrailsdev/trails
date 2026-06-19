@@ -87,7 +87,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     }).loaders;
     const loader = loaders.find((l) => l instanceof ThroughAssociation);
     if (!loader) throw new Error("expected a ThroughAssociation loader");
-    return loader as ThroughAssociation;
+    return loader;
   }
 
   it("carries annotate from the through reflection scope onto the through query", async () => {

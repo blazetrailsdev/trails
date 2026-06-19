@@ -252,7 +252,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
     if (o instanceof ChangeColumnDefaultDefinition)
       return this.visitChangeColumnDefaultDefinition(o);
-    return super.accept(o as Parameters<AbstractSchemaCreation["accept"]>[0]);
+    return super.accept(o);
   }
 
   /** @internal */
@@ -263,7 +263,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
     let sql = `ALTER COLUMN ${quotedName} TYPE ${column.sqlType}`;
 
-    const options = this.columnOptions(column) as Record<string, unknown>;
+    const options = this.columnOptions(column);
 
     if (options["collation"]) {
       sql += ` COLLATE ${this.adapter.quoteIdentifier(String(options["collation"]))}`;

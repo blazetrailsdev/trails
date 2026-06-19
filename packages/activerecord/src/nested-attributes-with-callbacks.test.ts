@@ -89,7 +89,7 @@ describe("NestedAttributesWithCallbacksTest", () => {
     addCallbackCalled = [];
     pirate = new NwcPirate();
     pirate.catchphrase = "Don't call me!";
-    (pirate as any).birdsAttributes = [{ name: "Bird1" }, { name: "Bird2" }];
+    pirate.birdsAttributes = [{ name: "Bird1" }, { name: "Bird2" }];
     await pirate.save();
     birds = await pirate.birds.toArray();
   });
@@ -131,44 +131,44 @@ describe("NestedAttributesWithCallbacksTest", () => {
   // Characterizing when :before_add callback is called
   it(":before_add called for new bird when not loaded", async () => {
     expect(pirate.birdsWithAdd.loaded).toBe(false);
-    (pirate as any).birdsWithAddAttributes = newBirdAttributes();
+    pirate.birdsWithAddAttributes = newBirdAttributes();
     await assertNewBirdWithCallbackCalled();
   });
 
   it(":before_add called for new bird when loaded", async () => {
     await pirate.birdsWithAdd.load();
-    (pirate as any).birdsWithAddAttributes = newBirdAttributes();
+    pirate.birdsWithAddAttributes = newBirdAttributes();
     await assertNewBirdWithCallbackCalled();
   });
 
   it(":before_add not called for identical assignment when not loaded", async () => {
     expect(pirate.birdsWithAdd.loaded).toBe(false);
-    (pirate as any).birdsWithAddAttributes = existingBirdsAttributes();
+    pirate.birdsWithAddAttributes = existingBirdsAttributes();
     await assertCallbacksNotCalled();
   });
 
   it(":before_add not called for identical assignment when loaded", async () => {
     await pirate.birdsWithAdd.load();
-    (pirate as any).birdsWithAddAttributes = existingBirdsAttributes();
+    pirate.birdsWithAddAttributes = existingBirdsAttributes();
     await assertCallbacksNotCalled();
   });
 
   it(":before_add not called for destroy assignment when not loaded", async () => {
     expect(pirate.birdsWithAdd.loaded).toBe(false);
-    (pirate as any).birdsWithAddAttributes = destroyBirdAttributes();
+    pirate.birdsWithAddAttributes = destroyBirdAttributes();
     await assertCallbacksNotCalled();
   });
 
   it(":before_add not called for deletion assignment when loaded", async () => {
     await pirate.birdsWithAdd.load();
-    (pirate as any).birdsWithAddAttributes = destroyBirdAttributes();
+    pirate.birdsWithAddAttributes = destroyBirdAttributes();
     await assertCallbacksNotCalled();
   });
 
   // Ensuring that the records in the association target are updated,
   // whether the association is loaded before or not
   const assertAssignmentAffectsRecordsInTarget = async (associationName: string) => {
-    const association = (pirate as any)[associationName].target as NwcBird[];
+    const association = pirate[associationName].target as NwcBird[];
     const updated = association.find((b: NwcBird) => String(b.id) === String(birdToUpdate().id));
     expect(updated!.attributeChanged("name")).toBe(true);
     const destroyed = association.find((b: NwcBird) => String(b.id) === String(birdToDestroy().id));
@@ -177,13 +177,13 @@ describe("NestedAttributesWithCallbacksTest", () => {
 
   it("Assignment updates records in target when not loaded", async () => {
     expect(pirate.birdsWithAdd.loaded).toBe(false);
-    (pirate as any).birdsWithAddAttributes = updateNewAndDestroyBirdAttributes();
+    pirate.birdsWithAddAttributes = updateNewAndDestroyBirdAttributes();
     await assertAssignmentAffectsRecordsInTarget("birdsWithAdd");
   });
 
   it("Assignment updates records in target when loaded", async () => {
     await pirate.birdsWithAdd.load();
-    (pirate as any).birdsWithAddAttributes = updateNewAndDestroyBirdAttributes();
+    pirate.birdsWithAddAttributes = updateNewAndDestroyBirdAttributes();
     await assertAssignmentAffectsRecordsInTarget("birdsWithAdd");
   });
 
@@ -191,13 +191,13 @@ describe("NestedAttributesWithCallbacksTest", () => {
   // `birds_with_add_load`, whose `before_add` proc force-loads the target.
   it("Assignment updates records in target when not loaded", async () => {
     expect(pirate.birdsWithAddLoad.loaded).toBe(false);
-    (pirate as any).birdsWithAddLoadAttributes = updateNewAndDestroyBirdAttributes();
+    pirate.birdsWithAddLoadAttributes = updateNewAndDestroyBirdAttributes();
     await assertAssignmentAffectsRecordsInTarget("birdsWithAddLoad");
   });
 
   it("Assignment updates records in target when loaded", async () => {
     await pirate.birdsWithAddLoad.load();
-    (pirate as any).birdsWithAddLoadAttributes = updateNewAndDestroyBirdAttributes();
+    pirate.birdsWithAddLoadAttributes = updateNewAndDestroyBirdAttributes();
     await assertAssignmentAffectsRecordsInTarget("birdsWithAddLoad");
   });
 });

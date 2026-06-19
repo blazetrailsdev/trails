@@ -72,7 +72,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       return attrs.map((a) => this.build(a, block));
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return (this._association as CollectionProxy<T>).build(merged, block) as T;
+    return (this._association as CollectionProxy<T>).build(merged, block);
   }
 
   /**
@@ -101,11 +101,11 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   ): Promise<T | T[]> {
     if (Array.isArray(attrs)) {
       const records: T[] = [];
-      for (const a of attrs) records.push((await this.create(a, block)) as T);
+      for (const a of attrs) records.push(await this.create(a, block));
       return records;
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return (this._association as CollectionProxy<T>).create(merged, block) as Promise<T>;
+    return (this._association as CollectionProxy<T>).create(merged, block);
   }
 
   /**
@@ -124,11 +124,11 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   ): Promise<T | T[]> {
     if (Array.isArray(attrs)) {
       const records: T[] = [];
-      for (const a of attrs) records.push((await this.createBang(a, block)) as T);
+      for (const a of attrs) records.push(await this.createBang(a, block));
       return records;
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return (this._association as CollectionProxy<T>).createBang(merged, block) as Promise<T>;
+    return (this._association as CollectionProxy<T>).createBang(merged, block);
   }
 
   /**
@@ -226,7 +226,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     const inverseName: string | null =
       resolvedRefl?.inverseName?.() ??
       (reflection.options.inverseOf && !reflection.options.polymorphic
-        ? (reflection.options.inverseOf as string)
+        ? reflection.options.inverseOf
         : null);
 
     if (inverseName) {
@@ -271,7 +271,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
           inversable = true;
         }
         if (!inversable) continue;
-        _cacheSingularTarget(r as Base, inverseName, owner as Base);
+        _cacheSingularTarget(r as Base, inverseName, owner);
       }
     }
 

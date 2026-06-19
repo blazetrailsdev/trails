@@ -66,7 +66,7 @@ export function buildJourneyRouter(
 ): JourneyRouter {
   const journeyRoutes = new JourneyRoutes();
   for (let i = 0; i < routes.length; i++) {
-    const r = routes[i]!;
+    const r = routes[i];
     const tree = new Parser().parse(r.path);
     const ast = new Ast(tree, true);
     // Path-capture constraints become pattern requirements; request-attribute

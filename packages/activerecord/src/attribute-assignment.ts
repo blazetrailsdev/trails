@@ -51,10 +51,7 @@ export function _assignAttributes(
   }
 
   if (nestedParameterAttributes) {
-    assignNestedParameterAttributes.call(
-      this,
-      nestedParameterAttributes as Record<string, unknown>,
-    );
+    assignNestedParameterAttributes.call(this, nestedParameterAttributes);
   }
   if (multiParameterAttributes) {
     assignMultiparameterAttributes.call(this, multiParameterAttributes);

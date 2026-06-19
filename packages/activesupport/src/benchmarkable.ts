@@ -106,5 +106,5 @@ export function benchmark<T>(
     );
   }
   log();
-  return result! as Awaited<T>;
+  return result as Awaited<T>;
 }

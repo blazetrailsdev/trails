@@ -59,7 +59,7 @@ describe("encrypted-file-editor", () => {
     childProcessAdapterConfig.adapter = "write";
     const file = build();
     await editEncryptedFile(file, "test edit");
-    expect(await (await getFsAsync()).exists!(keyPath)).toBe(true);
+    expect(await (await getFsAsync()).exists(keyPath)).toBe(true);
     expect(await file.read()).toBe("hello\n");
   });
 
@@ -68,7 +68,7 @@ describe("encrypted-file-editor", () => {
     await fs.writeFile!(keyPath, EncryptedFile.generateKey());
     await editEncryptedFile(build(), "test edit");
     expect(calls).toHaveLength(0);
-    expect(await fs.exists!(contentPath)).toBe(false);
+    expect(await fs.exists(contentPath)).toBe(false);
   });
 
   it("show round-trips on success and sets exit 1 when key is absent", async () => {

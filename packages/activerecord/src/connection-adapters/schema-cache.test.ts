@@ -623,7 +623,7 @@ describe("DDL cache-invalidation safety-net", () => {
       order.push(`clear:${name}`);
       origClear(pool, name);
     });
-    (adapter.executeMutation as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+    adapter.executeMutation.mockImplementation(async () => {
       order.push("sql");
       return 0;
     });
@@ -647,7 +647,7 @@ describe("DDL cache-invalidation safety-net", () => {
       order.push(`clear:${name}`);
       origClear(pool, name);
     });
-    (adapter.executeMutation as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+    adapter.executeMutation.mockImplementation(async () => {
       order.push("sql");
       return 0;
     });

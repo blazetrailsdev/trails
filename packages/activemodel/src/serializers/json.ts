@@ -107,14 +107,14 @@ export class JSON {
     // `hash.values.first` unconditionally — Rails ignores the configured
     // root key on the read path (json.rb:146-147).
     if (root !== false && root != null) {
-      hash = Object.values(hash as Record<string, unknown>)[0];
+      hash = Object.values(hash)[0];
       if (!isPlainJsonObject(hash)) {
         throw new TypeError(
           `fromJson root payload must be a JSON object, got ${describeJsonShape(hash)}`,
         );
       }
     }
-    this.attributes = hash as Record<string, unknown>;
+    this.attributes = hash;
     return this;
   }
 

@@ -546,7 +546,7 @@ describe("EnumTest", () => {
     await Book.create({ status: castEnumValue(Book, "status", "proposed"), name: "Pro" });
 
     const notPublished = await (Book as any).notPublished().toArray();
-    expect(notPublished.some((b: any) => (b as any).id === (pub as any).id)).toBe(false);
+    expect(notPublished.some((b: any) => b.id === (pub as any).id)).toBe(false);
 
     const notProposed = await (Book as any).notProposed().toArray();
     expect(notProposed.some((b: any) => readEnumValue(b, "status") === "published")).toBe(true);
@@ -592,8 +592,8 @@ describe("EnumTest", () => {
     }
     defineEnum(Post, "status", { draft: 0, written: 1, published: 2 });
     const p = (Post as any).written().build();
-    expect((p as any).isWritten()).toBe(true);
-    expect((p as any).isDraft()).toBe(false);
+    expect(p.isWritten()).toBe(true);
+    expect(p.isDraft()).toBe(false);
   });
   it("creating new objects with enum scopes", async () => {
     class Post extends Base {
@@ -604,8 +604,8 @@ describe("EnumTest", () => {
     }
     defineEnum(Post, "status", { draft: 0, written: 1, published: 2 });
     const p = await (Post as any).written().create();
-    expect((p as any).isWritten()).toBe(true);
-    expect((p as any).isDraft()).toBe(false);
+    expect(p.isWritten()).toBe(true);
+    expect(p.isDraft()).toBe(false);
   });
   it("reserved enum values", async () => {
     class Post extends Base {
@@ -748,16 +748,16 @@ describe("EnumTest", () => {
     expect(typeof (Cat as any).balineseJavanese).toBe("function");
 
     // Original-form predicate/bang accessible via bracket notation (Rails parity)
-    const cat = Object.create(Cat.prototype) as any;
+    const cat = Object.create(Cat.prototype);
     cat.writeAttribute = (_attr: string, val: unknown) => {
       cat._val = val;
     };
     cat.readAttribute = () => "American Bobtail";
     cat.isPersisted = () => false;
-    expect((cat as any)["isAmerican Bobtail"]()).toBe(true);
-    expect((cat as any)["isBalinese-Javanese"]()).toBe(false);
-    expect(typeof (cat as any)["American BobtailBang"]).toBe("function");
-    expect(typeof (cat as any)["Balinese-JavaneseBang"]).toBe("function");
+    expect(cat["isAmerican Bobtail"]()).toBe(true);
+    expect(cat["isBalinese-Javanese"]()).toBe(false);
+    expect(typeof cat["American BobtailBang"]).toBe("function");
+    expect(typeof cat["Balinese-JavaneseBang"]).toBe("function");
   });
 });
 

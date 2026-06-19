@@ -73,12 +73,8 @@ describe("TokenForTest", () => {
   });
 
   it("finds record by token", async () => {
-    expect(((await (TokenUser as any).findByTokenFor("lookup", lookupToken)) as any).id).toBe(
-      user.id,
-    );
-    expect(((await (TokenUser as any).findByTokenForBang("lookup", lookupToken)) as any).id).toBe(
-      user.id,
-    );
+    expect((await (TokenUser as any).findByTokenFor("lookup", lookupToken)).id).toBe(user.id);
+    expect((await (TokenUser as any).findByTokenForBang("lookup", lookupToken)).id).toBe(user.id);
   });
 
   it("returns nil when record is not found", async () => {
@@ -112,9 +108,9 @@ describe("TokenForTest", () => {
   });
 
   it("finds record when token has not expired and embedded data has not changed", async () => {
-    expect(
-      ((await (TokenUser as any).findByTokenFor("password_reset", passwordResetToken)) as any).id,
-    ).toBe(user.id);
+    expect((await (TokenUser as any).findByTokenFor("password_reset", passwordResetToken)).id).toBe(
+      user.id,
+    );
   });
 
   it("does not find record when token has expired", async () => {
@@ -129,9 +125,7 @@ describe("TokenForTest", () => {
 
   it("tokens do not expire by default", async () => {
     travel(1000 * 365 * DAY);
-    expect(((await (TokenUser as any).findByTokenFor("lookup", lookupToken)) as any).id).toBe(
-      user.id,
-    );
+    expect((await (TokenUser as any).findByTokenFor("lookup", lookupToken)).id).toBe(user.id);
   });
 
   it("does not find record when expires_in is different", async () => {
@@ -140,9 +134,7 @@ describe("TokenForTest", () => {
     try {
       expect(await (TokenUser as any).findByTokenFor("lookup", lookupToken)).toBeNull();
       const newLookupToken = (user as any).generateTokenFor("lookup");
-      expect(((await (TokenUser as any).findByTokenFor("lookup", newLookupToken)) as any).id).toBe(
-        user.id,
-      );
+      expect((await (TokenUser as any).findByTokenFor("lookup", newLookupToken)).id).toBe(user.id);
     } finally {
       generatesTokenFor(TokenUser, "lookup");
     }
@@ -161,9 +153,7 @@ describe("TokenForTest", () => {
 
   it("supports JSON-serializable embedded data", async () => {
     const snapshotToken = (user as any).generateTokenFor("snapshot");
-    expect(((await (TokenUser as any).findByTokenFor("snapshot", snapshotToken)) as any).id).toBe(
-      user.id,
-    );
+    expect((await (TokenUser as any).findByTokenFor("snapshot", snapshotToken)).id).toBe(user.id);
     // Rails: @user.touch(time: @user.updated_at.advance(seconds: 1))
     const advanced = new Date(new Date(String((user as any).updated_at)).getTime() + 1000);
     await (user as any).touch({ time: advanced });
@@ -182,7 +172,7 @@ describe("TokenForTest", () => {
     const subclassedUser = await (Subclass as any).findByTokenFor("lookup", lookupToken);
 
     expect(subclassedUser).toBeInstanceOf(Subclass);
-    expect((subclassedUser as any).id).toBe(user.id);
+    expect(subclassedUser.id).toBe(user.id);
   });
 
   it("subclasses can redefine tokens", async () => {
@@ -194,9 +184,9 @@ describe("TokenForTest", () => {
     const subclassedUser = await Subclass.find(user.id);
     const subclassedLookupToken = (subclassedUser as any).generateTokenFor("lookup");
 
-    expect(
-      ((await (Subclass as any).findByTokenFor("lookup", subclassedLookupToken)) as any).id,
-    ).toBe(user.id);
+    expect((await (Subclass as any).findByTokenFor("lookup", subclassedLookupToken)).id).toBe(
+      user.id,
+    );
     expect(await (Subclass as any).findByTokenFor("lookup", lookupToken)).toBeNull();
     expect(await (TokenUser as any).findByTokenFor("lookup", subclassedLookupToken)).toBeNull();
   });
@@ -208,9 +198,9 @@ describe("TokenForTest", () => {
     const customPkUser = await CustomPk.find((user as any).auth_token);
     const customPkLookupToken = (customPkUser as any).generateTokenFor("lookup");
 
-    expect(
-      ((await (CustomPk as any).findByTokenFor("lookup", customPkLookupToken)) as any).id,
-    ).toBe((customPkUser as any).id);
+    expect((await (CustomPk as any).findByTokenFor("lookup", customPkLookupToken)).id).toBe(
+      (customPkUser as any).id,
+    );
     expect(await (CustomPk as any).findByTokenFor("lookup", lookupToken)).toBeNull();
   });
 
@@ -220,9 +210,7 @@ describe("TokenForTest", () => {
     const book = await CpkBook.create({ author_id: 1, id: 3, shop_id: 2 });
     const token = (book as any).generateTokenFor("test");
 
-    expect(((await (CpkBook as any).findByTokenFor("test", token)) as any).id).toEqual(
-      (book as any).id,
-    );
+    expect((await (CpkBook as any).findByTokenFor("test", token)).id).toEqual((book as any).id);
   });
 
   it("raises when no primary key has been declared", async () => {

@@ -1104,7 +1104,7 @@ export class ToSql extends Visitor {
     if (this.unboundableSign(node.right) !== 0) {
       return collector.append("1=0");
     }
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
+    if (node.right instanceof Nodes.Quoted && node.right.value === null) {
       this.visitNodeOrValue(node.left, collector);
       collector.append(" IS NULL");
       return collector;
@@ -1119,7 +1119,7 @@ export class ToSql extends Visitor {
     node: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
+    if (node.right instanceof Nodes.Quoted && node.right.value === null) {
       this.visitNodeOrValue(node.left, collector);
       collector.append(" IS NULL");
       return collector;
@@ -1131,7 +1131,7 @@ export class ToSql extends Visitor {
     node: Nodes.IsDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
+    if (node.right instanceof Nodes.Quoted && node.right.value === null) {
       this.visitNodeOrValue(node.left, collector);
       collector.append(" IS NOT NULL");
       return collector;
@@ -1143,7 +1143,7 @@ export class ToSql extends Visitor {
     if (this.unboundableSign(node.right) !== 0) {
       return collector.append("1=1");
     }
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
+    if (node.right instanceof Nodes.Quoted && node.right.value === null) {
       this.visitNodeOrValue(node.left, collector);
       collector.append(" IS NOT NULL");
       return collector;

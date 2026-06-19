@@ -40,9 +40,9 @@ describe("Relation#unscope — full Rails key coverage", () => {
 
   it("unscope('createWith') clears _createWithAttrs", () => {
     const rel = (UscAuthor as any).all().createWith({ name: "default" });
-    expect((rel as any)._createWithAttrs).toEqual({ name: "default" });
+    expect(rel._createWithAttrs).toEqual({ name: "default" });
     const cleared = rel.unscope("createWith");
-    expect((cleared as any)._createWithAttrs).toEqual({});
+    expect(cleared._createWithAttrs).toEqual({});
   });
 
   it("unscope('preload') clears preload only — leaves includes / eagerLoad alone", () => {
@@ -51,11 +51,11 @@ describe("Relation#unscope — full Rails key coverage", () => {
       .preload("uscPosts")
       .includes("uscPosts")
       .eagerLoad("uscPosts");
-    expect((rel as any)._preloadAssociations).toEqual(["uscPosts"]);
+    expect(rel._preloadAssociations).toEqual(["uscPosts"]);
     const cleared = rel.unscope("preload");
-    expect((cleared as any)._preloadAssociations).toEqual([]);
-    expect((cleared as any)._includesAssociations).toEqual(["uscPosts"]);
-    expect((cleared as any)._eagerLoadAssociations).toEqual(["uscPosts"]);
+    expect(cleared._preloadAssociations).toEqual([]);
+    expect(cleared._includesAssociations).toEqual(["uscPosts"]);
+    expect(cleared._eagerLoadAssociations).toEqual(["uscPosts"]);
   });
 
   it("unscope('eagerLoad') clears eagerLoad only — leaves includes / preload alone", () => {
@@ -65,9 +65,9 @@ describe("Relation#unscope — full Rails key coverage", () => {
       .includes("uscPosts")
       .eagerLoad("uscPosts");
     const cleared = rel.unscope("eagerLoad");
-    expect((cleared as any)._eagerLoadAssociations).toEqual([]);
-    expect((cleared as any)._includesAssociations).toEqual(["uscPosts"]);
-    expect((cleared as any)._preloadAssociations).toEqual(["uscPosts"]);
+    expect(cleared._eagerLoadAssociations).toEqual([]);
+    expect(cleared._includesAssociations).toEqual(["uscPosts"]);
+    expect(cleared._preloadAssociations).toEqual(["uscPosts"]);
   });
 
   it("unscope('includes') clears includes only — leaves preload / eagerLoad alone (Rails-faithful)", () => {
@@ -79,8 +79,8 @@ describe("Relation#unscope — full Rails key coverage", () => {
       .includes("uscPosts")
       .eagerLoad("uscPosts");
     const cleared = rel.unscope("includes");
-    expect((cleared as any)._includesAssociations).toEqual([]);
-    expect((cleared as any)._preloadAssociations).toEqual(["uscPosts"]);
-    expect((cleared as any)._eagerLoadAssociations).toEqual(["uscPosts"]);
+    expect(cleared._includesAssociations).toEqual([]);
+    expect(cleared._preloadAssociations).toEqual(["uscPosts"]);
+    expect(cleared._eagerLoadAssociations).toEqual(["uscPosts"]);
   });
 });

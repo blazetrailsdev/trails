@@ -41,7 +41,7 @@ export class ActionableExceptions {
       return this.app(env);
     }
 
-    const params = request.params as Record<string, unknown>;
+    const params = request.params;
     const errorName = String(params["error"] ?? "");
     const action = String(params["action"] ?? "");
 

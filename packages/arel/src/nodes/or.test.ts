@@ -34,7 +34,7 @@ describe("Arel", () => {
         const left = attr.eq(10);
         const right = attr.eq(11);
         const node = left.or(right);
-        const grouping = node as Nodes.Grouping;
+        const grouping = node;
         const orNode = grouping.expr as Nodes.Or;
         expect(orNode.left).toBe(left);
         expect(orNode.right).toBe(right);

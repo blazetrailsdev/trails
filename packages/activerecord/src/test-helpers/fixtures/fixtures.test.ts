@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { DatabaseAdapter } from "../../adapter.js";
-import { defineFixtures, fixtureId, isFixtureRef, type FixtureRef } from "../define-fixtures.js";
+import { defineFixtures, fixtureId, isFixtureRef } from "../define-fixtures.js";
 import { adminAccountsFixtureData } from "./admin/accounts.js";
 import { adminUsersFixtureData } from "./admin/users.js";
 import { adminRandomlyNamedA9FixtureData } from "./admin/randomly-named-a9.js";
@@ -106,7 +106,7 @@ describe("topicFixtureData", () => {
 
   it("second fixture has Mary as author and a cross-ref to first", () => {
     expect(topicFixtureData.second.author_name).toBe("Mary");
-    const parentRef = topicFixtureData.second.parent_id as FixtureRef;
+    const parentRef = topicFixtureData.second.parent_id;
     expect(isFixtureRef(parentRef)).toBe(true);
     expect(parentRef.fixtureName).toBe("first");
     expect(parentRef.tableName).toBe("topics");
@@ -139,7 +139,7 @@ describe("postFixtureData", () => {
   });
 
   it("posts reference authors table via ref()", () => {
-    const authorRef = postFixtureData.welcome.author_id as FixtureRef;
+    const authorRef = postFixtureData.welcome.author_id;
     expect(isFixtureRef(authorRef)).toBe(true);
     expect(authorRef.tableName).toBe("authors");
   });
@@ -148,7 +148,7 @@ describe("postFixtureData", () => {
 describe("commentFixtureData", () => {
   it("greetings comment references welcome post via ref()", () => {
     expect(commentFixtureData.greetings.body).toBe("Thank you for the welcome");
-    const postRef = commentFixtureData.greetings.post_id as FixtureRef;
+    const postRef = commentFixtureData.greetings.post_id;
     expect(isFixtureRef(postRef)).toBe(true);
     expect(postRef.fixtureName).toBe("welcome");
     expect(postRef.tableName).toBe("posts");
@@ -156,7 +156,7 @@ describe("commentFixtureData", () => {
 
   it("does_it_hurt is a SpecialComment on thinking post", () => {
     expect(commentFixtureData.does_it_hurt.type).toBe("SpecialComment");
-    const postRef = commentFixtureData.does_it_hurt.post_id as FixtureRef;
+    const postRef = commentFixtureData.does_it_hurt.post_id;
     expect(isFixtureRef(postRef)).toBe(true);
     expect(postRef.fixtureName).toBe("thinking");
   });
@@ -177,7 +177,7 @@ describe("commentFixtureData", () => {
     expect(greetingsInsert).toBeTruthy();
     // posts.welcome pins an explicit `id: 1`, so the ref resolves to that pinned id
     // (not the CRC32 label hash) even though the posts set isn't loaded here.
-    expectValueInRow(greetingsInsert, postFixtureData.welcome.id as number);
+    expectValueInRow(greetingsInsert, postFixtureData.welcome.id);
     expect(greetingsInsert).not.toContain(String(fixtureId("welcome")));
   });
 });
@@ -189,14 +189,14 @@ describe("authorFixtureData", () => {
 
   it("david has correct name and cross-refs to author_addresses", () => {
     expect(authorFixtureData.david.name).toBe("David");
-    const addrRef = authorFixtureData.david.author_address_id as FixtureRef;
+    const addrRef = authorFixtureData.david.author_address_id;
     expect(isFixtureRef(addrRef)).toBe(true);
     expect(addrRef.tableName).toBe("author_addresses");
     expect(addrRef.fixtureName).toBe("david_address");
   });
 
   it("mary refs mary_address", () => {
-    const addrRef = authorFixtureData.mary.author_address_id as FixtureRef;
+    const addrRef = authorFixtureData.mary.author_address_id;
     expect(isFixtureRef(addrRef)).toBe(true);
     expect(addrRef.fixtureName).toBe("mary_address");
   });
@@ -234,7 +234,7 @@ describe("bookFixtureData", () => {
   });
 
   it("rfr refs authors via ref()", () => {
-    const authorRef = bookFixtureData.rfr.author_id as FixtureRef;
+    const authorRef = bookFixtureData.rfr.author_id;
     expect(isFixtureRef(authorRef)).toBe(true);
     expect(authorRef.tableName).toBe("authors");
     expect(authorRef.fixtureName).toBe("david");
@@ -312,12 +312,12 @@ describe("companyFixtureData", () => {
 
   it("first_client is a Client with firm_id cross-ref to first_firm and self-ref client_of", () => {
     expect(companyFixtureData.first_client.type).toBe("Client");
-    const firmRef = companyFixtureData.first_client.firm_id as FixtureRef;
+    const firmRef = companyFixtureData.first_client.firm_id;
     expect(isFixtureRef(firmRef)).toBe(true);
     expect(firmRef.tableName).toBe("companies");
     expect(firmRef.fixtureName).toBe("first_firm");
     // client_of: 2 in Rails YAML — first_client's own ID (self-ref; ref() is just ID math)
-    const clientOfRef = companyFixtureData.first_client.client_of as FixtureRef;
+    const clientOfRef = companyFixtureData.first_client.client_of;
     expect(isFixtureRef(clientOfRef)).toBe(true);
     expect(clientOfRef.fixtureName).toBe("first_client");
   });
@@ -328,7 +328,7 @@ describe("companyFixtureData", () => {
 
   it("leetsoft has no type (falls back to Company base)", () => {
     expect((companyFixtureData.leetsoft as any).type).toBeUndefined();
-    const clientOfRef = companyFixtureData.leetsoft.client_of as FixtureRef;
+    const clientOfRef = companyFixtureData.leetsoft.client_of;
     expect(isFixtureRef(clientOfRef)).toBe(true);
     expect(clientOfRef.fixtureName).toBe("rails_core");
   });
@@ -369,7 +369,7 @@ describe("accountFixtureData", () => {
 
   it("signals37 has firm_id cross-ref to first_firm and correct credit_limit", () => {
     expect(accountFixtureData.signals37.credit_limit).toBe(50);
-    const firmRef = accountFixtureData.signals37.firm_id as FixtureRef;
+    const firmRef = accountFixtureData.signals37.firm_id;
     expect(isFixtureRef(firmRef)).toBe(true);
     expect(firmRef.tableName).toBe("companies");
     expect(firmRef.fixtureName).toBe("first_firm");
@@ -381,7 +381,7 @@ describe("accountFixtureData", () => {
   });
 
   it("odegy_account references odegy company", () => {
-    const firmRef = accountFixtureData.odegy_account.firm_id as FixtureRef;
+    const firmRef = accountFixtureData.odegy_account.firm_id;
     expect(isFixtureRef(firmRef)).toBe(true);
     expect(firmRef.fixtureName).toBe("odegy");
   });
@@ -459,8 +459,8 @@ describe("developersProjectsFixtureData", () => {
   });
 
   it("david_active_record refs david in developers and active_record in projects", () => {
-    const devRef = developersProjectsFixtureData.david_active_record.developer_id as FixtureRef;
-    const projRef = developersProjectsFixtureData.david_active_record.project_id as FixtureRef;
+    const devRef = developersProjectsFixtureData.david_active_record.developer_id;
+    const projRef = developersProjectsFixtureData.david_active_record.project_id;
     expect(isFixtureRef(devRef)).toBe(true);
     expect(devRef.tableName).toBe("developers");
     expect(devRef.fixtureName).toBe("david");
@@ -500,7 +500,7 @@ describe("admin/users (slash-keyed subdir fixture)", () => {
 
   it("david has correct name and account_id ref to admin_accounts", () => {
     expect(adminUsersFixtureData.david.name).toBe("David");
-    const acctRef = adminUsersFixtureData.david.account_id as FixtureRef;
+    const acctRef = adminUsersFixtureData.david.account_id;
     expect(isFixtureRef(acctRef)).toBe(true);
     expect(acctRef.tableName).toBe("admin_accounts");
     expect(acctRef.fixtureName).toBe("signals37");
@@ -508,7 +508,7 @@ describe("admin/users (slash-keyed subdir fixture)", () => {
 
   it("jamis has settings with symbol key and account_id ref", () => {
     expect(adminUsersFixtureData.jamis.name).toBe("Jamis");
-    const acctRef = adminUsersFixtureData.jamis.account_id as FixtureRef;
+    const acctRef = adminUsersFixtureData.jamis.account_id;
     expect(isFixtureRef(acctRef)).toBe(true);
     expect(acctRef.fixtureName).toBe("signals37");
     expect((adminUsersFixtureData.jamis.settings as Record<string, string>)[":symbol"]).toBe(

@@ -42,7 +42,7 @@ export function parseFilename(path: string, knownFormats: Set<string>): ParsedFi
   let format: string | null = null;
   let variant: string | null = null;
   if (tokens.length >= 1) {
-    const candidate = tokens[tokens.length - 1]!;
+    const candidate = tokens[tokens.length - 1];
     const plusIdx = candidate.indexOf("+");
     const formatToken = plusIdx === -1 ? candidate : candidate.slice(0, plusIdx);
     if (knownFormats.has(formatToken)) {
@@ -56,7 +56,7 @@ export function parseFilename(path: string, knownFormats: Set<string>): ParsedFi
   // or `action.locale.handler`). Guard: require at least one remaining token for the name so
   // a bare two-letter filename (`en.tse`) doesn't produce an empty name.
   let locale: string | null = null;
-  if (tokens.length >= 2 && LOCALE_RE.test(tokens[tokens.length - 1]!)) {
+  if (tokens.length >= 2 && LOCALE_RE.test(tokens[tokens.length - 1])) {
     locale = tokens.pop()!;
   }
 

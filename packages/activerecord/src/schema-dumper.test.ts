@@ -142,7 +142,7 @@ describe("SchemaDumperTest", () => {
     for (const pattern of [/default: /, /limit: /, /null: /]) {
       for (const line of columnLines.filter((l) => pattern.test(l))) {
         const m = line.match(pattern)!;
-        const before = line.slice(m.index! - 2, m.index!);
+        const before = line.slice(m.index! - 2, m.index);
         expect(before === "{ " || before === ", ").toBe(true);
       }
     }
@@ -247,7 +247,7 @@ describe("SchemaDumperTest", () => {
       name: "index_companies_on_name_and_description",
       length: 10,
     });
-    const output = (await SchemaDumper.dump(lenAdapter)) as string;
+    const output = await SchemaDumper.dump(lenAdapter);
     const line = output.split(/\n/).find((l) => /index_companies_on_name_and_description/.test(l));
     // Sub-part prefix lengths are MySQL-only; other adapters drop the option.
     expect(line?.includes("length: 10")).toBe(adapterType === "mysql");
@@ -446,7 +446,7 @@ describe("SchemaDumperTest", () => {
         t.text("medium_text", { size: "medium" });
         t.text("long_text", { size: "long" });
       });
-      const output = (await SchemaDumper.dump(bfAdapter)) as string;
+      const output = await SchemaDumper.dump(bfAdapter);
       expect(output).toMatch(/t\.binary\("tiny_blob", \{ size: "tiny" \}\)/);
       expect(output).toMatch(/t\.binary\("normal_blob"\)/);
       expect(output).toMatch(/t\.binary\("medium_blob", \{ size: "medium" \}\)/);
@@ -482,7 +482,7 @@ describe("SchemaDumperTest", () => {
       using: "btree",
       name: "index_key_tests_on_pizza",
     });
-    const output = (await SchemaDumper.dump(ktAdapter)) as string;
+    const output = await SchemaDumper.dump(ktAdapter);
     expect(output).toContain(
       'addIndex("key_tests", "awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',
     );

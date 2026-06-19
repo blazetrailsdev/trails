@@ -75,7 +75,6 @@ function castToBoolean(value: unknown): boolean {
 /** @internal */
 export function queryCastAttribute(this: any, attrName: string, value: unknown): unknown {
   // typeForAttribute is a class method — look it up on the constructor, not the instance.
-  const type = ((this.constructor as any).typeForAttribute?.(attrName) ??
-    booleanType) as BooleanType;
+  const type = (this.constructor.typeForAttribute?.(attrName) ?? booleanType) as BooleanType;
   return type.deserialize(value);
 }

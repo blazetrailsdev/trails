@@ -72,7 +72,7 @@ export class SingularAssociation extends Association {
    *                    lazy loads through.
    */
   get reader(): Base | null {
-    if (this.loaded) return this.target as Base | null;
+    if (this.loaded) return this.target;
 
     // An in-memory target (set via build / internal assignment paths
     // like Preloader::Association#associate_records_from_unscoped,
@@ -82,7 +82,7 @@ export class SingularAssociation extends Association {
     // future reads.
     if (this.target != null) {
       this.loadedBang();
-      return this.target as Base;
+      return this.target;
     }
 
     // Sync resolution via preloaded / cached associations. `doFindTarget`

@@ -625,7 +625,7 @@ describe("AssociationCallbacksTest", () => {
   // creating a Developer autosaves an `audit_logs` row (its `before_create`),
   // so that table must exist too.
   beforeAll(async () => {
-    await defineSchema(Base.connection as TestDatabaseAdapter, {
+    await defineSchema(Base.connection, {
       audit_logs: canonicalSchema.audit_logs,
     });
   });

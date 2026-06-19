@@ -114,7 +114,7 @@ export function _extractRedirectToStatus(
     options !== null &&
     typeof options === "object" &&
     !Array.isArray(options) &&
-    Object.hasOwn(options as object, "status")
+    Object.hasOwn(options, "status")
   ) {
     const opts = options as Record<string, unknown>;
     const status = opts.status;

@@ -71,7 +71,7 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
       expect(col.database === null || typeof col.database === "string").toBe(true);
       expect(col.type === null || typeof col.type === "string").toBe(true);
     }
-    expect(cols[0]!.name).toBe("id");
+    expect(cols[0].name).toBe("id");
   });
 
   it("setReadBigInts enables bigint returns", async () => {

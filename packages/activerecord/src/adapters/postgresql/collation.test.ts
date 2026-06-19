@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -29,7 +28,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgresqlCollationTest", () => {
     it("string column with collation", async () => {
       // Rails: assert_equal :string, column.type; assert_equal "C", column.collation
-      const cols = (await adapter.columns("postgresql_collations")) as PgColumn[];
+      const cols = await adapter.columns("postgresql_collations");
       const col = cols.find((c) => c.name === "string_c")!;
       expect(col.type).toBe("string");
       expect(col.collation).toBe("C");
@@ -37,7 +36,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("text column with collation", async () => {
       // Rails: assert_equal :text, column.type; assert_equal "POSIX", column.collation
-      const cols = (await adapter.columns("postgresql_collations")) as PgColumn[];
+      const cols = await adapter.columns("postgresql_collations");
       const col = cols.find((c) => c.name === "text_posix")!;
       expect(col.type).toBe("text");
       expect(col.collation).toBe("POSIX");
@@ -46,7 +45,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("add column with collation", async () => {
       // Rails: @connection.add_column :postgresql_collations, :title, :string, collation: "C"
       await adapter.addColumn("postgresql_collations", "title", "string", { collation: "C" });
-      const cols = (await adapter.columns("postgresql_collations")) as PgColumn[];
+      const cols = await adapter.columns("postgresql_collations");
       const col = cols.find((c) => c.name === "title")!;
       expect(col.type).toBe("string");
       expect(col.collation).toBe("C");
@@ -58,7 +57,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.changeColumn("postgresql_collations", "description", "text", {
         collation: "POSIX",
       });
-      const cols = (await adapter.columns("postgresql_collations")) as PgColumn[];
+      const cols = await adapter.columns("postgresql_collations");
       const col = cols.find((c) => c.name === "description")!;
       expect(col.type).toBe("text");
       expect(col.collation).toBe("POSIX");

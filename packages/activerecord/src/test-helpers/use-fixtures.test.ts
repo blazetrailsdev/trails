@@ -605,7 +605,7 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
     const [row] = (await Base.adapter.execute(
       `SELECT breed FROM ${Base.adapter.quoteTableName("parrots")} WHERE name = 'Curious George'`,
     )) as { breed: number }[];
-    expect(row!.breed).toBe(1);
+    expect(row.breed).toBe(1);
     expect(parrots("george").readAttribute("breed")).toBe("australian");
     expect(parrots("louis").readAttribute("breed")).toBe("african");
   });

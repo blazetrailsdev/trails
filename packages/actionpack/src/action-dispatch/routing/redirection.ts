@@ -123,7 +123,7 @@ export class Redirect extends Endpoint {
       payload.location = response.headers["Location"];
       payload.request = request;
       return response.toRack();
-    }) as [number, Record<string, string>, unknown];
+    });
   }
 
   buildResponse(req: Request): Response {
@@ -198,13 +198,13 @@ export class PathRedirect extends Redirect {
     if (m) {
       const [, p, q, f] = m;
       const path = this.interpolationRequired(p, params)
-        ? interpolate(p!, this.escapePath(params))
+        ? interpolate(p, this.escapePath(params))
         : (p ?? "");
       const query = this.interpolationRequired(q, params)
-        ? interpolate(q!, this.escape(params))
+        ? interpolate(q, this.escape(params))
         : (q ?? "");
       const fragment = this.interpolationRequired(f, params)
-        ? interpolate(f!, this.escapeFragment(params))
+        ? interpolate(f, this.escapeFragment(params))
         : (f ?? "");
       return `${path}${query}${fragment}`;
     }
@@ -295,7 +295,7 @@ export function redirect(
   if (last && typeof last === "object" && !("call" in last) && typeof last !== "function") {
     options = args.pop() as OptionRedirectOptions & { status?: number };
   }
-  const status = (options?.status as number | undefined) ?? 301;
+  const status = options?.status ?? 301;
   if (options) delete options.status;
   const path = args.shift();
 
@@ -307,7 +307,7 @@ export function redirect(
   }
   let block: RedirectBlock | undefined;
   if (typeof path === "function") {
-    block = path as RedirectBlock;
+    block = path;
   } else if (path && typeof (path as RedirectCallable).call === "function") {
     const callable = path as RedirectCallable;
     block = (params, request) => callable.call(params, request);

@@ -28,11 +28,11 @@ describe("RailtieTest", () => {
   afterEach(() => {
     SecurePassword.minCost = false;
     ActiveModelError.i18nCustomizeFullMessage = false;
-    (BaseRailtie.subclasses as (typeof BaseRailtie)[]).length = 0;
-    (BaseRailtie.subclasses as (typeof BaseRailtie)[]).push(...savedSubclasses);
+    BaseRailtie.subclasses.length = 0;
+    BaseRailtie.subclasses.push(...savedSubclasses);
     // Reset per-class config to saved snapshot
     for (const key of Object.keys(Trailtie.config)) {
-      delete (Trailtie.config as Record<string, unknown>)[key];
+      delete Trailtie.config[key];
     }
     Object.assign(Trailtie.config, savedConfig);
     // Clear deprecators registry
@@ -98,7 +98,7 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers applies i18nCustomizeFullMessage from Railtie.config.activeModel", () => {
-    (Trailtie.config as Record<string, unknown>)["activeModel"] = {
+    Trailtie.config["activeModel"] = {
       i18nCustomizeFullMessage: true,
     };
     Trailtie.runInitializers();
@@ -106,7 +106,7 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers applies i18nCustomizeFullMessage from flat Railtie.config (backwards-compat)", () => {
-    (Trailtie.config as Record<string, unknown>)["i18nCustomizeFullMessage"] = true;
+    Trailtie.config["i18nCustomizeFullMessage"] = true;
     Trailtie.runInitializers();
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });

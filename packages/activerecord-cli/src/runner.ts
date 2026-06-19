@@ -15,7 +15,7 @@ export async function arRunner(cwd: string, args: string[]): Promise<number> {
       i++;
       continue;
     }
-    if (!args[i]!.startsWith("-")) {
+    if (!args[i].startsWith("-")) {
       scriptPath = args[i];
       scriptIdx = i;
       break;

@@ -313,12 +313,12 @@ export class SchemaStatements {
           unique: idx.unique,
           name: idx.name,
           where: idx.where,
-          order: expandIndexOption(idx.orders, idx.columns) as Record<string, string>,
+          order: expandIndexOption(idx.orders, idx.columns),
           using: idx.using,
           type: idx.type,
           comment: idx.comment,
-          length: expandIndexOption(idx.lengths, idx.columns) as Record<string, number>,
-          opclass: expandIndexOption(idx.opclasses, idx.columns) as Record<string, string>,
+          length: expandIndexOption(idx.lengths, idx.columns),
+          opclass: expandIndexOption(idx.opclasses, idx.columns),
           include: idx.include,
           nullsNotDistinct: idx.nullsNotDistinct,
           algorithm: idx.algorithm,
@@ -1921,7 +1921,7 @@ export class SchemaStatements {
     if (options && typeof options === "object") {
       return (col: string) => options[col];
     }
-    return (_col: string) => (options as string | undefined) ?? undefined;
+    return (_col: string) => options ?? undefined;
   }
 
   /** @internal */

@@ -685,7 +685,7 @@ function shouldMultipart(params: Record<string, unknown>): boolean {
     if (Array.isArray(value)) return value.some(check);
     if (value instanceof UploadedFile) return true;
     if (value !== null && typeof value === "object") {
-      return Object.values(value as object).some(check);
+      return Object.values(value).some(check);
     }
     return false;
   };

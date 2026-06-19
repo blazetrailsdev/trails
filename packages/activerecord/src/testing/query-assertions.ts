@@ -46,7 +46,7 @@ export class SQLCounter {
     this.logAll.push(sql);
 
     if (payload.name !== "SCHEMA") {
-      const binds = (payload.binds as unknown[] | undefined) ?? [];
+      const binds = payload.binds ?? [];
       this.logFull.push([sql, binds]);
     }
   }

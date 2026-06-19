@@ -88,8 +88,7 @@ export function buildAdapterArg(
     // forward unrelated database.yml entries (pool, host, etc.) into the
     // options object. The adapter ignores unknown keys today but accepting
     // them here would lock in a foot-gun.
-    const { readonly, driver, pragmas, strict, statementLimit, preparedStatements } =
-      configuration as Record<string, unknown>;
+    const { readonly, driver, pragmas, strict, statementLimit, preparedStatements } = configuration;
     const options: Record<string, unknown> = {};
     if (readonly !== undefined) options.readonly = readonly;
     if (driver !== undefined) options.driver = driver;

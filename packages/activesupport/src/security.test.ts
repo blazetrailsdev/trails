@@ -93,8 +93,8 @@ describe("MessageVerifierTest", () => {
   it("valid_message returns false on tampered data", () => {
     const v = new MessageVerifier("Hey, I'm a secret!");
     const [data, hash] = v.generate({ some: "data" }).split("--");
-    expect(v.validMessage(`${data!.split("").reverse().join("")}--${hash}`)).toBe(false);
-    expect(v.validMessage(`${data}--${hash!.split("").reverse().join("")}`)).toBe(false);
+    expect(v.validMessage(`${data.split("").reverse().join("")}--${hash}`)).toBe(false);
+    expect(v.validMessage(`${data}--${hash.split("").reverse().join("")}`)).toBe(false);
     expect(v.validMessage("purejunk")).toBe(false);
   });
 

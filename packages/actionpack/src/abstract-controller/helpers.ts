@@ -243,7 +243,7 @@ function makeIncludeLink(
     has(t, prop) {
       return Object.prototype.hasOwnProperty.call(mod, prop) || Reflect.has(t, prop);
     },
-  }) as HelperMethodsModule;
+  });
 }
 
 function recordHelperIncluded(helpers: HelperMethodsModule, mod: object): void {

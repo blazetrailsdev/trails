@@ -134,9 +134,7 @@ export class TypeMapInitializer {
       this.register(row.oid, (_oid: number | string, ...args: unknown[]) => {
         const rangeType = this.storeLookup(rangeOid, ...args);
         const subtype =
-          rangeType instanceof RangeType
-            ? rangeType.subtype
-            : (rangeType as unknown as RangeSubtype);
+          rangeType instanceof RangeType ? rangeType.subtype : (rangeType as RangeSubtype);
         return new MultiRangeType(subtype, row.typname);
       });
     }

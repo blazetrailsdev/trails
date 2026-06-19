@@ -364,7 +364,7 @@ describe("DJAS — composite key support", () => {
     );
     const returned = (await djar.ids()) as unknown[][];
     returned.push([999, 999]);
-    (returned[0] as unknown[])[1] = 42;
+    returned[0][1] = 42;
     // Second call sees the original — mutation didn't leak into
     // the DJAR's internal state.
     expect(await djar.ids()).toEqual([[1, 100]]);

@@ -76,7 +76,7 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
     // Canonicalize the proxy name to the underscore form so
     // Migrator.validate()'s duplicate-name check sees hyphen-alias and
     // underscore-form migrations as the same logical name.
-    const name = match[2]!.replace(/-/g, "_");
+    const name = match[2].replace(/-/g, "_");
     const filePath = path.join(migrationsDir, file);
 
     proxies.push({

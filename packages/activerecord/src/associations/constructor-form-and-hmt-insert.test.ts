@@ -155,7 +155,7 @@ describe("HABTM insert_record two-step", () => {
     const reloaded = await B30Post.find(post.id);
     const tags = await (reloaded as any).association("tags").loadTarget();
     expect(tags).toHaveLength(1);
-    expect((tags[0] as any).id).toBe(tag.id);
+    expect(tags[0].id).toBe(tag.id);
   });
 });
 

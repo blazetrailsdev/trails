@@ -48,7 +48,7 @@ export class Map {
       if (definition) {
         const type =
           typeof definition === "object" && definition !== null && "type" in definition
-            ? (definition as any).type
+            ? definition.type
             : definition;
         if (type) return type as Type;
       }

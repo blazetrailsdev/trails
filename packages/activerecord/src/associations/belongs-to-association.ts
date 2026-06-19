@@ -234,7 +234,7 @@ export class BelongsToAssociation extends SingularAssociation {
     if (!inverse) return false;
     const isHasOne =
       typeof inverse.isHasOne === "function" ? inverse.isHasOne() : inverse.macro === "hasOne";
-    const inverseKlass = inverse.klass as typeof Base | undefined;
+    const inverseKlass = inverse.klass;
     return isHasOne || !!inverseKlass?.hasManyInversing;
   }
 

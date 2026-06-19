@@ -275,7 +275,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
     if (o instanceof ChangeColumnDefaultDefinition)
       return this.visitChangeColumnDefaultDefinition(o);
-    return super.accept(o as Parameters<AbstractSchemaCreation["accept"]>[0]);
+    return super.accept(o);
   }
 
   /** @internal */

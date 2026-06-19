@@ -299,7 +299,7 @@ function eachAttributes(
     let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
     if (!attr && isEqualityNode(node)) {
       const left = (node as any).left;
-      if (left && typeof (left as any).fetchAttribute === "function") attr = left;
+      if (left && typeof left.fetchAttribute === "function") attr = left;
     }
     if (attr) fn(attr, node);
   }

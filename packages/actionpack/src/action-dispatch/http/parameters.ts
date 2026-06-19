@@ -88,13 +88,12 @@ export function setParameterParsers(
   const entries: Iterable<[unknown, ParameterParser]> =
     parsers instanceof Map
       ? parsers.entries()
-      : (Reflect.ownKeys(parsers).map((k) => [
-          k,
-          (parsers as Record<string | symbol, ParameterParser>)[k as never],
-        ]) as Array<[unknown, ParameterParser]>);
+      : (Reflect.ownKeys(parsers).map((k) => [k, parsers[k as never]]) as Array<
+          [unknown, ParameterParser]
+        >);
   for (const [key, value] of entries) {
     const sym =
-      key !== null && typeof key === "object" && "symbol" in (key as object)
+      key !== null && typeof key === "object" && "symbol" in key
         ? String((key as { symbol: unknown }).symbol)
         : typeof key === "symbol"
           ? (key.description ?? String(key))

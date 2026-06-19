@@ -99,7 +99,7 @@ export class ActionFilter implements CallbackPredicateLike {
       if (missing !== undefined) {
         const names =
           this._filters.length === 1
-            ? _inspectFilter(this._filters[0]!)
+            ? _inspectFilter(this._filters[0])
             : `[${this._filters.map(_inspectFilter).join(", ")}]`;
         // Ruby `:key.inspect` renders as `:key`; preserve that for parity
         // with Rails' error message format (the literal `:only` / `:except`).
@@ -226,7 +226,7 @@ function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | und
   return list.map((item) =>
     typeof item === "function"
       ? (item as unknown as CallbackCondition)
-      : (c: object) => (item as CallbackPredicateLike).isMatch(c as AbstractController),
+      : (c: object) => item.isMatch(c as AbstractController),
   );
 }
 

@@ -181,7 +181,7 @@ describe("EncryptedFileTest", () => {
     await ef.write(CONTENT);
 
     const fs = await getFsAsync();
-    expect(await fs.exists!(contentPath)).toBe(true);
+    expect(await fs.exists(contentPath)).toBe(true);
     expect(await ef.read()).toBe(CONTENT);
   });
 

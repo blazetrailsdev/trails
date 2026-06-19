@@ -87,7 +87,7 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
   for (const name of names) {
     const descriptor = findPropertyDescriptor(target, name);
     const original = (target as Record<string, unknown>)[name] as (...args: unknown[]) => unknown;
-    const wrapper = mod[name] as PrependMethod;
+    const wrapper = mod[name];
     const wrapped = function (this: unknown, ...args: unknown[]) {
       return wrapper.call(this, original, ...args);
     };

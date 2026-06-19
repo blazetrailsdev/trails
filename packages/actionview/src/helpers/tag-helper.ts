@@ -651,7 +651,7 @@ function createTagBuilderProxy(): TagBuilder {
     has() {
       return true;
     },
-  }) as TagBuilder;
+  });
 }
 
 function selfClosingTagString(

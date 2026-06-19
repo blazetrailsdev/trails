@@ -155,7 +155,7 @@ export async function performQuery(
       const execPrepared = (name: string) =>
         rawConnection.query({
           name,
-          values: pgBinds as unknown[],
+          values: pgBinds,
           rowMode: "array",
         } as unknown as pg.QueryConfig);
       try {
@@ -176,7 +176,7 @@ export async function performQuery(
     } else {
       result = await rawConnection.query({
         text: pgSql,
-        values: pgBinds as unknown[],
+        values: pgBinds,
         rowMode: "array",
       });
     }

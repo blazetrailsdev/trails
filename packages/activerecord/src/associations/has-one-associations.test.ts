@@ -49,7 +49,7 @@ import {
 
 /** Load and return a singular association's target (Rails sync reader). */
 async function readHasOne(owner: any, name: string): Promise<any> {
-  return (await owner.association(name).loadTarget()) as any;
+  return await owner.association(name).loadTarget();
 }
 
 function registerCompanyModels(): void {
@@ -136,7 +136,7 @@ describe("HasOneAssociationsTest", () => {
   it("with select", async () => {
     const firm = await Firm.find(1);
     const account = await readHasOne(firm, "accountWithSelect");
-    expect(Object.keys((account as any).attributes).length).toBe(2);
+    expect(Object.keys(account.attributes).length).toBe(2);
   });
 
   it("finding using primary key", async () => {
@@ -572,16 +572,16 @@ describe("HasOneAssociationsTest", () => {
   it("association protect foreign key", async () => {
     const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
     let ship = (pirate.association("ship") as any).build();
-    expect((ship as any).pirate_id).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
     ship = (pirate.association("ship") as any).build({ pirate_id: (pirate.id as number) + 1 });
-    expect((ship as any).pirate_id).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
     ship = await (pirate.association("ship") as any).create({ name: "s1" });
-    expect((ship as any).pirate_id).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
     ship = await (pirate.association("ship") as any).create({
       name: "s2",
       pirate_id: (pirate.id as number) + 1,
     });
-    expect((ship as any).pirate_id).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it.skip("build with block", () => {
@@ -633,7 +633,7 @@ describe("HasOneAssociationsTest", () => {
     await ship.save();
 
     ship.name = "new name";
-    expect((ship as any).changed).toBe(true);
+    expect(ship.changed).toBe(true);
     await assertQueriesCount(3, false, async () => {
       (pirate.association("ship") as any).writer(ship);
       await pirate.save();

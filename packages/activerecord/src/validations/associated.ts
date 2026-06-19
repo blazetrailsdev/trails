@@ -33,7 +33,7 @@ export class AssociatedValidator extends EachValidator {
     const values = Array.isArray(value) ? value : value != null ? [value] : [];
 
     if (values.some((assoc: any) => !isValidObject(assoc, context))) {
-      const { attributes: _, ...errorOpts } = this.options as Record<string, unknown>;
+      const { attributes: _, ...errorOpts } = this.options;
       record.errors.add(attribute, "invalid", { ...errorOpts, value });
     }
   }

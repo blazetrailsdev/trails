@@ -310,7 +310,7 @@ describe("SQLite3::Quoting", () => {
       const instant = Temporal.Instant.from("2026-04-18T12:34:56.123456Z");
       await adapter.executeMutation(`INSERT INTO "events" ("ts") VALUES (${quote(instant)})`);
       const rows = await adapter.execute(`SELECT "ts" FROM "events" LIMIT 1`);
-      const raw = (rows as Record<string, unknown>[])[0].ts as string;
+      const raw = rows[0].ts as string;
       // SQLiteDateTimeType converts the offset-less UTC string → Temporal.Instant.
       const cast = new SQLiteDateTimeType().cast(raw);
       expect(cast).toBeInstanceOf(Temporal.Instant);
@@ -322,7 +322,7 @@ describe("SQLite3::Quoting", () => {
       const dt = Temporal.PlainDateTime.from("2026-04-18T12:34:56.654321");
       await adapter.executeMutation(`INSERT INTO "events" ("dt") VALUES (${quote(dt)})`);
       const rows = await adapter.execute(`SELECT "dt" FROM "events" LIMIT 1`);
-      const raw = (rows as Record<string, unknown>[])[0].dt as string;
+      const raw = rows[0].dt as string;
       const cast = new SQLiteDateTimeType().cast(raw) as Temporal.Instant;
       expect(cast).toBeInstanceOf(Temporal.Instant);
       const zdt = cast.toZonedDateTimeISO("UTC");
@@ -334,7 +334,7 @@ describe("SQLite3::Quoting", () => {
       const date = Temporal.PlainDate.from("2026-04-18");
       await adapter.executeMutation(`INSERT INTO "events" ("d") VALUES (${quote(date)})`);
       const rows = await adapter.execute(`SELECT "d" FROM "events" LIMIT 1`);
-      const raw = (rows as Record<string, unknown>[])[0].d as string;
+      const raw = rows[0].d as string;
       const cast = new DateType().cast(raw);
       expect(cast).toBeInstanceOf(Temporal.PlainDate);
       const pd = cast as Temporal.PlainDate;
@@ -350,7 +350,7 @@ describe("SQLite3::Quoting", () => {
       const time = Temporal.PlainTime.from("14:23:55.654321");
       await adapter.executeMutation(`INSERT INTO "events" ("t") VALUES (${quote(time)})`);
       const rows = await adapter.execute(`SELECT "t" FROM "events" LIMIT 1`);
-      const raw = (rows as Record<string, unknown>[])[0].t as string;
+      const raw = rows[0].t as string;
       const cast = new TimeType().cast(raw) as Temporal.PlainTime;
       expect(cast).toBeInstanceOf(Temporal.PlainTime);
       expect(cast.hour).toBe(14);

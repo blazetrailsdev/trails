@@ -51,12 +51,12 @@ export class OrderedOptions {
           (target as any)[prop] = value;
           return true;
         }
-        target._data.set(prop as string, value);
+        target._data.set(prop, value);
         return true;
       },
       has(target, prop: string | symbol) {
         if (typeof prop === "symbol" || prop in target) return true;
-        return target._data.has(prop as string);
+        return target._data.has(prop);
       },
     });
   }
@@ -156,7 +156,7 @@ export class InheritableOptions extends OrderedOptions {
           const val = (target as any)[prop];
           return typeof val === "function" ? val.bind(target) : val;
         }
-        const strProp = prop as string;
+        const strProp = prop;
         if (strProp.endsWith("?")) {
           const key = strProp.slice(0, -1);
           return () => {

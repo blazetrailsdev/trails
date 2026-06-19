@@ -26,7 +26,7 @@ function expandKey(key: unknown): string {
     if (Array.isArray(key)) {
       return key.map(expandKey).join("/");
     }
-    if (Symbol.iterator in (key as object)) {
+    if (Symbol.iterator in key) {
       return [...(key as Iterable<unknown>)].map(expandKey).join("/");
     }
   }

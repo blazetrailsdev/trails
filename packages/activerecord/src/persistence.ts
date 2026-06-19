@@ -1317,7 +1317,7 @@ export function becomesBang<
   T extends BecomesRecord & { becomes: typeof becomes },
   K extends typeof import("./base.js").Base,
 >(this: T, klass: K): InstanceType<K> {
-  const instance = this.becomes(klass) as InstanceType<K>;
+  const instance = this.becomes(klass);
   const base = getStiBase(klass);
   const inheritanceCol = getInheritanceColumn(base);
   if (inheritanceCol) {
@@ -1423,7 +1423,7 @@ export function _findRecord(
   this: PersistencePrivateHost & { constructor: any },
   options?: { lock?: boolean | string; allQueries?: boolean | null },
 ): Promise<unknown> {
-  const ctor = this.constructor as any;
+  const ctor = this.constructor;
   const preloads = strictLoadedAssociations.call(this);
   // Rails: self.class.all(all_queries: all_queries).preload(...) — the
   // all_queries flag controls whether `all_queries: true` default scopes apply.
@@ -1690,7 +1690,7 @@ export function applyDefaultAndGlobalConstraints(
   if (defaultConstraint != null) manager.where(defaultConstraint);
   const globalScope = ScopeRegistry.globalCurrentScope(ctor);
   if (globalScope) {
-    const ast = (globalScope as any)._whereClause?.ast;
+    const ast = globalScope._whereClause?.ast;
     if (ast != null) manager.where(ast);
   }
 }

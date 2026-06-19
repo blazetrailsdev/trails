@@ -298,7 +298,7 @@ describe("defineFixtures", () => {
       taggable_id: postId,
     };
     const rows = new Map([[taggingId, taggingRow]]);
-    const Tagging = makeModel("taggings", rows) as any;
+    const Tagging = makeModel("taggings", rows);
     Tagging._reflections = {
       taggable: {
         macro: "belongsTo",
@@ -323,7 +323,7 @@ describe("defineFixtures", () => {
     // they should pass through unchanged — no expansion is triggered.
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("welcome_tag"), { id: fixtureId("welcome_tag") }]]);
-    const Tagging = makeModel("taggings", rows) as any;
+    const Tagging = makeModel("taggings", rows);
     Tagging._reflections = {
       taggable: { macro: "belongsTo", isPolymorphic: () => true },
     };
@@ -342,7 +342,7 @@ describe("defineFixtures", () => {
   it("polymorphic ref: null value sets both type and id columns to null", async () => {
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("untagged"), { id: fixtureId("untagged") }]]);
-    const Tagging = makeModel("taggings", rows) as any;
+    const Tagging = makeModel("taggings", rows);
     Tagging._reflections = {
       taggable: { macro: "belongsTo", isPolymorphic: () => true },
     };
@@ -364,7 +364,7 @@ describe("defineFixtures", () => {
   it("polymorphic ref: ref() on a poly key throws instead of inserting spurious column", async () => {
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);
-    const Tagging = makeModel("taggings", rows) as any;
+    const Tagging = makeModel("taggings", rows);
     Tagging._reflections = {
       taggable: { macro: "belongsTo", isPolymorphic: () => true },
     };
@@ -379,7 +379,7 @@ describe("defineFixtures", () => {
     // duck-typed check, which would have happily accepted any class instance.
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);
-    const Tagging = makeModel("taggings", rows) as any;
+    const Tagging = makeModel("taggings", rows);
     Tagging._reflections = {
       taggable: { macro: "belongsTo", isPolymorphic: () => true },
     };
@@ -394,7 +394,7 @@ describe("defineFixtures", () => {
   it("polymorphic ref: non-instance non-null value throws a clear error", async () => {
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);
-    const Tagging = makeModel("taggings", rows) as any;
+    const Tagging = makeModel("taggings", rows);
     Tagging._reflections = {
       taggable: { macro: "belongsTo", isPolymorphic: () => true },
     };

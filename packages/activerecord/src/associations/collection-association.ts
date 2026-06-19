@@ -162,7 +162,7 @@ export class CollectionAssociation extends Association {
    * each record, persisting if the owner is persisted.
    */
   async concat(...records: Base[]): Promise<Base[]> {
-    const flattened = records.flat() as Base[];
+    const flattened = records.flat();
     if (this.owner.isNewRecord()) {
       await this.loadTarget();
       await this.concatRecords(flattened);
@@ -337,7 +337,7 @@ export class CollectionAssociation extends Association {
       // inverse, then after_remove. delete_records (the DB delete) is skipped —
       // a new owner has no persisted join rows yet, so existing_records is
       // empty (the owner's save is what creates them).
-      const toRemove = (this.target as Base[]).filter((r) => !otherArray.includes(r));
+      const toRemove = this.target.filter((r) => !otherArray.includes(r));
       let removable = true;
       for (const r of toRemove) {
         if (!callback(this, "beforeRemove", r)) {
@@ -742,8 +742,8 @@ export class CollectionAssociation extends Association {
       await this.deleteRecords(existingRecords, method);
     }
     for (const record of records) {
-      const idx = (this.target as Base[]).indexOf(record);
-      if (idx !== -1) (this.target as Base[]).splice(idx, 1);
+      const idx = this.target.indexOf(record);
+      if (idx !== -1) this.target.splice(idx, 1);
       // A `dependent: :destroy` record is frozen once destroyed, so clearing its
       // inverse foreign key would raise FrozenError. Rails leaves the destroyed
       // record's attributes untouched here (remove_records only prunes @target),
@@ -913,8 +913,8 @@ export class CollectionAssociation extends Association {
 function transaction(assoc: CollectionAssociation, block: () => Promise<void>): Promise<void> {
   // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
   const klass = (assoc.reflection as any).klass ?? assoc.klass;
-  if (klass && typeof (klass as any).transaction === "function") {
-    return (klass as any).transaction(block);
+  if (klass && typeof klass.transaction === "function") {
+    return klass.transaction(block);
   }
   return block();
 }
@@ -926,9 +926,9 @@ async function replaceRecords(
   originalTarget: Base[],
 ): Promise<Base[]> {
   // Rails: delete(difference(target, new_target)); concat(difference(new_target, target))
-  const toDelete = (assoc.target as Base[]).filter((r) => !newTarget.includes(r));
+  const toDelete = assoc.target.filter((r) => !newTarget.includes(r));
   if (toDelete.length > 0) await assoc.delete(...toDelete);
-  const toAdd = newTarget.filter((r) => !(assoc.target as Base[]).includes(r));
+  const toAdd = newTarget.filter((r) => !assoc.target.includes(r));
   if (toAdd.length > 0) {
     try {
       await assoc.concat(...toAdd);
@@ -944,7 +944,7 @@ async function replaceRecords(
       throw e;
     }
   }
-  return assoc.target as Base[];
+  return assoc.target;
 }
 
 /** @internal */
@@ -969,7 +969,7 @@ function replaceOnTarget(
   const replaced = assoc as any;
   let index = -1;
   if (replace) {
-    index = (assoc.target as Base[]).indexOf(record);
+    index = assoc.target.indexOf(record);
   }
 
   // Rails: catch(:abort) { callback(:before_add, record) } || return unless skip_callbacks
@@ -978,7 +978,7 @@ function replaceOnTarget(
   assoc.setInverseInstance(record);
   replaced._associationIds = null;
 
-  const target = assoc.target as Base[];
+  const target = assoc.target;
   if (index !== -1) {
     target[index] = record;
   } else {
@@ -1070,7 +1070,7 @@ function isIncludeInMemory(assoc: CollectionAssociation, record: Base): boolean 
       }
     }
   }
-  return (assoc.target as Base[]).includes(record);
+  return assoc.target.includes(record);
 }
 
 function arraysEqual(a: Base[], b: Base[]): boolean {

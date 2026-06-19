@@ -227,7 +227,7 @@ function resetDefaultAttributes(this: AnyClass): void {
  * Mirrors: ActiveRecord::Attributes::ClassMethods#resolve_type_name
  */
 function resolveTypeName(this: AnyClass, name: string): Type {
-  return typeLookup(name) as Type;
+  return typeLookup(name);
 }
 
 /**

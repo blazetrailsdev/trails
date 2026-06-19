@@ -99,7 +99,7 @@ export class Reaper {
     }, frequency * 1000);
 
     if (typeof timer === "object" && "unref" in timer) {
-      (timer as NodeJS.Timeout).unref();
+      timer.unref();
     }
 
     return timer;

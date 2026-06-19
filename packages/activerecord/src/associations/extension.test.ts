@@ -40,7 +40,7 @@ describe("AssociationsExtensionsTest", () => {
   // the posts fixture INSERT (which carries a `body` value) finds the column.
   // Registered after `useHandlerFixtures` so this `beforeAll` runs last and wins.
   beforeAll(async () => {
-    const s = canonicalSchema as Schema;
+    const s = canonicalSchema;
     await defineSchema(
       {
         posts: s.posts,

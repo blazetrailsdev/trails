@@ -11,7 +11,7 @@ describe("MysqlColumn", () => {
       { primaryKey: true, autoIncrement: true, unsigned: true, virtual: false },
     );
     const json = JSON.parse(JSON.stringify(original.toJSON()));
-    const restored = MysqlColumn.fromJSON(json) as MysqlColumn;
+    const restored = MysqlColumn.fromJSON(json);
     expect(restored.autoIncrement).toBe(true);
     expect(restored.unsigned).toBe(true);
     expect(restored.virtual).toBe(false);

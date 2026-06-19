@@ -109,10 +109,7 @@ function parseAddForeignKey(call: ts.CallExpression): ForeignKeyDefinition | und
   const toTable = strLiteral(args[1]);
   if (!fromTable || !toTable) return undefined;
 
-  const opts =
-    args.length >= 3 && ts.isObjectLiteralExpression(args[2])
-      ? (args[2] as ts.ObjectLiteralExpression)
-      : undefined;
+  const opts = args.length >= 3 && ts.isObjectLiteralExpression(args[2]) ? args[2] : undefined;
 
   // Rails' foreign_key_column_for strips the configured table_name_prefix/suffix
   // before singularizing (schema_statements.rb:1241,1246); the offline parser has

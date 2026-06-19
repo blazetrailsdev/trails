@@ -31,8 +31,8 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["posts"]!["title"]).toEqual({ type: "string", null: false });
-    expect(result["posts"]!["body"]).toEqual({ type: "text", null: true });
+    expect(result["posts"]["title"]).toEqual({ type: "string", null: false });
+    expect(result["posts"]["body"]).toEqual({ type: "text", null: true });
   });
 
   it("handles arrays: array: true → type: array + arrayElementType", () => {
@@ -45,12 +45,12 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["items"]!["tags"]).toEqual({
+    expect(result["items"]["tags"]).toEqual({
       type: "array",
       null: true,
       arrayElementType: "string",
     });
-    expect(result["items"]!["scores"]).toEqual({
+    expect(result["items"]["scores"]).toEqual({
       type: "array",
       null: false,
       arrayElementType: "integer",
@@ -66,7 +66,7 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["articles"]!["status"]).toEqual({ type: "enum", null: false });
+    expect(result["articles"]["status"]).toEqual({ type: "enum", null: false });
   });
 
   it("handles t.column fallback with raw SQL type", () => {
@@ -79,8 +79,8 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["widgets"]!["data"]).toEqual({ type: "jsonb", null: false });
-    expect(result["widgets"]!["extra"]).toEqual({ type: "tsvector", null: true });
+    expect(result["widgets"]["data"]).toEqual({ type: "jsonb", null: false });
+    expect(result["widgets"]["extra"]).toEqual({ type: "tsvector", null: true });
   });
 
   it("t.column with array: true → type: array + arrayElementType", () => {
@@ -92,7 +92,7 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["things"]!["labels"]).toEqual({
+    expect(result["things"]["labels"]).toEqual({
       type: "array",
       null: false,
       arrayElementType: "citext",
@@ -109,9 +109,9 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(Object.keys(result["products"]!)).not.toContain("price > 0");
-    expect(Object.keys(result["products"]!)).not.toContain("checkConstraint");
-    expect(result["products"]!["price"]).toEqual({ type: "decimal", null: false });
+    expect(Object.keys(result["products"])).not.toContain("price > 0");
+    expect(Object.keys(result["products"])).not.toContain("checkConstraint");
+    expect(result["products"]["price"]).toEqual({ type: "decimal", null: false });
   });
 
   it("id: false → no id column synthesized", () => {
@@ -124,7 +124,7 @@ describe("parseSchemaTs", () => {
     `;
     const result = parseSchemaTs(source, FILE);
     expect(result["schema_migrations"]).not.toHaveProperty("id");
-    expect(result["schema_migrations"]!["version"]).toEqual({ type: "string", null: false });
+    expect(result["schema_migrations"]["version"]).toEqual({ type: "string", null: false });
   });
 
   it("id: 'uuid' → id column with type uuid", () => {
@@ -136,7 +136,7 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["tokens"]!["id"]).toEqual({ type: "uuid", null: false });
+    expect(result["tokens"]["id"]).toEqual({ type: "uuid", null: false });
   });
 
   it("composite primaryKey: [...] → id: false, PK cols captured from body", () => {
@@ -151,9 +151,9 @@ describe("parseSchemaTs", () => {
     `;
     const result = parseSchemaTs(source, FILE);
     expect(result["taggings"]).not.toHaveProperty("id");
-    expect(result["taggings"]!["tag_id"]).toEqual({ type: "integer", null: false });
-    expect(result["taggings"]!["taggable_id"]).toEqual({ type: "integer", null: false });
-    expect(result["taggings"]!["taggable_type"]).toEqual({ type: "string", null: true });
+    expect(result["taggings"]["tag_id"]).toEqual({ type: "integer", null: false });
+    expect(result["taggings"]["taggable_id"]).toEqual({ type: "integer", null: false });
+    expect(result["taggings"]["taggable_type"]).toEqual({ type: "string", null: true });
   });
 
   it("datetime columns resolve correctly (no t.timestamps() expansion needed — SchemaDumper expands inline)", () => {
@@ -167,9 +167,9 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["events"]!["created_at"]).toEqual({ type: "datetime", null: false });
-    expect(result["events"]!["updated_at"]).toEqual({ type: "datetime", null: false });
-    expect(result["events"]!["occurred_at"]).toEqual({ type: "datetime", null: true });
+    expect(result["events"]["created_at"]).toEqual({ type: "datetime", null: false });
+    expect(result["events"]["updated_at"]).toEqual({ type: "datetime", null: false });
+    expect(result["events"]["occurred_at"]).toEqual({ type: "datetime", null: true });
   });
 
   it("t.timestamps() expands to created_at + updated_at (not-null datetime)", () => {
@@ -182,8 +182,8 @@ describe("parseSchemaTs", () => {
       }
     `;
     const result = parseSchemaTs(source, FILE);
-    expect(result["logs"]!["created_at"]).toEqual({ type: "datetime", null: false });
-    expect(result["logs"]!["updated_at"]).toEqual({ type: "datetime", null: false });
+    expect(result["logs"]["created_at"]).toEqual({ type: "datetime", null: false });
+    expect(result["logs"]["updated_at"]).toEqual({ type: "datetime", null: false });
   });
 
   it("skips createTable with concise (non-block) arrow body without crashing", () => {
@@ -199,7 +199,7 @@ describe("parseSchemaTs", () => {
     const result = parseSchemaTs(source, FILE);
     expect(result["weird"]).toBeDefined();
     expect(result["weird"]).not.toHaveProperty("name");
-    expect(result["normal"]!["name"]).toEqual({ type: "string", null: true });
+    expect(result["normal"]["name"]).toEqual({ type: "string", null: true });
   });
 
   it("parses multiple tables", () => {
@@ -216,8 +216,8 @@ describe("parseSchemaTs", () => {
     `;
     const result = parseSchemaTs(source, FILE);
     expect(Object.keys(result)).toEqual(expect.arrayContaining(["users", "posts"]));
-    expect(result["users"]!["email"]).toEqual({ type: "string", null: false });
-    expect(result["posts"]!["user_id"]).toEqual({ type: "integer", null: true });
-    expect(result["posts"]!["content"]).toEqual({ type: "text", null: true });
+    expect(result["users"]["email"]).toEqual({ type: "string", null: false });
+    expect(result["posts"]["user_id"]).toEqual({ type: "integer", null: true });
+    expect(result["posts"]["content"]).toEqual({ type: "text", null: true });
   });
 });

@@ -57,9 +57,9 @@ describe("Attribute concat / contains / overlaps return typed infix subclasses",
     // `quoted_node(other)`. On Attribute that wraps the value in
     // Casted(value, this) so the visitor can apply column type-casting.
     const c = users.attr("ids").contains([1, 2]);
-    expect((c as Nodes.Contains).right).toBeInstanceOf(Nodes.Casted);
+    expect(c.right).toBeInstanceOf(Nodes.Casted);
     const o = users.attr("ids").overlaps([1, 2]);
-    expect((o as Nodes.Overlaps).right).toBeInstanceOf(Nodes.Casted);
+    expect(o.right).toBeInstanceOf(Nodes.Casted);
   });
 });
 

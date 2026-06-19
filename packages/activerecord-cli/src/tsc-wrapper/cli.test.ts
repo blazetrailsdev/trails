@@ -133,12 +133,12 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
     const remapped = remapDiagnostics(diagnostics, host);
     // Every diagnostic without deltas should have the same start position
     for (let i = 0; i < diagnostics.length; i++) {
-      const d = diagnostics[i]!;
+      const d = diagnostics[i];
       if (!d.file) continue;
       const deltas = host.getDeltasForFile(path.resolve(d.file.fileName));
       if (!deltas || deltas.length === 0) {
         // eslint-disable-next-line vitest/no-conditional-expect
-        expect(remapped[i]!.start).toBe(d.start);
+        expect(remapped[i].start).toBe(d.start);
       }
     }
   });

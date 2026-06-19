@@ -1891,7 +1891,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const algorithmKey = (options.algorithm as string | undefined)?.toLowerCase();
     let algorithmSql: string | undefined;
     if (algorithmKey) {
-      const algorithms = this.indexAlgorithms() as Record<string, string>;
+      const algorithms = this.indexAlgorithms();
       if (!(algorithmKey in algorithms)) {
         const valid = Object.keys(algorithms);
         throw new Error(
@@ -1956,7 +1956,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       opts = columnNameOrOptions;
       columnName = opts.column as string | string[] | undefined;
     } else {
-      columnName = columnNameOrOptions as string | string[] | undefined;
+      columnName = columnNameOrOptions;
       opts = options;
     }
     const indexName =

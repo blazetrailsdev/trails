@@ -373,13 +373,9 @@ describe("TimestampTest", () => {
     const updatedAt = post.updated_at as Temporal.Instant;
     expect(createdAt).toBeInstanceOf(Temporal.Instant);
     expect(updatedAt).toBeInstanceOf(Temporal.Instant);
-    expect((createdAt as Temporal.Instant).epochMilliseconds).toBeGreaterThanOrEqual(
-      before.epochMilliseconds,
-    );
-    expect((createdAt as Temporal.Instant).epochMilliseconds).toBeLessThanOrEqual(
-      after.epochMilliseconds,
-    );
-    expect(createdAt.epochMilliseconds).toBe((updatedAt as Temporal.Instant).epochMilliseconds);
+    expect(createdAt.epochMilliseconds).toBeGreaterThanOrEqual(before.epochMilliseconds);
+    expect(createdAt.epochMilliseconds).toBeLessThanOrEqual(after.epochMilliseconds);
+    expect(createdAt.epochMilliseconds).toBe(updatedAt.epochMilliseconds);
   });
 
   it("created_at round-trips through the database as Temporal.Instant", async () => {
@@ -518,8 +514,8 @@ describe("TimestampTest", () => {
 
     const newUpdatedAt = post.updated_at as Temporal.Instant;
     expect(newUpdatedAt).toBeInstanceOf(Temporal.Instant);
-    expect((newUpdatedAt as Temporal.Instant).epochMilliseconds).toBeGreaterThanOrEqual(
-      (originalUpdatedAt as Temporal.Instant).epochMilliseconds,
+    expect(newUpdatedAt.epochMilliseconds).toBeGreaterThanOrEqual(
+      originalUpdatedAt.epochMilliseconds,
     );
   });
 
@@ -718,12 +714,8 @@ describe("TimestampTest", () => {
 
     const createdAt = post.created_at as Temporal.Instant;
     expect(createdAt).toBeInstanceOf(Temporal.Instant);
-    expect((createdAt as Temporal.Instant).epochMilliseconds).toBeGreaterThanOrEqual(
-      before.epochMilliseconds,
-    );
-    expect((createdAt as Temporal.Instant).epochMilliseconds).toBeLessThanOrEqual(
-      after.epochMilliseconds,
-    );
+    expect(createdAt.epochMilliseconds).toBeGreaterThanOrEqual(before.epochMilliseconds);
+    expect(createdAt.epochMilliseconds).toBeLessThanOrEqual(after.epochMilliseconds);
   });
 
   it("does not overwrite explicit timestamps on create", async () => {
@@ -874,7 +866,7 @@ describe("TimestampTest", () => {
     const article = await Article.create({ title: "Hello" });
     const createdAt = article.created_at as Temporal.Instant;
     const updatedAt = article.updated_at as Temporal.Instant;
-    expect(createdAt.epochMilliseconds).toBe((updatedAt as Temporal.Instant).epochMilliseconds);
+    expect(createdAt.epochMilliseconds).toBe(updatedAt.epochMilliseconds);
   });
 
   it("updates updated_at but not created_at on update", async () => {

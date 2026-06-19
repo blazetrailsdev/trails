@@ -37,7 +37,7 @@ describe("As", () => {
       const asNode = new Nodes.As(selectAst, new Nodes.SqlLiteral("cte_name"));
       const cte = asNode.toCte();
       expect(cte).toBeInstanceOf(Nodes.Cte);
-      expect((cte as Nodes.Cte).name).toBe("cte_name");
+      expect(cte.name).toBe("cte_name");
     });
   });
 });

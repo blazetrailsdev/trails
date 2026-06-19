@@ -291,7 +291,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("creation respects hash condition", async () => {
-    const general = (await Category.find(1)) as Category;
+    const general = await Category.find(1);
     const post = association<Post>(general, "postWithConditions").build({ body: " " });
     expect(await post.save()).toBe(true);
     expect(post.title).toBe("Yet Another Testing Title");
@@ -486,25 +486,17 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     ).toBe(1);
 
     expect(
-      (
-        (await association<Developer>(activeRecord, "developersNamedDavid").find(
-          david.id,
-        )) as Developer
-      ).id,
+      (await association<Developer>(activeRecord, "developersNamedDavid").find(david.id)).id,
     ).toBe(david.id);
     expect(
       (
-        (await association<Developer>(activeRecord, "developersNamedDavidWithHashConditions").find(
+        await association<Developer>(activeRecord, "developersNamedDavidWithHashConditions").find(
           david.id,
-        )) as Developer
+        )
       ).id,
     ).toBe(david.id);
     expect(
-      (
-        (await association<Developer>(activeRecord, "salariedDevelopers").find(
-          david.id,
-        )) as Developer
-      ).id,
+      (await association<Developer>(activeRecord, "salariedDevelopers").find(david.id)).id,
     ).toBe(david.id);
 
     await association<Developer>(activeRecord, "developersNamedDavid").clear();
@@ -516,9 +508,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const david = developers("david");
     const activeRecord = projects("active_record");
     const proxy = association<Developer>(activeRecord, "developers");
-    expect(((await proxy.find(david.id)) as Developer).id).toBe(david.id);
+    expect((await proxy.find(david.id)).id).toBe(david.id);
     await proxy.reload();
-    expect(((await proxy.find(david.id)) as Developer).id).toBe(david.id);
+    expect((await proxy.find(david.id)).id).toBe(david.id);
   });
 
   it("include uses array include after loaded", async () => {
@@ -661,7 +653,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("consider type", async () => {
-    const developer = (await Developer.all().toArray())[0] as Developer;
+    const developer = (await Developer.all().toArray())[0];
     const specialProject = await SpecialProject.create({ name: "Special Project" });
 
     const otherProject = (await association<Project>(developer, "projects").toArray())[0];
@@ -676,7 +668,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("symbol join table", async () => {
-    const developer = (await Developer.all().toArray())[0] as Developer;
+    const developer = (await Developer.all().toArray())[0];
     const sp = await association<SpecialProject>(developer, "symSpecialProjects").create({
       name: "omg",
     });
@@ -698,14 +690,14 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("updating attributes on non rich associations", async () => {
-    const technology = (await Category.find(2)) as Category;
-    const welcome = (await association<Post>(technology, "posts").toArray())[0] as Post;
+    const technology = await Category.find(2);
+    const welcome = (await association<Post>(technology, "posts").toArray())[0];
     welcome.title = "Something else";
     expect(await (welcome as any).saveBang()).toBeTruthy();
   });
 
   it("habtm respects select", async () => {
-    const technology = (await Category.find(2)) as Category;
+    const technology = await Category.find(2);
     for (const o of await association<Post>(technology, "selectTestingPosts").reload()) {
       expect((o as any).attributes).toHaveProperty("correctness_marker");
     }
@@ -715,9 +707,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("habtm selects all columns by default", async () => {
     const david = developers("david");
-    const first = (await association<Project>(david, "projects").toArray())[0] as Project;
+    const first = (await association<Project>(david, "projects").toArray())[0];
     expect(Object.keys((first as any).attributes).sort()).toEqual(
-      (Project.columnNames() as string[]).slice().sort(),
+      Project.columnNames().slice().sort(),
     );
   });
 
@@ -726,7 +718,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const first = (
       await (association<Project>(david, "projects") as any).select("id").toArray()
     )[0];
-    expect(Object.keys((first as any).attributes)).toEqual(["id"]);
+    expect(Object.keys(first.attributes)).toEqual(["id"]);
   });
 
   it("join middle table alias", async () => {
@@ -766,9 +758,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("find scoped grouped", async () => {
-    const general = (await Category.find(1)) as Category;
+    const general = await Category.find(1);
     expect((await association<Post>(general, "postsGroupedByTitle").toArray()).length).toBe(5);
-    const technology = (await Category.find(2)) as Category;
+    const technology = await Category.find(2);
     expect((await association<Post>(technology, "postsGroupedByTitle").toArray()).length).toBe(1);
   });
 

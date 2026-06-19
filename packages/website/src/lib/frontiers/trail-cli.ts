@@ -73,10 +73,10 @@ function discoverMigrations(
                 const content = vfs.read(file.path)?.content;
                 if (!content) throw new Error(`File not found: ${file.path}`);
                 await executeCode(content);
-                const reg = getMigrations().find((r) => r.version === match![1]);
+                const reg = getMigrations().find((r) => r.version === match[1]);
                 if (!reg) {
                   throw new Error(
-                    `Migration ${match![1]} from ${file.path} did not register after execution`,
+                    `Migration ${match[1]} from ${file.path} did not register after execution`,
                   );
                 }
                 const inner = await reg.migration();
@@ -92,10 +92,10 @@ function discoverMigrations(
                 const content = vfs.read(file.path)?.content;
                 if (!content) throw new Error(`File not found: ${file.path}`);
                 await executeCode(content);
-                const reg = getMigrations().find((r) => r.version === match![1]);
+                const reg = getMigrations().find((r) => r.version === match[1]);
                 if (!reg) {
                   throw new Error(
-                    `Migration ${match![1]} from ${file.path} did not register after execution`,
+                    `Migration ${match[1]} from ${file.path} did not register after execution`,
                   );
                 }
                 const inner = await reg.migration();

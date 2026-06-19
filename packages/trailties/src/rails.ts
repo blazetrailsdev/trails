@@ -46,7 +46,7 @@ export class Trails {
     if (_application) return _application;
     const klass = Application.appClass;
     if (!klass) return null;
-    _application = klass.instance() as Application;
+    _application = klass.instance();
     return _application;
   }
   static set application(app: Application | null) {

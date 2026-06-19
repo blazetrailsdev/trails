@@ -109,9 +109,7 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
     const sqlType = strLiteral(args[1]);
     if (!sqlType) return [];
     const optsNode =
-      args.length >= 3 && ts.isObjectLiteralExpression(args[2])
-        ? (args[2] as ts.ObjectLiteralExpression)
-        : undefined;
+      args.length >= 3 && ts.isObjectLiteralExpression(args[2]) ? args[2] : undefined;
     const nullFalse = !!(optsNode && isFalse(objPropValue(optsNode, "null")));
     const isArray = !!(
       optsNode && objPropValue(optsNode, "array")?.kind === ts.SyntaxKind.TrueKeyword
@@ -123,10 +121,7 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
     return [{ colName, col }];
   }
 
-  const optsNode =
-    args.length >= 2 && ts.isObjectLiteralExpression(args[1])
-      ? (args[1] as ts.ObjectLiteralExpression)
-      : undefined;
+  const optsNode = args.length >= 2 && ts.isObjectLiteralExpression(args[1]) ? args[1] : undefined;
   const nullFalse = !!(optsNode && isFalse(objPropValue(optsNode, "null")));
   const isArray = !!(
     optsNode && objPropValue(optsNode, "array")?.kind === ts.SyntaxKind.TrueKeyword

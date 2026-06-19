@@ -190,7 +190,7 @@ export class ThroughAssociation extends Association {
     // query instead (see _buildThroughScope / _partitionReflectionWhere).
     let sourceScope = this._partitionReflectionWhere().sourceScope;
     if (sourceScope != null && this._preloadScope != null) {
-      sourceScope = (sourceScope as any).merge(this._preloadScope);
+      sourceScope = sourceScope.merge(this._preloadScope);
     } else if (sourceScope == null) {
       sourceScope = this._preloadScope;
     }
@@ -300,7 +300,7 @@ export class ThroughAssociation extends Association {
       }
       const arr: Base[] = Array.isArray(recs) ? [...recs] : recs != null ? [recs] : [];
       const filtered = arr.filter(
-        (record) => (record as any)._readAttribute(foreignType!) === sourceType,
+        (record) => (record as any)._readAttribute(foreignType) === sourceType,
       );
       map.set(owner, filtered);
     }

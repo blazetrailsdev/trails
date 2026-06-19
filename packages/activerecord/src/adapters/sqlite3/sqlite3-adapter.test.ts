@@ -715,7 +715,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     try {
       const conn = new BetterSQLite3Adapter(":memory:", { driver: fakeDriver });
       try {
-        expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(true);
+        expect(capture.config?.strict).toBe(true);
         expect(conn.strictStrings).toBe(true);
       } finally {
         await conn.close();

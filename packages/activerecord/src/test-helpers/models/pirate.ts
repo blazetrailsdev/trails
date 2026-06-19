@@ -72,7 +72,7 @@ export class Pirate extends Base {
 
   get shipLog(): string[] {
     if (!this._shipLog) this._shipLog = [];
-    return this._shipLog as string[];
+    return this._shipLog;
   }
   private _shipLog?: string[];
 

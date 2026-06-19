@@ -250,7 +250,7 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
   it("test_requirements_for_missing_keys_check", () => {
     const nameRegex = /test/;
     const p = buildPath("/page/:name", { name: nameRegex });
-    const transformed = p.requirementsForMissingKeysCheck["name"]!;
+    const transformed = p.requirementsForMissingKeysCheck["name"];
     expect(transformed.source).toBe(new RegExp(`^(?:test)$`).source);
   });
 
@@ -258,7 +258,7 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
     // /^a|b$/ parses as /(^a)|(b$)/. Verify the (?:…) wrapping by
     // checking that neither branch leaks past its anchor.
     const p = buildPath("/page/:name", { name: [/foo/, /bar/] });
-    const re = p.requirementsForMissingKeysCheck["name"]!;
+    const re = p.requirementsForMissingKeysCheck["name"];
     expect(re.test("foo")).toBe(true);
     expect(re.test("bar")).toBe(true);
     expect(re.test("xfooy")).toBe(false);

@@ -74,7 +74,7 @@ describe("AttributeAssignmentTest", () => {
         this.attribute("name", "string");
       }
       set name(v: string) {
-        (this as Base).writeAttribute("name", (v as string).toUpperCase());
+        (this as Base).writeAttribute("name", v.toUpperCase());
       }
       // getter mirrors the default attribute read
       get name(): string {
@@ -85,7 +85,7 @@ describe("AttributeAssignmentTest", () => {
       // shadow with getter-only — Rails' `public_send("name=", v)` would still
       // dispatch to Base#name=; our walk must too.
       override get name(): string {
-        return (super.name as string) + "!";
+        return super.name + "!";
       }
     }
     const c = new Child({});

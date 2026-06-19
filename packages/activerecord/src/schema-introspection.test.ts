@@ -27,7 +27,7 @@ function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
       if (typeof prop === "string" && hiddenSet.has(prop)) return false;
       return Reflect.has(target, prop);
     },
-  }) as A;
+  });
 }
 
 // The tables these tests create via MigrationContext leak into the shared

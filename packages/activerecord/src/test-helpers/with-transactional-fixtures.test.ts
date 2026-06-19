@@ -321,7 +321,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
         // so a vacuous pass (e.g. lazy open) is caught immediately.
         expect(sidecarA.openTransactions).toBeGreaterThan(0);
         // Transaction is open. Signal chain B to read.
-        signalBReady!();
+        signalBReady();
         // Hold the transaction open until chain B has read.
         await aDone;
       }),
@@ -338,7 +338,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
           bObservedCurrentTxJoinable = ct?.joinable ?? false;
         } finally {
           // Always unblock chain A so the test fails rather than hangs.
-          signalADone!();
+          signalADone();
         }
       })(),
     ]);

@@ -34,7 +34,7 @@ describe("TouchTest", () => {
     expect(stamped.readAttribute("updated_at")).toBeNull();
     expect(stamped.readAttribute("created_at")).toBeNull();
     await stamped.save();
-    const createdAt = stamped.readAttribute("created_at") as unknown;
+    const createdAt = stamped.readAttribute("created_at");
     expect(createdAt).not.toBeNull();
 
     const oldUpdatedAt = stamped.readAttribute("updated_at");

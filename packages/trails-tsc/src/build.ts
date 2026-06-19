@@ -125,7 +125,7 @@ export function createTrailsSolutionBuilder(
 
   const reportDiagnostic: ts.DiagnosticReporter = (d) => {
     if (!buildOpts.onDiagnostic) return;
-    const remapped = remapDiagnostics([d], compositeRemapHost, originalSfCache)[0]!;
+    const remapped = remapDiagnostics([d], compositeRemapHost, originalSfCache)[0];
     buildOpts.onDiagnostic(remapped);
   };
   const reportStatus: ts.DiagnosticReporter = (d) => buildOpts.onStatus?.(d);

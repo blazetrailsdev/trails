@@ -6285,7 +6285,7 @@ describe("RelationTest", () => {
 
     const scope = RefPost.all().includes("refAuthor") as any;
     expect(scope._eagerLoadingForSql()).toBe(false);
-    expect((scope.references("ref_authors") as any)._eagerLoadingForSql()).toBe(true);
+    expect(scope.references("ref_authors")._eagerLoadingForSql()).toBe(true);
   });
 
   it("references doesnt trigger eager loading if reference not included", () => {

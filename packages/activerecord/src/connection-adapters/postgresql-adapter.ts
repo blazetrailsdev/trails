@@ -985,7 +985,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
     // pgResult.rows is already positional arrays thanks to rowMode.
-    const rowArrays = pgResult.rows as unknown[][];
+    const rowArrays = pgResult.rows;
     return new Result(columns, rowArrays, columnTypes as Record<string, Type>);
   }
 
@@ -1395,8 +1395,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const pgResult = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const r = await this._runQuery(client, rewritten, bindArray, { rowMode: "array" });
-        payload.row_count = (r as pg.QueryResult).rowCount ?? 0;
-        return r as pg.QueryResult;
+        payload.row_count = r.rowCount ?? 0;
+        return r;
       } catch (e: any) {
         const translated = this._translateException(e, rewritten, bindArray);
         payload.exception = translated;
@@ -2750,7 +2750,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         this._hasOptimizerHints = false;
       }
     }
-    return this._databaseVersion!;
+    return this._databaseVersion;
   }
 
   /**
@@ -4648,7 +4648,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     `);
     return Promise.all(
       rows.map(async (row) => {
-        const r = row as Record<string, unknown>;
+        const r = row;
         const conkey = String(r.conkey).replace(/[{}]/g, "").split(",").map(Number);
         const columns = await this.columnNamesFromColumnNumbers(Number(r.conrelid), conkey);
         const nullsNotDistinct = (r.constraintdef as string).startsWith(
@@ -4718,7 +4718,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       [name],
     );
     if (rows.length === 0) return undefined;
-    const row = rows[0] as Record<string, unknown>;
+    const row = rows[0];
     const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
     const cols = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
     return new UniqueConstraintDefinition(tableName, cols, { name });

@@ -430,7 +430,7 @@ function quoteBoundValue(quoter: Quoter, value: unknown): string {
   // implementation intentionally limits support to those two collection
   // types and does not expand arbitrary iterables (Buffer/Map/etc).
   if (isEnumerable(value)) {
-    const values = Array.from(value as Iterable<unknown>);
+    const values = Array.from(value);
     if (values.length === 0) {
       const cast = quoter.castBoundValue(null);
       return quoter.quote(cast);

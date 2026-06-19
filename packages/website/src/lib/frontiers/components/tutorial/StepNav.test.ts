@@ -54,12 +54,12 @@ describe("StepNav", () => {
 
   it("disables prev on first step", () => {
     render(StepNav, { props: { ...defaults, currentStep: 1 } });
-    expect((screen.getByTestId("prev-button") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("prev-button").disabled).toBe(true);
   });
 
   it("disables next on last step", () => {
     render(StepNav, { props: { ...defaults, currentStep: 8 } });
-    expect((screen.getByTestId("next-button") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("next-button").disabled).toBe(true);
   });
 
   it("arrow keys navigate between steps", () => {

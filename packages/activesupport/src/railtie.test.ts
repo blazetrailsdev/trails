@@ -11,17 +11,17 @@ describe("Railtie", () => {
   beforeEach(() => {
     savedSubclasses = [...Railtie.subclasses];
     savedConfig = { ...Railtie.config };
-    (Railtie.subclasses as (typeof Railtie)[]).length = 0;
+    Railtie.subclasses.length = 0;
     for (const key of Object.keys(Railtie.config)) {
-      delete (Railtie.config as Record<string, unknown>)[key];
+      delete Railtie.config[key];
     }
   });
 
   afterEach(() => {
-    (Railtie.subclasses as (typeof Railtie)[]).length = 0;
-    (Railtie.subclasses as (typeof Railtie)[]).push(...savedSubclasses);
+    Railtie.subclasses.length = 0;
+    Railtie.subclasses.push(...savedSubclasses);
     for (const key of Object.keys(Railtie.config)) {
-      delete (Railtie.config as Record<string, unknown>)[key];
+      delete Railtie.config[key];
     }
     Object.assign(Railtie.config, savedConfig);
   });

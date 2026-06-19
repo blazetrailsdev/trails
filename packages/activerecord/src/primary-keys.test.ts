@@ -46,7 +46,7 @@ describe("PrimaryKeysTest", () => {
   it("to key with default primary key", async () => {
     const topic = new Topic();
     expect(topic.toKey()).toBeNull();
-    const found = (await Topic.find(topics("first").id)) as Topic;
+    const found = await Topic.find(topics("first").id);
     expect(found.toKey()).toEqual([topics("first").id]);
   });
 
@@ -67,12 +67,12 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("read attribute id", async () => {
-    const topic = (await Topic.find(topics("first").id)) as Topic;
+    const topic = await Topic.find(topics("first").id);
     expect(topic.readAttribute("id")).toBe(1);
   });
 
   it("read attribute with custom primary key does not return it when reading the id attribute", async () => {
-    const keyboard = (await Keyboard.createBang()) as Keyboard;
+    const keyboard = await Keyboard.createBang();
     // keyboard's PK is key_number, not id — readAttribute("id") returns null
     expect(keyboard.readAttribute("id")).toBeNull();
   });
@@ -98,7 +98,7 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("id was", async () => {
-    const topic = (await Topic.find(topics("first").id)) as Topic;
+    const topic = await Topic.find(topics("first").id);
     expect(topic.id).toBe(1);
     topic.id = 3;
     expect((topic as any).idWas()).toBe(1);
@@ -108,16 +108,16 @@ describe("PrimaryKeysTest", () => {
   it("id?", async () => {
     // Rails: assert_changes("topic.id?", from: true, to: false) { topic.id = nil }
     // TS: no id? predicate exposed on Base instances; test the equivalent check
-    const topic = (await Topic.find(topics("first").id)) as Topic;
+    const topic = await Topic.find(topics("first").id);
     expect(topic.id != null).toBe(true);
     topic.id = null as unknown as number;
     expect(topic.id != null).toBe(false);
   });
 
   it("integer key", async () => {
-    const t1 = (await Topic.find(topics("first").id)) as Topic;
+    const t1 = await Topic.find(topics("first").id);
     expect(t1.author_name).toBe(topics("first").author_name);
-    const t2 = (await Topic.find(topics("second").id)) as Topic;
+    const t2 = await Topic.find(topics("second").id);
     expect(t2.author_name).toBe(topics("second").author_name);
     // Rails: also creates a new Topic, saves, and re-finds it. Omitted here:
     // Topic.beforeCreate has a callback `this`-binding gap in the TS port (the
@@ -130,13 +130,13 @@ describe("PrimaryKeysTest", () => {
     // sequence is non-transactional, so a stale in-memory PK only diverges from
     // the DB-generated value once the sequence has moved off 1 — without this a
     // bug that left `keyboard.id` at 1 would be masked.
-    await (new Keyboard({ name: "seed" }) as Keyboard).saveBang();
+    await new Keyboard({ name: "seed" }).saveBang();
     const keyboard = new Keyboard({ name: "HHKB" });
     await keyboard.saveBang();
     const found = (await Keyboard.findBy({ name: "HHKB" })) as Keyboard;
     // Rails: assert_equal keyboard.id, Keyboard.find_by_name("HHKB").id
     expect(keyboard.id).toBe(found.id);
-    const refound = (await Keyboard.find(keyboard.id)) as Keyboard;
+    const refound = await Keyboard.find(keyboard.id);
     expect(refound.id).toBe(keyboard.id);
   });
 
@@ -169,9 +169,9 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("string key", async () => {
-    let sub = (await Subscriber.find(subscribers("first").nick)) as Subscriber;
+    let sub = await Subscriber.find(subscribers("first").nick);
     expect(sub.name).toBe(subscribers("first").name);
-    sub = (await Subscriber.find(subscribers("second").nick)) as Subscriber;
+    sub = await Subscriber.find(subscribers("second").nick);
     expect(sub.name).toBe(subscribers("second").name);
 
     const newSub = new Subscriber();
@@ -181,7 +181,7 @@ describe("PrimaryKeysTest", () => {
     await newSub.saveBang();
     expect(newSub.id).toBe("jdoe");
 
-    const reloaded = (await Subscriber.find("jdoe")) as Subscriber;
+    const reloaded = await Subscriber.find("jdoe");
     expect(reloaded.name).toBe("John Doe");
   });
 
@@ -192,10 +192,7 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("find with more than one string key", async () => {
-    const found = (await Subscriber.find(
-      subscribers("first").nick,
-      subscribers("second").nick,
-    )) as Subscriber[];
+    const found = await Subscriber.find(subscribers("first").nick, subscribers("second").nick);
     expect(found.length).toBe(2);
   });
 
@@ -230,16 +227,12 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("instance update should quote pkey", async () => {
-    const monkey = (await MixedCaseMonkey.find(
-      mixedCaseMonkeys("first").monkeyID,
-    )) as MixedCaseMonkey;
+    const monkey = await MixedCaseMonkey.find(mixedCaseMonkeys("first").monkeyID);
     await expect(monkey.save()).resolves.not.toThrow();
   });
 
   it("instance destroy should quote pkey", async () => {
-    const monkey = (await MixedCaseMonkey.find(
-      mixedCaseMonkeys("first").monkeyID,
-    )) as MixedCaseMonkey;
+    const monkey = await MixedCaseMonkey.find(mixedCaseMonkeys("first").monkeyID);
     await expect(monkey.destroy()).resolves.not.toThrow();
   });
 
@@ -415,10 +408,10 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   async function assertAutoIncremented() {
     AutoIncrement.resetColumnInformation();
     await AutoIncrement.loadSchema();
-    const record1 = (await AutoIncrement.createBang()) as AutoIncrement;
+    const record1 = await AutoIncrement.createBang();
     expect(record1.id).not.toBeNull();
     await record1.destroy();
-    const record2 = (await AutoIncrement.createBang()) as AutoIncrement;
+    const record2 = await AutoIncrement.createBang();
     expect(record2.id).not.toBeNull();
     // Rails: assert_operator record2.id, :>, record1.id (sequences don't reuse after delete)
     // SQLite INTEGER PRIMARY KEY without AUTOINCREMENT may reuse the deleted rowid;
@@ -745,7 +738,7 @@ describe("PrimaryKeyIntegerTest", () => {
       await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
       Widget.resetColumnInformation();
       await Widget.loadSchema();
-      const w = (await Widget.createBang()) as Widget;
+      const w = await Widget.createBang();
       expect(w.id).not.toBeNull();
     },
   );

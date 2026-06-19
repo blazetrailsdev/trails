@@ -96,8 +96,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: record = ByteaDataType.first
       const record = await (ByteaDataType as any).first();
       // Rails: assert_equal(data, record.payload)
-      expect((record as any).payload).toBeInstanceOf(Uint8Array);
-      expect(Buffer.from((record as any).payload as Uint8Array)).toEqual(data);
+      expect(record.payload).toBeInstanceOf(Uint8Array);
+      expect(Buffer.from(record.payload as Uint8Array)).toEqual(data);
     });
 
     it("read nil value", async () => {
@@ -106,7 +106,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: record = ByteaDataType.first
       const record = await (ByteaDataType as any).first();
       // Rails: assert_nil(record.payload)
-      expect((record as any).payload).toBeNull();
+      expect(record.payload).toBeNull();
     });
 
     it("write value", async () => {
@@ -115,10 +115,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: record = ByteaDataType.create(payload: data)
       const record = await (ByteaDataType as any).create({ payload: data });
       // Rails: assert_not_predicate record, :new_record?
-      expect((record as any).isNewRecord()).toBe(false);
+      expect(record.isNewRecord()).toBe(false);
       // Rails: assert_equal(data, record.payload)
-      expect((record as any).payload).toBeInstanceOf(Uint8Array);
-      expect(Buffer.from((record as any).payload as Uint8Array)).toEqual(data);
+      expect(record.payload).toBeInstanceOf(Uint8Array);
+      expect(Buffer.from(record.payload as Uint8Array)).toEqual(data);
     });
 
     // Rails: re-used by test_via_to_sql and test_via_to_sql_with_complicating_connection
@@ -159,11 +159,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: record = ByteaDataType.create(payload: data)
       const record = await (ByteaDataType as any).create({ payload: data });
       // Rails: assert_not_predicate record, :new_record?
-      expect((record as any).isNewRecord()).toBe(false);
+      expect(record.isNewRecord()).toBe(false);
       // Rails: assert_equal(data, record.payload)
-      expect(Buffer.from((record as any).payload as Uint8Array)).toEqual(data);
+      expect(Buffer.from(record.payload as Uint8Array)).toEqual(data);
       // Rails: assert_equal(data, ByteaDataType.where(id: record.id).first.payload)
-      const reloaded = await ByteaDataType.find((record as any).id);
+      const reloaded = await ByteaDataType.find(record.id);
       expect(Buffer.from((reloaded as any).payload as Uint8Array)).toEqual(data);
     });
 
@@ -171,11 +171,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: record = ByteaDataType.create(payload: nil)
       const record = await (ByteaDataType as any).create({ payload: null });
       // Rails: assert_not_predicate record, :new_record?
-      expect((record as any).isNewRecord()).toBe(false);
+      expect(record.isNewRecord()).toBe(false);
       // Rails: assert_nil(record.payload)
-      expect((record as any).payload).toBeNull();
+      expect(record.payload).toBeNull();
       // Rails: assert_nil(ByteaDataType.where(id: record.id).first.payload)
-      const reloaded = await ByteaDataType.find((record as any).id);
+      const reloaded = await ByteaDataType.find(record.id);
       expect((reloaded as any).payload).toBeNull();
     });
 

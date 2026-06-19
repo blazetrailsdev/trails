@@ -99,7 +99,7 @@ describe("EagerLoadPolyAssocsTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
+      Base.connection,
       {
         shape_expressions: canonicalSchema.shape_expressions,
         circles: canonicalSchema.circles,
@@ -124,19 +124,15 @@ describe("EagerLoadPolyAssocsTest", () => {
     const paintTextures: PaintTexture[] = [];
 
     for (let i = 0; i < NUM_SIMPLE_OBJS; i++) {
-      circles.push((await Circle.create({})) as Circle);
-      squares.push((await Square.create({})) as Square);
-      triangles.push((await Triangle.create({})) as Triangle);
-      nonPolyOnes.push((await NonPolyOne.create({})) as NonPolyOne);
-      nonPolyTwos.push((await NonPolyTwo.create({})) as NonPolyTwo);
+      circles.push(await Circle.create({}));
+      squares.push(await Square.create({}));
+      triangles.push(await Triangle.create({}));
+      nonPolyOnes.push(await NonPolyOne.create({}));
+      nonPolyTwos.push(await NonPolyTwo.create({}));
     }
     for (let i = 0; i < NUM_SIMPLE_OBJS; i++) {
-      paintColors.push(
-        (await PaintColor.create({ non_poly_one_id: sample(nonPolyOnes).id })) as PaintColor,
-      );
-      paintTextures.push(
-        (await PaintTexture.create({ non_poly_two_id: sample(nonPolyTwos).id })) as PaintTexture,
-      );
+      paintColors.push(await PaintColor.create({ non_poly_one_id: sample(nonPolyOnes).id }));
+      paintTextures.push(await PaintTexture.create({ non_poly_two_id: sample(nonPolyTwos).id }));
     }
     for (let i = 0; i < NUM_SHAPE_EXPRESSIONS; i++) {
       const shapePool = sample([circles, squares, triangles]) as Base[];
@@ -170,7 +166,7 @@ describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
   useHandlerFixtures(["categories"]);
   beforeAll(async () => {
     await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
+      Base.connection,
       {
         authors: canonicalSchema.authors,
         posts: canonicalSchema.posts,
@@ -190,12 +186,12 @@ describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
   registerModel(AuthorFavorite);
 
   it("missing data in a nested include should not cause errors when constructing objects", async () => {
-    const daveyMcdave = (await Author.create({ name: "Davey McDave" })) as Author;
-    const firstPost = (await Post.create({
+    const daveyMcdave = await Author.create({ name: "Davey McDave" });
+    const firstPost = await Post.create({
       author_id: daveyMcdave.id,
       title: "Davey Speaks",
       body: "Expressive wordage",
-    })) as Post;
+    });
     await Comment.create({ post_id: firstPost.id, body: "Inflammatory doublespeak" });
     const firstCategory = (await Category.first()) as Category;
     await Categorization.create({

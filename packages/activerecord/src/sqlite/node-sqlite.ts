@@ -47,7 +47,7 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
   }
 
   private call<T>(method: string, binds: SqliteBinds | undefined): T {
-    return (this.stmt as unknown as Record<string, (...a: unknown[]) => T>)[method]!(
+    return (this.stmt as unknown as Record<string, (...a: unknown[]) => T>)[method](
       ...expandBinds(binds),
     );
   }

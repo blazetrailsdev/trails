@@ -33,7 +33,7 @@ function withConn(opts: { sharedCache?: boolean } = {}): AbstractSQLite3Adapter 
 }
 
 function readUncommitted(conn: AbstractSQLite3Adapter): boolean {
-  const row = ((conn as any).driver.prepare("PRAGMA read_uncommitted") as any).get() as {
+  const row = (conn as any).driver.prepare("PRAGMA read_uncommitted").get() as {
     read_uncommitted: number;
   };
   return row.read_uncommitted !== 0;

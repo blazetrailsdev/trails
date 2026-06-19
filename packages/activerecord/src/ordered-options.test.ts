@@ -134,7 +134,7 @@ describe("OrderedOptionsTest", () => {
   it("ordered options dup", () => {
     const a = new OrderedOptions() as any;
     a.boy = "John";
-    const b = a.dup() as any;
+    const b = a.dup();
     b.boy = "Jane";
     expect(a.boy).toBe("John");
     expect(b.boy).toBe("Jane");
@@ -144,7 +144,7 @@ describe("OrderedOptionsTest", () => {
     const parent = new OrderedOptions({ foo: "bar" });
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
-    const copy = child.dup() as any;
+    const copy = child.dup();
     copy.baz = "changed";
     expect(child.baz).toBe("qux");
     expect(copy.baz).toBe("changed");

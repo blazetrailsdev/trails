@@ -49,11 +49,11 @@ describe("AuthenticationGenerator", () => {
   it("--skip-mailer drops mailer/preview/views; --api keeps mailer but drops views", () => {
     makeGen().run({ skipMailer: true });
     expect(exists("src/app/mailers/passwords-mailer.ts")).toBe(false);
-    expect(exists(VIEWS[0]!)).toBe(false);
+    expect(exists(VIEWS[0])).toBe(false);
     expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(false);
     makeGen().run({ api: true });
     expect(exists("src/app/mailers/passwords-mailer.ts")).toBe(true);
-    expect(exists(VIEWS[0]!)).toBe(false);
+    expect(exists(VIEWS[0])).toBe(false);
   });
 
   it("injects inside the class even when ApplicationController has a body", () => {

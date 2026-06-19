@@ -22,7 +22,7 @@ describe("OrderTest", () => {
   // would cache-hit and skip recreation.
   beforeAll(async () => {
     await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
+      Base.connection,
       {
         authors: canonicalSchema.authors,
         author_addresses: canonicalSchema.author_addresses,

@@ -95,26 +95,24 @@ export class UniquenessValidator extends EachValidator {
     if (value == null) return;
 
     const finderClass = findFinderClassFor(record, this._klass);
-    const modelClass = (finderClass ?? record.constructor) as any;
+    const modelClass = finderClass ?? record.constructor;
     if (!modelClass.where) return;
 
     const mapped = mapEnumAttribute(modelClass, attribute, value);
 
     if (
       record.isPersisted?.() &&
-      !isValidationNeeded(modelClass, record, attribute, this.options as Record<string, unknown>)
+      !isValidationNeeded(modelClass, record, attribute, this.options)
     ) {
       return;
     }
 
     const opts = this.options as any;
 
-    let asyncValidations = (record as any)._asyncValidationPromises as
-      | Promise<unknown>[]
-      | undefined;
+    let asyncValidations = record._asyncValidationPromises as Promise<unknown>[] | undefined;
     if (!Array.isArray(asyncValidations)) {
       asyncValidations = [];
-      (record as any)._asyncValidationPromises = asyncValidations;
+      record._asyncValidationPromises = asyncValidations;
     }
 
     const errorOpts: Record<string, unknown> = { value };
@@ -122,12 +120,7 @@ export class UniquenessValidator extends EachValidator {
     if (opts?.strict != null) errorOpts.strict = opts.strict;
 
     const validationPromise = (async () => {
-      let [relation] = await buildRelation(
-        modelClass,
-        attribute,
-        mapped,
-        this.options as Record<string, unknown>,
-      );
+      let [relation] = await buildRelation(modelClass, attribute, mapped, this.options);
 
       if (record.isPersisted?.()) {
         const pk = modelClass.primaryKey ?? "id";
@@ -146,7 +139,7 @@ export class UniquenessValidator extends EachValidator {
         }
       }
 
-      relation = scopeRelation(record, relation, this.options as Record<string, unknown>);
+      relation = scopeRelation(record, relation, this.options);
 
       if (opts?.conditions && typeof opts.conditions === "function") {
         const conditioned =
@@ -190,7 +183,7 @@ function findFinderClassFor(record: any, klassOption: any): any {
     if (current === klassOption) break;
     const parent = Object.getPrototypeOf(current);
     if (!parent || parent === Function.prototype || parent === Object) break;
-    if (typeof (parent as any).where !== "function") break;
+    if (typeof parent.where !== "function") break;
     current = parent;
   }
   return lastConcrete ?? record.constructor;
@@ -224,7 +217,7 @@ function isValidationNeeded(
       ? [options.scope as string]
       : [];
   const attrs = resolveAttributes(record, [...scope, attribute]);
-  const dirty = (record as any)._dirty;
+  const dirty = record._dirty;
   const anyChangedOrNull = attrs.some(
     (a) => dirty?.attributeChanged?.(a) || record.readAttribute?.(a) == null,
   );
@@ -317,7 +310,7 @@ async function buildRelation(
   // arg so processArguments can expand the IN list to include the plain-text variant.
   // The Arel node path below bypasses processArguments entirely and would miss rows
   // stored without encryption.
-  if ((typeObj as any)?.supportUnencryptedData) {
+  if (typeObj?.supportUnencryptedData) {
     return [base.where({ [attribute]: value })];
   }
 
@@ -338,11 +331,7 @@ async function buildRelation(
       // which returns false from can_perform_case_insensitive_comparison_for? for uuid
       // (PG has no lower(uuid) function). Use plain equality instead.
       const colType =
-        typeObj == null
-          ? null
-          : typeof (typeObj as any).type === "function"
-            ? (typeObj as any).type()
-            : (typeObj as any).type;
+        typeObj == null ? null : typeof typeObj.type === "function" ? typeObj.type() : typeObj.type;
       if (colType !== "uuid") {
         comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
         if (comparison == null && typeof value === "string") {

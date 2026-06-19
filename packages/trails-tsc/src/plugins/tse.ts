@@ -63,13 +63,13 @@ function emitNodes(nodes: TseAst["nodes"]): string[] {
       innerDepths.push(0);
       lines.push(`  _ob.append(${node.value.trim()}`);
     } else if (node.kind === "code" && innerDepths.length > 0) {
-      const innerDepth = innerDepths[innerDepths.length - 1]!;
+      const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
         const t = node.value.trim();
         lines.push(`  ${t.endsWith(";") ? t.slice(0, -1) : t});`);
       } else {
-        innerDepths[innerDepths.length - 1]! += netBraceDepth(node.value);
+        innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
         lines.push(emitNode(node));
       }
     } else {

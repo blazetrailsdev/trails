@@ -238,17 +238,17 @@ describe("DelegationTest", () => {
       const post = await Post.first();
       const target = (post as any).comments;
       // Unloaded — partition is still present and loads the rows on call.
-      expect(typeof (target as any).partition).toBe("function");
-      expect((target as any).loaded).toBe(false);
+      expect(typeof target.partition).toBe("function");
+      expect(target.loaded).toBe(false);
 
       // Predicate value from an independent query so the proxy stays unloaded.
       const someId = (await Comment.first())!.id;
-      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === someId);
+      const [matched, unmatched] = await target.partition((c: any) => c.id === someId);
 
       // Rails' CollectionProxy#records → load_target hydrates @target and marks
       // the association loaded; the awaited partition does the same.
-      expect((target as any).loaded).toBe(true);
-      const records: any[] = (target as any).target;
+      expect(target.loaded).toBe(true);
+      const records: any[] = target.target;
       expect(records.length).toBeGreaterThan(0);
       // [matched, unmatched] preserve the records' relative order.
       expect(matched.map((c: any) => c.id)).toEqual(

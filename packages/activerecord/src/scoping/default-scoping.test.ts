@@ -563,13 +563,13 @@ describe("DefaultScopingTest", () => {
 
   it("additional conditions in a scope are ANDed with the default scope", async () => {
     const scope = (DeveloperCalledJamis as any).david();
-    expect((scope as any)._whereClause.ast.children.length).toBe(2);
+    expect(scope._whereClause.ast.children.length).toBe(2);
     expect(await scope.toArray()).toEqual([]);
   });
 
   it("a scope can remove the condition from the default scope", async () => {
     const scope = (DeveloperCalledJamis as any).david2();
-    expect((scope as any)._whereClause.ast).toBeInstanceOf(Nodes.Equality);
+    expect(scope._whereClause.ast).toBeInstanceOf(Nodes.Equality);
     expect((await scope.toArray()).map((d: any) => d.id)).toEqual(
       (await Developer.where({ name: "David" }).toArray()).map((d: any) => d.id),
     );
@@ -627,7 +627,7 @@ describe("DefaultScopingTest", () => {
     const received = Developer.eagerLoad("projects").select("id").unscope("eagerLoad", "select");
     const rows = await received.toArray();
     expect(names(rows)).toEqual(expected);
-    expect(((rows[0] as any).projects as any).loaded).toBe(false);
+    expect((rows[0] as any).projects.loaded).toBe(false);
   });
 
   it("unscope preloads", async () => {
@@ -635,7 +635,7 @@ describe("DefaultScopingTest", () => {
     const received = Developer.preload("projects").select("id").unscope("preload", "select");
     const rows = await received.toArray();
     expect(names(rows)).toEqual(expected);
-    expect(((rows[0] as any).projects as any).loaded).toBe(false);
+    expect((rows[0] as any).projects.loaded).toBe(false);
   });
 
   it("unscope joins and select on developers projects", async () => {
@@ -866,10 +866,10 @@ describe("DefaultScopingTest", () => {
     const post = posts("thinking") as any;
     const expected = [comments("does_it_hurt").id];
 
-    await (post.specialComments as any).updateAll({ deleted_at: new Date() });
+    await post.specialComments.updateAll({ deleted_at: new Date() });
 
     await expect(Post.joins("specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
-    expect(await (await (post.specialComments as any).reload()).toArray()).toEqual([]);
+    expect(await (await post.specialComments.reload()).toArray()).toEqual([]);
 
     const specialCommentIds = async (rel: any) =>
       (await (await rel.find(post.id)).specialComments.toArray()).map((c: any) => c.id);
@@ -948,7 +948,7 @@ describe("DefaultScopingTest", () => {
       developer_id: (await Developer.first())!.id,
     });
     const first = (await post.commentWithDefaultScopeReferencesAssociations.toArray())[0];
-    expect((first as any).id).toBe((comment as any).id);
+    expect(first.id).toBe(comment.id);
   });
 
   // `post.first_comment` lazy-loads the singular association; the trails idiom
@@ -962,7 +962,7 @@ describe("DefaultScopingTest", () => {
       body: "Great post.",
       developer_id: (await Developer.first())!.id,
     });
-    expect((await post.loadHasOne("firstComment")).id).toBe((comment as any).id);
+    expect((await post.loadHasOne("firstComment")).id).toBe(comment.id);
   });
 
   it("default scope with references works with find by", async () => {
@@ -975,9 +975,9 @@ describe("DefaultScopingTest", () => {
       developer_id: (await Developer.first())!.id,
     });
     const found = await CommentWithDefaultScopeReferencesAssociation.findBy({
-      id: (comment as any).id,
+      id: comment.id,
     });
-    expect((found as any).id).toBe((comment as any).id);
+    expect((found as any).id).toBe(comment.id);
   });
 });
 

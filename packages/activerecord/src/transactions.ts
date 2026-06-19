@@ -517,13 +517,13 @@ function _restoreTransactionRecordState(this: Base, forceRestoreState = false): 
     // PK does not appear as a spurious pending change.
     const ctor = this.constructor as typeof Base;
     if (Array.isArray(ctor.primaryKey)) {
-      const cols = ctor.primaryKey as string[];
+      const cols = ctor.primaryKey;
       const savedId = state.id as unknown[];
       if (cols.some((col, i) => r._attributes.fetchValue(col) !== savedId[i])) {
         cols.forEach((col, i) => r._attributes.writeFromUser(col, savedId[i]));
       }
-    } else if (r._attributes.fetchValue(ctor.primaryKey as string) !== state.id) {
-      r._attributes.writeFromUser(ctor.primaryKey as string, state.id);
+    } else if (r._attributes.fetchValue(ctor.primaryKey) !== state.id) {
+      r._attributes.writeFromUser(ctor.primaryKey, state.id);
     }
 
     if (state.frozen && !r._attributes.isFrozen()) {

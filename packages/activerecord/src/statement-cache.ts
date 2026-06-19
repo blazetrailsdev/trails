@@ -272,7 +272,7 @@ export class StatementCache {
       // nested-hash condition (find_by(author: {...})) must take the
       // relation path, not the cached statement.
       if (Object.getPrototypeOf(value) === Object.prototype) return true;
-      if ("_attributes" in (value as object)) return true;
+      if ("_attributes" in value) return true;
     }
     return false;
   }

@@ -44,9 +44,9 @@ export class ImmutableStringType extends ValueType<string> {
    * @internal Rails-private helper.
    */
   protected castValue(value: unknown): string | null {
-    if (value === true) return Object.freeze(this.trueString) as string;
-    if (value === false) return Object.freeze(this.falseString) as string;
+    if (value === true) return Object.freeze(this.trueString);
+    if (value === false) return Object.freeze(this.falseString);
     const str = String(value);
-    return Object.freeze(str) as string;
+    return Object.freeze(str);
   }
 }

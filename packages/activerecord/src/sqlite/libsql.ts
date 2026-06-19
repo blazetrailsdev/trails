@@ -35,11 +35,11 @@ class LibsqlStatement implements SqliteStatement, SyncSqliteStatement {
   }
 
   all(binds?: SqliteBinds): unknown[] {
-    return this.stmt.all(...bindArgs(binds)) as unknown[];
+    return this.stmt.all(...bindArgs(binds));
   }
 
   iterate(binds?: SqliteBinds): IterableIterator<unknown> {
-    return this.stmt.iterate(...bindArgs(binds)) as IterableIterator<unknown>;
+    return this.stmt.iterate(...bindArgs(binds));
   }
 
   get reader(): boolean {

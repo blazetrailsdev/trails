@@ -327,7 +327,7 @@ export function isEncryptedAttribute(klass: any, attr: string): boolean {
  * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
  */
 export function encryptedAttributeQ(record: any, attributeName: string): boolean {
-  const klass = record.constructor as any;
+  const klass = record.constructor;
   // Resolve attribute aliases (mirrors Rails' attribute_aliases lookup).
   const resolved = klass._attributeAliases?.[attributeName] ?? attributeName;
   if (!klass._encryptedAttributes?.has(resolved)) return false;
@@ -345,7 +345,7 @@ export function encryptedAttributeQ(record: any, attributeName: string): boolean
  * Mirrors: ActiveRecord::Encryption::EncryptableRecord#ciphertext_for
  */
 export function ciphertextFor(record: any, attributeName: string): unknown {
-  const klass = record.constructor as any;
+  const klass = record.constructor;
   const resolved = klass._attributeAliases?.[attributeName] ?? attributeName;
   if (encryptedAttributeQ(record, attributeName)) {
     return record.readAttributeBeforeTypeCast(resolved);
@@ -358,7 +358,7 @@ export function ciphertextFor(record: any, attributeName: string): unknown {
  * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypt
  */
 export async function encryptRecord(record: any): Promise<void> {
-  const klass = record.constructor as any;
+  const klass = record.constructor;
   const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
   if (encryptedAttrs.size === 0) return;
 
@@ -385,7 +385,7 @@ export async function encryptRecord(record: any): Promise<void> {
  * Mirrors: ActiveRecord::Encryption::EncryptableRecord#decrypt
  */
 export async function decryptRecord(record: any): Promise<void> {
-  const klass = record.constructor as any;
+  const klass = record.constructor;
   const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
   if (encryptedAttrs.size === 0) return;
 

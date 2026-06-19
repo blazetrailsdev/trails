@@ -159,7 +159,7 @@ function writerMethod(
       }
       if (value instanceof klass) {
         for (const [modelAttr, valueAttr] of mapping)
-          this.writeAttribute(modelAttr, (value as any)[valueAttr]);
+          this.writeAttribute(modelAttr, value[valueAttr]);
         cache.set(
           name,
           Object.freeze(Object.assign(Object.create(Object.getPrototypeOf(value)), value)),

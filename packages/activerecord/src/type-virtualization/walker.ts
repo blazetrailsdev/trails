@@ -457,8 +457,8 @@ export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
     );
     let typeParams = "";
     if (stmt.typeParameters && stmt.typeParameters.length > 0) {
-      const first = stmt.typeParameters[0]!.pos;
-      const last = stmt.typeParameters[stmt.typeParameters.length - 1]!.end;
+      const first = stmt.typeParameters[0].pos;
+      const last = stmt.typeParameters[stmt.typeParameters.length - 1].end;
       typeParams = `<${sourceFile.text.slice(first, last)}>`;
     }
     declaredClasses.set(stmt.name.text, { exported, typeParams });

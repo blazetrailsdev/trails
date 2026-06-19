@@ -888,11 +888,11 @@ describe("PessimisticLockingTest", () => {
     const p = await Person.find(people("michael").id);
     await Person.transaction(async () => {
       const outerTx = adapter.transactionManager.currentTransaction;
-      expect((outerTx as any).joinable).toBe(true);
+      expect(outerTx.joinable).toBe(true);
       await p.withLock({ requiresNew: true, joinable: false }, async () => {
         const innerTx = adapter.transactionManager.currentTransaction;
         expect(innerTx).not.toBe(outerTx);
-        expect((innerTx as any).joinable).toBe(false);
+        expect(innerTx.joinable).toBe(false);
       });
     });
   });

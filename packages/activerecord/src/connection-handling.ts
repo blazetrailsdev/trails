@@ -120,7 +120,7 @@ export function connectsTo(
                 `await the pool's \`adapterReady\` promise after \`connectsTo\` returns.`,
             );
           }
-          return new AdapterClass(...(adapterArg as unknown[]));
+          return new AdapterClass(...adapterArg);
         },
       });
       pool.adapterReady = adapterReady;
@@ -330,7 +330,7 @@ export function withConnection<T>(
   try {
     return Promise.resolve(connectionPool.call(this).withConnection(fn, options)) as Promise<T>;
   } catch (err) {
-    return Promise.reject(err) as Promise<T>;
+    return Promise.reject(err);
   }
 }
 
@@ -500,8 +500,8 @@ export function schemaCache(this: typeof Base) {
 
 export function clearCacheBang(this: typeof Base): void {
   const cache = schemaCache.call(this);
-  if (cache && typeof (cache as any).clearBang === "function") {
-    (cache as any).clearBang();
+  if (cache && typeof cache.clearBang === "function") {
+    cache.clearBang();
   }
 }
 
@@ -595,7 +595,7 @@ export function withRoleAndShard<T>(
       removeStackEntry(entry);
       throw error;
     }
-    return withCleanup(loaded as unknown as T, () => removeStackEntry(entry));
+    return withCleanup(loaded as T, () => removeStackEntry(entry));
   }
 
   if (isThenable(result)) {
@@ -784,9 +784,7 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
   // `sqlite3:db/test.sqlite3` → "sqlite3"), even when the connection
   // target should be built from a (possibly-mutated) configuration hash.
   const originalUrl =
-    (dbConfig instanceof UrlConfig ? dbConfig.url : undefined) ||
-    (dbConfig.configuration.url as string | undefined) ||
-    "";
+    (dbConfig instanceof UrlConfig ? dbConfig.url : undefined) || dbConfig.configuration.url || "";
   const adapterName =
     dbConfig.adapter || (originalUrl ? adapterNameFromUrl(originalUrl) : undefined);
   if (!adapterName) {

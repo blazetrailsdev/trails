@@ -32,7 +32,7 @@ export class ComparisonValidator extends EachValidator {
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     for (const optKey of COMPARE_CHECKS) {
-      const raw = (this.options as Record<string, unknown>)[optKey];
+      const raw = this.options[optKey];
       if (raw === undefined) continue;
       const optionValue = this.resolveValue(record, raw);
 
@@ -85,7 +85,7 @@ export class ComparisonValidator extends EachValidator {
   }
 
   override checkValidity(): void {
-    if (!COMPARE_CHECKS.some((k) => (this.options as Record<string, unknown>)[k] !== undefined)) {
+    if (!COMPARE_CHECKS.some((k) => this.options[k] !== undefined)) {
       throw new ArgumentError(
         "One of :greater_than, :greater_than_or_equal_to, :less_than, :less_than_or_equal_to, :equal_to, or :other_than must be supplied",
       );

@@ -115,9 +115,9 @@ export class LengthValidator extends EachValidator {
     // Rails length.rb:51-65 — iterate CHECKS, skip absent constraints.
     const valueIsNil = value === null || value === undefined;
 
-    const rawMin = this.options.minimum as unknown;
-    const rawMax = this.options.maximum as unknown;
-    const rawIs = this.options.is as unknown;
+    const rawMin = this.options.minimum;
+    const rawMax = this.options.maximum;
+    const rawIs = this.options.is;
 
     // Rails length.rb:55 — `check_value = resolve_value(record, check_value)`
     const min = resolveLengthOpt.call(this, record, rawMin);

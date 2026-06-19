@@ -2440,7 +2440,7 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     let receivedAdapter: unknown;
     await DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
       receivedAdapter = adapter;
-      const rows = await (adapter as import("../adapter.js").DatabaseAdapter).execute("SELECT 1");
+      const rows = await adapter.execute("SELECT 1");
       expect(rows).toBeDefined();
     });
     expect(receivedAdapter).toBeDefined();

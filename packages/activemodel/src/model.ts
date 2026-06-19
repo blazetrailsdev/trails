@@ -1087,7 +1087,7 @@ export class Model {
       this.prototype,
       timing,
       event,
-      fn as CallbackFn | AroundCallbackFn | CallbackObject,
+      fn,
       options as CallbackConditions | undefined,
     );
   }

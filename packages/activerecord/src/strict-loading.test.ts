@@ -1179,7 +1179,7 @@ describe("StrictLoadingTest", () => {
     // N+1-only mode only guards against cascading lookups, not the root load.
     // Read through the CollectionProxy reader (`developer.projects.to_a`),
     // which must cascade strict_loading onto each child.
-    const books = (await association(author, "npoHmBooks").toArray()) as Base[];
+    const books = await association(author, "npoHmBooks").toArray();
 
     // strict_loading is enabled for has_many associations
     expect(books.every((b) => b.isStrictLoading())).toBe(true);
@@ -1235,7 +1235,7 @@ describe("StrictLoadingTest", () => {
     // strict_loading is enabled for has_many through a belongs_to. Read
     // through the CollectionProxy reader (`developer.ship.parts.to_a`),
     // which must cascade strict_loading onto each child.
-    const parts = (await association(loadedShip, "npoBtParts").toArray()) as Base[];
+    const parts = await association(loadedShip, "npoBtParts").toArray();
     expect(parts.every((p) => p.isStrictLoading())).toBe(true);
     await expect((parts[0] as any).association("npoBtShip").loadTarget()).rejects.toThrow(
       StrictLoadingViolationError,
@@ -1269,7 +1269,7 @@ describe("StrictLoadingTest", () => {
 
     // Load via the thenable path (`await proxy` — CollectionProxy#load)
     // rather than `.toArray()`. Strict loading must still cascade.
-    const books = (await association(author, "slcplBooks")) as Base[];
+    const books = await association(author, "slcplBooks");
 
     expect(books.every((b) => b.isStrictLoading())).toBe(true);
     await expect((books[0] as any).association("slcplAuthor").loadTarget()).rejects.toThrow(
@@ -1320,7 +1320,7 @@ describe("StrictLoadingTest", () => {
     expect((loadedShip as any).strictLoadingMode()).toBe("n_plus_one_only");
 
     // Load parts via thenable path — mode propagated from ship enables cascade
-    const parts = (await association(loadedShip, "slcpmParts")) as Base[];
+    const parts = await association(loadedShip, "slcpmParts");
     expect(parts.every((p) => p.isStrictLoading())).toBe(true);
     await expect((parts[0] as any).association("slcpmShip").loadTarget()).rejects.toThrow(
       StrictLoadingViolationError,
@@ -1353,7 +1353,7 @@ describe("StrictLoadingTest", () => {
     // AssociationRelation's per-record set_strict_loading block.
     const proxy = association(author, "slcpdBooks");
     proxy.strictLoadingBang(true);
-    const books = (await proxy.toArray()) as Base[];
+    const books = await proxy.toArray();
     expect(books.every((b) => b.isStrictLoading())).toBe(true);
   });
   it("proxy strict_loading(false) wins over n_plus_one_only cascade in diverged path", async () => {
@@ -1384,7 +1384,7 @@ describe("StrictLoadingTest", () => {
     // (Relation#exec_queries: `unless strict_loading_value.nil?`), so false wins.
     const proxy = association(dev, "slcpfLogs");
     proxy.strictLoadingBang(false);
-    const logs = (await proxy.toArray()) as Base[];
+    const logs = await proxy.toArray();
     expect(logs.every((l) => !l.isStrictLoading())).toBe(true);
   });
   it("default mode can be changed globally", async () => {
@@ -2489,7 +2489,7 @@ describe("StrictLoadingFixturesTest", () => {
     // The fixture record is instantiated before the default flips, capturing
     // `strict_loading_by_default == false` — loading through the normal DB
     // path while the default is off models that.
-    const zine = (await SlfZine.find(created.id))!;
+    const zine = await SlfZine.find(created.id);
     try {
       SlfZine.strictLoadingByDefault = true;
       expect(zine.isStrictLoading()).toBe(false);
@@ -2500,7 +2500,7 @@ describe("StrictLoadingFixturesTest", () => {
 
       // ...but a record freshly fetched under `strict_loading_by_default` IS
       // strict and DOES raise (strict_loading_test.rb:760).
-      const fresh = (await SlfZine.find(created.id))!;
+      const fresh = await SlfZine.find(created.id);
       expect(fresh.isStrictLoading()).toBe(true);
       await expect(association(fresh, "slfInterests").toArray()).rejects.toThrow(
         StrictLoadingViolationError,

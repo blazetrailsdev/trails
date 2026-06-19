@@ -325,6 +325,6 @@ describe("defineHelpersModule", () => {
     expect(Object.getPrototypeOf(mod)).toBe(parent._helpers);
     // Live: methods added to parent after definition remain visible.
     helperMethod(parent, "addedLater");
-    expect(typeof (mod as HelperMethodsModule).addedLater).toBe("function");
+    expect(typeof mod.addedLater).toBe("function");
   });
 });

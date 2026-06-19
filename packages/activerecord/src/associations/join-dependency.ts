@@ -185,7 +185,7 @@ export class JoinDependency {
       parentAssocName?: string;
     },
   ): JoinPart | null {
-    const modelClass = (options?.fromModel ?? this._baseModel) as any;
+    const modelClass = options?.fromModel ?? this._baseModel;
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === assocName);
     if (!assocDef) return null;
@@ -226,7 +226,7 @@ export class JoinDependency {
       foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
       if (Array.isArray(foreignKey)) return null;
       const className = assocDef.options.className ?? _camelize(assocName);
-      targetModel = modelRegistry.get(className) as typeof Base | undefined;
+      targetModel = modelRegistry.get(className);
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
       primaryKey = assocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
@@ -253,7 +253,7 @@ export class JoinDependency {
       const className =
         assocDef.options.className ??
         _camelize(assocDef.type === "hasMany" ? _singularize(assocName) : assocName);
-      targetModel = modelRegistry.get(className) as typeof Base | undefined;
+      targetModel = modelRegistry.get(className);
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
       foreignKey = assocDef.options.as
@@ -280,7 +280,7 @@ export class JoinDependency {
     } else {
       // Collision: route through AliasTracker with the Rails alias candidate
       // (aliasNameFor bumps the candidate's count and suffixes `_N` on repeat).
-      const parentTableName = (modelClass as any).tableName;
+      const parentTableName = modelClass.tableName;
       const candidate = reflection
         ? reflection.aliasCandidate(parentTableName)
         : `${targetTable!}_${parentTableName}`;
@@ -357,11 +357,11 @@ export class JoinDependency {
               : new Nodes.And([predicate, scopeAst]);
         }
       }
-      predicate = this._addStiConstraintArel(predicate, targetModel!, targetArelTable);
+      predicate = this._addStiConstraintArel(predicate, targetModel, targetArelTable);
       arelJoin = new this._joinType(targetArelTable, new Nodes.On(predicate));
     }
 
-    const treePart = reflection ? new JoinAssociation(reflection) : new JoinLeaf(targetModel!);
+    const treePart = reflection ? new JoinAssociation(reflection) : new JoinLeaf(targetModel);
     treePart.tableIndex = tableIndex;
     treePart.arelTable = targetArelTable;
     treePart.tableAlias = tableAlias;
@@ -1085,8 +1085,8 @@ export class JoinDependency {
       const right = associations[key];
       const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
       const reflection = this.findReflection(baseKlass, name);
-      (reflection as any).checkValidityBang?.();
-      (reflection as any).checkEagerLoadableBang?.();
+      reflection.checkValidityBang?.();
+      reflection.checkEagerLoadableBang?.();
 
       if (reflection.isPolymorphic?.()) {
         throw new EagerLoadPolymorphicError(name);
@@ -1172,22 +1172,22 @@ export class JoinDependency {
     }
 
     const isCollection = node.assocType === "hasMany";
-    if (!(record as any)._preloadedAssociations) {
-      (record as any)._preloadedAssociations = new Map();
+    if (!record._preloadedAssociations) {
+      record._preloadedAssociations = new Map();
     }
     if (isCollection) {
-      if (!(record as any)._preloadedAssociations.has(node.immediateAssocName)) {
-        (record as any)._preloadedAssociations.set(node.immediateAssocName, []);
+      if (!record._preloadedAssociations.has(node.immediateAssocName)) {
+        record._preloadedAssociations.set(node.immediateAssocName, []);
       }
     } else {
-      (record as any)._preloadedAssociations.set(node.immediateAssocName, model);
+      record._preloadedAssociations.set(node.immediateAssocName, model);
     }
 
     this._wireAssociationProxy(record, node, model);
 
-    if (node.isReadonly()) (model as any)._readonly = true;
-    if (node.isStrictLoading() && typeof (model as any).strictLoadingBang === "function") {
-      (model as any).strictLoadingBang();
+    if (node.isReadonly()) model._readonly = true;
+    if (node.isStrictLoading() && typeof model.strictLoadingBang === "function") {
+      model.strictLoadingBang();
     }
     return model;
   }
@@ -1235,11 +1235,11 @@ export class JoinDependency {
       if (!proxy || proxy.loaded) return;
       proxy.target = [];
       proxy.loadedBang?.();
-      if (!(parent as any)._preloadedAssociations) {
-        (parent as any)._preloadedAssociations = new Map();
+      if (!parent._preloadedAssociations) {
+        parent._preloadedAssociations = new Map();
       }
-      if (!(parent as any)._preloadedAssociations.has(node.immediateAssocName)) {
-        (parent as any)._preloadedAssociations.set(node.immediateAssocName, []);
+      if (!parent._preloadedAssociations.has(node.immediateAssocName)) {
+        parent._preloadedAssociations.set(node.immediateAssocName, []);
       }
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
@@ -1319,7 +1319,7 @@ export class JoinDependency {
       // chain[0] is the target reflection (root); chain[1..] are through.
       // parent.table_name is the parent's real table name (JoinPart delegates
       // table_name to base_klass), not its alias.
-      const parentTableName = (modelClass as any).tableName;
+      const parentTableName = modelClass.tableName;
       const effectiveName = collides
         ? this._aliasTracker.aliasNameFor(
             i === 0
@@ -1434,8 +1434,7 @@ export class JoinDependency {
         treePart.assocName = throughNodeName;
         treePart.immediateAssocName = throughName;
         treePart.parentPath = parentAssocName ?? null;
-        treePart.assocType =
-          ((refl as any)._reflection ?? refl).macro === "hasOne" ? "hasOne" : "hasMany";
+        treePart.assocType = (refl._reflection ?? refl).macro === "hasOne" ? "hasOne" : "hasMany";
         treePart.arelJoin = arelJoin;
         treePart.isThroughNode = true;
         this._insertTreeNode(treePart);

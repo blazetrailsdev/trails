@@ -270,7 +270,7 @@ function prependCtes(
   const connection = rel._modelClass.connection;
   const compile = (node: Nodes.Node): [string, unknown[]] => {
     if (!connection.visitor?.compileWithBinds) return [connection.toSql(node), []];
-    return connection.visitor.compileWithBinds(node) as [string, unknown[]];
+    return connection.visitor.compileWithBinds(node);
   };
   const { sql: cteSql, binds: cteRawBinds } = buildCteSql(rel._ctes, compile, (name) =>
     connection.quoteTableName(name),
@@ -294,7 +294,7 @@ function typeCastCalcBind(b: unknown): unknown {
 function compileManagerWithBinds(rel: CalculationRelation, manager: any): [string, unknown[]] {
   const visitor = rel._modelClass.connection.visitor;
   if (visitor?.compileWithBinds) {
-    const [sql, rawBinds] = visitor.compileWithBinds(manager.ast) as [string, unknown[]];
+    const [sql, rawBinds] = visitor.compileWithBinds(manager.ast);
     return [sql, rawBinds.map(typeCastCalcBind)];
   }
   return [rel._modelClass.connection.toSql(manager), []];
@@ -350,7 +350,7 @@ async function singleAggregate(
     `${rel._modelClass.name} ${opName}`,
     ctedBinds,
   );
-  const rows = result.toArray() as Record<string, unknown>[];
+  const rows = result.toArray();
   const val = rows[0]?.val;
   if (val === undefined || val === null) {
     return fn === "sum" ? castAggValue(null, fn, colType, coerceNumeric) : null;
@@ -400,7 +400,7 @@ async function groupedAggregate(
     `${rel._modelClass.name} ${opName}`,
     ctedBinds,
   );
-  const rows = queryResult.toArray() as Record<string, unknown>[];
+  const rows = queryResult.toArray();
 
   const aggOf = (val: unknown): unknown =>
     val === undefined || val === null
@@ -413,10 +413,10 @@ async function groupedAggregate(
     // Rails keys the result hash by the associated record objects, looked up by
     // foreign-key value. JS Map keys compare by reference, so callers locate a
     // key by its `id` rather than by holding the same instance.
-    const klass = (association.klass as any).baseClass ?? association.klass;
+    const klass = association.klass.baseClass ?? association.klass;
     const ids = rows.map((row) => row.group_key).filter((v) => v != null);
     const records: any[] =
-      ids.length > 0 ? await (klass as any).where({ [klass.primaryKey]: ids }).toArray() : [];
+      ids.length > 0 ? await klass.where({ [klass.primaryKey]: ids }).toArray() : [];
     const byId = new Map(records.map((r) => [String(r.id), r]));
     const result = new Map<unknown, unknown>();
     for (const row of rows) {
@@ -502,7 +502,7 @@ async function groupedCompositeAssoc(
     `${rel._modelClass.name} ${opName}`,
     ctedBinds,
   );
-  const rows = queryResult.toArray() as Record<string, unknown>[];
+  const rows = queryResult.toArray();
 
   const aggOf = (val: unknown): unknown =>
     val === undefined || val === null
@@ -511,7 +511,7 @@ async function groupedCompositeAssoc(
         : null
       : castAggValue(val, fn, colType, coerceNumeric);
 
-  const klass = (association.klass as any).baseClass ?? association.klass;
+  const klass = association.klass.baseClass ?? association.klass;
   const pk = (Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]) as string[];
   // NUL-join so string-valued key components cannot collide across the tuple
   // boundary (e.g. ["a b","c"] vs ["a","b c"]).
@@ -519,7 +519,7 @@ async function groupedCompositeAssoc(
   const tuples = rows
     .map((row) => aliases.map((a) => row[a]))
     .filter((vals) => vals.every((v) => v != null));
-  const records: any[] = tuples.length > 0 ? await (klass as any).where(pk, tuples).toArray() : [];
+  const records: any[] = tuples.length > 0 ? await klass.where(pk, tuples).toArray() : [];
   // The composite-PK `id` accessor returns an array, so key the lookup map by
   // the raw per-column attribute values to match the SQL group-key tuple.
   const byKey = new Map(records.map((r) => [keyOf(pk.map((k) => r._readAttribute(k))), r]));
@@ -552,7 +552,7 @@ export async function performCount(
     const allEager = [...new Set([...eagerSpecs, ...includesSpecs, ...promoted])];
     // CPK + grouped eagerLoad not yet supported; fall through to plain groupedAggregate.
     if (!Array.isArray(this._modelClass.primaryKey)) {
-      const pk = this._modelClass.primaryKey as string;
+      const pk = this._modelClass.primaryKey;
       const jd = QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
       const jdNodes: Nodes.Join[] = jd.joinConstraints(
         [],
@@ -658,9 +658,7 @@ export async function performCount(
             `${this._modelClass.name} Ids`,
             idCtedBinds,
           );
-          const limitedIds = (idResult.toArray() as Record<string, unknown>[]).map(
-            (row) => row[pk],
-          );
+          const limitedIds = idResult.toArray().map((row) => row[pk]);
           // `pk IN ()` is invalid SQL — Rails' `where!(primary_key => [])` short-circuits
           // to a no-match relation, so the count is 0.
           if (limitedIds.length === 0) return 0;
@@ -697,7 +695,7 @@ export async function performCount(
             `${this._modelClass.name} Count`,
             ctedBinds,
           );
-          const limitedRows = limitedResult.toArray() as Record<string, unknown>[];
+          const limitedRows = limitedResult.toArray();
           return Number(limitedRows[0]?.count ?? 0);
         }
         // Mirrors Rails recursive calculate() on the JD relation: COUNT(DISTINCT requested_col).
@@ -725,7 +723,7 @@ export async function performCount(
           `${this._modelClass.name} Count`,
           ctedBinds,
         );
-        const rows = result.toArray() as Record<string, unknown>[];
+        const rows = result.toArray();
         return Number(rows[0]?.count ?? 0);
       }
     }
@@ -796,7 +794,7 @@ export async function performCount(
       `${this._modelClass.name} Count`,
       ctedBinds,
     );
-    const rows = result.toArray() as Record<string, unknown>[];
+    const rows = result.toArray();
     return Number(rows[0]?.count ?? 0);
   }
 
@@ -816,7 +814,7 @@ export async function performCount(
       `${this._modelClass.name} Count`,
       ctedBinds,
     );
-    const rows = result.toArray() as Record<string, unknown>[];
+    const rows = result.toArray();
     return Number(rows[0]?.count ?? 0);
   }
 
@@ -841,7 +839,7 @@ export async function performCount(
         `${this._modelClass.name} Count`,
         ctedBinds,
       );
-      const rows = result.toArray() as Record<string, unknown>[];
+      const rows = result.toArray();
       return Number(rows[0]?.count ?? 0);
     }
     const countNode = table.get(pk).count(true);
@@ -856,7 +854,7 @@ export async function performCount(
       `${this._modelClass.name} Count`,
       ctedBinds,
     );
-    const rows = result.toArray() as Record<string, unknown>[];
+    const rows = result.toArray();
     return Number(rows[0]?.count ?? 0);
   }
 
@@ -872,7 +870,7 @@ export async function performCount(
     `${this._modelClass.name} Count`,
     ctedBinds,
   );
-  const rows = result.toArray() as Record<string, unknown>[];
+  const rows = result.toArray();
   return Number(rows[0]?.count ?? 0);
 }
 
@@ -1014,7 +1012,7 @@ function truncate(name: string): string {
 export function aggregateColumn(rel: CalculationRelation, columnName: string): unknown {
   const table = rel._modelClass.arelTable;
   if (columnName === "*" || columnName === "1") {
-    return (table as any).sql ? (table as any).sql(columnName) : columnName;
+    return table.sql ? table.sql(columnName) : columnName;
   }
   // Mirrors buildAggNode / Rails' aggregate_column → arel_column: a known column
   // qualifies onto the model's own table, a "table.column" string resolves

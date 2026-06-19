@@ -162,10 +162,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    * logic in `loadBelongsTo` so reads and writes use the same column.
    */
   private foreignTypeName(): string {
-    return (
-      (this.reflection.options.foreignType as string | undefined) ??
-      `${underscore(this.reflection.name)}_type`
-    );
+    return this.reflection.options.foreignType ?? `${underscore(this.reflection.name)}_type`;
   }
 
   /**

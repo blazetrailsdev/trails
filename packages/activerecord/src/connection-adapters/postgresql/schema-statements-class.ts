@@ -671,7 +671,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // so an order that becomes empty after stripping (e.g. bare "DESC") doesn't
     // consume an alias index slot and shift subsequent aliases.
     const orderColumns = (orders ?? [])
-      .map((o) => (typeof o === "string" ? o : visitor.compile(o as Nodes.Node)))
+      .map((o) => (typeof o === "string" ? o : visitor.compile(o)))
       .filter((o) => o.trim().length > 0)
       .map((o) =>
         o
@@ -851,8 +851,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const defaultValue =
       defaultOrChanges !== null &&
       typeof defaultOrChanges === "object" &&
-      "from" in (defaultOrChanges as object) &&
-      "to" in (defaultOrChanges as object)
+      "from" in defaultOrChanges &&
+      "to" in defaultOrChanges
         ? (defaultOrChanges as { from: unknown; to: unknown }).to
         : defaultOrChanges;
     if (defaultValue == null) {
@@ -860,7 +860,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`,
       );
     } else {
-      const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
+      const col = (await this.columns(tableName)).find((c) => c.name === columnName);
       const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
       const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
       await this.adapter.executeMutation(
@@ -892,7 +892,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition | undefined> {
-    const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
+    const col = (await this.columns(tableName)).find((c) => c.name === columnName);
     if (!col) return undefined;
     const defaultValue = this.extractNewDefaultValue(defaultOrChanges);
     const cd = new ColumnDefinition(columnName, (col.type ?? "string") as ColumnType, {
@@ -915,7 +915,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const quotedTable = this._qt(tableName);
     const quotedCol = this._qi(columnName);
     if (!nullable && defaultValue != null) {
-      const col = (await this.columns(tableName)).find((c) => (c as Column).name === columnName);
+      const col = (await this.columns(tableName)).find((c) => c.name === columnName);
       // Rails guards the pre-ALTER UPDATE with `if column` — skip it when the
       // column can't be found rather than quoting against an undefined column.
       if (col) {
@@ -1274,7 +1274,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         AND n.nspname = ${scope.schema}
     `);
     return rows.map((row) => {
-      const r = row as Record<string, unknown>;
+      const r = row;
       const constraintdef = r.constraintdef as string;
       const whereIdx = constraintdef.search(/ WHERE /i);
       let predicate: string | undefined;
@@ -1297,7 +1297,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       );
       return new ExclusionConstraintDefinition(tableName, expression, {
         name: r.conname as string,
-        using: using as string | undefined,
+        using: using,
         where: predicate,
         deferrable: deferrable || undefined,
       });
@@ -1329,7 +1329,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     if (rows.length === 0) return undefined;
     const row = rows[0] as Record<string, string>;
     // Split on WHERE first (Rails approach), then extract expression from EXCLUDE clause.
-    const [excludePart] = (row.constraintdef as string).split(/ WHERE /i);
+    const [excludePart] = row.constraintdef.split(/ WHERE /i);
     const parts = excludePart.match(/EXCLUDE(?:\s+USING\s+\w+)?\s+\((.+)\)/s);
     return new ExclusionConstraintDefinition(tableName, parts?.[1] ?? "", { name });
   }

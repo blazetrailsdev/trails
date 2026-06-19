@@ -1526,7 +1526,7 @@ describe("UniquenessValidationTest", () => {
     adp.caseInsensitiveComparison = async (attribute: any, value: unknown) => {
       await Promise.resolve();
       wasAwaited = true;
-      return attribute.lower().eq((attribute.relation as any).lower(value));
+      return attribute.lower().eq(attribute.relation.lower(value));
     };
 
     try {

@@ -85,7 +85,7 @@ export class Association {
       !Array.isArray(scope) &&
       !(scope instanceof Function)
     ) {
-      options = scope as Record<string, unknown>;
+      options = scope;
       scope = null;
     }
 

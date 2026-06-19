@@ -100,10 +100,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_times (id, time_interval, scaled_time_interval) VALUES (1, '1 year 2 days ago', '3 weeks ago')`,
       );
       const first = await (M as any).find(1);
-      expect((first as any).time_interval).toBe("P-1Y-2D");
+      expect(first.time_interval).toBe("P-1Y-2D");
       const { Duration } = await import("@blazetrails/activesupport");
       // Rails' assert_equal on Duration compares total seconds, not parts.
-      expect((first as any).scaled_time_interval.eql(Duration.days(-21))).toBe(true);
+      expect(first.scaled_time_interval.eql(Duration.days(-21))).toBe(true);
     });
 
     it("update large time in seconds", async () => {
@@ -114,20 +114,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       const first = await (M as any).find(1);
       const { Duration } = await import("@blazetrails/activesupport");
       const seventyYearsSeconds = Duration.years(70).inSeconds();
-      (first as any).scaled_time_interval = seventyYearsSeconds;
-      expect(await (first as any).save()).toBeTruthy();
-      await (first as any).reload();
+      first.scaled_time_interval = seventyYearsSeconds;
+      expect(await first.save()).toBeTruthy();
+      await first.reload();
       // Rails' assert_equal on Duration compares total seconds, not parts —
       // PG stores numeric seconds as hours/minutes, so the value round-trips
       // with the same inSeconds() but different shape.
-      expect((first as any).scaled_time_interval.eql(Duration.years(70))).toBe(true);
+      expect(first.scaled_time_interval.eql(Duration.years(70))).toBe(true);
     });
 
     it("oid values", async () => {
       const M = await setupOidsTable();
       await adapter.exec(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
       const first = await (M as any).find(1);
-      expect((first as any).obj_id).toBe(1234);
+      expect(first.obj_id).toBe(1234);
     });
 
     it("update oid", async () => {
@@ -135,10 +135,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
       const first = await (M as any).find(1);
       const newValue = 2147483648;
-      (first as any).obj_id = newValue;
-      expect(await (first as any).save()).toBeTruthy();
-      await (first as any).reload();
-      expect((first as any).obj_id).toBe(newValue);
+      first.obj_id = newValue;
+      expect(await first.save()).toBeTruthy();
+      await first.reload();
+      expect(first.obj_id).toBe(newValue);
     });
 
     it("text columns are limitless the upper limit is one GB", async () => {

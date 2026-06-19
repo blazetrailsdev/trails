@@ -328,7 +328,7 @@ export function _enum(
 
   const attribute = name;
   const mapping = Array.isArray(values)
-    ? Object.fromEntries((values as string[]).map((v, i) => [v, i]))
+    ? Object.fromEntries(values.map((v, i) => [v, i]))
     : (values as Record<string, number>);
 
   if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
@@ -603,7 +603,7 @@ export function castEnumValue(
   const mapping = modelClass._enums?.get(attribute);
   if (!mapping) return null;
 
-  return enumTypeFor(attribute, mapping).serialize(value) as number | string | null;
+  return enumTypeFor(attribute, mapping).serialize(value);
 }
 
 /**

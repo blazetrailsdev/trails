@@ -35,7 +35,7 @@ export function scope<T extends typeof Base>(
 
   Object.defineProperty(modelClass, name, {
     value: function (...args: any[]) {
-      return (this as any).all()[name](...args);
+      return this.all()[name](...args);
     },
     writable: true,
     configurable: true,

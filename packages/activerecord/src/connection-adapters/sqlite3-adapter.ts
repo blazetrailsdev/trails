@@ -1877,7 +1877,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         precision,
         scale: null,
       });
-      const rawDflt = r.dflt_value as string | null;
+      const rawDflt = r.dflt_value;
       const defaultValue = sqliteExtractValueFromDefault(rawDflt);
       // Mirrors Rails' SQLite3Adapter#extract_default_function /
       // #has_default_function?: only treat the dflt_value as a SQL function
@@ -2488,10 +2488,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   private resolveDriverFactory(): SqliteDriver {
     const driverOpt = (this._config as SQLite3AdapterOptions).driver;
     if (driverOpt != null) {
-      if (
-        typeof (driverOpt as SqliteDriver).name !== "string" ||
-        typeof (driverOpt as SqliteDriver).open !== "function"
-      ) {
+      if (typeof driverOpt.name !== "string" || typeof driverOpt.open !== "function") {
         throw new TypeError(
           "config.driver must be a SqliteDriver " +
             "(object with `name: string` and `open(config)` function).",

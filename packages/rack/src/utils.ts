@@ -302,7 +302,7 @@ export function setCookieHeader(
   let values: string[];
 
   if (typeof value === "object" && !Array.isArray(value)) {
-    const opts = value as Record<string, any>;
+    const opts = value;
     if (opts.domain) domain = `; domain=${opts.domain}`;
     if (opts.path) path = `; path=${opts.path}`;
     if (opts.max_age !== undefined) maxAge = `; max-age=${opts.max_age}`;

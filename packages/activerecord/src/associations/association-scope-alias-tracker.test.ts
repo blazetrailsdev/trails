@@ -104,7 +104,7 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
     // task #21).
     class TestScope extends AssociationScope {
       public runGetChain(reflection: any) {
-        const tracker = AliasTracker.create(null, (reflection as any).klass.arelTable.name, []);
+        const tracker = AliasTracker.create(null, reflection.klass.arelTable.name, []);
         return this.getChain(reflection, tracker);
       }
     }

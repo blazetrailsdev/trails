@@ -635,7 +635,7 @@ export class Base extends Metal {
       nameOrModelOrOptions !== null &&
       !Array.isArray(nameOrModelOrOptions)
     ) {
-      opts = nameOrModelOrOptions as Record<string, unknown>;
+      opts = nameOrModelOrOptions;
     } else {
       model = nameOrModelOrOptions;
     }
