@@ -791,12 +791,12 @@ describe("RelationTest", () => {
           this._tableName = "setop_posts";
           this.attribute("title", "string");
           this.attribute("setop_author_id", "integer");
+          this.belongsTo("setopAuthor", {
+            className: "SetOpAuthor",
+            foreignKey: "setop_author_id",
+          });
         }
       }
-      Associations.belongsTo.call(SetOpPost, "setopAuthor", {
-        className: "SetOpAuthor",
-        foreignKey: "setop_author_id",
-      });
       // An eager-load operand must NOT compile through its JoinDependency manager
       // inside a set operation: the wide `t0_r*` alias list + LEFT OUTER JOINs
       // would make the operand arity-incompatible with the other UNION side (and
@@ -2747,12 +2747,12 @@ describe("RelationTest", () => {
         this._tableName = "eager_setop_posts";
         this.attribute("title", "string");
         this.attribute("eager_setop_author_id", "integer");
+        this.belongsTo("author", {
+          className: "EagerSetopAuthor",
+          foreignKey: "eager_setop_author_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerSetopPost, "author", {
-      className: "EagerSetopAuthor",
-      foreignKey: "eager_setop_author_id",
-    });
     const author = await EagerSetopAuthor.create({ name: "alice" });
     await EagerSetopPost.create({ title: "x", eager_setop_author_id: (author as any).id });
     await EagerSetopPost.create({ title: "y", eager_setop_author_id: (author as any).id });
@@ -6276,12 +6276,12 @@ describe("RelationTest", () => {
         this._tableName = "ref_posts";
         this.attribute("title", "string");
         this.attribute("ref_author_id", "integer");
+        this.belongsTo("refAuthor", {
+          className: "RefAuthor",
+          foreignKey: "ref_author_id",
+        });
       }
     }
-    Associations.belongsTo.call(RefPost, "refAuthor", {
-      className: "RefAuthor",
-      foreignKey: "ref_author_id",
-    });
 
     const scope = RefPost.all().includes("refAuthor") as any;
     expect(scope._eagerLoadingForSql()).toBe(false);

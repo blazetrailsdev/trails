@@ -18,7 +18,6 @@ import {
   Rollback,
   registerModel,
 } from "./index.js";
-import { Associations } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -695,9 +694,9 @@ describe("TransactionCallbacksTest", () => {
         this._tableName = "comments";
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
+        this.belongsTo("post", { touch: true });
       }
     }
-    Associations.belongsTo.call(Comment, "post", { touch: true });
     registerModel(Comment);
 
     const post = await Post.create({ title: "Hello" });

@@ -155,15 +155,162 @@ const rule = {
     const classesByName = new Map(); // name -> node | "AMBIGUOUS"
     const candidates = [];
 
+    // name -> textual start offsets of every local binding with that name.
+    // Used to reject a fix whose argument expressions reference a binding
+    // declared *after* the target class: hoisting the call into the class's
+    // `static {}` block (which runs at class-evaluation time) would then read
+    // that binding inside its TDZ — a runtime ReferenceError, not just a type
+    // error. Such sites are reported as standaloneNoFix and left in place.
+    const bindingStarts = new Map(); // name -> number[] (all decl start offsets)
+    function recordBinding(name, start) {
+      if (typeof name !== "string") return;
+      const arr = bindingStarts.get(name);
+      if (arr) arr.push(start);
+      else bindingStarts.set(name, [start]);
+    }
+
     function recordClass(node) {
       if (!node.id || node.id.type !== "Identifier") return;
       const name = node.id.name;
       classesByName.set(name, classesByName.has(name) ? "AMBIGUOUS" : node);
+      recordBinding(name, node.range[0]);
+    }
+
+    // Collect the identifier names a binding *pattern* introduces, recursing
+    // through destructuring (`const { scope } = …`, `const [a, ...rest] = …`,
+    // defaults) so every name is recorded — not just the simple-identifier case.
+    function bindingNamesOf(pattern, out = new Set()) {
+      if (!pattern || typeof pattern.type !== "string") return out;
+      switch (pattern.type) {
+        case "Identifier":
+          out.add(pattern.name);
+          break;
+        case "AssignmentPattern":
+          bindingNamesOf(pattern.left, out);
+          break;
+        case "RestElement":
+          bindingNamesOf(pattern.argument, out);
+          break;
+        case "ArrayPattern":
+          for (const el of pattern.elements) if (el) bindingNamesOf(el, out);
+          break;
+        case "ObjectPattern":
+          for (const p of pattern.properties) {
+            bindingNamesOf(p.type === "RestElement" ? p.argument : p.value, out);
+          }
+          break;
+      }
+      return out;
+    }
+
+    const FUNCTION_TYPES = new Set([
+      "ArrowFunctionExpression",
+      "FunctionExpression",
+      "FunctionDeclaration",
+    ]);
+
+    // Collect identifier *references* inside an argument subtree, skipping
+    // non-computed property keys (`{ className: x }` → only `x`) and member
+    // property names (`a.b` → only `a`), which are not variable reads. Function
+    // parameters are local bindings, so references that resolve to them (e.g.
+    // `owner` in `scope: (owner) => owner`) are excluded — otherwise a same-named
+    // variable declared between the class and the call would wrongly suppress an
+    // actually-safe fix. `bound` carries the param names in scope.
+    function referencedNames(node, out, bound = new Set()) {
+      if (!node || typeof node.type !== "string") return out;
+      if (node.type === "Identifier") {
+        if (!bound.has(node.name)) out.add(node.name);
+        return out;
+      }
+      let childBound = bound;
+      if (FUNCTION_TYPES.has(node.type)) {
+        childBound = new Set(bound);
+        for (const p of node.params) bindingNamesOf(p, childBound);
+      }
+      for (const key of Object.keys(node)) {
+        if (key === "parent" || key === "range" || key === "loc") continue;
+        if (node.type === "Property" && !node.computed && key === "key") continue;
+        if (node.type === "MemberExpression" && !node.computed && key === "property") continue;
+        const child = node[key];
+        if (Array.isArray(child)) {
+          for (const c of child)
+            if (c && typeof c.type === "string") referencedNames(c, out, childBound);
+        } else if (child && typeof child.type === "string") {
+          referencedNames(child, out, childBound);
+        }
+      }
+      return out;
+    }
+
+    // Root identifier of an assignment target, unwrapping member chains and
+    // TS/paren wrappers: `(X as any)._associations` and `X.foo.bar` → "X".
+    function assignmentRootName(target) {
+      let n = target;
+      while (n) {
+        if (n.type === "MemberExpression") n = n.object;
+        else if (n.type === "TSAsExpression" || n.type === "TSNonNullExpression") n = n.expression;
+        else break;
+      }
+      return n && n.type === "Identifier" ? n.name : null;
+    }
+
+    // Property name of a non-computed member, or a string-literal computed
+    // member; null otherwise.
+    function memberPropName(member) {
+      if (!member.computed && member.property.type === "Identifier") return member.property.name;
+      if (
+        member.computed &&
+        member.property.type === "Literal" &&
+        typeof member.property.value === "string"
+      ) {
+        return member.property.value;
+      }
+      return null;
+    }
+
+    // Does a statement subtree reset/mutate the receiver's association state?
+    // Catches the `(X as any)._associations = []` reset idiom (the standalone
+    // call originally ran *after* that reset, but hoisting it into the static
+    // {} block runs it at class-evaluation time — before the reset wipes it),
+    // including the aliased form `[X, Y].forEach((m) => { m._associations = [] })`
+    // where the assignment target's root is the loop variable, not the receiver.
+    // So we flag both: an assignment whose member root is the receiver, and any
+    // assignment to a member named `_associations` (the registry being reset).
+    function mutatesReceiverMember(subtree, receiver) {
+      let found = false;
+      (function walk(n) {
+        if (found || !n || typeof n.type !== "string") return;
+        if (
+          n.type === "AssignmentExpression" &&
+          n.left.type === "MemberExpression" &&
+          (assignmentRootName(n.left) === receiver || memberPropName(n.left) === "_associations")
+        ) {
+          found = true;
+          return;
+        }
+        for (const key of Object.keys(n)) {
+          if (key === "parent" || key === "range" || key === "loc") continue;
+          const child = n[key];
+          if (Array.isArray(child)) {
+            for (const c of child) if (c && typeof c.type === "string") walk(c);
+          } else if (child && typeof child.type === "string") {
+            walk(child);
+          }
+        }
+      })(subtree);
+      return found;
     }
 
     return {
       ClassDeclaration: recordClass,
       ClassExpression: recordClass,
+
+      VariableDeclarator(node) {
+        for (const name of bindingNamesOf(node.id)) recordBinding(name, node.range[0]);
+      },
+      FunctionDeclaration(node) {
+        if (node.id && node.id.type === "Identifier") recordBinding(node.id.name, node.range[0]);
+      },
 
       CallExpression(node) {
         const macro = macroOfCall(node.callee);
@@ -198,8 +345,56 @@ const rule = {
               reason = `${receiver} has no static {} block`;
             } else if (resolved.range[1] >= node.range[0]) {
               reason = `${receiver} is not declared before this call`;
+            } else if (stmt.parent !== resolved.parent) {
+              // The call must be a sibling statement in the same scope as the
+              // class. A call nested in a deeper scope (e.g. inside an `it()`
+              // callback while the class is declared at `describe` scope) runs
+              // per-invocation; hoisting it into the static {} block — which
+              // runs once at class-evaluation time — drops those repeat
+              // declarations and changes behavior.
+              reason = `${receiver} is declared in a different scope than this call`;
             } else {
-              classNode = resolved;
+              // Reject if any argument references a binding declared after the
+              // target class — hoisting into its static {} block would read it
+              // in its TDZ at class-evaluation time (runtime ReferenceError).
+              const refs = referencedNames(
+                { type: "ArrayExpression", elements: node.arguments.slice(1) },
+                new Set(),
+              );
+              let offender = null;
+              for (const name of refs) {
+                const starts = bindingStarts.get(name);
+                // A binding of this name declared textually between the target
+                // class and the call (block-scoped decls shadow, so check the
+                // interval, not a global min) would land in its TDZ once hoisted.
+                if (starts && starts.some((s) => s > resolved.range[0] && s < node.range[1])) {
+                  offender = name;
+                  break;
+                }
+              }
+              if (offender) {
+                reason = `an argument references ${offender}, declared after ${receiver}`;
+              } else {
+                // Refuse if a sibling statement *between* the class and the call
+                // mutates a member of the receiver (e.g. `X._associations = []`):
+                // the call originally ran after that mutation, but hoisting it
+                // into the static {} block runs it before — so the mutation
+                // would then wipe the just-declared association.
+                const siblings = resolved.parent.body;
+                const mutated =
+                  Array.isArray(siblings) &&
+                  siblings.some(
+                    (s) =>
+                      s.range[0] > resolved.range[1] &&
+                      s.range[1] < node.range[0] &&
+                      mutatesReceiverMember(s, receiver),
+                  );
+                if (mutated) {
+                  reason = `a statement between ${receiver} and this call mutates ${receiver}`;
+                } else {
+                  classNode = resolved;
+                }
+              }
             }
           }
 

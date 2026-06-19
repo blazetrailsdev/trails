@@ -306,36 +306,36 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("member_type_id", "integer");
         this.attribute("admittable_id", "integer");
         this.attribute("admittable_type", "string");
+        this.belongsTo("memberType", {
+          className: "MdMemberType",
+          foreignKey: "member_type_id",
+        });
+        this.belongsTo("admittable", { polymorphic: true });
       }
     }
     class MdMemberDetail extends Base {
       static {
         this.attribute("member_id", "integer");
+        this.belongsTo("member", {
+          className: "MdMember",
+          foreignKey: "member_id",
+        });
+        this.hasOne("memberType", {
+          className: "MdMemberType",
+          through: "member",
+          source: "memberType",
+        });
+        this.hasOne("admittable", {
+          className: "MdMember",
+          through: "member",
+          source: "admittable",
+          sourceType: "MdMember",
+        });
       }
     }
     registerModel(MdMemberType);
     registerModel(MdMember);
     registerModel(MdMemberDetail);
-    Associations.belongsTo.call(MdMember, "memberType", {
-      className: "MdMemberType",
-      foreignKey: "member_type_id",
-    });
-    Associations.belongsTo.call(MdMember, "admittable", { polymorphic: true });
-    Associations.belongsTo.call(MdMemberDetail, "member", {
-      className: "MdMember",
-      foreignKey: "member_id",
-    });
-    Associations.hasOne.call(MdMemberDetail, "memberType", {
-      className: "MdMemberType",
-      through: "member",
-      source: "memberType",
-    });
-    Associations.hasOne.call(MdMemberDetail, "admittable", {
-      className: "MdMember",
-      through: "member",
-      source: "admittable",
-      sourceType: "MdMember",
-    });
 
     await MdMemberType.create({ name: "Standard" });
     const memberType = await MdMemberType.create({ name: "Premium" });
@@ -436,29 +436,29 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
         this.attribute("club_id", "integer");
+        this.belongsTo("club", {
+          className: "HotpClub",
+          foreignKey: "club_id",
+        });
       }
     }
     class HotpMember extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("sponsor", {
+          className: "HotpSponsor",
+          as: "sponsorable",
+        });
+        this.hasOne("sponsorClub", {
+          through: "sponsor",
+          source: "club",
+          className: "HotpClub",
+        });
       }
     }
     registerModel(HotpClub);
     registerModel(HotpSponsor);
     registerModel(HotpMember);
-    Associations.hasOne.call(HotpMember, "sponsor", {
-      className: "HotpSponsor",
-      as: "sponsorable",
-    });
-    Associations.hasOne.call(HotpMember, "sponsorClub", {
-      through: "sponsor",
-      source: "club",
-      className: "HotpClub",
-    });
-    Associations.belongsTo.call(HotpSponsor, "club", {
-      className: "HotpClub",
-      foreignKey: "club_id",
-    });
     const club = await HotpClub.create({ name: "Moustache Club" });
     const member = await HotpMember.create({ name: "Groucho" });
     await HotpSponsor.create({
@@ -510,29 +510,29 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
         this.attribute("club_id", "integer");
+        this.belongsTo("club", {
+          className: "HotepClub",
+          foreignKey: "club_id",
+        });
       }
     }
     class HotepMember extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("sponsor", {
+          className: "HotepSponsor",
+          as: "sponsorable",
+        });
+        this.hasOne("sponsorClub", {
+          through: "sponsor",
+          source: "club",
+          className: "HotepClub",
+        });
       }
     }
     registerModel(HotepClub);
     registerModel(HotepSponsor);
     registerModel(HotepMember);
-    Associations.hasOne.call(HotepMember, "sponsor", {
-      className: "HotepSponsor",
-      as: "sponsorable",
-    });
-    Associations.hasOne.call(HotepMember, "sponsorClub", {
-      through: "sponsor",
-      source: "club",
-      className: "HotepClub",
-    });
-    Associations.belongsTo.call(HotepSponsor, "club", {
-      className: "HotepClub",
-      foreignKey: "club_id",
-    });
     const club = await HotepClub.create({ name: "Polymorphic Eager Club" });
     const member = await HotepMember.create({ name: "Groucho" });
     await HotepSponsor.create({
@@ -558,38 +558,39 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("member_id", "integer");
         this.attribute("club_id", "integer");
         this.attribute("favorite", "boolean");
+        this.belongsTo("club", {
+          className: "CeClub",
+          foreignKey: "club_id",
+        });
       }
     }
     class CeMember extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("membership", {
+          className: "CeMembership",
+          foreignKey: "member_id",
+        });
+        this.hasOne("favoriteClub", {
+          className: "CeClub",
+          through: "membership",
+          source: "club",
+          scope: (rel: any) => rel.where({ ce_memberships: { favorite: true } }),
+        });
+        this.hasOne("hairyClub", {
+          className: "CeClub",
+          through: "membership",
+          source: "club",
+          scope: (rel: any) =>
+            rel.where({ ce_clubs: { name: "Moustache and Eyebrow Fancier Club" } }),
+        });
       }
     }
     registerModel(CeClub);
     registerModel(CeMembership);
     registerModel(CeMember);
-    Associations.hasOne.call(CeMember, "membership", {
-      className: "CeMembership",
-      foreignKey: "member_id",
-    });
-    Associations.belongsTo.call(CeMembership, "club", {
-      className: "CeClub",
-      foreignKey: "club_id",
-    });
     // conditions on the through table
-    Associations.hasOne.call(CeMember, "favoriteClub", {
-      className: "CeClub",
-      through: "membership",
-      source: "club",
-      scope: (rel: any) => rel.where({ ce_memberships: { favorite: true } }),
-    });
     // conditions on the source table
-    Associations.hasOne.call(CeMember, "hairyClub", {
-      className: "CeClub",
-      through: "membership",
-      source: "club",
-      scope: (rel: any) => rel.where({ ce_clubs: { name: "Moustache and Eyebrow Fancier Club" } }),
-    });
 
     const club = await CeClub.create({ name: "Moustache and Eyebrow Fancier Club" });
     const member = await CeMember.create({ name: "Groucho" });
@@ -624,6 +625,13 @@ describe("HasOneThroughAssociationsTest", () => {
     class StClub extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("sponsor", { className: "StSponsor", foreignKey: "club_id" });
+        this.hasOne("sponsoredMember", {
+          className: "StMember",
+          through: "sponsor",
+          source: "sponsorable",
+          sourceType: "StMember",
+        });
       }
     }
     class StSponsor extends Base {
@@ -631,6 +639,7 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("club_id", "integer");
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
+        this.belongsTo("sponsorable", { polymorphic: true });
       }
     }
     class StMember extends Base {
@@ -647,14 +656,6 @@ describe("HasOneThroughAssociationsTest", () => {
     registerModel(StSponsor);
     registerModel(StMember);
     registerModel(StOrg);
-    Associations.hasOne.call(StClub, "sponsor", { className: "StSponsor", foreignKey: "club_id" });
-    Associations.hasOne.call(StClub, "sponsoredMember", {
-      className: "StMember",
-      through: "sponsor",
-      source: "sponsorable",
-      sourceType: "StMember",
-    });
-    Associations.belongsTo.call(StSponsor, "sponsorable", { polymorphic: true });
 
     const memberClub = await StClub.create({ name: "Moustache Club" });
     const member = await StMember.create({ name: "Groucho" });
@@ -685,6 +686,13 @@ describe("HasOneThroughAssociationsTest", () => {
     class EsClub extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("sponsor", { className: "EsSponsor", foreignKey: "club_id" });
+        this.hasOne("sponsoredMember", {
+          className: "EsMember",
+          through: "sponsor",
+          source: "sponsorable",
+          sourceType: "EsMember",
+        });
       }
     }
     class EsSponsor extends Base {
@@ -692,6 +700,7 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("club_id", "integer");
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
+        this.belongsTo("sponsorable", { polymorphic: true });
       }
     }
     class EsMember extends Base {
@@ -708,14 +717,6 @@ describe("HasOneThroughAssociationsTest", () => {
     registerModel(EsSponsor);
     registerModel(EsMember);
     registerModel(EsOrg);
-    Associations.hasOne.call(EsClub, "sponsor", { className: "EsSponsor", foreignKey: "club_id" });
-    Associations.hasOne.call(EsClub, "sponsoredMember", {
-      className: "EsMember",
-      through: "sponsor",
-      source: "sponsorable",
-      sourceType: "EsMember",
-    });
-    Associations.belongsTo.call(EsSponsor, "sponsorable", { polymorphic: true });
 
     const memberClub = await EsClub.create({ name: "Moustache Club" });
     const member = await EsMember.create({ name: "Groucho" });
@@ -794,26 +795,26 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
         this.attribute("club_id", "integer");
+        this.belongsTo("sponsorClub", {
+          className: "NpClub",
+          foreignKey: "club_id",
+        });
       }
     }
     class NpMember extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("sponsor", { className: "NpSponsor", as: "sponsorable" });
+        this.hasOne("sponsorClub", {
+          through: "sponsor",
+          source: "sponsorClub",
+          className: "NpClub",
+        });
       }
     }
     registerModel(NpClub);
     registerModel(NpSponsor);
     registerModel(NpMember);
-    Associations.hasOne.call(NpMember, "sponsor", { className: "NpSponsor", as: "sponsorable" });
-    Associations.hasOne.call(NpMember, "sponsorClub", {
-      through: "sponsor",
-      source: "sponsorClub",
-      className: "NpClub",
-    });
-    Associations.belongsTo.call(NpSponsor, "sponsorClub", {
-      className: "NpClub",
-      foreignKey: "club_id",
-    });
     const club = await NpClub.create({ name: "Eager Club" });
     const member = await NpMember.create({ name: "Groucho Marx" });
     await NpSponsor.create({
@@ -849,26 +850,26 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
         this.attribute("club_id", "integer");
+        this.belongsTo("sponsorClub", {
+          className: "NpmClub",
+          foreignKey: "club_id",
+        });
       }
     }
     class NpmMember extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("sponsor", { className: "NpmSponsor", as: "sponsorable" });
+        this.hasOne("sponsorClub", {
+          through: "sponsor",
+          source: "sponsorClub",
+          className: "NpmClub",
+        });
       }
     }
     registerModel(NpmClub);
     registerModel(NpmSponsor);
     registerModel(NpmMember);
-    Associations.hasOne.call(NpmMember, "sponsor", { className: "NpmSponsor", as: "sponsorable" });
-    Associations.hasOne.call(NpmMember, "sponsorClub", {
-      through: "sponsor",
-      source: "sponsorClub",
-      className: "NpmClub",
-    });
-    Associations.belongsTo.call(NpmSponsor, "sponsorClub", {
-      className: "NpmClub",
-      foreignKey: "club_id",
-    });
     const club = await NpmClub.create({ name: "Boring Club" });
     const outrageous = await NpmClub.create({ name: "Outrageous Club" });
     const member = await NpmMember.create({ name: "Groucho Marx" });
@@ -1083,6 +1084,10 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("speedometer_id", "string");
         this.attribute("name", "string");
         this.attribute("dashboard_id", "string");
+        this.belongsTo("dashboard", {
+          className: "MvDashboard",
+          foreignKey: "dashboard_id",
+        });
       }
     }
     class MvMinivan extends Base {
@@ -1092,24 +1097,20 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("minivan_id", "string");
         this.attribute("name", "string");
         this.attribute("speedometer_id", "string");
+        this.belongsTo("speedometer", {
+          className: "MvSpeedometer",
+          foreignKey: "speedometer_id",
+        });
+        this.hasOne("dashboard", {
+          className: "MvDashboard",
+          through: "speedometer",
+          source: "dashboard",
+        });
       }
     }
     registerModel(MvDashboard);
     registerModel(MvSpeedometer);
     registerModel(MvMinivan);
-    Associations.belongsTo.call(MvSpeedometer, "dashboard", {
-      className: "MvDashboard",
-      foreignKey: "dashboard_id",
-    });
-    Associations.belongsTo.call(MvMinivan, "speedometer", {
-      className: "MvSpeedometer",
-      foreignKey: "speedometer_id",
-    });
-    Associations.hasOne.call(MvMinivan, "dashboard", {
-      className: "MvDashboard",
-      through: "speedometer",
-      source: "dashboard",
-    });
 
     await MvDashboard.create({ dashboard_id: "d1", name: "my_dashboard" });
     await MvSpeedometer.create({
@@ -1303,18 +1304,18 @@ describe("HasOneThroughAssociationsTest", () => {
     class ManyMember extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("memberships", {
+          className: "Membership",
+          foreignKey: "member_id",
+        });
+        this.hasOne("clubThroughMany", {
+          className: "Club",
+          through: "memberships",
+          source: "club",
+        });
       }
     }
     registerModel(ManyMember);
-    Associations.hasMany.call(ManyMember, "memberships", {
-      className: "Membership",
-      foreignKey: "member_id",
-    });
-    Associations.hasOne.call(ManyMember, "clubThroughMany", {
-      className: "Club",
-      through: "memberships",
-      source: "club",
-    });
     const rec = new ManyMember({ name: "Test" });
     // Accessing the through-collection association should raise
     expect(() => rec.association("clubThroughMany")).toThrow(
@@ -1333,15 +1334,15 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("name", "string");
         this.attribute("admittable_id", "integer");
         this.attribute("admittable_type", "string");
+        this.belongsTo("admittable", { polymorphic: true });
+        this.hasOne("premiumClub", {
+          through: "admittable",
+          className: "PaClub",
+        });
       }
     }
     registerModel(PaClub);
     registerModel(PaMember);
-    Associations.belongsTo.call(PaMember, "admittable", { polymorphic: true });
-    Associations.hasOne.call(PaMember, "premiumClub", {
-      through: "admittable",
-      className: "PaClub",
-    });
     const member = new PaMember({ name: "Groucho" });
     expect(() => member.association("premiumClub")).toThrow(
       HasOneAssociationPolymorphicThroughError,
@@ -1508,6 +1509,10 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
+        this.hasMany("cpkMembership3s", {
+          foreignKey: ["cpk_club_region_id", "cpk_club_id"],
+          className: "CpkMembership3",
+        });
       }
     }
     class CpkMembership3 extends Base {
@@ -1518,10 +1523,6 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("member_name", "string");
       }
     }
-    Associations.hasMany.call(CpkClub, "cpkMembership3s", {
-      foreignKey: ["cpk_club_region_id", "cpk_club_id"],
-      className: "CpkMembership3",
-    });
     registerModel("CpkClub", CpkClub);
     registerModel("CpkMembership3", CpkMembership3);
     // Unpersisted owner — PK values are null
@@ -1541,6 +1542,10 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
+        this.hasOne("cpkMembership2", {
+          foreignKey: ["cpk_club2_region_id", "cpk_club2_id"],
+          className: "CpkMembership2",
+        });
       }
     }
     class CpkMembership2 extends Base {
@@ -1550,10 +1555,6 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("cpk_club2_id", "integer");
       }
     }
-    Associations.hasOne.call(CpkClub2, "cpkMembership2", {
-      foreignKey: ["cpk_club2_region_id", "cpk_club2_id"],
-      className: "CpkMembership2",
-    });
     registerModel("CpkClub2", CpkClub2);
     registerModel("CpkMembership2", CpkMembership2);
     const club = await CpkClub2.create({ region_id: 1, id: 1, name: "Club" });

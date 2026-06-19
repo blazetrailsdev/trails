@@ -10,7 +10,7 @@ import {
   AssociationNotFoundError,
   EagerLoadPolymorphicError,
 } from "../index.js";
-import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
+import { association, loadHasMany, loadHasManyThrough } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -402,6 +402,14 @@ class SgPost extends Base {
   static {
     this.attribute("title", "string");
     this.attribute("sg_author_id", "integer");
+    this.belongsTo("author", {
+      className: "SgAuthor",
+      foreignKey: "sg_author_id",
+    });
+    this.hasOne("firstComment", {
+      className: "SgComment",
+      foreignKey: "sg_post_id",
+    });
   }
 }
 class SgMembership extends Base {
@@ -413,34 +421,26 @@ class SgMember extends Base {
   static {
     this.attribute("name", "string");
     this.attribute("sg_post_id", "integer");
+    this.belongsTo("post", { className: "SgPost", foreignKey: "sg_post_id" });
   }
 }
 class SgOrganization extends Base {
   static {
     this.attribute("name", "string");
     this.attribute("sg_membership_id", "integer");
+    this.belongsTo("membership", {
+      className: "SgMembership",
+      foreignKey: "sg_membership_id",
+    });
   }
 }
 class SgSponsor extends Base {
   static {
     this.attribute("sponsorable_id", "integer");
     this.attribute("sponsorable_type", "string");
+    this.belongsTo("sponsorable", { polymorphic: true });
   }
 }
-Associations.belongsTo.call(SgPost, "author", {
-  className: "SgAuthor",
-  foreignKey: "sg_author_id",
-});
-Associations.hasOne.call(SgPost, "firstComment", {
-  className: "SgComment",
-  foreignKey: "sg_post_id",
-});
-Associations.belongsTo.call(SgMember, "post", { className: "SgPost", foreignKey: "sg_post_id" });
-Associations.belongsTo.call(SgOrganization, "membership", {
-  className: "SgMembership",
-  foreignKey: "sg_membership_id",
-});
-Associations.belongsTo.call(SgSponsor, "sponsorable", { polymorphic: true });
 
 function registerSponsorableModels(): void {
   registerModel("SgAuthor", SgAuthor);
@@ -477,6 +477,10 @@ describe("EagerAssociationTest", () => {
     class EagerInvParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerInvChildren", {
+          className: "EagerInvChild",
+          foreignKey: "eager_inv_parent_id",
+        });
       }
     }
     class EagerInvChild extends Base {
@@ -485,10 +489,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_inv_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerInvParent, "eagerInvChildren", {
-      className: "EagerInvChild",
-      foreignKey: "eager_inv_parent_id",
-    });
     registerModel("EagerInvParent", EagerInvParent);
     registerModel("EagerInvChild", EagerInvChild);
 
@@ -505,6 +505,10 @@ describe("EagerAssociationTest", () => {
     class EagerOrPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerOrComments", {
+          className: "EagerOrComment",
+          foreignKey: "eager_or_post_id",
+        });
       }
     }
     class EagerOrComment extends Base {
@@ -513,10 +517,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_or_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerOrPost, "eagerOrComments", {
-      className: "EagerOrComment",
-      foreignKey: "eager_or_post_id",
-    });
     registerModel("EagerOrPost", EagerOrPost);
     registerModel("EagerOrComment", EagerOrComment);
 
@@ -562,6 +562,10 @@ describe("EagerAssociationTest", () => {
     class EagerPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerComments", {
+          className: "EagerComment",
+          foreignKey: "eager_post_id",
+        });
       }
     }
     class EagerComment extends Base {
@@ -570,10 +574,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerPost, "eagerComments", {
-      className: "EagerComment",
-      foreignKey: "eager_post_id",
-    });
     registerModel("EagerPost", EagerPost);
     registerModel("EagerComment", EagerComment);
 
@@ -592,6 +592,10 @@ describe("EagerAssociationTest", () => {
     class EagerOrderPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerOrderComments", {
+          className: "EagerOrderComment",
+          foreignKey: "eager_order_post_id",
+        });
       }
     }
     class EagerOrderComment extends Base {
@@ -600,10 +604,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_order_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerOrderPost, "eagerOrderComments", {
-      className: "EagerOrderComment",
-      foreignKey: "eager_order_post_id",
-    });
     registerModel("EagerOrderPost", EagerOrderPost);
     registerModel("EagerOrderComment", EagerOrderComment);
 
@@ -620,12 +620,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtAuthorships", {
+          className: "EagerHmtAuthorship",
+          foreignKey: "eager_hmt_author_id",
+        });
+        this.hasMany("eagerHmtBooks", {
+          through: "eagerHmtAuthorships",
+          source: "eagerHmtBook",
+          className: "EagerHmtBook",
+        });
       }
     }
     class EagerHmtAuthorship extends Base {
       static {
         this.attribute("eager_hmt_author_id", "integer");
         this.attribute("eager_hmt_book_id", "integer");
+        this.belongsTo("eagerHmtBook", {
+          className: "EagerHmtBook",
+          foreignKey: "eager_hmt_book_id",
+        });
       }
     }
     class EagerHmtBook extends Base {
@@ -633,20 +646,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtAuthor, "eagerHmtAuthorships", {
-      className: "EagerHmtAuthorship",
-      foreignKey: "eager_hmt_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtAuthor, "eagerHmtBooks", {
-      through: "eagerHmtAuthorships",
-      source: "eagerHmtBook",
-      className: "EagerHmtBook",
-    });
-    Associations.belongsTo.call(EagerHmtAuthorship, "eagerHmtBook", {
-      className: "EagerHmtBook",
-      foreignKey: "eager_hmt_book_id",
-    });
     registerModel("EagerHmtAuthor", EagerHmtAuthor);
     registerModel("EagerHmtAuthorship", EagerHmtAuthorship);
     registerModel("EagerHmtBook", EagerHmtBook);
@@ -674,6 +674,10 @@ describe("EagerAssociationTest", () => {
     class EagerHoRefParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("eagerHoRefChild", {
+          className: "EagerHoRefChild",
+          foreignKey: "eager_ho_ref_parent_id",
+        });
       }
     }
     class EagerHoRefChild extends Base {
@@ -682,10 +686,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ho_ref_parent_id", "integer");
       }
     }
-    Associations.hasOne.call(EagerHoRefParent, "eagerHoRefChild", {
-      className: "EagerHoRefChild",
-      foreignKey: "eager_ho_ref_parent_id",
-    });
     registerModel("EagerHoRefParent", EagerHoRefParent);
     registerModel("EagerHoRefChild", EagerHoRefChild);
 
@@ -707,6 +707,10 @@ describe("EagerAssociationTest", () => {
     class EagerHoNoPkParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("eagerHoNoPkChild", {
+          className: "EagerHoNoPkChild",
+          foreignKey: "eager_ho_no_pk_parent_id",
+        });
       }
     }
     class EagerHoNoPkChild extends Base {
@@ -718,10 +722,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ho_no_pk_parent_id", "integer");
       }
     }
-    Associations.hasOne.call(EagerHoNoPkParent, "eagerHoNoPkChild", {
-      className: "EagerHoNoPkChild",
-      foreignKey: "eager_ho_no_pk_parent_id",
-    });
     registerModel("EagerHoNoPkParent", EagerHoNoPkParent);
     registerModel("EagerHoNoPkChild", EagerHoNoPkChild);
 
@@ -740,6 +740,10 @@ describe("EagerAssociationTest", () => {
     class EagerHmNoPkParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmNoPkChildren", {
+          className: "EagerHmNoPkChild",
+          foreignKey: "eager_hm_no_pk_parent_id",
+        });
       }
     }
     class EagerHmNoPkChild extends Base {
@@ -752,10 +756,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_hm_no_pk_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerHmNoPkParent, "eagerHmNoPkChildren", {
-      className: "EagerHmNoPkChild",
-      foreignKey: "eager_hm_no_pk_parent_id",
-    });
     registerModel("EagerHmNoPkParent", EagerHmNoPkParent);
     registerModel("EagerHmNoPkChild", EagerHmNoPkChild);
 
@@ -797,6 +797,10 @@ describe("EagerAssociationTest", () => {
     class EagerDupParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerDupChildren", {
+          className: "EagerDupChild",
+          foreignKey: "eager_dup_parent_id",
+        });
       }
     }
     class EagerDupChild extends Base {
@@ -805,10 +809,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_dup_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerDupParent, "eagerDupChildren", {
-      className: "EagerDupChild",
-      foreignKey: "eager_dup_parent_id",
-    });
     registerModel("EagerDupParent", EagerDupParent);
     registerModel("EagerDupChild", EagerDupChild);
 
@@ -831,12 +831,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("eager_dup_author_id", "integer");
+        this.belongsTo("eagerDupAuthor", {
+          className: "EagerDupAuthor",
+          foreignKey: "eager_dup_author_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerDupPost, "eagerDupAuthor", {
-      className: "EagerDupAuthor",
-      foreignKey: "eager_dup_author_id",
-    });
     registerModel("EagerDupAuthor", EagerDupAuthor);
     registerModel("EagerDupPost", EagerDupPost);
 
@@ -863,12 +863,12 @@ describe("EagerAssociationTest", () => {
     class EagerArticle extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerTags", {
+          className: "EagerTag",
+          foreignKey: "eager_article_id",
+        });
       }
     }
-    Associations.hasMany.call(EagerArticle, "eagerTags", {
-      className: "EagerTag",
-      foreignKey: "eager_article_id",
-    });
     registerModel("EagerTag", EagerTag);
     registerModel("EagerArticle", EagerArticle);
 
@@ -885,6 +885,10 @@ describe("EagerAssociationTest", () => {
     class EagerHoParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("eagerHoChild", {
+          className: "EagerHoChild",
+          foreignKey: "eager_ho_parent_id",
+        });
       }
     }
     class EagerHoChild extends Base {
@@ -893,10 +897,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ho_parent_id", "integer");
       }
     }
-    Associations.hasOne.call(EagerHoParent, "eagerHoChild", {
-      className: "EagerHoChild",
-      foreignKey: "eager_ho_parent_id",
-    });
     registerModel("EagerHoParent", EagerHoParent);
     registerModel("EagerHoChild", EagerHoChild);
 
@@ -921,12 +921,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("value", "string");
         this.attribute("eager_bt_parent_id", "integer");
+        this.belongsTo("eagerBtParent", {
+          className: "EagerBtParent",
+          foreignKey: "eager_bt_parent_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerBtChild, "eagerBtParent", {
-      className: "EagerBtParent",
-      foreignKey: "eager_bt_parent_id",
-    });
     registerModel("EagerBtParent", EagerBtParent);
     registerModel("EagerBtChild", EagerBtChild);
 
@@ -951,12 +951,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("value", "string");
         this.attribute("eager_null_parent_id", "integer");
+        this.belongsTo("eagerNullParent", {
+          className: "EagerNullParent",
+          foreignKey: "eager_null_parent_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerNullChild, "eagerNullParent", {
-      className: "EagerNullParent",
-      foreignKey: "eager_null_parent_id",
-    });
     registerModel("EagerNullParent", EagerNullParent);
     registerModel("EagerNullChild", EagerNullChild);
 
@@ -977,10 +977,10 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
         this.attribute("parent_type", "string");
+        this.belongsTo("parent", { polymorphic: true });
       }
     }
     registerModel(EagerPolyChild);
-    Associations.belongsTo.call(EagerPolyChild, "parent", { polymorphic: true });
     await EagerPolyChild.create({
       name: "orphan",
       parent_id: null as any,
@@ -997,10 +997,10 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
         this.attribute("parent_type", "string");
+        this.belongsTo("parent", { polymorphic: true });
       }
     }
     registerModel(EagerPolyChild2);
-    Associations.belongsTo.call(EagerPolyChild2, "parent", { polymorphic: true });
     await EagerPolyChild2.create({ name: "empty_type", parent_id: 1, parent_type: "" });
     const results = await EagerPolyChild2.all().includes("parent").toArray();
     expect(results).toHaveLength(1);
@@ -1018,12 +1018,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("eager_author_id", "integer");
+        this.belongsTo("eagerAuthor", {
+          className: "EagerAuthor",
+          foreignKey: "eager_author_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerBook, "eagerAuthor", {
-      className: "EagerAuthor",
-      foreignKey: "eager_author_id",
-    });
     registerModel("EagerAuthor", EagerAuthor);
     registerModel("EagerBook", EagerBook);
 
@@ -1046,12 +1046,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("eager_nl_author_id", "integer");
+        this.belongsTo("author", {
+          className: "EagerNlAuthor",
+          foreignKey: "eager_nl_author_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerNlPost, "author", {
-      className: "EagerNlAuthor",
-      foreignKey: "eager_nl_author_id",
-    });
     registerModel("EagerNlAuthor", EagerNlAuthor);
     registerModel("EagerNlPost", EagerNlPost);
     // author is null → the nested `nonExisting` branch has no source records (eager_test.rb:380).
@@ -1068,6 +1068,10 @@ describe("EagerAssociationTest", () => {
     class EagerTlPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("comments", {
+          className: "EagerTlComment",
+          foreignKey: "eager_tl_post_id",
+        });
       }
     }
     class EagerTlComment extends Base {
@@ -1075,16 +1079,12 @@ describe("EagerAssociationTest", () => {
         this.attribute("body", "string");
         this.attribute("eager_tl_post_id", "integer");
         this.attribute("eager_tl_author_id", "integer");
+        this.belongsTo("author", {
+          className: "EagerTlAuthor",
+          foreignKey: "eager_tl_author_id",
+        });
       }
     }
-    Associations.hasMany.call(EagerTlPost, "comments", {
-      className: "EagerTlComment",
-      foreignKey: "eager_tl_post_id",
-    });
-    Associations.belongsTo.call(EagerTlComment, "author", {
-      className: "EagerTlAuthor",
-      foreignKey: "eager_tl_author_id",
-    });
     registerModel("EagerTlAuthor", EagerTlAuthor);
     registerModel("EagerTlPost", EagerTlPost);
     registerModel("EagerTlComment", EagerTlComment);
@@ -1104,6 +1104,10 @@ describe("EagerAssociationTest", () => {
     class NestHoAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("nestHoPost", {
+          className: "NestHoPost",
+          foreignKey: "nest_ho_author_id",
+        });
       }
     }
     class NestHoPost extends Base {
@@ -1112,10 +1116,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("nest_ho_author_id", "integer");
       }
     }
-    Associations.hasOne.call(NestHoAuthor, "nestHoPost", {
-      className: "NestHoPost",
-      foreignKey: "nest_ho_author_id",
-    });
     registerModel("NestHoAuthor", NestHoAuthor);
     registerModel("NestHoPost", NestHoPost);
 
@@ -1131,6 +1131,10 @@ describe("EagerAssociationTest", () => {
     class NestHoOrdAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("nestHoOrdPost", {
+          className: "NestHoOrdPost",
+          foreignKey: "nest_ho_ord_author_id",
+        });
       }
     }
     class NestHoOrdPost extends Base {
@@ -1139,10 +1143,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("nest_ho_ord_author_id", "integer");
       }
     }
-    Associations.hasOne.call(NestHoOrdAuthor, "nestHoOrdPost", {
-      className: "NestHoOrdPost",
-      foreignKey: "nest_ho_ord_author_id",
-    });
     registerModel("NestHoOrdAuthor", NestHoOrdAuthor);
     registerModel("NestHoOrdPost", NestHoOrdPost);
 
@@ -1161,6 +1161,10 @@ describe("EagerAssociationTest", () => {
     class NestHoOaAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("nestHoOaPost", {
+          className: "NestHoOaPost",
+          foreignKey: "nest_ho_oa_author_id",
+        });
       }
     }
     class NestHoOaPost extends Base {
@@ -1169,10 +1173,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("nest_ho_oa_author_id", "integer");
       }
     }
-    Associations.hasOne.call(NestHoOaAuthor, "nestHoOaPost", {
-      className: "NestHoOaPost",
-      foreignKey: "nest_ho_oa_author_id",
-    });
     registerModel("NestHoOaAuthor", NestHoOaAuthor);
     registerModel("NestHoOaPost", NestHoOaPost);
 
@@ -1191,6 +1191,10 @@ describe("EagerAssociationTest", () => {
     class NestHoOnAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("nestHoOnPost", {
+          className: "NestHoOnPost",
+          foreignKey: "nest_ho_on_author_id",
+        });
       }
     }
     class NestHoOnPost extends Base {
@@ -1199,10 +1203,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("nest_ho_on_author_id", "integer");
       }
     }
-    Associations.hasOne.call(NestHoOnAuthor, "nestHoOnPost", {
-      className: "NestHoOnPost",
-      foreignKey: "nest_ho_on_author_id",
-    });
     registerModel("NestHoOnAuthor", NestHoOnAuthor);
     registerModel("NestHoOnPost", NestHoOnPost);
 
@@ -1221,6 +1221,10 @@ describe("EagerAssociationTest", () => {
     class NestHoCAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("nestHoCPost", {
+          className: "NestHoCPost",
+          foreignKey: "nest_ho_c_author_id",
+        });
       }
     }
     class NestHoCPost extends Base {
@@ -1229,10 +1233,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("nest_ho_c_author_id", "integer");
       }
     }
-    Associations.hasOne.call(NestHoCAuthor, "nestHoCPost", {
-      className: "NestHoCPost",
-      foreignKey: "nest_ho_c_author_id",
-    });
     registerModel("NestHoCAuthor", NestHoCAuthor);
     registerModel("NestHoCPost", NestHoCPost);
 
@@ -1251,6 +1251,10 @@ describe("EagerAssociationTest", () => {
     class NestHoCaAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("nestHoCaPost", {
+          className: "NestHoCaPost",
+          foreignKey: "nest_ho_ca_author_id",
+        });
       }
     }
     class NestHoCaPost extends Base {
@@ -1259,10 +1263,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("nest_ho_ca_author_id", "integer");
       }
     }
-    Associations.hasOne.call(NestHoCaAuthor, "nestHoCaPost", {
-      className: "NestHoCaPost",
-      foreignKey: "nest_ho_ca_author_id",
-    });
     registerModel("NestHoCaAuthor", NestHoCaAuthor);
     registerModel("NestHoCaPost", NestHoCaPost);
 
@@ -1281,6 +1281,10 @@ describe("EagerAssociationTest", () => {
     class NestHoCnAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("nestHoCnPost", {
+          className: "NestHoCnPost",
+          foreignKey: "nest_ho_cn_author_id",
+        });
       }
     }
     class NestHoCnPost extends Base {
@@ -1289,10 +1293,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("nest_ho_cn_author_id", "integer");
       }
     }
-    Associations.hasOne.call(NestHoCnAuthor, "nestHoCnPost", {
-      className: "NestHoCnPost",
-      foreignKey: "nest_ho_cn_author_id",
-    });
     registerModel("NestHoCnAuthor", NestHoCnAuthor);
     registerModel("NestHoCnPost", NestHoCnPost);
 
@@ -1318,12 +1318,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("eager_qt_company_id", "integer");
+        this.belongsTo("eagerQtCompany", {
+          className: "EagerQtCompany",
+          foreignKey: "eager_qt_company_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerQtClient, "eagerQtCompany", {
-      className: "EagerQtCompany",
-      foreignKey: "eager_qt_company_id",
-    });
     registerModel("EagerQtCompany", EagerQtCompany);
     registerModel("EagerQtClient", EagerQtClient);
     const co = await EagerQtCompany.create({ name: "Acme" });
@@ -1335,6 +1335,10 @@ describe("EagerAssociationTest", () => {
     class EagerQtHoParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("eagerQtHoChild", {
+          className: "EagerQtHoChild",
+          foreignKey: "eager_qt_ho_parent_id",
+        });
       }
     }
     class EagerQtHoChild extends Base {
@@ -1343,10 +1347,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_qt_ho_parent_id", "integer");
       }
     }
-    Associations.hasOne.call(EagerQtHoParent, "eagerQtHoChild", {
-      className: "EagerQtHoChild",
-      foreignKey: "eager_qt_ho_parent_id",
-    });
     registerModel("EagerQtHoParent", EagerQtHoParent);
     registerModel("EagerQtHoChild", EagerQtHoChild);
     const p = await EagerQtHoParent.create({ name: "P" });
@@ -1358,6 +1358,10 @@ describe("EagerAssociationTest", () => {
     class EagerQtHmParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerQtHmChildren", {
+          className: "EagerQtHmChild",
+          foreignKey: "eager_qt_hm_parent_id",
+        });
       }
     }
     class EagerQtHmChild extends Base {
@@ -1366,10 +1370,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_qt_hm_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerQtHmParent, "eagerQtHmChildren", {
-      className: "EagerQtHmChild",
-      foreignKey: "eager_qt_hm_parent_id",
-    });
     registerModel("EagerQtHmParent", EagerQtHmParent);
     registerModel("EagerQtHmChild", EagerQtHmChild);
     const p = await EagerQtHmParent.create({ name: "P" });
@@ -1381,12 +1381,25 @@ describe("EagerAssociationTest", () => {
     class EagerQtThrOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerQtThrJoins", {
+          className: "EagerQtThrJoin",
+          foreignKey: "eager_qt_thr_owner_id",
+        });
+        this.hasMany("eagerQtThrItems", {
+          className: "EagerQtThrItem",
+          through: "eagerQtThrJoins",
+          source: "eagerQtThrItem",
+        });
       }
     }
     class EagerQtThrJoin extends Base {
       static {
         this.attribute("eager_qt_thr_owner_id", "integer");
         this.attribute("eager_qt_thr_item_id", "integer");
+        this.belongsTo("eagerQtThrItem", {
+          className: "EagerQtThrItem",
+          foreignKey: "eager_qt_thr_item_id",
+        });
       }
     }
     class EagerQtThrItem extends Base {
@@ -1394,20 +1407,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(EagerQtThrOwner, "eagerQtThrJoins", {
-      className: "EagerQtThrJoin",
-      foreignKey: "eager_qt_thr_owner_id",
-    });
 
-    Associations.hasMany.call(EagerQtThrOwner, "eagerQtThrItems", {
-      className: "EagerQtThrItem",
-      through: "eagerQtThrJoins",
-      source: "eagerQtThrItem",
-    });
-    Associations.belongsTo.call(EagerQtThrJoin, "eagerQtThrItem", {
-      className: "EagerQtThrItem",
-      foreignKey: "eager_qt_thr_item_id",
-    });
     registerModel("EagerQtThrOwner", EagerQtThrOwner);
     registerModel("EagerQtThrJoin", EagerQtThrJoin);
     registerModel("EagerQtThrItem", EagerQtThrItem);
@@ -1424,6 +1424,10 @@ describe("EagerAssociationTest", () => {
     class EagerStrParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerStrChildren", {
+          className: "EagerStrChild",
+          foreignKey: "eager_str_parent_id",
+        });
       }
     }
     class EagerStrChild extends Base {
@@ -1432,10 +1436,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_str_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerStrParent, "eagerStrChildren", {
-      className: "EagerStrChild",
-      foreignKey: "eager_str_parent_id",
-    });
     registerModel("EagerStrParent", EagerStrParent);
     registerModel("EagerStrChild", EagerStrChild);
 
@@ -1456,12 +1456,25 @@ describe("EagerAssociationTest", () => {
     class EagerStrThrOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerStrThrJoins", {
+          className: "EagerStrThrJoin",
+          foreignKey: "eager_str_thr_owner_id",
+        });
+        this.hasMany("eagerStrThrItems", {
+          through: "eagerStrThrJoins",
+          source: "eagerStrThrItem",
+          className: "EagerStrThrItem",
+        });
       }
     }
     class EagerStrThrJoin extends Base {
       static {
         this.attribute("eager_str_thr_owner_id", "integer");
         this.attribute("eager_str_thr_item_id", "integer");
+        this.belongsTo("eagerStrThrItem", {
+          className: "EagerStrThrItem",
+          foreignKey: "eager_str_thr_item_id",
+        });
       }
     }
     class EagerStrThrItem extends Base {
@@ -1469,20 +1482,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(EagerStrThrOwner, "eagerStrThrJoins", {
-      className: "EagerStrThrJoin",
-      foreignKey: "eager_str_thr_owner_id",
-    });
 
-    Associations.hasMany.call(EagerStrThrOwner, "eagerStrThrItems", {
-      through: "eagerStrThrJoins",
-      source: "eagerStrThrItem",
-      className: "EagerStrThrItem",
-    });
-    Associations.belongsTo.call(EagerStrThrJoin, "eagerStrThrItem", {
-      className: "EagerStrThrItem",
-      foreignKey: "eager_str_thr_item_id",
-    });
     registerModel("EagerStrThrOwner", EagerStrThrOwner);
     registerModel("EagerStrThrJoin", EagerStrThrJoin);
     registerModel("EagerStrThrItem", EagerStrThrItem);
@@ -1512,12 +1512,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("value", "string");
         this.attribute("eager_str_bt_parent_id", "integer");
+        this.belongsTo("eagerStrBtParent", {
+          className: "EagerStrBtParent",
+          foreignKey: "eager_str_bt_parent_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerStrBtChild, "eagerStrBtParent", {
-      className: "EagerStrBtParent",
-      foreignKey: "eager_str_bt_parent_id",
-    });
     registerModel("EagerStrBtParent", EagerStrBtParent);
     registerModel("EagerStrBtChild", EagerStrBtChild);
 
@@ -1536,6 +1536,10 @@ describe("EagerAssociationTest", () => {
     class EjAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ejPosts", {
+          className: "EjPost",
+          foreignKey: "ej_author_id",
+        });
       }
     }
     class EjPost extends Base {
@@ -1544,10 +1548,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("ej_author_id", "integer");
       }
     }
-    Associations.hasMany.call(EjAuthor, "ejPosts", {
-      className: "EjPost",
-      foreignKey: "ej_author_id",
-    });
     registerModel(EjAuthor);
     registerModel(EjPost);
 
@@ -1579,12 +1579,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("ej_bt_author_id", "integer");
+        this.belongsTo("ejBtAuthor", {
+          className: "EjBtAuthor",
+          foreignKey: "ej_bt_author_id",
+        });
       }
     }
-    Associations.belongsTo.call(EjBtPost, "ejBtAuthor", {
-      className: "EjBtAuthor",
-      foreignKey: "ej_bt_author_id",
-    });
     registerModel(EjBtAuthor);
     registerModel(EjBtPost);
 
@@ -1608,6 +1608,10 @@ describe("EagerAssociationTest", () => {
     class EjHoUser extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("ejHoProfile", {
+          className: "EjHoProfile",
+          foreignKey: "ej_ho_user_id",
+        });
       }
     }
     class EjHoProfile extends Base {
@@ -1616,10 +1620,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("ej_ho_user_id", "integer");
       }
     }
-    Associations.hasOne.call(EjHoUser, "ejHoProfile", {
-      className: "EjHoProfile",
-      foreignKey: "ej_ho_user_id",
-    });
     registerModel(EjHoUser);
     registerModel(EjHoProfile);
 
@@ -1643,6 +1643,10 @@ describe("EagerAssociationTest", () => {
     class EjEmAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ejEmPosts", {
+          className: "EjEmPost",
+          foreignKey: "ej_em_author_id",
+        });
       }
     }
     class EjEmPost extends Base {
@@ -1651,10 +1655,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("ej_em_author_id", "integer");
       }
     }
-    Associations.hasMany.call(EjEmAuthor, "ejEmPosts", {
-      className: "EjEmPost",
-      foreignKey: "ej_em_author_id",
-    });
     registerModel(EjEmAuthor);
     registerModel(EjEmPost);
 
@@ -1671,6 +1671,10 @@ describe("EagerAssociationTest", () => {
     class EjHabtmPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasAndBelongsToMany("ejHabtmCategories", {
+          className: "EjHabtmCategory",
+          joinTable: "ej_habtm_categories_ej_habtm_posts",
+        });
       }
     }
     class EjHabtmCategory extends Base {
@@ -1678,10 +1682,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasAndBelongsToMany.call(EjHabtmPost, "ejHabtmCategories", {
-      className: "EjHabtmCategory",
-      joinTable: "ej_habtm_categories_ej_habtm_posts",
-    });
     registerModel(EjHabtmPost);
     registerModel(EjHabtmCategory);
 
@@ -1716,6 +1716,10 @@ describe("EagerAssociationTest", () => {
     class PrHabtmPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasAndBelongsToMany("prHabtmCategories", {
+          className: "PrHabtmCategory",
+          joinTable: "pr_habtm_categories_pr_habtm_posts",
+        });
       }
     }
     class PrHabtmCategory extends Base {
@@ -1723,10 +1727,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasAndBelongsToMany.call(PrHabtmPost, "prHabtmCategories", {
-      className: "PrHabtmCategory",
-      joinTable: "pr_habtm_categories_pr_habtm_posts",
-    });
     registerModel(PrHabtmPost);
     registerModel(PrHabtmCategory);
 
@@ -1749,12 +1749,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtReader extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtSubscriptions", {
+          className: "EagerHmtSubscription",
+          foreignKey: "eager_hmt_reader_id",
+        });
+        this.hasMany("eagerHmtMagazines", {
+          through: "eagerHmtSubscriptions",
+          source: "eagerHmtMagazine",
+          className: "EagerHmtMagazine",
+        });
       }
     }
     class EagerHmtSubscription extends Base {
       static {
         this.attribute("eager_hmt_reader_id", "integer");
         this.attribute("eager_hmt_magazine_id", "integer");
+        this.belongsTo("eagerHmtMagazine", {
+          className: "EagerHmtMagazine",
+          foreignKey: "eager_hmt_magazine_id",
+        });
       }
     }
     class EagerHmtMagazine extends Base {
@@ -1762,20 +1775,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtReader, "eagerHmtSubscriptions", {
-      className: "EagerHmtSubscription",
-      foreignKey: "eager_hmt_reader_id",
-    });
 
-    Associations.hasMany.call(EagerHmtReader, "eagerHmtMagazines", {
-      through: "eagerHmtSubscriptions",
-      source: "eagerHmtMagazine",
-      className: "EagerHmtMagazine",
-    });
-    Associations.belongsTo.call(EagerHmtSubscription, "eagerHmtMagazine", {
-      className: "EagerHmtMagazine",
-      foreignKey: "eager_hmt_magazine_id",
-    });
     registerModel("EagerHmtReader", EagerHmtReader);
     registerModel("EagerHmtSubscription", EagerHmtSubscription);
     registerModel("EagerHmtMagazine", EagerHmtMagazine);
@@ -1803,12 +1803,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtBtAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtBtPosts", {
+          className: "EagerHmtBtPost",
+          foreignKey: "eager_hmt_bt_author_id",
+        });
+        this.hasMany("eagerHmtBtComments", {
+          through: "eagerHmtBtPosts",
+          source: "eagerHmtBtComment",
+          className: "EagerHmtBtComment",
+        });
       }
     }
     class EagerHmtBtPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("eager_hmt_bt_author_id", "integer");
+        this.hasMany("eagerHmtBtComment", {
+          className: "EagerHmtBtComment",
+          foreignKey: "eager_hmt_bt_post_id",
+        });
       }
     }
     class EagerHmtBtComment extends Base {
@@ -1817,20 +1830,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_hmt_bt_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerHmtBtAuthor, "eagerHmtBtPosts", {
-      className: "EagerHmtBtPost",
-      foreignKey: "eager_hmt_bt_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtBtAuthor, "eagerHmtBtComments", {
-      through: "eagerHmtBtPosts",
-      source: "eagerHmtBtComment",
-      className: "EagerHmtBtComment",
-    });
-    Associations.hasMany.call(EagerHmtBtPost, "eagerHmtBtComment", {
-      className: "EagerHmtBtComment",
-      foreignKey: "eager_hmt_bt_post_id",
-    });
     registerModel("EagerHmtBtAuthor", EagerHmtBtAuthor);
     registerModel("EagerHmtBtPost", EagerHmtBtPost);
     registerModel("EagerHmtBtComment", EagerHmtBtComment);
@@ -1862,6 +1862,15 @@ describe("EagerAssociationTest", () => {
     class EagerStiAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerSpecialPosts", {
+          className: "EagerSpecialPost",
+          foreignKey: "eager_sti_author_id",
+        });
+        this.hasMany("specialPostComments", {
+          className: "EagerStiComment",
+          through: "eagerSpecialPosts",
+          source: "eagerStiComment",
+        });
       }
     }
     class EagerStiPost extends Base {
@@ -1877,6 +1886,10 @@ describe("EagerAssociationTest", () => {
       static {
         registerModel(EagerSpecialPost);
         registerSubclass(EagerSpecialPost);
+        this.hasMany("eagerStiComment", {
+          className: "EagerStiComment",
+          foreignKey: "eager_sti_post_id",
+        });
       }
     }
     class EagerStiComment extends Base {
@@ -1888,20 +1901,6 @@ describe("EagerAssociationTest", () => {
     registerModel(EagerStiAuthor);
     registerModel(EagerStiPost);
     registerModel(EagerStiComment);
-    Associations.hasMany.call(EagerStiAuthor, "eagerSpecialPosts", {
-      className: "EagerSpecialPost",
-      foreignKey: "eager_sti_author_id",
-    });
-
-    Associations.hasMany.call(EagerStiAuthor, "specialPostComments", {
-      className: "EagerStiComment",
-      through: "eagerSpecialPosts",
-      source: "eagerStiComment",
-    });
-    Associations.hasMany.call(EagerSpecialPost, "eagerStiComment", {
-      className: "EagerStiComment",
-      foreignKey: "eager_sti_post_id",
-    });
 
     const author = await EagerStiAuthor.create({ name: "David" });
     const normalPost = await EagerStiPost.create({
@@ -1929,12 +1928,25 @@ describe("EagerAssociationTest", () => {
     class EagerImpOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerImpJoins", {
+          className: "EagerImpJoin",
+          foreignKey: "eager_imp_owner_id",
+        });
+        this.hasMany("eagerImpItems", {
+          className: "EagerImpItem",
+          through: "eagerImpJoins",
+          source: "eagerImpItem",
+        });
       }
     }
     class EagerImpJoin extends Base {
       static {
         this.attribute("eager_imp_owner_id", "integer");
         this.attribute("eager_imp_item_id", "integer");
+        this.belongsTo("eagerImpItem", {
+          className: "EagerImpItem",
+          foreignKey: "eager_imp_item_id",
+        });
       }
     }
     class EagerImpItem extends Base {
@@ -1942,20 +1954,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(EagerImpOwner, "eagerImpJoins", {
-      className: "EagerImpJoin",
-      foreignKey: "eager_imp_owner_id",
-    });
 
-    Associations.hasMany.call(EagerImpOwner, "eagerImpItems", {
-      className: "EagerImpItem",
-      through: "eagerImpJoins",
-      source: "eagerImpItem",
-    });
-    Associations.belongsTo.call(EagerImpJoin, "eagerImpItem", {
-      className: "EagerImpItem",
-      foreignKey: "eager_imp_item_id",
-    });
     registerModel("EagerImpOwner", EagerImpOwner);
     registerModel("EagerImpJoin", EagerImpJoin);
     registerModel("EagerImpItem", EagerImpItem);
@@ -1981,12 +1980,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtCondAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtCondAuthorships", {
+          className: "EagerHmtCondAuthorship",
+          foreignKey: "eager_hmt_cond_author_id",
+        });
+        this.hasMany("eagerHmtCondBooks", {
+          through: "eagerHmtCondAuthorships",
+          source: "eagerHmtCondBook",
+          className: "EagerHmtCondBook",
+        });
       }
     }
     class EagerHmtCondAuthorship extends Base {
       static {
         this.attribute("eager_hmt_cond_author_id", "integer");
         this.attribute("eager_hmt_cond_book_id", "integer");
+        this.belongsTo("eagerHmtCondBook", {
+          className: "EagerHmtCondBook",
+          foreignKey: "eager_hmt_cond_book_id",
+        });
       }
     }
     class EagerHmtCondBook extends Base {
@@ -1994,20 +2006,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtCondAuthor, "eagerHmtCondAuthorships", {
-      className: "EagerHmtCondAuthorship",
-      foreignKey: "eager_hmt_cond_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtCondAuthor, "eagerHmtCondBooks", {
-      through: "eagerHmtCondAuthorships",
-      source: "eagerHmtCondBook",
-      className: "EagerHmtCondBook",
-    });
-    Associations.belongsTo.call(EagerHmtCondAuthorship, "eagerHmtCondBook", {
-      className: "EagerHmtCondBook",
-      foreignKey: "eager_hmt_cond_book_id",
-    });
     registerModel("EagerHmtCondAuthor", EagerHmtCondAuthor);
     registerModel("EagerHmtCondAuthorship", EagerHmtCondAuthorship);
     registerModel("EagerHmtCondBook", EagerHmtCondBook);
@@ -2035,12 +2034,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtTopAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtTopAuthorships", {
+          className: "EagerHmtTopAuthorship",
+          foreignKey: "eager_hmt_top_author_id",
+        });
+        this.hasMany("eagerHmtTopBooks", {
+          through: "eagerHmtTopAuthorships",
+          source: "eagerHmtTopBook",
+          className: "EagerHmtTopBook",
+        });
       }
     }
     class EagerHmtTopAuthorship extends Base {
       static {
         this.attribute("eager_hmt_top_author_id", "integer");
         this.attribute("eager_hmt_top_book_id", "integer");
+        this.belongsTo("eagerHmtTopBook", {
+          className: "EagerHmtTopBook",
+          foreignKey: "eager_hmt_top_book_id",
+        });
       }
     }
     class EagerHmtTopBook extends Base {
@@ -2048,20 +2060,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtTopAuthor, "eagerHmtTopAuthorships", {
-      className: "EagerHmtTopAuthorship",
-      foreignKey: "eager_hmt_top_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtTopAuthor, "eagerHmtTopBooks", {
-      through: "eagerHmtTopAuthorships",
-      source: "eagerHmtTopBook",
-      className: "EagerHmtTopBook",
-    });
-    Associations.belongsTo.call(EagerHmtTopAuthorship, "eagerHmtTopBook", {
-      className: "EagerHmtTopBook",
-      foreignKey: "eager_hmt_top_book_id",
-    });
     registerModel("EagerHmtTopAuthor", EagerHmtTopAuthor);
     registerModel("EagerHmtTopAuthorship", EagerHmtTopAuthorship);
     registerModel("EagerHmtTopBook", EagerHmtTopBook);
@@ -2095,12 +2094,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtIncAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtIncAuthorships", {
+          className: "EagerHmtIncAuthorship",
+          foreignKey: "eager_hmt_inc_author_id",
+        });
+        this.hasMany("eagerHmtIncBooks", {
+          through: "eagerHmtIncAuthorships",
+          source: "eagerHmtIncBook",
+          className: "EagerHmtIncBook",
+        });
       }
     }
     class EagerHmtIncAuthorship extends Base {
       static {
         this.attribute("eager_hmt_inc_author_id", "integer");
         this.attribute("eager_hmt_inc_book_id", "integer");
+        this.belongsTo("eagerHmtIncBook", {
+          className: "EagerHmtIncBook",
+          foreignKey: "eager_hmt_inc_book_id",
+        });
       }
     }
     class EagerHmtIncBook extends Base {
@@ -2108,20 +2120,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtIncAuthor, "eagerHmtIncAuthorships", {
-      className: "EagerHmtIncAuthorship",
-      foreignKey: "eager_hmt_inc_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtIncAuthor, "eagerHmtIncBooks", {
-      through: "eagerHmtIncAuthorships",
-      source: "eagerHmtIncBook",
-      className: "EagerHmtIncBook",
-    });
-    Associations.belongsTo.call(EagerHmtIncAuthorship, "eagerHmtIncBook", {
-      className: "EagerHmtIncBook",
-      foreignKey: "eager_hmt_inc_book_id",
-    });
     registerModel("EagerHmtIncAuthor", EagerHmtIncAuthor);
     registerModel("EagerHmtIncAuthorship", EagerHmtIncAuthorship);
     registerModel("EagerHmtIncBook", EagerHmtIncBook);
@@ -2152,12 +2151,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtCjAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtCjAuthorships", {
+          className: "EagerHmtCjAuthorship",
+          foreignKey: "eager_hmt_cj_author_id",
+        });
+        this.hasMany("eagerHmtCjBooks", {
+          through: "eagerHmtCjAuthorships",
+          source: "eagerHmtCjBook",
+          className: "EagerHmtCjBook",
+        });
       }
     }
     class EagerHmtCjAuthorship extends Base {
       static {
         this.attribute("eager_hmt_cj_author_id", "integer");
         this.attribute("eager_hmt_cj_book_id", "integer");
+        this.belongsTo("eagerHmtCjBook", {
+          className: "EagerHmtCjBook",
+          foreignKey: "eager_hmt_cj_book_id",
+        });
       }
     }
     class EagerHmtCjBook extends Base {
@@ -2165,20 +2177,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtCjAuthor, "eagerHmtCjAuthorships", {
-      className: "EagerHmtCjAuthorship",
-      foreignKey: "eager_hmt_cj_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtCjAuthor, "eagerHmtCjBooks", {
-      through: "eagerHmtCjAuthorships",
-      source: "eagerHmtCjBook",
-      className: "EagerHmtCjBook",
-    });
-    Associations.belongsTo.call(EagerHmtCjAuthorship, "eagerHmtCjBook", {
-      className: "EagerHmtCjBook",
-      foreignKey: "eager_hmt_cj_book_id",
-    });
     registerModel("EagerHmtCjAuthor", EagerHmtCjAuthor);
     registerModel("EagerHmtCjAuthorship", EagerHmtCjAuthorship);
     registerModel("EagerHmtCjBook", EagerHmtCjBook);
@@ -2202,12 +2201,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtDiAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtDiAuthorships", {
+          className: "EagerHmtDiAuthorship",
+          foreignKey: "eager_hmt_di_author_id",
+        });
+        this.hasMany("eagerHmtDiBooks", {
+          through: "eagerHmtDiAuthorships",
+          source: "eagerHmtDiBook",
+          className: "EagerHmtDiBook",
+        });
       }
     }
     class EagerHmtDiAuthorship extends Base {
       static {
         this.attribute("eager_hmt_di_author_id", "integer");
         this.attribute("eager_hmt_di_book_id", "integer");
+        this.belongsTo("eagerHmtDiBook", {
+          className: "EagerHmtDiBook",
+          foreignKey: "eager_hmt_di_book_id",
+        });
       }
     }
     class EagerHmtDiBook extends Base {
@@ -2215,20 +2227,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtDiAuthor, "eagerHmtDiAuthorships", {
-      className: "EagerHmtDiAuthorship",
-      foreignKey: "eager_hmt_di_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtDiAuthor, "eagerHmtDiBooks", {
-      through: "eagerHmtDiAuthorships",
-      source: "eagerHmtDiBook",
-      className: "EagerHmtDiBook",
-    });
-    Associations.belongsTo.call(EagerHmtDiAuthorship, "eagerHmtDiBook", {
-      className: "EagerHmtDiBook",
-      foreignKey: "eager_hmt_di_book_id",
-    });
     registerModel("EagerHmtDiAuthor", EagerHmtDiAuthor);
     registerModel("EagerHmtDiAuthorship", EagerHmtDiAuthorship);
     registerModel("EagerHmtDiBook", EagerHmtDiBook);
@@ -2266,6 +2265,10 @@ describe("EagerAssociationTest", () => {
     class HabtmLimPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasAndBelongsToMany("habtmLimCategories", {
+          className: "HabtmLimCategory",
+          joinTable: "habtm_lim_categories_habtm_lim_posts",
+        });
       }
     }
     class HabtmLimCategory extends Base {
@@ -2273,10 +2276,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasAndBelongsToMany.call(HabtmLimPost, "habtmLimCategories", {
-      className: "HabtmLimCategory",
-      joinTable: "habtm_lim_categories_habtm_lim_posts",
-    });
     registerModel(HabtmLimPost);
     registerModel(HabtmLimCategory);
 
@@ -2317,6 +2316,10 @@ describe("EagerAssociationTest", () => {
     class HabtmEagerPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasAndBelongsToMany("habtmEagerCategories", {
+          className: "HabtmEagerCategory",
+          joinTable: "habtm_eager_categories_habtm_eager_posts",
+        });
       }
     }
     class HabtmEagerCategory extends Base {
@@ -2324,10 +2327,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasAndBelongsToMany.call(HabtmEagerPost, "habtmEagerCategories", {
-      className: "HabtmEagerCategory",
-      joinTable: "habtm_eager_categories_habtm_eager_posts",
-    });
     registerModel(HabtmEagerPost);
     registerModel(HabtmEagerCategory);
 
@@ -2364,6 +2363,10 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
+        this.hasMany("eagerInhClients", {
+          className: "EagerInhClient",
+          foreignKey: "eager_inh_company_id",
+        });
       }
     }
     class EagerInhFirm extends EagerInhCompany {}
@@ -2378,10 +2381,6 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerInhClient", EagerInhClient);
     enableSti(EagerInhCompany);
     registerSubclass(EagerInhFirm);
-    Associations.hasMany.call(EagerInhCompany, "eagerInhClients", {
-      className: "EagerInhClient",
-      foreignKey: "eager_inh_company_id",
-    });
     const firm = await EagerInhFirm.create({ name: "Firm1" });
     await EagerInhClient.create({ name: "Client1", eager_inh_company_id: firm.id });
     const companies = await EagerInhCompany.all().includes("eagerInhClients").toArray();
@@ -2393,6 +2392,10 @@ describe("EagerAssociationTest", () => {
     class EagerHoiParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("eagerHoiProfile", {
+          className: "EagerHoiProfile",
+          foreignKey: "eager_hoi_parent_id",
+        });
       }
     }
     class EagerHoiProfile extends Base {
@@ -2408,10 +2411,6 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerHoiSpecialProfile", EagerHoiSpecialProfile);
     enableSti(EagerHoiProfile);
     registerSubclass(EagerHoiSpecialProfile);
-    Associations.hasOne.call(EagerHoiParent, "eagerHoiProfile", {
-      className: "EagerHoiProfile",
-      foreignKey: "eager_hoi_parent_id",
-    });
     const parent = await EagerHoiParent.create({ name: "P" });
     await EagerHoiSpecialProfile.create({
       bio: "Special",
@@ -2428,6 +2427,10 @@ describe("EagerAssociationTest", () => {
     class EagerHmiAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmiPosts", {
+          className: "EagerHmiPost",
+          foreignKey: "eager_hmi_author_id",
+        });
       }
     }
     class EagerHmiPost extends Base {
@@ -2443,10 +2446,6 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerHmiSpecialPost", EagerHmiSpecialPost);
     enableSti(EagerHmiPost);
     registerSubclass(EagerHmiSpecialPost);
-    Associations.hasMany.call(EagerHmiAuthor, "eagerHmiPosts", {
-      className: "EagerHmiPost",
-      foreignKey: "eager_hmi_author_id",
-    });
     const author = await EagerHmiAuthor.create({ name: "A" });
     await EagerHmiPost.create({ title: "Normal", eager_hmi_author_id: author.id });
     await EagerHmiSpecialPost.create({
@@ -2463,6 +2462,10 @@ describe("EagerAssociationTest", () => {
     class HabtmInhPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasAndBelongsToMany("habtmInhSpecialCategories", {
+          className: "HabtmInhSpecialCategory",
+          joinTable: "habtm_inh_categories_habtm_inh_posts",
+        });
       }
     }
     class HabtmInhCategory extends Base {
@@ -2474,10 +2477,6 @@ describe("EagerAssociationTest", () => {
     class HabtmInhSpecialCategory extends HabtmInhCategory {}
     enableSti(HabtmInhCategory);
     registerSubclass(HabtmInhSpecialCategory);
-    Associations.hasAndBelongsToMany.call(HabtmInhPost, "habtmInhSpecialCategories", {
-      className: "HabtmInhSpecialCategory",
-      joinTable: "habtm_inh_categories_habtm_inh_posts",
-    });
     registerModel(HabtmInhPost);
     registerModel(HabtmInhCategory);
     registerModel(HabtmInhSpecialCategory);
@@ -2537,12 +2536,12 @@ describe("EagerAssociationTest", () => {
     class ExSugPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("tagging", {
+          className: "ExSugTagging",
+          foreignKey: "ex_sug_post_id",
+        });
       }
     }
-    Associations.hasMany.call(ExSugPost, "tagging", {
-      className: "ExSugTagging",
-      foreignKey: "ex_sug_post_id",
-    });
     registerModel("ExSugTagging", ExSugTagging);
     registerModel("ExSugPost", ExSugPost);
 
@@ -2561,12 +2560,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtOrdAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtOrdAuthorships", {
+          className: "EagerHmtOrdAuthorship",
+          foreignKey: "eager_hmt_ord_author_id",
+        });
+        this.hasMany("eagerHmtOrdBooks", {
+          through: "eagerHmtOrdAuthorships",
+          source: "eagerHmtOrdBook",
+          className: "EagerHmtOrdBook",
+        });
       }
     }
     class EagerHmtOrdAuthorship extends Base {
       static {
         this.attribute("eager_hmt_ord_author_id", "integer");
         this.attribute("eager_hmt_ord_book_id", "integer");
+        this.belongsTo("eagerHmtOrdBook", {
+          className: "EagerHmtOrdBook",
+          foreignKey: "eager_hmt_ord_book_id",
+        });
       }
     }
     class EagerHmtOrdBook extends Base {
@@ -2574,20 +2586,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtOrdAuthor, "eagerHmtOrdAuthorships", {
-      className: "EagerHmtOrdAuthorship",
-      foreignKey: "eager_hmt_ord_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtOrdAuthor, "eagerHmtOrdBooks", {
-      through: "eagerHmtOrdAuthorships",
-      source: "eagerHmtOrdBook",
-      className: "EagerHmtOrdBook",
-    });
-    Associations.belongsTo.call(EagerHmtOrdAuthorship, "eagerHmtOrdBook", {
-      className: "EagerHmtOrdBook",
-      foreignKey: "eager_hmt_ord_book_id",
-    });
     registerModel("EagerHmtOrdAuthor", EagerHmtOrdAuthor);
     registerModel("EagerHmtOrdAuthorship", EagerHmtOrdAuthorship);
     registerModel("EagerHmtOrdBook", EagerHmtOrdBook);
@@ -2615,12 +2614,25 @@ describe("EagerAssociationTest", () => {
     class EagerHmtMoAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerHmtMoAuthorships", {
+          className: "EagerHmtMoAuthorship",
+          foreignKey: "eager_hmt_mo_author_id",
+        });
+        this.hasMany("eagerHmtMoBooks", {
+          through: "eagerHmtMoAuthorships",
+          source: "eagerHmtMoBook",
+          className: "EagerHmtMoBook",
+        });
       }
     }
     class EagerHmtMoAuthorship extends Base {
       static {
         this.attribute("eager_hmt_mo_author_id", "integer");
         this.attribute("eager_hmt_mo_book_id", "integer");
+        this.belongsTo("eagerHmtMoBook", {
+          className: "EagerHmtMoBook",
+          foreignKey: "eager_hmt_mo_book_id",
+        });
       }
     }
     class EagerHmtMoBook extends Base {
@@ -2628,20 +2640,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(EagerHmtMoAuthor, "eagerHmtMoAuthorships", {
-      className: "EagerHmtMoAuthorship",
-      foreignKey: "eager_hmt_mo_author_id",
-    });
 
-    Associations.hasMany.call(EagerHmtMoAuthor, "eagerHmtMoBooks", {
-      through: "eagerHmtMoAuthorships",
-      source: "eagerHmtMoBook",
-      className: "EagerHmtMoBook",
-    });
-    Associations.belongsTo.call(EagerHmtMoAuthorship, "eagerHmtMoBook", {
-      className: "EagerHmtMoBook",
-      foreignKey: "eager_hmt_mo_book_id",
-    });
     registerModel("EagerHmtMoAuthor", EagerHmtMoAuthor);
     registerModel("EagerHmtMoAuthorship", EagerHmtMoAuthorship);
     registerModel("EagerHmtMoBook", EagerHmtMoBook);
@@ -2676,6 +2675,10 @@ describe("EagerAssociationTest", () => {
     class EagerDsPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerDsComments", {
+          className: "EagerDsComment",
+          foreignKey: "eager_ds_post_id",
+        });
       }
     }
     class EagerDsComment extends Base {
@@ -2684,10 +2687,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ds_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerDsPost, "eagerDsComments", {
-      className: "EagerDsComment",
-      foreignKey: "eager_ds_post_id",
-    });
     registerModel("EagerDsPost", EagerDsPost);
     registerModel("EagerDsComment", EagerDsComment);
     const post = await EagerDsPost.create({ title: "P" });
@@ -2699,6 +2698,10 @@ describe("EagerAssociationTest", () => {
     class EagerDsCmPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerDsCmComments", {
+          className: "EagerDsCmComment",
+          foreignKey: "eager_ds_cm_post_id",
+        });
       }
     }
     class EagerDsCmComment extends Base {
@@ -2707,10 +2710,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ds_cm_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerDsCmPost, "eagerDsCmComments", {
-      className: "EagerDsCmComment",
-      foreignKey: "eager_ds_cm_post_id",
-    });
     registerModel("EagerDsCmPost", EagerDsCmPost);
     registerModel("EagerDsCmComment", EagerDsCmComment);
     const post = await EagerDsCmPost.create({ title: "P" });
@@ -2744,6 +2743,10 @@ describe("EagerAssociationTest", () => {
     class EagerDsLPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerDsLComments", {
+          className: "EagerDsLComment",
+          foreignKey: "eager_ds_l_post_id",
+        });
       }
     }
     class EagerDsLComment extends Base {
@@ -2752,10 +2755,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ds_l_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerDsLPost, "eagerDsLComments", {
-      className: "EagerDsLComment",
-      foreignKey: "eager_ds_l_post_id",
-    });
     registerModel("EagerDsLPost", EagerDsLPost);
     registerModel("EagerDsLComment", EagerDsLComment);
     const post = await EagerDsLPost.create({ title: "P" });
@@ -2767,6 +2766,10 @@ describe("EagerAssociationTest", () => {
     class EagerDsBPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerDsBComments", {
+          className: "EagerDsBComment",
+          foreignKey: "eager_ds_b_post_id",
+        });
       }
     }
     class EagerDsBComment extends Base {
@@ -2775,10 +2778,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ds_b_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerDsBPost, "eagerDsBComments", {
-      className: "EagerDsBComment",
-      foreignKey: "eager_ds_b_post_id",
-    });
     registerModel("EagerDsBPost", EagerDsBPost);
     registerModel("EagerDsBComment", EagerDsBComment);
     const post = await EagerDsBPost.create({ title: "P" });
@@ -2790,6 +2789,10 @@ describe("EagerAssociationTest", () => {
     class EagerDsCallPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerDsCallComments", {
+          className: "EagerDsCallComment",
+          foreignKey: "eager_ds_call_post_id",
+        });
       }
     }
     class EagerDsCallComment extends Base {
@@ -2798,10 +2801,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ds_call_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerDsCallPost, "eagerDsCallComments", {
-      className: "EagerDsCallComment",
-      foreignKey: "eager_ds_call_post_id",
-    });
     registerModel("EagerDsCallPost", EagerDsCallPost);
     registerModel("EagerDsCallComment", EagerDsCallComment);
     const post = await EagerDsCallPost.create({ title: "P" });
@@ -2816,6 +2815,10 @@ describe("EagerAssociationTest", () => {
     class EagerLeoPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerLeoComments", {
+          className: "EagerLeoComment",
+          foreignKey: "eager_leo_post_id",
+        });
       }
     }
     class EagerLeoComment extends Base {
@@ -2824,10 +2827,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_leo_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerLeoPost, "eagerLeoComments", {
-      className: "EagerLeoComment",
-      foreignKey: "eager_leo_post_id",
-    });
     registerModel("EagerLeoPost", EagerLeoPost);
     registerModel("EagerLeoComment", EagerLeoComment);
     const post = await EagerLeoPost.create({ title: "P" });
@@ -2846,6 +2845,10 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("priority", "integer");
+        this.hasMany("eagerLmoComments", {
+          className: "EagerLmoComment",
+          foreignKey: "eager_lmo_post_id",
+        });
       }
     }
     class EagerLmoComment extends Base {
@@ -2854,10 +2857,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_lmo_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerLmoPost, "eagerLmoComments", {
-      className: "EagerLmoComment",
-      foreignKey: "eager_lmo_post_id",
-    });
     registerModel("EagerLmoPost", EagerLmoPost);
     registerModel("EagerLmoComment", EagerLmoComment);
     const post = await EagerLmoPost.create({ title: "P", priority: 1 });
@@ -2874,6 +2873,10 @@ describe("EagerAssociationTest", () => {
     class EagerLnPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerLnComments", {
+          className: "EagerLnComment",
+          foreignKey: "eager_ln_post_id",
+        });
       }
     }
     class EagerLnComment extends Base {
@@ -2882,10 +2885,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_ln_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerLnPost, "eagerLnComments", {
-      className: "EagerLnComment",
-      foreignKey: "eager_ln_post_id",
-    });
     registerModel("EagerLnPost", EagerLnPost);
     registerModel("EagerLnComment", EagerLnComment);
     const post = await EagerLnPost.create({ title: "P" });
@@ -2899,6 +2898,7 @@ describe("EagerAssociationTest", () => {
     class PtcPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("ptcTaggings", { as: "taggable", className: "PtcTagging" });
       }
     }
     class PtcTagging extends Base {
@@ -2913,7 +2913,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(PtcPost, "ptcTaggings", { as: "taggable", className: "PtcTagging" });
     registerModel("PtcPost", PtcPost);
     registerModel("PtcTagging", PtcTagging);
     registerModel("PtcTag", PtcTag);
@@ -2930,6 +2929,13 @@ describe("EagerAssociationTest", () => {
     class MaHabtmAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("maHabtmPosts", {
+          foreignKey: "ma_habtm_author_id",
+        });
+        this.hasAndBelongsToMany("maHabtmCategories", {
+          className: "MaHabtmCategory",
+          joinTable: "ma_habtm_authors_ma_habtm_categories",
+        });
       }
     }
     class MaHabtmPost extends Base {
@@ -2943,13 +2949,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(MaHabtmAuthor, "maHabtmPosts", {
-      foreignKey: "ma_habtm_author_id",
-    });
-    Associations.hasAndBelongsToMany.call(MaHabtmAuthor, "maHabtmCategories", {
-      className: "MaHabtmCategory",
-      joinTable: "ma_habtm_authors_ma_habtm_categories",
-    });
     registerModel(MaHabtmAuthor);
     registerModel(MaHabtmPost);
     registerModel(MaHabtmCategory);
@@ -2978,6 +2977,10 @@ describe("EagerAssociationTest", () => {
     class EagerMultiHoParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("eagerMultiHoProfile", {
+          className: "EagerMultiHoProfile",
+          foreignKey: "eager_multi_ho_parent_id",
+        });
       }
     }
     class EagerMultiHoProfile extends Base {
@@ -2986,10 +2989,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_multi_ho_parent_id", "integer");
       }
     }
-    Associations.hasOne.call(EagerMultiHoParent, "eagerMultiHoProfile", {
-      className: "EagerMultiHoProfile",
-      foreignKey: "eager_multi_ho_parent_id",
-    });
     registerModel("EagerMultiHoParent", EagerMultiHoParent);
     registerModel("EagerMultiHoProfile", EagerMultiHoProfile);
 
@@ -3023,17 +3022,17 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("company_id", "integer");
         this.attribute("mentor_company_id", "integer");
+        this.belongsTo("company", {
+          className: "EagerMultiBtCompany",
+          foreignKey: "company_id",
+        });
+        this.belongsTo("mentorCompany", {
+          className: "EagerMultiBtCompany",
+          foreignKey: "mentor_company_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerMultiBtEmployee, "company", {
-      className: "EagerMultiBtCompany",
-      foreignKey: "company_id",
-    });
 
-    Associations.belongsTo.call(EagerMultiBtEmployee, "mentorCompany", {
-      className: "EagerMultiBtCompany",
-      foreignKey: "mentor_company_id",
-    });
     registerModel("EagerMultiBtCompany", EagerMultiBtCompany);
     registerModel("EagerMultiBtEmployee", EagerMultiBtEmployee);
 
@@ -3058,6 +3057,10 @@ describe("EagerAssociationTest", () => {
     class EagerNode extends Base {
       static {
         this.attribute("value", "string");
+        this.hasMany("eagerEdges", {
+          className: "EagerEdge",
+          foreignKey: "eager_node_id",
+        });
       }
     }
     class EagerEdge extends Base {
@@ -3066,10 +3069,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_node_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerNode, "eagerEdges", {
-      className: "EagerEdge",
-      foreignKey: "eager_node_id",
-    });
     registerModel("EagerNode", EagerNode);
     registerModel("EagerEdge", EagerEdge);
 
@@ -3085,6 +3084,10 @@ describe("EagerAssociationTest", () => {
     class EagerFloatItem extends Base {
       static {
         this.attribute("price", "float");
+        this.hasMany("eagerFloatDetails", {
+          className: "EagerFloatDetail",
+          foreignKey: "eager_float_item_id",
+        });
       }
     }
     class EagerFloatDetail extends Base {
@@ -3093,10 +3096,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_float_item_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerFloatItem, "eagerFloatDetails", {
-      className: "EagerFloatDetail",
-      foreignKey: "eager_float_item_id",
-    });
     registerModel("EagerFloatItem", EagerFloatItem);
     registerModel("EagerFloatDetail", EagerFloatDetail);
 
@@ -3116,6 +3115,10 @@ describe("EagerAssociationTest", () => {
     class EagerPreHoParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("eagerPreHoChild", {
+          className: "EagerPreHoChild",
+          foreignKey: "eager_pre_ho_parent_id",
+        });
       }
     }
     class EagerPreHoChild extends Base {
@@ -3124,10 +3127,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_pre_ho_parent_id", "integer");
       }
     }
-    Associations.hasOne.call(EagerPreHoParent, "eagerPreHoChild", {
-      className: "EagerPreHoChild",
-      foreignKey: "eager_pre_ho_parent_id",
-    });
     registerModel("EagerPreHoParent", EagerPreHoParent);
     registerModel("EagerPreHoChild", EagerPreHoChild);
 
@@ -3151,12 +3150,17 @@ describe("EagerAssociationTest", () => {
     class PciAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pciPosts", { foreignKey: "pci_author_id" });
       }
     }
     class PciPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pci_author_id", "integer");
+        this.hasAndBelongsToMany("pciCategories", {
+          className: "PciCategory",
+          joinTable: "pci_categories_pci_posts",
+        });
       }
     }
     class PciCategory extends Base {
@@ -3164,11 +3168,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(PciAuthor, "pciPosts", { foreignKey: "pci_author_id" });
-    Associations.hasAndBelongsToMany.call(PciPost, "pciCategories", {
-      className: "PciCategory",
-      joinTable: "pci_categories_pci_posts",
-    });
     registerModel(PciAuthor);
     registerModel(PciPost);
     registerModel(PciCategory);
@@ -3197,12 +3196,18 @@ describe("EagerAssociationTest", () => {
     class PcihAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pcihPosts", { foreignKey: "pcih_author_id" });
       }
     }
     class PcihPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pcih_author_id", "integer");
+        this.hasMany("pcihComments", { foreignKey: "pcih_post_id" });
+        this.hasAndBelongsToMany("pcihCategories", {
+          className: "PcihCategory",
+          joinTable: "pcih_categories_pcih_posts",
+        });
       }
     }
     class PcihComment extends Base {
@@ -3216,12 +3221,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(PcihAuthor, "pcihPosts", { foreignKey: "pcih_author_id" });
-    Associations.hasMany.call(PcihPost, "pcihComments", { foreignKey: "pcih_post_id" });
-    Associations.hasAndBelongsToMany.call(PcihPost, "pcihCategories", {
-      className: "PcihCategory",
-      joinTable: "pcih_categories_pcih_posts",
-    });
     registerModel(PcihAuthor);
     registerModel(PcihPost);
     registerModel(PcihComment);
@@ -3256,6 +3255,10 @@ describe("EagerAssociationTest", () => {
     class EagerCountPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("eagerCountComments", {
+          className: "EagerCountComment",
+          foreignKey: "eager_count_post_id",
+        });
       }
     }
     class EagerCountComment extends Base {
@@ -3264,10 +3267,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_count_post_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerCountPost, "eagerCountComments", {
-      className: "EagerCountComment",
-      foreignKey: "eager_count_post_id",
-    });
     registerModel("EagerCountPost", EagerCountPost);
     registerModel("EagerCountComment", EagerCountComment);
 
@@ -3294,6 +3293,9 @@ describe("EagerAssociationTest", () => {
         this.attribute("body", "string");
         this.attribute("type", "string");
         this.attribute("sti_share_post_id", "integer");
+        this.belongsTo("stiSharePost", {
+          foreignKey: "sti_share_post_id",
+        });
       }
     }
     class StiSharePost extends Base {
@@ -3302,9 +3304,6 @@ describe("EagerAssociationTest", () => {
       }
     }
     enableSti(StiShareComment);
-    Associations.belongsTo.call(StiShareComment, "stiSharePost", {
-      foreignKey: "sti_share_post_id",
-    });
     registerModel(StiShareComment);
     registerModel(StiSharePost);
 
@@ -3361,6 +3360,10 @@ describe("EagerAssociationTest", () => {
     class EagerPkAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerPkPosts", {
+          className: "EagerPkPost",
+          foreignKey: "eager_pk_author_id",
+        });
       }
     }
     class EagerPkPost extends Base {
@@ -3369,10 +3372,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_pk_author_id", "integer");
       }
     }
-    Associations.hasMany.call(EagerPkAuthor, "eagerPkPosts", {
-      className: "EagerPkPost",
-      foreignKey: "eager_pk_author_id",
-    });
     registerModel("EagerPkAuthor", EagerPkAuthor);
     registerModel("EagerPkPost", EagerPkPost);
     const a = await EagerPkAuthor.create({ name: "Alice" });
@@ -3388,6 +3387,10 @@ describe("EagerAssociationTest", () => {
     class IncPkAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("incPkPosts", {
+          className: "IncPkPost",
+          foreignKey: "inc_pk_author_id",
+        });
       }
     }
     class IncPkPost extends Base {
@@ -3396,10 +3399,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("inc_pk_author_id", "integer");
       }
     }
-    Associations.hasMany.call(IncPkAuthor, "incPkPosts", {
-      className: "IncPkPost",
-      foreignKey: "inc_pk_author_id",
-    });
     registerModel("IncPkAuthor", IncPkAuthor);
     registerModel("IncPkPost", IncPkPost);
     const a = await IncPkAuthor.create({ name: "Bob" });
@@ -3420,12 +3419,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("value", "string");
         this.attribute("eager_empty_bt_parent_id", "integer");
+        this.belongsTo("eagerEmptyBtParent", {
+          className: "EagerEmptyBtParent",
+          foreignKey: "eager_empty_bt_parent_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerEmptyBtChild, "eagerEmptyBtParent", {
-      className: "EagerEmptyBtParent",
-      foreignKey: "eager_empty_bt_parent_id",
-    });
     registerModel("EagerEmptyBtParent", EagerEmptyBtParent);
     registerModel("EagerEmptyBtChild", EagerEmptyBtChild);
 
@@ -3443,10 +3442,10 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("owner_id", "integer");
         this.attribute("owner_type", "string");
+        this.belongsTo("owner", { polymorphic: true });
       }
     }
     registerModel(PrePolyOrphan);
-    Associations.belongsTo.call(PrePolyOrphan, "owner", { polymorphic: true });
     await PrePolyOrphan.create({ name: "orphan" });
     const results = await PrePolyOrphan.all().includes("owner").toArray();
     expect(results).toHaveLength(1);
@@ -3457,12 +3456,25 @@ describe("EagerAssociationTest", () => {
     class EagerDistOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerDistJoins", {
+          className: "EagerDistJoin",
+          foreignKey: "eager_dist_owner_id",
+        });
+        this.hasMany("eagerDistItems", {
+          through: "eagerDistJoins",
+          source: "eagerDistItem",
+          className: "EagerDistItem",
+        });
       }
     }
     class EagerDistJoin extends Base {
       static {
         this.attribute("eager_dist_owner_id", "integer");
         this.attribute("eager_dist_item_id", "integer");
+        this.belongsTo("eagerDistItem", {
+          className: "EagerDistItem",
+          foreignKey: "eager_dist_item_id",
+        });
       }
     }
     class EagerDistItem extends Base {
@@ -3470,20 +3482,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(EagerDistOwner, "eagerDistJoins", {
-      className: "EagerDistJoin",
-      foreignKey: "eager_dist_owner_id",
-    });
 
-    Associations.hasMany.call(EagerDistOwner, "eagerDistItems", {
-      through: "eagerDistJoins",
-      source: "eagerDistItem",
-      className: "EagerDistItem",
-    });
-    Associations.belongsTo.call(EagerDistJoin, "eagerDistItem", {
-      className: "EagerDistItem",
-      foreignKey: "eager_dist_item_id",
-    });
     registerModel("EagerDistOwner", EagerDistOwner);
     registerModel("EagerDistJoin", EagerDistJoin);
     registerModel("EagerDistItem", EagerDistItem);
@@ -3512,6 +3511,10 @@ describe("EagerAssociationTest", () => {
     class EagerReordParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("eagerReordChild", {
+          className: "EagerReordChild",
+          foreignKey: "eager_reord_parent_id",
+        });
       }
     }
     class EagerReordChild extends Base {
@@ -3520,10 +3523,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("eager_reord_parent_id", "integer");
       }
     }
-    Associations.hasOne.call(EagerReordParent, "eagerReordChild", {
-      className: "EagerReordChild",
-      foreignKey: "eager_reord_parent_id",
-    });
     registerModel("EagerReordParent", EagerReordParent);
     registerModel("EagerReordChild", EagerReordChild);
     const parent = await EagerReordParent.create({ name: "P" });
@@ -3545,22 +3544,22 @@ describe("EagerAssociationTest", () => {
     class JeeoPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("jeeoComments", {
+          className: "JeeoComment",
+          foreignKey: "jeeo_post_id",
+        });
       }
     }
     class JeeoComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("jeeo_post_id", "integer");
+        this.belongsTo("jeeoPost", {
+          className: "JeeoPost",
+          foreignKey: "jeeo_post_id",
+        });
       }
     }
-    Associations.hasMany.call(JeeoPost, "jeeoComments", {
-      className: "JeeoComment",
-      foreignKey: "jeeo_post_id",
-    });
-    Associations.belongsTo.call(JeeoComment, "jeeoPost", {
-      className: "JeeoPost",
-      foreignKey: "jeeo_post_id",
-    });
     registerModel("JeeoPost", JeeoPost);
     registerModel("JeeoComment", JeeoComment);
 
@@ -3596,12 +3595,24 @@ describe("EagerAssociationTest", () => {
     class ElmarMentor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("elmarDevelopers", {
+          className: "ElmarDeveloper",
+          foreignKey: "elmar_mentor_id",
+        });
       }
     }
     class ElmarDeveloper extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("elmar_mentor_id", "integer");
+        this.belongsTo("elmarMentor", {
+          className: "ElmarMentor",
+          foreignKey: "elmar_mentor_id",
+        });
+        this.hasMany("elmarContracts", {
+          className: "ElmarContract",
+          foreignKey: "elmar_developer_id",
+        });
       }
     }
     class ElmarContract extends Base {
@@ -3613,47 +3624,35 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("elmar_mentor_id", "integer");
+        this.belongsTo("elmarMentor", {
+          className: "ElmarMentor",
+          foreignKey: "elmar_mentor_id",
+        });
+        this.hasMany("elmarProjectDevelopers", {
+          className: "ElmarProjectDeveloper",
+          foreignKey: "elmar_project_id",
+        });
+        this.hasMany("elmarDevelopers", {
+          className: "ElmarDeveloper",
+          through: "elmarProjectDevelopers",
+          source: "elmarDeveloper",
+        });
       }
     }
     class ElmarProjectDeveloper extends Base {
       static {
         this.attribute("elmar_project_id", "integer");
         this.attribute("elmar_developer_id", "integer");
+        this.belongsTo("elmarDeveloper", {
+          className: "ElmarDeveloper",
+          foreignKey: "elmar_developer_id",
+        });
+        this.belongsTo("elmarProject", {
+          className: "ElmarProject",
+          foreignKey: "elmar_project_id",
+        });
       }
     }
-    Associations.belongsTo.call(ElmarDeveloper, "elmarMentor", {
-      className: "ElmarMentor",
-      foreignKey: "elmar_mentor_id",
-    });
-    Associations.hasMany.call(ElmarDeveloper, "elmarContracts", {
-      className: "ElmarContract",
-      foreignKey: "elmar_developer_id",
-    });
-    Associations.belongsTo.call(ElmarProject, "elmarMentor", {
-      className: "ElmarMentor",
-      foreignKey: "elmar_mentor_id",
-    });
-    Associations.hasMany.call(ElmarProject, "elmarProjectDevelopers", {
-      className: "ElmarProjectDeveloper",
-      foreignKey: "elmar_project_id",
-    });
-    Associations.hasMany.call(ElmarProject, "elmarDevelopers", {
-      className: "ElmarDeveloper",
-      through: "elmarProjectDevelopers",
-      source: "elmarDeveloper",
-    });
-    Associations.hasMany.call(ElmarMentor, "elmarDevelopers", {
-      className: "ElmarDeveloper",
-      foreignKey: "elmar_mentor_id",
-    });
-    Associations.belongsTo.call(ElmarProjectDeveloper, "elmarDeveloper", {
-      className: "ElmarDeveloper",
-      foreignKey: "elmar_developer_id",
-    });
-    Associations.belongsTo.call(ElmarProjectDeveloper, "elmarProject", {
-      className: "ElmarProject",
-      foreignKey: "elmar_project_id",
-    });
     registerModel("ElmarMentor", ElmarMentor);
     registerModel("ElmarDeveloper", ElmarDeveloper);
     registerModel("ElmarContract", ElmarContract);
@@ -3707,6 +3706,16 @@ describe("EagerAssociationTest", () => {
     class PcsProject extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pcsContractships", {
+          className: "PcsContractship",
+          foreignKey: "pcs_project_id",
+        });
+        this.hasMany("scopedDevs", {
+          className: "PcsDeveloper",
+          through: "pcsContractships",
+          source: "pcsDeveloper",
+          scope: (rel: any) => rel.where({ name: "David" }),
+        });
       }
     }
     class PcsDeveloper extends Base {
@@ -3718,25 +3727,15 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("pcs_project_id", "integer");
         this.attribute("pcs_developer_id", "integer");
+        this.belongsTo("pcsDeveloper", {
+          className: "PcsDeveloper",
+          foreignKey: "pcs_developer_id",
+        });
       }
     }
     registerModel(PcsProject);
     registerModel(PcsDeveloper);
     registerModel(PcsContractship);
-    Associations.hasMany.call(PcsProject, "pcsContractships", {
-      className: "PcsContractship",
-      foreignKey: "pcs_project_id",
-    });
-    Associations.hasMany.call(PcsProject, "scopedDevs", {
-      className: "PcsDeveloper",
-      through: "pcsContractships",
-      source: "pcsDeveloper",
-      scope: (rel: any) => rel.where({ name: "David" }),
-    });
-    Associations.belongsTo.call(PcsContractship, "pcsDeveloper", {
-      className: "PcsDeveloper",
-      foreignKey: "pcs_developer_id",
-    });
 
     const proj = await PcsProject.create({ name: "AR" });
     const david = await PcsDeveloper.create({ name: "David" });
@@ -3771,9 +3770,9 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("bt_scope_author_id", "integer");
+        this.belongsTo("btScopeAuthor", { foreignKey: "bt_scope_author_id" });
       }
     }
-    Associations.belongsTo.call(BtScopePost, "btScopeAuthor", { foreignKey: "bt_scope_author_id" });
     registerModel(BtScopeAuthor);
     registerModel(BtScopePost);
 
@@ -3794,6 +3793,10 @@ describe("EagerAssociationTest", () => {
     class HmScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmScopePosts", {
+          className: "HmScopePost",
+          foreignKey: "hm_scope_author_id",
+        });
       }
     }
     class HmScopePost extends Base {
@@ -3802,10 +3805,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("hm_scope_author_id", "integer");
       }
     }
-    Associations.hasMany.call(HmScopeAuthor, "hmScopePosts", {
-      className: "HmScopePost",
-      foreignKey: "hm_scope_author_id",
-    });
     registerModel(HmScopeAuthor);
     registerModel(HmScopePost);
 
@@ -3825,12 +3824,25 @@ describe("EagerAssociationTest", () => {
     class EagerTwiceOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eagerTwiceJoins", {
+          className: "EagerTwiceJoin",
+          foreignKey: "eager_twice_owner_id",
+        });
+        this.hasMany("eagerTwiceTargets", {
+          through: "eagerTwiceJoins",
+          source: "eagerTwiceTarget",
+          className: "EagerTwiceTarget",
+        });
       }
     }
     class EagerTwiceJoin extends Base {
       static {
         this.attribute("eager_twice_owner_id", "integer");
         this.attribute("eager_twice_target_id", "integer");
+        this.belongsTo("eagerTwiceTarget", {
+          className: "EagerTwiceTarget",
+          foreignKey: "eager_twice_target_id",
+        });
       }
     }
     class EagerTwiceTarget extends Base {
@@ -3838,20 +3850,7 @@ describe("EagerAssociationTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(EagerTwiceOwner, "eagerTwiceJoins", {
-      className: "EagerTwiceJoin",
-      foreignKey: "eager_twice_owner_id",
-    });
 
-    Associations.hasMany.call(EagerTwiceOwner, "eagerTwiceTargets", {
-      through: "eagerTwiceJoins",
-      source: "eagerTwiceTarget",
-      className: "EagerTwiceTarget",
-    });
-    Associations.belongsTo.call(EagerTwiceJoin, "eagerTwiceTarget", {
-      className: "EagerTwiceTarget",
-      foreignKey: "eager_twice_target_id",
-    });
     registerModel("EagerTwiceOwner", EagerTwiceOwner);
     registerModel("EagerTwiceJoin", EagerTwiceJoin);
     registerModel("EagerTwiceTarget", EagerTwiceTarget);
@@ -3906,6 +3905,11 @@ describe("EagerAssociationTest", () => {
     class PIDASAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pidasPostsWithSignature", {
+          className: "PIDASPost",
+          foreignKey: "pidas_author_id",
+          scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
+        });
       }
     }
     class PIDASPost extends Base {
@@ -3916,11 +3920,6 @@ describe("EagerAssociationTest", () => {
     }
     registerModel("PIDASAuthor", PIDASAuthor);
     registerModel("PIDASPost", PIDASPost);
-    Associations.hasMany.call(PIDASAuthor, "pidasPostsWithSignature", {
-      className: "PIDASPost",
-      foreignKey: "pidas_author_id",
-      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
-    });
     const author1 = await PIDASAuthor.create({ name: "Alice" });
     await PIDASPost.create({ pidas_author_id: author1.id, mention: "alice" });
     const authors = await (PIDASAuthor as any).preload("pidasPostsWithSignature").toArray();
@@ -3933,6 +3932,11 @@ describe("EagerAssociationTest", () => {
     class ELIDASAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("elidasPostsWithSignature", {
+          className: "ELIDASPost",
+          foreignKey: "elidas_author_id",
+          scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name }),
+        });
       }
     }
     class ELIDASPost extends Base {
@@ -3942,11 +3946,6 @@ describe("EagerAssociationTest", () => {
     }
     registerModel("ELIDASAuthor", ELIDASAuthor);
     registerModel("ELIDASPost", ELIDASPost);
-    Associations.hasMany.call(ELIDASAuthor, "elidasPostsWithSignature", {
-      className: "ELIDASPost",
-      foreignKey: "elidas_author_id",
-      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name }),
-    });
     await expect(
       (ELIDASAuthor as any).eagerLoad("elidasPostsWithSignature").toArray(),
     ).rejects.toThrow("association scope 'elidasPostsWithSignature' is instance dependent");
@@ -3955,6 +3954,12 @@ describe("EagerAssociationTest", () => {
     class POIDASAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("poidasPostsMentioning", {
+          className: "POIDASPost",
+          foreignKey: "poidas_author_id",
+          scope: (_rel: any, owner?: any) =>
+            owner ? _rel.where({ mention: owner.name.toLowerCase() }) : _rel,
+        });
       }
     }
     class POIDASPost extends Base {
@@ -3965,12 +3970,6 @@ describe("EagerAssociationTest", () => {
     }
     registerModel("POIDASAuthor", POIDASAuthor);
     registerModel("POIDASPost", POIDASPost);
-    Associations.hasMany.call(POIDASAuthor, "poidasPostsMentioning", {
-      className: "POIDASPost",
-      foreignKey: "poidas_author_id",
-      scope: (_rel: any, owner?: any) =>
-        owner ? _rel.where({ mention: owner.name.toLowerCase() }) : _rel,
-    });
     const author1 = await POIDASAuthor.create({ name: "Bob" });
     await POIDASPost.create({ poidas_author_id: author1.id, mention: "bob" });
     const authors = await (POIDASAuthor as any).includes("poidasPostsMentioning").toArray();
@@ -3983,6 +3982,11 @@ describe("EagerAssociationTest", () => {
     class EOIDASAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("eoidasPostsMentioning", {
+          className: "EOIDASPost",
+          foreignKey: "eoidas_author_id",
+          scope: (_rel: any, owner?: any) => (owner ? _rel.where({ mention: owner.name }) : _rel),
+        });
       }
     }
     class EOIDASPost extends Base {
@@ -3992,11 +3996,6 @@ describe("EagerAssociationTest", () => {
     }
     registerModel("EOIDASAuthor", EOIDASAuthor);
     registerModel("EOIDASPost", EOIDASPost);
-    Associations.hasMany.call(EOIDASAuthor, "eoidasPostsMentioning", {
-      className: "EOIDASPost",
-      foreignKey: "eoidas_author_id",
-      scope: (_rel: any, owner?: any) => (owner ? _rel.where({ mention: owner.name }) : _rel),
-    });
     await expect(
       (EOIDASAuthor as any).eagerLoad("eoidasPostsMentioning").toArray(),
     ).rejects.toThrow("association scope 'eoidasPostsMentioning' is instance dependent");
@@ -4022,6 +4021,12 @@ describe("EagerAssociationTest", () => {
     class AweAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("awePostsWithExtension", {
+          className: "AwePost",
+          foreignKey: "awe_author_id",
+          scope: (rel: any) => rel.order("title"),
+          extend: { extensionMethod() {} },
+        });
       }
     }
     class AwePost extends Base {
@@ -4035,12 +4040,6 @@ describe("EagerAssociationTest", () => {
     // Rails: `has_many :posts_with_extension, -> { order(:title) } do ... end`
     // Extension block + ownerless scope (relation-only param, no owner) —
     // checkEagerLoadableBang treats scope.length > 1 as instance-dependent.
-    Associations.hasMany.call(AweAuthor, "awePostsWithExtension", {
-      className: "AwePost",
-      foreignKey: "awe_author_id",
-      scope: (rel: any) => rel.order("title"),
-      extend: { extensionMethod() {} },
-    });
     const author = await AweAuthor.create({ name: "A" });
     await AwePost.create({ awe_author_id: author.id, title: "p" });
     const authors = await (AweAuthor as any).includes("awePostsWithExtension").toArray();
@@ -4055,6 +4054,13 @@ describe("EagerAssociationTest", () => {
     class AwexAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("awexPostsWithExtAndInstance", {
+          className: "AwexPost",
+          foreignKey: "awex_author_id",
+          scope: (_rel: any, owner?: any) =>
+            owner ? _rel.where({ mention: owner.name.toLowerCase() }) : _rel,
+          extend: { extensionMethod() {} },
+        });
       }
     }
     class AwexPost extends Base {
@@ -4066,13 +4072,6 @@ describe("EagerAssociationTest", () => {
     registerModel("AwexAuthor", AwexAuthor);
     registerModel("AwexPost", AwexPost);
     // Rails: `has_many :posts_with_extension_and_instance, ->(record) { ... } do ... end`
-    Associations.hasMany.call(AwexAuthor, "awexPostsWithExtAndInstance", {
-      className: "AwexPost",
-      foreignKey: "awex_author_id",
-      scope: (_rel: any, owner?: any) =>
-        owner ? _rel.where({ mention: owner.name.toLowerCase() }) : _rel,
-      extend: { extensionMethod() {} },
-    });
     const author = await AwexAuthor.create({ name: "Alice" });
     await AwexPost.create({ awex_author_id: author.id, mention: "alice" });
     await AwexPost.create({ awex_author_id: author.id, mention: "zoe" });
@@ -4091,6 +4090,10 @@ describe("EagerAssociationTest", () => {
     class PraAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("praPosts", {
+          className: "PraPost",
+          foreignKey: "pra_author_id",
+        });
       }
     }
     class PraPost extends Base {
@@ -4099,10 +4102,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("pra_author_id", "integer");
       }
     }
-    Associations.hasMany.call(PraAuthor, "praPosts", {
-      className: "PraPost",
-      foreignKey: "pra_author_id",
-    });
     registerModel("PraAuthor", PraAuthor);
     registerModel("PraPost", PraPost);
     const a = await PraAuthor.create({ name: "A" });
@@ -4116,6 +4115,10 @@ describe("EagerAssociationTest", () => {
     class EnraAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("enraPosts", {
+          className: "EnraPost",
+          foreignKey: "enra_author_id",
+        });
       }
     }
     class EnraPost extends Base {
@@ -4124,10 +4127,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("enra_author_id", "integer");
       }
     }
-    Associations.hasMany.call(EnraAuthor, "enraPosts", {
-      className: "EnraPost",
-      foreignKey: "enra_author_id",
-    });
     registerModel("EnraAuthor", EnraAuthor);
     registerModel("EnraPost", EnraPost);
     const a = await EnraAuthor.create({ name: "A" });
@@ -4142,6 +4141,11 @@ describe("EagerAssociationTest", () => {
     class ElraAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("elraPosts", {
+          className: "ElraPost",
+          foreignKey: "elra_author_id",
+          scope: (rel: any) => rel.readonly(),
+        });
       }
     }
     class ElraPost extends Base {
@@ -4150,11 +4154,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("elra_author_id", "integer");
       }
     }
-    Associations.hasMany.call(ElraAuthor, "elraPosts", {
-      className: "ElraPost",
-      foreignKey: "elra_author_id",
-      scope: (rel: any) => rel.readonly(),
-    });
     registerModel("ElraAuthor", ElraAuthor);
     registerModel("ElraPost", ElraPost);
     const a = await ElraAuthor.create({ name: "A" });
@@ -4179,6 +4178,7 @@ describe("EagerAssociationTest", () => {
     class EwcAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("essays", { className: "EwcEssay" });
       }
     }
     class EwcEssay extends Base {
@@ -4187,12 +4187,11 @@ describe("EagerAssociationTest", () => {
         this.attribute("ewc_author_id", "integer");
         this.attribute("writer_id", "integer");
         this.attribute("writer_type", "string");
+        this.belongsTo("writer", { polymorphic: true });
       }
     }
     registerModel(EwcAuthor);
     registerModel(EwcEssay);
-    Associations.hasMany.call(EwcAuthor, "essays", { className: "EwcEssay" });
-    Associations.belongsTo.call(EwcEssay, "writer", { polymorphic: true });
 
     const david = await EwcAuthor.create({ name: "David" });
     await EwcEssay.create({ name: "A", ewc_author_id: david.id });
@@ -4224,12 +4223,19 @@ describe("EagerAssociationTest", () => {
     class PhmtAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("phmtPosts", { foreignKey: "phmt_author_id" });
+        this.hasMany("phmtComments", {
+          through: "phmtPosts",
+          source: "phmtComments",
+          className: "PhmtComment",
+        });
       }
     }
     class PhmtPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("phmt_author_id", "integer");
+        this.hasMany("phmtComments", { foreignKey: "phmt_post_id" });
       }
     }
     class PhmtComment extends Base {
@@ -4238,13 +4244,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("phmt_post_id", "integer");
       }
     }
-    Associations.hasMany.call(PhmtAuthor, "phmtPosts", { foreignKey: "phmt_author_id" });
-    Associations.hasMany.call(PhmtAuthor, "phmtComments", {
-      through: "phmtPosts",
-      source: "phmtComments",
-      className: "PhmtComment",
-    });
-    Associations.hasMany.call(PhmtPost, "phmtComments", { foreignKey: "phmt_post_id" });
     registerModel(PhmtAuthor);
     registerModel(PhmtPost);
     registerModel(PhmtComment);
@@ -4335,12 +4334,12 @@ describe("EagerAssociationTest", () => {
         this.attribute("order_shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("product", "string");
+        this.belongsTo("cpkOrder", {
+          foreignKey: ["order_shop_id", "order_id"],
+          className: "CpkOrder",
+        });
       }
     }
-    Associations.belongsTo.call(CpkLineItem, "cpkOrder", {
-      foreignKey: ["order_shop_id", "order_id"],
-      className: "CpkOrder",
-    });
     registerModel(CpkOrder);
     registerModel(CpkLineItem);
 
@@ -4363,6 +4362,10 @@ describe("EagerAssociationTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
+        this.hasMany("cpkHmItems", {
+          className: "CpkHmItem",
+          foreignKey: ["order_shop_id", "order_id"],
+        });
       }
     }
     class CpkHmItem extends Base {
@@ -4372,10 +4375,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("product", "string");
       }
     }
-    Associations.hasMany.call(CpkHmOrder, "cpkHmItems", {
-      className: "CpkHmItem",
-      foreignKey: ["order_shop_id", "order_id"],
-    });
     registerModel(CpkHmOrder);
     registerModel(CpkHmItem);
 
@@ -4396,6 +4395,10 @@ describe("EagerAssociationTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
+        this.hasOne("cpkHoReceipt", {
+          className: "CpkHoReceipt",
+          foreignKey: ["order_shop_id", "order_id"],
+        });
       }
     }
     class CpkHoReceipt extends Base {
@@ -4405,10 +4408,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("number", "string");
       }
     }
-    Associations.hasOne.call(CpkHoOrder, "cpkHoReceipt", {
-      className: "CpkHoReceipt",
-      foreignKey: ["order_shop_id", "order_id"],
-    });
     registerModel(CpkHoOrder);
     registerModel(CpkHoReceipt);
 
@@ -4445,59 +4444,59 @@ describe("EagerAssociationTest", () => {
     class IdupPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("idupComments", {
+          className: "IdupComment",
+          foreignKey: "idup_post_id",
+        });
+        this.hasMany("idupCategoryPosts", {
+          className: "IdupCategoryPost",
+          foreignKey: "idup_post_id",
+        });
+        this.hasMany("idupCategories", {
+          className: "IdupCategory",
+          through: "idupCategoryPosts",
+          source: "idupCategory",
+        });
       }
     }
     class IdupComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("idup_post_id", "integer");
+        this.belongsTo("idupPost", {
+          className: "IdupPost",
+          foreignKey: "idup_post_id",
+        });
       }
     }
     class IdupCategory extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("idupCategoryPosts", {
+          className: "IdupCategoryPost",
+          foreignKey: "idup_category_id",
+        });
+        this.hasMany("idupPosts", {
+          className: "IdupPost",
+          through: "idupCategoryPosts",
+          source: "idupPost",
+        });
       }
     }
     class IdupCategoryPost extends Base {
       static {
         this.attribute("idup_post_id", "integer");
         this.attribute("idup_category_id", "integer");
+        this.belongsTo("idupPost", {
+          className: "IdupPost",
+          foreignKey: "idup_post_id",
+        });
+        this.belongsTo("idupCategory", {
+          className: "IdupCategory",
+          foreignKey: "idup_category_id",
+        });
       }
     }
-    Associations.hasMany.call(IdupPost, "idupComments", {
-      className: "IdupComment",
-      foreignKey: "idup_post_id",
-    });
-    Associations.hasMany.call(IdupPost, "idupCategoryPosts", {
-      className: "IdupCategoryPost",
-      foreignKey: "idup_post_id",
-    });
-    Associations.hasMany.call(IdupPost, "idupCategories", {
-      className: "IdupCategory",
-      through: "idupCategoryPosts",
-      source: "idupCategory",
-    });
-    Associations.hasMany.call(IdupCategory, "idupCategoryPosts", {
-      className: "IdupCategoryPost",
-      foreignKey: "idup_category_id",
-    });
-    Associations.hasMany.call(IdupCategory, "idupPosts", {
-      className: "IdupPost",
-      through: "idupCategoryPosts",
-      source: "idupPost",
-    });
-    Associations.belongsTo.call(IdupComment, "idupPost", {
-      className: "IdupPost",
-      foreignKey: "idup_post_id",
-    });
-    Associations.belongsTo.call(IdupCategoryPost, "idupPost", {
-      className: "IdupPost",
-      foreignKey: "idup_post_id",
-    });
-    Associations.belongsTo.call(IdupCategoryPost, "idupCategory", {
-      className: "IdupCategory",
-      foreignKey: "idup_category_id",
-    });
     registerModel("IdupPost", IdupPost);
     registerModel("IdupComment", IdupComment);
     registerModel("IdupCategory", IdupCategory);
@@ -4538,6 +4537,10 @@ describe("EagerAssociationTest", () => {
     class AlarPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("alarComments", {
+          className: "AlarComment",
+          foreignKey: "alar_post_id",
+        });
       }
     }
     class AlarComment extends Base {
@@ -4550,35 +4553,31 @@ describe("EagerAssociationTest", () => {
     class AlarCategory extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("alarCategoryPosts", {
+          className: "AlarCategoryPost",
+          foreignKey: "alar_category_id",
+        });
+        this.hasMany("alarPosts", {
+          className: "AlarPost",
+          through: "alarCategoryPosts",
+          source: "alarPost",
+        });
       }
     }
     class AlarCategoryPost extends Base {
       static {
         this.attribute("alar_post_id", "integer");
         this.attribute("alar_category_id", "integer");
+        this.belongsTo("alarPost", {
+          className: "AlarPost",
+          foreignKey: "alar_post_id",
+        });
+        this.belongsTo("alarCategory", {
+          className: "AlarCategory",
+          foreignKey: "alar_category_id",
+        });
       }
     }
-    Associations.hasMany.call(AlarPost, "alarComments", {
-      className: "AlarComment",
-      foreignKey: "alar_post_id",
-    });
-    Associations.hasMany.call(AlarCategory, "alarCategoryPosts", {
-      className: "AlarCategoryPost",
-      foreignKey: "alar_category_id",
-    });
-    Associations.hasMany.call(AlarCategory, "alarPosts", {
-      className: "AlarPost",
-      through: "alarCategoryPosts",
-      source: "alarPost",
-    });
-    Associations.belongsTo.call(AlarCategoryPost, "alarPost", {
-      className: "AlarPost",
-      foreignKey: "alar_post_id",
-    });
-    Associations.belongsTo.call(AlarCategoryPost, "alarCategory", {
-      className: "AlarCategory",
-      foreignKey: "alar_category_id",
-    });
     registerModel("AlarPost", AlarPost);
     registerModel("AlarComment", AlarComment);
     registerModel("AlarCategory", AlarCategory);
@@ -4609,6 +4608,10 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("lna_author_id", "integer");
+        this.belongsTo("lnaAuthor", {
+          className: "LnaAuthor",
+          foreignKey: "lna_author_id",
+        });
       }
     }
     class LnaAuthor extends Base {
@@ -4616,10 +4619,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.belongsTo.call(LnaPost, "lnaAuthor", {
-      className: "LnaAuthor",
-      foreignKey: "lna_author_id",
-    });
     registerModel("LnaPost", LnaPost);
     registerModel("LnaAuthor", LnaAuthor);
 
@@ -4642,12 +4641,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("eabt_post_id", "integer");
+        this.belongsTo("eabtPost", {
+          className: "EabtPost",
+          foreignKey: "eabt_post_id",
+        });
       }
     }
-    Associations.belongsTo.call(EabtComment, "eabtPost", {
-      className: "EabtPost",
-      foreignKey: "eabt_post_id",
-    });
     registerModel("EabtPost", EabtPost);
     registerModel("EabtComment", EabtComment);
 
@@ -4694,6 +4693,10 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("peb_firm_id", "integer");
+        this.belongsTo("pebFirm", {
+          className: "PebFirm",
+          foreignKey: "peb_firm_id",
+        });
       }
     }
     class PebFirm extends Base {
@@ -4701,10 +4704,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.belongsTo.call(PebClient, "pebFirm", {
-      className: "PebFirm",
-      foreignKey: "peb_firm_id",
-    });
     registerModel("PebClient", PebClient);
     registerModel("PebFirm", PebFirm);
 
@@ -4730,35 +4729,35 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("dp_author_id", "integer");
+        this.belongsTo("dpAuthor", {
+          className: "DpAuthor",
+          foreignKey: "dp_author_id",
+        });
+        this.hasMany("dpComments", {
+          className: "DpComment",
+          foreignKey: "dp_post_id",
+        });
       }
     }
     class DpAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("dpPosts", {
+          className: "DpPost",
+          foreignKey: "dp_author_id",
+        });
       }
     }
     class DpComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("dp_post_id", "integer");
+        this.belongsTo("dpPost", {
+          className: "DpPost",
+          foreignKey: "dp_post_id",
+        });
       }
     }
-    Associations.belongsTo.call(DpPost, "dpAuthor", {
-      className: "DpAuthor",
-      foreignKey: "dp_author_id",
-    });
-    Associations.hasMany.call(DpPost, "dpComments", {
-      className: "DpComment",
-      foreignKey: "dp_post_id",
-    });
-    Associations.hasMany.call(DpAuthor, "dpPosts", {
-      className: "DpPost",
-      foreignKey: "dp_author_id",
-    });
-    Associations.belongsTo.call(DpComment, "dpPost", {
-      className: "DpPost",
-      foreignKey: "dp_post_id",
-    });
     registerModel("DpPost", DpPost);
     registerModel("DpAuthor", DpAuthor);
     registerModel("DpComment", DpComment);
@@ -4793,6 +4792,10 @@ describe("EagerAssociationTest", () => {
         this.attribute("psta_member_id", "integer");
         this.attribute("psta_club_id", "integer");
         this.attribute("active", "boolean");
+        this.belongsTo("pstaClub", {
+          className: "PstaClub",
+          foreignKey: "psta_club_id",
+        });
       }
     }
     class PstaClub extends Base {
@@ -4803,17 +4806,13 @@ describe("EagerAssociationTest", () => {
     class PstaMember extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("pstaCurrentMembership", {
+          className: "PstaMembership",
+          foreignKey: "psta_member_id",
+          scope: (rel: any) => rel.where({ active: true }),
+        });
       }
     }
-    Associations.hasOne.call(PstaMember, "pstaCurrentMembership", {
-      className: "PstaMembership",
-      foreignKey: "psta_member_id",
-      scope: (rel: any) => rel.where({ active: true }),
-    });
-    Associations.belongsTo.call(PstaMembership, "pstaClub", {
-      className: "PstaClub",
-      foreignKey: "psta_club_id",
-    });
     registerModel("PstaMember", PstaMember);
     registerModel("PstaMembership", PstaMembership);
     registerModel("PstaClub", PstaClub);

@@ -4,7 +4,6 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, CollectionProxy, association, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
 import { HasMany } from "./builder/has-many.js";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
@@ -190,12 +189,12 @@ describe("AssociationsExtensionsTest", () => {
         this._tableName = "ext_posts";
         this.attribute("title", "string");
         this.adapter = extAdapter;
+        this.hasMany("extComments", {
+          foreignKey: "ext_post_id",
+          className: "ExtComment",
+        });
       }
     }
-    Associations.hasMany.call(ExtPost, "extComments", {
-      foreignKey: "ext_post_id",
-      className: "ExtComment",
-    });
     registerModel("ExtPost", ExtPost);
     registerModel("ExtComment", ExtComment);
     return { ExtPost, ExtComment };

@@ -59,6 +59,10 @@ describe("AssociationScope", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
+        this.hasMany("as_posts", {
+          className: "AsPost",
+          foreignKey: "as_author_id",
+        });
       }
     }
     class AsPost extends Base {
@@ -66,18 +70,14 @@ describe("AssociationScope", () => {
         this.attribute("id", "integer");
         this.attribute("as_author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("as_author", {
+          className: "AsAuthor",
+          foreignKey: "as_author_id",
+        });
       }
     }
     registerModel(AsAuthor);
     registerModel(AsPost);
-    Associations.hasMany.call(AsAuthor, "as_posts", {
-      className: "AsPost",
-      foreignKey: "as_author_id",
-    });
-    Associations.belongsTo.call(AsPost, "as_author", {
-      className: "AsAuthor",
-      foreignKey: "as_author_id",
-    });
     return { AsAuthor, AsPost };
   }
 
@@ -196,6 +196,10 @@ describe("AssociationScope", () => {
     class StiOwner extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasMany("sti_specials", {
+          className: "StiSpecial",
+          foreignKey: "sti_owner_id",
+        });
       }
     }
     class StiBase extends Base {
@@ -214,10 +218,6 @@ describe("AssociationScope", () => {
     }
     registerModel(StiOwner);
     registerModel(StiBase);
-    Associations.hasMany.call(StiOwner, "sti_specials", {
-      className: "StiSpecial",
-      foreignKey: "sti_owner_id",
-    });
 
     const owner = new StiOwner({ id: 3 });
     const reflection = (StiOwner as any)._reflectOnAssociation("sti_specials");
@@ -239,6 +239,10 @@ describe("AssociationScope", () => {
     class DsAuthor extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasMany("ds_posts", {
+          className: "DsPost",
+          foreignKey: "ds_author_id",
+        });
       }
     }
     class DsPost extends Base {
@@ -250,10 +254,6 @@ describe("AssociationScope", () => {
     }
     registerModel(DsAuthor);
     registerModel(DsPost);
-    Associations.hasMany.call(DsAuthor, "ds_posts", {
-      className: "DsPost",
-      foreignKey: "ds_author_id",
-    });
 
     const author = new DsAuthor({ id: 1 });
     const reflection = (DsAuthor as any)._reflectOnAssociation("ds_posts");
@@ -279,6 +279,10 @@ describe("AssociationScope", () => {
     class WrAuthor extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasMany("wr_posts", {
+          className: "WrPost",
+          foreignKey: "wr_author_id",
+        });
       }
     }
     class WrPost extends Base {
@@ -289,10 +293,6 @@ describe("AssociationScope", () => {
     }
     registerModel(WrAuthor);
     registerModel(WrPost);
-    Associations.hasMany.call(WrAuthor, "wr_posts", {
-      className: "WrPost",
-      foreignKey: "wr_author_id",
-    });
 
     const author = await WrAuthor.create({});
     await WrPost.create({ wr_author_id: author.id, kind: "draft" });
@@ -317,6 +317,16 @@ describe("AssociationScope", () => {
     class ZeroArityAuthor extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasMany("zero_arity_posts", {
+          className: "ZeroArityPost",
+          foreignKey: "zero_arity_author_id",
+          // The function's .length is 0, so the loader must use scopeFor's
+          // 0-arity branch (this=relation). If we passed it as a 1-arg
+          // function, `where` would not exist on the empty arg.
+          scope: function (this: any) {
+            return this.where({ active: true });
+          },
+        });
       }
     }
     class ZeroArityPost extends Base {
@@ -327,16 +337,6 @@ describe("AssociationScope", () => {
     }
     registerModel(ZeroArityAuthor);
     registerModel(ZeroArityPost);
-    Associations.hasMany.call(ZeroArityAuthor, "zero_arity_posts", {
-      className: "ZeroArityPost",
-      foreignKey: "zero_arity_author_id",
-      // The function's .length is 0, so the loader must use scopeFor's
-      // 0-arity branch (this=relation). If we passed it as a 1-arg
-      // function, `where` would not exist on the empty arg.
-      scope: function (this: any) {
-        return this.where({ active: true });
-      },
-    });
 
     const owner = new ZeroArityAuthor({ id: 1 });
     const reflection = (ZeroArityAuthor as any)._reflectOnAssociation("zero_arity_posts");
@@ -354,6 +354,10 @@ describe("AssociationScope", () => {
     class AsOwner extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasMany("as_comments", {
+          className: "AsComment",
+          as: "commentable",
+        });
       }
     }
     class AsComment extends Base {
@@ -364,10 +368,6 @@ describe("AssociationScope", () => {
     }
     registerModel(AsOwner);
     registerModel(AsComment);
-    Associations.hasMany.call(AsOwner, "as_comments", {
-      className: "AsComment",
-      as: "commentable",
-    });
     const owner = new AsOwner({ id: 7 });
     const reflection = (AsOwner as any)._reflectOnAssociation("as_comments");
     const sql = (
@@ -415,6 +415,10 @@ describe("AssociationScope", () => {
     class AsOneOwner extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasOne("as_one_image", {
+          className: "AsOneImage",
+          as: "imageable",
+        });
       }
     }
     class AsOneImage extends Base {
@@ -425,10 +429,6 @@ describe("AssociationScope", () => {
     }
     registerModel(AsOneOwner);
     registerModel(AsOneImage);
-    Associations.hasOne.call(AsOneOwner, "as_one_image", {
-      className: "AsOneImage",
-      as: "imageable",
-    });
     const owner = new AsOneOwner({ id: 3 });
     const reflection = (AsOneOwner as any)._reflectOnAssociation("as_one_image");
     const sql = (
@@ -454,11 +454,11 @@ describe("AssociationScope", () => {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
+        this.belongsTo("commentable", { polymorphic: true });
       }
     }
     registerModel(PolyTarget);
     registerModel(PolyComment);
-    Associations.belongsTo.call(PolyComment, "commentable", { polymorphic: true });
     const comment = new PolyComment({ commentable_id: 99, commentable_type: "PolyTarget" });
     const reflection = (PolyComment as any)._reflectOnAssociation("commentable");
     const sql = (
@@ -516,11 +516,11 @@ describe("AssociationScope", () => {
       static {
         this.attribute("commentable_id", "string");
         this.attribute("commentable_type", "string");
+        this.belongsTo("commentable", { polymorphic: true });
       }
     }
     registerModel(UuidTarget);
     registerModel(UuidComment);
-    Associations.belongsTo.call(UuidComment, "commentable", { polymorphic: true });
     const comment = new UuidComment({
       commentable_id: "abc-123",
       commentable_type: "UuidTarget",
@@ -552,6 +552,18 @@ describe("AssociationScope", () => {
     class CcAuthor extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasMany("cc_memberships", {
+          className: "CcMembership",
+          foreignKey: "cc_author_id",
+          // Scope on the through reflection — chain.reverse_each must pick
+          // it up when AssociationScope walks the chain for cc_tags.
+          scope: (rel: any) => rel.where({ active: true }),
+        });
+        this.hasMany("cc_tags", {
+          className: "CcTag",
+          through: "cc_memberships",
+          source: "cc_tag",
+        });
       }
     }
     class CcMembership extends Base {
@@ -559,6 +571,10 @@ describe("AssociationScope", () => {
         this.attribute("cc_author_id", "integer");
         this.attribute("cc_tag_id", "integer");
         this.attribute("active", "boolean");
+        this.belongsTo("cc_tag", {
+          className: "CcTag",
+          foreignKey: "cc_tag_id",
+        });
       }
     }
     class CcTag extends Base {
@@ -569,22 +585,6 @@ describe("AssociationScope", () => {
     registerModel(CcAuthor);
     registerModel(CcMembership);
     registerModel(CcTag);
-    Associations.hasMany.call(CcAuthor, "cc_memberships", {
-      className: "CcMembership",
-      foreignKey: "cc_author_id",
-      // Scope on the through reflection — chain.reverse_each must pick
-      // it up when AssociationScope walks the chain for cc_tags.
-      scope: (rel: any) => rel.where({ active: true }),
-    });
-    Associations.hasMany.call(CcAuthor, "cc_tags", {
-      className: "CcTag",
-      through: "cc_memberships",
-      source: "cc_tag",
-    });
-    Associations.belongsTo.call(CcMembership, "cc_tag", {
-      className: "CcTag",
-      foreignKey: "cc_tag_id",
-    });
 
     const author = new CcAuthor({ id: 1 });
     const reflection = (CcAuthor as any)._reflectOnAssociation("cc_tags");
@@ -614,6 +614,16 @@ describe("AssociationScope", () => {
       declare name: string;
       static {
         this.attribute("name", "string");
+        this.hasMany("st_galleries", {
+          className: "StGallery",
+          foreignKey: "st_author_id",
+        });
+        this.hasMany("st_photos", {
+          className: "StPhoto",
+          through: "st_galleries",
+          source: "imageable",
+          sourceType: "StPhoto",
+        });
       }
     }
     class StGallery extends Base {
@@ -621,6 +631,7 @@ describe("AssociationScope", () => {
         this.attribute("st_author_id", "integer");
         this.attribute("imageable_id", "integer");
         this.attribute("imageable_type", "string");
+        this.belongsTo("imageable", { polymorphic: true });
       }
     }
     class StPhoto extends Base {
@@ -639,18 +650,7 @@ describe("AssociationScope", () => {
     registerModel(StGallery);
     registerModel(StPhoto);
     registerModel(StVideo);
-    Associations.hasMany.call(StAuthor, "st_galleries", {
-      className: "StGallery",
-      foreignKey: "st_author_id",
-    });
-    Associations.belongsTo.call(StGallery, "imageable", { polymorphic: true });
     // Through with sourceType — only StPhoto galleries should match.
-    Associations.hasMany.call(StAuthor, "st_photos", {
-      className: "StPhoto",
-      through: "st_galleries",
-      source: "imageable",
-      sourceType: "StPhoto",
-    });
 
     const author = await StAuthor.create({ name: "Alice" });
     const photo = await StPhoto.create({ title: "p1" });
@@ -688,6 +688,16 @@ describe("AssociationScope", () => {
       declare name: string;
       static {
         this.attribute("name", "string");
+        this.hasMany("np_galleries", {
+          className: "NpGallery",
+          foreignKey: "np_author_id",
+        });
+        this.hasMany("np_photos", {
+          className: "NpPhoto",
+          through: "np_galleries",
+          source: "imageable",
+          sourceType: "NpPhoto",
+        });
       }
     }
     class NpGallery extends Base {
@@ -695,6 +705,10 @@ describe("AssociationScope", () => {
         this.attribute("np_author_id", "integer");
         this.attribute("imageable_uuid", "string");
         this.attribute("imageable_type", "string");
+        this.belongsTo("imageable", {
+          polymorphic: true,
+          foreignKey: "imageable_uuid",
+        });
       }
     }
     class NpPhoto extends Base {
@@ -708,20 +722,6 @@ describe("AssociationScope", () => {
     registerModel(NpAuthor);
     registerModel(NpGallery);
     registerModel(NpPhoto);
-    Associations.hasMany.call(NpAuthor, "np_galleries", {
-      className: "NpGallery",
-      foreignKey: "np_author_id",
-    });
-    Associations.belongsTo.call(NpGallery, "imageable", {
-      polymorphic: true,
-      foreignKey: "imageable_uuid",
-    });
-    Associations.hasMany.call(NpAuthor, "np_photos", {
-      className: "NpPhoto",
-      through: "np_galleries",
-      source: "imageable",
-      sourceType: "NpPhoto",
-    });
 
     const author = await NpAuthor.create({ name: "Alice" });
     const photo = await NpPhoto.create({ uuid: "u1", title: "p1" });
@@ -751,11 +751,24 @@ describe("AssociationScope", () => {
     class Ho1User extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("ho1_account", {
+          className: "Ho1Account",
+          foreignKey: "ho1_user_id",
+        });
+        this.hasOne("ho1_pref", {
+          className: "Ho1Pref",
+          through: "ho1_account",
+          source: "ho1_pref",
+        });
       }
     }
     class Ho1Account extends Base {
       static {
         this.attribute("ho1_user_id", "integer");
+        this.hasOne("ho1_pref", {
+          className: "Ho1Pref",
+          foreignKey: "ho1_account_id",
+        });
       }
     }
     class Ho1Pref extends Base {
@@ -768,19 +781,6 @@ describe("AssociationScope", () => {
     registerModel(Ho1User);
     registerModel(Ho1Account);
     registerModel(Ho1Pref);
-    Associations.hasOne.call(Ho1User, "ho1_account", {
-      className: "Ho1Account",
-      foreignKey: "ho1_user_id",
-    });
-    Associations.hasOne.call(Ho1Account, "ho1_pref", {
-      className: "Ho1Pref",
-      foreignKey: "ho1_account_id",
-    });
-    Associations.hasOne.call(Ho1User, "ho1_pref", {
-      className: "Ho1Pref",
-      through: "ho1_account",
-      source: "ho1_pref",
-    });
 
     const user = await Ho1User.create({ name: "Alice" });
     const account = await Ho1Account.create({ ho1_user_id: user.id });
@@ -806,11 +806,24 @@ describe("AssociationScope", () => {
     class HsAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hs_posts", {
+          className: "HsPost",
+          foreignKey: "hs_author_id",
+        });
+        this.hasMany("hs_comments", {
+          className: "HsComment",
+          through: "hs_posts",
+          source: "hs_comments",
+        });
       }
     }
     class HsPost extends Base {
       static {
         this.attribute("hs_author_id", "integer");
+        this.hasMany("hs_comments", {
+          className: "HsComment",
+          foreignKey: "hs_post_id",
+        });
       }
     }
     class HsComment extends Base {
@@ -823,19 +836,6 @@ describe("AssociationScope", () => {
     registerModel(HsAuthor);
     registerModel(HsPost);
     registerModel(HsComment);
-    Associations.hasMany.call(HsAuthor, "hs_posts", {
-      className: "HsPost",
-      foreignKey: "hs_author_id",
-    });
-    Associations.hasMany.call(HsPost, "hs_comments", {
-      className: "HsComment",
-      foreignKey: "hs_post_id",
-    });
-    Associations.hasMany.call(HsAuthor, "hs_comments", {
-      className: "HsComment",
-      through: "hs_posts",
-      source: "hs_comments",
-    });
 
     const author = await HsAuthor.create({ name: "Alice" });
     const p1 = await HsPost.create({ hs_author_id: author.id });
@@ -862,12 +862,25 @@ describe("AssociationScope", () => {
     class HotPost extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasOne("hot_post_hook", {
+          className: "HotPostHook",
+          foreignKey: "hot_post_id",
+        });
+        this.hasOne("hot_review", {
+          className: "HotReview",
+          through: "hot_post_hook",
+          source: "hot_review",
+        });
       }
     }
     class HotPostHook extends Base {
       static {
         this.attribute("hot_post_id", "integer");
         this.attribute("hot_review_id", "integer");
+        this.belongsTo("hot_review", {
+          className: "HotReview",
+          foreignKey: "hot_review_id",
+        });
       }
     }
     class HotReview extends Base {
@@ -879,19 +892,6 @@ describe("AssociationScope", () => {
     registerModel(HotPost);
     registerModel(HotPostHook);
     registerModel(HotReview);
-    Associations.hasOne.call(HotPost, "hot_post_hook", {
-      className: "HotPostHook",
-      foreignKey: "hot_post_id",
-    });
-    Associations.hasOne.call(HotPost, "hot_review", {
-      className: "HotReview",
-      through: "hot_post_hook",
-      source: "hot_review",
-    });
-    Associations.belongsTo.call(HotPostHook, "hot_review", {
-      className: "HotReview",
-      foreignKey: "hot_review_id",
-    });
 
     const post = await HotPost.create({});
     const review = await HotReview.create({ body: "Great post" });
@@ -917,12 +917,25 @@ describe("AssociationScope", () => {
       declare name: string;
       static {
         this.attribute("name", "string");
+        this.hasMany("mg_postings", {
+          className: "MgPosting",
+          foreignKey: "mg_author_id",
+        });
+        this.hasMany("mg_tags", {
+          className: "MgTag",
+          through: "mg_postings",
+          source: "mg_tag",
+        });
       }
     }
     class MgPosting extends Base {
       static {
         this.attribute("mg_author_id", "integer");
         this.attribute("mg_tag_id", "integer");
+        this.belongsTo("mg_tag", {
+          className: "MgTag",
+          foreignKey: "mg_tag_id",
+        });
       }
     }
     class MgTag extends Base {
@@ -934,19 +947,6 @@ describe("AssociationScope", () => {
     registerModel(MgAuthor);
     registerModel(MgPosting);
     registerModel(MgTag);
-    Associations.hasMany.call(MgAuthor, "mg_postings", {
-      className: "MgPosting",
-      foreignKey: "mg_author_id",
-    });
-    Associations.hasMany.call(MgAuthor, "mg_tags", {
-      className: "MgTag",
-      through: "mg_postings",
-      source: "mg_tag",
-    });
-    Associations.belongsTo.call(MgPosting, "mg_tag", {
-      className: "MgTag",
-      foreignKey: "mg_tag_id",
-    });
 
     const alice = await MgAuthor.create({ name: "Alice" });
     const bob = await MgAuthor.create({ name: "Bob" });
@@ -974,12 +974,25 @@ describe("AssociationScope", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
+        this.hasMany("int_memberships", {
+          className: "IntMembership",
+          foreignKey: "int_author_id",
+        });
+        this.hasMany("int_tags", {
+          className: "IntTag",
+          through: "int_memberships",
+          source: "int_tag",
+        });
       }
     }
     class IntMembership extends Base {
       static {
         this.attribute("int_author_id", "integer");
         this.attribute("int_tag_id", "integer");
+        this.belongsTo("int_tag", {
+          className: "IntTag",
+          foreignKey: "int_tag_id",
+        });
       }
     }
     class IntTag extends Base {
@@ -992,19 +1005,6 @@ describe("AssociationScope", () => {
     registerModel(IntAuthor);
     registerModel(IntMembership);
     registerModel(IntTag);
-    Associations.hasMany.call(IntAuthor, "int_memberships", {
-      className: "IntMembership",
-      foreignKey: "int_author_id",
-    });
-    Associations.hasMany.call(IntAuthor, "int_tags", {
-      className: "IntTag",
-      through: "int_memberships",
-      source: "int_tag",
-    });
-    Associations.belongsTo.call(IntMembership, "int_tag", {
-      className: "IntTag",
-      foreignKey: "int_tag_id",
-    });
 
     const alice = await IntAuthor.create({ name: "Alice" });
     const bob = await IntAuthor.create({ name: "Bob" });
@@ -1030,12 +1030,24 @@ describe("AssociationScope", () => {
     class HotUser extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasOne("hot_account", {
+          className: "HotAccount",
+          foreignKey: "hot_user_id",
+        });
+        this.hasOne("hot_settings", {
+          className: "HotSettings",
+          through: "hot_account",
+        });
       }
     }
     class HotAccount extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("hot_user_id", "integer");
+        this.hasOne("hot_settings", {
+          className: "HotSettings",
+          foreignKey: "hot_account_id",
+        });
       }
     }
     class HotSettings extends Base {
@@ -1046,18 +1058,6 @@ describe("AssociationScope", () => {
     registerModel(HotUser);
     registerModel(HotAccount);
     registerModel(HotSettings);
-    Associations.hasOne.call(HotUser, "hot_account", {
-      className: "HotAccount",
-      foreignKey: "hot_user_id",
-    });
-    Associations.hasOne.call(HotUser, "hot_settings", {
-      className: "HotSettings",
-      through: "hot_account",
-    });
-    Associations.hasOne.call(HotAccount, "hot_settings", {
-      className: "HotSettings",
-      foreignKey: "hot_account_id",
-    });
 
     const user = new HotUser({ id: 5 });
     const reflection = (HotUser as any)._reflectOnAssociation("hot_settings");
@@ -1092,12 +1092,24 @@ describe("AssociationScope", () => {
     class ThroughAuthor extends Base {
       static {
         this.attribute("id", "integer");
+        this.hasMany("through_memberships", {
+          className: "ThroughMembership",
+          foreignKey: "through_author_id",
+        });
+        this.hasMany("through_posts", {
+          className: "ThroughPost",
+          through: "through_memberships",
+        });
       }
     }
     class ThroughMembership extends Base {
       static {
         this.attribute("through_author_id", "integer");
         this.attribute("through_post_id", "integer");
+        this.belongsTo("through_post", {
+          className: "ThroughPost",
+          foreignKey: "through_post_id",
+        });
       }
     }
     class ThroughPost extends Base {
@@ -1108,18 +1120,6 @@ describe("AssociationScope", () => {
     registerModel(ThroughAuthor);
     registerModel(ThroughMembership);
     registerModel(ThroughPost);
-    Associations.hasMany.call(ThroughAuthor, "through_memberships", {
-      className: "ThroughMembership",
-      foreignKey: "through_author_id",
-    });
-    Associations.hasMany.call(ThroughAuthor, "through_posts", {
-      className: "ThroughPost",
-      through: "through_memberships",
-    });
-    Associations.belongsTo.call(ThroughMembership, "through_post", {
-      className: "ThroughPost",
-      foreignKey: "through_post_id",
-    });
 
     const author = new ThroughAuthor({ id: 1 });
     const reflection = (ThroughAuthor as any)._reflectOnAssociation("through_posts");
@@ -1164,20 +1164,20 @@ describe("AssociationScope", () => {
         this.attribute("pst_gallery_id", "integer");
         this.attribute("imageable_id", "integer");
         this.attribute("imageable_type", "string");
+        this.hasMany("children", {
+          className: "PstGallery",
+          foreignKey: "pst_gallery_id",
+        });
+        this.belongsTo("imageable", { polymorphic: true });
+        this.hasMany("imageables", {
+          className: "PstGallery",
+          through: "children",
+          source: "imageable",
+          sourceType: "PstGallery",
+        });
       }
     }
     registerModel("PstGallery", PstGallery);
-    Associations.hasMany.call(PstGallery, "children", {
-      className: "PstGallery",
-      foreignKey: "pst_gallery_id",
-    });
-    Associations.belongsTo.call(PstGallery, "imageable", { polymorphic: true });
-    Associations.hasMany.call(PstGallery, "imageables", {
-      className: "PstGallery",
-      through: "children",
-      source: "imageable",
-      sourceType: "PstGallery",
-    });
 
     const owner = new PstGallery({});
     (owner as any).id = 5;

@@ -3,7 +3,6 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -28,6 +27,8 @@ class ShapeExpression extends Base {
     this.attribute("shape_id", "integer");
     this.attribute("paint_type", "string");
     this.attribute("paint_id", "integer");
+    this.belongsTo("shape", { polymorphic: true });
+    this.belongsTo("paint", { polymorphic: true });
   }
 }
 class Circle extends Base {
@@ -49,12 +50,20 @@ class PaintColor extends Base {
   static {
     this._tableName = "paint_colors";
     this.attribute("non_poly_one_id", "integer");
+    this.belongsTo("nonPoly", {
+      foreignKey: "non_poly_one_id",
+      className: "NonPolyOne",
+    });
   }
 }
 class PaintTexture extends Base {
   static {
     this._tableName = "paint_textures";
     this.attribute("non_poly_two_id", "integer");
+    this.belongsTo("nonPoly", {
+      foreignKey: "non_poly_two_id",
+      className: "NonPolyTwo",
+    });
   }
 }
 class NonPolyOne extends Base {
@@ -68,16 +77,6 @@ class NonPolyTwo extends Base {
   }
 }
 
-Associations.belongsTo.call(ShapeExpression, "shape", { polymorphic: true });
-Associations.belongsTo.call(ShapeExpression, "paint", { polymorphic: true });
-Associations.belongsTo.call(PaintColor, "nonPoly", {
-  foreignKey: "non_poly_one_id",
-  className: "NonPolyOne",
-});
-Associations.belongsTo.call(PaintTexture, "nonPoly", {
-  foreignKey: "non_poly_two_id",
-  className: "NonPolyTwo",
-});
 registerModel("ShapeExpression", ShapeExpression);
 registerModel("Circle", Circle);
 registerModel("Square", Square);

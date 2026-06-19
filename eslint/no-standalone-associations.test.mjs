@@ -109,6 +109,75 @@ tester.run("no-standalone-associations", rule, {
         "Associations.hasAndBelongsToMany.call(P, 'cs', {});",
       errors: [{ messageId: "standaloneNoFix" }],
     },
+    // No fix: the call lives in a deeper scope than the class declaration
+    // (e.g. inside an it() callback while the class is at describe scope).
+    // Hoisting a per-invocation call into the once-run static {} block would
+    // drop repeat declarations and change behavior.
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {}\n}\n" +
+        "describe('x', () => {\n  Associations.hasMany.call(P, 'cs', {});\n});",
+      errors: [{ messageId: "standaloneNoFix" }],
+    },
+    // No fix: a sibling statement between the class and the call mutates a
+    // member of the receiver (the `X._associations = []` reset idiom). Hoisting
+    // the call into the static {} block would run it before the reset wipes it.
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {}\n}\n" +
+        "P._associations = [];\n" +
+        "Associations.hasMany.call(P, 'cs', {});",
+      errors: [{ messageId: "standaloneNoFix" }],
+    },
+    // No fix: the aliased reset form `[X].forEach((m) => { m._associations = [] })`
+    // — guard #4 must walk into the callback and match the `_associations` reset
+    // even though the assignment target's root is the loop variable, not P.
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {}\n}\n" +
+        "[P].forEach((m) => { m._associations = []; });\n" +
+        "Associations.hasMany.call(P, 'cs', {});",
+      errors: [{ messageId: "standaloneNoFix" }],
+    },
+    // No fix: an argument references a binding declared AFTER the target class.
+    // Hoisting into the static {} block would read `scope` in its TDZ at
+    // class-evaluation time (runtime ReferenceError), so leave it in place.
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {}\n}\n" +
+        "const scope = () => {};\n" +
+        "Associations.hasMany.call(P, 'cs', { scope });",
+      errors: [{ messageId: "standaloneNoFix" }],
+    },
+    // No fix: a destructured binding declared after the class is referenced in
+    // the args — `bindingNamesOf` must record the destructured name so the TDZ
+    // guard fires (a simple-identifier-only check would miss it).
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {}\n}\n" +
+        "const { scope } = getOpts();\n" +
+        "Associations.hasMany.call(P, 'cs', { scope });",
+      errors: [{ messageId: "standaloneNoFix" }],
+    },
+    // Safe fix despite a same-named variable between class and call: the `owner`
+    // in `scope: (owner) => owner` is the arrow's own parameter, not the outer
+    // `const owner`, so the reference walk excludes it and the fix proceeds.
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {\n    this._tableName = 'ps';\n  }\n}\n" +
+        "const owner = 5;\n" +
+        "Associations.hasMany.call(P, 'cs', { scope: (owner) => owner });\n",
+      output:
+        "class P extends Base {\n  static {\n    this._tableName = 'ps';\n    this.hasMany('cs', { scope: (owner) => owner });\n  }\n}\n" +
+        "const owner = 5;\n",
+      errors: [{ messageId: "standalone" }],
+    },
   ],
 });
 

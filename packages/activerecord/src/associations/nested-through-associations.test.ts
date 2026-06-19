@@ -1647,6 +1647,16 @@ describe("NestedThroughAssociationsTest", () => {
       static {
         this.tableName = "pst_tags";
         this.attribute("name", "string");
+        this.hasMany("taggings", {
+          className: "PstTagging",
+          foreignKey: "pst_tag_id",
+        });
+        this.hasMany("taggedPosts", {
+          className: "PstPost",
+          through: "taggings",
+          source: "taggable",
+          sourceType: "PstPost",
+        });
       }
     }
     class PstTagging extends Base {
@@ -1655,6 +1665,10 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("pst_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
+        this.belongsTo("taggable", {
+          polymorphic: true,
+          foreignKey: "taggable_id",
+        });
       }
     }
     class PstPost extends Base {
@@ -1666,20 +1680,6 @@ describe("NestedThroughAssociationsTest", () => {
     registerModel("PstTag", PstTag);
     registerModel("PstTagging", PstTagging);
     registerModel("PstPost", PstPost);
-    Associations.hasMany.call(PstTag, "taggings", {
-      className: "PstTagging",
-      foreignKey: "pst_tag_id",
-    });
-    Associations.hasMany.call(PstTag, "taggedPosts", {
-      className: "PstPost",
-      through: "taggings",
-      source: "taggable",
-      sourceType: "PstPost",
-    });
-    Associations.belongsTo.call(PstTagging, "taggable", {
-      polymorphic: true,
-      foreignKey: "taggable_id",
-    });
     // INNER JOIN path (Relation#_resolveThroughJoin)
     const innerSql = (PstTag as any).all().joins("taggedPosts").toSql();
     expect(innerSql).toMatch(/JOIN ["`]pst_posts["`]/);
@@ -1698,12 +1698,25 @@ describe("NestedThroughAssociationsTest", () => {
     class FkThrAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("fkThrPosts", {
+          className: "FkThrPost",
+          foreignKey: "writer_id",
+        });
+        this.hasMany("fkThrComments", {
+          through: "fkThrPosts",
+          source: "fkThrComments",
+          className: "FkThrComment",
+        });
       }
     }
     class FkThrPost extends Base {
       static {
         this.attribute("writer_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("fkThrComments", {
+          className: "FkThrComment",
+          foreignKey: "fk_thr_post_id",
+        });
       }
     }
     class FkThrComment extends Base {
@@ -1712,20 +1725,7 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("body", "string");
       }
     }
-    Associations.hasMany.call(FkThrAuthor, "fkThrPosts", {
-      className: "FkThrPost",
-      foreignKey: "writer_id",
-    });
 
-    Associations.hasMany.call(FkThrAuthor, "fkThrComments", {
-      through: "fkThrPosts",
-      source: "fkThrComments",
-      className: "FkThrComment",
-    });
-    Associations.hasMany.call(FkThrPost, "fkThrComments", {
-      className: "FkThrComment",
-      foreignKey: "fk_thr_post_id",
-    });
     registerModel("FkThrAuthor", FkThrAuthor);
     registerModel("FkThrPost", FkThrPost);
     registerModel("FkThrComment", FkThrComment);
@@ -1747,12 +1747,25 @@ describe("NestedThroughAssociationsTest", () => {
     class FkSrcAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("fkSrcPosts", {
+          className: "FkSrcPost",
+          foreignKey: "fk_src_author_id",
+        });
+        this.hasMany("fkSrcComments", {
+          through: "fkSrcPosts",
+          source: "fkSrcComments",
+          className: "FkSrcComment",
+        });
       }
     }
     class FkSrcPost extends Base {
       static {
         this.attribute("fk_src_author_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("fkSrcComments", {
+          className: "FkSrcComment",
+          foreignKey: "article_id",
+        });
       }
     }
     class FkSrcComment extends Base {
@@ -1761,20 +1774,7 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("body", "string");
       }
     }
-    Associations.hasMany.call(FkSrcAuthor, "fkSrcPosts", {
-      className: "FkSrcPost",
-      foreignKey: "fk_src_author_id",
-    });
 
-    Associations.hasMany.call(FkSrcAuthor, "fkSrcComments", {
-      through: "fkSrcPosts",
-      source: "fkSrcComments",
-      className: "FkSrcComment",
-    });
-    Associations.hasMany.call(FkSrcPost, "fkSrcComments", {
-      className: "FkSrcComment",
-      foreignKey: "article_id",
-    });
     registerModel("FkSrcAuthor", FkSrcAuthor);
     registerModel("FkSrcPost", FkSrcPost);
     registerModel("FkSrcComment", FkSrcComment);
@@ -1796,6 +1796,15 @@ describe("NestedThroughAssociationsTest", () => {
     class StiThrClub extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("stiThrMemberships", {
+          className: "StiThrMembership",
+          foreignKey: "sti_thr_club_id",
+        });
+        this.hasMany("stiThrMembers", {
+          through: "stiThrMemberships",
+          source: "stiThrMember",
+          className: "StiThrMember",
+        });
       }
     }
     class StiThrMembership extends Base {
@@ -1805,6 +1814,10 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("type", "string");
         this._tableName = "sti_thr_memberships";
         enableSti(StiThrMembership);
+        this.belongsTo("stiThrMember", {
+          className: "StiThrMember",
+          foreignKey: "sti_thr_member_id",
+        });
       }
     }
     class StiThrSuperMembership extends StiThrMembership {
@@ -1818,20 +1831,7 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(StiThrClub, "stiThrMemberships", {
-      className: "StiThrMembership",
-      foreignKey: "sti_thr_club_id",
-    });
 
-    Associations.hasMany.call(StiThrClub, "stiThrMembers", {
-      through: "stiThrMemberships",
-      source: "stiThrMember",
-      className: "StiThrMember",
-    });
-    Associations.belongsTo.call(StiThrMembership, "stiThrMember", {
-      className: "StiThrMember",
-      foreignKey: "sti_thr_member_id",
-    });
     registerModel("StiThrClub", StiThrClub);
     registerModel("StiThrMembership", StiThrMembership);
     registerModel("StiThrMember", StiThrMember);
@@ -1860,6 +1860,20 @@ describe("NestedThroughAssociationsTest", () => {
     class StiNPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("specialComments", {
+          className: "StiNSpecialComment",
+          foreignKey: "sti_n_post_id",
+        });
+        this.hasMany("specialCommentsRatings", {
+          className: "StiNRating",
+          through: "specialComments",
+          source: "ratings",
+        });
+        this.hasMany("specialCommentsRatingsTaggings", {
+          className: "StiNTagging",
+          through: "specialCommentsRatings",
+          source: "taggings",
+        });
       }
     }
     class StiNComment extends Base {
@@ -1875,12 +1889,20 @@ describe("NestedThroughAssociationsTest", () => {
       static {
         registerModel(StiNSpecialComment);
         registerSubclass(StiNSpecialComment);
+        this.hasMany("ratings", {
+          className: "StiNRating",
+          foreignKey: "sti_n_comment_id",
+        });
       }
     }
     class StiNRating extends Base {
       static {
         this.attribute("sti_n_comment_id", "integer");
         this.attribute("value", "integer");
+        this.hasMany("taggings", {
+          className: "StiNTagging",
+          foreignKey: "sti_n_rating_id",
+        });
       }
     }
     class StiNTagging extends Base {
@@ -1888,28 +1910,6 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("sti_n_rating_id", "integer");
       }
     }
-    Associations.hasMany.call(StiNPost, "specialComments", {
-      className: "StiNSpecialComment",
-      foreignKey: "sti_n_post_id",
-    });
-    Associations.hasMany.call(StiNSpecialComment, "ratings", {
-      className: "StiNRating",
-      foreignKey: "sti_n_comment_id",
-    });
-    Associations.hasMany.call(StiNRating, "taggings", {
-      className: "StiNTagging",
-      foreignKey: "sti_n_rating_id",
-    });
-    Associations.hasMany.call(StiNPost, "specialCommentsRatings", {
-      className: "StiNRating",
-      through: "specialComments",
-      source: "ratings",
-    });
-    Associations.hasMany.call(StiNPost, "specialCommentsRatingsTaggings", {
-      className: "StiNTagging",
-      through: "specialCommentsRatings",
-      source: "taggings",
-    });
     registerModel("StiNPost", StiNPost);
     registerModel("StiNComment", StiNComment);
     registerModel("StiNRating", StiNRating);
@@ -1936,18 +1936,40 @@ describe("NestedThroughAssociationsTest", () => {
     class NwrAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("nwrPosts", {
+          className: "NwrPost",
+          foreignKey: "nwr_author_id",
+        });
+        this.hasMany("nwrTaggings", {
+          through: "nwrPosts",
+          source: "nwrTaggings",
+          className: "NwrTagging",
+        });
+        this.hasMany("nwrTags", {
+          through: "nwrTaggings",
+          source: "nwrTag",
+          className: "NwrTag",
+        });
       }
     }
     class NwrPost extends Base {
       static {
         this.attribute("nwr_author_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("nwrTaggings", {
+          className: "NwrTagging",
+          foreignKey: "nwr_post_id",
+        });
       }
     }
     class NwrTagging extends Base {
       static {
         this.attribute("nwr_post_id", "integer");
         this.attribute("nwr_tag_id", "integer");
+        this.belongsTo("nwrTag", {
+          className: "NwrTag",
+          foreignKey: "nwr_tag_id",
+        });
       }
     }
     class NwrTag extends Base {
@@ -1955,30 +1977,7 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(NwrAuthor, "nwrPosts", {
-      className: "NwrPost",
-      foreignKey: "nwr_author_id",
-    });
 
-    Associations.hasMany.call(NwrAuthor, "nwrTaggings", {
-      through: "nwrPosts",
-      source: "nwrTaggings",
-      className: "NwrTagging",
-    });
-
-    Associations.hasMany.call(NwrAuthor, "nwrTags", {
-      through: "nwrTaggings",
-      source: "nwrTag",
-      className: "NwrTag",
-    });
-    Associations.hasMany.call(NwrPost, "nwrTaggings", {
-      className: "NwrTagging",
-      foreignKey: "nwr_post_id",
-    });
-    Associations.belongsTo.call(NwrTagging, "nwrTag", {
-      className: "NwrTag",
-      foreignKey: "nwr_tag_id",
-    });
     registerModel("NwrAuthor", NwrAuthor);
     registerModel("NwrPost", NwrPost);
     registerModel("NwrTagging", NwrTagging);
@@ -2002,11 +2001,29 @@ describe("NestedThroughAssociationsTest", () => {
     class NhoAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("nhoPost", {
+          className: "NhoPost",
+          foreignKey: "nho_author_id",
+        });
+        this.hasOne("nhoComment", {
+          through: "nhoPost",
+          source: "nhoComment",
+          className: "NhoComment",
+        });
+        this.hasOne("nhoNestedComment", {
+          through: "nhoComment",
+          source: "nhoComment",
+          className: "NhoComment",
+        });
       }
     }
     class NhoPost extends Base {
       static {
         this.attribute("nho_author_id", "integer");
+        this.hasOne("nhoComment", {
+          className: "NhoComment",
+          foreignKey: "nho_post_id",
+        });
       }
     }
     class NhoComment extends Base {
@@ -2015,26 +2032,7 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("body", "string");
       }
     }
-    Associations.hasOne.call(NhoAuthor, "nhoPost", {
-      className: "NhoPost",
-      foreignKey: "nho_author_id",
-    });
 
-    Associations.hasOne.call(NhoAuthor, "nhoComment", {
-      through: "nhoPost",
-      source: "nhoComment",
-      className: "NhoComment",
-    });
-
-    Associations.hasOne.call(NhoAuthor, "nhoNestedComment", {
-      through: "nhoComment",
-      source: "nhoComment",
-      className: "NhoComment",
-    });
-    Associations.hasOne.call(NhoPost, "nhoComment", {
-      className: "NhoComment",
-      foreignKey: "nho_post_id",
-    });
     registerModel("NhoAuthor", NhoAuthor);
     registerModel("NhoPost", NhoPost);
     registerModel("NhoComment", NhoComment);
@@ -2317,18 +2315,40 @@ describe("NestedThroughAssociationsTest", () => {
     class NfkOrganization extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("nfkAuthors", {
+          className: "NfkAuthor",
+          foreignKey: "organization_id",
+        });
+        this.hasMany("nfkCategories", {
+          className: "NfkCategory",
+          through: "nfkAuthors",
+          source: "nfkCategories",
+        });
       }
     }
     class NfkAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("organization_id", "integer");
+        this.hasMany("nfkEssays", {
+          className: "NfkEssay",
+          foreignKey: "writer_id",
+        });
+        this.hasMany("nfkCategories", {
+          className: "NfkCategory",
+          through: "nfkEssays",
+          source: "nfkCategory",
+        });
       }
     }
     class NfkEssay extends Base {
       static {
         this.attribute("writer_id", "integer");
         this.attribute("nfk_category_id", "integer");
+        this.belongsTo("nfkCategory", {
+          className: "NfkCategory",
+          foreignKey: "nfk_category_id",
+        });
       }
     }
     class NfkCategory extends Base {
@@ -2336,30 +2356,7 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(NfkOrganization, "nfkAuthors", {
-      className: "NfkAuthor",
-      foreignKey: "organization_id",
-    });
 
-    Associations.hasMany.call(NfkOrganization, "nfkCategories", {
-      className: "NfkCategory",
-      through: "nfkAuthors",
-      source: "nfkCategories",
-    });
-    Associations.hasMany.call(NfkAuthor, "nfkEssays", {
-      className: "NfkEssay",
-      foreignKey: "writer_id",
-    });
-
-    Associations.hasMany.call(NfkAuthor, "nfkCategories", {
-      className: "NfkCategory",
-      through: "nfkEssays",
-      source: "nfkCategory",
-    });
-    Associations.belongsTo.call(NfkEssay, "nfkCategory", {
-      className: "NfkCategory",
-      foreignKey: "nfk_category_id",
-    });
     registerModel("NfkOrganization", NfkOrganization);
     registerModel("NfkAuthor", NfkAuthor);
     registerModel("NfkEssay", NfkEssay);
@@ -2382,6 +2379,15 @@ describe("NestedThroughAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("category_id", "integer");
+        this.belongsTo("author", {
+          className: "Author",
+          foreignKey: "author_id",
+        });
+        this.hasMany("postTaggings", {
+          className: "Tagging",
+          through: "author",
+          source: "taggings",
+        });
       }
     }
     registerModel(Categorization);
@@ -2396,15 +2402,6 @@ describe("NestedThroughAssociationsTest", () => {
       className: "Tagging",
       foreignKey: "taggable_id",
       as: "taggable",
-    });
-    Associations.belongsTo.call(Categorization, "author", {
-      className: "Author",
-      foreignKey: "author_id",
-    });
-    Associations.hasMany.call(Categorization, "postTaggings", {
-      className: "Tagging",
-      through: "author",
-      source: "taggings",
     });
 
     const david = await Author.create({ name: "David" });
@@ -2423,11 +2420,36 @@ describe("NestedThroughAssociationsTest", () => {
     class PhmtHotel extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("phmtDepartments", {
+          className: "PhmtDepartment",
+          foreignKey: "phmt_hotel_id",
+        });
+        this.hasMany("phmtChefs", {
+          className: "PhmtChef",
+          through: "phmtDepartments",
+          source: "phmtChefs",
+        });
+        this.hasMany("phmtCakeDesigners", {
+          className: "PhmtCakeDesigner",
+          through: "phmtChefs",
+          source: "employable",
+          sourceType: "PhmtCakeDesigner",
+        });
+        this.hasMany("phmtDrinkDesigners", {
+          className: "PhmtDrinkDesigner",
+          through: "phmtChefs",
+          source: "employable",
+          sourceType: "PhmtDrinkDesigner",
+        });
       }
     }
     class PhmtDepartment extends Base {
       static {
         this.attribute("phmt_hotel_id", "integer");
+        this.hasMany("phmtChefs", {
+          className: "PhmtChef",
+          foreignKey: "phmt_department_id",
+        });
       }
     }
     class PhmtChef extends Base {
@@ -2435,6 +2457,10 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("phmt_department_id", "integer");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
+        this.belongsTo("employable", {
+          polymorphic: true,
+          foreignKey: "employable_id",
+        });
       }
     }
     class PhmtCakeDesigner extends Base {
@@ -2447,37 +2473,7 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(PhmtHotel, "phmtDepartments", {
-      className: "PhmtDepartment",
-      foreignKey: "phmt_hotel_id",
-    });
 
-    Associations.hasMany.call(PhmtHotel, "phmtChefs", {
-      className: "PhmtChef",
-      through: "phmtDepartments",
-      source: "phmtChefs",
-    });
-
-    Associations.hasMany.call(PhmtHotel, "phmtCakeDesigners", {
-      className: "PhmtCakeDesigner",
-      through: "phmtChefs",
-      source: "employable",
-      sourceType: "PhmtCakeDesigner",
-    });
-    Associations.hasMany.call(PhmtHotel, "phmtDrinkDesigners", {
-      className: "PhmtDrinkDesigner",
-      through: "phmtChefs",
-      source: "employable",
-      sourceType: "PhmtDrinkDesigner",
-    });
-    Associations.hasMany.call(PhmtDepartment, "phmtChefs", {
-      className: "PhmtChef",
-      foreignKey: "phmt_department_id",
-    });
-    Associations.belongsTo.call(PhmtChef, "employable", {
-      polymorphic: true,
-      foreignKey: "employable_id",
-    });
     registerModel("PhmtHotel", PhmtHotel);
     registerModel("PhmtDepartment", PhmtDepartment);
     registerModel("PhmtChef", PhmtChef);
@@ -2516,11 +2512,36 @@ describe("NestedThroughAssociationsTest", () => {
     class PhmtHotel2 extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("phmtDepartment2s", {
+          className: "PhmtDepartment2",
+          foreignKey: "phmt_hotel2_id",
+        });
+        this.hasMany("phmtChef2s", {
+          className: "PhmtChef2",
+          through: "phmtDepartment2s",
+          source: "phmtChef2s",
+        });
+        this.hasMany("phmtCakeDesigner2s", {
+          className: "PhmtCakeDesigner2",
+          through: "phmtChef2s",
+          source: "employable",
+          sourceType: "PhmtCakeDesigner2",
+        });
+        this.hasMany("phmtDrinkDesigner2s", {
+          className: "PhmtDrinkDesigner2",
+          through: "phmtChef2s",
+          source: "employable",
+          sourceType: "PhmtDrinkDesigner2",
+        });
       }
     }
     class PhmtDepartment2 extends Base {
       static {
         this.attribute("phmt_hotel2_id", "integer");
+        this.hasMany("phmtChef2s", {
+          className: "PhmtChef2",
+          foreignKey: "phmt_department2_id",
+        });
       }
     }
     class PhmtChef2 extends Base {
@@ -2528,6 +2549,10 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("phmt_department2_id", "integer");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
+        this.belongsTo("employable", {
+          polymorphic: true,
+          foreignKey: "employable_id",
+        });
       }
     }
     class PhmtCakeDesigner2 extends Base {
@@ -2540,36 +2565,7 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(PhmtHotel2, "phmtDepartment2s", {
-      className: "PhmtDepartment2",
-      foreignKey: "phmt_hotel2_id",
-    });
 
-    Associations.hasMany.call(PhmtHotel2, "phmtChef2s", {
-      className: "PhmtChef2",
-      through: "phmtDepartment2s",
-      source: "phmtChef2s",
-    });
-    Associations.hasMany.call(PhmtHotel2, "phmtCakeDesigner2s", {
-      className: "PhmtCakeDesigner2",
-      through: "phmtChef2s",
-      source: "employable",
-      sourceType: "PhmtCakeDesigner2",
-    });
-    Associations.hasMany.call(PhmtHotel2, "phmtDrinkDesigner2s", {
-      className: "PhmtDrinkDesigner2",
-      through: "phmtChef2s",
-      source: "employable",
-      sourceType: "PhmtDrinkDesigner2",
-    });
-    Associations.hasMany.call(PhmtDepartment2, "phmtChef2s", {
-      className: "PhmtChef2",
-      foreignKey: "phmt_department2_id",
-    });
-    Associations.belongsTo.call(PhmtChef2, "employable", {
-      polymorphic: true,
-      foreignKey: "employable_id",
-    });
     registerModel("PhmtHotel2", PhmtHotel2);
     registerModel("PhmtDepartment2", PhmtDepartment2);
     registerModel("PhmtChef2", PhmtChef2);
@@ -2613,11 +2609,36 @@ describe("NestedThroughAssociationsTest", () => {
     class Phmt3Hotel extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("phmt3Department3s", {
+          className: "Phmt3Department",
+          foreignKey: "phmt3_hotel_id",
+        });
+        this.hasMany("phmt3Chefs", {
+          className: "Phmt3Chef",
+          through: "phmt3Department3s",
+          source: "phmt3Chefs",
+        });
+        this.hasMany("cakeDesigners", {
+          className: "Phmt3CakeDesigner",
+          through: "phmt3Chefs",
+          source: "employable",
+          sourceType: "Phmt3CakeDesigner",
+        });
+        this.hasMany("drinkDesigners", {
+          className: "Phmt3DrinkDesigner",
+          through: "phmt3Chefs",
+          source: "employable",
+          sourceType: "Phmt3DrinkDesigner",
+        });
       }
     }
     class Phmt3Department extends Base {
       static {
         this.attribute("phmt3_hotel_id", "integer");
+        this.hasMany("phmt3Chefs", {
+          className: "Phmt3Chef",
+          foreignKey: "phmt3_department_id",
+        });
       }
     }
     class Phmt3Chef extends Base {
@@ -2625,6 +2646,10 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("phmt3_department_id", "integer");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
+        this.belongsTo("employable", {
+          polymorphic: true,
+          foreignKey: "employable_id",
+        });
       }
     }
     class Phmt3CakeDesigner extends Base {
@@ -2637,35 +2662,6 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(Phmt3Hotel, "phmt3Department3s", {
-      className: "Phmt3Department",
-      foreignKey: "phmt3_hotel_id",
-    });
-    Associations.hasMany.call(Phmt3Hotel, "phmt3Chefs", {
-      className: "Phmt3Chef",
-      through: "phmt3Department3s",
-      source: "phmt3Chefs",
-    });
-    Associations.hasMany.call(Phmt3Hotel, "cakeDesigners", {
-      className: "Phmt3CakeDesigner",
-      through: "phmt3Chefs",
-      source: "employable",
-      sourceType: "Phmt3CakeDesigner",
-    });
-    Associations.hasMany.call(Phmt3Hotel, "drinkDesigners", {
-      className: "Phmt3DrinkDesigner",
-      through: "phmt3Chefs",
-      source: "employable",
-      sourceType: "Phmt3DrinkDesigner",
-    });
-    Associations.hasMany.call(Phmt3Department, "phmt3Chefs", {
-      className: "Phmt3Chef",
-      foreignKey: "phmt3_department_id",
-    });
-    Associations.belongsTo.call(Phmt3Chef, "employable", {
-      polymorphic: true,
-      foreignKey: "employable_id",
-    });
     registerModel("Phmt3Hotel", Phmt3Hotel);
     registerModel("Phmt3Department", Phmt3Department);
     registerModel("Phmt3Chef", Phmt3Chef);
@@ -2701,6 +2697,10 @@ describe("NestedThroughAssociationsTest", () => {
       static {
         this.tableName = "hmps_categories";
         this.attribute("name", "string");
+        this.hasMany("essays", {
+          className: "HmpsEssay",
+          foreignKey: "hmps_category_id",
+        });
       }
     }
     class HmpsPost extends Base {
@@ -2708,6 +2708,24 @@ describe("NestedThroughAssociationsTest", () => {
         this.tableName = "hmps_posts";
         this.attribute("title", "string");
         this.attribute("body", "string");
+        this.hasAndBelongsToMany("categories", {
+          className: "HmpsCategory",
+          joinTable: "hmps_categories_posts",
+          foreignKey: "hmps_post_id",
+          associationForeignKey: "hmps_category_id",
+        });
+        this.hasMany("essays", {
+          className: "HmpsEssay",
+          through: "categories",
+          source: "essays",
+        });
+        this.hasMany("authorsOfEssaysNamedBob", {
+          className: "HmpsAuthor",
+          through: "essays",
+          source: "writer",
+          sourceType: "HmpsAuthor",
+          scope: (rel: any) => rel.where({ name: "Bob" }),
+        });
       }
     }
     class HmpsEssay extends Base {
@@ -2716,6 +2734,10 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("writer_id", "integer");
         this.attribute("writer_type", "string");
         this.attribute("hmps_category_id", "integer");
+        this.belongsTo("writer", {
+          polymorphic: true,
+          foreignKey: "writer_id",
+        });
       }
     }
     class HmpsAuthor extends Base {
@@ -2728,33 +2750,6 @@ describe("NestedThroughAssociationsTest", () => {
     registerModel("HmpsPost", HmpsPost);
     registerModel("HmpsEssay", HmpsEssay);
     registerModel("HmpsAuthor", HmpsAuthor);
-
-    Associations.hasAndBelongsToMany.call(HmpsPost, "categories", {
-      className: "HmpsCategory",
-      joinTable: "hmps_categories_posts",
-      foreignKey: "hmps_post_id",
-      associationForeignKey: "hmps_category_id",
-    });
-    Associations.hasMany.call(HmpsCategory, "essays", {
-      className: "HmpsEssay",
-      foreignKey: "hmps_category_id",
-    });
-    Associations.hasMany.call(HmpsPost, "essays", {
-      className: "HmpsEssay",
-      through: "categories",
-      source: "essays",
-    });
-    Associations.belongsTo.call(HmpsEssay, "writer", {
-      polymorphic: true,
-      foreignKey: "writer_id",
-    });
-    Associations.hasMany.call(HmpsPost, "authorsOfEssaysNamedBob", {
-      className: "HmpsAuthor",
-      through: "essays",
-      source: "writer",
-      sourceType: "HmpsAuthor",
-      scope: (rel: any) => rel.where({ name: "Bob" }),
-    });
 
     const post = await HmpsPost.create({ title: "Catchy Title", body: "Interesting body." });
     const category = await HmpsCategory.create({ name: "Anything" });
@@ -2789,12 +2784,26 @@ describe("NestedThroughAssociationsTest", () => {
     class RsrCategory extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("rsrPosts", {
+          className: "RsrPost",
+          foreignKey: "rsr_category_id",
+        });
+        this.hasMany("orderedPostComments", {
+          className: "RsrComment",
+          through: "rsrPosts",
+          source: "rsrComments",
+          scope: (rel: any) => rel.order({ id: "desc" }),
+        });
       }
     }
     class RsrPost extends Base {
       static {
         this.attribute("rsr_category_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("rsrComments", {
+          className: "RsrComment",
+          foreignKey: "rsr_post_id",
+        });
       }
     }
     class RsrComment extends Base {
@@ -2803,20 +2812,6 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("body", "string");
       }
     }
-    Associations.hasMany.call(RsrCategory, "rsrPosts", {
-      className: "RsrPost",
-      foreignKey: "rsr_category_id",
-    });
-    Associations.hasMany.call(RsrPost, "rsrComments", {
-      className: "RsrComment",
-      foreignKey: "rsr_post_id",
-    });
-    Associations.hasMany.call(RsrCategory, "orderedPostComments", {
-      className: "RsrComment",
-      through: "rsrPosts",
-      source: "rsrComments",
-      scope: (rel: any) => rel.order({ id: "desc" }),
-    });
     registerModel("RsrCategory", RsrCategory);
     registerModel("RsrPost", RsrPost);
     registerModel("RsrComment", RsrComment);

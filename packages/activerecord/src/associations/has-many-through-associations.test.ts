@@ -559,12 +559,19 @@ describe("HasManyThroughAssociationsTest", () => {
     class TajAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("tajPosts", { foreignKey: "taj_author_id" });
+        this.hasMany("tajComments", {
+          through: "tajPosts",
+          source: "tajComments",
+          className: "TajComment",
+        });
       }
     }
     class TajPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("taj_author_id", "integer");
+        this.hasMany("tajComments", { foreignKey: "taj_post_id" });
       }
     }
     class TajComment extends Base {
@@ -573,13 +580,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("taj_post_id", "integer");
       }
     }
-    Associations.hasMany.call(TajAuthor, "tajPosts", { foreignKey: "taj_author_id" });
-    Associations.hasMany.call(TajAuthor, "tajComments", {
-      through: "tajPosts",
-      source: "tajComments",
-      className: "TajComment",
-    });
-    Associations.hasMany.call(TajPost, "tajComments", { foreignKey: "taj_post_id" });
     registerModel("TajAuthor", TajAuthor);
     registerModel("TajPost", TajPost);
     registerModel("TajComment", TajComment);
@@ -602,12 +602,19 @@ describe("HasManyThroughAssociationsTest", () => {
     class TaljAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("taljPosts", { foreignKey: "talj_author_id" });
+        this.hasMany("taljComments", {
+          through: "taljPosts",
+          source: "taljComments",
+          className: "TaljComment",
+        });
       }
     }
     class TaljPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("talj_author_id", "integer");
+        this.hasMany("taljComments", { foreignKey: "talj_post_id" });
       }
     }
     class TaljComment extends Base {
@@ -616,13 +623,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("talj_post_id", "integer");
       }
     }
-    Associations.hasMany.call(TaljAuthor, "taljPosts", { foreignKey: "talj_author_id" });
-    Associations.hasMany.call(TaljAuthor, "taljComments", {
-      through: "taljPosts",
-      source: "taljComments",
-      className: "TaljComment",
-    });
-    Associations.hasMany.call(TaljPost, "taljComments", { foreignKey: "talj_post_id" });
     registerModel("TaljAuthor", TaljAuthor);
     registerModel("TaljPost", TaljPost);
     registerModel("TaljComment", TaljComment);
@@ -649,12 +649,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class TaCompany extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ta_contracts", {
+          className: "TaContract",
+          foreignKey: "ta_company_id",
+        });
+        this.hasMany("ta_developers", {
+          className: "TaDeveloper",
+          through: "ta_contracts",
+          source: "ta_developer",
+        });
       }
     }
     class TaContract extends Base {
       static {
         this.attribute("ta_company_id", "integer");
         this.attribute("ta_developer_id", "integer");
+        this.belongsTo("ta_developer", {
+          className: "TaDeveloper",
+          foreignKey: "ta_developer_id",
+        });
       }
     }
     class TaDeveloper extends Base {
@@ -665,19 +678,6 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("TaCompany", TaCompany);
     registerModel("TaContract", TaContract);
     registerModel("TaDeveloper", TaDeveloper);
-    Associations.belongsTo.call(TaContract, "ta_developer", {
-      className: "TaDeveloper",
-      foreignKey: "ta_developer_id",
-    });
-    Associations.hasMany.call(TaCompany, "ta_contracts", {
-      className: "TaContract",
-      foreignKey: "ta_company_id",
-    });
-    Associations.hasMany.call(TaCompany, "ta_developers", {
-      className: "TaDeveloper",
-      through: "ta_contracts",
-      source: "ta_developer",
-    });
 
     const company = await TaCompany.create({ name: "Special" });
     const alice = await TaDeveloper.create({ name: "Alice" });
@@ -702,12 +702,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class PnAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pnPosts", {
+          className: "PnPost",
+          foreignKey: "pn_author_id",
+        });
       }
     }
     class PnPost extends Base {
       static {
         this.attribute("pn_author_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("pnTaggings", {
+          className: "PnTagging",
+          foreignKey: "pn_post_id",
+        });
+        this.hasMany("pnTags", {
+          through: "pnTaggings",
+          source: "pnTag",
+          className: "PnTag",
+        });
       }
     }
     class PnTag extends Base {
@@ -719,26 +732,13 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("pn_post_id", "integer");
         this.attribute("pn_tag_id", "integer");
+        this.belongsTo("pnTag", {
+          className: "PnTag",
+          foreignKey: "pn_tag_id",
+        });
       }
     }
-    Associations.hasMany.call(PnAuthor, "pnPosts", {
-      className: "PnPost",
-      foreignKey: "pn_author_id",
-    });
-    Associations.hasMany.call(PnPost, "pnTaggings", {
-      className: "PnTagging",
-      foreignKey: "pn_post_id",
-    });
 
-    Associations.hasMany.call(PnPost, "pnTags", {
-      through: "pnTaggings",
-      source: "pnTag",
-      className: "PnTag",
-    });
-    Associations.belongsTo.call(PnTagging, "pnTag", {
-      className: "PnTag",
-      foreignKey: "pn_tag_id",
-    });
     registerModel("PnAuthor", PnAuthor);
     registerModel("PnPost", PnPost);
     registerModel("PnTag", PnTag);
@@ -767,12 +767,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class PsrCompany extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("psrContracts", {
+          className: "PsrContract",
+          foreignKey: "psr_company_id",
+        });
+        this.hasMany("psrDevelopers", {
+          through: "psrContracts",
+          source: "psrDeveloper",
+          className: "PsrDeveloper",
+        });
       }
     }
     class PsrContract extends Base {
       static {
         this.attribute("psr_company_id", "integer");
         this.attribute("psr_developer_id", "integer");
+        this.belongsTo("psrDeveloper", {
+          className: "PsrDeveloper",
+          foreignKey: "psr_developer_id",
+        });
       }
     }
     class PsrDeveloper extends Base {
@@ -780,20 +793,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(PsrCompany, "psrContracts", {
-      className: "PsrContract",
-      foreignKey: "psr_company_id",
-    });
 
-    Associations.hasMany.call(PsrCompany, "psrDevelopers", {
-      through: "psrContracts",
-      source: "psrDeveloper",
-      className: "PsrDeveloper",
-    });
-    Associations.belongsTo.call(PsrContract, "psrDeveloper", {
-      className: "PsrDeveloper",
-      foreignKey: "psr_developer_id",
-    });
     registerModel("PsrCompany", PsrCompany);
     registerModel("PsrContract", PsrContract);
     registerModel("PsrDeveloper", PsrDeveloper);
@@ -815,6 +815,15 @@ describe("HasManyThroughAssociationsTest", () => {
     class PsClub extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("psMemberships", {
+          className: "PsMembership",
+          foreignKey: "ps_club_id",
+        });
+        this.hasMany("members", {
+          className: "PsMember",
+          through: "psMemberships",
+          source: "psMember",
+        });
       }
     }
     class PsMember extends Base {
@@ -829,6 +838,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("type", "string");
         this._tableName = "ps_memberships";
         enableSti(PsMembership);
+        this.belongsTo("psMember", {
+          className: "PsMember",
+          foreignKey: "ps_member_id",
+        });
       }
     }
     class PsSuperMembership extends PsMembership {
@@ -847,21 +860,6 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel(PsMember);
     registerModel(PsMembership);
 
-    Associations.hasMany.call(PsClub, "psMemberships", {
-      className: "PsMembership",
-      foreignKey: "ps_club_id",
-    });
-
-    Associations.hasMany.call(PsClub, "members", {
-      className: "PsMember",
-      through: "psMemberships",
-      source: "psMember",
-    });
-    Associations.belongsTo.call(PsMembership, "psMember", {
-      className: "PsMember",
-      foreignKey: "ps_member_id",
-    });
-
     const club = await PsClub.create({ name: "Aaron cool banana club" });
     const member1 = await PsMember.create({ name: "Aaron" });
     const member2 = await PsMember.create({ name: "Cat" });
@@ -878,6 +876,10 @@ describe("HasManyThroughAssociationsTest", () => {
     class PreloadMultiParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("preloadMultiChildren", {
+          className: "PreloadMultiChild",
+          foreignKey: "preload_multi_parent_id",
+        });
       }
     }
     class PreloadMultiChild extends Base {
@@ -886,10 +888,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("preload_multi_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(PreloadMultiParent, "preloadMultiChildren", {
-      className: "PreloadMultiChild",
-      foreignKey: "preload_multi_parent_id",
-    });
     registerModel("PreloadMultiParent", PreloadMultiParent);
     registerModel("PreloadMultiChild", PreloadMultiChild);
 
@@ -919,12 +917,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtSingletonOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtSingletonJoins", {
+          className: "HmtSingletonJoin",
+          foreignKey: "hmt_singleton_owner_id",
+        });
+        this.hasMany("hmtSingletonItems", {
+          through: "hmtSingletonJoins",
+          source: "hmtSingletonItem",
+          className: "HmtSingletonItem",
+        });
       }
     }
     class HmtSingletonJoin extends Base {
       static {
         this.attribute("hmt_singleton_owner_id", "integer");
         this.attribute("hmt_singleton_item_id", "integer");
+        this.belongsTo("hmtSingletonItem", {
+          className: "HmtSingletonItem",
+          foreignKey: "hmt_singleton_item_id",
+        });
       }
     }
     class HmtSingletonItem extends Base {
@@ -932,20 +943,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtSingletonOwner, "hmtSingletonJoins", {
-      className: "HmtSingletonJoin",
-      foreignKey: "hmt_singleton_owner_id",
-    });
 
-    Associations.hasMany.call(HmtSingletonOwner, "hmtSingletonItems", {
-      through: "hmtSingletonJoins",
-      source: "hmtSingletonItem",
-      className: "HmtSingletonItem",
-    });
-    Associations.belongsTo.call(HmtSingletonJoin, "hmtSingletonItem", {
-      className: "HmtSingletonItem",
-      foreignKey: "hmt_singleton_item_id",
-    });
     registerModel("HmtSingletonOwner", HmtSingletonOwner);
     registerModel("HmtSingletonJoin", HmtSingletonJoin);
     registerModel("HmtSingletonItem", HmtSingletonItem);
@@ -969,12 +967,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoPkOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtNoPkJoins", {
+          className: "HmtNoPkJoin",
+          foreignKey: "hmt_no_pk_owner_id",
+        });
+        this.hasMany("hmtNoPkItems", {
+          through: "hmtNoPkJoins",
+          source: "hmtNoPkItem",
+          className: "HmtNoPkItem",
+        });
       }
     }
     class HmtNoPkJoin extends Base {
       static {
         this.attribute("hmt_no_pk_owner_id", "integer");
         this.attribute("hmt_no_pk_item_id", "integer");
+        this.belongsTo("hmtNoPkItem", {
+          className: "HmtNoPkItem",
+          foreignKey: "hmt_no_pk_item_id",
+        });
       }
     }
     class HmtNoPkItem extends Base {
@@ -982,20 +993,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtNoPkOwner, "hmtNoPkJoins", {
-      className: "HmtNoPkJoin",
-      foreignKey: "hmt_no_pk_owner_id",
-    });
 
-    Associations.hasMany.call(HmtNoPkOwner, "hmtNoPkItems", {
-      through: "hmtNoPkJoins",
-      source: "hmtNoPkItem",
-      className: "HmtNoPkItem",
-    });
-    Associations.belongsTo.call(HmtNoPkJoin, "hmtNoPkItem", {
-      className: "HmtNoPkItem",
-      foreignKey: "hmt_no_pk_item_id",
-    });
     registerModel("HmtNoPkOwner", HmtNoPkOwner);
     registerModel("HmtNoPkJoin", HmtNoPkJoin);
     registerModel("HmtNoPkItem", HmtNoPkItem);
@@ -1019,12 +1017,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoPkDelOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtNoPkDelJoins", {
+          className: "HmtNoPkDelJoin",
+          foreignKey: "hmt_no_pk_del_owner_id",
+        });
+        this.hasMany("hmtNoPkDelItems", {
+          through: "hmtNoPkDelJoins",
+          source: "hmtNoPkDelItem",
+          className: "HmtNoPkDelItem",
+        });
       }
     }
     class HmtNoPkDelJoin extends Base {
       static {
         this.attribute("hmt_no_pk_del_owner_id", "integer");
         this.attribute("hmt_no_pk_del_item_id", "integer");
+        this.belongsTo("hmtNoPkDelItem", {
+          className: "HmtNoPkDelItem",
+          foreignKey: "hmt_no_pk_del_item_id",
+        });
       }
     }
     class HmtNoPkDelItem extends Base {
@@ -1032,20 +1043,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtNoPkDelOwner, "hmtNoPkDelJoins", {
-      className: "HmtNoPkDelJoin",
-      foreignKey: "hmt_no_pk_del_owner_id",
-    });
 
-    Associations.hasMany.call(HmtNoPkDelOwner, "hmtNoPkDelItems", {
-      through: "hmtNoPkDelJoins",
-      source: "hmtNoPkDelItem",
-      className: "HmtNoPkDelItem",
-    });
-    Associations.belongsTo.call(HmtNoPkDelJoin, "hmtNoPkDelItem", {
-      className: "HmtNoPkDelItem",
-      foreignKey: "hmt_no_pk_del_item_id",
-    });
     registerModel("HmtNoPkDelOwner", HmtNoPkDelOwner);
     registerModel("HmtNoPkDelJoin", HmtNoPkDelJoin);
     registerModel("HmtNoPkDelItem", HmtNoPkDelItem);
@@ -1070,12 +1068,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtPkOptOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtPkOptJoins", {
+          className: "HmtPkOptJoin",
+          foreignKey: "hmt_pk_opt_owner_id",
+        });
+        this.hasMany("hmtPkOptItems", {
+          through: "hmtPkOptJoins",
+          source: "hmtPkOptItem",
+          className: "HmtPkOptItem",
+        });
       }
     }
     class HmtPkOptJoin extends Base {
       static {
         this.attribute("hmt_pk_opt_owner_id", "integer");
         this.attribute("hmt_pk_opt_item_id", "integer");
+        this.belongsTo("hmtPkOptItem", {
+          className: "HmtPkOptItem",
+          foreignKey: "hmt_pk_opt_item_id",
+        });
       }
     }
     class HmtPkOptItem extends Base {
@@ -1083,20 +1094,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtPkOptOwner, "hmtPkOptJoins", {
-      className: "HmtPkOptJoin",
-      foreignKey: "hmt_pk_opt_owner_id",
-    });
 
-    Associations.hasMany.call(HmtPkOptOwner, "hmtPkOptItems", {
-      through: "hmtPkOptJoins",
-      source: "hmtPkOptItem",
-      className: "HmtPkOptItem",
-    });
-    Associations.belongsTo.call(HmtPkOptJoin, "hmtPkOptItem", {
-      className: "HmtPkOptItem",
-      foreignKey: "hmt_pk_opt_item_id",
-    });
     registerModel("HmtPkOptOwner", HmtPkOptOwner);
     registerModel("HmtPkOptJoin", HmtPkOptJoin);
     registerModel("HmtPkOptItem", HmtPkOptItem);
@@ -1120,12 +1118,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtPerson extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtMemberships", {
+          className: "HmtMembership",
+          foreignKey: "person_id",
+        });
+        this.hasMany("hmtClubs", {
+          through: "hmtMemberships",
+          source: "hmtClub",
+          className: "HmtClub",
+        });
       }
     }
     class HmtMembership extends Base {
       static {
         this.attribute("person_id", "integer");
         this.attribute("hmt_club_id", "integer");
+        this.belongsTo("hmtClub", {
+          className: "HmtClub",
+          foreignKey: "hmt_club_id",
+        });
       }
     }
     class HmtClub extends Base {
@@ -1133,20 +1144,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(HmtPerson, "hmtMemberships", {
-      className: "HmtMembership",
-      foreignKey: "person_id",
-    });
 
-    Associations.hasMany.call(HmtPerson, "hmtClubs", {
-      through: "hmtMemberships",
-      source: "hmtClub",
-      className: "HmtClub",
-    });
-    Associations.belongsTo.call(HmtMembership, "hmtClub", {
-      className: "HmtClub",
-      foreignKey: "hmt_club_id",
-    });
     registerModel("HmtPerson", HmtPerson);
     registerModel("HmtMembership", HmtMembership);
     registerModel("HmtClub", HmtClub);
@@ -1284,27 +1282,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("post_id", "integer");
         this.attribute("hmt_tag_id", "integer");
+        this.belongsTo("hmtTag", {
+          className: "HmtTag",
+          foreignKey: "hmt_tag_id",
+        });
       }
     }
     class HmtPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("hmtPostTags", {
+          className: "HmtPostTag",
+          foreignKey: "post_id",
+        });
+        this.hasMany("hmtTags", {
+          through: "hmtPostTags",
+          source: "hmtTag",
+          className: "HmtTag",
+        });
       }
     }
-    Associations.hasMany.call(HmtPost, "hmtPostTags", {
-      className: "HmtPostTag",
-      foreignKey: "post_id",
-    });
 
-    Associations.hasMany.call(HmtPost, "hmtTags", {
-      through: "hmtPostTags",
-      source: "hmtTag",
-      className: "HmtTag",
-    });
-    Associations.belongsTo.call(HmtPostTag, "hmtTag", {
-      className: "HmtTag",
-      foreignKey: "hmt_tag_id",
-    });
     registerModel("HmtTag", HmtTag);
     registerModel("HmtPostTag", HmtPostTag);
     registerModel("HmtPost", HmtPost);
@@ -1333,12 +1331,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDupPerson extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDupMemberships", {
+          className: "HmtDupMembership",
+          foreignKey: "hmt_dup_person_id",
+        });
+        this.hasMany("hmtDupClubs", {
+          through: "hmtDupMemberships",
+          source: "hmtDupClub",
+          className: "HmtDupClub",
+        });
       }
     }
     class HmtDupMembership extends Base {
       static {
         this.attribute("hmt_dup_person_id", "integer");
         this.attribute("hmt_dup_club_id", "integer");
+        this.belongsTo("hmtDupClub", {
+          className: "HmtDupClub",
+          foreignKey: "hmt_dup_club_id",
+        });
       }
     }
     class HmtDupClub extends Base {
@@ -1346,20 +1357,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(HmtDupPerson, "hmtDupMemberships", {
-      className: "HmtDupMembership",
-      foreignKey: "hmt_dup_person_id",
-    });
 
-    Associations.hasMany.call(HmtDupPerson, "hmtDupClubs", {
-      through: "hmtDupMemberships",
-      source: "hmtDupClub",
-      className: "HmtDupClub",
-    });
-    Associations.belongsTo.call(HmtDupMembership, "hmtDupClub", {
-      className: "HmtDupClub",
-      foreignKey: "hmt_dup_club_id",
-    });
     registerModel("HmtDupPerson", HmtDupPerson);
     registerModel("HmtDupMembership", HmtDupMembership);
     registerModel("HmtDupClub", HmtDupClub);
@@ -1386,6 +1384,10 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDup2Person extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDup2Joins", {
+          className: "HmtDup2Join",
+          foreignKey: "hmt_dup2_person_id",
+        });
       }
     }
     class HmtDup2Join extends Base {
@@ -1399,10 +1401,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(HmtDup2Person, "hmtDup2Joins", {
-      className: "HmtDup2Join",
-      foreignKey: "hmt_dup2_person_id",
-    });
     registerModel("HmtDup2Person", HmtDup2Person);
     registerModel("HmtDup2Join", HmtDup2Join);
     registerModel("HmtDup2Item", HmtDup2Item);
@@ -1426,12 +1424,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDelOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDelJoins", {
+          className: "HmtDelJoin",
+          foreignKey: "hmt_del_owner_id",
+        });
+        this.hasMany("hmtDelItems", {
+          through: "hmtDelJoins",
+          source: "hmtDelItem",
+          className: "HmtDelItem",
+        });
       }
     }
     class HmtDelJoin extends Base {
       static {
         this.attribute("hmt_del_owner_id", "integer");
         this.attribute("hmt_del_item_id", "integer");
+        this.belongsTo("hmtDelItem", {
+          className: "HmtDelItem",
+          foreignKey: "hmt_del_item_id",
+        });
       }
     }
     class HmtDelItem extends Base {
@@ -1439,20 +1450,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtDelOwner, "hmtDelJoins", {
-      className: "HmtDelJoin",
-      foreignKey: "hmt_del_owner_id",
-    });
 
-    Associations.hasMany.call(HmtDelOwner, "hmtDelItems", {
-      through: "hmtDelJoins",
-      source: "hmtDelItem",
-      className: "HmtDelItem",
-    });
-    Associations.belongsTo.call(HmtDelJoin, "hmtDelItem", {
-      className: "HmtDelItem",
-      foreignKey: "hmt_del_item_id",
-    });
     registerModel("HmtDelOwner", HmtDelOwner);
     registerModel("HmtDelJoin", HmtDelJoin);
     registerModel("HmtDelItem", HmtDelItem);
@@ -1518,12 +1516,25 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
+        this.hasMany("anbReaders", {
+          className: "AnbReader",
+          foreignKey: "anb_post_id",
+        });
+        this.hasMany("anbPeople", {
+          through: "anbReaders",
+          source: "anbPerson",
+          className: "AnbPerson",
+        });
       }
     }
     class AnbReader extends Base {
       static {
         this.attribute("anb_person_id", "integer");
         this.attribute("anb_post_id", "integer");
+        this.belongsTo("anbPerson", {
+          className: "AnbPerson",
+          foreignKey: "anb_person_id",
+        });
       }
     }
     class AnbPerson extends Base {
@@ -1531,20 +1542,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("first_name", "string");
       }
     }
-    Associations.hasMany.call(AnbPost, "anbReaders", {
-      className: "AnbReader",
-      foreignKey: "anb_post_id",
-    });
 
-    Associations.hasMany.call(AnbPost, "anbPeople", {
-      through: "anbReaders",
-      source: "anbPerson",
-      className: "AnbPerson",
-    });
-    Associations.belongsTo.call(AnbReader, "anbPerson", {
-      className: "AnbPerson",
-      foreignKey: "anb_person_id",
-    });
     registerModel("AnbPost", AnbPost);
     registerModel("AnbReader", AnbReader);
     registerModel("AnbPerson", AnbPerson);
@@ -1559,39 +1557,39 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtsPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("btsReaders", {
+          className: "BtsReader",
+          foreignKey: "bts_post_id",
+        });
+        this.hasMany("btsPeople", {
+          through: "btsReaders",
+          source: "btsPerson",
+          className: "BtsPerson",
+        });
       }
     }
     class BtsReader extends Base {
       static {
         this.attribute("bts_person_id", "integer");
         this.attribute("bts_post_id", "integer");
+        this.belongsTo("btsPerson", {
+          className: "BtsPerson",
+          foreignKey: "bts_person_id",
+          inverseOf: "btsReaders",
+        });
       }
     }
     class BtsPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("btsReaders", {
+          className: "BtsReader",
+          foreignKey: "bts_person_id",
+          inverseOf: "btsPerson",
+        });
       }
     }
-    Associations.hasMany.call(BtsPost, "btsReaders", {
-      className: "BtsReader",
-      foreignKey: "bts_post_id",
-    });
 
-    Associations.hasMany.call(BtsPost, "btsPeople", {
-      through: "btsReaders",
-      source: "btsPerson",
-      className: "BtsPerson",
-    });
-    Associations.belongsTo.call(BtsReader, "btsPerson", {
-      className: "BtsPerson",
-      foreignKey: "bts_person_id",
-      inverseOf: "btsReaders",
-    });
-    Associations.hasMany.call(BtsPerson, "btsReaders", {
-      className: "BtsReader",
-      foreignKey: "bts_person_id",
-      inverseOf: "btsPerson",
-    });
     registerModel("BtsPost", BtsPost);
     registerModel("BtsReader", BtsReader);
     registerModel("BtsPerson", BtsPerson);
@@ -1610,12 +1608,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtshPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("btshReaders", {
+          className: "BtshReader",
+          foreignKey: "btsh_post_id",
+        });
+        this.hasMany("btshPeople", {
+          through: "btshReaders",
+          source: "btshPerson",
+          className: "BtshPerson",
+        });
       }
     }
     class BtshReader extends Base {
       static {
         this.attribute("btsh_person_id", "integer");
         this.attribute("btsh_post_id", "integer");
+        this.belongsTo("btshPerson", {
+          className: "BtshPerson",
+          foreignKey: "btsh_person_id",
+        });
       }
     }
     class BtshPerson extends Base {
@@ -1623,20 +1634,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("first_name", "string");
       }
     }
-    Associations.hasMany.call(BtshPost, "btshReaders", {
-      className: "BtshReader",
-      foreignKey: "btsh_post_id",
-    });
 
-    Associations.hasMany.call(BtshPost, "btshPeople", {
-      through: "btshReaders",
-      source: "btshPerson",
-      className: "BtshPerson",
-    });
-    Associations.belongsTo.call(BtshReader, "btshPerson", {
-      className: "BtshPerson",
-      foreignKey: "btsh_person_id",
-    });
     registerModel("BtshPost", BtshPost);
     registerModel("BtshReader", BtshReader);
     registerModel("BtshPerson", BtshPerson);
@@ -1651,12 +1649,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtrsPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("btrsReaders", {
+          className: "BtrsReader",
+          foreignKey: "btrs_post_id",
+        });
+        this.hasMany("btrsPeople", {
+          through: "btrsReaders",
+          source: "btrsPerson",
+          className: "BtrsPerson",
+        });
       }
     }
     class BtrsReader extends Base {
       static {
         this.attribute("btrs_person_id", "integer");
         this.attribute("btrs_post_id", "integer");
+        this.belongsTo("btrsPerson", {
+          className: "BtrsPerson",
+          foreignKey: "btrs_person_id",
+        });
       }
     }
     class BtrsPerson extends Base {
@@ -1664,20 +1675,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("first_name", "string");
       }
     }
-    Associations.hasMany.call(BtrsPost, "btrsReaders", {
-      className: "BtrsReader",
-      foreignKey: "btrs_post_id",
-    });
 
-    Associations.hasMany.call(BtrsPost, "btrsPeople", {
-      through: "btrsReaders",
-      source: "btrsPerson",
-      className: "BtrsPerson",
-    });
-    Associations.belongsTo.call(BtrsReader, "btrsPerson", {
-      className: "BtrsPerson",
-      foreignKey: "btrs_person_id",
-    });
     registerModel("BtrsPost", BtrsPost);
     registerModel("BtrsReader", BtrsReader);
     registerModel("BtrsPerson", BtrsPerson);
@@ -1698,42 +1696,42 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtWriter extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtWriterBooks", {
+          className: "HmtWriterBook",
+          foreignKey: "writer_id",
+        });
+        this.hasMany("hmtWriterBookTitles", {
+          through: "hmtWriterBooks",
+          source: "hmtWriterBookTitle",
+          className: "HmtWriterBookTitle",
+        });
       }
     }
     class HmtWriterBook extends Base {
       static {
         this.attribute("writer_id", "integer");
         this.attribute("book_id", "integer");
+        this.belongsTo("hmtWriter", {
+          className: "HmtWriter",
+          foreignKey: "writer_id",
+          inverseOf: "hmtWriterBooks",
+        });
+        this.belongsTo("hmtWriterBookTitle", {
+          className: "HmtWriterBookTitle",
+          foreignKey: "book_id",
+        });
       }
     }
     class HmtWriterBookTitle extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("hmtWriterBooks", {
+          className: "HmtWriterBook",
+          foreignKey: "book_id",
+          inverseOf: "hmtWriterBookTitle",
+        });
       }
     }
-    Associations.hasMany.call(HmtWriter, "hmtWriterBooks", {
-      className: "HmtWriterBook",
-      foreignKey: "writer_id",
-    });
-    Associations.hasMany.call(HmtWriter, "hmtWriterBookTitles", {
-      through: "hmtWriterBooks",
-      source: "hmtWriterBookTitle",
-      className: "HmtWriterBookTitle",
-    });
-    Associations.belongsTo.call(HmtWriterBook, "hmtWriter", {
-      className: "HmtWriter",
-      foreignKey: "writer_id",
-      inverseOf: "hmtWriterBooks",
-    });
-    Associations.belongsTo.call(HmtWriterBook, "hmtWriterBookTitle", {
-      className: "HmtWriterBookTitle",
-      foreignKey: "book_id",
-    });
-    Associations.hasMany.call(HmtWriterBookTitle, "hmtWriterBooks", {
-      className: "HmtWriterBook",
-      foreignKey: "book_id",
-      inverseOf: "hmtWriterBookTitle",
-    });
     registerModel("HmtWriter", HmtWriter);
     registerModel("HmtWriterBook", HmtWriterBook);
     registerModel("HmtWriterBookTitle", HmtWriterBookTitle);
@@ -1762,12 +1760,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDelAssocOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDelAssocJoins", {
+          className: "HmtDelAssocJoin",
+          foreignKey: "hmt_del_assoc_owner_id",
+        });
+        this.hasMany("hmtDelAssocItems", {
+          through: "hmtDelAssocJoins",
+          source: "hmtDelAssocItem",
+          className: "HmtDelAssocItem",
+        });
       }
     }
     class HmtDelAssocJoin extends Base {
       static {
         this.attribute("hmt_del_assoc_owner_id", "integer");
         this.attribute("hmt_del_assoc_item_id", "integer");
+        this.belongsTo("hmtDelAssocItem", {
+          className: "HmtDelAssocItem",
+          foreignKey: "hmt_del_assoc_item_id",
+        });
       }
     }
     class HmtDelAssocItem extends Base {
@@ -1775,20 +1786,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtDelAssocOwner, "hmtDelAssocJoins", {
-      className: "HmtDelAssocJoin",
-      foreignKey: "hmt_del_assoc_owner_id",
-    });
 
-    Associations.hasMany.call(HmtDelAssocOwner, "hmtDelAssocItems", {
-      through: "hmtDelAssocJoins",
-      source: "hmtDelAssocItem",
-      className: "HmtDelAssocItem",
-    });
-    Associations.belongsTo.call(HmtDelAssocJoin, "hmtDelAssocItem", {
-      className: "HmtDelAssocItem",
-      foreignKey: "hmt_del_assoc_item_id",
-    });
     registerModel("HmtDelAssocOwner", HmtDelAssocOwner);
     registerModel("HmtDelAssocJoin", HmtDelAssocJoin);
     registerModel("HmtDelAssocItem", HmtDelAssocItem);
@@ -1813,12 +1811,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDestroyAssocOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDestroyAssocJoins", {
+          className: "HmtDestroyAssocJoin",
+          foreignKey: "hmt_destroy_assoc_owner_id",
+        });
+        this.hasMany("hmtDestroyAssocItems", {
+          through: "hmtDestroyAssocJoins",
+          source: "hmtDestroyAssocItem",
+          className: "HmtDestroyAssocItem",
+        });
       }
     }
     class HmtDestroyAssocJoin extends Base {
       static {
         this.attribute("hmt_destroy_assoc_owner_id", "integer");
         this.attribute("hmt_destroy_assoc_item_id", "integer");
+        this.belongsTo("hmtDestroyAssocItem", {
+          className: "HmtDestroyAssocItem",
+          foreignKey: "hmt_destroy_assoc_item_id",
+        });
       }
     }
     class HmtDestroyAssocItem extends Base {
@@ -1826,20 +1837,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtDestroyAssocOwner, "hmtDestroyAssocJoins", {
-      className: "HmtDestroyAssocJoin",
-      foreignKey: "hmt_destroy_assoc_owner_id",
-    });
 
-    Associations.hasMany.call(HmtDestroyAssocOwner, "hmtDestroyAssocItems", {
-      through: "hmtDestroyAssocJoins",
-      source: "hmtDestroyAssocItem",
-      className: "HmtDestroyAssocItem",
-    });
-    Associations.belongsTo.call(HmtDestroyAssocJoin, "hmtDestroyAssocItem", {
-      className: "HmtDestroyAssocItem",
-      foreignKey: "hmt_destroy_assoc_item_id",
-    });
     registerModel("HmtDestroyAssocOwner", HmtDestroyAssocOwner);
     registerModel("HmtDestroyAssocJoin", HmtDestroyAssocJoin);
     registerModel("HmtDestroyAssocItem", HmtDestroyAssocItem);
@@ -1870,12 +1868,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDestroyAllOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDestroyAllJoins", {
+          className: "HmtDestroyAllJoin",
+          foreignKey: "hmt_destroy_all_owner_id",
+        });
+        this.hasMany("hmtDestroyAllItems", {
+          through: "hmtDestroyAllJoins",
+          source: "hmtDestroyAllItem",
+          className: "HmtDestroyAllItem",
+        });
       }
     }
     class HmtDestroyAllJoin extends Base {
       static {
         this.attribute("hmt_destroy_all_owner_id", "integer");
         this.attribute("hmt_destroy_all_item_id", "integer");
+        this.belongsTo("hmtDestroyAllItem", {
+          className: "HmtDestroyAllItem",
+          foreignKey: "hmt_destroy_all_item_id",
+        });
       }
     }
     class HmtDestroyAllItem extends Base {
@@ -1883,20 +1894,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtDestroyAllOwner, "hmtDestroyAllJoins", {
-      className: "HmtDestroyAllJoin",
-      foreignKey: "hmt_destroy_all_owner_id",
-    });
 
-    Associations.hasMany.call(HmtDestroyAllOwner, "hmtDestroyAllItems", {
-      through: "hmtDestroyAllJoins",
-      source: "hmtDestroyAllItem",
-      className: "HmtDestroyAllItem",
-    });
-    Associations.belongsTo.call(HmtDestroyAllJoin, "hmtDestroyAllItem", {
-      className: "HmtDestroyAllItem",
-      foreignKey: "hmt_destroy_all_item_id",
-    });
     registerModel("HmtDestroyAllOwner", HmtDestroyAllOwner);
     registerModel("HmtDestroyAllJoin", HmtDestroyAllJoin);
     registerModel("HmtDestroyAllItem", HmtDestroyAllItem);
@@ -1970,12 +1968,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDaClrOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDaClrJoins", {
+          className: "HmtDaClrJoin",
+          foreignKey: "hmt_da_clr_owner_id",
+        });
+        this.hasMany("hmtDaClrItems", {
+          through: "hmtDaClrJoins",
+          source: "hmtDaClrItem",
+          className: "HmtDaClrItem",
+        });
       }
     }
     class HmtDaClrJoin extends Base {
       static {
         this.attribute("hmt_da_clr_owner_id", "integer");
         this.attribute("hmt_da_clr_item_id", "integer");
+        this.belongsTo("hmtDaClrItem", {
+          className: "HmtDaClrItem",
+          foreignKey: "hmt_da_clr_item_id",
+        });
       }
     }
     class HmtDaClrItem extends Base {
@@ -1983,20 +1994,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtDaClrOwner, "hmtDaClrJoins", {
-      className: "HmtDaClrJoin",
-      foreignKey: "hmt_da_clr_owner_id",
-    });
 
-    Associations.hasMany.call(HmtDaClrOwner, "hmtDaClrItems", {
-      through: "hmtDaClrJoins",
-      source: "hmtDaClrItem",
-      className: "HmtDaClrItem",
-    });
-    Associations.belongsTo.call(HmtDaClrJoin, "hmtDaClrItem", {
-      className: "HmtDaClrItem",
-      foreignKey: "hmt_da_clr_item_id",
-    });
     registerModel("HmtDaClrOwner", HmtDaClrOwner);
     registerModel("HmtDaClrJoin", HmtDaClrJoin);
     registerModel("HmtDaClrItem", HmtDaClrItem);
@@ -2037,12 +2035,26 @@ describe("HasManyThroughAssociationsTest", () => {
     class Af4Owner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany(`af4Refs_${method}`, {
+          className: "Af4Ref",
+          foreignKey: "af4_owner_id",
+        });
+        this.hasMany(`af4Items_${method}`, {
+          through: `af4Refs_${method}`,
+          source: "af4Item",
+          className: "Af4Item",
+          dependent: method === "delete_all" ? "delete" : "nullify",
+        });
       }
     }
     class Af4Ref extends Base {
       static {
         this.attribute("af4_owner_id", "integer");
         this.attribute("af4_item_id", "integer");
+        this.belongsTo("af4Item", {
+          className: "Af4Item",
+          foreignKey: "af4_item_id",
+        });
       }
     }
     class Af4Item extends Base {
@@ -2050,20 +2062,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(Af4Owner, `af4Refs_${method}`, {
-      className: "Af4Ref",
-      foreignKey: "af4_owner_id",
-    });
-    Associations.hasMany.call(Af4Owner, `af4Items_${method}`, {
-      through: `af4Refs_${method}`,
-      source: "af4Item",
-      className: "Af4Item",
-      dependent: method === "delete_all" ? "delete" : "nullify",
-    });
-    Associations.belongsTo.call(Af4Ref, "af4Item", {
-      className: "Af4Item",
-      foreignKey: "af4_item_id",
-    });
     registerModel("Af4Owner", Af4Owner);
     registerModel("Af4Ref", Af4Ref);
     registerModel("Af4Item", Af4Item);
@@ -2090,12 +2088,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDstClrOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDstClrJoins", {
+          className: "HmtDstClrJoin",
+          foreignKey: "hmt_dst_clr_owner_id",
+        });
+        this.hasMany("hmtDstClrItems", {
+          through: "hmtDstClrJoins",
+          source: "hmtDstClrItem",
+          className: "HmtDstClrItem",
+        });
       }
     }
     class HmtDstClrJoin extends Base {
       static {
         this.attribute("hmt_dst_clr_owner_id", "integer");
         this.attribute("hmt_dst_clr_item_id", "integer");
+        this.belongsTo("hmtDstClrItem", {
+          className: "HmtDstClrItem",
+          foreignKey: "hmt_dst_clr_item_id",
+        });
       }
     }
     class HmtDstClrItem extends Base {
@@ -2103,20 +2114,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtDstClrOwner, "hmtDstClrJoins", {
-      className: "HmtDstClrJoin",
-      foreignKey: "hmt_dst_clr_owner_id",
-    });
 
-    Associations.hasMany.call(HmtDstClrOwner, "hmtDstClrItems", {
-      through: "hmtDstClrJoins",
-      source: "hmtDstClrItem",
-      className: "HmtDstClrItem",
-    });
-    Associations.belongsTo.call(HmtDstClrJoin, "hmtDstClrItem", {
-      className: "HmtDstClrItem",
-      foreignKey: "hmt_dst_clr_item_id",
-    });
     registerModel("HmtDstClrOwner", HmtDstClrOwner);
     registerModel("HmtDstClrJoin", HmtDstClrJoin);
     registerModel("HmtDstClrItem", HmtDstClrItem);
@@ -2147,12 +2145,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDelClrOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDelClrJoins", {
+          className: "HmtDelClrJoin",
+          foreignKey: "hmt_del_clr_owner_id",
+        });
+        this.hasMany("hmtDelClrItems", {
+          through: "hmtDelClrJoins",
+          source: "hmtDelClrItem",
+          className: "HmtDelClrItem",
+        });
       }
     }
     class HmtDelClrJoin extends Base {
       static {
         this.attribute("hmt_del_clr_owner_id", "integer");
         this.attribute("hmt_del_clr_item_id", "integer");
+        this.belongsTo("hmtDelClrItem", {
+          className: "HmtDelClrItem",
+          foreignKey: "hmt_del_clr_item_id",
+        });
       }
     }
     class HmtDelClrItem extends Base {
@@ -2160,20 +2171,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtDelClrOwner, "hmtDelClrJoins", {
-      className: "HmtDelClrJoin",
-      foreignKey: "hmt_del_clr_owner_id",
-    });
 
-    Associations.hasMany.call(HmtDelClrOwner, "hmtDelClrItems", {
-      through: "hmtDelClrJoins",
-      source: "hmtDelClrItem",
-      className: "HmtDelClrItem",
-    });
-    Associations.belongsTo.call(HmtDelClrJoin, "hmtDelClrItem", {
-      className: "HmtDelClrItem",
-      foreignKey: "hmt_del_clr_item_id",
-    });
     registerModel("HmtDelClrOwner", HmtDelClrOwner);
     registerModel("HmtDelClrJoin", HmtDelClrJoin);
     registerModel("HmtDelClrItem", HmtDelClrItem);
@@ -2198,12 +2196,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtMismatchOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtMismatchJoins", {
+          className: "HmtMismatchJoin",
+          foreignKey: "hmt_mismatch_owner_id",
+        });
+        this.hasMany("hmtMismatchItems", {
+          through: "hmtMismatchJoins",
+          source: "hmtMismatchItem",
+          className: "HmtMismatchItem",
+        });
       }
     }
     class HmtMismatchJoin extends Base {
       static {
         this.attribute("hmt_mismatch_owner_id", "integer");
         this.attribute("hmt_mismatch_item_id", "integer");
+        this.belongsTo("hmtMismatchItem", {
+          className: "HmtMismatchItem",
+          foreignKey: "hmt_mismatch_item_id",
+        });
       }
     }
     class HmtMismatchItem extends Base {
@@ -2211,20 +2222,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtMismatchOwner, "hmtMismatchJoins", {
-      className: "HmtMismatchJoin",
-      foreignKey: "hmt_mismatch_owner_id",
-    });
 
-    Associations.hasMany.call(HmtMismatchOwner, "hmtMismatchItems", {
-      through: "hmtMismatchJoins",
-      source: "hmtMismatchItem",
-      className: "HmtMismatchItem",
-    });
-    Associations.belongsTo.call(HmtMismatchJoin, "hmtMismatchItem", {
-      className: "HmtMismatchItem",
-      foreignKey: "hmt_mismatch_item_id",
-    });
     registerModel("HmtMismatchOwner", HmtMismatchOwner);
     registerModel("HmtMismatchJoin", HmtMismatchJoin);
     registerModel("HmtMismatchItem", HmtMismatchItem);
@@ -2249,6 +2247,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class DepNullOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("depNullJoins", {
+          className: "DepNullJoin",
+          foreignKey: "dep_null_owner_id",
+          dependent: "nullify",
+        });
       }
     }
     class DepNullJoin extends Base {
@@ -2262,11 +2265,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(DepNullOwner, "depNullJoins", {
-      className: "DepNullJoin",
-      foreignKey: "dep_null_owner_id",
-      dependent: "nullify",
-    });
     registerModel("DepNullOwner", DepNullOwner);
     registerModel("DepNullJoin", DepNullJoin);
     registerModel("DepNullItem", DepNullItem);
@@ -2285,6 +2283,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class DepDelOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("depDelJoins", {
+          className: "DepDelJoin",
+          foreignKey: "dep_del_owner_id",
+          dependent: "delete",
+        });
       }
     }
     class DepDelJoin extends Base {
@@ -2293,11 +2296,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("dep_del_item_id", "integer");
       }
     }
-    Associations.hasMany.call(DepDelOwner, "depDelJoins", {
-      className: "DepDelJoin",
-      foreignKey: "dep_del_owner_id",
-      dependent: "delete",
-    });
     registerModel("DepDelOwner", DepDelOwner);
     registerModel("DepDelJoin", DepDelJoin);
     const owner = await DepDelOwner.create({ name: "O" });
@@ -2310,6 +2308,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class DepDesOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("depDesJoins", {
+          className: "DepDesJoin",
+          foreignKey: "dep_des_owner_id",
+          dependent: "destroy",
+        });
       }
     }
     class DepDesJoin extends Base {
@@ -2318,11 +2321,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("dep_des_item_id", "integer");
       }
     }
-    Associations.hasMany.call(DepDesOwner, "depDesJoins", {
-      className: "DepDesJoin",
-      foreignKey: "dep_des_owner_id",
-      dependent: "destroy",
-    });
     registerModel("DepDesOwner", DepDesOwner);
     registerModel("DepDesJoin", DepDesJoin);
     const owner = await DepDesOwner.create({ name: "O" });
@@ -2335,22 +2333,22 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtDesParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("btDesChildren", {
+          className: "BtDesChild",
+          foreignKey: "bt_des_parent_id",
+          dependent: "destroy",
+        });
       }
     }
     class BtDesChild extends Base {
       static {
         this.attribute("bt_des_parent_id", "integer");
+        this.belongsTo("btDesParent", {
+          className: "BtDesParent",
+          foreignKey: "bt_des_parent_id",
+        });
       }
     }
-    Associations.belongsTo.call(BtDesChild, "btDesParent", {
-      className: "BtDesParent",
-      foreignKey: "bt_des_parent_id",
-    });
-    Associations.hasMany.call(BtDesParent, "btDesChildren", {
-      className: "BtDesChild",
-      foreignKey: "bt_des_parent_id",
-      dependent: "destroy",
-    });
     registerModel("BtDesParent", BtDesParent);
     registerModel("BtDesChild", BtDesChild);
     const parent = await BtDesParent.create({ name: "P" });
@@ -2363,6 +2361,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtDelParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("btDelChildren", {
+          className: "BtDelChild",
+          foreignKey: "bt_del_parent_id",
+          dependent: "delete",
+        });
       }
     }
     class BtDelChild extends Base {
@@ -2370,11 +2373,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("bt_del_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(BtDelParent, "btDelChildren", {
-      className: "BtDelChild",
-      foreignKey: "bt_del_parent_id",
-      dependent: "delete",
-    });
     registerModel("BtDelParent", BtDelParent);
     registerModel("BtDelChild", BtDelChild);
     const parent = await BtDelParent.create({ name: "P" });
@@ -2387,6 +2385,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtNullParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("btNullChildren", {
+          className: "BtNullChild",
+          foreignKey: "bt_null_parent_id",
+          dependent: "nullify",
+        });
       }
     }
     class BtNullChild extends Base {
@@ -2394,11 +2397,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("bt_null_parent_id", "integer");
       }
     }
-    Associations.hasMany.call(BtNullParent, "btNullChildren", {
-      className: "BtNullChild",
-      foreignKey: "bt_null_parent_id",
-      dependent: "nullify",
-    });
     registerModel("BtNullParent", BtNullParent);
     registerModel("BtNullChild", BtNullChild);
     const parent = await BtNullParent.create({ name: "P" });
@@ -2413,12 +2411,22 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tags_count", "integer", { default: 0 });
+        this.hasMany("ccTaggings", {
+          className: "CcTagging",
+          foreignKey: "cc_owner_id",
+        });
+        this.hasMany("ccTags", { through: "ccTaggings", source: "ccTag" });
       }
     }
     class CcTagging extends Base {
       static {
         this.attribute("cc_owner_id", "integer");
         this.attribute("cc_tag_id", "integer");
+        this.belongsTo("ccOwner", {
+          foreignKey: "cc_owner_id",
+          counterCache: "tags_count",
+        });
+        this.belongsTo("ccTag", { foreignKey: "cc_tag_id" });
       }
     }
     class CcTag extends Base {
@@ -2426,16 +2434,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CcOwner, "ccTaggings", {
-      className: "CcTagging",
-      foreignKey: "cc_owner_id",
-    });
-    Associations.hasMany.call(CcOwner, "ccTags", { through: "ccTaggings", source: "ccTag" });
-    Associations.belongsTo.call(CcTagging, "ccOwner", {
-      foreignKey: "cc_owner_id",
-      counterCache: "tags_count",
-    });
-    Associations.belongsTo.call(CcTagging, "ccTag", { foreignKey: "cc_tag_id" });
     registerModel(CcOwner);
     registerModel(CcTagging);
     registerModel(CcTag);
@@ -2456,12 +2454,26 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tags_with_destroy_count", "integer", { default: 0 });
+        this.hasMany("ccDestrTaggings", {
+          className: "CcDestrTagging",
+          foreignKey: "cc_destr_owner_id",
+        });
+        this.hasMany("ccDestrTags", {
+          through: "ccDestrTaggings",
+          source: "ccDestrTag",
+          className: "CcDestrTag",
+        });
       }
     }
     class CcDestrTagging extends Base {
       static {
         this.attribute("cc_destr_owner_id", "integer");
         this.attribute("cc_destr_tag_id", "integer");
+        this.belongsTo("ccDestrOwner", {
+          foreignKey: "cc_destr_owner_id",
+          counterCache: "tags_with_destroy_count",
+        });
+        this.belongsTo("ccDestrTag", { foreignKey: "cc_destr_tag_id" });
       }
     }
     class CcDestrTag extends Base {
@@ -2469,20 +2481,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CcDestrOwner, "ccDestrTaggings", {
-      className: "CcDestrTagging",
-      foreignKey: "cc_destr_owner_id",
-    });
-    Associations.hasMany.call(CcDestrOwner, "ccDestrTags", {
-      through: "ccDestrTaggings",
-      source: "ccDestrTag",
-      className: "CcDestrTag",
-    });
-    Associations.belongsTo.call(CcDestrTagging, "ccDestrOwner", {
-      foreignKey: "cc_destr_owner_id",
-      counterCache: "tags_with_destroy_count",
-    });
-    Associations.belongsTo.call(CcDestrTagging, "ccDestrTag", { foreignKey: "cc_destr_tag_id" });
     registerModel(CcDestrOwner);
     registerModel(CcDestrTagging);
     registerModel(CcDestrTag);
@@ -2506,12 +2504,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tags_with_nullify_count", "integer", { default: 0 });
+        this.hasMany("ccNulTaggings", {
+          className: "CcNulTagging",
+          foreignKey: "cc_nul_owner_id",
+          dependent: "nullify",
+        });
+        this.hasMany("ccNulTags", {
+          through: "ccNulTaggings",
+          source: "ccNulTag",
+          className: "CcNulTag",
+        });
       }
     }
     class CcNulTagging extends Base {
       static {
         this.attribute("cc_nul_owner_id", "integer");
         this.attribute("cc_nul_tag_id", "integer");
+        this.belongsTo("ccNulOwner", {
+          foreignKey: "cc_nul_owner_id",
+          counterCache: "tags_with_nullify_count",
+        });
+        this.belongsTo("ccNulTag", { foreignKey: "cc_nul_tag_id" });
       }
     }
     class CcNulTag extends Base {
@@ -2519,21 +2532,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CcNulOwner, "ccNulTaggings", {
-      className: "CcNulTagging",
-      foreignKey: "cc_nul_owner_id",
-      dependent: "nullify",
-    });
-    Associations.hasMany.call(CcNulOwner, "ccNulTags", {
-      through: "ccNulTaggings",
-      source: "ccNulTag",
-      className: "CcNulTag",
-    });
-    Associations.belongsTo.call(CcNulTagging, "ccNulOwner", {
-      foreignKey: "cc_nul_owner_id",
-      counterCache: "tags_with_nullify_count",
-    });
-    Associations.belongsTo.call(CcNulTagging, "ccNulTag", { foreignKey: "cc_nul_tag_id" });
     registerModel(CcNulOwner);
     registerModel(CcNulTagging);
     registerModel(CcNulTag);
@@ -2558,12 +2556,26 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tags_count", "integer", { default: 0 });
+        this.hasMany("ccRplTaggings", {
+          className: "CcRplTagging",
+          foreignKey: "cc_rpl_owner_id",
+        });
+        this.hasMany("ccRplTags", {
+          through: "ccRplTaggings",
+          source: "ccRplTag",
+          className: "CcRplTag",
+        });
       }
     }
     class CcRplTagging extends Base {
       static {
         this.attribute("cc_rpl_owner_id", "integer");
         this.attribute("cc_rpl_tag_id", "integer");
+        this.belongsTo("ccRplOwner", {
+          foreignKey: "cc_rpl_owner_id",
+          counterCache: "tags_count",
+        });
+        this.belongsTo("ccRplTag", { foreignKey: "cc_rpl_tag_id" });
       }
     }
     class CcRplTag extends Base {
@@ -2571,20 +2583,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CcRplOwner, "ccRplTaggings", {
-      className: "CcRplTagging",
-      foreignKey: "cc_rpl_owner_id",
-    });
-    Associations.hasMany.call(CcRplOwner, "ccRplTags", {
-      through: "ccRplTaggings",
-      source: "ccRplTag",
-      className: "CcRplTag",
-    });
-    Associations.belongsTo.call(CcRplTagging, "ccRplOwner", {
-      foreignKey: "cc_rpl_owner_id",
-      counterCache: "tags_count",
-    });
-    Associations.belongsTo.call(CcRplTagging, "ccRplTag", { foreignKey: "cc_rpl_tag_id" });
     registerModel(CcRplOwner);
     registerModel(CcRplTagging);
     registerModel(CcRplTag);
@@ -2608,12 +2606,22 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("taggings_count", "integer", { default: 0 });
+        this.hasMany("ccDTaggings", {
+          className: "CcDTagging",
+          foreignKey: "cc_d_owner_id",
+        });
+        this.hasMany("ccDTags", { through: "ccDTaggings", source: "ccDTag" });
       }
     }
     class CcDTagging extends Base {
       static {
         this.attribute("cc_d_owner_id", "integer");
         this.attribute("cc_d_tag_id", "integer");
+        this.belongsTo("ccDOwner", {
+          foreignKey: "cc_d_owner_id",
+          counterCache: "taggings_count",
+        });
+        this.belongsTo("ccDTag", { foreignKey: "cc_d_tag_id" });
       }
     }
     class CcDTag extends Base {
@@ -2621,16 +2629,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CcDOwner, "ccDTaggings", {
-      className: "CcDTagging",
-      foreignKey: "cc_d_owner_id",
-    });
-    Associations.hasMany.call(CcDOwner, "ccDTags", { through: "ccDTaggings", source: "ccDTag" });
-    Associations.belongsTo.call(CcDTagging, "ccDOwner", {
-      foreignKey: "cc_d_owner_id",
-      counterCache: "taggings_count",
-    });
-    Associations.belongsTo.call(CcDTagging, "ccDTag", { foreignKey: "cc_d_tag_id" });
     registerModel(CcDOwner);
     registerModel(CcDTagging);
     registerModel(CcDTag);
@@ -2651,6 +2649,15 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("indestructible_tags_count", "integer", { default: 0 });
+        this.hasMany("idestrTaggings", {
+          className: "IdestrTagging",
+          foreignKey: "idestr_owner_id",
+        });
+        this.hasMany("idestrTags", {
+          through: "idestrTaggings",
+          source: "idestrTag",
+          className: "IdestrTag",
+        });
       }
     }
     class IdestrTagging extends Base {
@@ -2660,7 +2667,12 @@ describe("HasManyThroughAssociationsTest", () => {
         // before_destroy that prevents destruction
         this.beforeDestroy((r: any) => {
           return false;
-        }); // prevent destroy by returning false
+        });
+        this.belongsTo("idestrOwner", {
+          foreignKey: "idestr_owner_id",
+          counterCache: "indestructible_tags_count",
+        });
+        this.belongsTo("idestrTag", { foreignKey: "idestr_tag_id" }); // prevent destroy by returning false
       }
     }
     class IdestrTag extends Base {
@@ -2668,20 +2680,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(IdestrOwner, "idestrTaggings", {
-      className: "IdestrTagging",
-      foreignKey: "idestr_owner_id",
-    });
-    Associations.hasMany.call(IdestrOwner, "idestrTags", {
-      through: "idestrTaggings",
-      source: "idestrTag",
-      className: "IdestrTag",
-    });
-    Associations.belongsTo.call(IdestrTagging, "idestrOwner", {
-      foreignKey: "idestr_owner_id",
-      counterCache: "indestructible_tags_count",
-    });
-    Associations.belongsTo.call(IdestrTagging, "idestrTag", { foreignKey: "idestr_tag_id" });
     registerModel(IdestrOwner);
     registerModel(IdestrTagging);
     registerModel(IdestrTag);
@@ -2704,12 +2702,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtReplOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtReplJoins", {
+          className: "HmtReplJoin",
+          foreignKey: "hmt_repl_owner_id",
+        });
+        this.hasMany("hmtReplItems", {
+          through: "hmtReplJoins",
+          source: "hmtReplItem",
+          className: "HmtReplItem",
+        });
       }
     }
     class HmtReplJoin extends Base {
       static {
         this.attribute("hmt_repl_owner_id", "integer");
         this.attribute("hmt_repl_item_id", "integer");
+        this.belongsTo("hmtReplItem", {
+          className: "HmtReplItem",
+          foreignKey: "hmt_repl_item_id",
+        });
       }
     }
     class HmtReplItem extends Base {
@@ -2717,20 +2728,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtReplOwner, "hmtReplJoins", {
-      className: "HmtReplJoin",
-      foreignKey: "hmt_repl_owner_id",
-    });
 
-    Associations.hasMany.call(HmtReplOwner, "hmtReplItems", {
-      through: "hmtReplJoins",
-      source: "hmtReplItem",
-      className: "HmtReplItem",
-    });
-    Associations.belongsTo.call(HmtReplJoin, "hmtReplItem", {
-      className: "HmtReplItem",
-      foreignKey: "hmt_repl_item_id",
-    });
     registerModel("HmtReplOwner", HmtReplOwner);
     registerModel("HmtReplJoin", HmtReplJoin);
     registerModel("HmtReplItem", HmtReplItem);
@@ -2768,12 +2766,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtReplDupOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtReplDupJoins", {
+          className: "HmtReplDupJoin",
+          foreignKey: "hmt_repl_dup_owner_id",
+        });
+        this.hasMany("hmtReplDupItems", {
+          through: "hmtReplDupJoins",
+          source: "hmtReplDupItem",
+          className: "HmtReplDupItem",
+        });
       }
     }
     class HmtReplDupJoin extends Base {
       static {
         this.attribute("hmt_repl_dup_owner_id", "integer");
         this.attribute("hmt_repl_dup_item_id", "integer");
+        this.belongsTo("hmtReplDupItem", {
+          className: "HmtReplDupItem",
+          foreignKey: "hmt_repl_dup_item_id",
+        });
       }
     }
     class HmtReplDupItem extends Base {
@@ -2781,20 +2792,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtReplDupOwner, "hmtReplDupJoins", {
-      className: "HmtReplDupJoin",
-      foreignKey: "hmt_repl_dup_owner_id",
-    });
 
-    Associations.hasMany.call(HmtReplDupOwner, "hmtReplDupItems", {
-      through: "hmtReplDupJoins",
-      source: "hmtReplDupItem",
-      className: "HmtReplDupItem",
-    });
-    Associations.belongsTo.call(HmtReplDupJoin, "hmtReplDupItem", {
-      className: "HmtReplDupItem",
-      foreignKey: "hmt_repl_dup_item_id",
-    });
     registerModel("HmtReplDupOwner", HmtReplDupOwner);
     registerModel("HmtReplDupJoin", HmtReplDupJoin);
     registerModel("HmtReplDupItem", HmtReplDupItem);
@@ -2823,12 +2821,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class RopPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("ropReaders", {
+          className: "RopReader",
+          foreignKey: "rop_post_id",
+        });
+        this.hasMany("ropPeople", {
+          through: "ropReaders",
+          source: "ropPerson",
+          className: "RopPerson",
+        });
       }
     }
     class RopReader extends Base {
       static {
         this.attribute("rop_person_id", "integer");
         this.attribute("rop_post_id", "integer");
+        this.belongsTo("ropPerson", {
+          className: "RopPerson",
+          foreignKey: "rop_person_id",
+        });
       }
     }
     class RopPerson extends Base {
@@ -2836,20 +2847,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("first_name", "string");
       }
     }
-    Associations.hasMany.call(RopPost, "ropReaders", {
-      className: "RopReader",
-      foreignKey: "rop_post_id",
-    });
 
-    Associations.hasMany.call(RopPost, "ropPeople", {
-      through: "ropReaders",
-      source: "ropPerson",
-      className: "RopPerson",
-    });
-    Associations.belongsTo.call(RopReader, "ropPerson", {
-      className: "RopPerson",
-      foreignKey: "rop_person_id",
-    });
     registerModel("RopPost", RopPost);
     registerModel("RopReader", RopReader);
     registerModel("RopPerson", RopPerson);
@@ -2874,12 +2872,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class RbiPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("rbiReaders", {
+          className: "RbiReader",
+          foreignKey: "rbi_post_id",
+        });
+        this.hasMany("rbiPeople", {
+          through: "rbiReaders",
+          source: "rbiPerson",
+          className: "RbiPerson",
+        });
       }
     }
     class RbiReader extends Base {
       static {
         this.attribute("rbi_person_id", "integer");
         this.attribute("rbi_post_id", "integer");
+        this.belongsTo("rbiPerson", {
+          className: "RbiPerson",
+          foreignKey: "rbi_person_id",
+        });
       }
     }
     class RbiPerson extends Base {
@@ -2887,20 +2898,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("first_name", "string");
       }
     }
-    Associations.hasMany.call(RbiPost, "rbiReaders", {
-      className: "RbiReader",
-      foreignKey: "rbi_post_id",
-    });
 
-    Associations.hasMany.call(RbiPost, "rbiPeople", {
-      through: "rbiReaders",
-      source: "rbiPerson",
-      className: "RbiPerson",
-    });
-    Associations.belongsTo.call(RbiReader, "rbiPerson", {
-      className: "RbiPerson",
-      foreignKey: "rbi_person_id",
-    });
     registerModel("RbiPost", RbiPost);
     registerModel("RbiReader", RbiReader);
     registerModel("RbiPerson", RbiPerson);
@@ -2960,27 +2958,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("trb_post_id", "integer");
         this.attribute("trb_tag_id", "integer");
+        this.belongsTo("trbTag", {
+          className: "TrbTag",
+          foreignKey: "trb_tag_id",
+        });
       }
     }
     class TrbPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("trbTaggings", {
+          className: "TrbTagging",
+          foreignKey: "trb_post_id",
+        });
+        this.hasMany("trbTags", {
+          through: "trbTaggings",
+          source: "trbTag",
+          className: "TrbTag",
+        });
       }
     }
-    Associations.hasMany.call(TrbPost, "trbTaggings", {
-      className: "TrbTagging",
-      foreignKey: "trb_post_id",
-    });
 
-    Associations.hasMany.call(TrbPost, "trbTags", {
-      through: "trbTaggings",
-      source: "trbTag",
-      className: "TrbTag",
-    });
-    Associations.belongsTo.call(TrbTagging, "trbTag", {
-      className: "TrbTag",
-      foreignKey: "trb_tag_id",
-    });
     registerModel("TrbTag", TrbTag);
     registerModel("TrbTagging", TrbTagging);
     registerModel("TrbPost", TrbPost);
@@ -3037,27 +3035,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("acc_post_id", "integer");
         this.attribute("acc_tag_id", "integer");
+        this.belongsTo("accTag", {
+          className: "AccTag",
+          foreignKey: "acc_tag_id",
+        });
       }
     }
     class AccPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("accTaggings", {
+          className: "AccTagging",
+          foreignKey: "acc_post_id",
+        });
+        this.hasMany("accTags", {
+          through: "accTaggings",
+          source: "accTag",
+          className: "AccTag",
+        });
       }
     }
-    Associations.hasMany.call(AccPost, "accTaggings", {
-      className: "AccTagging",
-      foreignKey: "acc_post_id",
-    });
 
-    Associations.hasMany.call(AccPost, "accTags", {
-      through: "accTaggings",
-      source: "accTag",
-      className: "AccTag",
-    });
-    Associations.belongsTo.call(AccTagging, "accTag", {
-      className: "AccTag",
-      foreignKey: "acc_tag_id",
-    });
     registerModel("AccTag", AccTag);
     registerModel("AccTagging", AccTagging);
     registerModel("AccPost", AccPost);
@@ -3252,6 +3250,10 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("pwir_owner_id", "integer");
         this.attribute("pwir_item_id", "integer");
+        this.belongsTo("pwir_item", {
+          className: "PwirItem",
+          foreignKey: "pwir_item_id",
+        });
       }
     }
     class PwirItem extends Base {
@@ -3263,24 +3265,20 @@ describe("HasManyThroughAssociationsTest", () => {
     class PwirOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pwir_joins", {
+          className: "PwirJoin",
+          foreignKey: "pwir_owner_id",
+        });
+        this.hasMany("pwir_items", {
+          className: "PwirItem",
+          through: "pwir_joins",
+          source: "pwir_item",
+        });
       }
     }
     registerModel("PwirJoin", PwirJoin);
     registerModel("PwirItem", PwirItem);
     registerModel("PwirOwner", PwirOwner);
-    Associations.belongsTo.call(PwirJoin, "pwir_item", {
-      className: "PwirItem",
-      foreignKey: "pwir_item_id",
-    });
-    Associations.hasMany.call(PwirOwner, "pwir_joins", {
-      className: "PwirJoin",
-      foreignKey: "pwir_owner_id",
-    });
-    Associations.hasMany.call(PwirOwner, "pwir_items", {
-      className: "PwirItem",
-      through: "pwir_joins",
-      source: "pwir_item",
-    });
 
     const owner = await PwirOwner.create({ name: "Firm" });
     const invalid = new PwirItem({ name: "0" });
@@ -3298,6 +3296,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.validate((r: any) => {
           r.errors.add("base", "Invalid Contract");
         });
+        this.belongsTo("pij_item", {
+          className: "PijItem",
+          foreignKey: "pij_item_id",
+        });
       }
     }
     class PijItem extends Base {
@@ -3308,24 +3310,20 @@ describe("HasManyThroughAssociationsTest", () => {
     class PijOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pij_joins", {
+          className: "PijJoin",
+          foreignKey: "pij_owner_id",
+        });
+        this.hasMany("pij_items", {
+          className: "PijItem",
+          through: "pij_joins",
+          source: "pij_item",
+        });
       }
     }
     registerModel("PijJoin", PijJoin);
     registerModel("PijItem", PijItem);
     registerModel("PijOwner", PijOwner);
-    Associations.belongsTo.call(PijJoin, "pij_item", {
-      className: "PijItem",
-      foreignKey: "pij_item_id",
-    });
-    Associations.hasMany.call(PijOwner, "pij_joins", {
-      className: "PijJoin",
-      foreignKey: "pij_owner_id",
-    });
-    Associations.hasMany.call(PijOwner, "pij_items", {
-      className: "PijItem",
-      through: "pij_joins",
-      source: "pij_item",
-    });
 
     const owner = await PijOwner.create({ name: "Firm" });
     const item = await PijItem.create({ name: "lifo" });
@@ -3336,12 +3334,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtClrOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtClrJoins", {
+          className: "HmtClrJoin",
+          foreignKey: "hmt_clr_owner_id",
+        });
+        this.hasMany("hmtClrItems", {
+          through: "hmtClrJoins",
+          source: "hmtClrItem",
+          className: "HmtClrItem",
+        });
       }
     }
     class HmtClrJoin extends Base {
       static {
         this.attribute("hmt_clr_owner_id", "integer");
         this.attribute("hmt_clr_item_id", "integer");
+        this.belongsTo("hmtClrItem", {
+          className: "HmtClrItem",
+          foreignKey: "hmt_clr_item_id",
+        });
       }
     }
     class HmtClrItem extends Base {
@@ -3349,20 +3360,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtClrOwner, "hmtClrJoins", {
-      className: "HmtClrJoin",
-      foreignKey: "hmt_clr_owner_id",
-    });
 
-    Associations.hasMany.call(HmtClrOwner, "hmtClrItems", {
-      through: "hmtClrJoins",
-      source: "hmtClrItem",
-      className: "HmtClrItem",
-    });
-    Associations.belongsTo.call(HmtClrJoin, "hmtClrItem", {
-      className: "HmtClrItem",
-      foreignKey: "hmt_clr_item_id",
-    });
     registerModel("HmtClrOwner", HmtClrOwner);
     registerModel("HmtClrJoin", HmtClrJoin);
     registerModel("HmtClrItem", HmtClrItem);
@@ -3401,12 +3399,31 @@ describe("HasManyThroughAssociationsTest", () => {
     class AcoOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("acoJoins", {
+          className: "AcoJoin",
+          foreignKey: "aco_owner_id",
+        });
+        this.hasMany("acoPersons", {
+          through: "acoJoins",
+          source: "acoPerson",
+          className: "AcoPerson",
+          beforeAdd: (owner: Base, record: Base) => {
+            log.push(["added", "before", record.first_name as string]);
+          },
+          afterAdd: (owner: Base, record: Base) => {
+            log.push(["added", "after", record.first_name as string]);
+          },
+        });
       }
     }
     class AcoJoin extends Base {
       static {
         this.attribute("aco_owner_id", "integer");
         this.attribute("aco_person_id", "integer");
+        this.belongsTo("acoPerson", {
+          className: "AcoPerson",
+          foreignKey: "aco_person_id",
+        });
       }
     }
     class AcoPerson extends Base {
@@ -3414,25 +3431,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("first_name", "string");
       }
     }
-    Associations.hasMany.call(AcoOwner, "acoJoins", {
-      className: "AcoJoin",
-      foreignKey: "aco_owner_id",
-    });
-    Associations.hasMany.call(AcoOwner, "acoPersons", {
-      through: "acoJoins",
-      source: "acoPerson",
-      className: "AcoPerson",
-      beforeAdd: (owner: Base, record: Base) => {
-        log.push(["added", "before", record.first_name as string]);
-      },
-      afterAdd: (owner: Base, record: Base) => {
-        log.push(["added", "after", record.first_name as string]);
-      },
-    });
-    Associations.belongsTo.call(AcoJoin, "acoPerson", {
-      className: "AcoPerson",
-      foreignKey: "aco_person_id",
-    });
     registerModel("AcoOwner", AcoOwner);
     registerModel("AcoJoin", AcoJoin);
     registerModel("AcoPerson", AcoPerson);
@@ -3480,29 +3478,29 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("df_person_id", "integer");
         this.attribute("df_post_id", "integer");
+        this.belongsTo("df_post", {
+          className: "DfPost",
+          foreignKey: "df_post_id",
+        });
       }
     }
     class DfPerson extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("df_readers", {
+          className: "DfReader",
+          foreignKey: "df_person_id",
+        });
+        this.hasMany("df_posts", {
+          className: "DfPost",
+          through: "df_readers",
+          source: "df_post",
+        });
       }
     }
     registerModel("DfPost", DfPost);
     registerModel("DfReader", DfReader);
     registerModel("DfPerson", DfPerson);
-    Associations.belongsTo.call(DfReader, "df_post", {
-      className: "DfPost",
-      foreignKey: "df_post_id",
-    });
-    Associations.hasMany.call(DfPerson, "df_readers", {
-      className: "DfReader",
-      foreignKey: "df_person_id",
-    });
-    Associations.hasMany.call(DfPerson, "df_posts", {
-      className: "DfPost",
-      through: "df_readers",
-      source: "df_post",
-    });
 
     const person = await DfPerson.create({ name: "Michael" });
     const post = await DfPost.create({ title: "Welcome to the weblog" });
@@ -3524,29 +3522,29 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("ci_person_id", "integer");
         this.attribute("ci_post_id", "integer");
+        this.belongsTo("ci_post", {
+          className: "CiPost",
+          foreignKey: "ci_post_id",
+        });
       }
     }
     class CiPerson extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ci_readers", {
+          className: "CiReader",
+          foreignKey: "ci_person_id",
+        });
+        this.hasMany("ci_posts", {
+          className: "CiPost",
+          through: "ci_readers",
+          source: "ci_post",
+        });
       }
     }
     registerModel("CiPost", CiPost);
     registerModel("CiReader", CiReader);
     registerModel("CiPerson", CiPerson);
-    Associations.belongsTo.call(CiReader, "ci_post", {
-      className: "CiPost",
-      foreignKey: "ci_post_id",
-    });
-    Associations.hasMany.call(CiPerson, "ci_readers", {
-      className: "CiReader",
-      foreignKey: "ci_person_id",
-    });
-    Associations.hasMany.call(CiPerson, "ci_posts", {
-      className: "CiPost",
-      through: "ci_readers",
-      source: "ci_post",
-    });
 
     const person = await CiPerson.create({ name: "Michael" });
     await CiPost.create({ title: "A" }).then(async (p) =>
@@ -3564,12 +3562,22 @@ describe("HasManyThroughAssociationsTest", () => {
     class IjqPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("ijqReferences", { foreignKey: "ijq_person_id" });
+        this.hasMany("ijqJobs", {
+          through: "ijqReferences",
+          source: "ijqJob",
+          className: "IjqJob",
+        });
       }
     }
     class IjqReference extends Base {
       static {
         this.attribute("ijq_person_id", "integer");
         this.attribute("ijq_job_id", "integer");
+        this.belongsTo("ijqJob", {
+          foreignKey: "ijq_job_id",
+          className: "IjqJob",
+        });
       }
     }
     class IjqJob extends Base {
@@ -3577,16 +3585,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(IjqPerson, "ijqReferences", { foreignKey: "ijq_person_id" });
-    Associations.hasMany.call(IjqPerson, "ijqJobs", {
-      through: "ijqReferences",
-      source: "ijqJob",
-      className: "IjqJob",
-    });
-    Associations.belongsTo.call(IjqReference, "ijqJob", {
-      foreignKey: "ijq_job_id",
-      className: "IjqJob",
-    });
     registerModel("IjqPerson", IjqPerson);
     registerModel("IjqReference", IjqReference);
     registerModel("IjqJob", IjqJob);
@@ -3613,12 +3611,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtIdsCondOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtIdsCondJoins", {
+          className: "HmtIdsCondJoin",
+          foreignKey: "hmt_ids_cond_owner_id",
+        });
+        this.hasMany("hmtIdsCondItems", {
+          through: "hmtIdsCondJoins",
+          source: "hmtIdsCondItem",
+          className: "HmtIdsCondItem",
+        });
       }
     }
     class HmtIdsCondJoin extends Base {
       static {
         this.attribute("hmt_ids_cond_owner_id", "integer");
         this.attribute("hmt_ids_cond_item_id", "integer");
+        this.belongsTo("hmtIdsCondItem", {
+          className: "HmtIdsCondItem",
+          foreignKey: "hmt_ids_cond_item_id",
+        });
       }
     }
     class HmtIdsCondItem extends Base {
@@ -3626,20 +3637,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtIdsCondOwner, "hmtIdsCondJoins", {
-      className: "HmtIdsCondJoin",
-      foreignKey: "hmt_ids_cond_owner_id",
-    });
 
-    Associations.hasMany.call(HmtIdsCondOwner, "hmtIdsCondItems", {
-      through: "hmtIdsCondJoins",
-      source: "hmtIdsCondItem",
-      className: "HmtIdsCondItem",
-    });
-    Associations.belongsTo.call(HmtIdsCondJoin, "hmtIdsCondItem", {
-      className: "HmtIdsCondItem",
-      foreignKey: "hmt_ids_cond_item_id",
-    });
     registerModel("HmtIdsCondOwner", HmtIdsCondOwner);
     registerModel("HmtIdsCondJoin", HmtIdsCondJoin);
     registerModel("HmtIdsCondItem", HmtIdsCondItem);
@@ -3730,12 +3728,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class TxnOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("txn_joins", {
+          className: "TxnJoin",
+          foreignKey: "txn_owner_id",
+        });
+        this.hasMany("txn_tags", {
+          className: "TxnTag",
+          through: "txn_joins",
+          source: "txn_tag",
+        });
       }
     }
     class TxnJoin extends Base {
       static {
         this.attribute("txn_owner_id", "integer");
         this.attribute("txn_tag_id", "integer");
+        this.belongsTo("txn_tag", {
+          className: "TxnTag",
+          foreignKey: "txn_tag_id",
+        });
       }
     }
     class TxnTag extends Base {
@@ -3746,19 +3757,6 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("TxnOwner", TxnOwner);
     registerModel("TxnJoin", TxnJoin);
     registerModel("TxnTag", TxnTag);
-    Associations.belongsTo.call(TxnJoin, "txn_tag", {
-      className: "TxnTag",
-      foreignKey: "txn_tag_id",
-    });
-    Associations.hasMany.call(TxnOwner, "txn_joins", {
-      className: "TxnJoin",
-      foreignKey: "txn_owner_id",
-    });
-    Associations.hasMany.call(TxnOwner, "txn_tags", {
-      className: "TxnTag",
-      through: "txn_joins",
-      source: "txn_tag",
-    });
 
     const owner = await TxnOwner.create({ name: "Post" });
     const tag = await TxnTag.create({ name: "science" });
@@ -3786,12 +3784,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class TxnPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("txn_readers", {
+          className: "TxnReader",
+          foreignKey: "txn_post_id",
+        });
+        this.hasMany("txn_people", {
+          className: "TxnPerson",
+          through: "txn_readers",
+          source: "txn_person",
+        });
       }
     }
     class TxnReader extends Base {
       static {
         this.attribute("txn_post_id", "integer");
         this.attribute("txn_person_id", "integer");
+        this.belongsTo("txn_person", {
+          className: "TxnPerson",
+          foreignKey: "txn_person_id",
+        });
       }
     }
     class TxnPerson extends Base {
@@ -3802,19 +3813,6 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("TxnPost", TxnPost);
     registerModel("TxnReader", TxnReader);
     registerModel("TxnPerson", TxnPerson);
-    Associations.belongsTo.call(TxnReader, "txn_person", {
-      className: "TxnPerson",
-      foreignKey: "txn_person_id",
-    });
-    Associations.hasMany.call(TxnPost, "txn_readers", {
-      className: "TxnReader",
-      foreignKey: "txn_post_id",
-    });
-    Associations.hasMany.call(TxnPost, "txn_people", {
-      className: "TxnPerson",
-      through: "txn_readers",
-      source: "txn_person",
-    });
 
     const post = await TxnPost.create({ title: "Thinking" });
     const p1 = await TxnPerson.create({ name: "David" });
@@ -3834,12 +3832,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoBtOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtNoBtJoins", {
+          className: "HmtNoBtJoin",
+          foreignKey: "hmt_no_bt_owner_id",
+        });
+        this.hasMany("hmtNoBtItems", {
+          through: "hmtNoBtJoins",
+          source: "hmtNoBtItem",
+          className: "HmtNoBtItem",
+        });
       }
     }
     class HmtNoBtJoin extends Base {
       static {
         this.attribute("hmt_no_bt_owner_id", "integer");
         this.attribute("hmt_no_bt_item_id", "integer");
+        this.belongsTo("hmtNoBtItem", {
+          className: "HmtNoBtItem",
+          foreignKey: "hmt_no_bt_item_id",
+        });
       }
     }
     class HmtNoBtItem extends Base {
@@ -3847,20 +3858,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtNoBtOwner, "hmtNoBtJoins", {
-      className: "HmtNoBtJoin",
-      foreignKey: "hmt_no_bt_owner_id",
-    });
 
-    Associations.hasMany.call(HmtNoBtOwner, "hmtNoBtItems", {
-      through: "hmtNoBtJoins",
-      source: "hmtNoBtItem",
-      className: "HmtNoBtItem",
-    });
-    Associations.belongsTo.call(HmtNoBtJoin, "hmtNoBtItem", {
-      className: "HmtNoBtItem",
-      foreignKey: "hmt_no_bt_item_id",
-    });
     registerModel("HmtNoBtOwner", HmtNoBtOwner);
     registerModel("HmtNoBtJoin", HmtNoBtJoin);
     registerModel("HmtNoBtItem", HmtNoBtItem);
@@ -3879,18 +3877,26 @@ describe("HasManyThroughAssociationsTest", () => {
     class MjAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("mjPosts", { foreignKey: "mj_author_id" });
+        this.hasMany("mjComments", {
+          through: "mjPosts",
+          source: "mjComments",
+          className: "MjComment",
+        });
       }
     }
     class MjPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("mj_author_id", "integer");
+        this.hasMany("mjComments", { foreignKey: "mj_post_id" });
       }
     }
     class MjComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("mj_post_id", "integer");
+        this.hasMany("mjRatings", { foreignKey: "mj_comment_id" });
       }
     }
     class MjRating extends Base {
@@ -3899,14 +3905,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("mj_comment_id", "integer");
       }
     }
-    Associations.hasMany.call(MjAuthor, "mjPosts", { foreignKey: "mj_author_id" });
-    Associations.hasMany.call(MjAuthor, "mjComments", {
-      through: "mjPosts",
-      source: "mjComments",
-      className: "MjComment",
-    });
-    Associations.hasMany.call(MjPost, "mjComments", { foreignKey: "mj_post_id" });
-    Associations.hasMany.call(MjComment, "mjRatings", { foreignKey: "mj_comment_id" });
     registerModel("MjAuthor", MjAuthor);
     registerModel("MjPost", MjPost);
     registerModel("MjComment", MjComment);
@@ -3926,12 +3924,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class NpkOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("npkJoins", {
+          className: "NpkJoin",
+          foreignKey: "npk_owner_id",
+        });
+        this.hasMany("npkItems", {
+          through: "npkJoins",
+          source: "npkItem",
+          className: "NpkItem",
+        });
       }
     }
     class NpkJoin extends Base {
       static {
         this.attribute("npk_owner_id", "integer");
         this.attribute("npk_item_id", "integer");
+        this.belongsTo("npkItem", {
+          className: "NpkItem",
+          foreignKey: "npk_item_id",
+        });
       }
     }
     class NpkItem extends Base {
@@ -3939,20 +3950,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(NpkOwner, "npkJoins", {
-      className: "NpkJoin",
-      foreignKey: "npk_owner_id",
-    });
 
-    Associations.hasMany.call(NpkOwner, "npkItems", {
-      through: "npkJoins",
-      source: "npkItem",
-      className: "NpkItem",
-    });
-    Associations.belongsTo.call(NpkJoin, "npkItem", {
-      className: "NpkItem",
-      foreignKey: "npk_item_id",
-    });
     registerModel("NpkOwner", NpkOwner);
     registerModel("NpkJoin", NpkJoin);
     registerModel("NpkItem", NpkItem);
@@ -3973,12 +3971,26 @@ describe("HasManyThroughAssociationsTest", () => {
     class FicOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ficJoins", {
+          className: "FicJoin",
+          foreignKey: "fic_owner_id",
+        });
+        this.hasMany("ficPosts", {
+          through: "ficJoins",
+          source: "ficPost",
+          className: "FicPost",
+          scope: (rel: any) => rel.where({ title: "Authorless" }),
+        });
       }
     }
     class FicJoin extends Base {
       static {
         this.attribute("fic_owner_id", "integer");
         this.attribute("fic_post_id", "integer");
+        this.belongsTo("ficPost", {
+          className: "FicPost",
+          foreignKey: "fic_post_id",
+        });
       }
     }
     class FicPost extends Base {
@@ -3986,20 +3998,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(FicOwner, "ficJoins", {
-      className: "FicJoin",
-      foreignKey: "fic_owner_id",
-    });
-    Associations.hasMany.call(FicOwner, "ficPosts", {
-      through: "ficJoins",
-      source: "ficPost",
-      className: "FicPost",
-      scope: (rel: any) => rel.where({ title: "Authorless" }),
-    });
-    Associations.belongsTo.call(FicJoin, "ficPost", {
-      className: "FicPost",
-      foreignKey: "fic_post_id",
-    });
     registerModel("FicOwner", FicOwner);
     registerModel("FicJoin", FicJoin);
     registerModel("FicPost", FicPost);
@@ -4023,12 +4021,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtHoReflOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtHoReflJoins", {
+          className: "HmtHoReflJoin",
+          foreignKey: "hmt_ho_refl_owner_id",
+        });
+        this.hasMany("hmtHoReflItems", {
+          through: "hmtHoReflJoins",
+          source: "hmtHoReflItem",
+          className: "HmtHoReflItem",
+        });
       }
     }
     class HmtHoReflJoin extends Base {
       static {
         this.attribute("hmt_ho_refl_owner_id", "integer");
         this.attribute("hmt_ho_refl_item_id", "integer");
+        this.belongsTo("hmtHoReflItem", {
+          className: "HmtHoReflItem",
+          foreignKey: "hmt_ho_refl_item_id",
+        });
       }
     }
     class HmtHoReflItem extends Base {
@@ -4036,20 +4047,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtHoReflOwner, "hmtHoReflJoins", {
-      className: "HmtHoReflJoin",
-      foreignKey: "hmt_ho_refl_owner_id",
-    });
 
-    Associations.hasMany.call(HmtHoReflOwner, "hmtHoReflItems", {
-      through: "hmtHoReflJoins",
-      source: "hmtHoReflItem",
-      className: "HmtHoReflItem",
-    });
-    Associations.belongsTo.call(HmtHoReflJoin, "hmtHoReflItem", {
-      className: "HmtHoReflItem",
-      foreignKey: "hmt_ho_refl_item_id",
-    });
     registerModel("HmtHoReflOwner", HmtHoReflOwner);
     registerModel("HmtHoReflJoin", HmtHoReflJoin);
     registerModel("HmtHoReflItem", HmtHoReflItem);
@@ -4073,12 +4071,14 @@ describe("HasManyThroughAssociationsTest", () => {
     class MhrAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("mhrPost", { foreignKey: "mhr_author_id" });
       }
     }
     class MhrPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("mhr_author_id", "integer");
+        this.hasMany("mhrComments", { foreignKey: "mhr_post_id" });
       }
     }
     class MhrComment extends Base {
@@ -4088,13 +4088,11 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     // Through goes via has_one, so writes should be forbidden
-    Associations.hasOne.call(MhrAuthor, "mhrPost", { foreignKey: "mhr_author_id" });
     (MhrAuthor as any)._associations.push({
       type: "hasMany",
       name: "mhrComments",
       options: { through: "mhrPost", source: "mhrComments", className: "MhrComment" },
     });
-    Associations.hasMany.call(MhrPost, "mhrComments", { foreignKey: "mhr_post_id" });
     registerModel("MhrAuthor", MhrAuthor);
     registerModel("MhrPost", MhrPost);
     registerModel("MhrComment", MhrComment);
@@ -4120,12 +4118,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class NskPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("nskTaggings", {
+          className: "NskTagging",
+          foreignKey: "nsk_post_id",
+        });
+        this.hasMany("nskTags", {
+          through: "nskTaggings",
+          source: "nskTag",
+          className: "NskTag",
+        });
       }
     }
     class NskTagging extends Base {
       static {
         this.attribute("nsk_post_id", "integer");
         this.attribute("nsk_tag_id", "integer");
+        this.belongsTo("nskTag", {
+          className: "NskTag",
+          foreignKey: "nsk_tag_id",
+        });
       }
     }
     class NskTag extends Base {
@@ -4133,20 +4144,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(NskPost, "nskTaggings", {
-      className: "NskTagging",
-      foreignKey: "nsk_post_id",
-    });
 
-    Associations.hasMany.call(NskPost, "nskTags", {
-      through: "nskTaggings",
-      source: "nskTag",
-      className: "NskTag",
-    });
-    Associations.belongsTo.call(NskTagging, "nskTag", {
-      className: "NskTag",
-      foreignKey: "nsk_tag_id",
-    });
     registerModel("NskPost", NskPost);
     registerModel("NskTagging", NskTagging);
     registerModel("NskTag", NskTag);
@@ -4164,12 +4162,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class CbkPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("cbkTaggings", {
+          className: "CbkTagging",
+          foreignKey: "cbk_post_id",
+        });
+        this.hasMany("cbkTags", {
+          through: "cbkTaggings",
+          source: "cbkTag",
+          className: "CbkTag",
+        });
       }
     }
     class CbkTagging extends Base {
       static {
         this.attribute("cbk_post_id", "integer");
         this.attribute("cbk_tag_id", "integer");
+        this.belongsTo("cbkTag", {
+          className: "CbkTag",
+          foreignKey: "cbk_tag_id",
+        });
       }
     }
     class CbkTag extends Base {
@@ -4177,20 +4188,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CbkPost, "cbkTaggings", {
-      className: "CbkTagging",
-      foreignKey: "cbk_post_id",
-    });
 
-    Associations.hasMany.call(CbkPost, "cbkTags", {
-      through: "cbkTaggings",
-      source: "cbkTag",
-      className: "CbkTag",
-    });
-    Associations.belongsTo.call(CbkTagging, "cbkTag", {
-      className: "CbkTag",
-      foreignKey: "cbk_tag_id",
-    });
     registerModel("CbkPost", CbkPost);
     registerModel("CbkTagging", CbkTagging);
     registerModel("CbkTag", CbkTag);
@@ -4205,12 +4203,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class CckPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("cckTaggings", {
+          className: "CckTagging",
+          foreignKey: "cck_post_id",
+        });
+        this.hasMany("cckTags", {
+          through: "cckTaggings",
+          source: "cckTag",
+          className: "CckTag",
+        });
       }
     }
     class CckTagging extends Base {
       static {
         this.attribute("cck_post_id", "integer");
         this.attribute("cck_tag_id", "integer");
+        this.belongsTo("cckTag", {
+          className: "CckTag",
+          foreignKey: "cck_tag_id",
+        });
       }
     }
     class CckTag extends Base {
@@ -4218,20 +4229,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CckPost, "cckTaggings", {
-      className: "CckTagging",
-      foreignKey: "cck_post_id",
-    });
 
-    Associations.hasMany.call(CckPost, "cckTags", {
-      through: "cckTaggings",
-      source: "cckTag",
-      className: "CckTag",
-    });
-    Associations.belongsTo.call(CckTagging, "cckTag", {
-      className: "CckTag",
-      foreignKey: "cck_tag_id",
-    });
     registerModel("CckPost", CckPost);
     registerModel("CckTagging", CckTagging);
     registerModel("CckTag", CckTag);
@@ -4272,12 +4270,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class CdkPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("cdkTaggings", {
+          className: "CdkTagging",
+          foreignKey: "cdk_post_id",
+        });
+        this.hasMany("cdkTags", {
+          through: "cdkTaggings",
+          source: "cdkTag",
+          className: "CdkTag",
+        });
       }
     }
     class CdkTagging extends Base {
       static {
         this.attribute("cdk_post_id", "integer");
         this.attribute("cdk_tag_id", "integer");
+        this.belongsTo("cdkTag", {
+          className: "CdkTag",
+          foreignKey: "cdk_tag_id",
+        });
       }
     }
     class CdkTag extends Base {
@@ -4285,20 +4296,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CdkPost, "cdkTaggings", {
-      className: "CdkTagging",
-      foreignKey: "cdk_post_id",
-    });
 
-    Associations.hasMany.call(CdkPost, "cdkTags", {
-      through: "cdkTaggings",
-      source: "cdkTag",
-      className: "CdkTag",
-    });
-    Associations.belongsTo.call(CdkTagging, "cdkTag", {
-      className: "CdkTag",
-      foreignKey: "cdk_tag_id",
-    });
     registerModel("CdkPost", CdkPost);
     registerModel("CdkTagging", CdkTagging);
     registerModel("CdkTag", CdkTag);
@@ -4325,27 +4323,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("spk_person_id", "integer");
         this.attribute("spk_post_id", "integer");
+        this.belongsTo("spkPost", {
+          className: "SpkPost",
+          foreignKey: "spk_post_id",
+        });
       }
     }
     class SpkPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("spkReaders", {
+          className: "SpkReader",
+          foreignKey: "spk_person_id",
+        });
+        this.hasMany("spkPosts", {
+          through: "spkReaders",
+          source: "spkPost",
+          className: "SpkPost",
+        });
       }
     }
-    Associations.hasMany.call(SpkPerson, "spkReaders", {
-      className: "SpkReader",
-      foreignKey: "spk_person_id",
-    });
 
-    Associations.hasMany.call(SpkPerson, "spkPosts", {
-      through: "spkReaders",
-      source: "spkPost",
-      className: "SpkPost",
-    });
-    Associations.belongsTo.call(SpkReader, "spkPost", {
-      className: "SpkPost",
-      foreignKey: "spk_post_id",
-    });
     registerModel("SpkPost", SpkPost);
     registerModel("SpkReader", SpkReader);
     registerModel("SpkPerson", SpkPerson);
@@ -4396,27 +4394,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("tc_person_id", "integer");
         this.attribute("tc_post_id", "integer");
+        this.belongsTo("tcPost", {
+          className: "TcPost",
+          foreignKey: "tc_post_id",
+        });
       }
     }
     class TcPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("tcReaders", {
+          className: "TcReader",
+          foreignKey: "tc_person_id",
+        });
+        this.hasMany("tcPosts", {
+          through: "tcReaders",
+          source: "tcPost",
+          className: "TcPost",
+        });
       }
     }
-    Associations.hasMany.call(TcPerson, "tcReaders", {
-      className: "TcReader",
-      foreignKey: "tc_person_id",
-    });
 
-    Associations.hasMany.call(TcPerson, "tcPosts", {
-      through: "tcReaders",
-      source: "tcPost",
-      className: "TcPost",
-    });
-    Associations.belongsTo.call(TcReader, "tcPost", {
-      className: "TcPost",
-      foreignKey: "tc_post_id",
-    });
     registerModel("TcPost", TcPost);
     registerModel("TcReader", TcReader);
     registerModel("TcPerson", TcPerson);
@@ -4440,27 +4438,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("sp_person_id", "integer");
         this.attribute("sp_post_id", "integer");
+        this.belongsTo("spPost", {
+          className: "SpPost",
+          foreignKey: "sp_post_id",
+        });
       }
     }
     class SpPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("spReaders", {
+          className: "SpReader",
+          foreignKey: "sp_person_id",
+        });
+        this.hasMany("spPosts", {
+          through: "spReaders",
+          source: "spPost",
+          className: "SpPost",
+        });
       }
     }
-    Associations.hasMany.call(SpPerson, "spReaders", {
-      className: "SpReader",
-      foreignKey: "sp_person_id",
-    });
 
-    Associations.hasMany.call(SpPerson, "spPosts", {
-      through: "spReaders",
-      source: "spPost",
-      className: "SpPost",
-    });
-    Associations.belongsTo.call(SpReader, "spPost", {
-      className: "SpPost",
-      foreignKey: "sp_post_id",
-    });
     registerModel("SpPost", SpPost);
     registerModel("SpReader", SpReader);
     registerModel("SpPerson", SpPerson);
@@ -4484,27 +4482,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("ei_person_id", "integer");
         this.attribute("ei_post_id", "integer");
+        this.belongsTo("eiPost", {
+          className: "EiPost",
+          foreignKey: "ei_post_id",
+        });
       }
     }
     class EiPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("eiReaders", {
+          className: "EiReader",
+          foreignKey: "ei_person_id",
+        });
+        this.hasMany("eiPosts", {
+          through: "eiReaders",
+          source: "eiPost",
+          className: "EiPost",
+        });
       }
     }
-    Associations.hasMany.call(EiPerson, "eiReaders", {
-      className: "EiReader",
-      foreignKey: "ei_person_id",
-    });
 
-    Associations.hasMany.call(EiPerson, "eiPosts", {
-      through: "eiReaders",
-      source: "eiPost",
-      className: "EiPost",
-    });
-    Associations.belongsTo.call(EiReader, "eiPost", {
-      className: "EiPost",
-      foreignKey: "ei_post_id",
-    });
     registerModel("EiPost", EiPost);
     registerModel("EiReader", EiReader);
     registerModel("EiPerson", EiPerson);
@@ -4523,27 +4521,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("eit_person_id", "integer");
         this.attribute("eit_post_id", "integer");
+        this.belongsTo("eitPost", {
+          className: "EitPost",
+          foreignKey: "eit_post_id",
+        });
       }
     }
     class EitPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("eitReaders", {
+          className: "EitReader",
+          foreignKey: "eit_person_id",
+        });
+        this.hasMany("eitPosts", {
+          through: "eitReaders",
+          source: "eitPost",
+          className: "EitPost",
+        });
       }
     }
-    Associations.hasMany.call(EitPerson, "eitReaders", {
-      className: "EitReader",
-      foreignKey: "eit_person_id",
-    });
 
-    Associations.hasMany.call(EitPerson, "eitPosts", {
-      through: "eitReaders",
-      source: "eitPost",
-      className: "EitPost",
-    });
-    Associations.belongsTo.call(EitReader, "eitPost", {
-      className: "EitPost",
-      foreignKey: "eit_post_id",
-    });
     registerModel("EitPost", EitPost);
     registerModel("EitReader", EitReader);
     registerModel("EitPerson", EitPerson);
@@ -4638,27 +4636,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("inc_b_person_id", "integer");
         this.attribute("inc_b_post_id", "integer");
+        this.belongsTo("incBPost", {
+          className: "IncBPost",
+          foreignKey: "inc_b_post_id",
+        });
       }
     }
     class IncBPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("incBReaders", {
+          className: "IncBReader",
+          foreignKey: "inc_b_person_id",
+        });
+        this.hasMany("incBPosts", {
+          through: "incBReaders",
+          source: "incBPost",
+          className: "IncBPost",
+        });
       }
     }
-    Associations.hasMany.call(IncBPerson, "incBReaders", {
-      className: "IncBReader",
-      foreignKey: "inc_b_person_id",
-    });
 
-    Associations.hasMany.call(IncBPerson, "incBPosts", {
-      through: "incBReaders",
-      source: "incBPost",
-      className: "IncBPost",
-    });
-    Associations.belongsTo.call(IncBReader, "incBPost", {
-      className: "IncBPost",
-      foreignKey: "inc_b_post_id",
-    });
     registerModel("IncBPost", IncBPost);
     registerModel("IncBReader", IncBReader);
     registerModel("IncBPerson", IncBPerson);
@@ -4679,27 +4677,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("inc_n_person_id", "integer");
         this.attribute("inc_n_post_id", "integer");
+        this.belongsTo("incNPost", {
+          className: "IncNPost",
+          foreignKey: "inc_n_post_id",
+        });
       }
     }
     class IncNPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("incNReaders", {
+          className: "IncNReader",
+          foreignKey: "inc_n_person_id",
+        });
+        this.hasMany("incNPosts", {
+          through: "incNReaders",
+          source: "incNPost",
+          className: "IncNPost",
+        });
       }
     }
-    Associations.hasMany.call(IncNPerson, "incNReaders", {
-      className: "IncNReader",
-      foreignKey: "inc_n_person_id",
-    });
 
-    Associations.hasMany.call(IncNPerson, "incNPosts", {
-      through: "incNReaders",
-      source: "incNPost",
-      className: "IncNPost",
-    });
-    Associations.belongsTo.call(IncNReader, "incNPost", {
-      className: "IncNPost",
-      foreignKey: "inc_n_post_id",
-    });
     registerModel("IncNPost", IncNPost);
     registerModel("IncNReader", IncNReader);
     registerModel("IncNPerson", IncNPerson);
@@ -4714,12 +4712,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtRoOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtRoJoins", {
+          className: "HmtRoJoin",
+          foreignKey: "hmt_ro_owner_id",
+        });
+        this.hasMany("hmtRoItems", {
+          through: "hmtRoJoins",
+          source: "hmtRoItem",
+          className: "HmtRoItem",
+        });
       }
     }
     class HmtRoJoin extends Base {
       static {
         this.attribute("hmt_ro_owner_id", "integer");
         this.attribute("hmt_ro_item_id", "integer");
+        this.belongsTo("hmtRoItem", {
+          className: "HmtRoItem",
+          foreignKey: "hmt_ro_item_id",
+        });
       }
     }
     class HmtRoItem extends Base {
@@ -4727,20 +4738,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtRoOwner, "hmtRoJoins", {
-      className: "HmtRoJoin",
-      foreignKey: "hmt_ro_owner_id",
-    });
 
-    Associations.hasMany.call(HmtRoOwner, "hmtRoItems", {
-      through: "hmtRoJoins",
-      source: "hmtRoItem",
-      className: "HmtRoItem",
-    });
-    Associations.belongsTo.call(HmtRoJoin, "hmtRoItem", {
-      className: "HmtRoItem",
-      foreignKey: "hmt_ro_item_id",
-    });
     registerModel("HmtRoOwner", HmtRoOwner);
     registerModel("HmtRoJoin", HmtRoJoin);
     registerModel("HmtRoItem", HmtRoItem);
@@ -4768,12 +4766,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtUpdOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtUpdJoins", {
+          className: "HmtUpdJoin",
+          foreignKey: "hmt_upd_owner_id",
+        });
+        this.hasMany("hmtUpdItems", {
+          through: "hmtUpdJoins",
+          source: "hmtUpdItem",
+          className: "HmtUpdItem",
+        });
       }
     }
     class HmtUpdJoin extends Base {
       static {
         this.attribute("hmt_upd_owner_id", "integer");
         this.attribute("hmt_upd_item_id", "integer");
+        this.belongsTo("hmtUpdItem", {
+          className: "HmtUpdItem",
+          foreignKey: "hmt_upd_item_id",
+        });
       }
     }
     class HmtUpdItem extends Base {
@@ -4781,20 +4792,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtUpdOwner, "hmtUpdJoins", {
-      className: "HmtUpdJoin",
-      foreignKey: "hmt_upd_owner_id",
-    });
 
-    Associations.hasMany.call(HmtUpdOwner, "hmtUpdItems", {
-      through: "hmtUpdJoins",
-      source: "hmtUpdItem",
-      className: "HmtUpdItem",
-    });
-    Associations.belongsTo.call(HmtUpdJoin, "hmtUpdItem", {
-      className: "HmtUpdItem",
-      foreignKey: "hmt_upd_item_id",
-    });
     registerModel("HmtUpdOwner", HmtUpdOwner);
     registerModel("HmtUpdJoin", HmtUpdJoin);
     registerModel("HmtUpdItem", HmtUpdItem);
@@ -4829,19 +4827,19 @@ describe("HasManyThroughAssociationsTest", () => {
     class SsAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ss_all_readers", {
+          className: "SsReader",
+          foreignKey: "ss_author_id",
+        });
+        this.hasMany("ss_non_skimmer_readers", {
+          className: "SsReader",
+          foreignKey: "ss_author_id",
+          scope: (rel: any) => rel.where({ skimmer: false }),
+        });
       }
     }
     registerModel("SsReader", SsReader);
     registerModel("SsAuthor", SsAuthor);
-    Associations.hasMany.call(SsAuthor, "ss_all_readers", {
-      className: "SsReader",
-      foreignKey: "ss_author_id",
-    });
-    Associations.hasMany.call(SsAuthor, "ss_non_skimmer_readers", {
-      className: "SsReader",
-      foreignKey: "ss_author_id",
-      scope: (rel: any) => rel.where({ skimmer: false }),
-    });
 
     const author = await SsAuthor.create({ name: "Michael" });
     const r1 = await SsReader.create({ ss_author_id: author.id, skimmer: false });
@@ -4860,6 +4858,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ssi_author_id", "integer");
         this.attribute("ssi_post_id", "integer");
         this.attribute("skimmer", "boolean");
+        this.belongsTo("ssi_post", {
+          className: "SsiPost",
+          foreignKey: "ssi_post_id",
+        });
       }
     }
     class SsiPost extends Base {
@@ -4870,29 +4872,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class SsiAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ssi_all_joins", {
+          className: "SsiJoin",
+          foreignKey: "ssi_author_id",
+        });
+        this.hasMany("ssi_non_skimmer_joins", {
+          className: "SsiJoin",
+          foreignKey: "ssi_author_id",
+          scope: (rel: any) => rel.where({ skimmer: false }),
+        });
+        this.hasMany("ssi_posts", {
+          className: "SsiPost",
+          through: "ssi_non_skimmer_joins",
+          source: "ssi_post",
+        });
       }
     }
     registerModel("SsiJoin", SsiJoin);
     registerModel("SsiPost", SsiPost);
     registerModel("SsiAuthor", SsiAuthor);
-    Associations.belongsTo.call(SsiJoin, "ssi_post", {
-      className: "SsiPost",
-      foreignKey: "ssi_post_id",
-    });
-    Associations.hasMany.call(SsiAuthor, "ssi_all_joins", {
-      className: "SsiJoin",
-      foreignKey: "ssi_author_id",
-    });
-    Associations.hasMany.call(SsiAuthor, "ssi_non_skimmer_joins", {
-      className: "SsiJoin",
-      foreignKey: "ssi_author_id",
-      scope: (rel: any) => rel.where({ skimmer: false }),
-    });
-    Associations.hasMany.call(SsiAuthor, "ssi_posts", {
-      className: "SsiPost",
-      through: "ssi_non_skimmer_joins",
-      source: "ssi_post",
-    });
 
     const author = await SsiAuthor.create({ name: "Bob" });
     const post = await SsiPost.create({ title: "Welcome" });
@@ -4910,6 +4908,10 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("ssj_author_id", "integer");
         this.attribute("ssj_post_id", "integer");
+        this.belongsTo("ssj_post", {
+          className: "SsjPost",
+          foreignKey: "ssj_post_id",
+        });
       }
     }
     class SsjPost extends Base {
@@ -4921,25 +4923,21 @@ describe("HasManyThroughAssociationsTest", () => {
     class SsjAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ssj_joins", {
+          className: "SsjJoin",
+          foreignKey: "ssj_author_id",
+        });
+        this.hasMany("ssj_published_posts", {
+          className: "SsjPost",
+          through: "ssj_joins",
+          source: "ssj_post",
+          scope: (rel: any) => rel.where({ published: true }),
+        });
       }
     }
     registerModel("SsjJoin", SsjJoin);
     registerModel("SsjPost", SsjPost);
     registerModel("SsjAuthor", SsjAuthor);
-    Associations.belongsTo.call(SsjJoin, "ssj_post", {
-      className: "SsjPost",
-      foreignKey: "ssj_post_id",
-    });
-    Associations.hasMany.call(SsjAuthor, "ssj_joins", {
-      className: "SsjJoin",
-      foreignKey: "ssj_author_id",
-    });
-    Associations.hasMany.call(SsjAuthor, "ssj_published_posts", {
-      className: "SsjPost",
-      through: "ssj_joins",
-      source: "ssj_post",
-      scope: (rel: any) => rel.where({ published: true }),
-    });
 
     const author = await SsjAuthor.create({ name: "Bob" });
     const p1 = await SsjPost.create({ title: "Published", published: true });
@@ -4970,34 +4968,34 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("dup_author_id", "integer");
         this.attribute("dup_post_id", "integer");
         this.attribute("dup_cat_id", "integer");
+        this.belongsTo("dup_post", {
+          className: "DupPost",
+          foreignKey: "dup_post_id",
+        });
+        this.belongsTo("dup_cat", {
+          className: "DupCat",
+          foreignKey: "dup_cat_id",
+        });
       }
     }
     class DupAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("dup_categs", {
+          className: "DupCateg",
+          foreignKey: "dup_author_id",
+        });
+        this.hasMany("dup_general_posts", {
+          className: "DupPost",
+          through: "dup_categs",
+          source: "dup_post",
+        });
       }
     }
     registerModel("DupCat", DupCat);
     registerModel("DupPost", DupPost);
     registerModel("DupCateg", DupCateg);
     registerModel("DupAuthor", DupAuthor);
-    Associations.belongsTo.call(DupCateg, "dup_post", {
-      className: "DupPost",
-      foreignKey: "dup_post_id",
-    });
-    Associations.belongsTo.call(DupCateg, "dup_cat", {
-      className: "DupCat",
-      foreignKey: "dup_cat_id",
-    });
-    Associations.hasMany.call(DupAuthor, "dup_categs", {
-      className: "DupCateg",
-      foreignKey: "dup_author_id",
-    });
-    Associations.hasMany.call(DupAuthor, "dup_general_posts", {
-      className: "DupPost",
-      through: "dup_categs",
-      source: "dup_post",
-    });
 
     const author = await DupAuthor.create({ name: "David" });
     const post = await DupPost.create({ title: "Welcome" });
@@ -5019,28 +5017,28 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("rw_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
+        this.belongsTo("taggable", {
+          className: "RwPost",
+          foreignKey: "taggable_id",
+          polymorphic: true,
+        });
       }
     }
     class RwTag extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("rwTaggings", {
+          className: "RwTagging",
+          foreignKey: "rw_tag_id",
+        });
+        this.hasMany("taggedPosts", {
+          through: "rwTaggings",
+          source: "taggable",
+          className: "RwPost",
+        });
       }
     }
-    Associations.hasMany.call(RwTag, "rwTaggings", {
-      className: "RwTagging",
-      foreignKey: "rw_tag_id",
-    });
 
-    Associations.hasMany.call(RwTag, "taggedPosts", {
-      through: "rwTaggings",
-      source: "taggable",
-      className: "RwPost",
-    });
-    Associations.belongsTo.call(RwTagging, "taggable", {
-      className: "RwPost",
-      foreignKey: "taggable_id",
-      polymorphic: true,
-    });
     registerModel("RwPost", RwPost);
     registerModel("RwTagging", RwTagging);
     registerModel("RwTag", RwTag);
@@ -5067,28 +5065,28 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ppk_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
+        this.belongsTo("taggable", {
+          className: "PpkPost",
+          foreignKey: "taggable_id",
+          polymorphic: true,
+        });
       }
     }
     class PpkTag extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ppkTaggings", {
+          className: "PpkTagging",
+          foreignKey: "ppk_tag_id",
+        });
+        this.hasMany("taggedPosts", {
+          through: "ppkTaggings",
+          source: "taggable",
+          className: "PpkPost",
+        });
       }
     }
-    Associations.hasMany.call(PpkTag, "ppkTaggings", {
-      className: "PpkTagging",
-      foreignKey: "ppk_tag_id",
-    });
 
-    Associations.hasMany.call(PpkTag, "taggedPosts", {
-      through: "ppkTaggings",
-      source: "taggable",
-      className: "PpkPost",
-    });
-    Associations.belongsTo.call(PpkTagging, "taggable", {
-      className: "PpkPost",
-      foreignKey: "taggable_id",
-      polymorphic: true,
-    });
     registerModel("PpkPost", PpkPost);
     registerModel("PpkTagging", PpkTagging);
     registerModel("PpkTag", PpkTag);
@@ -5108,12 +5106,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtPkOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtPkJoins", {
+          className: "HmtPkJoin",
+          foreignKey: "hmt_pk_owner_id",
+        });
+        this.hasMany("hmtPkItems", {
+          className: "HmtPkItem",
+          through: "hmtPkJoins",
+          source: "hmtPkItem",
+        });
       }
     }
     class HmtPkJoin extends Base {
       static {
         this.attribute("hmt_pk_owner_id", "integer");
         this.attribute("hmt_pk_item_id", "integer");
+        this.belongsTo("hmtPkItem", {
+          className: "HmtPkItem",
+          foreignKey: "hmt_pk_item_id",
+        });
       }
     }
     class HmtPkItem extends Base {
@@ -5121,20 +5132,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtPkOwner, "hmtPkJoins", {
-      className: "HmtPkJoin",
-      foreignKey: "hmt_pk_owner_id",
-    });
 
-    Associations.hasMany.call(HmtPkOwner, "hmtPkItems", {
-      className: "HmtPkItem",
-      through: "hmtPkJoins",
-      source: "hmtPkItem",
-    });
-    Associations.belongsTo.call(HmtPkJoin, "hmtPkItem", {
-      className: "HmtPkItem",
-      foreignKey: "hmt_pk_item_id",
-    });
     registerModel("HmtPkOwner", HmtPkOwner);
     registerModel("HmtPkJoin", HmtPkJoin);
     registerModel("HmtPkItem", HmtPkItem);
@@ -5155,12 +5153,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDsOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtDsJoins", {
+          className: "HmtDsJoin",
+          foreignKey: "hmt_ds_owner_id",
+        });
+        this.hasMany("hmtDsItems", {
+          className: "HmtDsItem",
+          through: "hmtDsJoins",
+          source: "hmtDsItem",
+        });
       }
     }
     class HmtDsJoin extends Base {
       static {
         this.attribute("hmt_ds_owner_id", "integer");
         this.attribute("hmt_ds_item_id", "integer");
+        this.belongsTo("hmtDsItem", {
+          className: "HmtDsItem",
+          foreignKey: "hmt_ds_item_id",
+        });
       }
     }
     class HmtDsItem extends Base {
@@ -5168,20 +5179,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtDsOwner, "hmtDsJoins", {
-      className: "HmtDsJoin",
-      foreignKey: "hmt_ds_owner_id",
-    });
 
-    Associations.hasMany.call(HmtDsOwner, "hmtDsItems", {
-      className: "HmtDsItem",
-      through: "hmtDsJoins",
-      source: "hmtDsItem",
-    });
-    Associations.belongsTo.call(HmtDsJoin, "hmtDsItem", {
-      className: "HmtDsItem",
-      foreignKey: "hmt_ds_item_id",
-    });
     registerModel("HmtDsOwner", HmtDsOwner);
     registerModel("HmtDsJoin", HmtDsJoin);
     registerModel("HmtDsItem", HmtDsItem);
@@ -5234,12 +5232,22 @@ describe("HasManyThroughAssociationsTest", () => {
     class JdAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("jdCategorizations", { foreignKey: "jd_author_id" });
+        this.hasMany("jdUniquePosts", {
+          through: "jdCategorizations",
+          source: "jdPost",
+          className: "JdPost",
+        });
       }
     }
     class JdCategorization extends Base {
       static {
         this.attribute("jd_author_id", "integer");
         this.attribute("jd_post_id", "integer");
+        this.belongsTo("jdPost", {
+          foreignKey: "jd_post_id",
+          className: "JdPost",
+        });
       }
     }
     class JdPost extends Base {
@@ -5247,16 +5255,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(JdAuthor, "jdCategorizations", { foreignKey: "jd_author_id" });
-    Associations.hasMany.call(JdAuthor, "jdUniquePosts", {
-      through: "jdCategorizations",
-      source: "jdPost",
-      className: "JdPost",
-    });
-    Associations.belongsTo.call(JdCategorization, "jdPost", {
-      foreignKey: "jd_post_id",
-      className: "JdPost",
-    });
     registerModel("JdAuthor", JdAuthor);
     registerModel("JdCategorization", JdCategorization);
     registerModel("JdPost", JdPost);
@@ -5280,17 +5278,28 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("jbt_author_id", "integer");
+        this.belongsTo("jbtAuthor", { foreignKey: "jbt_author_id" });
+        this.hasMany("jbtAuthorCategorizations", {
+          through: "jbtAuthor",
+          source: "jbtCategorizations",
+          className: "JbtCategorization",
+        });
       }
     }
     class JbtAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("jbtCategorizations", { foreignKey: "jbt_author_id" });
       }
     }
     class JbtCategorization extends Base {
       static {
         this.attribute("jbt_author_id", "integer");
         this.attribute("jbt_category_id", "integer");
+        this.belongsTo("jbtCategory", {
+          foreignKey: "jbt_category_id",
+          className: "JbtCategory",
+        });
       }
     }
     class JbtCategory extends Base {
@@ -5298,18 +5307,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.belongsTo.call(JbtPost, "jbtAuthor", { foreignKey: "jbt_author_id" });
-    Associations.hasMany.call(JbtAuthor, "jbtCategorizations", { foreignKey: "jbt_author_id" });
-    Associations.belongsTo.call(JbtCategorization, "jbtCategory", {
-      foreignKey: "jbt_category_id",
-      className: "JbtCategory",
-    });
     // Post -> author -> categorizations (through belongs_to then has_many)
-    Associations.hasMany.call(JbtPost, "jbtAuthorCategorizations", {
-      through: "jbtAuthor",
-      source: "jbtCategorizations",
-      className: "JbtCategorization",
-    });
     registerModel("JbtPost", JbtPost);
     registerModel("JbtAuthor", JbtAuthor);
     registerModel("JbtCategorization", JbtCategorization);
@@ -5335,12 +5333,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtSelOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtSelJoins", {
+          className: "HmtSelJoin",
+          foreignKey: "hmt_sel_owner_id",
+        });
+        this.hasMany("hmtSelItems", {
+          className: "HmtSelItem",
+          through: "hmtSelJoins",
+          source: "hmtSelItem",
+        });
       }
     }
     class HmtSelJoin extends Base {
       static {
         this.attribute("hmt_sel_owner_id", "integer");
         this.attribute("hmt_sel_item_id", "integer");
+        this.belongsTo("hmtSelItem", {
+          className: "HmtSelItem",
+          foreignKey: "hmt_sel_item_id",
+        });
       }
     }
     class HmtSelItem extends Base {
@@ -5349,20 +5360,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("extra", "string");
       }
     }
-    Associations.hasMany.call(HmtSelOwner, "hmtSelJoins", {
-      className: "HmtSelJoin",
-      foreignKey: "hmt_sel_owner_id",
-    });
 
-    Associations.hasMany.call(HmtSelOwner, "hmtSelItems", {
-      className: "HmtSelItem",
-      through: "hmtSelJoins",
-      source: "hmtSelItem",
-    });
-    Associations.belongsTo.call(HmtSelJoin, "hmtSelItem", {
-      className: "HmtSelItem",
-      foreignKey: "hmt_sel_item_id",
-    });
     registerModel("HmtSelOwner", HmtSelOwner);
     registerModel("HmtSelJoin", HmtSelJoin);
     registerModel("HmtSelItem", HmtSelItem);
@@ -5384,6 +5382,16 @@ describe("HasManyThroughAssociationsTest", () => {
     class GidAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("gidCategorizations", {
+          className: "GidCategorization",
+          foreignKey: "gid_author_id",
+        });
+        this.hasMany("gidCategoriesLikeGeneral", {
+          through: "gidCategorizations",
+          source: "gidCategory",
+          className: "GidCategory",
+          scope: (rel: any) => rel.where({ name: "General" }),
+        });
       }
     }
     class GidCategorization extends Base {
@@ -5391,6 +5399,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("gid_author_id", "integer");
         this.attribute("gid_category_id", "integer");
         this.attribute("special", "boolean");
+        this.belongsTo("gidCategory", {
+          className: "GidCategory",
+          foreignKey: "gid_category_id",
+        });
       }
     }
     class GidCategory extends Base {
@@ -5398,20 +5410,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(GidAuthor, "gidCategorizations", {
-      className: "GidCategorization",
-      foreignKey: "gid_author_id",
-    });
-    Associations.hasMany.call(GidAuthor, "gidCategoriesLikeGeneral", {
-      through: "gidCategorizations",
-      source: "gidCategory",
-      className: "GidCategory",
-      scope: (rel: any) => rel.where({ name: "General" }),
-    });
-    Associations.belongsTo.call(GidCategorization, "gidCategory", {
-      className: "GidCategory",
-      foreignKey: "gid_category_id",
-    });
     registerModel("GidAuthor", GidAuthor);
     registerModel("GidCategorization", GidCategorization);
     registerModel("GidCategory", GidCategory);
@@ -5436,12 +5434,26 @@ describe("HasManyThroughAssociationsTest", () => {
     class GcsOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("gcsJoins", {
+          className: "GcsJoin",
+          foreignKey: "gcs_owner_id",
+        });
+        this.hasMany("gcsPostsNoComments", {
+          through: "gcsJoins",
+          source: "gcsPost",
+          className: "GcsPost",
+          scope: (rel: any) => rel.where({ comments_count: 0 }),
+        });
       }
     }
     class GcsJoin extends Base {
       static {
         this.attribute("gcs_owner_id", "integer");
         this.attribute("gcs_post_id", "integer");
+        this.belongsTo("gcsPost", {
+          className: "GcsPost",
+          foreignKey: "gcs_post_id",
+        });
       }
     }
     class GcsPost extends Base {
@@ -5450,20 +5462,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("comments_count", "integer");
       }
     }
-    Associations.hasMany.call(GcsOwner, "gcsJoins", {
-      className: "GcsJoin",
-      foreignKey: "gcs_owner_id",
-    });
-    Associations.hasMany.call(GcsOwner, "gcsPostsNoComments", {
-      through: "gcsJoins",
-      source: "gcsPost",
-      className: "GcsPost",
-      scope: (rel: any) => rel.where({ comments_count: 0 }),
-    });
-    Associations.belongsTo.call(GcsJoin, "gcsPost", {
-      className: "GcsPost",
-      foreignKey: "gcs_post_id",
-    });
     registerModel("GcsOwner", GcsOwner);
     registerModel("GcsJoin", GcsJoin);
     registerModel("GcsPost", GcsPost);
@@ -5496,29 +5494,29 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("cnt_author_id", "integer");
         this.attribute("cnt_cat_id", "integer");
+        this.belongsTo("cnt_cat", {
+          className: "CntCat",
+          foreignKey: "cnt_cat_id",
+        });
       }
     }
     class CntAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("cnt_categs", {
+          className: "CntCateg",
+          foreignKey: "cnt_author_id",
+        });
+        this.hasMany("cnt_cats", {
+          className: "CntCat",
+          through: "cnt_categs",
+          source: "cnt_cat",
+        });
       }
     }
     registerModel("CntCat", CntCat);
     registerModel("CntCateg", CntCateg);
     registerModel("CntAuthor", CntAuthor);
-    Associations.belongsTo.call(CntCateg, "cnt_cat", {
-      className: "CntCat",
-      foreignKey: "cnt_cat_id",
-    });
-    Associations.hasMany.call(CntAuthor, "cnt_categs", {
-      className: "CntCateg",
-      foreignKey: "cnt_author_id",
-    });
-    Associations.hasMany.call(CntAuthor, "cnt_cats", {
-      className: "CntCat",
-      through: "cnt_categs",
-      source: "cnt_cat",
-    });
 
     const author = await CntAuthor.create({ name: "Mary" });
     const cat1 = await CntCat.create({ name: "General" });
@@ -5535,12 +5533,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtFkOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtFkJoins", {
+          className: "HmtFkJoin",
+          foreignKey: "hmt_fk_owner_id",
+        });
+        this.hasMany("hmtFkTargets", {
+          through: "hmtFkJoins",
+          source: "hmtFkTarget",
+          className: "HmtFkTarget",
+        });
       }
     }
     class HmtFkJoin extends Base {
       static {
         this.attribute("hmt_fk_owner_id", "integer");
         this.attribute("hmt_fk_target_id", "integer");
+        this.belongsTo("hmtFkTarget", {
+          className: "HmtFkTarget",
+          foreignKey: "hmt_fk_target_id",
+        });
       }
     }
     class HmtFkTarget extends Base {
@@ -5548,20 +5559,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtFkOwner, "hmtFkJoins", {
-      className: "HmtFkJoin",
-      foreignKey: "hmt_fk_owner_id",
-    });
 
-    Associations.hasMany.call(HmtFkOwner, "hmtFkTargets", {
-      through: "hmtFkJoins",
-      source: "hmtFkTarget",
-      className: "HmtFkTarget",
-    });
-    Associations.belongsTo.call(HmtFkJoin, "hmtFkTarget", {
-      className: "HmtFkTarget",
-      foreignKey: "hmt_fk_target_id",
-    });
     registerModel("HmtFkOwner", HmtFkOwner);
     registerModel("HmtFkJoin", HmtFkJoin);
     registerModel("HmtFkTarget", HmtFkTarget);
@@ -5590,12 +5588,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoCounterOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtNoCounterJoins", {
+          className: "HmtNoCounterJoin",
+          foreignKey: "hmt_no_counter_owner_id",
+        });
+        this.hasMany("hmtNoCounterItems", {
+          through: "hmtNoCounterJoins",
+          source: "hmtNoCounterItem",
+          className: "HmtNoCounterItem",
+        });
       }
     }
     class HmtNoCounterJoin extends Base {
       static {
         this.attribute("hmt_no_counter_owner_id", "integer");
         this.attribute("hmt_no_counter_item_id", "integer");
+        this.belongsTo("hmtNoCounterItem", {
+          className: "HmtNoCounterItem",
+          foreignKey: "hmt_no_counter_item_id",
+        });
       }
     }
     class HmtNoCounterItem extends Base {
@@ -5603,20 +5614,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtNoCounterOwner, "hmtNoCounterJoins", {
-      className: "HmtNoCounterJoin",
-      foreignKey: "hmt_no_counter_owner_id",
-    });
 
-    Associations.hasMany.call(HmtNoCounterOwner, "hmtNoCounterItems", {
-      through: "hmtNoCounterJoins",
-      source: "hmtNoCounterItem",
-      className: "HmtNoCounterItem",
-    });
-    Associations.belongsTo.call(HmtNoCounterJoin, "hmtNoCounterItem", {
-      className: "HmtNoCounterItem",
-      foreignKey: "hmt_no_counter_item_id",
-    });
     registerModel("HmtNoCounterOwner", HmtNoCounterOwner);
     registerModel("HmtNoCounterJoin", HmtNoCounterJoin);
     registerModel("HmtNoCounterItem", HmtNoCounterItem);
@@ -5645,12 +5643,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class PkoOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pkoJoins", {
+          className: "PkoJoin",
+          foreignKey: "pko_owner_id",
+        });
+        this.hasMany("pkoItems", {
+          through: "pkoJoins",
+          source: "pkoItem",
+          className: "PkoItem",
+        });
       }
     }
     class PkoJoin extends Base {
       static {
         this.attribute("pko_owner_id", "integer");
         this.attribute("pko_item_id", "integer");
+        this.belongsTo("pkoItem", {
+          className: "PkoItem",
+          foreignKey: "pko_item_id",
+        });
       }
     }
     class PkoItem extends Base {
@@ -5658,20 +5669,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(PkoOwner, "pkoJoins", {
-      className: "PkoJoin",
-      foreignKey: "pko_owner_id",
-    });
 
-    Associations.hasMany.call(PkoOwner, "pkoItems", {
-      through: "pkoJoins",
-      source: "pkoItem",
-      className: "PkoItem",
-    });
-    Associations.belongsTo.call(PkoJoin, "pkoItem", {
-      className: "PkoItem",
-      foreignKey: "pko_item_id",
-    });
     registerModel("PkoOwner", PkoOwner);
     registerModel("PkoJoin", PkoJoin);
     registerModel("PkoItem", PkoItem);
@@ -5714,12 +5712,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtArrOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtArrJoins", {
+          className: "HmtArrJoin",
+          foreignKey: "hmt_arr_owner_id",
+        });
+        this.hasMany("hmtArrItems", {
+          through: "hmtArrJoins",
+          source: "hmtArrItem",
+          className: "HmtArrItem",
+        });
       }
     }
     class HmtArrJoin extends Base {
       static {
         this.attribute("hmt_arr_owner_id", "integer");
         this.attribute("hmt_arr_item_id", "integer");
+        this.belongsTo("hmtArrItem", {
+          className: "HmtArrItem",
+          foreignKey: "hmt_arr_item_id",
+        });
       }
     }
     class HmtArrItem extends Base {
@@ -5727,20 +5738,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtArrOwner, "hmtArrJoins", {
-      className: "HmtArrJoin",
-      foreignKey: "hmt_arr_owner_id",
-    });
 
-    Associations.hasMany.call(HmtArrOwner, "hmtArrItems", {
-      through: "hmtArrJoins",
-      source: "hmtArrItem",
-      className: "HmtArrItem",
-    });
-    Associations.belongsTo.call(HmtArrJoin, "hmtArrItem", {
-      className: "HmtArrItem",
-      foreignKey: "hmt_arr_item_id",
-    });
     registerModel("HmtArrOwner", HmtArrOwner);
     registerModel("HmtArrJoin", HmtArrJoin);
     registerModel("HmtArrItem", HmtArrItem);
@@ -5774,6 +5772,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.validate((r: any) => {
           r.errors.add("base", "Invalid Join");
         });
+        this.belongsTo("cbang_item", {
+          className: "CbangItem",
+          foreignKey: "cbang_item_id",
+        });
       }
     }
     class CbangItem extends Base {
@@ -5784,24 +5786,20 @@ describe("HasManyThroughAssociationsTest", () => {
     class CbangOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("cbang_joins", {
+          className: "CbangJoin",
+          foreignKey: "cbang_owner_id",
+        });
+        this.hasMany("cbang_items", {
+          className: "CbangItem",
+          through: "cbang_joins",
+          source: "cbang_item",
+        });
       }
     }
     registerModel("CbangJoin", CbangJoin);
     registerModel("CbangItem", CbangItem);
     registerModel("CbangOwner", CbangOwner);
-    Associations.belongsTo.call(CbangJoin, "cbang_item", {
-      className: "CbangItem",
-      foreignKey: "cbang_item_id",
-    });
-    Associations.hasMany.call(CbangOwner, "cbang_joins", {
-      className: "CbangJoin",
-      foreignKey: "cbang_owner_id",
-    });
-    Associations.hasMany.call(CbangOwner, "cbang_items", {
-      className: "CbangItem",
-      through: "cbang_joins",
-      source: "cbang_item",
-    });
 
     const owner = await CbangOwner.create({ name: "O" });
     const item = await CbangItem.create({ name: "A" });
@@ -5818,6 +5816,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.validate((r: any) => {
           r.errors.add("base", "Invalid Join");
         });
+        this.belongsTo("sbang_item", {
+          className: "SbangItem",
+          foreignKey: "sbang_item_id",
+        });
       }
     }
     class SbangItem extends Base {
@@ -5828,24 +5830,20 @@ describe("HasManyThroughAssociationsTest", () => {
     class SbangOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("sbang_joins", {
+          className: "SbangJoin",
+          foreignKey: "sbang_owner_id",
+        });
+        this.hasMany("sbang_items", {
+          className: "SbangItem",
+          through: "sbang_joins",
+          source: "sbang_item",
+        });
       }
     }
     registerModel("SbangJoin", SbangJoin);
     registerModel("SbangItem", SbangItem);
     registerModel("SbangOwner", SbangOwner);
-    Associations.belongsTo.call(SbangJoin, "sbang_item", {
-      className: "SbangItem",
-      foreignKey: "sbang_item_id",
-    });
-    Associations.hasMany.call(SbangOwner, "sbang_joins", {
-      className: "SbangJoin",
-      foreignKey: "sbang_owner_id",
-    });
-    Associations.hasMany.call(SbangOwner, "sbang_items", {
-      className: "SbangItem",
-      through: "sbang_joins",
-      source: "sbang_item",
-    });
 
     const owner = await SbangOwner.create({ name: "O" });
     const item = await SbangItem.create({ name: "A" });
@@ -5864,6 +5862,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.validate((r: any) => {
           r.errors.add("base", "Invalid Join");
         });
+        this.belongsTo("fbang_item", {
+          className: "FbangItem",
+          foreignKey: "fbang_item_id",
+        });
       }
     }
     class FbangItem extends Base {
@@ -5874,24 +5876,20 @@ describe("HasManyThroughAssociationsTest", () => {
     class FbangOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("fbang_joins", {
+          className: "FbangJoin",
+          foreignKey: "fbang_owner_id",
+        });
+        this.hasMany("fbang_items", {
+          className: "FbangItem",
+          through: "fbang_joins",
+          source: "fbang_item",
+        });
       }
     }
     registerModel("FbangJoin", FbangJoin);
     registerModel("FbangItem", FbangItem);
     registerModel("FbangOwner", FbangOwner);
-    Associations.belongsTo.call(FbangJoin, "fbang_item", {
-      className: "FbangItem",
-      foreignKey: "fbang_item_id",
-    });
-    Associations.hasMany.call(FbangOwner, "fbang_joins", {
-      className: "FbangJoin",
-      foreignKey: "fbang_owner_id",
-    });
-    Associations.hasMany.call(FbangOwner, "fbang_items", {
-      className: "FbangItem",
-      through: "fbang_joins",
-      source: "fbang_item",
-    });
 
     const item = await FbangItem.create({ name: "A" });
     const owner = new FbangOwner();
@@ -5912,12 +5910,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtEmptyThrOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtEmptyThrJoins", {
+          className: "HmtEmptyThrJoin",
+          foreignKey: "hmt_empty_thr_owner_id",
+        });
+        this.hasMany("hmtEmptyThrItems", {
+          through: "hmtEmptyThrJoins",
+          source: "hmtEmptyThrItem",
+          className: "HmtEmptyThrItem",
+        });
       }
     }
     class HmtEmptyThrJoin extends Base {
       static {
         this.attribute("hmt_empty_thr_owner_id", "integer");
         this.attribute("hmt_empty_thr_item_id", "integer");
+        this.belongsTo("hmtEmptyThrItem", {
+          className: "HmtEmptyThrItem",
+          foreignKey: "hmt_empty_thr_item_id",
+        });
       }
     }
     class HmtEmptyThrItem extends Base {
@@ -5925,20 +5936,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtEmptyThrOwner, "hmtEmptyThrJoins", {
-      className: "HmtEmptyThrJoin",
-      foreignKey: "hmt_empty_thr_owner_id",
-    });
 
-    Associations.hasMany.call(HmtEmptyThrOwner, "hmtEmptyThrItems", {
-      through: "hmtEmptyThrJoins",
-      source: "hmtEmptyThrItem",
-      className: "HmtEmptyThrItem",
-    });
-    Associations.belongsTo.call(HmtEmptyThrJoin, "hmtEmptyThrItem", {
-      className: "HmtEmptyThrItem",
-      foreignKey: "hmt_empty_thr_item_id",
-    });
     registerModel("HmtEmptyThrOwner", HmtEmptyThrOwner);
     registerModel("HmtEmptyThrJoin", HmtEmptyThrJoin);
     registerModel("HmtEmptyThrItem", HmtEmptyThrItem);
@@ -5957,6 +5955,15 @@ describe("HasManyThroughAssociationsTest", () => {
     class PepOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("pepTaggings", {
+          className: "PepTagging",
+          foreignKey: "pep_owner_id",
+        });
+        this.hasMany("pepItems", {
+          through: "pepTaggings",
+          source: "taggable",
+          className: "PepItem",
+        });
       }
     }
     class PepTagging extends Base {
@@ -5964,6 +5971,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("pep_owner_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
+        this.belongsTo("taggable", {
+          className: "PepItem",
+          foreignKey: "taggable_id",
+          polymorphic: true,
+        });
       }
     }
     class PepItem extends Base {
@@ -5971,21 +5983,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(PepOwner, "pepTaggings", {
-      className: "PepTagging",
-      foreignKey: "pep_owner_id",
-    });
 
-    Associations.hasMany.call(PepOwner, "pepItems", {
-      through: "pepTaggings",
-      source: "taggable",
-      className: "PepItem",
-    });
-    Associations.belongsTo.call(PepTagging, "taggable", {
-      className: "PepItem",
-      foreignKey: "taggable_id",
-      polymorphic: true,
-    });
     registerModel("PepOwner", PepOwner);
     registerModel("PepTagging", PepTagging);
     registerModel("PepItem", PepItem);
@@ -6002,12 +6000,19 @@ describe("HasManyThroughAssociationsTest", () => {
     class EjjOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ejjPets", { foreignKey: "ejj_owner_id" });
+        this.hasMany("ejjToys", {
+          through: "ejjPets",
+          source: "ejjToys",
+          className: "EjjToy",
+        });
       }
     }
     class EjjPet extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("ejj_owner_id", "integer");
+        this.hasMany("ejjToys", { foreignKey: "ejj_pet_id" });
       }
     }
     class EjjToy extends Base {
@@ -6016,13 +6021,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ejj_pet_id", "integer");
       }
     }
-    Associations.hasMany.call(EjjOwner, "ejjPets", { foreignKey: "ejj_owner_id" });
-    Associations.hasMany.call(EjjOwner, "ejjToys", {
-      through: "ejjPets",
-      source: "ejjToys",
-      className: "EjjToy",
-    });
-    Associations.hasMany.call(EjjPet, "ejjToys", { foreignKey: "ejj_pet_id" });
     registerModel("EjjOwner", EjjOwner);
     registerModel("EjjPet", EjjPet);
     registerModel("EjjToy", EjjToy);
@@ -6051,28 +6049,28 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ps_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
+        this.belongsTo("taggable", {
+          className: "PsPost",
+          foreignKey: "taggable_id",
+          polymorphic: true,
+        });
       }
     }
     class PsTag extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("psTaggings", {
+          className: "PsTagging",
+          foreignKey: "ps_tag_id",
+        });
+        this.hasMany("taggedPosts", {
+          through: "psTaggings",
+          source: "taggable",
+          className: "PsPost",
+        });
       }
     }
-    Associations.hasMany.call(PsTag, "psTaggings", {
-      className: "PsTagging",
-      foreignKey: "ps_tag_id",
-    });
 
-    Associations.hasMany.call(PsTag, "taggedPosts", {
-      through: "psTaggings",
-      source: "taggable",
-      className: "PsPost",
-    });
-    Associations.belongsTo.call(PsTagging, "taggable", {
-      className: "PsPost",
-      foreignKey: "taggable_id",
-      polymorphic: true,
-    });
     registerModel("PsPost", PsPost);
     registerModel("PsTagging", PsTagging);
     registerModel("PsTag", PsTag);
@@ -6097,6 +6095,16 @@ describe("HasManyThroughAssociationsTest", () => {
     class PjmPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("pjmTaggings", {
+          className: "PjmTagging",
+          foreignKey: "taggable_id",
+          as: "taggable",
+        });
+        this.hasMany("pjmTags", {
+          through: "pjmTaggings",
+          source: "pjmTag",
+          className: "PjmTag",
+        });
       }
     }
     class PjmTagging extends Base {
@@ -6104,6 +6112,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("pjm_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
+        this.belongsTo("pjmTag", {
+          className: "PjmTag",
+          foreignKey: "pjm_tag_id",
+        });
       }
     }
     class PjmTag extends Base {
@@ -6111,21 +6123,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(PjmPost, "pjmTaggings", {
-      className: "PjmTagging",
-      foreignKey: "taggable_id",
-      as: "taggable",
-    });
 
-    Associations.hasMany.call(PjmPost, "pjmTags", {
-      through: "pjmTaggings",
-      source: "pjmTag",
-      className: "PjmTag",
-    });
-    Associations.belongsTo.call(PjmTagging, "pjmTag", {
-      className: "PjmTag",
-      foreignKey: "pjm_tag_id",
-    });
     registerModel("PjmPost", PjmPost);
     registerModel("PjmTagging", PjmTagging);
     registerModel("PjmTag", PjmTag);
@@ -6156,27 +6154,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("ord_person_id", "integer");
         this.attribute("ord_post_id", "integer");
+        this.belongsTo("ordPost", {
+          className: "OrdPost",
+          foreignKey: "ord_post_id",
+        });
       }
     }
     class OrdPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("ordReaders", {
+          className: "OrdReader",
+          foreignKey: "ord_person_id",
+        });
+        this.hasMany("ordPosts", {
+          through: "ordReaders",
+          source: "ordPost",
+          className: "OrdPost",
+        });
       }
     }
-    Associations.hasMany.call(OrdPerson, "ordReaders", {
-      className: "OrdReader",
-      foreignKey: "ord_person_id",
-    });
 
-    Associations.hasMany.call(OrdPerson, "ordPosts", {
-      through: "ordReaders",
-      source: "ordPost",
-      className: "OrdPost",
-    });
-    Associations.belongsTo.call(OrdReader, "ordPost", {
-      className: "OrdPost",
-      foreignKey: "ord_post_id",
-    });
     registerModel("OrdPost", OrdPost);
     registerModel("OrdReader", OrdReader);
     registerModel("OrdPerson", OrdPerson);
@@ -6198,40 +6196,40 @@ describe("HasManyThroughAssociationsTest", () => {
     class SumPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("sumReaders", { foreignKey: "sum_post_id" });
+        this.hasMany("sumPeople", {
+          through: "sumReaders",
+          source: "sumPerson",
+          className: "SumPerson",
+        });
       }
     }
     class SumPerson extends Base {
       static {
         this.attribute("first_name", "string");
         this.attribute("followers_count", "integer");
+        this.hasMany("sumReaders", { foreignKey: "sum_person_id" });
+        this.hasMany("sumPosts", {
+          through: "sumReaders",
+          source: "sumPost",
+          className: "SumPost",
+        });
       }
     }
     class SumReader extends Base {
       static {
         this.attribute("sum_post_id", "integer");
         this.attribute("sum_person_id", "integer");
+        this.belongsTo("sumPerson", {
+          foreignKey: "sum_person_id",
+          className: "SumPerson",
+        });
+        this.belongsTo("sumPost", {
+          foreignKey: "sum_post_id",
+          className: "SumPost",
+        });
       }
     }
-    Associations.hasMany.call(SumPost, "sumReaders", { foreignKey: "sum_post_id" });
-    Associations.hasMany.call(SumPost, "sumPeople", {
-      through: "sumReaders",
-      source: "sumPerson",
-      className: "SumPerson",
-    });
-    Associations.belongsTo.call(SumReader, "sumPerson", {
-      foreignKey: "sum_person_id",
-      className: "SumPerson",
-    });
-    Associations.hasMany.call(SumPerson, "sumReaders", { foreignKey: "sum_person_id" });
-    Associations.hasMany.call(SumPerson, "sumPosts", {
-      through: "sumReaders",
-      source: "sumPost",
-      className: "SumPost",
-    });
-    Associations.belongsTo.call(SumReader, "sumPost", {
-      foreignKey: "sum_post_id",
-      className: "SumPost",
-    });
     registerModel("SumPost", SumPost);
     registerModel("SumPerson", SumPerson);
     registerModel("SumReader", SumReader);
@@ -6286,26 +6284,26 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("ds_owner_id", "integer");
         this.attribute("ds_tgt_id", "integer");
+        this.belongsTo("ds_tgt", { className: "DsTgt", foreignKey: "ds_tgt_id" });
       }
     }
     class DsOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ds_joins", {
+          className: "DsJoin",
+          foreignKey: "ds_owner_id",
+        });
+        this.hasMany("ds_tgts", {
+          className: "DsTgt",
+          through: "ds_joins",
+          source: "ds_tgt",
+        });
       }
     }
     registerModel("DsTgt", DsTgt);
     registerModel("DsJoin", DsJoin);
     registerModel("DsOwner", DsOwner);
-    Associations.belongsTo.call(DsJoin, "ds_tgt", { className: "DsTgt", foreignKey: "ds_tgt_id" });
-    Associations.hasMany.call(DsOwner, "ds_joins", {
-      className: "DsJoin",
-      foreignKey: "ds_owner_id",
-    });
-    Associations.hasMany.call(DsOwner, "ds_tgts", {
-      className: "DsTgt",
-      through: "ds_joins",
-      source: "ds_tgt",
-    });
 
     const owner = await DsOwner.create({ name: "O" });
     const t1 = await DsTgt.create({ title: "First", is_first: true });
@@ -6324,12 +6322,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class IncScopeOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("inc_scope_joins", {
+          className: "IncScopeJoin",
+          foreignKey: "inc_scope_owner_id",
+        });
+        this.hasMany("inc_scope_tgts", {
+          className: "IncScopeTgt",
+          through: "inc_scope_joins",
+          source: "inc_scope_tgt",
+        });
       }
     }
     class IncScopeJoin extends Base {
       static {
         this.attribute("inc_scope_owner_id", "integer");
         this.attribute("inc_scope_tgt_id", "integer");
+        this.belongsTo("inc_scope_tgt", {
+          className: "IncScopeTgt",
+          foreignKey: "inc_scope_tgt_id",
+        });
       }
     }
     class IncScopeTgt extends Base {
@@ -6340,19 +6351,6 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("IncScopeOwner", IncScopeOwner);
     registerModel("IncScopeJoin", IncScopeJoin);
     registerModel("IncScopeTgt", IncScopeTgt);
-    Associations.belongsTo.call(IncScopeJoin, "inc_scope_tgt", {
-      className: "IncScopeTgt",
-      foreignKey: "inc_scope_tgt_id",
-    });
-    Associations.hasMany.call(IncScopeOwner, "inc_scope_joins", {
-      className: "IncScopeJoin",
-      foreignKey: "inc_scope_owner_id",
-    });
-    Associations.hasMany.call(IncScopeOwner, "inc_scope_tgts", {
-      className: "IncScopeTgt",
-      through: "inc_scope_joins",
-      source: "inc_scope_tgt",
-    });
 
     const owner = await IncScopeOwner.create({ name: "O" });
     const tgt = await IncScopeTgt.create({ label: "A" });
@@ -6368,6 +6366,21 @@ describe("HasManyThroughAssociationsTest", () => {
     class IrClub extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ir_memberships", {
+          className: "IrMembership",
+          foreignKey: "ir_club_id",
+        });
+        this.hasMany("ir_members", {
+          className: "IrMember",
+          through: "ir_memberships",
+          source: "ir_member",
+        });
+        this.hasMany("ir_favorites", {
+          className: "IrMember",
+          through: "ir_memberships",
+          source: "ir_member",
+          scope: (rel: any) => rel.where({ "ir_memberships.favorite": true }),
+        });
       }
     }
     class IrMembership extends Base {
@@ -6375,6 +6388,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ir_club_id", "integer");
         this.attribute("ir_member_id", "integer");
         this.attribute("favorite", "boolean");
+        this.belongsTo("ir_member", {
+          className: "IrMember",
+          foreignKey: "ir_member_id",
+        });
       }
     }
     class IrMember extends Base {
@@ -6385,26 +6402,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("IrClub", IrClub);
     registerModel("IrMembership", IrMembership);
     registerModel("IrMember", IrMember);
-    Associations.belongsTo.call(IrMembership, "ir_member", {
-      className: "IrMember",
-      foreignKey: "ir_member_id",
-    });
-    Associations.hasMany.call(IrClub, "ir_memberships", {
-      className: "IrMembership",
-      foreignKey: "ir_club_id",
-    });
-    Associations.hasMany.call(IrClub, "ir_members", {
-      className: "IrMember",
-      through: "ir_memberships",
-      source: "ir_member",
-    });
     // scoped through: only favorite memberships (scope on the through/join table)
-    Associations.hasMany.call(IrClub, "ir_favorites", {
-      className: "IrMember",
-      through: "ir_memberships",
-      source: "ir_member",
-      scope: (rel: any) => rel.where({ "ir_memberships.favorite": true }),
-    });
 
     const club = await IrClub.create({ name: "Club" });
     const member = await IrMember.create({ name: "Alice" });
@@ -6423,6 +6421,16 @@ describe("HasManyThroughAssociationsTest", () => {
     class IrClub2 extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ir_memberships2", {
+          className: "IrMembership2",
+          foreignKey: "ir_club2_id",
+        });
+        this.hasMany("ir_custom_favorites", {
+          className: "IrMember2",
+          through: "ir_memberships2",
+          source: "ir_member2",
+          scope: (rel: any) => rel.where({ "ir_membership2s.favorite": true }),
+        });
       }
     }
     class IrMembership2 extends Base {
@@ -6430,6 +6438,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ir_club2_id", "integer");
         this.attribute("ir_member2_id", "integer");
         this.attribute("favorite", "boolean");
+        this.belongsTo("ir_member2", {
+          className: "IrMember2",
+          foreignKey: "ir_member2_id",
+        });
       }
     }
     class IrMember2 extends Base {
@@ -6440,20 +6452,6 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("IrClub2", IrClub2);
     registerModel("IrMembership2", IrMembership2);
     registerModel("IrMember2", IrMember2);
-    Associations.belongsTo.call(IrMembership2, "ir_member2", {
-      className: "IrMember2",
-      foreignKey: "ir_member2_id",
-    });
-    Associations.hasMany.call(IrClub2, "ir_memberships2", {
-      className: "IrMembership2",
-      foreignKey: "ir_club2_id",
-    });
-    Associations.hasMany.call(IrClub2, "ir_custom_favorites", {
-      className: "IrMember2",
-      through: "ir_memberships2",
-      source: "ir_member2",
-      scope: (rel: any) => rel.where({ "ir_membership2s.favorite": true }),
-    });
 
     const club = await IrClub2.create({ name: "Club" });
     const member = await IrMember2.create({ name: "Alice" });
@@ -6471,6 +6469,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("htu_post_id", "integer");
         this.attribute("htu_person_id", "integer");
         this.attribute("skimmer", "boolean");
+        this.belongsTo("htu_person", {
+          className: "HtuPerson",
+          foreignKey: "htu_person_id",
+        });
       }
     }
     class HtuPerson extends Base {
@@ -6481,31 +6483,27 @@ describe("HasManyThroughAssociationsTest", () => {
     class HtuPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("htu_readers", {
+          className: "HtuReader",
+          foreignKey: "htu_post_id",
+        });
+        this.hasMany("htu_people", {
+          className: "HtuPerson",
+          through: "htu_readers",
+          source: "htu_person",
+        });
+        this.hasMany("htu_non_skimmer_people", {
+          className: "HtuPerson",
+          through: "htu_readers",
+          source: "htu_person",
+          scope: (rel: any) => rel.where({ "htu_readers.skimmer": false }),
+        });
       }
     }
     registerModel("HtuReader", HtuReader);
     registerModel("HtuPerson", HtuPerson);
     registerModel("HtuPost", HtuPost);
-    Associations.belongsTo.call(HtuReader, "htu_person", {
-      className: "HtuPerson",
-      foreignKey: "htu_person_id",
-    });
-    Associations.hasMany.call(HtuPost, "htu_readers", {
-      className: "HtuReader",
-      foreignKey: "htu_post_id",
-    });
-    Associations.hasMany.call(HtuPost, "htu_people", {
-      className: "HtuPerson",
-      through: "htu_readers",
-      source: "htu_person",
-    });
     // scoped: only non-skimmer readers
-    Associations.hasMany.call(HtuPost, "htu_non_skimmer_people", {
-      className: "HtuPerson",
-      through: "htu_readers",
-      source: "htu_person",
-      scope: (rel: any) => rel.where({ "htu_readers.skimmer": false }),
-    });
 
     const post = await HtuPost.create({ title: "Beach" });
     const david = await HtuPerson.create({ name: "David" });
@@ -6526,6 +6524,15 @@ describe("HasManyThroughAssociationsTest", () => {
     class StiAddClub extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("stiAddMemberships", {
+          className: "StiAddMembership",
+          foreignKey: "sti_add_club_id",
+        });
+        this.hasMany("stiAddMembers", {
+          through: "stiAddMemberships",
+          source: "stiAddMember",
+          className: "StiAddMember",
+        });
       }
     }
     class StiAddMember extends Base {
@@ -6540,6 +6547,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("type", "string");
         this._tableName = "sti_add_memberships";
         enableSti(StiAddMembership);
+        this.belongsTo("stiAddMember", {
+          className: "StiAddMember",
+          foreignKey: "sti_add_member_id",
+        });
       }
     }
     class StiAddSuperMembership extends StiAddMembership {
@@ -6548,20 +6559,7 @@ describe("HasManyThroughAssociationsTest", () => {
         registerSubclass(StiAddSuperMembership);
       }
     }
-    Associations.hasMany.call(StiAddClub, "stiAddMemberships", {
-      className: "StiAddMembership",
-      foreignKey: "sti_add_club_id",
-    });
 
-    Associations.hasMany.call(StiAddClub, "stiAddMembers", {
-      through: "stiAddMemberships",
-      source: "stiAddMember",
-      className: "StiAddMember",
-    });
-    Associations.belongsTo.call(StiAddMembership, "stiAddMember", {
-      className: "StiAddMember",
-      foreignKey: "sti_add_member_id",
-    });
     registerModel("StiAddClub", StiAddClub);
     registerModel("StiAddMember", StiAddMember);
     registerModel("StiAddMembership", StiAddMembership);
@@ -6585,6 +6583,10 @@ describe("HasManyThroughAssociationsTest", () => {
     class BfAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("bfPosts", {
+          className: "BfPost",
+          foreignKey: "bf_author_id",
+        });
       }
     }
     class BfPost extends Base {
@@ -6597,22 +6599,18 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("bf_author_id", "integer");
         this.attribute("name", "string");
+        this.belongsTo("bfAuthor", {
+          className: "BfAuthor",
+          foreignKey: "bf_author_id",
+        });
+        this.hasMany("bfPosts", {
+          through: "bfAuthor",
+          source: "bfPosts",
+          className: "BfPost",
+        });
       }
     }
-    Associations.hasMany.call(BfAuthor, "bfPosts", {
-      className: "BfPost",
-      foreignKey: "bf_author_id",
-    });
-    Associations.belongsTo.call(BfOrg, "bfAuthor", {
-      className: "BfAuthor",
-      foreignKey: "bf_author_id",
-    });
 
-    Associations.hasMany.call(BfOrg, "bfPosts", {
-      through: "bfAuthor",
-      source: "bfPosts",
-      className: "BfPost",
-    });
     registerModel("BfAuthor", BfAuthor);
     registerModel("BfPost", BfPost);
     registerModel("BfOrg", BfOrg);
@@ -6636,12 +6634,26 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtMgClub extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmt_mg_memberships", {
+          className: "HmtMgMembership",
+          foreignKey: "hmt_mg_club_id",
+          scope: (rel: any) => rel.distinct(),
+        });
+        this.hasMany("hmt_mg_favorites", {
+          className: "HmtMgMember",
+          through: "hmt_mg_memberships",
+          source: "hmt_mg_member",
+        });
       }
     }
     class HmtMgMembership extends Base {
       static {
         this.attribute("hmt_mg_club_id", "integer");
         this.attribute("hmt_mg_member_id", "integer");
+        this.belongsTo("hmt_mg_member", {
+          className: "HmtMgMember",
+          foreignKey: "hmt_mg_member_id",
+        });
       }
     }
     class HmtMgMember extends Base {
@@ -6652,20 +6664,6 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("HmtMgClub", HmtMgClub);
     registerModel("HmtMgMembership", HmtMgMembership);
     registerModel("HmtMgMember", HmtMgMember);
-    Associations.belongsTo.call(HmtMgMembership, "hmt_mg_member", {
-      className: "HmtMgMember",
-      foreignKey: "hmt_mg_member_id",
-    });
-    Associations.hasMany.call(HmtMgClub, "hmt_mg_memberships", {
-      className: "HmtMgMembership",
-      foreignKey: "hmt_mg_club_id",
-      scope: (rel: any) => rel.distinct(),
-    });
-    Associations.hasMany.call(HmtMgClub, "hmt_mg_favorites", {
-      className: "HmtMgMember",
-      through: "hmt_mg_memberships",
-      source: "hmt_mg_member",
-    });
 
     const club = new HmtMgClub({ name: "C" });
     // The through association scope (distinct) should not bleed into the target relation.
@@ -6691,6 +6689,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.defaultScope((rel: any) =>
           currentOwnerId !== null ? rel.where({ dc_owner_id: currentOwnerId }) : rel,
         );
+        this.belongsTo("dc_tgt", { className: "DcTgt", foreignKey: "dc_tgt_id" });
       }
     }
     class DcTgt extends Base {
@@ -6701,21 +6700,20 @@ describe("HasManyThroughAssociationsTest", () => {
     class DcOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("dc_joins", {
+          className: "DcJoin",
+          foreignKey: "dc_owner_id",
+        });
+        this.hasMany("dc_tgts", {
+          className: "DcTgt",
+          through: "dc_joins",
+          source: "dc_tgt",
+        });
       }
     }
     registerModel("DcTgt", DcTgt);
     registerModel("DcJoin", DcJoin);
     registerModel("DcOwner", DcOwner);
-    Associations.belongsTo.call(DcJoin, "dc_tgt", { className: "DcTgt", foreignKey: "dc_tgt_id" });
-    Associations.hasMany.call(DcOwner, "dc_joins", {
-      className: "DcJoin",
-      foreignKey: "dc_owner_id",
-    });
-    Associations.hasMany.call(DcOwner, "dc_tgts", {
-      className: "DcTgt",
-      through: "dc_joins",
-      source: "dc_tgt",
-    });
 
     const owner1 = await DcOwner.create({ name: "O1" });
     const owner2 = await DcOwner.create({ name: "O2" });
@@ -6743,12 +6741,29 @@ describe("HasManyThroughAssociationsTest", () => {
     class JsAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("js_posts", {
+          className: "JsPost",
+          foreignKey: "js_author_id",
+        });
+        this.hasMany("js_comments", {
+          className: "JsComment",
+          through: "js_posts",
+          source: "js_comments",
+        });
       }
     }
     class JsPost extends Base {
       static {
         this.attribute("js_author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("js_author", {
+          className: "JsAuthor",
+          foreignKey: "js_author_id",
+        });
+        this.hasMany("js_comments", {
+          className: "JsComment",
+          foreignKey: "js_post_id",
+        });
       }
     }
     class JsComment extends Base {
@@ -6760,23 +6775,6 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("JsAuthor", JsAuthor);
     registerModel("JsPost", JsPost);
     registerModel("JsComment", JsComment);
-    Associations.belongsTo.call(JsPost, "js_author", {
-      className: "JsAuthor",
-      foreignKey: "js_author_id",
-    });
-    Associations.hasMany.call(JsPost, "js_comments", {
-      className: "JsComment",
-      foreignKey: "js_post_id",
-    });
-    Associations.hasMany.call(JsAuthor, "js_posts", {
-      className: "JsPost",
-      foreignKey: "js_author_id",
-    });
-    Associations.hasMany.call(JsAuthor, "js_comments", {
-      className: "JsComment",
-      through: "js_posts",
-      source: "js_comments",
-    });
 
     const author = await JsAuthor.create({ name: "David" });
     const post = await JsPost.create({ js_author_id: author.id, title: "First Post" });
@@ -6793,40 +6791,40 @@ describe("HasManyThroughAssociationsTest", () => {
     class LjAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("lj_posts", {
+          className: "LjPost",
+          foreignKey: "lj_author_id",
+        });
+        this.hasMany("lj_comments", {
+          className: "LjComment",
+          through: "lj_posts",
+          source: "lj_comments",
+        });
       }
     }
     class LjPost extends Base {
       static {
         this.attribute("lj_author_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("lj_comments", {
+          className: "LjComment",
+          foreignKey: "lj_post_id",
+        });
       }
     }
     class LjComment extends Base {
       static {
         this.attribute("lj_post_id", "integer");
         this.attribute("body", "string");
+        this.belongsTo("lj_post", {
+          className: "LjPost",
+          foreignKey: "lj_post_id",
+        });
       }
     }
     registerModel("LjAuthor", LjAuthor);
     registerModel("LjPost", LjPost);
     registerModel("LjComment", LjComment);
-    Associations.belongsTo.call(LjComment, "lj_post", {
-      className: "LjPost",
-      foreignKey: "lj_post_id",
-    });
-    Associations.hasMany.call(LjPost, "lj_comments", {
-      className: "LjComment",
-      foreignKey: "lj_post_id",
-    });
-    Associations.hasMany.call(LjAuthor, "lj_posts", {
-      className: "LjPost",
-      foreignKey: "lj_author_id",
-    });
-    Associations.hasMany.call(LjAuthor, "lj_comments", {
-      className: "LjComment",
-      through: "lj_posts",
-      source: "lj_comments",
-    });
 
     const author = await LjAuthor.create({ name: "Mary" });
     const post = await LjPost.create({ lj_author_id: author.id, title: "Other" });
@@ -6843,45 +6841,45 @@ describe("HasManyThroughAssociationsTest", () => {
     class UsAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("us_posts", {
+          className: "UsPost",
+          foreignKey: "us_author_id",
+        });
+        this.hasMany("us_comments", {
+          className: "UsComment",
+          through: "us_posts",
+          source: "us_comments",
+        });
+        this.hasMany("us_unordered_comments", {
+          className: "UsComment",
+          through: "us_posts",
+          source: "us_comments",
+          scope: (rel: any) => rel.unscope("order"),
+        });
       }
     }
     class UsPost extends Base {
       static {
         this.attribute("us_author_id", "integer");
+        this.hasMany("us_comments", {
+          className: "UsComment",
+          foreignKey: "us_post_id",
+        });
       }
     }
     class UsComment extends Base {
       static {
         this.attribute("us_post_id", "integer");
         this.attribute("body", "string");
+        this.belongsTo("us_post", {
+          className: "UsPost",
+          foreignKey: "us_post_id",
+        });
       }
     }
     registerModel("UsAuthor", UsAuthor);
     registerModel("UsPost", UsPost);
     registerModel("UsComment", UsComment);
-    Associations.belongsTo.call(UsComment, "us_post", {
-      className: "UsPost",
-      foreignKey: "us_post_id",
-    });
-    Associations.hasMany.call(UsPost, "us_comments", {
-      className: "UsComment",
-      foreignKey: "us_post_id",
-    });
-    Associations.hasMany.call(UsAuthor, "us_posts", {
-      className: "UsPost",
-      foreignKey: "us_author_id",
-    });
-    Associations.hasMany.call(UsAuthor, "us_comments", {
-      className: "UsComment",
-      through: "us_posts",
-      source: "us_comments",
-    });
-    Associations.hasMany.call(UsAuthor, "us_unordered_comments", {
-      className: "UsComment",
-      through: "us_posts",
-      source: "us_comments",
-      scope: (rel: any) => rel.unscope("order"),
-    });
 
     const author = await UsAuthor.create({ name: "Mary" });
     const post = await UsPost.create({ us_author_id: author.id });
@@ -6897,51 +6895,51 @@ describe("HasManyThroughAssociationsTest", () => {
     class SjAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("sj_posts", {
+          className: "SjPost",
+          foreignKey: "sj_author_id",
+        });
+        this.hasMany("sj_comments", {
+          className: "SjComment",
+          through: "sj_posts",
+          source: "sj_comments",
+        });
+        this.hasMany("sj_recent_comments", {
+          className: "SjComment",
+          through: "sj_posts",
+          source: "sj_comments",
+          scope: (rel: any) =>
+            rel.joins(
+              `INNER JOIN "sj_posts" AS "sj_posts_alias" ON "sj_posts_alias"."id" = "sj_comments"."sj_post_id"`,
+            ),
+        });
       }
     }
     class SjPost extends Base {
       static {
         this.attribute("sj_author_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("sj_comments", {
+          className: "SjComment",
+          foreignKey: "sj_post_id",
+        });
       }
     }
     class SjComment extends Base {
       static {
         this.attribute("sj_post_id", "integer");
         this.attribute("body", "string");
+        this.belongsTo("sj_post", {
+          className: "SjPost",
+          foreignKey: "sj_post_id",
+        });
       }
     }
     registerModel("SjAuthor", SjAuthor);
     registerModel("SjPost", SjPost);
     registerModel("SjComment", SjComment);
-    Associations.belongsTo.call(SjComment, "sj_post", {
-      className: "SjPost",
-      foreignKey: "sj_post_id",
-    });
-    Associations.hasMany.call(SjPost, "sj_comments", {
-      className: "SjComment",
-      foreignKey: "sj_post_id",
-    });
-    Associations.hasMany.call(SjAuthor, "sj_posts", {
-      className: "SjPost",
-      foreignKey: "sj_author_id",
-    });
-    Associations.hasMany.call(SjAuthor, "sj_comments", {
-      className: "SjComment",
-      through: "sj_posts",
-      source: "sj_comments",
-    });
 
     // Through association with a scope that adds a JOIN — tests both string and hash join in scope
-    Associations.hasMany.call(SjAuthor, "sj_recent_comments", {
-      className: "SjComment",
-      through: "sj_posts",
-      source: "sj_comments",
-      scope: (rel: any) =>
-        rel.joins(
-          `INNER JOIN "sj_posts" AS "sj_posts_alias" ON "sj_posts_alias"."id" = "sj_comments"."sj_post_id"`,
-        ),
-    });
 
     const author = await SjAuthor.create({ name: "David" });
     const post = await SjPost.create({ sj_author_id: author.id, title: "P1" });
@@ -6962,6 +6960,16 @@ describe("HasManyThroughAssociationsTest", () => {
     class StFamily extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("st_trees", {
+          className: "StTree",
+          foreignKey: "st_family_id",
+          scope: (rel: any) => rel.where({ token: null }),
+        });
+        this.hasMany("st_members", {
+          className: "StUser",
+          through: "st_trees",
+          source: "st_member",
+        });
       }
     }
     class StUser extends Base {
@@ -6974,25 +6982,15 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("st_family_id", "integer");
         this.attribute("st_member_id", "integer");
         this.attribute("token", "string");
+        this.belongsTo("st_member", {
+          className: "StUser",
+          foreignKey: "st_member_id",
+        });
       }
     }
     registerModel("StFamily", StFamily);
     registerModel("StUser", StUser);
     registerModel("StTree", StTree);
-    Associations.belongsTo.call(StTree, "st_member", {
-      className: "StUser",
-      foreignKey: "st_member_id",
-    });
-    Associations.hasMany.call(StFamily, "st_trees", {
-      className: "StTree",
-      foreignKey: "st_family_id",
-      scope: (rel: any) => rel.where({ token: null }),
-    });
-    Associations.hasMany.call(StFamily, "st_members", {
-      className: "StUser",
-      through: "st_trees",
-      source: "st_member",
-    });
 
     const family = await StFamily.create({ name: "F" });
     const u1 = await StUser.create({ name: "Alice" });
@@ -7052,14 +7050,14 @@ describe("HasManyThroughAssociationsTest", () => {
     class IoOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ioItems", {
+          through: "ioJoins",
+          source: "ioItem",
+          className: "IoItem",
+        });
       }
     }
     // Define through association BEFORE the through source
-    Associations.hasMany.call(IoOwner, "ioItems", {
-      through: "ioJoins",
-      source: "ioItem",
-      className: "IoItem",
-    });
     registerModel("IoOwner", IoOwner);
 
     const owner = await IoOwner.create({ name: "O" });
@@ -7086,29 +7084,29 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("uid_author_id", "integer");
         this.attribute("uid_cat_id", "integer");
         this.attribute("special", "boolean");
+        this.belongsTo("uid_cat", {
+          className: "UidCat",
+          foreignKey: "uid_cat_id",
+        });
       }
     }
     class UidAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("uid_categs", {
+          className: "UidCateg",
+          foreignKey: "uid_author_id",
+        });
+        this.hasMany("uid_cats", {
+          className: "UidCat",
+          through: "uid_categs",
+          source: "uid_cat",
+        });
       }
     }
     registerModel("UidCat", UidCat);
     registerModel("UidCateg", UidCateg);
     registerModel("UidAuthor", UidAuthor);
-    Associations.belongsTo.call(UidCateg, "uid_cat", {
-      className: "UidCat",
-      foreignKey: "uid_cat_id",
-    });
-    Associations.hasMany.call(UidAuthor, "uid_categs", {
-      className: "UidCateg",
-      foreignKey: "uid_author_id",
-    });
-    Associations.hasMany.call(UidAuthor, "uid_cats", {
-      className: "UidCat",
-      through: "uid_categs",
-      source: "uid_cat",
-    });
 
     const author = await UidAuthor.create({ name: "Bill" });
     const cat = await UidCat.create({ name: "General" });
@@ -7124,12 +7122,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtUnpOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtUnpJoins", {
+          className: "HmtUnpJoin",
+          foreignKey: "hmt_unp_owner_id",
+        });
+        this.hasMany("hmtUnpTargets", {
+          through: "hmtUnpJoins",
+          source: "hmtUnpTarget",
+          className: "HmtUnpTarget",
+        });
       }
     }
     class HmtUnpJoin extends Base {
       static {
         this.attribute("hmt_unp_owner_id", "integer");
         this.attribute("hmt_unp_target_id", "integer");
+        this.belongsTo("hmtUnpTarget", {
+          className: "HmtUnpTarget",
+          foreignKey: "hmt_unp_target_id",
+        });
       }
     }
     class HmtUnpTarget extends Base {
@@ -7137,20 +7148,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtUnpOwner, "hmtUnpJoins", {
-      className: "HmtUnpJoin",
-      foreignKey: "hmt_unp_owner_id",
-    });
 
-    Associations.hasMany.call(HmtUnpOwner, "hmtUnpTargets", {
-      through: "hmtUnpJoins",
-      source: "hmtUnpTarget",
-      className: "HmtUnpTarget",
-    });
-    Associations.belongsTo.call(HmtUnpJoin, "hmtUnpTarget", {
-      className: "HmtUnpTarget",
-      foreignKey: "hmt_unp_target_id",
-    });
     registerModel("HmtUnpOwner", HmtUnpOwner);
     registerModel("HmtUnpJoin", HmtUnpJoin);
     registerModel("HmtUnpTarget", HmtUnpTarget);
@@ -7168,12 +7166,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNestedUnpOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtNestedUnpJoins", {
+          className: "HmtNestedUnpJoin",
+          foreignKey: "hmt_nested_unp_owner_id",
+        });
+        this.hasMany("hmtNestedUnpTargets", {
+          through: "hmtNestedUnpJoins",
+          source: "hmtNestedUnpTarget",
+          className: "HmtNestedUnpTarget",
+        });
       }
     }
     class HmtNestedUnpJoin extends Base {
       static {
         this.attribute("hmt_nested_unp_owner_id", "integer");
         this.attribute("hmt_nested_unp_target_id", "integer");
+        this.belongsTo("hmtNestedUnpTarget", {
+          className: "HmtNestedUnpTarget",
+          foreignKey: "hmt_nested_unp_target_id",
+        });
       }
     }
     class HmtNestedUnpTarget extends Base {
@@ -7181,20 +7192,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(HmtNestedUnpOwner, "hmtNestedUnpJoins", {
-      className: "HmtNestedUnpJoin",
-      foreignKey: "hmt_nested_unp_owner_id",
-    });
 
-    Associations.hasMany.call(HmtNestedUnpOwner, "hmtNestedUnpTargets", {
-      through: "hmtNestedUnpJoins",
-      source: "hmtNestedUnpTarget",
-      className: "HmtNestedUnpTarget",
-    });
-    Associations.belongsTo.call(HmtNestedUnpJoin, "hmtNestedUnpTarget", {
-      className: "HmtNestedUnpTarget",
-      foreignKey: "hmt_nested_unp_target_id",
-    });
     registerModel("HmtNestedUnpOwner", HmtNestedUnpOwner);
     registerModel("HmtNestedUnpJoin", HmtNestedUnpJoin);
     registerModel("HmtNestedUnpTarget", HmtNestedUnpTarget);
@@ -7211,12 +7209,20 @@ describe("HasManyThroughAssociationsTest", () => {
     class CvOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("cvPetTreasures", {
+          className: "CvPetTreasure",
+          foreignKey: "cv_owner_id",
+        });
       }
     }
     class CvPetTreasure extends Base {
       static {
         this.attribute("cv_owner_id", "integer");
         this.attribute("cv_pet_id", "integer");
+        this.belongsTo("cvPet", {
+          className: "CvPet",
+          foreignKey: "cv_pet_id",
+        });
       }
     }
     class CvPet extends Base {
@@ -7225,10 +7231,6 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     let callbackFired = false;
-    Associations.hasMany.call(CvOwner, "cvPetTreasures", {
-      className: "CvPetTreasure",
-      foreignKey: "cv_owner_id",
-    });
     Associations.hasMany.call(CvOwner, "cvPets", {
       through: "cvPetTreasures",
       source: "cvPet",
@@ -7237,10 +7239,6 @@ describe("HasManyThroughAssociationsTest", () => {
         // The child should be visible (have an id) by the time the callback fires
         if (record.name) callbackFired = true;
       },
-    });
-    Associations.belongsTo.call(CvPetTreasure, "cvPet", {
-      className: "CvPet",
-      foreignKey: "cv_pet_id",
     });
     registerModel("CvOwner", CvOwner);
     registerModel("CvPetTreasure", CvPetTreasure);
@@ -7270,11 +7268,19 @@ describe("HasManyThroughAssociationsTest", () => {
     class CaSeminar extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ca_sections", {
+          className: "CaSection",
+          foreignKey: "ca_seminar_id",
+        });
       }
     }
     class CaSession extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ca_sections", {
+          className: "CaSection",
+          foreignKey: "ca_session_id",
+        });
       }
     }
     class CaSection extends Base {
@@ -7282,23 +7288,15 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("short_name", "string");
         this.attribute("ca_seminar_id", "integer");
         this.attribute("ca_session_id", "integer");
+        this.belongsTo("ca_session", {
+          className: "CaSession",
+          foreignKey: "ca_session_id",
+        });
       }
     }
     registerModel("CaSeminar", CaSeminar);
     registerModel("CaSession", CaSession);
     registerModel("CaSection", CaSection);
-    Associations.hasMany.call(CaSeminar, "ca_sections", {
-      className: "CaSection",
-      foreignKey: "ca_seminar_id",
-    });
-    Associations.belongsTo.call(CaSection, "ca_session", {
-      className: "CaSession",
-      foreignKey: "ca_session_id",
-    });
-    Associations.hasMany.call(CaSession, "ca_sections", {
-      className: "CaSection",
-      foreignKey: "ca_session_id",
-    });
 
     const seminar = await CaSeminar.create({ name: "CS180" });
     const session = await CaSession.create({ name: "Fall" });
@@ -7327,6 +7325,15 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("cq_blog_post_tags", {
+          className: "CqBlogPostTag",
+          foreignKey: "blog_post_id",
+        });
+        this.hasMany("cq_tags", {
+          className: "CqTag",
+          through: "cq_blog_post_tags",
+          source: "cq_tag",
+        });
       }
     }
     class CqTag extends Base {
@@ -7340,24 +7347,15 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("blog_id", "integer");
         this.attribute("blog_post_id", "integer");
         this.attribute("tag_id", "integer");
+        this.belongsTo("cq_tag", {
+          className: "CqTag",
+          foreignKey: "tag_id",
+        });
       }
     }
     registerModel("CqBlogPost", CqBlogPost);
     registerModel("CqTag", CqTag);
     registerModel("CqBlogPostTag", CqBlogPostTag);
-    Associations.belongsTo.call(CqBlogPostTag, "cq_tag", {
-      className: "CqTag",
-      foreignKey: "tag_id",
-    });
-    Associations.hasMany.call(CqBlogPost, "cq_blog_post_tags", {
-      className: "CqBlogPostTag",
-      foreignKey: "blog_post_id",
-    });
-    Associations.hasMany.call(CqBlogPost, "cq_tags", {
-      className: "CqTag",
-      through: "cq_blog_post_tags",
-      source: "cq_tag",
-    });
 
     const post = await CqBlogPost.create({ blog_id: 1, title: "Great Post" });
     const tag = await CqTag.create({ blog_id: 1, name: "Ruby" });
@@ -7375,6 +7373,15 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("name", "string");
+        this.hasMany("cq_blog_post_tags2", {
+          className: "CqBlogPostTag2",
+          foreignKey: "tag_id",
+        });
+        this.hasMany("cq_blog_posts2", {
+          className: "CqBlogPost2",
+          through: "cq_blog_post_tags2",
+          source: "cq_blog_post2",
+        });
       }
     }
     class CqBlogPost2 extends Base {
@@ -7388,24 +7395,15 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("blog_id", "integer");
         this.attribute("blog_post_id", "integer");
         this.attribute("tag_id", "integer");
+        this.belongsTo("cq_blog_post2", {
+          className: "CqBlogPost2",
+          foreignKey: "blog_post_id",
+        });
       }
     }
     registerModel("CqTag2", CqTag2);
     registerModel("CqBlogPost2", CqBlogPost2);
     registerModel("CqBlogPostTag2", CqBlogPostTag2);
-    Associations.belongsTo.call(CqBlogPostTag2, "cq_blog_post2", {
-      className: "CqBlogPost2",
-      foreignKey: "blog_post_id",
-    });
-    Associations.hasMany.call(CqTag2, "cq_blog_post_tags2", {
-      className: "CqBlogPostTag2",
-      foreignKey: "tag_id",
-    });
-    Associations.hasMany.call(CqTag2, "cq_blog_posts2", {
-      className: "CqBlogPost2",
-      through: "cq_blog_post_tags2",
-      source: "cq_blog_post2",
-    });
 
     const tag = await CqTag2.create({ blog_id: 1, name: "Ruby" });
     const post = await CqBlogPost2.create({ blog_id: 1, title: "Great Post" });
@@ -7424,6 +7422,15 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
+        this.hasMany("cpkHmtJoins", {
+          foreignKey: ["cpk_hmt_owner_region_id", "cpk_hmt_owner_id"],
+          className: "CpkHmtJoin",
+        });
+        this.hasMany("cpkHmtTargets", {
+          through: "cpkHmtJoins",
+          className: "CpkHmtTarget",
+          source: "cpkHmtTarget",
+        });
       }
     }
     class CpkHmtJoin extends Base {
@@ -7432,6 +7439,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("cpk_hmt_owner_region_id", "integer");
         this.attribute("cpk_hmt_owner_id", "integer");
         this.attribute("cpk_hmt_target_id", "integer");
+        this.belongsTo("cpkHmtTarget", { className: "CpkHmtTarget" });
       }
     }
     class CpkHmtTarget extends Base {
@@ -7440,16 +7448,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CpkHmtOwner, "cpkHmtJoins", {
-      foreignKey: ["cpk_hmt_owner_region_id", "cpk_hmt_owner_id"],
-      className: "CpkHmtJoin",
-    });
-    Associations.belongsTo.call(CpkHmtJoin, "cpkHmtTarget", { className: "CpkHmtTarget" });
-    Associations.hasMany.call(CpkHmtOwner, "cpkHmtTargets", {
-      through: "cpkHmtJoins",
-      className: "CpkHmtTarget",
-      source: "cpkHmtTarget",
-    });
     registerModel("CpkHmtOwner", CpkHmtOwner);
     registerModel("CpkHmtJoin", CpkHmtJoin);
     registerModel("CpkHmtTarget", CpkHmtTarget);
@@ -7470,6 +7468,15 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
+        this.hasMany("cpkStJoins", {
+          foreignKey: ["cpk_st_owner_region_id", "cpk_st_owner_id"],
+          className: "CpkStJoin",
+        });
+        this.hasMany("cpkStTargets", {
+          through: "cpkStJoins",
+          className: "CpkStTarget",
+          source: "cpkStTarget",
+        });
       }
     }
     class CpkStJoin extends Base {
@@ -7478,6 +7485,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("cpk_st_owner_region_id", "integer");
         this.attribute("cpk_st_owner_id", "integer");
         this.attribute("cpk_st_target_id", "integer");
+        this.belongsTo("cpkStTarget", { className: "CpkStTarget" });
       }
     }
     class CpkStTarget extends Base {
@@ -7486,16 +7494,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CpkStOwner, "cpkStJoins", {
-      foreignKey: ["cpk_st_owner_region_id", "cpk_st_owner_id"],
-      className: "CpkStJoin",
-    });
-    Associations.belongsTo.call(CpkStJoin, "cpkStTarget", { className: "CpkStTarget" });
-    Associations.hasMany.call(CpkStOwner, "cpkStTargets", {
-      through: "cpkStJoins",
-      className: "CpkStTarget",
-      source: "cpkStTarget",
-    });
     registerModel("CpkStOwner", CpkStOwner);
     registerModel("CpkStJoin", CpkStJoin);
     registerModel("CpkStTarget", CpkStTarget);
@@ -7525,12 +7523,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class CpkBOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("cpkBJoins", {
+          className: "CpkBJoin",
+          foreignKey: "cpk_b_owner_id",
+        });
+        this.hasMany("cpkBItems", {
+          through: "cpkBJoins",
+          source: "cpkBItem",
+          className: "CpkBItem",
+        });
       }
     }
     class CpkBJoin extends Base {
       static {
         this.attribute("cpk_b_owner_id", "integer");
         this.attribute("cpk_b_item_id", "integer");
+        this.belongsTo("cpkBItem", {
+          className: "CpkBItem",
+          foreignKey: "cpk_b_item_id",
+        });
       }
     }
     class CpkBItem extends Base {
@@ -7538,20 +7549,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("label", "string");
       }
     }
-    Associations.hasMany.call(CpkBOwner, "cpkBJoins", {
-      className: "CpkBJoin",
-      foreignKey: "cpk_b_owner_id",
-    });
 
-    Associations.hasMany.call(CpkBOwner, "cpkBItems", {
-      through: "cpkBJoins",
-      source: "cpkBItem",
-      className: "CpkBItem",
-    });
-    Associations.belongsTo.call(CpkBJoin, "cpkBItem", {
-      className: "CpkBItem",
-      foreignKey: "cpk_b_item_id",
-    });
     registerModel("CpkBOwner", CpkBOwner);
     registerModel("CpkBJoin", CpkBJoin);
     registerModel("CpkBItem", CpkBItem);
@@ -7567,12 +7565,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtCrBook extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("hmtCrSubscriptions", {
+          className: "HmtCrSubscription",
+          foreignKey: "hmt_cr_book_id",
+        });
+        this.hasMany("hmtCrSubscribers", {
+          through: "hmtCrSubscriptions",
+          source: "hmtCrSubscriber",
+          className: "HmtCrSubscriber",
+        });
       }
     }
     class HmtCrSubscription extends Base {
       static {
         this.attribute("hmt_cr_book_id", "integer");
         this.attribute("hmt_cr_subscriber_id", "integer");
+        this.belongsTo("hmtCrSubscriber", {
+          className: "HmtCrSubscriber",
+          foreignKey: "hmt_cr_subscriber_id",
+        });
       }
     }
     class HmtCrSubscriber extends Base {
@@ -7580,20 +7591,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("nick", "string");
       }
     }
-    Associations.hasMany.call(HmtCrBook, "hmtCrSubscriptions", {
-      className: "HmtCrSubscription",
-      foreignKey: "hmt_cr_book_id",
-    });
 
-    Associations.hasMany.call(HmtCrBook, "hmtCrSubscribers", {
-      through: "hmtCrSubscriptions",
-      source: "hmtCrSubscriber",
-      className: "HmtCrSubscriber",
-    });
-    Associations.belongsTo.call(HmtCrSubscription, "hmtCrSubscriber", {
-      className: "HmtCrSubscriber",
-      foreignKey: "hmt_cr_subscriber_id",
-    });
     registerModel("HmtCrBook", HmtCrBook);
     registerModel("HmtCrSubscription", HmtCrSubscription);
     registerModel("HmtCrSubscriber", HmtCrSubscriber);
@@ -7622,27 +7620,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("oht_person_id", "integer");
         this.attribute("oht_post_id", "integer");
+        this.belongsTo("ohtPost", {
+          className: "OhtPost",
+          foreignKey: "oht_post_id",
+        });
       }
     }
     class OhtPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("ohtReaders", {
+          className: "OhtReader",
+          foreignKey: "oht_person_id",
+        });
+        this.hasMany("ohtPosts", {
+          through: "ohtReaders",
+          source: "ohtPost",
+          className: "OhtPost",
+        });
       }
     }
-    Associations.hasMany.call(OhtPerson, "ohtReaders", {
-      className: "OhtReader",
-      foreignKey: "oht_person_id",
-    });
 
-    Associations.hasMany.call(OhtPerson, "ohtPosts", {
-      through: "ohtReaders",
-      source: "ohtPost",
-      className: "OhtPost",
-    });
-    Associations.belongsTo.call(OhtReader, "ohtPost", {
-      className: "OhtPost",
-      foreignKey: "oht_post_id",
-    });
     registerModel("OhtPost", OhtPost);
     registerModel("OhtReader", OhtReader);
     registerModel("OhtPerson", OhtPerson);
@@ -7669,12 +7667,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class NpcLesson extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("npcLessonStudents", {
+          className: "NpcLessonStudent",
+          foreignKey: "npc_lesson_id",
+        });
+        this.hasMany("npcStudents", {
+          through: "npcLessonStudents",
+          source: "npcStudent",
+          className: "NpcStudent",
+        });
       }
     }
     class NpcLessonStudent extends Base {
       static {
         this.attribute("npc_lesson_id", "integer");
         this.attribute("npc_student_id", "integer");
+        this.belongsTo("npcStudent", {
+          className: "NpcStudent",
+          foreignKey: "npc_student_id",
+        });
       }
     }
     class NpcStudent extends Base {
@@ -7682,20 +7693,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(NpcLesson, "npcLessonStudents", {
-      className: "NpcLessonStudent",
-      foreignKey: "npc_lesson_id",
-    });
 
-    Associations.hasMany.call(NpcLesson, "npcStudents", {
-      through: "npcLessonStudents",
-      source: "npcStudent",
-      className: "NpcStudent",
-    });
-    Associations.belongsTo.call(NpcLessonStudent, "npcStudent", {
-      className: "NpcStudent",
-      foreignKey: "npc_student_id",
-    });
     registerModel("NpcLesson", NpcLesson);
     registerModel("NpcLessonStudent", NpcLessonStudent);
     registerModel("NpcStudent", NpcStudent);
@@ -7727,27 +7725,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("inc_person_id", "integer");
         this.attribute("inc_post_id", "integer");
+        this.belongsTo("incPost", {
+          className: "IncPost",
+          foreignKey: "inc_post_id",
+        });
       }
     }
     class IncPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("incReaders", {
+          className: "IncReader",
+          foreignKey: "inc_person_id",
+        });
+        this.hasMany("incPosts", {
+          through: "incReaders",
+          source: "incPost",
+          className: "IncPost",
+        });
       }
     }
-    Associations.hasMany.call(IncPerson, "incReaders", {
-      className: "IncReader",
-      foreignKey: "inc_person_id",
-    });
 
-    Associations.hasMany.call(IncPerson, "incPosts", {
-      through: "incReaders",
-      source: "incPost",
-      className: "IncPost",
-    });
-    Associations.belongsTo.call(IncReader, "incPost", {
-      className: "IncPost",
-      foreignKey: "inc_post_id",
-    });
     registerModel("IncPost", IncPost);
     registerModel("IncReader", IncReader);
     registerModel("IncPerson", IncPerson);
@@ -7762,6 +7760,10 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtBtAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hmtBtFavorites", {
+          className: "HmtBtFavorite",
+          foreignKey: "hmt_bt_author_id",
+        });
       }
     }
     class HmtBtFavorite extends Base {
@@ -7774,22 +7776,18 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("hmt_bt_author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("hmtBtAuthor", {
+          className: "HmtBtAuthor",
+          foreignKey: "hmt_bt_author_id",
+        });
+        this.hasMany("hmtBtFavorites", {
+          through: "hmtBtAuthor",
+          source: "hmtBtFavorites",
+          className: "HmtBtFavorite",
+        });
       }
     }
-    Associations.hasMany.call(HmtBtAuthor, "hmtBtFavorites", {
-      className: "HmtBtFavorite",
-      foreignKey: "hmt_bt_author_id",
-    });
-    Associations.belongsTo.call(HmtBtPost, "hmtBtAuthor", {
-      className: "HmtBtAuthor",
-      foreignKey: "hmt_bt_author_id",
-    });
 
-    Associations.hasMany.call(HmtBtPost, "hmtBtFavorites", {
-      through: "hmtBtAuthor",
-      source: "hmtBtFavorites",
-      className: "HmtBtFavorite",
-    });
     registerModel("HmtBtAuthor", HmtBtAuthor);
     registerModel("HmtBtFavorite", HmtBtFavorite);
     registerModel("HmtBtPost", HmtBtPost);
@@ -7815,18 +7813,18 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("first_name", "string");
         this.attribute("primary_contact_id", "integer");
+        this.hasMany("agents", {
+          className: "SelfPerson",
+          foreignKey: "primary_contact_id",
+        });
+        this.hasMany("agentsOfAgents", {
+          through: "agents",
+          source: "agents",
+          className: "SelfPerson",
+        });
       }
     }
-    Associations.hasMany.call(SelfPerson, "agents", {
-      className: "SelfPerson",
-      foreignKey: "primary_contact_id",
-    });
 
-    Associations.hasMany.call(SelfPerson, "agentsOfAgents", {
-      through: "agents",
-      source: "agents",
-      className: "SelfPerson",
-    });
     registerModel("SelfPerson", SelfPerson);
 
     const susan = await SelfPerson.create({ first_name: "Susan" });
@@ -7858,27 +7856,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("cwc_post_id", "integer");
         this.attribute("cwc_tag_id", "integer");
+        this.belongsTo("cwcTag", {
+          className: "CwcTag",
+          foreignKey: "cwc_tag_id",
+        });
       }
     }
     class CwcPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("cwcTaggings", {
+          className: "CwcTagging",
+          foreignKey: "cwc_post_id",
+        });
+        this.hasMany("cwcTags", {
+          through: "cwcTaggings",
+          source: "cwcTag",
+          className: "CwcTag",
+        });
       }
     }
-    Associations.hasMany.call(CwcPost, "cwcTaggings", {
-      className: "CwcTagging",
-      foreignKey: "cwc_post_id",
-    });
 
-    Associations.hasMany.call(CwcPost, "cwcTags", {
-      through: "cwcTaggings",
-      source: "cwcTag",
-      className: "CwcTag",
-    });
-    Associations.belongsTo.call(CwcTagging, "cwcTag", {
-      className: "CwcTag",
-      foreignKey: "cwc_tag_id",
-    });
     registerModel("CwcTag", CwcTag);
     registerModel("CwcTagging", CwcTagging);
     registerModel("CwcPost", CwcPost);
@@ -7901,27 +7899,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("nr_person_id", "integer");
         this.attribute("nr_post_id", "integer");
+        this.belongsTo("nrPost", {
+          className: "NrPost",
+          foreignKey: "nr_post_id",
+        });
       }
     }
     class NrPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("nrReaders", {
+          className: "NrReader",
+          foreignKey: "nr_person_id",
+        });
+        this.hasMany("nrPosts", {
+          through: "nrReaders",
+          source: "nrPost",
+          className: "NrPost",
+        });
       }
     }
-    Associations.hasMany.call(NrPerson, "nrReaders", {
-      className: "NrReader",
-      foreignKey: "nr_person_id",
-    });
 
-    Associations.hasMany.call(NrPerson, "nrPosts", {
-      through: "nrReaders",
-      source: "nrPost",
-      className: "NrPost",
-    });
-    Associations.belongsTo.call(NrReader, "nrPost", {
-      className: "NrPost",
-      foreignKey: "nr_post_id",
-    });
     registerModel("NrPost", NrPost);
     registerModel("NrReader", NrReader);
     registerModel("NrPerson", NrPerson);
@@ -7939,12 +7937,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class AePost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("aeReaders", {
+          className: "AeReader",
+          foreignKey: "ae_post_id",
+        });
+        this.hasMany("aePeople", {
+          through: "aeReaders",
+          source: "aePerson",
+          className: "AePerson",
+        });
       }
     }
     class AeReader extends Base {
       static {
         this.attribute("ae_person_id", "integer");
         this.attribute("ae_post_id", "integer");
+        this.belongsTo("aePerson", {
+          className: "AePerson",
+          foreignKey: "ae_person_id",
+        });
       }
     }
     class AePerson extends Base {
@@ -7952,20 +7963,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("first_name", "string");
       }
     }
-    Associations.hasMany.call(AePost, "aeReaders", {
-      className: "AeReader",
-      foreignKey: "ae_post_id",
-    });
 
-    Associations.hasMany.call(AePost, "aePeople", {
-      through: "aeReaders",
-      source: "aePerson",
-      className: "AePerson",
-    });
-    Associations.belongsTo.call(AeReader, "aePerson", {
-      className: "AePerson",
-      foreignKey: "ae_person_id",
-    });
     registerModel("AePost", AePost);
     registerModel("AeReader", AeReader);
     registerModel("AePerson", AePerson);
@@ -7984,12 +7982,25 @@ describe("HasManyThroughAssociationsTest", () => {
     class SzPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("szReaders", {
+          className: "SzReader",
+          foreignKey: "sz_post_id",
+        });
+        this.hasMany("szPeople", {
+          through: "szReaders",
+          source: "szPerson",
+          className: "SzPerson",
+        });
       }
     }
     class SzReader extends Base {
       static {
         this.attribute("sz_person_id", "integer");
         this.attribute("sz_post_id", "integer");
+        this.belongsTo("szPerson", {
+          className: "SzPerson",
+          foreignKey: "sz_person_id",
+        });
       }
     }
     class SzPerson extends Base {
@@ -7997,20 +8008,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("first_name", "string");
       }
     }
-    Associations.hasMany.call(SzPost, "szReaders", {
-      className: "SzReader",
-      foreignKey: "sz_post_id",
-    });
 
-    Associations.hasMany.call(SzPost, "szPeople", {
-      through: "szReaders",
-      source: "szPerson",
-      className: "SzPerson",
-    });
-    Associations.belongsTo.call(SzReader, "szPerson", {
-      className: "SzPerson",
-      foreignKey: "sz_person_id",
-    });
     registerModel("SzPost", SzPost);
     registerModel("SzReader", SzReader);
     registerModel("SzPerson", SzPerson);
@@ -8038,6 +8036,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class ClearScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("clear_scope_posts", {
+          className: "ClearScopePost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class ClearScopePost extends Base {
@@ -8048,11 +8051,6 @@ describe("HasManyThroughAssociationsTest", () => {
     }
     registerModel(ClearScopeAuthor);
     registerModel(ClearScopePost);
-    Associations.hasMany.call(ClearScopeAuthor, "clear_scope_posts", {
-      className: "ClearScopePost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await ClearScopeAuthor.create({ name: "Alice" });
     await ClearScopePost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -8073,27 +8071,27 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("gi_person_id", "integer");
         this.attribute("gi_post_id", "integer");
+        this.belongsTo("giPost", {
+          className: "GiPost",
+          foreignKey: "gi_post_id",
+        });
       }
     }
     class GiPerson extends Base {
       static {
         this.attribute("first_name", "string");
+        this.hasMany("giReaders", {
+          className: "GiReader",
+          foreignKey: "gi_person_id",
+        });
+        this.hasMany("giPosts", {
+          through: "giReaders",
+          source: "giPost",
+          className: "GiPost",
+        });
       }
     }
-    Associations.hasMany.call(GiPerson, "giReaders", {
-      className: "GiReader",
-      foreignKey: "gi_person_id",
-    });
 
-    Associations.hasMany.call(GiPerson, "giPosts", {
-      through: "giReaders",
-      source: "giPost",
-      className: "GiPost",
-    });
-    Associations.belongsTo.call(GiReader, "giPost", {
-      className: "GiPost",
-      foreignKey: "gi_post_id",
-    });
     registerModel("GiPost", GiPost);
     registerModel("GiReader", GiReader);
     registerModel("GiPerson", GiPerson);
@@ -8123,6 +8121,10 @@ describe("HasManyThroughAssociationsTest", () => {
         this.validate((r: any) => {
           r.errors.add("base", "Join always invalid");
         });
+        this.belongsTo("irpv_item", {
+          className: "IrpvItem",
+          foreignKey: "irpv_item_id",
+        });
       }
     }
     class IrpvItem extends Base {
@@ -8133,24 +8135,20 @@ describe("HasManyThroughAssociationsTest", () => {
     class IrpvOwner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("irpv_joins", {
+          className: "IrpvJoin",
+          foreignKey: "irpv_owner_id",
+        });
+        this.hasMany("irpv_items", {
+          className: "IrpvItem",
+          through: "irpv_joins",
+          source: "irpv_item",
+        });
       }
     }
     registerModel("IrpvJoin", IrpvJoin);
     registerModel("IrpvItem", IrpvItem);
     registerModel("IrpvOwner", IrpvOwner);
-    Associations.belongsTo.call(IrpvJoin, "irpv_item", {
-      className: "IrpvItem",
-      foreignKey: "irpv_item_id",
-    });
-    Associations.hasMany.call(IrpvOwner, "irpv_joins", {
-      className: "IrpvJoin",
-      foreignKey: "irpv_owner_id",
-    });
-    Associations.hasMany.call(IrpvOwner, "irpv_items", {
-      className: "IrpvItem",
-      through: "irpv_joins",
-      source: "irpv_item",
-    });
 
     const owner = await IrpvOwner.create({ name: "Firm" });
     const item = await IrpvItem.create({ name: "Item" });
@@ -8179,17 +8177,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class LtjmPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("ltjmTaggings", {
+          className: "LtjmTagging",
+          foreignKey: "post_id",
+        });
+        this.hasMany("ltjmTags", {
+          through: "ltjmTaggings",
+          className: "LtjmTag",
+          source: "tag",
+        });
       }
     }
-    Associations.hasMany.call(LtjmPost, "ltjmTaggings", {
-      className: "LtjmTagging",
-      foreignKey: "post_id",
-    });
-    Associations.hasMany.call(LtjmPost, "ltjmTags", {
-      through: "ltjmTaggings",
-      className: "LtjmTag",
-      source: "tag",
-    });
     registerModel("LtjmTag", LtjmTag);
     registerModel("LtjmTagging", LtjmTagging);
     registerModel("LtjmPost", LtjmPost);

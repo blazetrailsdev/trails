@@ -10,7 +10,6 @@
  *   const post = await f.Post.create({ title: "Hello", body: "World" });
  */
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
-import { Associations } from "./associations.js";
 
 /**
  * Creates a fresh set of test model classes. Models resolve their adapter
@@ -59,6 +58,14 @@ export function createFixtures(): TestFixtures {
       this.attribute("author_address_extra_id", "integer");
       this.attribute("owned_essay_id", "integer");
       this.attribute("organization_id", "string");
+      this.hasMany("posts", {
+        className: "Post",
+        foreignKey: "author_id",
+      });
+      this.hasMany("books", {
+        className: "Book",
+        foreignKey: "author_id",
+      });
     }
   }
 
@@ -79,6 +86,18 @@ export function createFixtures(): TestFixtures {
       this.attribute("author_id", "integer");
       this.attribute("legacy_comments_count", "integer", { default: 0 });
       this.attribute("tags_count", "integer", { default: 0 });
+      this.belongsTo("author", {
+        className: "Author",
+        foreignKey: "author_id",
+      });
+      this.hasMany("comments", {
+        className: "Comment",
+        foreignKey: "post_id",
+      });
+      this.hasMany("taggings", {
+        className: "Tagging",
+        foreignKey: "post_id",
+      });
     }
   }
 
@@ -92,6 +111,10 @@ export function createFixtures(): TestFixtures {
       this.attribute("parent_id", "integer");
       this.attribute("company_id", "integer");
       this.attribute("children_count", "integer", { default: 0 });
+      this.belongsTo("post", {
+        className: "Post",
+        foreignKey: "post_id",
+      });
     }
   }
 
@@ -100,6 +123,10 @@ export function createFixtures(): TestFixtures {
     static {
       this._tableName = "tags";
       this.attribute("name", "string");
+      this.hasMany("taggings", {
+        className: "Tagging",
+        foreignKey: "tag_id",
+      });
     }
   }
 
@@ -111,6 +138,14 @@ export function createFixtures(): TestFixtures {
       this.attribute("post_id", "integer");
       this.attribute("taggable_id", "integer");
       this.attribute("taggable_type", "string");
+      this.belongsTo("tag", {
+        className: "Tag",
+        foreignKey: "tag_id",
+      });
+      this.belongsTo("post", {
+        className: "Post",
+        foreignKey: "post_id",
+      });
     }
   }
 
@@ -129,6 +164,26 @@ export function createFixtures(): TestFixtures {
       this._tableName = "pirates";
       this.attribute("catchphrase", "string");
       this.attribute("parrot_id", "integer");
+      this.belongsTo("parrot", {
+        className: "Parrot",
+        foreignKey: "parrot_id",
+      });
+      this.hasMany("birds", {
+        className: "Bird",
+        foreignKey: "pirate_id",
+      });
+      this.hasOne("ship", {
+        className: "Ship",
+        foreignKey: "pirate_id",
+      });
+      this.hasMany("treasures", {
+        className: "Treasure",
+        foreignKey: "pirate_id",
+      });
+      this.hasAndBelongsToMany("parrots", {
+        className: "Parrot",
+        joinTable: "parrots_pirates",
+      });
     }
   }
 
@@ -140,6 +195,14 @@ export function createFixtures(): TestFixtures {
       this.attribute("pirate_id", "integer");
       this.attribute("treasures_count", "integer", { default: 0 });
       this.validates("name", { presence: true });
+      this.belongsTo("pirate", {
+        className: "Pirate",
+        foreignKey: "pirate_id",
+      });
+      this.hasMany("parts", {
+        className: "ShipPart",
+        foreignKey: "ship_id",
+      });
     }
   }
 
@@ -149,6 +212,10 @@ export function createFixtures(): TestFixtures {
       this._tableName = "ship_parts";
       this.attribute("name", "string");
       this.attribute("ship_id", "integer");
+      this.belongsTo("ship", {
+        className: "Ship",
+        foreignKey: "ship_id",
+      });
     }
   }
 
@@ -158,6 +225,10 @@ export function createFixtures(): TestFixtures {
       this._tableName = "treasures";
       this.attribute("name", "string");
       this.attribute("pirate_id", "integer");
+      this.belongsTo("pirate", {
+        className: "Pirate",
+        foreignKey: "pirate_id",
+      });
     }
   }
 
@@ -168,6 +239,10 @@ export function createFixtures(): TestFixtures {
       this.attribute("name", "string");
       this.attribute("pirate_id", "integer");
       this.validates("name", { presence: true });
+      this.belongsTo("pirate", {
+        className: "Pirate",
+        foreignKey: "pirate_id",
+      });
     }
   }
 
@@ -176,6 +251,10 @@ export function createFixtures(): TestFixtures {
     static {
       this._tableName = "parrots";
       this.attribute("name", "string");
+      this.hasAndBelongsToMany("pirates", {
+        className: "Pirate",
+        joinTable: "parrots_pirates",
+      });
     }
   }
 
@@ -186,6 +265,10 @@ export function createFixtures(): TestFixtures {
       this.attribute("name", "string");
       this.attribute("salary", "integer", { default: 70000 });
       this.attribute("shared_computers", "string");
+      this.hasAndBelongsToMany("projects", {
+        className: "Project",
+        joinTable: "developers_projects",
+      });
     }
   }
 
@@ -194,6 +277,10 @@ export function createFixtures(): TestFixtures {
     static {
       this._tableName = "projects";
       this.attribute("name", "string");
+      this.hasAndBelongsToMany("developers", {
+        className: "Developer",
+        joinTable: "developers_projects",
+      });
     }
   }
 
@@ -226,6 +313,10 @@ export function createFixtures(): TestFixtures {
       this.attribute("description", "string");
       this.attribute("account_id", "integer");
       this.attribute("status", "integer");
+      this.belongsTo("firm", {
+        className: "Company",
+        foreignKey: "firm_id",
+      });
     }
   }
 
@@ -239,6 +330,10 @@ export function createFixtures(): TestFixtures {
       this.attribute("author_name", "string");
       this.attribute("parent_id", "integer");
       this.attribute("replies_count", "integer", { default: 0 });
+      this.belongsTo("parent", {
+        className: "Topic",
+        foreignKey: "parent_id",
+      });
     }
   }
 
@@ -258,6 +353,10 @@ export function createFixtures(): TestFixtures {
       this.attribute("difficulty", "integer");
       this.attribute("boolean_status", "integer");
       this.attribute("cover", "string");
+      this.belongsTo("author", {
+        className: "Author",
+        foreignKey: "author_id",
+      });
     }
   }
 
@@ -280,6 +379,10 @@ export function createFixtures(): TestFixtures {
       this.attribute("status", "string");
       this.attribute("transactions_count", "integer");
       this.attribute("updated_at", "datetime");
+      this.belongsTo("firm", {
+        className: "Company",
+        foreignKey: "firm_id",
+      });
     }
   }
 
@@ -315,140 +418,36 @@ export function createFixtures(): TestFixtures {
   // ── Set up associations ─────────────────────────────────────────────
 
   // Post associations
-  Associations.belongsTo.call(Post, "author", {
-    className: "Author",
-    foreignKey: "author_id",
-  });
-  Associations.hasMany.call(Post, "comments", {
-    className: "Comment",
-    foreignKey: "post_id",
-  });
-  Associations.hasMany.call(Post, "taggings", {
-    className: "Tagging",
-    foreignKey: "post_id",
-  });
 
   // Comment associations
-  Associations.belongsTo.call(Comment, "post", {
-    className: "Post",
-    foreignKey: "post_id",
-  });
 
   // Author associations
-  Associations.hasMany.call(Author, "posts", {
-    className: "Post",
-    foreignKey: "author_id",
-  });
-  Associations.hasMany.call(Author, "books", {
-    className: "Book",
-    foreignKey: "author_id",
-  });
 
   // Tagging associations
-  Associations.belongsTo.call(Tagging, "tag", {
-    className: "Tag",
-    foreignKey: "tag_id",
-  });
-  Associations.belongsTo.call(Tagging, "post", {
-    className: "Post",
-    foreignKey: "post_id",
-  });
 
   // Tag associations
-  Associations.hasMany.call(Tag, "taggings", {
-    className: "Tagging",
-    foreignKey: "tag_id",
-  });
 
   // Pirate associations
-  Associations.belongsTo.call(Pirate, "parrot", {
-    className: "Parrot",
-    foreignKey: "parrot_id",
-  });
-  Associations.hasMany.call(Pirate, "birds", {
-    className: "Bird",
-    foreignKey: "pirate_id",
-  });
-  Associations.hasOne.call(Pirate, "ship", {
-    className: "Ship",
-    foreignKey: "pirate_id",
-  });
-  Associations.hasMany.call(Pirate, "treasures", {
-    className: "Treasure",
-    foreignKey: "pirate_id",
-  });
 
   // Ship associations
-  Associations.belongsTo.call(Ship, "pirate", {
-    className: "Pirate",
-    foreignKey: "pirate_id",
-  });
-  Associations.hasMany.call(Ship, "parts", {
-    className: "ShipPart",
-    foreignKey: "ship_id",
-  });
 
   // ShipPart associations
-  Associations.belongsTo.call(ShipPart, "ship", {
-    className: "Ship",
-    foreignKey: "ship_id",
-  });
 
   // Bird associations
-  Associations.belongsTo.call(Bird, "pirate", {
-    className: "Pirate",
-    foreignKey: "pirate_id",
-  });
 
   // Treasure associations
-  Associations.belongsTo.call(Treasure, "pirate", {
-    className: "Pirate",
-    foreignKey: "pirate_id",
-  });
 
   // Book associations
-  Associations.belongsTo.call(Book, "author", {
-    className: "Author",
-    foreignKey: "author_id",
-  });
 
   // Topic associations (self-referential)
-  Associations.belongsTo.call(Topic, "parent", {
-    className: "Topic",
-    foreignKey: "parent_id",
-  });
 
   // Company associations (self-referential firm)
-  Associations.belongsTo.call(Company, "firm", {
-    className: "Company",
-    foreignKey: "firm_id",
-  });
 
   // Account associations
-  Associations.belongsTo.call(Account, "firm", {
-    className: "Company",
-    foreignKey: "firm_id",
-  });
 
   // Developer <-> Project (HABTM)
-  Associations.hasAndBelongsToMany.call(Developer, "projects", {
-    className: "Project",
-    joinTable: "developers_projects",
-  });
-  Associations.hasAndBelongsToMany.call(Project, "developers", {
-    className: "Developer",
-    joinTable: "developers_projects",
-  });
 
   // Pirate <-> Parrot (HABTM)
-  Associations.hasAndBelongsToMany.call(Pirate, "parrots", {
-    className: "Parrot",
-    joinTable: "parrots_pirates",
-  });
-  Associations.hasAndBelongsToMany.call(Parrot, "pirates", {
-    className: "Pirate",
-    joinTable: "parrots_pirates",
-  });
 
   // Nested attributes
   acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true });

@@ -1310,12 +1310,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("company_id", "integer");
         this.attribute("name", "string");
+        this.belongsTo("elmCompany", {
+          className: "ElmCompany",
+          foreignKey: "company_id",
+        });
       }
     }
-    Associations.belongsTo.call(ElmEmployee, "elmCompany", {
-      className: "ElmCompany",
-      foreignKey: "company_id",
-    });
     registerModel(ElmCompany);
     registerModel(ElmEmployee);
     const co = await ElmCompany.create({ name: "Corp" });
@@ -1379,14 +1379,14 @@ describe("BelongsToAssociationsTest", () => {
     class BpjAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "BpjCompany",
+          foreignKey: "company_id",
+        });
       }
     }
     registerModel(BpjCompany);
     registerModel(BpjAccount);
-    Associations.belongsTo.call(BpjAccount, "company", {
-      className: "BpjCompany",
-      foreignKey: "company_id",
-    });
     const company = await BpjCompany.create({ name: "JoinCo" });
     const account = await BpjAccount.create({ company_id: company.id });
     // Verify the association loads correctly using the correct join column (id)
@@ -1407,13 +1407,13 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("company_id", "integer");
         this.attribute("name", "string");
+        this.belongsTo("optCompany", {
+          className: "OptCompany",
+          foreignKey: "company_id",
+          optional: true,
+        });
       }
     }
-    Associations.belongsTo.call(OptEmployee, "optCompany", {
-      className: "OptCompany",
-      foreignKey: "company_id",
-      optional: true,
-    });
     registerModel(OptCompany);
     registerModel(OptEmployee);
     // With optional: true, employee without company should be valid
@@ -1561,12 +1561,12 @@ describe("BelongsToAssociationsTest", () => {
     class EagerPkAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("eagerPkCompany", {
+          className: "EagerPkCompany",
+          foreignKey: "company_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerPkAccount, "eagerPkCompany", {
-      className: "EagerPkCompany",
-      foreignKey: "company_id",
-    });
     registerModel(EagerPkCompany);
     registerModel(EagerPkAccount);
     const company = await EagerPkCompany.create({ name: "Eager Co" });
@@ -1586,12 +1586,12 @@ describe("BelongsToAssociationsTest", () => {
     class EagerSymAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("eagerSymCompany", {
+          className: "EagerSymCompany",
+          foreignKey: "company_id",
+        });
       }
     }
-    Associations.belongsTo.call(EagerSymAccount, "eagerSymCompany", {
-      className: "EagerSymCompany",
-      foreignKey: "company_id",
-    });
     registerModel(EagerSymCompany);
     registerModel(EagerSymAccount);
     const company = await EagerSymCompany.create({ name: "Sym Co" });
@@ -1969,6 +1969,7 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
+        this.belongsTo("sponsorable", { polymorphic: true });
       }
     }
     class PacMember extends Base {
@@ -1978,7 +1979,6 @@ describe("BelongsToAssociationsTest", () => {
     }
     registerModel(PacSponsor);
     registerModel(PacMember);
-    Associations.belongsTo.call(PacSponsor, "sponsorable", { polymorphic: true });
     const member = await PacMember.create({ name: "Alice" });
     const sponsor = await PacSponsor.create({
       sponsorable_id: member.id,
@@ -1999,11 +1999,11 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
         this.attribute("body", "string");
+        this.belongsTo("commentable", { polymorphic: true });
       }
     }
     registerModel(WpcPost);
     registerModel(WpcComment);
-    Associations.belongsTo.call(WpcComment, "commentable", { polymorphic: true });
     const post = await WpcPost.create({ title: "Hello" });
     const comment = await WpcComment.create({
       commentable_id: post.id,
@@ -2046,15 +2046,15 @@ describe("BelongsToAssociationsTest", () => {
     class CcAsgAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "CcAsgCompany",
+          foreignKey: "company_id",
+          counterCache: "accounts_count",
+        });
       }
     }
     registerModel(CcAsgCompany);
     registerModel(CcAsgAccount);
-    Associations.belongsTo.call(CcAsgAccount, "company", {
-      className: "CcAsgCompany",
-      foreignKey: "company_id",
-      counterCache: "accounts_count",
-    });
     const co1 = await CcAsgCompany.create({ name: "Old", accounts_count: 0 });
     const co2 = await CcAsgCompany.create({ name: "New", accounts_count: 0 });
     const account = await CcAsgAccount.create({ company_id: co1.id });
@@ -2076,15 +2076,15 @@ describe("BelongsToAssociationsTest", () => {
     class NsCcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "NsCcCompany",
+          foreignKey: "company_id",
+          counterCache: "accounts_count",
+        });
       }
     }
     registerModel(NsCcCompany);
     registerModel(NsCcAccount);
-    Associations.belongsTo.call(NsCcAccount, "company", {
-      className: "NsCcCompany",
-      foreignKey: "company_id",
-      counterCache: "accounts_count",
-    });
     const co1 = await NsCcCompany.create({ name: "Old", accounts_count: 0 });
     const co2 = await NsCcCompany.create({ name: "New", accounts_count: 0 });
     const account = await NsCcAccount.create({ company_id: co1.id });
@@ -2103,15 +2103,15 @@ describe("BelongsToAssociationsTest", () => {
     class TouchMultAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "TouchMultCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TouchMultCompany);
     registerModel(TouchMultAccount);
-    Associations.belongsTo.call(TouchMultAccount, "company", {
-      className: "TouchMultCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await TouchMultCompany.create({
       name: "Acme",
       updated_at: new Date("2020-01-01"),
@@ -2132,15 +2132,15 @@ describe("BelongsToAssociationsTest", () => {
     class TouchNoUpdAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "TouchNoUpdCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TouchNoUpdCompany);
     registerModel(TouchNoUpdAccount);
-    Associations.belongsTo.call(TouchNoUpdAccount, "company", {
-      className: "TouchNoUpdCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await TouchNoUpdCompany.create({ name: "Acme" });
     const account = await TouchNoUpdAccount.create({ company_id: company.id });
     // Touching a parent without updated_at should not error
@@ -2158,15 +2158,15 @@ describe("BelongsToAssociationsTest", () => {
     class TouchRmAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "TouchRmCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TouchRmCompany);
     registerModel(TouchRmAccount);
-    Associations.belongsTo.call(TouchRmAccount, "company", {
-      className: "TouchRmCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await TouchRmCompany.create({
       name: "Acme",
       updated_at: new Date("2020-01-01"),
@@ -2190,15 +2190,15 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("company_id", "integer");
         this.attribute("credit_limit", "integer");
+        this.belongsTo("company", {
+          className: "TouchUpdCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TouchUpdCompany);
     registerModel(TouchUpdAccount);
-    Associations.belongsTo.call(TouchUpdAccount, "company", {
-      className: "TouchUpdCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await TouchUpdCompany.create({
       name: "Acme",
       updated_at: new Date("2020-01-01"),
@@ -2220,15 +2220,15 @@ describe("BelongsToAssociationsTest", () => {
     class TouchEmptyAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "TouchEmptyCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TouchEmptyCompany);
     registerModel(TouchEmptyAccount);
-    Associations.belongsTo.call(TouchEmptyAccount, "company", {
-      className: "TouchEmptyCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await TouchEmptyCompany.create({
       name: "Acme",
       updated_at: new Date("2020-01-01"),
@@ -2251,15 +2251,15 @@ describe("BelongsToAssociationsTest", () => {
     class TouchDesAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "TouchDesCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TouchDesCompany);
     registerModel(TouchDesAccount);
-    Associations.belongsTo.call(TouchDesAccount, "company", {
-      className: "TouchDesCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await TouchDesCompany.create({
       name: "Acme",
       updated_at: new Date("2020-01-01"),
@@ -2282,15 +2282,15 @@ describe("BelongsToAssociationsTest", () => {
     class TouchDesPAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "TouchDesPCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TouchDesPCompany);
     registerModel(TouchDesPAccount);
-    Associations.belongsTo.call(TouchDesPAccount, "company", {
-      className: "TouchDesPCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await TouchDesPCompany.create({
       name: "Acme",
       updated_at: new Date("2020-01-01"),
@@ -2311,15 +2311,15 @@ describe("BelongsToAssociationsTest", () => {
     class TouchReaAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "TouchReaCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TouchReaCompany);
     registerModel(TouchReaAccount);
-    Associations.belongsTo.call(TouchReaAccount, "company", {
-      className: "TouchReaCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const co1 = await TouchReaCompany.create({ name: "Old", updated_at: new Date("2020-01-01") });
     const co2 = await TouchReaCompany.create({ name: "New", updated_at: new Date("2020-01-01") });
     const account = await TouchReaAccount.create({ company_id: co1.id });
@@ -2454,15 +2454,15 @@ describe("BelongsToAssociationsTest", () => {
     class CcddAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "CcddCompany",
+          foreignKey: "company_id",
+          counterCache: "accounts_count",
+        });
       }
     }
     registerModel(CcddCompany);
     registerModel(CcddAccount);
-    Associations.belongsTo.call(CcddAccount, "company", {
-      className: "CcddCompany",
-      foreignKey: "company_id",
-      counterCache: "accounts_count",
-    });
     const company = await CcddCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await CcddAccount.create({ company_id: company.id });
     await updateCounterCaches(account, "increment");
@@ -2482,15 +2482,15 @@ describe("BelongsToAssociationsTest", () => {
     class CccdAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "CccdCompany",
+          foreignKey: "company_id",
+          counterCache: "accounts_count",
+        });
       }
     }
     registerModel(CccdCompany);
     registerModel(CccdAccount);
-    Associations.belongsTo.call(CccdAccount, "company", {
-      className: "CccdCompany",
-      foreignKey: "company_id",
-      counterCache: "accounts_count",
-    });
     const company = await CccdCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await CccdAccount.create({ company_id: company.id });
     await updateCounterCaches(account, "increment");
@@ -2628,6 +2628,11 @@ describe("BelongsToAssociationsTest", () => {
     class DhCompany extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("accounts", {
+          className: "DhAccount",
+          foreignKey: "company_id",
+          dependent: "restrictWithException",
+        });
       }
     }
     class DhAccount extends Base {
@@ -2637,11 +2642,6 @@ describe("BelongsToAssociationsTest", () => {
     }
     registerModel(DhCompany);
     registerModel(DhAccount);
-    Associations.hasMany.call(DhCompany, "accounts", {
-      className: "DhAccount",
-      foreignKey: "company_id",
-      dependent: "restrictWithException",
-    });
     const company = await DhCompany.create({ name: "Acme" });
     await DhAccount.create({ company_id: company.id });
     // Destroying parent with dependent restrict should throw
@@ -2653,11 +2653,21 @@ describe("BelongsToAssociationsTest", () => {
     class Dh3Company extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("accounts", {
+          className: "Dh3Account",
+          foreignKey: "company_id",
+          dependent: "destroy",
+        });
       }
     }
     class Dh3Account extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.hasMany("subAccounts", {
+          className: "Dh3SubAccount",
+          foreignKey: "account_id",
+          dependent: "restrictWithException",
+        });
       }
     }
     class Dh3SubAccount extends Base {
@@ -2668,16 +2678,6 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Dh3Company);
     registerModel(Dh3Account);
     registerModel(Dh3SubAccount);
-    Associations.hasMany.call(Dh3Company, "accounts", {
-      className: "Dh3Account",
-      foreignKey: "company_id",
-      dependent: "destroy",
-    });
-    Associations.hasMany.call(Dh3Account, "subAccounts", {
-      className: "Dh3SubAccount",
-      foreignKey: "account_id",
-      dependent: "restrictWithException",
-    });
     const company = await Dh3Company.create({ name: "Acme" });
     const account = await Dh3Account.create({ company_id: company.id });
     await Dh3SubAccount.create({ account_id: account.id });
@@ -2757,15 +2757,15 @@ describe("BelongsToAssociationsTest", () => {
     class DcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "DcCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(DcCompany);
     registerModel(DcAccount);
-    Associations.belongsTo.call(DcAccount, "company", {
-      className: "DcCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await DcCompany.create({ name: "Acme" });
     const account = await DcAccount.create({ company_id: company.id });
     // Destroying child with unloaded parent should not raise
@@ -2869,15 +2869,15 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
         this.attribute("tag_id", "integer");
+        this.belongsTo("taggable", {
+          polymorphic: true,
+          counterCache: "tags_count",
+        });
       }
     }
     registerModel(PccPost);
     registerModel(PccComment);
     registerModel(PccTagging);
-    Associations.belongsTo.call(PccTagging, "taggable", {
-      polymorphic: true,
-      counterCache: "tags_count",
-    });
     const post = await PccPost.create({ title: "P1", tags_count: 1 });
     const comment = await PccComment.create({ body: "C1", tags_count: 0 });
     // post and comment have same id=1, test reassignment
@@ -2900,21 +2900,21 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("wheels_count", "integer");
+        this.hasMany("wheels", { className: "PcnWheel", as: "wheelable" });
       }
     }
     class PcnWheel extends Base {
       static {
         this.attribute("wheelable_id", "integer");
         this.attribute("wheelable_type", "string");
+        this.belongsTo("wheelable", {
+          polymorphic: true,
+          counterCache: "wheels_count",
+        });
       }
     }
     registerModel(PcnCar);
     registerModel(PcnWheel);
-    Associations.belongsTo.call(PcnWheel, "wheelable", {
-      polymorphic: true,
-      counterCache: "wheels_count",
-    });
-    Associations.hasMany.call(PcnCar, "wheels", { className: "PcnWheel", as: "wheelable" });
     const car = await PcnCar.create({ name: "Sedan", wheels_count: 0 });
     const wheel = await PcnWheel.create({ wheelable_type: "PcnCar", wheelable_id: car.id });
     // Counter cache incremented by create's auto-call to updateCounterCaches
@@ -2932,11 +2932,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("wheelable_id", "integer");
         this.attribute("wheelable_type", "string");
+        this.belongsTo("wheelable", { polymorphic: true, touch: true });
       }
     }
     registerModel(PcntCar);
     registerModel(PcntWheel);
-    Associations.belongsTo.call(PcntWheel, "wheelable", { polymorphic: true, touch: true });
     const car = await PcntCar.create({ name: "Sedan" });
     const originalUpdatedAt = car.updated_at;
     await new Promise((r) => setTimeout(r, 10));
@@ -3063,14 +3063,14 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
         this.attribute("children_count", "integer");
+        this.belongsTo("parent", {
+          className: "SrCategory",
+          foreignKey: "parent_id",
+          counterCache: "children_count",
+        });
       }
     }
     registerModel(SrCategory);
-    Associations.belongsTo.call(SrCategory, "parent", {
-      className: "SrCategory",
-      foreignKey: "parent_id",
-      counterCache: "children_count",
-    });
     const parent = await SrCategory.create({ name: "Parent", children_count: 0 });
     const child = await SrCategory.create({ name: "Child", parent_id: parent.id });
     await updateCounterCaches(child, "increment");
@@ -3110,11 +3110,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
+        this.belongsTo("sponsorable", { polymorphic: true });
       }
     }
     registerModel(PcpkToy);
     registerModel(PcpkSponsor);
-    Associations.belongsTo.call(PcpkSponsor, "sponsorable", { polymorphic: true });
     const toy = await PcpkToy.create({ name: "Bear" });
     const sponsor = await PcpkSponsor.create({
       sponsorable_id: toy.id,
@@ -3135,11 +3135,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
+        this.belongsTo("sponsorable", { polymorphic: true, touch: true });
       }
     }
     registerModel(DpcToy);
     registerModel(DpcSponsorship);
-    Associations.belongsTo.call(DpcSponsorship, "sponsorable", { polymorphic: true, touch: true });
     const toy = await DpcToy.create({ name: "Bear" });
     const sponsorship = await DpcSponsorship.create({
       sponsorable_id: toy.id,
@@ -3171,26 +3171,26 @@ describe("BelongsToAssociationsTest", () => {
     class MccAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "MccCompany",
+          foreignKey: "company_id",
+          counterCache: "accounts_count",
+        });
       }
     }
     class MccProject extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "MccCompany",
+          foreignKey: "company_id",
+          counterCache: "projects_count",
+        });
       }
     }
     registerModel(MccCompany);
     registerModel(MccAccount);
     registerModel(MccProject);
-    Associations.belongsTo.call(MccAccount, "company", {
-      className: "MccCompany",
-      foreignKey: "company_id",
-      counterCache: "accounts_count",
-    });
-    Associations.belongsTo.call(MccProject, "company", {
-      className: "MccCompany",
-      foreignKey: "company_id",
-      counterCache: "projects_count",
-    });
     const company = await MccCompany.create({ name: "Acme", accounts_count: 0, projects_count: 0 });
     // create auto-calls updateCounterCaches, so no need to call it manually
     const account = await MccAccount.create({ company_id: company.id });
@@ -3253,12 +3253,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
+        this.belongsTo("taggable", { polymorphic: true });
       }
     }
     registerModel(TpcPost);
     registerModel(TpcComment);
     registerModel(TpcTagging);
-    Associations.belongsTo.call(TpcTagging, "taggable", { polymorphic: true });
     const post = await TpcPost.create({ title: "Hello" });
     const comment = await TpcComment.create({ body: "World" });
     const tagging = await TpcTagging.create({ taggable_id: post.id, taggable_type: "TpcPost" });
@@ -3278,15 +3278,15 @@ describe("BelongsToAssociationsTest", () => {
     class RpcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "RpcCompany",
+          foreignKey: "company_id",
+          optional: false,
+        });
       }
     }
     registerModel(RpcCompany);
     registerModel(RpcAccount);
-    Associations.belongsTo.call(RpcAccount, "company", {
-      className: "RpcCompany",
-      foreignKey: "company_id",
-      optional: false,
-    });
     // With optional: false (required), saving without FK should fail validation
     const account = RpcAccount.new({});
     const saved = await account.save();
@@ -3302,15 +3302,15 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("company_id", "integer");
         this.attribute("notes", "string");
+        this.belongsTo("company", {
+          className: "SpcCompany",
+          foreignKey: "company_id",
+          optional: false,
+        });
       }
     }
     registerModel(SpcCompany);
     registerModel(SpcAccount);
-    Associations.belongsTo.call(SpcAccount, "company", {
-      className: "SpcCompany",
-      foreignKey: "company_id",
-      optional: false,
-    });
     const company = await SpcCompany.create({ name: "Acme" });
     const account = await SpcAccount.create({ company_id: company.id });
     // Updating a non-FK field should pass even if we don't re-validate presence
@@ -3327,15 +3327,15 @@ describe("BelongsToAssociationsTest", () => {
     class RvfAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "RvfCompany",
+          foreignKey: "company_id",
+          optional: false,
+        });
       }
     }
     registerModel(RvfCompany);
     registerModel(RvfAccount);
-    Associations.belongsTo.call(RvfAccount, "company", {
-      className: "RvfCompany",
-      foreignKey: "company_id",
-      optional: false,
-    });
     const company = await RvfCompany.create({ name: "Acme" });
     const account = await RvfAccount.create({ company_id: company.id });
     // FK is set and valid, save should succeed
@@ -3347,13 +3347,13 @@ describe("BelongsToAssociationsTest", () => {
     class CpkmAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "NonExistentModel",
+          foreignKey: "company_id",
+        });
       }
     }
     registerModel(CpkmAccount);
-    Associations.belongsTo.call(CpkmAccount, "company", {
-      className: "NonExistentModel",
-      foreignKey: "company_id",
-    });
     const account = CpkmAccount.new({ company_id: 1 });
     // Loading should throw because the model is not registered
     await expect(
@@ -3469,14 +3469,14 @@ describe("BelongsToAssociationsTest", () => {
     class DcnClient extends Base {
       static {
         this.attribute("firm_id", "integer");
+        this.belongsTo("company", {
+          className: "DcnFirm",
+          foreignKey: "firm_id",
+        });
       }
     }
     registerModel(DcnFirm);
     registerModel(DcnClient);
-    Associations.belongsTo.call(DcnClient, "company", {
-      className: "DcnFirm",
-      foreignKey: "firm_id",
-    });
     const firm = await DcnFirm.create({ name: "Law Firm" });
     const client = await DcnClient.create({ firm_id: firm.id });
     const loaded = await loadBelongsTo(client, "company", {
@@ -3496,15 +3496,15 @@ describe("BelongsToAssociationsTest", () => {
     class NccAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "NccCompany",
+          foreignKey: "company_id",
+        });
       }
     }
     registerModel(NccCompany);
     registerModel(NccAccount);
     // No counterCache option - accounts_count should not be auto-updated
-    Associations.belongsTo.call(NccAccount, "company", {
-      className: "NccCompany",
-      foreignKey: "company_id",
-    });
     const company = await NccCompany.create({ name: "Acme", accounts_count: 0 });
     await NccAccount.create({ company_id: company.id });
     const reloaded = await NccCompany.find(company.id!);
@@ -3521,15 +3521,15 @@ describe("BelongsToAssociationsTest", () => {
     class PkcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "PkcCompany",
+          foreignKey: "company_id",
+          counterCache: "accounts_count",
+        });
       }
     }
     registerModel(PkcCompany);
     registerModel(PkcAccount);
-    Associations.belongsTo.call(PkcAccount, "company", {
-      className: "PkcCompany",
-      foreignKey: "company_id",
-      counterCache: "accounts_count",
-    });
     const company = await PkcCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await PkcAccount.create({ company_id: company.id });
     await updateCounterCaches(account, "increment");
@@ -3547,16 +3547,16 @@ describe("BelongsToAssociationsTest", () => {
     class CatAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "CatCompany",
+          foreignKey: "company_id",
+          counterCache: "accounts_count",
+          touch: true,
+        });
       }
     }
     registerModel(CatCompany);
     registerModel(CatAccount);
-    Associations.belongsTo.call(CatAccount, "company", {
-      className: "CatCompany",
-      foreignKey: "company_id",
-      counterCache: "accounts_count",
-      touch: true,
-    });
     const company = await CatCompany.create({ name: "Acme", accounts_count: 0 });
     const account = await CatAccount.create({ company_id: company.id });
     await updateCounterCaches(account, "increment");
@@ -3573,15 +3573,15 @@ describe("BelongsToAssociationsTest", () => {
     class TotAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "TotCompany",
+          foreignKey: "company_id",
+          touch: true,
+        });
       }
     }
     registerModel(TotCompany);
     registerModel(TotAccount);
-    Associations.belongsTo.call(TotAccount, "company", {
-      className: "TotCompany",
-      foreignKey: "company_id",
-      touch: true,
-    });
     const company = await TotCompany.create({ name: "Acme" });
     const originalUpdatedAt = company.updated_at;
     await new Promise((r) => setTimeout(r, 10));
@@ -3600,15 +3600,15 @@ describe("BelongsToAssociationsTest", () => {
     class DdAccount extends Base {
       static {
         this.attribute("company_id", "integer");
+        this.belongsTo("company", {
+          className: "DdCompany",
+          foreignKey: "company_id",
+          dependent: "destroy",
+        });
       }
     }
     registerModel(DdCompany);
     registerModel(DdAccount);
-    Associations.belongsTo.call(DdAccount, "company", {
-      className: "DdCompany",
-      foreignKey: "company_id",
-      dependent: "destroy",
-    });
     const company = await DdCompany.create({ name: "Acme" });
     const account = await DdAccount.create({ company_id: company.id });
     // Destroying the child should work
@@ -3648,11 +3648,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
+        this.belongsTo("taggable", { polymorphic: true });
       }
     }
     registerModel(PcftPost);
     registerModel(PcftTagging);
-    Associations.belongsTo.call(PcftTagging, "taggable", { polymorphic: true });
     const post = await PcftPost.create({ title: "Hello" });
     const tagging = await PcftTagging.create({ taggable_id: post.id, taggable_type: "PcftPost" });
     const loaded = await loadBelongsTo(tagging, "taggable", { polymorphic: true });

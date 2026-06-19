@@ -407,11 +407,11 @@ describe("StatementCacheTest", () => {
           this.tableName = "molecules";
           this.adapter = conn;
           this.attribute("liquid_id", "integer");
+          this.belongsTo("liquid");
         }
       }
       registerModel("Liquid", Liquid);
       registerModel("Molecule", Molecule);
-      Associations.belongsTo.call(Molecule, "liquid");
 
       const salty = await Liquid.create({ name: "salty" });
       const molecule = await Molecule.create({ name: "dioxane", liquid_id: salty.id });

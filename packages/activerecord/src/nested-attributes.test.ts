@@ -1248,12 +1248,12 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
       static {
         this._tableName = "ier_articles";
         this.attribute("title", "string");
+        this.hasMany("ierTags", {
+          className: "IERTag",
+          foreignKey: "ier_article_id",
+        });
       }
     }
-    Associations.hasMany.call(IERArticle, "ierTags", {
-      className: "IERTag",
-      foreignKey: "ier_article_id",
-    });
     acceptsNestedAttributesFor(IERArticle, "ierTags", {
       rejectIf: (attrs) => attrs.name === "skip",
     });
@@ -1285,12 +1285,12 @@ describe("TestNestedAttributesWithExtend", () => {
       static {
         this._tableName = "ext_articles";
         this.attribute("title", "string");
+        this.hasMany("extTags", {
+          className: "ExtTag",
+          foreignKey: "ext_article_id",
+        });
       }
     }
-    Associations.hasMany.call(ExtArticle, "extTags", {
-      className: "ExtTag",
-      foreignKey: "ext_article_id",
-    });
     acceptsNestedAttributesFor(ExtArticle, "extTags");
     registerModel(ExtTag);
     registerModel(ExtArticle);
@@ -1323,13 +1323,13 @@ describe("TestNestedAttributesForDelegatedType", () => {
         this._tableName = "dt_entries";
         this.attribute("entryable_type", "string");
         this.attribute("entryable_id", "integer");
+        this.hasOne("dtComment", {
+          className: "DTComment",
+          foreignKey: "dt_entry_id",
+        });
       }
     }
     // Set up a has_one association to simulate delegated type behavior
-    Associations.hasOne.call(DTEntry, "dtComment", {
-      className: "DTComment",
-      foreignKey: "dt_entry_id",
-    });
     registerModel(DTComment);
     registerModel(DTEntry);
     // Delegated type is essentially a polymorphic pattern; verify basic nested attrs work
@@ -1345,12 +1345,12 @@ describe("TestNestedAttributesForDelegatedType", () => {
       static {
         this._tableName = "dt_entries2";
         this.attribute("title", "string");
+        this.hasOne("dtComment2", {
+          className: "DTComment2",
+          foreignKey: "dt_entry2_id",
+        });
       }
     }
-    Associations.hasOne.call(DTEntry2, "dtComment2", {
-      className: "DTComment2",
-      foreignKey: "dt_entry2_id",
-    });
     registerModel(DTComment2);
     registerModel(DTEntry2);
     acceptsNestedAttributesFor(DTEntry2, "dtComment2");

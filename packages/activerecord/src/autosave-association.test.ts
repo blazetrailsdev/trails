@@ -660,6 +660,7 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("clients", { autosave: true });
       }
     }
     class Client extends Base {
@@ -671,7 +672,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     }
     registerModel("Company", Company);
     registerModel("Client", Client);
-    Associations.hasMany.call(Company, "clients", { autosave: true });
     return { Company, Client };
   }
 
@@ -805,6 +805,11 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
+        this.hasMany("orderAgreements", {
+          className: "AiCpkOrderAgreement",
+          foreignKey: "order_id",
+          primaryKey: "id",
+        });
       }
     }
     class AiCpkOrderAgreement extends Base {
@@ -812,17 +817,12 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this._tableName = "ai_cpk_order_agreements";
         this.attribute("order_id", "integer");
         this.attribute("signature", "string");
+        this.belongsTo("order", {
+          className: "AiCpkOrder",
+          primaryKey: "id",
+        });
       }
     }
-    Associations.hasMany.call(AiCpkOrder, "orderAgreements", {
-      className: "AiCpkOrderAgreement",
-      foreignKey: "order_id",
-      primaryKey: "id",
-    });
-    Associations.belongsTo.call(AiCpkOrderAgreement, "order", {
-      className: "AiCpkOrder",
-      primaryKey: "id",
-    });
     registerModel("AiCpkOrder", AiCpkOrder);
     registerModel("AiCpkOrderAgreement", AiCpkOrderAgreement);
 
@@ -854,6 +854,10 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
+        this.hasMany("books", {
+          className: "AiCpkTwoBook",
+          foreignKey: ["shop_id", "order_id"],
+        });
       }
     }
     class AiCpkTwoBook extends Base {
@@ -865,17 +869,13 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.attribute("order_id", "integer");
         this.attribute("shop_id", "integer");
         this.primaryKey = ["author_id", "id"];
+        this.belongsTo("order", {
+          className: "AiCpkTwoOrder",
+          foreignKey: ["shop_id", "order_id"],
+          primaryKey: ["shop_id", "id"],
+        });
       }
     }
-    Associations.hasMany.call(AiCpkTwoOrder, "books", {
-      className: "AiCpkTwoBook",
-      foreignKey: ["shop_id", "order_id"],
-    });
-    Associations.belongsTo.call(AiCpkTwoBook, "order", {
-      className: "AiCpkTwoOrder",
-      foreignKey: ["shop_id", "order_id"],
-      primaryKey: ["shop_id", "id"],
-    });
     registerModel("AiCpkTwoOrder", AiCpkTwoOrder);
     registerModel("AiCpkTwoBook", AiCpkTwoBook);
 
@@ -908,6 +908,11 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
+        this.hasOne("cpkBookFk", {
+          className: "CpkBookFk",
+          foreignKey: "order_id",
+          autosave: true,
+        });
       }
     }
     class CpkBookFk extends Base {
@@ -919,11 +924,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     registerModel("CpkOrderPk", CpkOrderPk);
     registerModel("CpkBookFk", CpkBookFk);
     // has_one with single-column FK on CPK parent (like OrderWithPrimaryKeyAssociatedBook)
-    Associations.hasOne.call(CpkOrderPk, "cpkBookFk", {
-      className: "CpkBookFk",
-      foreignKey: "order_id",
-      autosave: true,
-    });
     const order = new CpkOrderPk({ shop_id: 5, id: 7, status: "open" });
     const book = new CpkBookFk({ title: "My Book" });
     cacheAssoc(order, "cpkBookFk", book);
@@ -938,12 +938,25 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     class AidFirm extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("aidContracts", {
+          className: "AidContract",
+          foreignKey: "aid_firm_id",
+        });
+        this.hasMany("aidDevelopers", {
+          through: "aidContracts",
+          source: "aidDeveloper",
+          className: "AidDeveloper",
+        });
       }
     }
     class AidContract extends Base {
       static {
         this.attribute("aid_firm_id", "integer");
         this.attribute("aid_developer_id", "integer");
+        this.belongsTo("aidDeveloper", {
+          className: "AidDeveloper",
+          foreignKey: "aid_developer_id",
+        });
       }
     }
     class AidDeveloper extends Base {
@@ -951,20 +964,7 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(AidFirm, "aidContracts", {
-      className: "AidContract",
-      foreignKey: "aid_firm_id",
-    });
 
-    Associations.hasMany.call(AidFirm, "aidDevelopers", {
-      through: "aidContracts",
-      source: "aidDeveloper",
-      className: "AidDeveloper",
-    });
-    Associations.belongsTo.call(AidContract, "aidDeveloper", {
-      className: "AidDeveloper",
-      foreignKey: "aid_developer_id",
-    });
     registerModel("AidFirm", AidFirm);
     registerModel("AidContract", AidContract);
     registerModel("AidDeveloper", AidDeveloper);
@@ -1084,6 +1084,7 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class Firm extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("account", { autosave: true });
       }
     }
     class Account extends Base {
@@ -1095,7 +1096,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     registerModel("Firm", Firm);
     registerModel("Account", Account);
-    Associations.hasOne.call(Firm, "account", { autosave: true });
     return { Firm, Account };
   }
 
@@ -1104,6 +1104,7 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class PFirm extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("pAccount", { foreignKey: "p_firm_id" });
       }
     }
     class PAccount extends Base {
@@ -1115,7 +1116,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     registerModel("PFirm", PFirm);
     registerModel("PAccount", PAccount);
-    Associations.hasOne.call(PFirm, "pAccount", { foreignKey: "p_firm_id" });
 
     const firm = new PFirm({ name: "GlobalMegaCorp" });
     expect(firm.isValid()).toBe(true);
@@ -1226,6 +1226,11 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.afterSave(function () {
           log.push("after_save");
         });
+        this.hasOne("cbAccount", {
+          autosave: true,
+          className: "CbAccount",
+          foreignKey: "cb_firm_id",
+        });
       }
     }
     class CbAccount extends Base {
@@ -1236,11 +1241,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     registerModel("CbFirm", CbFirm);
     registerModel("CbAccount", CbAccount);
-    Associations.hasOne.call(CbFirm, "cbAccount", {
-      autosave: true,
-      className: "CbAccount",
-      foreignKey: "cb_firm_id",
-    });
     const firm = new CbFirm({ name: "LLC" });
     const account = new CbAccount({ credit_limit: 100 });
     cacheAssoc(firm, "cbAccount", account);
@@ -1269,6 +1269,11 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.afterSave(function () {
           log.push("after_save");
         });
+        this.hasOne("cuAccount", {
+          autosave: true,
+          className: "CuAccount",
+          foreignKey: "cu_firm_id",
+        });
       }
     }
     class CuAccount extends Base {
@@ -1279,11 +1284,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     registerModel("CuFirm", CuFirm);
     registerModel("CuAccount", CuAccount);
-    Associations.hasOne.call(CuFirm, "cuAccount", {
-      autosave: true,
-      className: "CuAccount",
-      foreignKey: "cu_firm_id",
-    });
     const firm = await CuFirm.create({ name: "LLC" });
     log.length = 0;
     firm.name = "Updated LLC";
@@ -1308,6 +1308,11 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.afterSave(function () {
           log.push("after_save");
         });
+        this.hasOne("csAccount", {
+          autosave: true,
+          className: "CsAccount",
+          foreignKey: "cs_firm_id",
+        });
       }
     }
     class CsAccount extends Base {
@@ -1318,11 +1323,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     registerModel("CsFirm", CsFirm);
     registerModel("CsAccount", CsAccount);
-    Associations.hasOne.call(CsFirm, "csAccount", {
-      autosave: true,
-      className: "CsAccount",
-      foreignKey: "cs_firm_id",
-    });
     const firm = await CsFirm.create({ name: "LLC" });
     log.length = 0;
     const account = new CsAccount({ credit_limit: 10 });
@@ -1339,6 +1339,11 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class CbParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("cbChild", {
+          autosave: true,
+          className: "CbChild",
+          foreignKey: "cb_parent_id",
+        });
       }
     }
     class CbChild extends Base {
@@ -1352,11 +1357,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     registerModel("CbParent", CbParent);
     registerModel("CbChild", CbChild);
-    Associations.hasOne.call(CbParent, "cbChild", {
-      autosave: true,
-      className: "CbChild",
-      foreignKey: "cb_parent_id",
-    });
     const parent = await CbParent.create({ name: "P" });
     const child = new CbChild({ value: "V" });
     cacheAssoc(parent, "cbChild", child);
@@ -1394,12 +1394,12 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.afterSave(function (rec: any) {
           rec.afterSaveCount = (rec.afterSaveCount ?? 0) + 1;
         });
+        this.belongsTo("eye", { autosave: true, className: "Eye" });
       }
     }
     registerModel("Eye", Eye);
     registerModel("Iris", Iris);
     Associations.hasOne.call(Eye, "iris", { autosave: true, className: "Iris" });
-    Associations.belongsTo.call(Iris, "eye", { autosave: true, className: "Eye" });
     return { Eye, Iris };
   }
   it("callbacks on child when parent autosaves child twice", async () => {
@@ -1422,6 +1422,12 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class PolyParent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("polyChild", {
+          as: "employable",
+          autosave: true,
+          className: "PolyChild",
+          inverseOf: "employable",
+        });
       }
     }
     class PolyChild extends Base {
@@ -1441,20 +1447,14 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.afterSave(function () {
           log.push("after_save");
         });
+        this.belongsTo("employable", {
+          polymorphic: true,
+          inverseOf: "polyChild",
+        });
       }
     }
     registerModel("PolyParent", PolyParent);
     registerModel("PolyChild", PolyChild);
-    Associations.hasOne.call(PolyParent, "polyChild", {
-      as: "employable",
-      autosave: true,
-      className: "PolyChild",
-      inverseOf: "employable",
-    });
-    Associations.belongsTo.call(PolyChild, "employable", {
-      polymorphic: true,
-      inverseOf: "polyChild",
-    });
     const parent = new PolyParent({ name: "P" });
     const child = new PolyChild({ name: "C" });
     // Mirrors Rails HasOneAssociation#set_owner_attributes which writes the
@@ -1484,15 +1484,15 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       static {
         this.attribute("species", "string");
         this.attribute("cb_owner_id", "integer");
+        this.belongsTo("cbOwner", {
+          autosave: true,
+          className: "CbOwner",
+          foreignKey: "cb_owner_id",
+        });
       }
     }
     registerModel("CbOwner", CbOwner);
     registerModel("CbPet", CbPet);
-    Associations.belongsTo.call(CbPet, "cbOwner", {
-      autosave: true,
-      className: "CbOwner",
-      foreignKey: "cb_owner_id",
-    });
     const owner = new CbOwner({ name: "Alice" });
     const pet = new CbPet({ species: "cat" });
     cacheAssoc(pet, "cbOwner", owner);
@@ -1532,6 +1532,11 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.afterSave(function () {
           log.push("parent_after_save");
         });
+        this.hasOne("polyAsChild", {
+          as: "employable",
+          className: "PolyAsChild",
+          inverseOf: "employable",
+        });
       }
     }
     class PolyAsChild extends Base {
@@ -1539,20 +1544,15 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("name", "string");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
+        this.belongsTo("employable", {
+          autosave: true,
+          polymorphic: true,
+          inverseOf: "polyAsChild",
+        });
       }
     }
     registerModel("PolyAsParent", PolyAsParent);
     registerModel("PolyAsChild", PolyAsChild);
-    Associations.hasOne.call(PolyAsParent, "polyAsChild", {
-      as: "employable",
-      className: "PolyAsChild",
-      inverseOf: "employable",
-    });
-    Associations.belongsTo.call(PolyAsChild, "employable", {
-      autosave: true,
-      polymorphic: true,
-      inverseOf: "polyAsChild",
-    });
     const parent = new PolyAsParent({ name: "P" });
     const child = new PolyAsChild({ name: "C" });
     // Mirrors Rails BelongsToPolymorphicAssociation#replace_keys which
@@ -1714,11 +1714,11 @@ describe.skip("TestAutosaveAssociationOnAHasOneAssociation", () => {
     class DualPirate extends Base {
       static {
         this.attribute("catchphrase", "string");
+        this.hasOne("dualValidShip", { autosave: true });
       }
     }
     registerModel("DualPirate", DualPirate);
     registerModel("DualValidShip", DualValidShip);
-    Associations.hasOne.call(DualPirate, "dualValidShip", { autosave: true });
     const pirate = await DualPirate.create({ catchphrase: "Yarr" });
     const ship = new DualValidShip({ name: "" });
     cacheAssoc(pirate, "dualValidShip", ship);
@@ -1763,19 +1763,19 @@ describe.skip("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
         this.validates("name", { presence: true });
+        this.hasMany("deepParts", { autosave: true });
       }
     }
     class DeepPirate extends Base {
       static {
         this.attribute("catchphrase", "string");
         this.validates("catchphrase", { presence: true });
+        this.hasOne("deepShip", { autosave: true });
       }
     }
     registerModel("DeepPirate", DeepPirate);
     registerModel("DeepShip", DeepShip);
     registerModel("DeepPart", DeepPart);
-    Associations.hasOne.call(DeepPirate, "deepShip", { autosave: true });
-    Associations.hasMany.call(DeepShip, "deepParts", { autosave: true });
 
     const pirate = await DeepPirate.create({ catchphrase: "Yarr" });
     const ship = await DeepShip.create({ name: "Pearl", pirate_id: pirate.id });
@@ -1866,37 +1866,37 @@ describe.skip("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("name", "string");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
+        this.belongsTo("employable", {
+          polymorphic: true,
+          inverseOf: "chef",
+        });
       }
     }
     class SwapCakeDesigner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("chef", {
+          as: "employable",
+          autosave: true,
+          className: "SwapChef",
+          inverseOf: "employable",
+        });
       }
     }
     class SwapDrinkDesigner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("chef", {
+          as: "employable",
+          autosave: true,
+          className: "SwapChef",
+          inverseOf: "employable",
+        });
       }
     }
     registerModel("SwapChef", SwapChef);
     registerModel("SwapCakeDesigner", SwapCakeDesigner);
     registerModel("SwapDrinkDesigner", SwapDrinkDesigner);
-    Associations.hasOne.call(SwapCakeDesigner, "chef", {
-      as: "employable",
-      autosave: true,
-      className: "SwapChef",
-      inverseOf: "employable",
-    });
-    Associations.hasOne.call(SwapDrinkDesigner, "chef", {
-      as: "employable",
-      autosave: true,
-      className: "SwapChef",
-      inverseOf: "employable",
-    });
-    Associations.belongsTo.call(SwapChef, "employable", {
-      polymorphic: true,
-      inverseOf: "chef",
-    });
 
     const cake = await SwapCakeDesigner.create({ name: "Cake" });
     const drink = await SwapDrinkDesigner.create({ name: "Drink" });
@@ -1953,20 +1953,20 @@ describe.skip("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("name", "string");
         this.attribute("billing_customer_id", "integer");
         this.attribute("shipping_customer_id", "integer");
+        this.belongsTo("billing", {
+          autosave: true,
+          className: "Customer",
+          foreignKey: "billing_customer_id",
+        });
+        this.belongsTo("shipping", {
+          autosave: true,
+          className: "Customer",
+          foreignKey: "shipping_customer_id",
+        });
       }
     }
     registerModel("Customer", Customer);
     registerModel("Order", Order);
-    Associations.belongsTo.call(Order, "billing", {
-      autosave: true,
-      className: "Customer",
-      foreignKey: "billing_customer_id",
-    });
-    Associations.belongsTo.call(Order, "shipping", {
-      autosave: true,
-      className: "Customer",
-      foreignKey: "shipping_customer_id",
-    });
     return { Customer, Order };
   }
 
@@ -2006,10 +2006,10 @@ describe.skip("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
       static {
         this.attribute("title", "string");
         this.attribute("flex_author_id", "integer");
+        this.belongsTo("flexAuthor", { autosave: true });
       }
     }
     registerModel("FlexPost", FlexPost);
-    Associations.belongsTo.call(FlexPost, "flexAuthor", { autosave: true });
     const author = new FlexAuthor({ name: "" });
     const post = new FlexPost({ title: "Test" });
     cacheAssoc(post, "flexAuthor", author);
@@ -2115,11 +2115,11 @@ describe.skip("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
+        this.belongsTo("sponsorable", { polymorphic: true });
       }
     }
     registerModel(PolyMember);
     registerModel(PolySponsor);
-    Associations.belongsTo.call(PolySponsor, "sponsorable", { polymorphic: true });
     const member = await PolyMember.create({ name: "Alice" });
     const sponsor = new PolySponsor({});
     setBelongsTo(sponsor, "sponsorable", member, { polymorphic: true });
@@ -2165,6 +2165,11 @@ describe.skip("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
+        this.hasOne("cpkBook2", {
+          className: "CpkBook2",
+          autosave: true,
+          foreignKey: ["shop_id", "order_id"],
+        });
       }
     }
     class CpkBook2 extends Base {
@@ -2176,11 +2181,6 @@ describe.skip("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     }
     registerModel("CpkOrder2", CpkOrder2);
     registerModel("CpkBook2", CpkBook2);
-    Associations.hasOne.call(CpkOrder2, "cpkBook2", {
-      className: "CpkBook2",
-      autosave: true,
-      foreignKey: ["shop_id", "order_id"],
-    });
     // Provide explicit composite PK values (Rails: Order.create!(id: [1, 2], ...))
     const order = new CpkOrder2({ shop_id: 1, id: 2, status: "pending" });
     const book = new CpkBook2({ title: "Composite Key Book" });
@@ -2473,6 +2473,11 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNes
     class P extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("kids", {
+          autosave: true,
+          indexErrors: true,
+          className: "BaseErrC",
+        });
       }
     }
     class C extends Base {
@@ -2488,11 +2493,6 @@ describe.skip("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNes
     }
     registerModel("BaseErrP", P);
     registerModel("BaseErrC", C);
-    Associations.hasMany.call(P, "kids", {
-      autosave: true,
-      indexErrors: true,
-      className: "BaseErrC",
-    });
     const parent = new P({ name: "p" });
     cacheAssoc(parent, "kids", [new C({ favorite: true }), new C({ favorite: false })]);
     expect(parent.isValid()).toBe(false);
@@ -2711,11 +2711,11 @@ describe.skip("TestAutosaveAssociationsInGeneral", () => {
     class Owner extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("widgets", { autosave: true });
       }
     }
     registerModel("Widget", Widget);
     registerModel("Owner", Owner);
-    Associations.hasMany.call(Owner, "widgets", { autosave: true });
 
     const owner = await Owner.create({ name: "Alice" });
     // Create a persisted, unchanged widget with a blank status
@@ -3133,21 +3133,21 @@ describe.skip("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
         this.validates("name", { presence: true });
+        this.hasMany("prisoners", { className: "PrisonerCyclic" });
       }
     }
     class PrisonerCyclic extends Base {
       static {
         this.attribute("ship_id", "integer");
+        this.belongsTo("ship", {
+          className: "ShipCyclic",
+          autosave: true,
+          inverseOf: "prisoners",
+        });
       }
     }
     registerModel("ShipCyclic", ShipCyclic);
     registerModel("PrisonerCyclic", PrisonerCyclic);
-    Associations.hasMany.call(ShipCyclic, "prisoners", { className: "PrisonerCyclic" });
-    Associations.belongsTo.call(PrisonerCyclic, "ship", {
-      className: "ShipCyclic",
-      autosave: true,
-      inverseOf: "prisoners",
-    });
     // Wire _ensureNoDuplicateErrors as after_validation on ShipCyclic (mirrors Rails'
     // AssociationBuilderExtension.build → add_autosave_association_callbacks).
     const prisonersRef = ShipCyclic.reflectOnAssociation("prisoners");
@@ -3282,6 +3282,11 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "vm_parents";
         this.attribute("name", "string");
+        this.hasMany("vmChildren", {
+          className: "VmChild",
+          foreignKey: "vm_parent_id",
+          validate: true,
+        });
       }
     }
     class VmChild extends Base {
@@ -3294,11 +3299,6 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("VmParent", VmParent);
     registerModel("VmChild", VmChild);
-    Associations.hasMany.call(VmParent, "vmChildren", {
-      className: "VmChild",
-      foreignKey: "vm_parent_id",
-      validate: true,
-    });
     const parent = await VmParent.create({ name: "P" });
     const child = new VmChild({ val: "" });
     cacheAssoc(parent, "vmChildren", [child]);
@@ -3310,6 +3310,11 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "vo_parents";
         this.attribute("name", "string");
+        this.hasOne("voChild", {
+          className: "VoChild",
+          foreignKey: "vo_parent_id",
+          validate: true,
+        });
       }
     }
     class VoChild extends Base {
@@ -3322,11 +3327,6 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("VoParent", VoParent);
     registerModel("VoChild", VoChild);
-    Associations.hasOne.call(VoParent, "voChild", {
-      className: "VoChild",
-      foreignKey: "vo_parent_id",
-      validate: true,
-    });
     const parent = await VoParent.create({ name: "P" });
     const child = new VoChild({ val: "" });
     cacheAssoc(parent, "voChild", child);
@@ -3338,6 +3338,11 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "nv_parents";
         this.attribute("name", "string");
+        this.hasOne("nvChild", {
+          className: "NvChild",
+          foreignKey: "nv_parent_id",
+          validate: false,
+        });
       }
     }
     class NvChild extends Base {
@@ -3350,11 +3355,6 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("NvParent", NvParent);
     registerModel("NvChild", NvChild);
-    Associations.hasOne.call(NvParent, "nvChild", {
-      className: "NvChild",
-      foreignKey: "nv_parent_id",
-      validate: false,
-    });
     const parent = await NvParent.create({ name: "P" });
     const child = new NvChild({ val: "" });
     cacheAssoc(parent, "nvChild", child);
@@ -3374,15 +3374,15 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this._tableName = "bv_children";
         this.attribute("val", "string");
         this.attribute("bv_owner_id", "integer");
+        this.belongsTo("bvOwner", {
+          className: "BvOwner",
+          foreignKey: "bv_owner_id",
+          validate: true,
+        });
       }
     }
     registerModel("BvOwner", BvOwner);
     registerModel("BvChild", BvChild);
-    Associations.belongsTo.call(BvChild, "bvOwner", {
-      className: "BvOwner",
-      foreignKey: "bv_owner_id",
-      validate: true,
-    });
     const child = await BvChild.create({ val: "ok" });
     const owner = new BvOwner({ name: "" });
     cacheAssoc(child, "bvOwner", owner);
@@ -3402,15 +3402,15 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this._tableName = "nb_children";
         this.attribute("val", "string");
         this.attribute("nb_owner_id", "integer");
+        this.belongsTo("nbOwner", {
+          className: "NbOwner",
+          foreignKey: "nb_owner_id",
+          validate: false,
+        });
       }
     }
     registerModel("NbOwner", NbOwner);
     registerModel("NbChild", NbChild);
-    Associations.belongsTo.call(NbChild, "nbOwner", {
-      className: "NbOwner",
-      foreignKey: "nb_owner_id",
-      validate: false,
-    });
     const child = await NbChild.create({ val: "ok" });
     const owner = new NbOwner({ name: "" });
     cacheAssoc(child, "nbOwner", owner);
@@ -3422,6 +3422,11 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "hv_parents";
         this.attribute("name", "string");
+        this.hasAndBelongsToMany("hvTags", {
+          className: "HvTag",
+          joinTable: "hv_parents_hv_tags",
+          validate: true,
+        });
       }
     }
     class HvTag extends Base {
@@ -3433,11 +3438,6 @@ describe.skip("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("HvParent", HvParent);
     registerModel("HvTag", HvTag);
-    Associations.hasAndBelongsToMany.call(HvParent, "hvTags", {
-      className: "HvTag",
-      joinTable: "hv_parents_hv_tags",
-      validate: true,
-    });
     const parent = await HvParent.create({ name: "P" });
     const tag = new HvTag({ label: "" });
     cacheAssoc(parent, "hvTags", [tag]);
@@ -3665,21 +3665,21 @@ describe.skip("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.attribute("title", "string");
         this.attribute("body", "string");
         this.attribute("author_id", "integer");
+        this.hasMany("comments", {
+          className: "Comment",
+          foreignKey: "post_id",
+        });
+        this.hasAndBelongsToMany("categories", {
+          className: "Category",
+          joinTable: "pwacc_categories_posts",
+          foreignKey: "post_id",
+          autosave: true,
+        });
       }
     }
     registerModel("Comment", Comment);
     registerModel("Category", Category);
     registerModel("PostWithAfterCreateCallback", PostWithAfterCreateCallback);
-    Associations.hasMany.call(PostWithAfterCreateCallback, "comments", {
-      className: "Comment",
-      foreignKey: "post_id",
-    });
-    Associations.hasAndBelongsToMany.call(PostWithAfterCreateCallback, "categories", {
-      className: "Category",
-      joinTable: "pwacc_categories_posts",
-      foreignKey: "post_id",
-      autosave: true,
-    });
     // Registered after the association so the habtm autosave after_create
     // callback fires first — matching Rails, where `has_and_belongs_to_many`
     // is declared before the model's own `after_create` block.
@@ -3866,6 +3866,15 @@ describe.skip("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
       static {
         this._tableName = "hot_members";
         this.attribute("name", "string");
+        this.hasOne("hotDetail", {
+          className: "HotDetail",
+          foreignKey: "hot_member_id",
+        });
+        this.hasOne("hotOrg", {
+          className: "HotOrg",
+          through: "hotDetail",
+          source: "hotOrg",
+        });
       }
     }
     class HotDetail extends Base {
@@ -3873,30 +3882,20 @@ describe.skip("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         this._tableName = "hot_details";
         this.attribute("hot_org_id", "integer");
         this.attribute("hot_member_id", "integer");
+        this.belongsTo("hotOrg", {
+          className: "HotOrg",
+          foreignKey: "hot_org_id",
+        });
+        this.belongsTo("hotMember", {
+          className: "HotMember",
+          foreignKey: "hot_member_id",
+        });
       }
     }
     registerModel("HotOrg", HotOrg);
     registerModel("HotMember", HotMember);
     registerModel("HotDetail", HotDetail);
-    Associations.hasOne.call(HotMember, "hotDetail", {
-      className: "HotDetail",
-      foreignKey: "hot_member_id",
-    });
 
-    Associations.hasOne.call(HotMember, "hotOrg", {
-      className: "HotOrg",
-      through: "hotDetail",
-      source: "hotOrg",
-    });
-    Associations.belongsTo.call(HotDetail, "hotOrg", {
-      className: "HotOrg",
-      foreignKey: "hot_org_id",
-    });
-
-    Associations.belongsTo.call(HotDetail, "hotMember", {
-      className: "HotMember",
-      foreignKey: "hot_member_id",
-    });
     const org = await HotOrg.create({ name: "Org" });
     const member = await HotMember.create({ name: "M" });
     await HotDetail.create({ hot_org_id: org.id, hot_member_id: member.id });
@@ -3914,6 +3913,15 @@ describe.skip("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
       static {
         this._tableName = "rev_orgs";
         this.attribute("name", "string");
+        this.hasOne("revDetail", {
+          className: "RevDetail",
+          foreignKey: "rev_org_id",
+        });
+        this.hasOne("revMember", {
+          className: "RevMember",
+          through: "revDetail",
+          source: "revMember",
+        });
       }
     }
     class RevMember extends Base {
@@ -3927,30 +3935,20 @@ describe.skip("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         this._tableName = "rev_details";
         this.attribute("rev_org_id", "integer");
         this.attribute("rev_member_id", "integer");
+        this.belongsTo("revOrg", {
+          className: "RevOrg",
+          foreignKey: "rev_org_id",
+        });
+        this.belongsTo("revMember", {
+          className: "RevMember",
+          foreignKey: "rev_member_id",
+        });
       }
     }
     registerModel("RevOrg", RevOrg);
     registerModel("RevMember", RevMember);
     registerModel("RevDetail", RevDetail);
-    Associations.hasOne.call(RevOrg, "revDetail", {
-      className: "RevDetail",
-      foreignKey: "rev_org_id",
-    });
 
-    Associations.hasOne.call(RevOrg, "revMember", {
-      className: "RevMember",
-      through: "revDetail",
-      source: "revMember",
-    });
-    Associations.belongsTo.call(RevDetail, "revOrg", {
-      className: "RevOrg",
-      foreignKey: "rev_org_id",
-    });
-
-    Associations.belongsTo.call(RevDetail, "revMember", {
-      className: "RevMember",
-      foreignKey: "rev_member_id",
-    });
     const org = await RevOrg.create({ name: "Org" });
     const member = await RevMember.create({ name: "M" });
     await RevDetail.create({ rev_org_id: org.id, rev_member_id: member.id });
@@ -4051,15 +4049,15 @@ describe.skip("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", (
         this._tableName = "bt_records";
         this.attribute("value", "string");
         this.attribute("bt_owner_id", "integer");
+        this.belongsTo("btOwner", {
+          className: "BtOwner",
+          foreignKey: "bt_owner_id",
+          autosave: true,
+        });
       }
     }
     registerModel("BtOwner", BtOwner);
     registerModel("BtRecord", BtRecord);
-    Associations.belongsTo.call(BtRecord, "btOwner", {
-      className: "BtOwner",
-      foreignKey: "bt_owner_id",
-      autosave: true,
-    });
     const owner = await BtOwner.create({ name: "Owner" });
     const record = new BtRecord({ value: "V", bt_owner_id: owner.id });
     cacheAssoc(record, "btOwner", owner);
@@ -4076,6 +4074,11 @@ describe.skip("TestAutosaveAssociationWithTouch", () => {
         this._tableName = "tch_parents";
         this.attribute("name", "string");
         this.attribute("updated_at", "string");
+        this.hasMany("tchChildren", {
+          className: "TchChild",
+          foreignKey: "tch_parent_id",
+          autosave: true,
+        });
       }
     }
     class TchChild extends Base {
@@ -4083,20 +4086,15 @@ describe.skip("TestAutosaveAssociationWithTouch", () => {
         this._tableName = "tch_children";
         this.attribute("value", "string");
         this.attribute("tch_parent_id", "integer");
+        this.belongsTo("tchParent", {
+          className: "TchParent",
+          foreignKey: "tch_parent_id",
+          touch: true,
+        });
       }
     }
     registerModel("TchParent", TchParent);
     registerModel("TchChild", TchChild);
-    Associations.hasMany.call(TchParent, "tchChildren", {
-      className: "TchChild",
-      foreignKey: "tch_parent_id",
-      autosave: true,
-    });
-    Associations.belongsTo.call(TchChild, "tchParent", {
-      className: "TchParent",
-      foreignKey: "tch_parent_id",
-      touch: true,
-    });
     const parent = await TchParent.create({ name: "P" });
     const child = new TchChild({ value: "C", tch_parent_id: parent.id });
     cacheAssoc(parent, "tchChildren", [child]);
@@ -4186,6 +4184,11 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "uc_parents";
         this.attribute("name", "string");
+        this.hasMany("ucChildren", {
+          className: "UcChild",
+          foreignKey: "uc_parent_id",
+          autosave: true,
+        });
       }
     }
     class UcChild extends Base {
@@ -4197,11 +4200,6 @@ describe.skip("should update children when autosave is true and parent is new bu
     }
     registerModel("UcParent", UcParent);
     registerModel("UcChild", UcChild);
-    Associations.hasMany.call(UcParent, "ucChildren", {
-      className: "UcChild",
-      foreignKey: "uc_parent_id",
-      autosave: true,
-    });
     // Child exists, parent is new
     const child = await UcChild.create({ val: "existing" });
     const parent = new UcParent({ name: "new parent" });
@@ -4226,12 +4224,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "nauto_articles";
         this.attribute("title", "string");
+        this.hasMany("nautoTags", {
+          className: "NAutoTag",
+          foreignKey: "nauto_article_id",
+        });
       }
     }
-    Associations.hasMany.call(NAutoArticle, "nautoTags", {
-      className: "NAutoTag",
-      foreignKey: "nauto_article_id",
-    });
     acceptsNestedAttributesFor(NAutoArticle, "nautoTags");
     registerModel(NAutoTag);
     registerModel(NAutoArticle);
@@ -4256,12 +4254,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "asb1_articles";
         this.attribute("title", "string");
+        this.hasMany("asb1Tags", {
+          className: "ASB1Tag",
+          foreignKey: "asb1_article_id",
+        });
       }
     }
-    Associations.hasMany.call(ASB1Article, "asb1Tags", {
-      className: "ASB1Tag",
-      foreignKey: "asb1_article_id",
-    });
     acceptsNestedAttributesFor(ASB1Article, "asb1Tags");
     registerModel(ASB1Tag);
     registerModel(ASB1Article);
@@ -4285,12 +4283,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "nuc_articles";
         this.attribute("title", "string");
+        this.hasMany("nucTags", {
+          className: "NUCTag",
+          foreignKey: "nuc_article_id",
+        });
       }
     }
-    Associations.hasMany.call(NUCArticle, "nucTags", {
-      className: "NUCTag",
-      foreignKey: "nuc_article_id",
-    });
     acceptsNestedAttributesFor(NUCArticle, "nucTags");
     registerModel(NUCTag);
     registerModel(NUCArticle);
@@ -4315,12 +4313,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "av_articles";
         this.attribute("title", "string");
+        this.hasMany("avTags", {
+          className: "AVTag",
+          foreignKey: "av_article_id",
+        });
       }
     }
-    Associations.hasMany.call(AVArticle, "avTags", {
-      className: "AVTag",
-      foreignKey: "av_article_id",
-    });
     acceptsNestedAttributesFor(AVArticle, "avTags");
     registerModel(AVTag);
     registerModel(AVArticle);
@@ -4342,12 +4340,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "ndi_articles";
         this.attribute("title", "string");
+        this.hasMany("ndiTags", {
+          className: "NDITag",
+          foreignKey: "ndi_article_id",
+        });
       }
     }
-    Associations.hasMany.call(NDIArticle, "ndiTags", {
-      className: "NDITag",
-      foreignKey: "ndi_article_id",
-    });
     acceptsNestedAttributesFor(NDIArticle, "ndiTags");
     registerModel(NDITag);
     registerModel(NDIArticle);
@@ -4373,12 +4371,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "di_articles";
         this.attribute("title", "string");
+        this.hasMany("diTags", {
+          className: "DITag",
+          foreignKey: "di_article_id",
+        });
       }
     }
-    Associations.hasMany.call(DIArticle, "diTags", {
-      className: "DITag",
-      foreignKey: "di_article_id",
-    });
     acceptsNestedAttributesFor(DIArticle, "diTags");
     registerModel(DITag);
     registerModel(DIArticle);
@@ -4402,12 +4400,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "bvu_articles";
         this.attribute("title", "string");
+        this.hasMany("bvuTags", {
+          className: "BVUTag",
+          foreignKey: "bvu_article_id",
+        });
       }
     }
-    Associations.hasMany.call(BVUArticle, "bvuTags", {
-      className: "BVUTag",
-      foreignKey: "bvu_article_id",
-    });
     acceptsNestedAttributesFor(BVUArticle, "bvuTags");
     registerModel(BVUTag);
     registerModel(BVUArticle);
@@ -4432,12 +4430,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "vc_articles";
         this.attribute("title", "string");
+        this.hasMany("vcTags", {
+          className: "VCTag",
+          foreignKey: "vc_article_id",
+        });
       }
     }
-    Associations.hasMany.call(VCArticle, "vcTags", {
-      className: "VCTag",
-      foreignKey: "vc_article_id",
-    });
     acceptsNestedAttributesFor(VCArticle, "vcTags");
     registerModel(VCTag);
     registerModel(VCArticle);
@@ -4459,12 +4457,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "bv_articles";
         this.attribute("title", "string");
+        this.hasMany("bvTags", {
+          className: "BVTag",
+          foreignKey: "bv_article_id",
+        });
       }
     }
-    Associations.hasMany.call(BVArticle, "bvTags", {
-      className: "BVTag",
-      foreignKey: "bv_article_id",
-    });
     acceptsNestedAttributesFor(BVArticle, "bvTags");
     registerModel(BVTag);
     registerModel(BVArticle);
@@ -4513,12 +4511,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "nl_articles";
         this.attribute("title", "string");
+        this.hasMany("nlTags", {
+          className: "NLTag",
+          foreignKey: "nl_article_id",
+        });
       }
     }
-    Associations.hasMany.call(NLArticle, "nlTags", {
-      className: "NLTag",
-      foreignKey: "nl_article_id",
-    });
     acceptsNestedAttributesFor(NLArticle, "nlTags");
     registerModel(NLTag);
     registerModel(NLArticle);
@@ -4540,12 +4538,12 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "me_articles";
         this.attribute("title", "string");
+        this.hasMany("meTags", {
+          className: "METag",
+          foreignKey: "me_article_id",
+        });
       }
     }
-    Associations.hasMany.call(MEArticle, "meTags", {
-      className: "METag",
-      foreignKey: "me_article_id",
-    });
     acceptsNestedAttributesFor(MEArticle, "meTags");
     registerModel(METag);
     registerModel(MEArticle);
@@ -4568,13 +4566,13 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "rb_articles";
         this.attribute("title", "string");
+        this.hasMany("rbTags", {
+          className: "RBTag",
+          foreignKey: "rb_article_id",
+          autosave: true,
+        });
       }
     }
-    Associations.hasMany.call(RBArticle, "rbTags", {
-      className: "RBTag",
-      foreignKey: "rb_article_id",
-      autosave: true,
-    });
     acceptsNestedAttributesFor(RBArticle, "rbTags");
     registerModel(RBTag);
     registerModel(RBArticle);
@@ -4601,13 +4599,13 @@ describe.skip("should update children when autosave is true and parent is new bu
       static {
         this._tableName = "ri_articles";
         this.attribute("title", "string");
+        this.hasMany("riTags", {
+          className: "RITag",
+          foreignKey: "ri_article_id",
+          autosave: true,
+        });
       }
     }
-    Associations.hasMany.call(RIArticle, "riTags", {
-      className: "RITag",
-      foreignKey: "ri_article_id",
-      autosave: true,
-    });
     registerModel(RITag);
     registerModel(RIArticle);
     const article = await RIArticle.create({ title: "test" });
@@ -4727,6 +4725,11 @@ describe.skip("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("name", "string");
         (this as any)._queryConstraintsList = ["tenant_id", "id"];
         (this as any)._hasQueryConstraints = true;
+        this.hasOne("qcChild", {
+          className: "QcChild",
+          foreignKey: ["tenant_id", "qc_owner_id"],
+          autosave: true,
+        });
       }
     }
     class QcChild extends Base {
@@ -4742,11 +4745,6 @@ describe.skip("autosaveHasOne queryConstraints PK/FK pairing", () => {
     // The old scalar-guard skipped computePrimaryKey → used ctor.primaryKey = "id" → mismatch.
     // The fixed code calls computePrimaryKey(reflection) which, via branch 2 (reflection
     // normalizes array FK into queryConstraints), returns queryConstraintsList = ["tenant_id","id"].
-    Associations.hasOne.call(QcOwner, "qcChild", {
-      className: "QcChild",
-      foreignKey: ["tenant_id", "qc_owner_id"],
-      autosave: true,
-    });
     const owner = new QcOwner({ tenant_id: 5, id: 11, name: "Corp" });
     const child = new QcChild({ title: "Doc" });
     owner.association("qcChild").setTarget(child as any);
@@ -4775,6 +4773,11 @@ describe.skip("autosaveHasOne queryConstraints PK/FK pairing", () => {
         // QC list — ctor.primaryKey remains scalar "id"
         (this as any)._queryConstraintsList = ["tenant_id", "id"];
         (this as any)._hasQueryConstraints = true;
+        this.hasOne("qcNoCollapseChild", {
+          className: "QcNoCollapseChild",
+          foreignKey: ["tenant_id", "qc_no_collapse_id"],
+          autosave: true,
+        });
       }
     }
     class QcNoCollapseChild extends Base {
@@ -4789,11 +4792,6 @@ describe.skip("autosaveHasOne queryConstraints PK/FK pairing", () => {
     // Explicit composite FK — reflection normalizes array FK to queryConstraints.
     // computePrimaryKey branch 2 returns QC list ["tenant_id","id"].
     // Array PK + array FK → composite pairing (no "id" collapse).
-    Associations.hasOne.call(QcNoCollapse, "qcNoCollapseChild", {
-      className: "QcNoCollapseChild",
-      foreignKey: ["tenant_id", "qc_no_collapse_id"],
-      autosave: true,
-    });
     const owner = new QcNoCollapse({ tenant_id: 9, id: 77, value: "v" });
     const child = new QcNoCollapseChild({ label: "l" });
     owner.association("qcNoCollapseChild").setTarget(child as any);
@@ -4820,6 +4818,7 @@ describe.skip("autosaveHasOne queryConstraints PK/FK pairing", () => {
         // Simulate a model with query_constraints [:tenant_id, :id]
         (this as any)._queryConstraintsList = ["tenant_id", "id"];
         (this as any)._hasQueryConstraints = true;
+        this.hasOne("qcTenantRecord", { autosave: true });
       }
     }
     class QcTenantRecord extends Base {
@@ -4840,7 +4839,6 @@ describe.skip("autosaveHasOne queryConstraints PK/FK pairing", () => {
     // may be composite. In this inline test the attribute "qc_tenant_id" is present, so the
     // deriveFkQueryConstraints result falls back to the simpler scalar "qc_tenant_id" path.
     // Core assertion: autosave assigns rec.qc_tenant_id ← tenant._readAttribute("id") = 42.
-    Associations.hasOne.call(QcTenant, "qcTenantRecord", { autosave: true });
     const tenant = new QcTenant({ tenant_id: 7, id: 42, name: "Acme" });
     const rec = new QcTenantRecord({ note: "hello" });
     tenant.association("qcTenantRecord").setTarget(rec as any);

@@ -95,6 +95,10 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
+        this.hasMany("cpkOrderItems", {
+          foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
+          className: "CpkOrderItem",
+        });
       }
     }
     class CpkOrderItem extends Base {
@@ -105,10 +109,6 @@ describe("AssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CpkOrder, "cpkOrderItems", {
-      foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
-      className: "CpkOrderItem",
-    });
     registerModel("CpkOrder", CpkOrder);
     registerModel("CpkOrderItem", CpkOrderItem);
     const order = await CpkOrder.create({ shop_id: 1, id: 1, status: "open" });
@@ -699,6 +699,11 @@ describe("PreloaderTest", () => {
     class PIDSAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("pidsPostsMentioning", {
+          className: "PIDSPost",
+          foreignKey: "author_id",
+          scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
+        });
       }
     }
     class PIDSPost extends Base {
@@ -708,11 +713,6 @@ describe("PreloaderTest", () => {
     }
     registerModel("PIDSAuthor", PIDSAuthor);
     registerModel("PIDSPost", PIDSPost);
-    Associations.hasMany.call(PIDSAuthor, "pidsPostsMentioning", {
-      className: "PIDSPost",
-      foreignKey: "author_id",
-      scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
-    });
 
     const david = await PIDSAuthor.create({ name: "David" });
     const david2 = await PIDSAuthor.create({ name: "David" });
@@ -737,11 +737,25 @@ describe("PreloaderTest", () => {
     class PWITSAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("pwitsAuthorPosts", {
+          className: "PWITSPost",
+          foreignKey: "author_id",
+        });
+        this.hasMany("pwitsCommentsMentioning", {
+          className: "PWITSComment",
+          through: "pwitsAuthorPosts",
+          source: "pwitsPostComments",
+          scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
+        });
       }
     }
     class PWITSPost extends Base {
       static {
         this._tableName = "posts";
+        this.hasMany("pwitsPostComments", {
+          className: "PWITSComment",
+          foreignKey: "post_id",
+        });
       }
     }
     class PWITSComment extends Base {
@@ -752,20 +766,6 @@ describe("PreloaderTest", () => {
     registerModel("PWITSAuthor", PWITSAuthor);
     registerModel("PWITSPost", PWITSPost);
     registerModel("PWITSComment", PWITSComment);
-    Associations.hasMany.call(PWITSAuthor, "pwitsAuthorPosts", {
-      className: "PWITSPost",
-      foreignKey: "author_id",
-    });
-    Associations.hasMany.call(PWITSPost, "pwitsPostComments", {
-      className: "PWITSComment",
-      foreignKey: "post_id",
-    });
-    Associations.hasMany.call(PWITSAuthor, "pwitsCommentsMentioning", {
-      className: "PWITSComment",
-      through: "pwitsAuthorPosts",
-      source: "pwitsPostComments",
-      scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
-    });
 
     const david = await PWITSAuthor.create({ name: "David" });
     const david2 = await PWITSAuthor.create({ name: "David" });
@@ -904,11 +904,25 @@ describe("PreloaderTest", () => {
     class GSLAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("gslThinkingPosts", {
+          className: "GSLPost",
+          foreignKey: "author_id",
+          scope: (rel: any) => rel.where({ title: "Thinking" }),
+        });
+        this.hasMany("gslWelcomePosts", {
+          className: "GSLPost",
+          foreignKey: "author_id",
+          scope: (rel: any) => rel.where({ title: "Welcome" }),
+        });
       }
     }
     class GSLPost extends Base {
       static {
         this._tableName = "posts";
+        this.hasMany("gslComments", {
+          className: "GSLComment",
+          foreignKey: "post_id",
+        });
       }
     }
     class GSLComment extends Base {
@@ -916,20 +930,6 @@ describe("PreloaderTest", () => {
         this._tableName = "comments";
       }
     }
-    Associations.hasMany.call(GSLAuthor, "gslThinkingPosts", {
-      className: "GSLPost",
-      foreignKey: "author_id",
-      scope: (rel: any) => rel.where({ title: "Thinking" }),
-    });
-    Associations.hasMany.call(GSLAuthor, "gslWelcomePosts", {
-      className: "GSLPost",
-      foreignKey: "author_id",
-      scope: (rel: any) => rel.where({ title: "Welcome" }),
-    });
-    Associations.hasMany.call(GSLPost, "gslComments", {
-      className: "GSLComment",
-      foreignKey: "post_id",
-    });
     registerModel("GSLAuthor", GSLAuthor);
     registerModel("GSLPost", GSLPost);
     registerModel("GSLComment", GSLComment);
@@ -955,11 +955,30 @@ describe("PreloaderTest", () => {
     class GSEAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("gseThinkingPosts", {
+          className: "GSEPost",
+          foreignKey: "author_id",
+          scope: (rel: any) => rel.where({ title: "Thinking" }),
+        });
+        this.hasMany("gseWelcomePosts", {
+          className: "GSEPost",
+          foreignKey: "author_id",
+          scope: (rel: any) => rel.where({ title: "Welcome" }),
+        });
       }
     }
     class GSEPost extends Base {
       static {
         this._tableName = "posts";
+        this.hasMany("gseComments", {
+          className: "GSEComment",
+          foreignKey: "post_id",
+        });
+        this.hasMany("gseCommentsWithExtending", {
+          className: "GSEComment",
+          foreignKey: "post_id",
+          scope: (rel: any) => rel.extending(gseExtension),
+        });
       }
     }
     class GSEComment extends Base {
@@ -967,27 +986,8 @@ describe("PreloaderTest", () => {
         this._tableName = "comments";
       }
     }
-    Associations.hasMany.call(GSEAuthor, "gseThinkingPosts", {
-      className: "GSEPost",
-      foreignKey: "author_id",
-      scope: (rel: any) => rel.where({ title: "Thinking" }),
-    });
-    Associations.hasMany.call(GSEAuthor, "gseWelcomePosts", {
-      className: "GSEPost",
-      foreignKey: "author_id",
-      scope: (rel: any) => rel.where({ title: "Welcome" }),
-    });
-    Associations.hasMany.call(GSEPost, "gseComments", {
-      className: "GSEComment",
-      foreignKey: "post_id",
-    });
     // Same SQL as gseComments, differing only by an `extending` module — Rails
     // excludes `:extending` from `values_for_queries`, so these coalesce.
-    Associations.hasMany.call(GSEPost, "gseCommentsWithExtending", {
-      className: "GSEComment",
-      foreignKey: "post_id",
-      scope: (rel: any) => rel.extending(gseExtension),
-    });
     registerModel("GSEAuthor", GSEAuthor);
     registerModel("GSEPost", GSEPost);
     registerModel("GSEComment", GSEComment);
@@ -1012,27 +1012,27 @@ describe("PreloaderTest", () => {
     class IAAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("iaFavs", {
+          className: "IAFav",
+          foreignKey: "author_id",
+          inverseOf: "iaAuthor",
+        });
       }
     }
     class IAFav extends Base {
       static {
         this._tableName = "author_favorites";
+        this.belongsTo("iaAuthor", {
+          className: "IAAuthor",
+          foreignKey: "author_id",
+          inverseOf: "iaFavs",
+        });
+        this.belongsTo("iaFavoriteAuthor", {
+          className: "IAAuthor",
+          foreignKey: "favorite_author_id",
+        });
       }
     }
-    Associations.hasMany.call(IAAuthor, "iaFavs", {
-      className: "IAFav",
-      foreignKey: "author_id",
-      inverseOf: "iaAuthor",
-    });
-    Associations.belongsTo.call(IAFav, "iaAuthor", {
-      className: "IAAuthor",
-      foreignKey: "author_id",
-      inverseOf: "iaFavs",
-    });
-    Associations.belongsTo.call(IAFav, "iaFavoriteAuthor", {
-      className: "IAAuthor",
-      foreignKey: "favorite_author_id",
-    });
     registerModel("IAAuthor", IAAuthor);
     registerModel("IAFav", IAFav);
     const mary = await IAAuthor.create({ name: "Mary" });
@@ -1142,17 +1142,17 @@ describe("PreloaderTest", () => {
     class DCPost extends Base {
       static {
         this._tableName = "posts";
+        this.belongsTo("dcAuthorWithLetterA", {
+          className: "DCAuthor",
+          foreignKey: "author_id",
+          scope: (rel: any) => rel.where({ name: "Alice" }),
+        });
+        this.belongsTo("dcAuthorPlain", {
+          className: "DCAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
-    Associations.belongsTo.call(DCPost, "dcAuthorWithLetterA", {
-      className: "DCAuthor",
-      foreignKey: "author_id",
-      scope: (rel: any) => rel.where({ name: "Alice" }),
-    });
-    Associations.belongsTo.call(DCPost, "dcAuthorPlain", {
-      className: "DCAuthor",
-      foreignKey: "author_id",
-    });
     registerModel("DCAuthor", DCAuthor);
     registerModel("DCPost", DCPost);
     const alice = await DCAuthor.create({ name: "Alice" });
@@ -1176,24 +1176,24 @@ describe("PreloaderTest", () => {
     class DKNPost extends Base {
       static {
         this._tableName = "posts";
+        this.belongsTo("dknAuthor", {
+          className: "DKNAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
     class DKNPostesque extends Base {
       static {
         this._tableName = "postesques";
+        this.belongsTo("dknAuthor", {
+          className: "DKNAuthor",
+          foreignKey: "author_name",
+          primaryKey: "name",
+        });
       }
     }
-    Associations.belongsTo.call(DKNPost, "dknAuthor", {
-      className: "DKNAuthor",
-      foreignKey: "author_id",
-    });
     // Mirrors Rails Postesque.belongs_to :author, foreign_key: :author_name, primary_key: :name.
     // Same scope (no WHERE), same class, but distinct join-primary-key → must NOT coalesce.
-    Associations.belongsTo.call(DKNPostesque, "dknAuthor", {
-      className: "DKNAuthor",
-      foreignKey: "author_name",
-      primaryKey: "name",
-    });
     registerModel("DKNAuthor", DKNAuthor);
     registerModel("DKNPost", DKNPost);
     registerModel("DKNPostesque", DKNPostesque);
@@ -1649,6 +1649,10 @@ describe("PreloaderTest", () => {
     class PKAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("pkPosts", {
+          className: "PKPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class PKPost extends Base {
@@ -1656,10 +1660,6 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
-    Associations.hasMany.call(PKAuthor, "pkPosts", {
-      className: "PKPost",
-      foreignKey: "author_id",
-    });
     registerModel("PKAuthor", PKAuthor);
     registerModel("PKPost", PKPost);
 
@@ -1677,6 +1677,10 @@ describe("PreloaderTest", () => {
     class PKQAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("pkqPosts", {
+          className: "PKQPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class PKQPost extends Base {
@@ -1684,10 +1688,6 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
-    Associations.hasMany.call(PKQAuthor, "pkqPosts", {
-      className: "PKQPost",
-      foreignKey: "author_id",
-    });
     registerModel("PKQAuthor", PKQAuthor);
     registerModel("PKQPost", PKQPost);
 
@@ -1710,12 +1710,12 @@ describe("PreloaderTest", () => {
     class PKBPost extends Base {
       static {
         this._tableName = "posts";
+        this.belongsTo("pkbAuthor", {
+          className: "PKBAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
-    Associations.belongsTo.call(PKBPost, "pkbAuthor", {
-      className: "PKBAuthor",
-      foreignKey: "author_id",
-    });
     registerModel("PKBAuthor", PKBAuthor);
     registerModel("PKBPost", PKBPost);
 
@@ -1738,12 +1738,12 @@ describe("PreloaderTest", () => {
     class PKBAPost extends Base {
       static {
         this._tableName = "posts";
+        this.belongsTo("pkbaAuthor", {
+          className: "PKBAAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
-    Associations.belongsTo.call(PKBAPost, "pkbaAuthor", {
-      className: "PKBAAuthor",
-      foreignKey: "author_id",
-    });
     registerModel("PKBAAuthor", PKBAAuthor);
     registerModel("PKBAPost", PKBAPost);
 
@@ -1768,12 +1768,12 @@ describe("PreloaderTest", () => {
     class PTLBPost extends Base {
       static {
         this._tableName = "posts";
+        this.belongsTo("ptlbAuthor", {
+          className: "PTLBAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
-    Associations.belongsTo.call(PTLBPost, "ptlbAuthor", {
-      className: "PTLBAuthor",
-      foreignKey: "author_id",
-    });
     registerModel("PTLBAuthor", PTLBAuthor);
     registerModel("PTLBPost", PTLBPost);
 
@@ -1791,6 +1791,10 @@ describe("PreloaderTest", () => {
     class PTLCAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("ptlcPosts", {
+          className: "PTLCPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class PTLCPost extends Base {
@@ -1798,10 +1802,6 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
-    Associations.hasMany.call(PTLCAuthor, "ptlcPosts", {
-      className: "PTLCPost",
-      foreignKey: "author_id",
-    });
     registerModel("PTLCAuthor", PTLCAuthor);
     registerModel("PTLCPost", PTLCPost);
 

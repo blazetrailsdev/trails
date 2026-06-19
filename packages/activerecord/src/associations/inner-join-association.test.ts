@@ -35,6 +35,7 @@ describe("InnerJoinAssociationTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("posts", {});
       }
     }
     class Post extends Base {
@@ -50,7 +51,6 @@ describe("InnerJoinAssociationTest", () => {
       }
     }
     Associations.belongsTo.call(Post, "author", {});
-    Associations.hasMany.call(Author, "posts", {});
     Associations.hasMany.call(Post, "comments", {});
     registerModel(Author);
     registerModel(Post);
@@ -285,18 +285,34 @@ describe("InnerJoinAssociationTest", () => {
     class ThrAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("thrPosts", { foreignKey: "thr_author_id" });
+        this.hasMany("thrTags", {
+          through: "thrPosts",
+          source: "thrTag",
+          className: "ThrTag",
+        });
       }
     }
     class ThrPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("thr_author_id", "integer");
+        this.hasMany("thrTaggings", { foreignKey: "thr_post_id" });
+        this.hasMany("thrTags", {
+          through: "thrTaggings",
+          source: "thrTag",
+          className: "ThrTag",
+        });
       }
     }
     class ThrTagging extends Base {
       static {
         this.attribute("thr_post_id", "integer");
         this.attribute("thr_tag_id", "integer");
+        this.belongsTo("thrTag", {
+          foreignKey: "thr_tag_id",
+          className: "ThrTag",
+        });
       }
     }
     class ThrTag extends Base {
@@ -304,22 +320,6 @@ describe("InnerJoinAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(ThrAuthor, "thrPosts", { foreignKey: "thr_author_id" });
-    Associations.hasMany.call(ThrAuthor, "thrTags", {
-      through: "thrPosts",
-      source: "thrTag",
-      className: "ThrTag",
-    });
-    Associations.hasMany.call(ThrPost, "thrTaggings", { foreignKey: "thr_post_id" });
-    Associations.hasMany.call(ThrPost, "thrTags", {
-      through: "thrTaggings",
-      source: "thrTag",
-      className: "ThrTag",
-    });
-    Associations.belongsTo.call(ThrTagging, "thrTag", {
-      foreignKey: "thr_tag_id",
-      className: "ThrTag",
-    });
     registerModel(ThrAuthor);
     registerModel(ThrPost);
     registerModel(ThrTagging);
@@ -409,6 +409,10 @@ describe("InnerJoinAssociationTest", () => {
     class HabtmPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasAndBelongsToMany("habtmTags", {
+          className: "HabtmTag",
+          joinTable: "habtm_posts_habtm_tags",
+        });
       }
     }
     class HabtmTag extends Base {
@@ -416,10 +420,6 @@ describe("InnerJoinAssociationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasAndBelongsToMany.call(HabtmPost, "habtmTags", {
-      className: "HabtmTag",
-      joinTable: "habtm_posts_habtm_tags",
-    });
     registerModel(HabtmPost);
     registerModel(HabtmTag);
 

@@ -284,14 +284,14 @@ describe("WhereTest", () => {
         this._tableName = "woa_essays";
         this.attribute("id", "integer");
         this.attribute("writer_id", "string");
+        this.belongsTo("writer", {
+          className: "WoaAuthor",
+          foreignKey: "writer_id",
+          primaryKey: "name",
+        });
       }
     }
     registerModel("WoaAuthor", WoaAuthor);
-    Associations.belongsTo.call(WoaEssay, "writer", {
-      className: "WoaAuthor",
-      foreignKey: "writer_id",
-      primaryKey: "name",
-    });
     const author = await WoaAuthor.create({ name: "David" });
     await WoaEssay.create({ writer_id: "David" });
     const essay = await WoaEssay.where({ writer: author }).first();
@@ -311,13 +311,13 @@ describe("WhereTest", () => {
         this._tableName = "woar_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
+        this.belongsTo("author", {
+          className: "WoarAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
     registerModel("WoarAuthor", WoarAuthor);
-    Associations.belongsTo.call(WoarPost, "author", {
-      className: "WoarAuthor",
-      foreignKey: "author_id",
-    });
     const author = await WoarAuthor.create({ name: "Alice" });
     await WoarPost.create({ author_id: author.id });
     await WoarPost.create({ author_id: null });
@@ -449,6 +449,10 @@ describe("WhereTest", () => {
         this._tableName = "wahm_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
+        this.hasMany("wahmPosts", {
+          className: "WahmPost",
+          foreignKey: "wahm_author_id",
+        });
       }
     }
     class WahmPost extends Base {
@@ -459,10 +463,6 @@ describe("WhereTest", () => {
         this.attribute("wahm_author_id", "integer");
       }
     }
-    Associations.hasMany.call(WahmAuthor, "wahmPosts", {
-      className: "WahmPost",
-      foreignKey: "wahm_author_id",
-    });
     registerModel("WahmAuthor", WahmAuthor);
     registerModel("WahmPost", WahmPost);
     const a1 = await WahmAuthor.create({ name: "With Posts" });
@@ -508,9 +508,9 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
+        this.belongsTo("author", { foreignKey: "author_id" });
       }
     }
-    Associations.belongsTo.call(WnaPost, "author", { foreignKey: "author_id" });
     registerModel("WnaPost", WnaPost);
     await WnaPost.create({ title: "Orphan", author_id: null });
     await WnaPost.create({ title: "Owned", author_id: 1 });
@@ -525,6 +525,10 @@ describe("WhereTest", () => {
         this._tableName = "wnahm_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
+        this.hasMany("wnahmPosts", {
+          className: "WnahmPost",
+          foreignKey: "wnahm_author_id",
+        });
       }
     }
     class WnahmPost extends Base {
@@ -535,10 +539,6 @@ describe("WhereTest", () => {
         this.attribute("wnahm_author_id", "integer");
       }
     }
-    Associations.hasMany.call(WnahmAuthor, "wnahmPosts", {
-      className: "WnahmPost",
-      foreignKey: "wnahm_author_id",
-    });
     registerModel("WnahmAuthor", WnahmAuthor);
     registerModel("WnahmPost", WnahmPost);
     const a1 = await WnahmAuthor.create({ name: "With Posts" });
@@ -555,6 +555,14 @@ describe("WhereTest", () => {
         this._tableName = "wnamm_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
+        this.hasMany("wnamm_posts", {
+          className: "WnammPost",
+          foreignKey: "wnamm_author_id",
+        });
+        this.hasMany("wnamm_comments", {
+          className: "WnammComment",
+          foreignKey: "wnamm_author_id",
+        });
       }
     }
     class WnammPost extends Base {
@@ -571,14 +579,6 @@ describe("WhereTest", () => {
         this.attribute("wnamm_author_id", "integer");
       }
     }
-    Associations.hasMany.call(WnammAuthor, "wnamm_posts", {
-      className: "WnammPost",
-      foreignKey: "wnamm_author_id",
-    });
-    Associations.hasMany.call(WnammAuthor, "wnamm_comments", {
-      className: "WnammComment",
-      foreignKey: "wnamm_author_id",
-    });
     registerModel("WnammAuthor", WnammAuthor);
     registerModel("WnammPost", WnammPost);
     registerModel("WnammComment", WnammComment);
@@ -756,14 +756,14 @@ describe("WhereTest", () => {
         this._tableName = "wnil_books";
         this.attribute("shop_id", "integer");
         this.attribute("order_id", "integer");
+        this.belongsTo("order", {
+          className: "WnilOrder",
+          foreignKey: ["shop_id", "order_id"],
+        });
       }
     }
     registerModel("WnilOrder", WnilOrder);
     registerModel("WnilBook", WnilBook);
-    Associations.belongsTo.call(WnilBook, "order", {
-      className: "WnilOrder",
-      foreignKey: ["shop_id", "order_id"],
-    });
 
     const order = await WnilOrder.create({ shop_id: 1 });
     const otherOrder = await WnilOrder.create({ shop_id: 2 });
@@ -798,13 +798,13 @@ describe("WhereTest", () => {
         this._tableName = "bts_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
+        this.belongsTo("author", {
+          className: "BtsAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
     registerModel("BtsAuthor", BtsAuthor);
-    Associations.belongsTo.call(BtsPost, "author", {
-      className: "BtsAuthor",
-      foreignKey: "author_id",
-    });
     const author = new BtsAuthor();
     author.id = 1;
     expect(BtsPost.where({ author_id: 1 }).toSql()).toEqual(
@@ -823,13 +823,13 @@ describe("WhereTest", () => {
         this._tableName = "btn_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
+        this.belongsTo("author", {
+          className: "BtnAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
     registerModel("BtnAuthor", BtnAuthor);
-    Associations.belongsTo.call(BtnPost, "author", {
-      className: "BtnAuthor",
-      foreignKey: "author_id",
-    });
     expect(BtnPost.where({ author_id: null }).toSql()).toEqual(
       BtnPost.where({ author: null }).toSql(),
     );
@@ -846,13 +846,13 @@ describe("WhereTest", () => {
         this._tableName = "btav_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
+        this.belongsTo("author", {
+          className: "BtavAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
     registerModel("BtavAuthor", BtavAuthor);
-    Associations.belongsTo.call(BtavPost, "author", {
-      className: "BtavAuthor",
-      foreignKey: "author_id",
-    });
     expect(BtavPost.where({ author_id: [1, 2] }).toSql()).toEqual(
       BtavPost.where({ author: [1, 2] }).toSql(),
     );
@@ -869,13 +869,13 @@ describe("WhereTest", () => {
         this._tableName = "btnr_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
+        this.belongsTo("author", {
+          className: "BtnrAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
     registerModel("BtnrAuthor", BtnrAuthor);
-    Associations.belongsTo.call(BtnrPost, "author", {
-      className: "BtnrAuthor",
-      foreignKey: "author_id",
-    });
     const expected = BtnrPost.where({ author_id: BtnrAuthor.where({ id: [1, 2] }) }).toSql();
     const actual = BtnrPost.where({ author: BtnrAuthor.where({ id: [1, 2] }) }).toSql();
     expect(actual).toEqual(expected);
@@ -887,24 +887,24 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("parent_id", "integer");
         this.attribute("post_id", "integer");
+        this.belongsTo("parent", {
+          className: "BnwComment",
+          foreignKey: "parent_id",
+        });
       }
     }
     class BnwPost extends Base {
       static {
         this._tableName = "bnw_posts";
         this.attribute("id", "integer");
+        this.hasMany("comments", {
+          className: "BnwComment",
+          foreignKey: "post_id",
+        });
       }
     }
     registerModel("BnwComment", BnwComment);
     registerModel("BnwPost", BnwPost);
-    Associations.belongsTo.call(BnwComment, "parent", {
-      className: "BnwComment",
-      foreignKey: "parent_id",
-    });
-    Associations.hasMany.call(BnwPost, "comments", {
-      className: "BnwComment",
-      foreignKey: "post_id",
-    });
     const parent = new BnwComment();
     (parent as any).id = 1;
     const expected = BnwPost.where({ comments: { parent_id: 1 } }).joins("comments");
@@ -916,6 +916,10 @@ describe("WhereTest", () => {
       static {
         this._tableName = "bnwr_authors";
         this.attribute("id", "integer");
+        this.hasMany("bnwr_posts", {
+          className: "BnwrPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class BnwrPost extends Base {
@@ -929,10 +933,6 @@ describe("WhereTest", () => {
     registerModel("BnwrPost", BnwrPost);
     // Use table name as association name so the WHERE predicate references the real table
     // column (bnwr_posts.author_id) rather than an alias that the JOIN doesn't expose.
-    Associations.hasMany.call(BnwrAuthor, "bnwr_posts", {
-      className: "BnwrPost",
-      foreignKey: "author_id",
-    });
 
     const author = await BnwrAuthor.create({});
     const decoy = await BnwrAuthor.create({});
@@ -970,10 +970,10 @@ describe("WhereTest", () => {
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
         this.attribute("price", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PolyTreasure", PolyTreasure);
-    Associations.belongsTo.call(PolyPriceEstimate, "estimateOf", { polymorphic: true });
 
     const treasure = new PolyTreasure();
     (treasure as any).id = 1;
@@ -1005,11 +1005,11 @@ describe("WhereTest", () => {
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
         this.attribute("price", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PonandTreasure", PonandTreasure);
     registerModel("PonandCar", PonandCar);
-    Associations.belongsTo.call(PonandPriceEstimate, "estimateOf", { polymorphic: true });
 
     const diamond = (await PonandTreasure.create({ name: "diamond" })) as any;
     const sapphire = (await PonandTreasure.create({ name: "sapphire" })) as any;
@@ -1059,6 +1059,10 @@ describe("WhereTest", () => {
       static {
         this._tableName = "ponand_treasures";
         this.attribute("name", "string");
+        this.hasMany("priceEstimates", {
+          className: "PonandNandPriceEstimate",
+          as: "estimateOf",
+        });
       }
     }
     class PonandNandPriceEstimate extends Base {
@@ -1068,15 +1072,11 @@ describe("WhereTest", () => {
         this.attribute("estimate_of_id", "integer");
         this.attribute("price", "integer");
         this.attribute("currency", "string");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PonandNandTreasure", PonandNandTreasure);
     registerModel("PonandNandPriceEstimate", PonandNandPriceEstimate);
-    Associations.belongsTo.call(PonandNandPriceEstimate, "estimateOf", { polymorphic: true });
-    Associations.hasMany.call(PonandNandTreasure, "priceEstimates", {
-      className: "PonandNandPriceEstimate",
-      as: "estimateOf",
-    });
 
     const diamond = (await PonandNandTreasure.create({ name: "diamond" })) as any;
     const sapphire = (await PonandNandTreasure.create({ name: "sapphire" })) as any;
@@ -1138,11 +1138,11 @@ describe("WhereTest", () => {
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
         this.attribute("price", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PonandArrTreasure", PonandArrTreasure);
     registerModel("PonandArrCar", PonandArrCar);
-    Associations.belongsTo.call(PonandArrPriceEstimate, "estimateOf", { polymorphic: true });
 
     const diamond = (await PonandArrTreasure.create({ name: "diamond" })) as any;
     const sapphire = (await PonandArrTreasure.create({ name: "sapphire" })) as any;
@@ -1202,11 +1202,11 @@ describe("WhereTest", () => {
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
         this.attribute("price", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PolyMTreasure", PolyMTreasure);
     registerModel("PolyMCar", PolyMCar);
-    Associations.belongsTo.call(PolyMPriceEstimate, "estimateOf", { polymorphic: true });
 
     const treasure1 = await PolyMTreasure.create({ name: "diamond" });
     const treasure2 = await PolyMTreasure.create({ name: "sapphire" });
@@ -1254,10 +1254,10 @@ describe("WhereTest", () => {
         this._tableName = "poly_price_estimates";
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PolyRTreasure", PolyRTreasure);
-    Associations.belongsTo.call(PolyRPriceEstimate, "estimateOf", { polymorphic: true });
 
     const expected = PolyRPriceEstimate.where({
       estimate_of_type: "PolyRTreasure",
@@ -1280,10 +1280,10 @@ describe("WhereTest", () => {
         this._tableName = "pss_price_estimates";
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PssTreasure", PssTreasure);
-    Associations.belongsTo.call(PssPriceEstimate, "estimateOf", { polymorphic: true });
 
     const treasure = new PssHiddenTreasure();
     (treasure as any).id = 1;
@@ -1307,6 +1307,10 @@ describe("WhereTest", () => {
       static {
         this._tableName = "pnw_treasures";
         this.attribute("name", "string");
+        this.hasMany("price_estimates", {
+          className: "PnwPriceEstimate",
+          as: "estimateOf",
+        });
       }
     }
     class PnwPriceEstimate extends Base {
@@ -1316,16 +1320,12 @@ describe("WhereTest", () => {
         this.attribute("estimate_of_id", "integer");
         this.attribute("thing_type", "string");
         this.attribute("thing_id", "integer");
+        this.belongsTo("thing", { polymorphic: true });
       }
     }
     registerModel("PnwPost", PnwPost);
     registerModel("PnwPriceEstimate", PnwPriceEstimate);
-    Associations.belongsTo.call(PnwPriceEstimate, "thing", { polymorphic: true });
     // Mirrors Rails `Treasure has_many :price_estimates, as: :estimate_of`.
-    Associations.hasMany.call(PnwTreasure, "price_estimates", {
-      className: "PnwPriceEstimate",
-      as: "estimateOf",
-    });
 
     const thing = new PnwPost();
     (thing as any).id = 1;
@@ -1344,6 +1344,10 @@ describe("WhereTest", () => {
       static {
         this._tableName = "psn_treasures";
         this.attribute("name", "string");
+        this.hasMany("price_estimates", {
+          className: "PsnPriceEstimate",
+          as: "estimateOf",
+        });
       }
     }
     class PsnHiddenTreasure extends PsnTreasure {}
@@ -1352,16 +1356,12 @@ describe("WhereTest", () => {
         this._tableName = "psn_price_estimates";
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PsnTreasure", PsnTreasure);
     registerModel("PsnPriceEstimate", PsnPriceEstimate);
-    Associations.belongsTo.call(PsnPriceEstimate, "estimateOf", { polymorphic: true });
     // Mirrors Rails `Treasure has_many :price_estimates, as: :estimate_of`.
-    Associations.hasMany.call(PsnTreasure, "price_estimates", {
-      className: "PsnPriceEstimate",
-      as: "estimateOf",
-    });
 
     const treasure = new PsnHiddenTreasure();
     (treasure as any).id = 1;
@@ -1384,6 +1384,10 @@ describe("WhereTest", () => {
       static {
         this._tableName = "pas_treasures";
         this.attribute("name", "string");
+        this.hasMany("price_estimates", {
+          className: "PasPriceEstimate",
+          as: "estimateOf",
+        });
       }
     }
     class PasPriceEstimate extends Base {
@@ -1395,10 +1399,6 @@ describe("WhereTest", () => {
     }
     registerModel("PasTreasure", PasTreasure);
     registerModel("PasPriceEstimate", PasPriceEstimate);
-    Associations.hasMany.call(PasTreasure, "price_estimates", {
-      className: "PasPriceEstimate",
-      as: "estimateOf",
-    });
 
     const sql = PasTreasure.joins("price_estimates").toSql();
 
@@ -1423,10 +1423,10 @@ describe("WhereTest", () => {
         this._tableName = "dpw_price_estimates";
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("DpwTreasure", DpwTreasure);
-    Associations.belongsTo.call(DpwPriceEstimate, "estimateOf", { polymorphic: true });
 
     const treasure = new DpwTreasure();
     (treasure as any).id = 1;
@@ -1566,6 +1566,10 @@ describe("WhereTest", () => {
         this._tableName = "whmr_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
+        this.hasMany("essays", {
+          className: "WhmrEssay",
+          foreignKey: "author_id",
+        });
       }
     }
     class WhmrEssay extends Base {
@@ -1578,10 +1582,6 @@ describe("WhereTest", () => {
     }
     registerModel("WhmrAuthor", WhmrAuthor);
     registerModel("WhmrEssay", WhmrEssay);
-    Associations.hasMany.call(WhmrAuthor, "essays", {
-      className: "WhmrEssay",
-      foreignKey: "author_id",
-    });
 
     const david = (await WhmrAuthor.create({ name: "David" })) as any;
     await WhmrAuthor.create({ name: "Other" });
@@ -1599,6 +1599,10 @@ describe("WhereTest", () => {
         this._tableName = "whor_addresses";
         this.attribute("id", "integer");
         this.attribute("name", "string");
+        this.hasOne("author", {
+          className: "WhorAuthor",
+          foreignKey: "author_address_id",
+        });
       }
     }
     class WhorAuthor extends Base {
@@ -1612,10 +1616,6 @@ describe("WhereTest", () => {
     registerModel("WhorAddress", WhorAddress);
     registerModel("WhorAuthor", WhorAuthor);
     // AuthorAddress has_one :author — FK lives on the author side
-    Associations.hasOne.call(WhorAddress, "author", {
-      className: "WhorAuthor",
-      foreignKey: "author_address_id",
-    });
 
     const address = (await WhorAddress.create({ name: "addr1" })) as any;
     await WhorAddress.create({ name: "addr2" });
@@ -1643,14 +1643,14 @@ describe("WhereTest", () => {
         this._tableName = "wsel_essays";
         this.attribute("id", "integer");
         this.attribute("writer_id", "string");
+        this.belongsTo("author", {
+          className: "WselAuthor",
+          foreignKey: "writer_id",
+          primaryKey: "name",
+        });
       }
     }
     registerModel("WselAuthor", WselAuthor);
-    Associations.belongsTo.call(WselEssay, "author", {
-      className: "WselAuthor",
-      foreignKey: "writer_id",
-      primaryKey: "name",
-    });
 
     const david = await WselAuthor.create({ name: "David" });
     const essay = await WselEssay.create({ writer_id: "David" });
@@ -1668,6 +1668,10 @@ describe("WhereTest", () => {
         this._tableName = "wcpr_treasures";
         this.attribute("id", "integer");
         this.attribute("name", "string");
+        this.hasMany("priceEstimates", {
+          className: "WcprPriceEstimate",
+          as: "estimateOf",
+        });
       }
     }
     class WcprPriceEstimate extends Base {
@@ -1676,15 +1680,11 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("WcprTreasure", WcprTreasure);
     registerModel("WcprPriceEstimate", WcprPriceEstimate);
-    Associations.belongsTo.call(WcprPriceEstimate, "estimateOf", { polymorphic: true });
-    Associations.hasMany.call(WcprTreasure, "priceEstimates", {
-      className: "WcprPriceEstimate",
-      as: "estimateOf",
-    });
 
     const diamond = (await WcprTreasure.create({ name: "diamond" })) as any;
     const emerald = (await WcprTreasure.create({ name: "emerald" })) as any;
@@ -2392,19 +2392,19 @@ describe("WhereTest", () => {
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
+        this.belongsTo("author", { className: "TcnjAuthor" });
       }
     }
     class TcnjComment extends Base {
       static {
         this._tableName = "comments";
         this.attribute("post_id", "integer");
+        this.belongsTo("post", { className: "TcnjPost" });
       }
     }
     registerModel("TcnjAuthor", TcnjAuthor);
     registerModel("TcnjPost", TcnjPost);
     registerModel("TcnjComment", TcnjComment);
-    Associations.belongsTo.call(TcnjPost, "author", { className: "TcnjAuthor" });
-    Associations.belongsTo.call(TcnjComment, "post", { className: "TcnjPost" });
 
     const author = await TcnjAuthor.create({});
     const otherAuthor = await TcnjAuthor.create({});
@@ -2510,10 +2510,10 @@ describe("WhereTest", () => {
         this._tableName = "pna_price_estimates";
         this.attribute("estimate_of_type", "string");
         this.attribute("estimate_of_id", "integer");
+        this.belongsTo("estimateOf", { polymorphic: true });
       }
     }
     registerModel("PnaTreasure", PnaTreasure);
-    Associations.belongsTo.call(PnaPriceEstimate, "estimateOf", { polymorphic: true });
 
     const treasure = new PnaTreasure();
     (treasure as any).id = 1;
@@ -2611,12 +2611,18 @@ describe("deriveForeignKey via joins string resolver", () => {
       static {
         this._tableName = "dfk_authors";
         this.attribute("name", "string");
+        this.hasMany("posts", { className: "DfkPost" });
+        this.hasMany("comments", {
+          className: "DfkComment",
+          through: "posts",
+        });
       }
     }
     class DfkPost extends Base {
       static {
         this._tableName = "dfk_posts";
         this.attribute("title", "string");
+        this.hasMany("comments", { className: "DfkComment" });
       }
     }
     class DfkComment extends Base {
@@ -2628,12 +2634,6 @@ describe("deriveForeignKey via joins string resolver", () => {
     registerModel("DfkAuthor", DfkAuthor);
     registerModel("DfkPost", DfkPost);
     registerModel("DfkComment", DfkComment);
-    Associations.hasMany.call(DfkAuthor, "posts", { className: "DfkPost" });
-    Associations.hasMany.call(DfkPost, "comments", { className: "DfkComment" });
-    Associations.hasMany.call(DfkAuthor, "comments", {
-      className: "DfkComment",
-      through: "posts",
-    });
 
     const sql = DfkAuthor.joins("comments").toSql();
 
@@ -2658,6 +2658,9 @@ describe("deriveForeignKey via joins string resolver", () => {
       static {
         this._tableName = "dfk_projects";
         this.attribute("name", "string");
+        this.hasAndBelongsToMany("developers", {
+          className: "DfkDeveloper",
+        });
       }
     }
     class DfkDeveloper extends Base {
@@ -2668,9 +2671,6 @@ describe("deriveForeignKey via joins string resolver", () => {
     }
     registerModel("DfkProject", DfkProject);
     registerModel("DfkDeveloper", DfkDeveloper);
-    Associations.hasAndBelongsToMany.call(DfkProject, "developers", {
-      className: "DfkDeveloper",
-    });
 
     const sql = DfkProject.joins("developers").toSql();
 
@@ -2697,11 +2697,11 @@ describe("deriveForeignKey via joins string resolver", () => {
       static {
         this._tableName = "dfk_accounts";
         this.attribute("name", "string");
+        this.hasMany("clients", { className: "DfkClient" });
       }
     }
     registerModel("DfkAccount", DfkAccount);
     registerModel("DfkClient", DfkClient);
-    Associations.hasMany.call(DfkAccount, "clients", { className: "DfkClient" });
 
     const sql = DfkAccount.joins("clients").toSql();
 
