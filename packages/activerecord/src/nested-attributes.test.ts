@@ -28,6 +28,7 @@ import { CpkBook, CpkChapter, CpkOrder } from "./test-helpers/models/cpk.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
 import { Ship as CanonicalShip } from "./test-helpers/models/ship.js";
+import { Developer } from "./test-helpers/models/developer.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
@@ -135,8 +136,6 @@ const TEST_SCHEMA = {
   parts: { name: "string", ship_id: "integer" },
   pirates: { catchphrase: "string" },
   plains: { name: "string" },
-  poly_owners: { target_type: "string", target_id: "integer" },
-  poly_targets: { name: "string" },
   posts: { title: "string" },
   rae_articles: { title: "string" },
   rae_tags: { name: "string", rae_article_id: "integer" },
@@ -569,63 +568,40 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
       updateOnly?: boolean;
     } = {},
   ) {
-    class Ship extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
-    registerModel("Ship", Ship);
-    registerModel("Pirate", Pirate);
-    acceptsNestedAttributesFor(Pirate, "ship", opts);
-    return { Ship, Pirate };
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+    // Ship belongs_to :developer, dependent: :destroy — destroying a ship
+    // builds the developer association, which must resolve from the registry.
+    registerModel(Developer);
+    acceptsNestedAttributesFor(CanonicalPirate, "ship", opts);
+    return { Ship: CanonicalShip, Pirate: CanonicalPirate };
   }
 
   it("should raise argument error if trying to build polymorphic belongs to", () => {
-    class PolyTarget extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PolyOwner extends Base {
-      static {
-        this.attribute("target_type", "string");
-        this.attribute("target_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(PolyOwner, "target", {
-      polymorphic: true,
-      foreignKey: "target_id",
-    });
-    registerModel("PolyTarget", PolyTarget);
-    registerModel("PolyOwner", PolyOwner);
+    // Rails: Treasure.new(name: "pearl", looter_attributes: { catchphrase: "Arrr" }).
+    // Treasure belongs_to :looter, polymorphic: true.
+    registerModel(Treasure);
     // Rails defers the polymorphic-target check to build time: declaring
     // accepts_nested_attributes_for on a polymorphic belongs_to succeeds, and
     // the ArgumentError only fires when a nested payload tries to build a new
     // record for the polymorphic association.
-    expect(() => acceptsNestedAttributesFor(PolyOwner, "target")).not.toThrow();
-    const owner = new PolyOwner();
+    expect(() => acceptsNestedAttributesFor(Treasure, "looter")).not.toThrow();
+    const treasure = new Treasure();
     expect(() => {
-      (owner as any).targetAttributes = { name: "pearl" };
+      (treasure as any).looterAttributes = { catchphrase: "Arrr" };
     }).toThrow(
-      "Cannot build association `target'. Are you trying to build a polymorphic one-to-one association?",
+      "Cannot build association `looter'. Are you trying to build a polymorphic one-to-one association?",
     );
 
     // An `id`-bearing payload routes to the update / record-not-found branches
     // in Rails (nested_attributes.rb:436-441), never the polymorphic build
     // error — so the check must NOT block it. It enqueues like any update.
-    const updater = new PolyOwner();
+    const updater = new Treasure();
     expect(() => {
-      (updater as any).targetAttributes = { id: 1, name: "pearl" };
+      (updater as any).looterAttributes = { id: 1, catchphrase: "Arrr" };
     }).not.toThrow();
-    expect((updater as any)._pendingNestedAttributes.get("target")).toEqual([
-      { id: 1, name: "pearl" },
+    expect((updater as any)._pendingNestedAttributes.get("looter")).toEqual([
+      { id: 1, catchphrase: "Arrr" },
     ]);
   });
 
