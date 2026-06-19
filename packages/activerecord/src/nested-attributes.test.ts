@@ -78,27 +78,19 @@ const TEST_SCHEMA = {
   n_article_cs: { title: "string" },
   n_article_ds: { title: "string" },
   n_article_es: { title: "string" },
-  n_article_fs: { title: "string" },
   n_article_hs: { title: "string" },
   n_article6s: { title: "string" },
   n_article7s: { title: "string" },
   n_article8s: { title: "string" },
   n_article9s: { title: "string" },
-  n_bird1s: { name: "string", npirate1_id: "integer" },
-  n_boat3s: { name: "string" },
   n_comment5s: { body: "string", npost5_id: "integer" },
-  n_part3s: { name: "string", nboat3_id: "integer" },
   n_pirate0s: { catchphrase: "string" },
-  n_pirate1s: { catchphrase: "string" },
-  n_pirate2s: { catchphrase: "string" },
   n_post5s: { title: "string" },
-  n_ship2s: { name: "string", npirate2_id: "integer" },
   n_tag_as: { name: "string", narticleA_id: "integer" },
   n_tag_bs: { name: "string", narticleB_id: "integer" },
   n_tag_cs: { name: "string", narticleC_id: "integer" },
   n_tag_ds: { name: "string", narticleD_id: "integer" },
   n_tag_es: { name: "string", narticleE_id: "integer" },
-  n_tag_fs: { name: "string", narticleF_id: "integer" },
   n_tag_hs: { name: "string", narticleH_id: "integer" },
   n_tag0s: { name: "string", npirate0_id: "integer" },
   n_tag6s: { name: "string", narticle6_id: "integer" },
@@ -130,8 +122,6 @@ const TEST_SCHEMA = {
   nupd_tags: { name: "string", nupd_article_id: "integer" },
   mol_pirates: { catchphrase: "string" },
   mol_birds: { name: "string", mol_pirate_id: "integer" },
-  ov_pirates: { catchphrase: "string" },
-  ov_ships: { name: "string", ov_pirate_id: "integer" },
   parts: { name: "string", ship_id: "integer" },
   pirates: { catchphrase: "string" },
   plains: { name: "string" },
@@ -143,10 +133,6 @@ const TEST_SCHEMA = {
   rnf_articles: { title: "string" },
   rnf_tags: { name: "string", rnf_article_id: "integer" },
   ships: { name: "string", pirate_id: "integer" },
-  sub_birds: { name: "string", sub_pirate_id: "integer" },
-  sub_pirates: { catchphrase: "string" },
-  ua_pirates: { catchphrase: "string" },
-  ua_ships: { name: "string", ua_pirate_id: "integer" },
   uahm_articles: { title: "string" },
   uahm_tags: { name: "string", uahm_article_id: "integer" },
 } as const;
@@ -1113,299 +1099,152 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("should add a proc to nested attributes options", () => {
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
-    registerModel("Comment", Comment);
-    registerModel("Post", Post);
-    const rejectFn = (attrs: Record<string, unknown>) => !attrs.body;
-    acceptsNestedAttributesFor(Post, "comments", { rejectIf: rejectFn });
-    const configs = (Post as any)._nestedAttributeConfigs;
-    const commentConfig = configs.find((c: any) => c.associationName === "comments");
-    expect(commentConfig.options.rejectIf).toBe(rejectFn);
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    const rejectFn = (attrs: Record<string, unknown>) => !attrs.name;
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: rejectFn });
+    const configs = (CanonicalPirate as any)._nestedAttributeConfigs;
+    const birdsConfig = configs.find((c: any) => c.associationName === "birds");
+    expect(birdsConfig.options.rejectIf).toBe(rejectFn);
   });
 
   it("should not build a new record using reject all even if destroy is given", async () => {
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
-    registerModel("Comment", Comment);
-    registerModel("Post", Post);
-    acceptsNestedAttributesFor(Post, "comments", { rejectIf: () => true });
-    const post = await Post.create({ title: "Test" });
-    assignNestedAttributes(post, "comments", [{ body: "", _destroy: false }]);
-    await post.save();
-    const comments = await Comment.where({ post_id: post.id }).toArray();
-    expect(comments.length).toBe(0);
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: () => true });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
+    assignNestedAttributes(pirate, "birds", [{ name: "", _destroy: false }]);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(0);
   });
 
   it("should not build a new record if reject all blank returns false", async () => {
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
-    registerModel("Comment", Comment);
-    registerModel("Post", Post);
-    acceptsNestedAttributesFor(Post, "comments", {
-      rejectIf: (attrs) => !attrs.body || attrs.body === "",
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
+      rejectIf: (attrs) => !attrs.name || attrs.name === "",
     });
-    const post = await Post.create({ title: "Test" });
-    assignNestedAttributes(post, "comments", [{ body: "" }]);
-    await post.save();
-    const comments = await Comment.where({ post_id: post.id }).toArray();
-    expect(comments.length).toBe(0);
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
+    assignNestedAttributes(pirate, "birds", [{ name: "" }]);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(0);
   });
 
   it("should raise an ArgumentError for non existing associations", () => {
-    class Plain extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(() => acceptsNestedAttributesFor(Plain, "nonExistent")).toThrow(/No association found/);
+    registerModel(CanonicalPirate);
+    expect(() => acceptsNestedAttributesFor(CanonicalPirate, "honesty")).toThrow(
+      /No association found/,
+    );
   });
   it("should raise an UnknownAttributeError for non existing nested attributes", async () => {
-    class UAShip extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("ua_pirate_id", "integer");
-      }
-    }
-    class UAPirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasOne.call(UAPirate, "uaShip", {
-      className: "UAShip",
-      foreignKey: "ua_pirate_id",
-    });
-    registerModel("UAShip", UAShip);
-    registerModel("UAPirate", UAPirate);
-    acceptsNestedAttributesFor(UAPirate, "uaShip");
-    const pirate = await UAPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "uaShip", [{ name: "Black Pearl", nonexistent: "boom" }]);
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+    acceptsNestedAttributesFor(CanonicalPirate, "ship");
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
+    assignNestedAttributes(pirate, "ship", [{ name: "Black Pearl", sail: true }]);
     await expect(pirate.save()).rejects.toThrow(/unknown attribute/);
   });
 
-  it("a model should respond to underscore destroy and return if it is marked for destruction", () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const item = new Item({ name: "test" });
-    markForDestruction(item);
-    expect(isMarkedForDestruction(item)).toBe(true);
+  it("a model should respond to underscore destroy and return if it is marked for destruction", async () => {
+    registerModel(CanonicalShip);
+    const ship = await CanonicalShip.create({ name: "Nights Dirty Lightning" });
+    markForDestruction(ship);
+    expect(isMarkedForDestruction(ship)).toBe(true);
   });
 
   it("reject if method without arguments", async () => {
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
-    registerModel("Comment", Comment);
-    registerModel("Post", Post);
-    acceptsNestedAttributesFor(Post, "comments", { rejectIf: () => true });
-    const post = await Post.create({ title: "Test" });
-    assignNestedAttributes(post, "comments", [{ body: "hello" }]);
-    await post.save();
-    const comments = await Comment.where({ post_id: post.id }).toArray();
-    expect(comments.length).toBe(0);
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: () => true });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
+    assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(0);
   });
 
   it("reject if method with arguments", async () => {
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
-    registerModel("Comment", Comment);
-    registerModel("Post", Post);
-    acceptsNestedAttributesFor(Post, "comments", { rejectIf: (attrs) => attrs.body === "spam" });
-    const post = await Post.create({ title: "Test" });
-    assignNestedAttributes(post, "comments", [{ body: "spam" }, { body: "legit" }]);
-    await post.save();
-    const comments = await Comment.where({ post_id: post.id }).toArray();
-    expect(comments.length).toBe(1);
-    expect(comments[0].body).toBe("legit");
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
+      rejectIf: (attrs) => attrs.name === "spam",
+    });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
+    assignNestedAttributes(pirate, "birds", [{ name: "spam" }, { name: "legit" }]);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
+    expect(birds[0].name).toBe("legit");
   });
 
   it("reject if with indifferent keys", async () => {
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
-    registerModel("Comment", Comment);
-    registerModel("Post", Post);
-    acceptsNestedAttributesFor(Post, "comments", { rejectIf: (attrs) => attrs.body === "reject" });
-    const post = await Post.create({ title: "Test" });
-    assignNestedAttributes(post, "comments", { "0": { body: "reject" }, "1": { body: "keep" } });
-    await post.save();
-    const comments = await Comment.where({ post_id: post.id }).toArray();
-    expect(comments.length).toBe(1);
-    expect(comments[0].body).toBe("keep");
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
+      rejectIf: (attrs) => attrs.name === "reject",
+    });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
+    assignNestedAttributes(pirate, "birds", { "0": { name: "reject" }, "1": { name: "keep" } });
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
+    expect(birds[0].name).toBe("keep");
   });
 
   it("reject if with a proc which returns true always for has one", async () => {
-    class Ship extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
-    registerModel("Ship", Ship);
-    registerModel("Pirate", Pirate);
-    acceptsNestedAttributesFor(Pirate, "ship", { rejectIf: () => true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+    acceptsNestedAttributesFor(CanonicalPirate, "ship", { rejectIf: () => true });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "ship", [{ name: "Rejected" }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await CanonicalShip.where({ pirate_id: pirate.id }).toArray();
     expect(ships.length).toBe(0);
   });
 
   it("reuse already built new record", () => {
-    class Ship extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
-    registerModel("Ship", Ship);
-    registerModel("Pirate", Pirate);
-    acceptsNestedAttributesFor(Pirate, "ship");
-    const pirate = new Pirate();
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+    acceptsNestedAttributesFor(CanonicalPirate, "ship");
+    const pirate = new CanonicalPirate();
     const shipBuiltFirst = (pirate.association("ship") as any).build();
     (pirate as any).shipAttributes = { name: "Ship 1" };
     expect((pirate.association("ship") as any).target).toBe(shipBuiltFirst);
   });
   it("do not allow assigning foreign key when reusing existing new record", async () => {
-    class Ship extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
-    registerModel("Ship", Ship);
-    registerModel("Pirate", Pirate);
-    acceptsNestedAttributesFor(Pirate, "ship");
-    const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+    acceptsNestedAttributesFor(CanonicalPirate, "ship");
+    const pirate = await CanonicalPirate.create({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
     (pirate.association("ship") as any).build();
     (pirate as any).shipAttributes = { name: "Ship 1", pirate_id: (pirate.id as number) + 1 };
     expect((pirate.association("ship") as any).target.pirate_id).toBe(pirate.id);
   });
 
   it("reject if with a proc which returns true always for has many", async () => {
-    class Bird extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasMany.call(Pirate, "birds", { className: "Bird", foreignKey: "pirate_id" });
-    registerModel("Bird", Bird);
-    registerModel("Pirate", Pirate);
-    acceptsNestedAttributesFor(Pirate, "birds", { rejectIf: () => true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: () => true });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
     expect(birds.length).toBe(0);
   });
 
   it("reject if with blank nested attributes id", async () => {
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
-    registerModel("Comment", Comment);
-    registerModel("Post", Post);
-    acceptsNestedAttributesFor(Post, "comments", {});
-    const post = await Post.create({ title: "Test" });
-    assignNestedAttributes(post, "comments", [{ body: "hello", id: undefined }]);
-    await post.save();
-    const comments = await Comment.where({ post_id: post.id }).toArray();
-    expect(comments.length).toBe(1);
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", {});
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
+    assignNestedAttributes(pirate, "birds", [{ name: "Polly", id: undefined }]);
+    await pirate.save();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
   });
 
   it("first and array index zero methods return the same value when nested attributes are set to update existing record", async () => {
@@ -1421,76 +1260,50 @@ describe("TestNestedAttributesInGeneral", () => {
     expect((first as any).topic).toBe((zero as any).topic);
   });
   it("allows class to override setter and call super", async () => {
-    class OvShip extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("ov_pirate_id", "integer");
-      }
-    }
-    class OvPirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasMany.call(OvPirate, "ovShips", {
-      className: "OvShip",
-      foreignKey: "ov_pirate_id",
-    });
-    registerModel("OvShip", OvShip);
-    registerModel("OvPirate", OvPirate);
-    acceptsNestedAttributesFor(OvPirate, "ovShips");
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
 
     // Override by wrapping assignNestedAttributes — the caller can intercept and modify attrs
-    const pirate = await OvPirate.create({ catchphrase: "Arrr" });
-    const modifiedAttrs = [{ name: "Overridden Ship" }];
-    assignNestedAttributes(pirate, "ovShips", modifiedAttrs);
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
+    const modifiedAttrs = [{ name: "Overridden Bird" }];
+    assignNestedAttributes(pirate, "birds", modifiedAttrs);
     await pirate.save();
-    const ships = await OvShip.where({ ov_pirate_id: pirate.id }).toArray();
-    expect(ships.length).toBe(1);
-    expect(ships[0].name).toBe("Overridden Ship");
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    expect(birds.length).toBe(1);
+    expect(birds[0].name).toBe("Overridden Bird");
   });
   it("accepts nested attributes for can be overridden in subclasses", async () => {
-    class SubBird extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("sub_pirate_id", "integer");
-      }
-    }
-    class SubPirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasMany.call(SubPirate, "subBirds", {
-      className: "SubBird",
-      foreignKey: "sub_pirate_id",
-    });
-    registerModel("SubBird", SubBird);
-    registerModel("SubPirate", SubPirate);
-    acceptsNestedAttributesFor(SubPirate, "subBirds", { rejectIf: () => true });
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: () => true });
 
     // Parent class rejects all — verify it works
-    const parentPirate = await SubPirate.create({ catchphrase: "Parent" });
-    assignNestedAttributes(parentPirate, "subBirds", [{ name: "Rejected" }]);
+    const parentPirate = await CanonicalPirate.create({ catchphrase: "Parent" });
+    assignNestedAttributes(parentPirate, "birds", [{ name: "Rejected" }]);
     await parentPirate.save();
-    const parentBirds = await SubBird.where({ sub_pirate_id: parentPirate.id }).toArray();
+    const parentBirds = await CanonicalBird.where({ pirate_id: parentPirate.id }).toArray();
     expect(parentBirds.length).toBe(0);
 
     // Subclass re-declares with different options (no reject)
-    class SubSubPirate extends SubPirate {}
-    Associations.hasMany.call(SubSubPirate, "subBirds", {
-      className: "SubBird",
-      foreignKey: "sub_pirate_id",
-    });
-    registerModel("SubSubPirate", SubSubPirate);
+    class SubPirate extends CanonicalPirate {
+      static {
+        this.tableName = "pirates";
+        (this as any)._associations = ((CanonicalPirate as any)._associations ?? []).filter(
+          (a: any) => a.name !== "birds",
+        );
+        this.hasMany("birds", { className: "Bird", foreignKey: "pirate_id" });
+      }
+    }
+    registerModel("SubPirate", SubPirate);
     // Override: subclass has its own config array
-    (SubSubPirate as any)._nestedAttributeConfigs = [];
-    acceptsNestedAttributesFor(SubSubPirate, "subBirds", { rejectIf: () => false });
+    (SubPirate as any)._nestedAttributeConfigs = [];
+    acceptsNestedAttributesFor(SubPirate, "birds", { rejectIf: () => false });
 
-    const pirate = await SubSubPirate.create({ catchphrase: "Yo" });
-    assignNestedAttributes(pirate, "subBirds", [{ name: "Polly" }]);
+    const pirate = await SubPirate.create({ catchphrase: "Yo" });
+    assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
-    const birds = await SubBird.where({ sub_pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
     expect(birds.length).toBe(1);
   });
   it("should not create duplicates with create with", async () => {
@@ -1519,126 +1332,69 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("should build a new record if reject all blank does not return false", async () => {
-    class NBird1 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("npirate1_id", "integer");
-      }
-    }
-    class NPirate1 extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasMany.call(NPirate1, "nBird1s", {
-      className: "NBird1",
-      foreignKey: "npirate1_id",
-    });
-    acceptsNestedAttributesFor(NPirate1, "nBird1s", {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
       rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
     });
-    registerModel(NBird1);
-    registerModel(NPirate1);
 
-    const pirate = await NPirate1.create({ catchphrase: "Savvy?" });
-    assignNestedAttributes(pirate, "nBird1s", [{ name: "Tweetie" }]);
+    const pirate = await CanonicalPirate.create({ catchphrase: "Savvy?" });
+    assignNestedAttributes(pirate, "birds", [{ name: "Tweetie" }]);
     await pirate.save();
 
-    const birds = await NBird1.where({ npirate1_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
     expect(birds.length).toBe(1);
     expect((birds[0] as any).name).toBe("Tweetie");
   });
 
   it("should disable allow destroy by default", async () => {
-    class NShip2 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("npirate2_id", "integer");
-      }
-    }
-    class NPirate2 extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    Associations.hasMany.call(NPirate2, "nShip2s", {
-      className: "NShip2",
-      foreignKey: "npirate2_id",
-    });
-    acceptsNestedAttributesFor(NPirate2, "nShip2s");
-    registerModel(NShip2);
-    registerModel(NPirate2);
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds");
 
-    const pirate = await NPirate2.create({ catchphrase: "Savvy?" });
-    const ship = await NShip2.create({ name: "Night Lightning", npirate2_id: pirate.id });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Savvy?" });
+    const bird = await CanonicalBird.create({ name: "Night Lightning", pirate_id: pirate.id });
 
-    assignNestedAttributes(pirate, "nShip2s", [{ id: ship.id, _destroy: true }]);
+    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true }]);
     await pirate.save();
 
-    const found = await NShip2.findBy({ id: ship.id });
+    const found = await CanonicalBird.findBy({ id: bird.id });
     expect(found).not.toBeNull();
   });
 
   it("destroy works independent of reject if", async () => {
-    class NTagF extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("narticleF_id", "integer");
-      }
-    }
-    class NArticleF extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(NArticleF, "nTagFs", {
-      className: "NTagF",
-      foreignKey: "narticleF_id",
-    });
-    acceptsNestedAttributesFor(NArticleF, "nTagFs", {
+    registerModel(Human);
+    registerModel(Interest);
+    acceptsNestedAttributesFor(Human, "interests", {
       allowDestroy: true,
       rejectIf: () => true,
     });
-    registerModel(NTagF);
-    registerModel(NArticleF);
 
-    const article = await NArticleF.create({ title: "Test" });
-    const tag = await NTagF.create({ name: "ruby", narticleF_id: article.id });
+    const human = await Human.create({ name: "Jon" });
+    const interest = await Interest.create({ topic: "the ladies", human_id: human.id });
 
-    assignNestedAttributes(article, "nTagFs", [{ id: tag.id, _destroy: true }]);
-    await article.save();
+    assignNestedAttributes(human, "interests", [{ id: interest.id, _destroy: true }]);
+    await human.save();
 
-    const found = await NTagF.findBy({ id: tag.id });
+    const found = await Interest.findBy({ id: interest.id });
     expect(found).toBeNull();
   });
 
   it("reject if is not short circuited if allow destroy is false", async () => {
-    class NPart3 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("nboat3_id", "integer");
-      }
-    }
-    class NBoat3 extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(NBoat3, "nPart3s", { className: "NPart3", foreignKey: "nboat3_id" });
-    acceptsNestedAttributesFor(NBoat3, "nPart3s", {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
       rejectIf: () => true,
       allowDestroy: false,
     });
-    registerModel(NPart3);
-    registerModel(NBoat3);
 
-    const boat = await NBoat3.create({ name: "SS Test" });
-    const part = await NPart3.create({ name: "Mast", nboat3_id: boat.id });
+    const pirate = await CanonicalPirate.create({ catchphrase: "Savvy?" });
+    const bird = await CanonicalBird.create({ name: "Mast", pirate_id: pirate.id });
 
-    assignNestedAttributes(boat, "nPart3s", [{ id: part.id, _destroy: true, name: "Mast" }]);
-    await boat.save();
+    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true, name: "Mast" }]);
+    await pirate.save();
 
-    const found = await NPart3.findBy({ id: part.id });
+    const found = await CanonicalBird.findBy({ id: bird.id });
     expect(found).not.toBeNull();
   });
 
