@@ -891,9 +891,14 @@ export function buildWhereClause(
       const adapter = connectionFor((this as any)._modelClass);
       for (const [name, value] of Object.entries(namedBinds)) {
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const replacement = Array.isArray(value)
-          ? value.map((v) => adapter.quote(v)).join(", ")
-          : adapter.quote(value);
+        // A Relation bind inlines its SQL as a subquery rather than being
+        // quoted as a scalar — mirrors Rails' Arel-node branch in
+        // `replace_named_bind_variables` (sanitization.rb).
+        const replacement = isRelationLike(value)
+          ? (value as { toSql(): string }).toSql()
+          : Array.isArray(value)
+            ? value.map((v) => adapter.quote(v)).join(", ")
+            : adapter.quote(value);
         // Named-bind substitution on a user-supplied SQL fragment, not an arel
         // AST — mirrors Rails `sanitize_sql` → `replace_named_bind_variables`
         // (sanitization.rb), which likewise `gsub`s `:name` tokens with quoted
@@ -1640,6 +1645,28 @@ export function buildCastValue(name: string, value: unknown): Attribute {
   return Attribute.withCastValue(name, value, new ValueType());
 }
 
+/**
+ * Normalize a bind value before handing it to `BoundSqlLiteral`. Mirrors Rails'
+ * `build_bound_sql_literal` (query_methods.rb): Arel nodes are rendered to SQL,
+ * and Relation-like values (which respond to `toSql`/`toArel` but are not Arel
+ * nodes) are inlined as a `SqlLiteral` so `where("id IN (?)", SomeRelation)`
+ * produces a subquery rather than reaching `visitBindValue`'s `quote()`.
+ * @internal
+ */
+function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
+  if (value instanceof Nodes.Node) {
+    return arelSql(this._modelClass.connection.toSql(value));
+  }
+  if (
+    value != null &&
+    typeof value === "object" &&
+    (typeof (value as any).toArel === "function" || typeof (value as any).toSql === "function")
+  ) {
+    return arelSql((value as any).toSql());
+  }
+  return value;
+}
+
 /** @internal */
 export function buildNamedBoundSqlLiteral(
   this: QueryMethodsHost,
@@ -1648,11 +1675,7 @@ export function buildNamedBoundSqlLiteral(
 ): Nodes.BoundSqlLiteral {
   const namedBinds: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
-    if (value instanceof Nodes.Node) {
-      namedBinds[key] = arelSql(this._modelClass.connection.toSql(value));
-    } else {
-      namedBinds[key] = value;
-    }
+    namedBinds[key] = normalizeBoundValue.call(this, value);
   }
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, [], namedBinds);
@@ -1667,12 +1690,7 @@ export function buildBoundSqlLiteral(
   statement: string,
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
-  const positionalBinds = values.map((value) => {
-    if (value instanceof Nodes.Node) {
-      return arelSql(this._modelClass.connection.toSql(value));
-    }
-    return value;
-  });
+  const positionalBinds = values.map((value) => normalizeBoundValue.call(this, value));
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, positionalBinds, {});
   } catch (e: any) {
