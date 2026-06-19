@@ -2604,12 +2604,13 @@ function wrapCollectionProxy<T extends Base = Base>(
         };
       }
 
-      // Array-method delegation — mirrors Rails' CollectionProxy/Relation
-      // `delegate ... to: :records` (delegation.rb). Falls through here once
-      // the scope and model class don't respond, routing genuine `Array`
-      // methods (e.g. `categories.sort`) through the loaded target. Last in
-      // the trap, so it never shadows own/scope/model methods.
-      if (scopeVal === undefined) {
+      // Array-method delegation (sync path) — mirrors Rails' CollectionProxy
+      // `delegate ... to: :records` (delegation.rb). Only reached when the
+      // proxy is already loaded; the async/unloaded path is handled above by
+      // `delegateEnumerableMethod` (before scope lookup), which routes to the
+      // collection cache via `target.load()`. Placed after scope lookup so it
+      // never shadows own/scope/model methods.
+      if (scopeVal === undefined && target.loaded) {
         const arrayDelegate = delegateArrayMethod(prop, () => target.target);
         if (arrayDelegate) return arrayDelegate;
       }

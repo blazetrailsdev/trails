@@ -221,25 +221,49 @@ export function delegateArrayMethod(
 }
 
 /**
+ * Async Array-method delegation — same curated set as `delegateArrayMethod`,
+ * but forces a load first via `loadRecords()` before applying the Array method.
+ * Used for *unloaded* relations/proxies so that `sort`, `map`, etc. are always
+ * present (Rails `assert_respond_to` passes on unloaded targets) and calling
+ * them hydrates the records, mirroring Rails' `records` → `load` path.
+ * JS has no blocking IO, so the load-on-call path must be async.
+ *
+ * Returns a bound callable when `prop` names a delegated `Array.prototype`
+ * method, otherwise `undefined`.
+ */
+export function delegateArrayMethodAsync(
+  prop: string,
+  loadRecords: () => Promise<unknown[]>,
+): ((...args: any[]) => Promise<unknown>) | undefined {
+  if (!DELEGATED_ARRAY_METHODS.has(prop)) return undefined;
+  const arrayMethod = (Array.prototype as unknown as Record<string, unknown>)[prop];
+  if (typeof arrayMethod !== "function") return undefined;
+  return async (...args: any[]) => {
+    const records = await loadRecords();
+    return (arrayMethod as (...a: any[]) => unknown).apply([...records], args);
+  };
+}
+
+/**
  * Enumerable-method delegation — Rails' `Relation`/`CollectionProxy`
- * `include Enumerable`, so `Enumerable` methods that have no JS
- * `Array.prototype` analogue (and therefore aren't reachable through
- * `delegateArrayMethod`) are routed here. `partition` mirrors
- * `Enumerable#partition`: it splits the records into `[matched, unmatched]`
- * in a single pass, preserving order, and never mutates the underlying
- * records.
+ * `include Enumerable` plus `delegate ... to: :records` (delegation.rb).
+ * All delegated methods here are **async + self-loading**: they are present
+ * on an unloaded relation/proxy and force the load themselves via
+ * `loadRecords()`, mirroring Rails where `records` → `load` runs before
+ * enumeration. JS has no blocking IO, so the load-on-call path is async.
  *
- * Unlike `delegateArrayMethod`, these are returned regardless of whether the
- * relation is already loaded, and the returned callable is **async**: it
- * forces the load itself via `loadRecords()` before enumerating. This mirrors
- * Rails, where `Enumerable#partition` enumerates through `each` → `records`,
- * and `records` calls `load` before returning `@records` (relation.rb) — so
- * `partition` works on an unloaded relation/association and reads the rows the
- * DB actually holds rather than a stale/empty in-memory buffer. JS has no
- * blocking IO, so the only faithful way to "load first" is to return a Promise.
+ * Covers two surfaces:
+ *   - `partition` — a pure Enumerable method with no JS `Array.prototype`
+ *     analogue (returns `[matched, unmatched]` in one pass).
+ *   - DELEGATED_ARRAY_METHODS — the curated `delegate ... to: :records` set
+ *     (sort, map, join, …). These also have a sync path via `delegateArrayMethod`
+ *     used when records are already loaded; this async path covers the
+ *     unloaded case and must be checked *before* scope/model-class delegation
+ *     in `wrapCollectionProxy` so it routes to the collection cache, not the
+ *     underlying relation's records.
  *
- * Returns a bound callable when `prop` names a supported Enumerable method,
- * otherwise `undefined` so the caller can fall through to its own default.
+ * Returns a bound callable when `prop` names a supported method, otherwise
+ * `undefined` so the caller can fall through to its own default.
  */
 export function delegateEnumerableMethod(
   prop: string,
@@ -255,7 +279,8 @@ export function delegateEnumerableMethod(
       return [matched, unmatched];
     };
   }
-  return undefined;
+  // DELEGATED_ARRAY_METHODS: async path for unloaded targets.
+  return delegateArrayMethodAsync(prop, loadRecords);
 }
 
 export function wrapWithScopeProxy<T extends object>(rel: T): T {
@@ -295,22 +320,26 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
         };
       }
 
-      // Enumerable-method delegation (the `include Enumerable` mixin) — async
-      // and self-loading, so it's offered whether or not the relation is
-      // loaded (mirrors Rails: `partition` enumerates through `records`, which
-      // forces a load). `toArray()` loads then returns the rows.
-      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.toArray());
-      if (enumerableDelegate) return enumerableDelegate;
-
-      // Array-method delegation (delegation.rb `delegate ... to: :records`).
-      // Only when the relation is already loaded — these are synchronous, and
-      // JS can't block on the DB, so an unloaded relation keeps its `undefined`
-      // default rather than delegating against records that aren't here yet.
+      // Array-method delegation (sync path) — when already loaded, delegate
+      // synchronously against the in-memory records (delegation.rb
+      // `delegate ... to: :records`). Checked before the async/enumerable
+      // path so a loaded relation uses the fast sync route.
       if (target._loaded) {
         const records = () => target._records ?? [];
         const arrayDelegate = delegateArrayMethod(prop, records);
         if (arrayDelegate) return arrayDelegate;
       }
+        if (arrayDelegate) return arrayDelegate;
+      }
+
+      // Enumerable-method delegation — async + self-loading. Covers `partition`
+      // and all DELEGATED_ARRAY_METHODS on unloaded relations (mirrors Rails'
+      // `records` → `load` path). Always present so `assert_respond_to` passes.
+      // `toArray()` forces a load and returns the rows.
+      const enumerableDelegate = delegateEnumerableMethod(prop as string, () =>
+        (target as any).toArray(),
+      );
+      if (enumerableDelegate) return enumerableDelegate;
       return value;
     },
   });
