@@ -2,10 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Store } from "./cache/store.js";
 import { Entry } from "./cache/entry.js";
 
-// Minimal in-memory concrete subclass for testing Store base class behavior.
 class TestStore extends Store {
   private _data = new Map<string, Entry>();
-
   protected readEntry(key: string, _o: Record<string, unknown>): Entry | null {
     return this._data.get(key) ?? null;
   }
@@ -45,13 +43,8 @@ class TestStore extends Store {
   }
 }
 
-// =============================================================================
-// CacheBehaviorTest (mirrors cache_store_behavior.rb)
-// =============================================================================
-
 describe("CacheBehaviorTest", () => {
   let cache: TestStore;
-
   beforeEach(() => {
     cache = new TestStore();
   });
@@ -160,22 +153,16 @@ describe("CacheBehaviorTest", () => {
     cache.write("foo", 1);
     expect(cache.increment("foo")).toBe(2);
   });
-
   it("decrement", () => {
     cache.write("foo", 3);
     expect(cache.decrement("foo")).toBe(2);
   });
 });
 
-// =============================================================================
-// CacheStoreLoggerTest (mirrors cache_store_logger_test.rb)
-// =============================================================================
-
 describe("CacheStoreLoggerTest", () => {
   it("mute logging", () => {
     const cache = new TestStore();
     let wrote = false;
-    cache.write("foo", "bar");
     cache.mute(() => {
       wrote = true;
     });
@@ -183,10 +170,6 @@ describe("CacheStoreLoggerTest", () => {
     expect(cache.silence).toBe(false);
   });
 });
-
-// =============================================================================
-// CacheStoreNamespaceTest (mirrors cache_store_namespace_test.rb)
-// =============================================================================
 
 describe("CacheStoreNamespaceTest", () => {
   it("static namespace", () => {
