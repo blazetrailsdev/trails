@@ -13,6 +13,21 @@
  */
 
 /**
+ * Returns true for URL schemes that identify a remote libsql/Turso endpoint.
+ * Inlined here (rather than imported from sqlite/libsql.ts) so adapter-args
+ * does not transitively load the optional `libsql` native peer dependency.
+ */
+function isRemoteLibsqlUrl(url: string): boolean {
+  return (
+    url.startsWith("libsql://") ||
+    url.startsWith("https://") ||
+    url.startsWith("http://") ||
+    url.startsWith("wss://") ||
+    url.startsWith("ws://")
+  );
+}
+
+/**
  * Normalize adapter aliases to their canonical name.
  *
  *   postgres / postgresql          → postgresql
@@ -23,7 +38,6 @@
  * shape (their subclasses inherit it from `AbstractSQLite3Adapter`), so they
  * normalize to `sqlite` for argument building. This only affects
  * constructor-argument shape; class resolution still keys off the raw name.
- * (`expo-sqlite` is not yet an openable adapter — see connection-adapters.ts.)
  */
 export function normalizeAdapterName(name: string): string {
   switch (name) {
@@ -38,6 +52,7 @@ export function normalizeAdapterName(name: string): string {
     case "node-sqlite":
     case "expo-sqlite":
     case "libsql":
+    case "libsql-remote":
       return "sqlite";
     default:
       return name;
@@ -46,7 +61,9 @@ export function normalizeAdapterName(name: string): string {
 
 /**
  * Strip the `sqlite[3]://` URL prefix, returning a bare filename
- * (`":memory:"`, path, or empty → `":memory:"`).
+ * (`":memory:"`, path, or empty → `":memory:"`). Remote libsql URLs
+ * (`libsql://`, `http(s)://`, `ws(s)://`) are passed through unchanged so the
+ * driver receives the full endpoint URL.
  */
 export function parseSqliteUrl(url: string): string {
   if (url.startsWith("sqlite3://") || url.startsWith("sqlite://")) {
@@ -78,17 +95,28 @@ export function buildAdapterArg(
   const url = configuration.url as string | undefined;
   const database = configuration.database as string | undefined;
   if (normalized === "sqlite") {
-    // Prefer an explicit `database` over `url` so caller-mutated configs
-    // (e.g. autoConnect rewriting the database for a per-worker slot, db:create
-    // swapping in a fresh database name) win over the original URL — matches
-    // the non-SQLite branch which only falls back to `url` when `database` is
-    // unset.
-    const filename = parseSqliteUrl(database || url || ":memory:");
+    // Remote libsql URLs (`libsql://`, `https://`, etc.) in `url` take
+    // precedence over `database` — the URL is the connection endpoint, not a
+    // local filename. For local adapters, prefer `database` over `url` so
+    // caller-mutated configs (e.g. autoConnect per-worker slots) win.
+    const resolvedUrl = url !== undefined && isRemoteLibsqlUrl(url) ? url : undefined;
+    // Use `||` (not `??`) so empty-string database/url values fall through to
+    // the next candidate, matching the pre-existing behaviour of this function.
+    const filename = parseSqliteUrl(resolvedUrl || database || url || ":memory:");
     // Keep only the SQLite3Adapter constructor's `options` keys so we don't
     // forward unrelated database.yml entries (pool, host, etc.) into the
     // options object. The adapter ignores unknown keys today but accepting
     // them here would lock in a foot-gun.
-    const { readonly, driver, pragmas, strict, statementLimit, preparedStatements } = configuration;
+    const {
+      readonly,
+      driver,
+      pragmas,
+      strict,
+      statementLimit,
+      preparedStatements,
+      driverOptions,
+      authToken,
+    } = configuration;
     const options: Record<string, unknown> = {};
     if (readonly !== undefined) options.readonly = readonly;
     if (driver !== undefined) options.driver = driver;
@@ -96,6 +124,14 @@ export function buildAdapterArg(
     if (strict !== undefined) options.strict = strict;
     if (statementLimit !== undefined) options.statementLimit = statementLimit;
     if (preparedStatements !== undefined) options.preparedStatements = preparedStatements;
+    if (driverOptions !== undefined) options.driverOptions = driverOptions;
+    // Merge authToken into any pre-existing driverOptions so callers that pass
+    // both { authToken, driverOptions: { tls: true } } don't lose the latter.
+    if (authToken !== undefined)
+      options.driverOptions = {
+        ...(options.driverOptions as Record<string, unknown> | undefined),
+        authToken,
+      };
     return Object.keys(options).length > 0 ? [filename, options] : [filename];
   }
   if (url && database === undefined) {

@@ -149,6 +149,62 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
   return new Database(config.database, opts);
 }
 
+/**
+ * Returns true when the URL scheme identifies a remote libsql/Turso endpoint
+ * (`libsql://`, `http://`, `https://`, `ws://`, `wss://`). Used by the remote
+ * driver and config helpers to distinguish network from local-file configs.
+ */
+export function isRemoteLibsqlUrl(url: string): boolean {
+  return (
+    url.startsWith("libsql://") ||
+    url.startsWith("https://") ||
+    url.startsWith("http://") ||
+    url.startsWith("wss://") ||
+    url.startsWith("ws://")
+  );
+}
+
+/** @internal */
+function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
+  // driverOptions carries authToken (and any other driver-specific keys).
+  // Unlike the local openDatabase, we don't force readonly here — remote
+  // Turso connections don't expose a read-only open mode.
+  const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
+  if (config.timeout !== undefined) opts.timeout = config.timeout;
+  return new Database(config.database, opts);
+}
+
+const remoteCapabilities: SqliteDriverCapabilities = {
+  inProcessSync: false,
+  streaming: false,
+  loadExtension: false,
+  concurrentStatements: false,
+  foreignKeysOnByDefault: false,
+  immediateTransactions: false,
+};
+
+/**
+ * libsql driver for remote Turso connections (`libsql://`, `https://`, etc.).
+ *
+ * Remote handles are network-backed; they must go through the async-open path
+ * (`AbstractSQLite3Adapter.openAsync()` / `completeAsyncConnect()`). The driver
+ * intentionally omits `openSync` so the abstract base defers to `connectAsync`.
+ * `restoreFromPath` and `databaseExists` are omitted — remote databases have no
+ * local-file counterpart.
+ *
+ * `connectAsync` issues `SELECT sqlite_version()` and `PRAGMA encoding` over
+ * the network during open. Turso supports both, so the happy path is reliable;
+ * a network error surfaces as a `DatabaseConnectionError` at connect time.
+ */
+export const libsqlRemoteDriver: SqliteDriver = {
+  name: "libsql-remote",
+  capabilities: remoteCapabilities,
+
+  open(config: SqliteOpenConfig): Promise<SqliteConnection> {
+    return Promise.resolve(new LibsqlConnection(openRemoteDatabase(config)));
+  },
+};
+
 const capabilities: SqliteDriverCapabilities = {
   inProcessSync: true,
   streaming: true,
