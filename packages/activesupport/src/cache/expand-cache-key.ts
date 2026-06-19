@@ -7,12 +7,24 @@ export function expandCacheKey(key: unknown, namespace?: string | symbol): strin
   return `${prefix}${versionPrefix}${expandKey(key)}`;
 }
 
+type CacheKeyable = {
+  cacheKeyWithVersion?: () => unknown;
+  cacheKey?: () => unknown;
+};
+
 function expandKey(key: unknown): string {
   if (key === null || key === undefined) return "";
   if (typeof key === "boolean") return String(key);
   if (typeof key === "object" && key !== null) {
-    if (typeof (key as { cacheKey?: unknown }).cacheKey === "function") {
-      return String((key as { cacheKey(): unknown }).cacheKey());
+    const obj = key as CacheKeyable;
+    if (typeof obj.cacheKeyWithVersion === "function") {
+      return String(obj.cacheKeyWithVersion());
+    }
+    if (typeof obj.cacheKey === "function") {
+      return String(obj.cacheKey());
+    }
+    if (Array.isArray(key)) {
+      return key.map(expandKey).join("/");
     }
     if (Symbol.iterator in (key as object)) {
       return [...(key as Iterable<unknown>)].map(expandKey).join("/");
