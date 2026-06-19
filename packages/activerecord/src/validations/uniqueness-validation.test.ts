@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, StrictValidationFailed } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 import { adapterType } from "../test-adapter.js";
 import { itIfSupports } from "../test-helpers/supports.js";
@@ -1629,5 +1629,31 @@ describe("UniquenessValidationTest", () => {
     persisted.name = "taken";
     expect(await persisted.save()).toBe(false);
     expect(persisted.errors.on("name")).toBeTruthy();
+  });
+
+  it("validatesUniqueness with strict raises StrictValidationFailed on a duplicate", async () => {
+    class Email extends Base {
+      static {
+        this.attribute("address", "string");
+        this.validatesUniqueness("address", { strict: true });
+      }
+    }
+    await Email.create({ address: "dup@example.com" });
+
+    const dup = new Email({ address: "dup@example.com" });
+    await expect(dup.save()).rejects.toThrow(StrictValidationFailed);
+  });
+
+  it("validates with uniqueness and strict raises StrictValidationFailed on a duplicate", async () => {
+    class Username extends Base {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { uniqueness: true, strict: true });
+      }
+    }
+    await Username.create({ name: "taken" });
+
+    const dup = new Username({ name: "taken" });
+    await expect(dup.save()).rejects.toThrow(StrictValidationFailed);
   });
 });

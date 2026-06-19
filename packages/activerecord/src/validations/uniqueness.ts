@@ -119,6 +119,7 @@ export class UniquenessValidator extends EachValidator {
 
     const errorOpts: Record<string, unknown> = { value };
     if (opts?.message != null) errorOpts.message = opts.message;
+    if (opts?.strict != null) errorOpts.strict = opts.strict;
 
     const validationPromise = (async () => {
       let [relation] = await buildRelation(
