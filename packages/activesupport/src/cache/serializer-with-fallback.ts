@@ -136,7 +136,10 @@ const messagePackWithFallback: Serializer = {
 
   dumped(dumped: unknown): boolean {
     return (
-      typeof dumped === "string" && dumped.charCodeAt(0) === 0xcc && dumped.charCodeAt(1) === 0x80
+      this.isAvailable!() &&
+      typeof dumped === "string" &&
+      dumped.charCodeAt(0) === 0xcc &&
+      dumped.charCodeAt(1) === 0x80
     );
   },
 
@@ -181,8 +184,6 @@ export const SerializerWithFallback = {
   SERIALIZERS,
 
   load: sharedLoad,
-
-  marshalLoad,
 
   get(format: string): Serializer & { load(dumped: unknown): unknown } {
     const s = SERIALIZERS[format];

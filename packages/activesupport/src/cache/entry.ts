@@ -73,9 +73,12 @@ export class Entry {
   // size when the data is compressed. Mirrors Rails Entry#bytesize
   // (entry.rb:60-69); the non-String branch is memoized like Rails' `@s`.
   bytesize(): number {
-    // A compressed entry stores a deflated latin1 string in _value; its byte
-    // size is its character count (one byte per latin1 char). Re-encoding
-    // through coder.dump would JSON-escape binary bytes and over-report.
+    // Rails measures `Marshal.dump(@value).bytesize` for compressed non-String
+    // values (entry.rb:65-68), which includes Marshal framing overhead. trails
+    // has no Marshal, so we return the raw compressed byte count instead
+    // (latin1 string length = byte count). This is a tracked deviation for
+    // non-String compressed values (nil/bool/Numeric are never compressed per
+    // entry.rb:79-82, so only Array/Object hits this branch in practice).
     if (this._compressed) return (this._value as string).length;
     const value = this.value;
     if (value == null) {
