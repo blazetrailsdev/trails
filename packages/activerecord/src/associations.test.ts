@@ -730,9 +730,7 @@ describe("PreloaderTest", () => {
     const david2 = await Author.create({ name: "David" });
     const bob = await Author.create({ name: "Bob" });
     const davidPost = await Post.create({ author_id: david.id, title: "Post", body: "body" });
-    // Both bodies contain "david" (lowercase) so they match the LIKE/ILIKE scope
-    // on all three CI databases.
-    const comment1 = await Comment.create({ post_id: davidPost.id, body: "Hi david!" });
+    const comment1 = await Comment.create({ post_id: davidPost.id, body: "Hi David!" });
     const comment2 = await Comment.create({
       post_id: davidPost.id,
       body: "This comment mentions david",
