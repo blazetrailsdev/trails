@@ -238,8 +238,14 @@ export function collectionCacheKey(
 
 // Matches DB timestamp strings in the form "YYYY-MM-DD HH:MM:SS" or
 // "YYYY-MM-DD HH:MM:SS.ffffff" — the only shapes rawTimestampToCacheVersion
-// can reliably strip-and-pad to a 20-char usec key.
-const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/;
+// can reliably strip-and-pad to a 20-char usec key. Rails relies on the
+// connection returning microsecond (≤6 fractional digit) strings; some trails
+// adapters serialize timestamps with sub-microsecond precision (e.g. SQLite
+// stores nanoseconds), which rawTimestampToCacheVersion would NOT truncate
+// (Rails' helper only pads, never trims), yielding a >20-char key. Capping the
+// fractional part at 6 digits keeps the fast path only when it produces the
+// same value the type-casting reader would; longer strings fall through to it.
+const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
 
 /**
  * Returns true when the raw DB timestamp string can be converted directly

@@ -4,7 +4,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 
 // Mirrors Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars).
@@ -99,32 +99,41 @@ describe("CacheKeyTest", () => {
     );
   });
 
-  it("cache_version is the same when it comes from the DB or from the user", async () => {
-    const CacheMeWithVersion = cacheMeWithVersion();
-    const record = await CacheMeWithVersion.create({});
-    const recordFromDb = await CacheMeWithVersion.find(record.id);
-    const spy = vi.spyOn(recordFromDb, "readAttribute");
-    const fromDb = recordFromDb.cacheVersion();
-    expect(spy).not.toHaveBeenCalledWith("updated_at");
-    expect(fromDb).toBe(record.cacheVersion());
-  });
+  // Rails skips these on Mysql2/Trilogy/PostgreSQL — those adapters don't return
+  // a raw string for updated_at_before_type_cast, so the fast path can't fire and
+  // the reader is always called.
+  it.skipIf(adapterType !== "sqlite")(
+    "cache_version is the same when it comes from the DB or from the user",
+    async () => {
+      const CacheMeWithVersion = cacheMeWithVersion();
+      const record = await CacheMeWithVersion.create({});
+      const recordFromDb = await CacheMeWithVersion.find(record.id);
+      const spy = vi.spyOn(recordFromDb, "readAttribute");
+      const fromDb = recordFromDb.cacheVersion();
+      expect(spy).not.toHaveBeenCalledWith("updated_at");
+      expect(fromDb).toBe(record.cacheVersion());
+    },
+  );
 
-  it("cache_version does not truncate zeros when timestamp ends in zeros", async () => {
-    const CacheMeWithVersion = cacheMeWithVersion();
-    const record = await CacheMeWithVersion.create({});
-    // Rails uses `travel_to beginning_of_day` so the DB stores a zeros-ending
-    // timestamp. We persist one directly (skipping the touch callback) so the
-    // reloaded record's raw before-type-cast string ends in zeros and exercises
-    // the fast path's zero-padding.
-    await record.updateColumns({
-      updated_at: Temporal.Instant.from("2016-11-12T00:00:00.000000Z"),
-    });
-    const recordFromDb = await CacheMeWithVersion.find(record.id);
-    const spy = vi.spyOn(recordFromDb, "readAttribute");
-    const fromDb = recordFromDb.cacheVersion();
-    expect(spy).not.toHaveBeenCalledWith("updated_at");
-    expect(fromDb).toBe("20161112000000000000");
-  });
+  it.skipIf(adapterType !== "sqlite")(
+    "cache_version does not truncate zeros when timestamp ends in zeros",
+    async () => {
+      const CacheMeWithVersion = cacheMeWithVersion();
+      const record = await CacheMeWithVersion.create({});
+      // Rails uses `travel_to beginning_of_day` so the DB stores a zeros-ending
+      // timestamp. We persist one directly (skipping the touch callback) so the
+      // reloaded record's raw before-type-cast string ends in zeros and exercises
+      // the fast path's zero-padding.
+      await record.updateColumns({
+        updated_at: Temporal.Instant.from("2016-11-12T00:00:00.000000Z"),
+      });
+      const recordFromDb = await CacheMeWithVersion.find(record.id);
+      const spy = vi.spyOn(recordFromDb, "readAttribute");
+      const fromDb = recordFromDb.cacheVersion();
+      expect(spy).not.toHaveBeenCalledWith("updated_at");
+      expect(fromDb).toBe("20161112000000000000");
+    },
+  );
 
   it("cache_version calls updated_at when the value is generated at create time", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
@@ -138,16 +147,19 @@ describe("CacheKeyTest", () => {
     expect(record.cacheVersion()).toBe(usec(record.readAttribute("updated_at")));
   });
 
-  it("cache_version does NOT call updated_at when value is from the database", async () => {
-    const CacheMeWithVersion = cacheMeWithVersion();
-    const record = await CacheMeWithVersion.create({});
-    const recordFromDb = await CacheMeWithVersion.find(record.id);
-    const expected = usec(recordFromDb.readAttribute("updated_at"));
-    const spy = vi.spyOn(recordFromDb, "readAttribute");
-    const version = recordFromDb.cacheVersion();
-    expect(spy).not.toHaveBeenCalledWith("updated_at");
-    expect(version).toBe(expected);
-  });
+  it.skipIf(adapterType !== "sqlite")(
+    "cache_version does NOT call updated_at when value is from the database",
+    async () => {
+      const CacheMeWithVersion = cacheMeWithVersion();
+      const record = await CacheMeWithVersion.create({});
+      const recordFromDb = await CacheMeWithVersion.find(record.id);
+      const expected = usec(recordFromDb.readAttribute("updated_at"));
+      const spy = vi.spyOn(recordFromDb, "readAttribute");
+      const version = recordFromDb.cacheVersion();
+      expect(spy).not.toHaveBeenCalledWith("updated_at");
+      expect(version).toBe(expected);
+    },
+  );
 
   it("cache_version does call updated_at when it is assigned via a Time object", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
