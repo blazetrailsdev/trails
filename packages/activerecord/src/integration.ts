@@ -13,6 +13,7 @@ interface Identifiable {
   isNewRecord(): boolean;
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
+  readAttributeBeforeTypeCast(name: string): unknown;
 }
 
 // ──────────────────────────────────────────────
@@ -148,9 +149,16 @@ export function cacheVersion(this: Identifiable): string | null {
   if (!klass.cacheVersioning) return null;
 
   if ((this as any).hasAttribute?.("updated_at")) {
-    // Mirrors Rails integration.rb:101-107 — reads `updated_at` via the
-    // alias-aware reader, so models aliasing updated_at to a real column
-    // (e.g. legacy_updated_at) still resolve their cache version.
+    // Mirrors Rails integration.rb:100-107. Fast path: when `updated_at` is
+    // still the raw DB string (not type-cast, not user-assigned),
+    // canUseFastCacheVersion reformats it WITHOUT invoking the `updated_at`
+    // type-casting reader. Only user-assigned values fall through to the
+    // alias-aware reader (so models aliasing updated_at to a real column
+    // still resolve their cache version).
+    const raw = this.readAttributeBeforeTypeCast("updated_at");
+    if (canUseFastCacheVersion(this, raw)) {
+      return rawTimestampToCacheVersion(raw as string);
+    }
     const val = this.readAttribute("updated_at");
     if (val instanceof Temporal.Instant) {
       const fmt: string = klass.cacheTimestampFormat ?? "usec";
