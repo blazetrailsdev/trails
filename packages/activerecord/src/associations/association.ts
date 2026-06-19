@@ -61,17 +61,18 @@ export class Association {
     // inverse-of misses). Delegates to
     // `ThroughReflection#checkValidityBang` via a memoized helper.
     validateThroughReflection(owner.constructor as typeof Base, reflection.name);
+    // Rails' `check_validity! → klass → compute_class` raises NameError
+    // synchronously in the constructor, so `record.association(:name)` itself
+    // throws rather than `load_target`. Mirrors association.rb:56-58.
+    this.checkKlass();
   }
 
   /**
-   * Eagerly resolve the target class name — mirrors the Rails path
-   * `check_validity! → klass → compute_class` that raises NameError the first
-   * time an association is loaded (not merely accessed for metadata operations
-   * like setTarget, isLoaded, etc.).
-   *
-   * Called at the top of loadTarget() so new records without FK values still
-   * raise when load is attempted. Skipped for polymorphic, through, and
-   * anonymous-class associations (HABTM join model side).
+   * Resolve the target class name eagerly — mirrors the Rails path
+   * `check_validity! → klass → compute_class` (association.rb:56-58).
+   * Called from the constructor so `record.association(:name)` raises
+   * synchronously for unknown classes. Skipped for polymorphic, through,
+   * and anonymous-class associations (HABTM join model side).
    */
   protected checkKlass(): void {
     const opts = this.reflection.options as AssociationOptions & { anonymousClass?: unknown };
@@ -306,7 +307,6 @@ export class Association {
    * Mirrors: ActiveRecord::Associations::Association#load_target
    */
   async loadTarget(): Promise<Base | Base[] | null> {
-    this.checkKlass();
     if (this.isStaleTarget() || this.findTargetNeeded()) {
       const cached = this.doFindTarget();
       if (cached !== undefined) {

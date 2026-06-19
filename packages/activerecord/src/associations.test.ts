@@ -13,6 +13,7 @@ import {
   reflectOnAssociation,
   registerModel,
   ConfigurationError,
+  NameError,
 } from "./index.js";
 import { makeRange } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -2672,11 +2673,10 @@ describe("OverridingAssociationsTest", () => {
     expect(reflectOnAssociation(OaArgTest, "items")).not.toBeNull();
   });
 
-  it("associations raise with name error if associated to classes that do not exist", async () => {
+  it("associations raise with name error if associated to classes that do not exist", () => {
     // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:779-798.
-    // Rails raises NameError eagerly in Association#initialize → check_validity! → klass.
-    // trails raises at loadTarget() time — class resolution happens before findTargetNeeded()
-    // so new records without FK values still raise, matching the Rails test shape.
+    // Rails raises NameError synchronously in Association#initialize → check_validity! → klass,
+    // so record.association(:name) itself throws — not load_target.
     class ModelAssociatedToClassesThatDoNotExist extends Base {
       static {
         this._tableName = "accounts";
@@ -2686,15 +2686,9 @@ describe("OverridingAssociationsTest", () => {
       }
     }
     const record = new ModelAssociatedToClassesThatDoNotExist();
-    await expect(record.association("nonExistentHasOneClass").loadTarget()).rejects.toThrow(
-      /not found in registry/,
-    );
-    await expect(record.association("nonExistentBelongsToClass").loadTarget()).rejects.toThrow(
-      /not found in registry/,
-    );
-    await expect(record.association("nonExistentHasManyClasses").loadTarget()).rejects.toThrow(
-      /not found in registry/,
-    );
+    expect(() => record.association("nonExistentHasOneClass")).toThrow(NameError);
+    expect(() => record.association("nonExistentBelongsToClass")).toThrow(NameError);
+    expect(() => record.association("nonExistentHasManyClasses")).toThrow(NameError);
   });
 });
 

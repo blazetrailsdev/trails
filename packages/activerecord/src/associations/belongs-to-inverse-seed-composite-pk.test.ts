@@ -34,8 +34,12 @@ class CpkSeedChild extends Base {
 }
 
 describe("belongs_to inverse seeding with a composite-PK target", () => {
-  // Register only the child — the parent is deliberately left out of the
-  // registry to prove the seed path does not resolve the target class.
+  // Register both models — the constructor now calls checkKlass() (matching
+  // Rails' Association#initialize → check_validity! timing), so the target
+  // class must be in the registry when association() is first called.
+  // The regression being guarded here (staleState resolving from registry
+  // instead of from the held instance) is independent of registration.
+  registerModel(CompositePkParent);
   registerModel(CpkSeedChild);
 
   it("seeds the holder without resolving the target class from the registry", () => {
