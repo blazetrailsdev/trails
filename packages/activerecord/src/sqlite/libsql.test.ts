@@ -336,6 +336,25 @@ describe("buildAdapterArg — authToken threading", () => {
     expect(args).toHaveLength(1);
     expect(args[0]).toBe("libsql://mydb.turso.io");
   });
+
+  it("merges authToken into a pre-existing driverOptions object", () => {
+    const [, options] = buildAdapterArg("libsql-remote", {
+      url: "libsql://mydb.turso.io",
+      authToken: "tok",
+      driverOptions: { tls: true },
+    }) as [string, Record<string, unknown>];
+    const driverOpts = options.driverOptions as Record<string, unknown>;
+    expect(driverOpts.authToken).toBe("tok");
+    expect(driverOpts.tls).toBe(true);
+  });
+
+  it("forwards a raw driverOptions object when authToken is absent", () => {
+    const [, options] = buildAdapterArg("libsql-remote", {
+      url: "libsql://mydb.turso.io",
+      driverOptions: { tls: false },
+    }) as [string, Record<string, unknown>];
+    expect((options.driverOptions as Record<string, unknown>).tls).toBe(false);
+  });
 });
 
 const tursoUrl = typeof process !== "undefined" ? process.env["TURSO_DATABASE_URL"] : undefined;

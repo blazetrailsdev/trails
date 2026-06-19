@@ -190,6 +190,10 @@ const remoteCapabilities: SqliteDriverCapabilities = {
  * intentionally omits `openSync` so the abstract base defers to `connectAsync`.
  * `restoreFromPath` and `databaseExists` are omitted — remote databases have no
  * local-file counterpart.
+ *
+ * `connectAsync` issues `SELECT sqlite_version()` and `PRAGMA encoding` over
+ * the network during open. Turso supports both, so the happy path is reliable;
+ * a network error surfaces as a `DatabaseConnectionError` at connect time.
  */
 export const libsqlRemoteDriver: SqliteDriver = {
   name: "libsql-remote",

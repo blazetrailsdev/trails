@@ -92,8 +92,16 @@ export function buildAdapterArg(
     // forward unrelated database.yml entries (pool, host, etc.) into the
     // options object. The adapter ignores unknown keys today but accepting
     // them here would lock in a foot-gun.
-    const { readonly, driver, pragmas, strict, statementLimit, preparedStatements, authToken } =
-      configuration;
+    const {
+      readonly,
+      driver,
+      pragmas,
+      strict,
+      statementLimit,
+      preparedStatements,
+      driverOptions,
+      authToken,
+    } = configuration;
     const options: Record<string, unknown> = {};
     if (readonly !== undefined) options.readonly = readonly;
     if (driver !== undefined) options.driver = driver;
@@ -101,7 +109,14 @@ export function buildAdapterArg(
     if (strict !== undefined) options.strict = strict;
     if (statementLimit !== undefined) options.statementLimit = statementLimit;
     if (preparedStatements !== undefined) options.preparedStatements = preparedStatements;
-    if (authToken !== undefined) options.driverOptions = { authToken };
+    if (driverOptions !== undefined) options.driverOptions = driverOptions;
+    // Merge authToken into any pre-existing driverOptions so callers that pass
+    // both { authToken, driverOptions: { tls: true } } don't lose the latter.
+    if (authToken !== undefined)
+      options.driverOptions = {
+        ...(options.driverOptions as Record<string, unknown> | undefined),
+        authToken,
+      };
     return Object.keys(options).length > 0 ? [filename, options] : [filename];
   }
   if (url && database === undefined) {
