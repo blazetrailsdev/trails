@@ -63,7 +63,6 @@ import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js
 import {
   AssociationNotFoundError,
   InverseOfAssociationNotFoundError,
-  InverseOfAssociationRecursiveError,
   HasOneThroughNestedAssociationsAreReadonly,
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
@@ -1035,25 +1034,10 @@ export async function loadBelongsTo(
   assocName: string,
   options: AssociationOptions,
 ): Promise<Base | null> {
-  // Rails runs `reflection.check_validity!` in `Association#initialize`, so a
-  // recursive `inverse_of` (an association whose inverse resolves back to
-  // itself) raises on first access. We defer it to the load path (rather than
-  // construction) so merely building an inverse-seeded child — which never
-  // loads — does not trip it. Scoped to the recursion check so a normal
-  // belongs_to load isn't burdened with the full validity sweep.
-  if (!options.polymorphic) {
-    const checkRefl = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName) as
-      | { checkValidityOfInverseBang?: () => void }
-      | undefined;
-    try {
-      checkRefl?.checkValidityOfInverseBang?.();
-    } catch (e) {
-      // Only the recursion verdict belongs on this fast path. A missing inverse
-      // is surfaced (with "Did you mean?" corrections) by `validateInverseOf`
-      // further down, which sees the load-time `inverseOf` option.
-      if (e instanceof InverseOfAssociationRecursiveError) throw e;
-    }
-  }
+  // Rails runs `reflection.check_validity!` in `Association#initialize`
+  // (now mirrored in the `Association` constructor via
+  // `validateReflectionValidity`), so a recursive/missing `inverse_of` already
+  // surfaced at first access. No load-path recursion shim is needed here.
 
   // Check cached (inverse_of) first, then preloaded.
   // Even for cached/preloaded hits, wire inverseOf so the parent's association

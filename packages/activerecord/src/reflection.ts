@@ -37,6 +37,7 @@ import {
   HasOneThroughCantAssociateThroughCollection,
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
+  CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
 import { isFinderNeedsTypeCondition, polymorphicName, typeCondition } from "./inheritance.js";
 
@@ -385,13 +386,27 @@ export class AbstractReflection {
       const inverse = this.inverseOf();
       if (inverse == null) {
         const inverseOf = this.inverseName()!;
+        // Rails' `InverseOfAssociationNotFoundError#corrections` builds a
+        // "Did you mean?" list from `associated_class.reflections.keys`
+        // (errors.rb) — the target model's declared association names ranked
+        // against the missing inverse name. Compute the same here so the
+        // constructor-time check surfaces suggestions, matching the load-time
+        // `validateInverseOf` path. `klass` may be unresolvable for some
+        // configs; fall back to no corrections rather than masking the error.
+        let corrections: string[] = [];
+        try {
+          const dictionary = (this.klass._associations ?? []).map((a) => a.name);
+          corrections = _correctNames(dictionary, inverseOf);
+        } catch {
+          corrections = [];
+        }
         // Rails passes the reflection; with no explicit associated_class the
         // message falls back to `reflection.class_name` (errors.rb). Thread the
         // target class name so the `in <class>` clause is always present.
         throw new InverseOfAssociationNotFoundError(
           this._concrete().name,
           inverseOf,
-          [],
+          corrections,
           this._concrete().className,
         );
       }
@@ -1047,19 +1062,16 @@ export class AssociationReflection extends MacroReflection {
         Array.isArray(this.foreignKey))
     ) {
       const fk = this.foreignKey;
+      // Rails raises `CompositePrimaryKeyMismatchError` here (reflection.rb:618).
+      // has_one/collection compare against the owner's active_record_primary_key;
+      // belongs_to against the target's association_primary_key.
       if (this.hasOne() || this.isCollection()) {
         if (arrayLen(this.activeRecordPrimaryKey) !== arrayLen(fk)) {
-          throw new Error(
-            `Association ${this.name}: composite primary key / foreign key length mismatch ` +
-              `(${arrayLen(this.activeRecordPrimaryKey)} primary key column(s) vs ${arrayLen(fk)} foreign key column(s))`,
-          );
+          throw new CompositePrimaryKeyMismatchError(this.activeRecord.name, this.name);
         }
       } else if (this.belongsTo()) {
         if (arrayLen(this.associationPrimaryKey) !== arrayLen(fk)) {
-          throw new Error(
-            `Association ${this.name}: composite primary key / foreign key length mismatch ` +
-              `(${arrayLen(this.associationPrimaryKey)} primary key column(s) vs ${arrayLen(fk)} foreign key column(s))`,
-          );
+          throw new CompositePrimaryKeyMismatchError(this.activeRecord.name, this.name);
         }
       }
     }
