@@ -1781,7 +1781,7 @@ export class ToSql extends Visitor {
 
   private visitBindValue(value: unknown, collector: SQLString): void {
     // Mirrors Rails' `new_bind` lambda inside `visit_Arel_Nodes_BoundSqlLiteral`
-    // (to_sql.rb:774-790): non-Arel values are routed through
+    // (to_sql.rb:774-795, Rails 8.0.2): non-Arel values are routed through
     // `collector.add_bind` / `add_binds`, NOT inline-quoted. On the Composite
     // path this yields parameterized SQL (`topics.id = ?`) plus a bind list — so
     // the prepared-statement template is reused across values — while the
@@ -1799,16 +1799,23 @@ export class ToSql extends Visitor {
       this.visit(value, collector);
     } else if (Array.isArray(value)) {
       if (value.length === 0) {
-        // Rails: `collector << @connection.quote(nil)` — empty list → NULL.
+        // Rails (to_sql.rb:779): `collector << @connection.quote(nil)` — empty
+        // list → NULL.
         collector.append(this.quote(null));
       } else if (value.every((v) => !(v instanceof Node))) {
         collector.addBinds(value, null, this.bindBlock());
       } else {
-        // Mixed Arel-node / scalar list: visit nodes, bind scalars (recursion
-        // dispatches each element back through this method).
+        // Mixed Arel-node / scalar list (to_sql.rb:784-791): visit nodes,
+        // single-`add_bind` every other element. A *nested* array here is bound
+        // as one value (one `?`), NOT re-expanded — that's why this branch calls
+        // `addBind` directly instead of recursing through `visitBindValue`.
         value.forEach((v, i) => {
           if (i > 0) collector.append(", ");
-          this.visitBindValue(v, collector);
+          if (v instanceof Node) {
+            this.visit(v, collector);
+          } else {
+            collector.addBind(v, this.bindBlock());
+          }
         });
       }
     } else {

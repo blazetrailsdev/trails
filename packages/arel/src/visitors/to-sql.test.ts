@@ -413,9 +413,15 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::BoundSqlLiteral", () => {
     it("quotes nested arrays", () => {
-      const node = users.get("id").in([[1, 2] as unknown[]]);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("'1,2'");
+      // Mirrors Rails to_sql_test.rb — two cases exercise the mixed
+      // Arel-node/scalar branch. An Arel node in the list is visited; every other
+      // element (including a nested array) is a single `add_bind` → one `?`.
+      const innerLiteral = new Nodes.BoundSqlLiteral("? * 2", [4], {});
+      const node = new Nodes.BoundSqlLiteral("id IN (?)", [[1, [2, 3], innerLiteral]], {});
+      expect(new Visitors.ToSql().compile(node)).toBe("id IN (?, ?, ? * 2)");
+
+      const node2 = new Nodes.BoundSqlLiteral("id IN (?)", [[1, [2, 3]]], {});
+      expect(new Visitors.ToSql().compile(node2)).toBe("id IN (?, ?)");
     });
   });
 
@@ -1061,9 +1067,13 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::BoundSqlLiteral", () => {
     it("supports other bound literals as binds", () => {
-      const node = new Nodes.BoundSqlLiteral("id = ?", [new Nodes.SqlLiteral("1")]);
+      // Rails to_sql_test.rb: `Arel.sql("?", [1, 2, Arel.sql("?", 3)])` — one
+      // `?` bound to a mixed scalar/Arel-node list. The nested bound literal is
+      // visited (its own `?`), the scalars each `add_bind` → `?, ?, ?`.
+      const inner = new Nodes.BoundSqlLiteral("?", [3], {});
+      const node = new Nodes.BoundSqlLiteral("?", [[1, 2, inner]], {});
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("id = 1");
+      expect(sql).toBe("?, ?, ?");
     });
   });
 
@@ -1192,9 +1202,11 @@ describe("the to_sql visitor", () => {
     });
 
     it("works with array values", () => {
-      const node = users.get("tags").eq([1, 2]);
+      // Rails to_sql_test.rb: a single positional `?` bound to an array expands
+      // through `add_binds` to one placeholder per element.
+      const node = new Nodes.BoundSqlLiteral("id IN (?)", [[1, 2, 3]], {});
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("'1,2'");
+      expect(sql).toBe("id IN (?, ?, ?)");
     });
   });
 
