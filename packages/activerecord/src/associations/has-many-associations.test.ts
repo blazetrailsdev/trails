@@ -2563,6 +2563,10 @@ describe("HasManyAssociationsTest", () => {
     // Array-like access
     expect(Array.isArray(posts)).toBe(true);
     expect(posts.length).toBe(2);
+    // Rails: Firm.order(:id).find { |f| f.id > 0 } — Enumerable#find/detect
+    // block-find over the loaded relation, distinct from the AR PK finder.
+    const found = await Author.order("id").detect((a: any) => a.id > 0);
+    expect((found as any).id).toBe(author.id);
   });
   it("find many with merged options", async () => {
     class MergedAuthor extends Base {

@@ -295,6 +295,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target.some(fn, thisArg);
   }
 
+  // Mirrors Ruby's Enumerable#detect / #find: returns the first record for
+  // which the block is truthy, else undefined. Named `detect` (not `find`)
+  // because `find` is the AR PK finder on both CollectionProxy and Relation.
+  // Rails reaches detect via Enumerable#detect → Relation#records →
+  // CollectionProxy#load_target (collection_proxy.rb:1024), so an unloaded
+  // proxy loads first — hence async + loadTarget() here (as select/records do).
+  async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
+    const records = await this.loadTarget();
+    return records.find(fn);
+  }
+
   // every has the standard type-predicate overload from Array<T>.
   every<S extends T>(
     predicate: (record: T, index: number, all: T[]) => record is S,
