@@ -17,10 +17,11 @@
  * falls back to a registry lookup instead of reading from the held instance
  * would go undetected. Catching that would require a spy on `resolveModel`.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import { Base } from "../base.js";
 import { registerModel } from "../associations.js";
+import * as associationsModule from "../associations.js";
 
 class CompositePkParent extends Base {
   static _tableName = "cpk_seed_parents";
@@ -71,6 +72,23 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
     const holder = child.association("compositePkParent");
     expect(holder.isLoaded()).toBe(true);
     expect(holder.target).toBe(parent);
+  });
+
+  it("reads the target PK from the held instance, not the registry", () => {
+    const child = new CpkSeedChild();
+    const parent = new CompositePkParent({ shop_id: 1, id: 2 });
+
+    // Build the holder first (constructor-level checkKlass resolves the class);
+    // the spy only guards the setTarget → staleState → foreignKeyNames path.
+    const holder = child.association("compositePkParent");
+
+    const spy = vi.spyOn(associationsModule, "resolveModel");
+    try {
+      holder.setTarget(parent);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("scalar FK + composite-PK target collapses to id component on assignment", () => {
