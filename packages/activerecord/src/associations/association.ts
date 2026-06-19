@@ -54,6 +54,14 @@ export class Association {
     this.loaded = false;
     this.target = null;
 
+    // Rails' `check_validity! → klass → compute_class` raises NameError
+    // synchronously in the constructor, so `record.association(:name)` itself
+    // throws rather than `load_target`. Mirrors association.rb:41-42. This runs
+    // first because in Rails the *first* `klass` access inside `check_validity!`
+    // is what raises NameError for an unknown class — our reflection-level
+    // validity checks reach `klass` too but surface a less specific error, so
+    // resolve the class (and raise the faithful NameError) up front.
+    this.checkKlass();
     // Rails' `Association#initialize` runs `reflection.check_validity!`
     // for EVERY macro (association.rb:39), so every Rails-named
     // misconfiguration surfaces at first use: missing/recursive inverse-of,
@@ -62,10 +70,6 @@ export class Association {
     // declaration. Delegates to the reflection's `checkValidityBang` (the
     // macro-specific override) via a memoized helper.
     validateReflectionValidity(owner.constructor as typeof Base, reflection.name);
-    // Rails' `check_validity! → klass → compute_class` raises NameError
-    // synchronously in the constructor, so `record.association(:name)` itself
-    // throws rather than `load_target`. Mirrors association.rb:41-42.
-    this.checkKlass();
   }
 
   /**
