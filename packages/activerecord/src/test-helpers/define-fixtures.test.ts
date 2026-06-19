@@ -195,8 +195,34 @@ describe("defineFixtures", () => {
     const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .find((s) => s.includes("INSERT INTO"));
-    expect(insertSql).toContain(String(fixtureId("welcome")));
+    // `posts.welcome` pins an explicit `id: 1` in the canonical fixtures, so the
+    // ref resolves to that pinned id (not the CRC32 fallback) even though the posts
+    // set isn't loaded here. `tags` has no `rails` label canonically, so that ref
+    // falls back to CRC32.
+    expect(insertSql).toMatch(/, 1, /);
+    expect(insertSql).not.toContain(String(fixtureId("welcome")));
     expect(insertSql).toContain(String(fixtureId("rails")));
+  });
+
+  it("ref() to an unloaded set resolves to the target's pinned explicit id", async () => {
+    // author_addresses.david_address_extra pins `id: 2` canonically. A ref to it must
+    // resolve to 2 even when the author_addresses set is never loaded — a cross-table
+    // FK coincidence the join-model custom-primary_key source test depends on.
+    const adapter = makeAdapter();
+    const rows = new Map([
+      [fixtureId("david"), { id: fixtureId("david"), author_address_extra_id: 2 }],
+    ]);
+    const Author = makeModel("authors", rows);
+
+    await defineFixtures(adapter, Author, {
+      david: { author_address_extra_id: ref("author_addresses", "david_address_extra") },
+    });
+
+    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO"));
+    expect(insertSql).toContain(", 2)");
+    expect(insertSql).not.toContain(String(fixtureId("david_address_extra")));
   });
 
   it("HABTM: string values for FK columns auto-resolve to fixtureId when table matches a_b pattern", async () => {
