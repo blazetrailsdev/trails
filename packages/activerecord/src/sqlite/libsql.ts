@@ -166,10 +166,10 @@ export function isRemoteLibsqlUrl(url: string): boolean {
 
 /** @internal */
 function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
-  const driverOpts = (config.driverOptions ?? {}) as Record<string, unknown>;
-  const { authToken, ...rest } = driverOpts;
-  const opts: Database.Options = { ...(rest as Database.Options) };
-  if (authToken !== undefined) (opts as Record<string, unknown>).authToken = authToken;
+  // driverOptions carries authToken (and any other driver-specific keys).
+  // Unlike the local openDatabase, we don't force readonly here — remote
+  // Turso connections don't expose a read-only open mode.
+  const opts = { ...(config.driverOptions as Database.Options | undefined) };
   return new Database(config.database, opts);
 }
 

@@ -25,7 +25,6 @@ import { isRemoteLibsqlUrl } from "../sqlite/libsql.js";
  * shape (their subclasses inherit it from `AbstractSQLite3Adapter`), so they
  * normalize to `sqlite` for argument building. This only affects
  * constructor-argument shape; class resolution still keys off the raw name.
- * (`expo-sqlite` is not yet an openable adapter — see connection-adapters.ts.)
  */
 export function normalizeAdapterName(name: string): string {
   switch (name) {
