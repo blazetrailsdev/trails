@@ -112,6 +112,8 @@ const nodeSqliteLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/node-sqlite-adapter.js")).NodeSQLiteAdapter as any;
 const expoSqliteLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/expo-sqlite-adapter.js")).ExpoSQLiteAdapter as any;
+const libsqlLoader: AdapterLoader = async () =>
+  (await import("./connection-adapters/libsql-adapter.js")).LibSQLAdapter as any;
 const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
@@ -122,6 +124,7 @@ register("node-sqlite", nodeSqliteLoader);
 // the async construction path (`AbstractSQLite3Adapter.openAsync()` / the pool's
 // async checkout, which awaits `completeAsyncConnect()` in `verifyBang`).
 register("expo-sqlite", expoSqliteLoader);
+register("libsql", libsqlLoader);
 register("mysql2", mysql2Loader);
 register("postgresql", postgresqlLoader);
 
