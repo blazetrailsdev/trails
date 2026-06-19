@@ -295,6 +295,9 @@ export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
   // Mirrors: database.yml `strict:` — disables double-quoted string literal fallback
   // (DQS) at the connection level. Defaults to SQLite3Adapter.strictStringsByDefault.
   strict?: boolean;
+  // Driver-specific options passed through to SqliteOpenConfig.driverOptions.
+  // Used by e.g. libsql-remote to forward `authToken` to the Database constructor.
+  driverOptions?: Record<string, unknown>;
 }
 
 /**

@@ -114,6 +114,8 @@ const expoSqliteLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/expo-sqlite-adapter.js")).ExpoSQLiteAdapter as any;
 const libsqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/libsql-adapter.js")).LibSQLAdapter as any;
+const libsqlRemoteLoader: AdapterLoader = async () =>
+  (await import("./connection-adapters/libsql-remote-adapter.js")).LibSQLRemoteAdapter as any;
 const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
@@ -125,6 +127,9 @@ register("node-sqlite", nodeSqliteLoader);
 // async checkout, which awaits `completeAsyncConnect()` in `verifyBang`).
 register("expo-sqlite", expoSqliteLoader);
 register("libsql", libsqlLoader);
+// `libsql-remote` uses the async-open path (no openSync); the driver opens
+// network-backed Turso databases via `new Database(url, { authToken })`.
+register("libsql-remote", libsqlRemoteLoader);
 register("mysql2", mysql2Loader);
 register("postgresql", postgresqlLoader);
 

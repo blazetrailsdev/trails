@@ -2,8 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
 import { getOs } from "@blazetrails/activesupport/os-adapter";
-import { libsqlDriver } from "./libsql.js";
+import { libsqlDriver, libsqlRemoteDriver, isRemoteLibsqlUrl } from "./libsql.js";
 import { LibSQLAdapter } from "../connection-adapters/libsql-adapter.js";
+import { LibSQLRemoteAdapter } from "../connection-adapters/libsql-remote-adapter.js";
+import { buildAdapterArg, parseSqliteUrl } from "../connection-adapters/adapter-args.js";
 
 describe("SqliteDriver — libsql round-trip", () => {
   let driver: SqliteConnection;
@@ -243,5 +245,139 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
     await expect(
       libsqlDriver.restoreFromPath!(templatePath, "file:restored?mode=memory&cache=shared"),
     ).rejects.toThrow(/in-memory destination/);
+  });
+});
+
+describe("isRemoteLibsqlUrl — URL scheme detection", () => {
+  it("recognises libsql:// as remote", () => {
+    expect(isRemoteLibsqlUrl("libsql://mydb.turso.io")).toBe(true);
+  });
+
+  it("recognises https:// as remote", () => {
+    expect(isRemoteLibsqlUrl("https://mydb.turso.io")).toBe(true);
+  });
+
+  it("recognises http:// as remote", () => {
+    expect(isRemoteLibsqlUrl("http://localhost:8080")).toBe(true);
+  });
+
+  it("recognises wss:// as remote", () => {
+    expect(isRemoteLibsqlUrl("wss://mydb.turso.io")).toBe(true);
+  });
+
+  it("recognises ws:// as remote", () => {
+    expect(isRemoteLibsqlUrl("ws://localhost:8080")).toBe(true);
+  });
+
+  it("does not treat local file paths as remote", () => {
+    expect(isRemoteLibsqlUrl("/tmp/local.db")).toBe(false);
+    expect(isRemoteLibsqlUrl("file:local.db")).toBe(false);
+    expect(isRemoteLibsqlUrl(":memory:")).toBe(false);
+  });
+});
+
+describe("libsqlRemoteDriver — capabilities and async-open dispatch", () => {
+  it("has inProcessSync: false", () => {
+    expect(libsqlRemoteDriver.capabilities.inProcessSync).toBe(false);
+  });
+
+  it("has loadExtension: false", () => {
+    expect(libsqlRemoteDriver.capabilities.loadExtension).toBe(false);
+  });
+
+  it("omits openSync so the async-open path is used", () => {
+    expect(libsqlRemoteDriver.openSync).toBeUndefined();
+  });
+
+  it("omits databaseExists", () => {
+    expect(libsqlRemoteDriver.databaseExists).toBeUndefined();
+  });
+
+  it("omits restoreFromPath", () => {
+    expect(libsqlRemoteDriver.restoreFromPath).toBeUndefined();
+  });
+});
+
+describe("parseSqliteUrl — remote URL pass-through", () => {
+  it("passes libsql:// through unchanged", () => {
+    expect(parseSqliteUrl("libsql://mydb.turso.io")).toBe("libsql://mydb.turso.io");
+  });
+
+  it("passes https:// through unchanged", () => {
+    expect(parseSqliteUrl("https://mydb.turso.io")).toBe("https://mydb.turso.io");
+  });
+
+  it("still strips sqlite3:// prefix for local adapters", () => {
+    expect(parseSqliteUrl("sqlite3:///tmp/local.db")).toBe("/tmp/local.db");
+  });
+});
+
+describe("buildAdapterArg — authToken threading", () => {
+  it("threads authToken into driverOptions", () => {
+    const [filename, options] = buildAdapterArg("libsql-remote", {
+      url: "libsql://mydb.turso.io",
+      authToken: "tok_secret",
+    }) as [string, Record<string, unknown>];
+    expect(filename).toBe("libsql://mydb.turso.io");
+    expect((options.driverOptions as Record<string, unknown>).authToken).toBe("tok_secret");
+  });
+
+  it("prefers remote url over database for libsql:// URLs", () => {
+    const [filename] = buildAdapterArg("libsql-remote", {
+      url: "libsql://mydb.turso.io",
+      database: "local.db",
+      authToken: "tok",
+    }) as [string];
+    expect(filename).toBe("libsql://mydb.turso.io");
+  });
+
+  it("produces no options object when only url and no extras supplied", () => {
+    const args = buildAdapterArg("libsql-remote", { url: "libsql://mydb.turso.io" });
+    expect(args).toHaveLength(1);
+    expect(args[0]).toBe("libsql://mydb.turso.io");
+  });
+});
+
+const tursoUrl = typeof process !== "undefined" ? process.env["TURSO_DATABASE_URL"] : undefined;
+const tursoToken = typeof process !== "undefined" ? process.env["TURSO_AUTH_TOKEN"] : undefined;
+const hasCredentials = Boolean(tursoUrl && tursoToken);
+
+describe.skipIf(!hasCredentials)("libsqlRemoteDriver — network round-trip (TURSO_*)", () => {
+  let conn: SqliteConnection;
+
+  beforeAll(async () => {
+    conn = await libsqlRemoteDriver.open({
+      database: tursoUrl!,
+      driverOptions: { authToken: tursoToken },
+    });
+  });
+
+  afterAll(async () => {
+    await conn.close();
+  });
+
+  it("opens a remote connection and can execute a query", async () => {
+    const stmt = await conn.prepare("SELECT 1 AS n");
+    const row = (await stmt.get()) as { n: number };
+    expect(row.n).toBe(1);
+  });
+});
+
+describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke (TURSO_*)", () => {
+  let adapter: LibSQLRemoteAdapter;
+
+  beforeAll(async () => {
+    adapter = (await LibSQLRemoteAdapter.openAsync(tursoUrl!, {
+      driverOptions: { authToken: tursoToken },
+    })) as LibSQLRemoteAdapter;
+  });
+
+  afterAll(async () => {
+    await adapter.close();
+  });
+
+  it("executes a SELECT through the adapter", async () => {
+    const rows = await adapter.execute("SELECT 1 AS n");
+    expect((rows[0] as { n: number }).n).toBe(1);
   });
 });
