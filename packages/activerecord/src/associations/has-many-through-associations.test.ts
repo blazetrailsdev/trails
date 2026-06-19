@@ -12,6 +12,9 @@ import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { CpkTag, CpkOrder, CpkOrderTag } from "../test-helpers/models/cpk.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Post, FirstPost } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
 
 const TEST_SCHEMA: Schema = {
   acc_posts: { title: "string" },
@@ -7003,122 +7006,46 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(members).toHaveLength(2); // u3 excluded by scope (token != null)
   });
 
-  it("through scope is affected by unscoping", async () => {
-    // Rails: FirstPost.unscoped { author.comments_on_first_posts } returns all
-    // Core: unscoped block on source model removes its default scope for through
-    class TsuPost extends Base {
-      static {
-        this.attribute("tsu_author_id", "integer");
-        this.attribute("title", "string");
-        this.defaultScope((rel: any) => rel.where({ title: "First Post" }));
-      }
-    }
-    class TsuComment extends Base {
-      static {
-        this.attribute("tsu_post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    class TsuAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("TsuPost", TsuPost);
-    registerModel("TsuComment", TsuComment);
-    registerModel("TsuAuthor", TsuAuthor);
-    Associations.belongsTo.call(TsuComment, "tsu_post", {
-      className: "TsuPost",
-      foreignKey: "tsu_post_id",
-    });
-    Associations.hasMany.call(TsuPost, "tsu_comments", {
-      className: "TsuComment",
-      foreignKey: "tsu_post_id",
-    });
-    Associations.hasMany.call(TsuAuthor, "tsu_posts", {
-      className: "TsuPost",
-      foreignKey: "tsu_author_id",
-    });
-    Associations.hasMany.call(TsuAuthor, "tsu_comments", {
-      className: "TsuComment",
-      through: "tsu_posts",
-      source: "tsu_comments",
+  describe("through scope (canonical)", () => {
+    registerModel([Author, Post, FirstPost, Comment]);
+    const { authors } = useHandlerFixtures(["authors", "posts", "comments"], {
+      schema: canonicalSchema,
     });
 
-    const author = await TsuAuthor.create({ name: "David" });
-    const p1 = await TsuPost.unscoped().create({ tsu_author_id: author.id, title: "First Post" });
-    await TsuComment.create({ tsu_post_id: p1.id, body: "C1" });
+    const ids = (records: any[]) => records.map((r: any) => r.id).sort((a, b) => a - b);
 
-    // Rails: FirstPost.unscoped { author.comments_on_first_posts } == author.comments (all)
-    // Verify the through association loads comments via the through model's posts.
-    // Both the scoped association and a manual unscoped query see the same "First Post" comment.
-    const allComments = await TsuPost.unscoped()
-      .where({ tsu_author_id: author.id })
-      .then(async (posts: any[]) => {
-        const postIds = posts.map((p: any) => p.id);
-        return TsuComment.where({ tsu_post_id: postIds }).toArray();
+    it("through scope is affected by unscoping", async () => {
+      // Rails: FirstPost.unscoped { author.comments_on_first_posts } returns the
+      // full comment set, because unscoping the through model (FirstPost, whose
+      // default_scope is where(id: 1)) widens first_posts to all the author's
+      // posts — so comments_on_first_posts equals author.comments.
+      const author = authors("david") as Author;
+      const expected = ids(await association(author, "comments").toArray());
+
+      const inside = await FirstPost.unscoped(async () => {
+        await author.reload();
+        return association(author, "commentsOnFirstPosts").toArray();
       });
 
-    const scoped = await (author as any).tsu_comments.toArray();
-    // scoped loads through tsu_posts (which has default scope matching "First Post")
-    // allComments is the unscoped equivalent — both should return exactly C1
-    expect(allComments).toHaveLength(1);
-    expect((allComments[0] as any).body).toBe("C1");
-    // The through association result matches the unscoped manual query
-    expect(scoped.length).toBe(allComments.length);
-  });
-
-  it("through scope isnt affected by scoping", async () => {
-    // Rails: FirstPost.where(id: 2).scoping { author.comments_on_first_posts.reset }
-    //   should return same results regardless of scoping block
-    // Core: scoping block on source model doesn't affect through association query
-    class TsiPost extends Base {
-      static {
-        this.attribute("tsi_author_id", "integer");
-        this.attribute("title", "string");
-        this.defaultScope((rel: any) => rel.where({ title: "First Post" }));
-      }
-    }
-    class TsiComment extends Base {
-      static {
-        this.attribute("tsi_post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    class TsiAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("TsiPost", TsiPost);
-    registerModel("TsiComment", TsiComment);
-    registerModel("TsiAuthor", TsiAuthor);
-    Associations.belongsTo.call(TsiComment, "tsi_post", {
-      className: "TsiPost",
-      foreignKey: "tsi_post_id",
-    });
-    Associations.hasMany.call(TsiPost, "tsi_comments", {
-      className: "TsiComment",
-      foreignKey: "tsi_post_id",
-    });
-    Associations.hasMany.call(TsiAuthor, "tsi_posts", {
-      className: "TsiPost",
-      foreignKey: "tsi_author_id",
-    });
-    Associations.hasMany.call(TsiAuthor, "tsi_comments", {
-      className: "TsiComment",
-      through: "tsi_posts",
-      source: "tsi_comments",
+      expect(ids(inside)).toEqual(expected);
+      expect(inside.length).toBeGreaterThan(1);
     });
 
-    const author = await TsiAuthor.create({ name: "David" });
-    const p1 = await TsiPost.unscoped().create({ tsi_author_id: author.id, title: "First Post" });
-    await TsiComment.create({ tsi_post_id: p1.id, body: "C1" });
+    it("through scope isnt affected by scoping", async () => {
+      // Rails: FirstPost.where(id: 2).scoping { author.comments_on_first_posts.reset }
+      // — the through association applies its own scope, so the surrounding
+      // scoping block on FirstPost leaves comments_on_first_posts unchanged.
+      const author = authors("david") as Author;
+      const expected = ids(await association(author, "commentsOnFirstPosts").toArray());
 
-    const expected = await (author as any).tsi_comments.toArray();
-    // Scoping a different query shouldn't affect the through association
-    const scopedResult = await (author as any).tsi_comments.toArray();
-    expect(scopedResult.map((r: any) => r.id)).toEqual(expected.map((r: any) => r.id));
+      await FirstPost.where({ id: 2 }).scoping(async () => {
+        const inside = ids(await association(author, "commentsOnFirstPosts").reset().toArray());
+        expect(inside).toEqual(expected);
+      });
+
+      const after = ids(await association(author, "commentsOnFirstPosts").reset().toArray());
+      expect(after).toEqual(expected);
+    });
   });
 
   it("incorrectly ordered through associations", async () => {
