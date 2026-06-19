@@ -117,12 +117,18 @@ export class Topic extends Base {
     this.afterInitialize((record: Topic) => {
       (record as any).setEmailAddress();
     });
+    // class_attribute :after_initialize_called (topic.rb:84-89).
+    this.afterInitialize(() => {
+      Topic.afterInitializeCalled = true;
+    });
     this.afterTouch(async (record: any) => {
       record.afterTouchCalled = (record.afterTouchCalled ?? 0) + 1;
     });
   }
 
   afterTouchCalled = 0;
+
+  static afterInitializeCalled: boolean | null = null;
 
   async parent() {
     return Topic.find(this.readAttribute("parent_id") as number);
