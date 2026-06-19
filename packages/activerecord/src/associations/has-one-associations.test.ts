@@ -99,6 +99,8 @@ describe("HasOneAssociationsTest", () => {
     registerModel(User);
     await Company.loadSchema();
     await Account.loadSchema();
+    await Car.loadSchema();
+    await Bulb.loadSchema();
   });
 
   beforeEach(() => {
@@ -551,10 +553,20 @@ describe("HasOneAssociationsTest", () => {
     // BLOCKED: replacement-failure error path on new record — gap.
   });
 
-  it.skip("association keys bypass attribute protection", () => {
-    // BLOCKED: canonical Bulb after_create / color= callbacks call public
-    // readAttribute/writeAttribute aliases that are declared but never assigned;
-    // creating any Bulb throws. Tracked: canonical-bulb-public-attribute-accessors.
+  it("association keys bypass attribute protection", async () => {
+    const car = (await Car.create({ name: "honda" })) as any;
+
+    let bulb = car.association("bulb").build();
+    expect(bulb.car_id).toBe(car.id);
+
+    bulb = car.association("bulb").build({ car_id: car.id + 1 });
+    expect(bulb.car_id).toBe(car.id);
+
+    bulb = await car.association("bulb").create();
+    expect(bulb.car_id).toBe(car.id);
+
+    bulb = await car.association("bulb").create({ car_id: car.id + 1 });
+    expect(bulb.car_id).toBe(car.id);
   });
 
   it("association protect foreign key", async () => {
