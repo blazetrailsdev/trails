@@ -1623,7 +1623,7 @@ describe("PreloaderTest", () => {
     const preloadSql = sqls[1];
     expectQuotedColumnInSql(preloadSql, "cpk_order_agreements.order_id", { inWhere: true });
     expect(orders![0].association("orderAgreements").isLoaded()).toBe(true);
-    const loaded = (orders![0] as any)._preloadedAssociations.get("orderAgreements");
+    const loaded = orders![0]._preloadedAssociations.get("orderAgreements");
     expect(loaded.map((a: any) => a.signature).sort()).toEqual(["abc", "def"]);
   });
 
@@ -1640,7 +1640,7 @@ describe("PreloaderTest", () => {
     const preloadSql = sqls[1];
     expectQuotedColumnInSql(preloadSql, "cpk_orders.id", { inWhere: true });
     expect(agreements![0].association("order").isLoaded()).toBe(true);
-    const loadedOrder = (agreements![0] as any)._preloadedAssociations.get("order");
+    const loadedOrder = agreements![0]._preloadedAssociations.get("order");
     expect(loadedOrder).not.toBeNull();
     expect((loadedOrder.id as [number, number])[1]).toBe(orderId);
   });
