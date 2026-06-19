@@ -411,7 +411,15 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
     ) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
-        propagateErrors(record, child, assoc.name);
+        // Rails save_collection_association (autosave_association.rb:447-453):
+        // `errors.add(reflection.name)` lives only in the non-autosave,
+        // non-nested branch, gated on `reflection.validate?`. Autosave
+        // collections insert with validate:false and add no owner error on
+        // failure; nested records never reach a failed insert here
+        // (_insertCollectionRecord short-circuits them to `true`).
+        if (!assoc.options.autosave && assoc.options.validate !== false) {
+          propagateErrors(record, assoc.name);
+        }
         return false;
       }
     }
@@ -613,7 +621,9 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     // !autosave is always false → validate: false.
     const saved = await childRecord.save({ validate: false });
     if (!saved) {
-      propagateErrors(record, childRecord, assoc.name);
+      // Rails save_has_one_association just `raise ActiveRecord::Rollback`
+      // on failure — it adds no owner error. Child validation errors were
+      // already imported during the validation phase (association_valid?).
       return false;
     }
   }
@@ -747,11 +757,11 @@ async function _autosaveBelongsTo(
     }
     if (!saved) {
       // Rails save_belongs_to_association:571 — `saved if autosave`. Only
-      // autosave==true propagates the failure to abort the owner save (and
-      // surfaces child errors via the validate_belongs_to_association path).
-      // Default belongs_to leaves owner.errors untouched on save failure.
+      // autosave==true propagates the failure to abort the owner save; child
+      // errors were already surfaced on the owner via the validation phase
+      // (validate_belongs_to_association → association_valid?), so no error is
+      // added here. Default belongs_to leaves owner.errors untouched.
       if (autosave) {
-        propagateErrors(record, assocRecord, assoc.name);
         return false;
       }
       return true;
@@ -824,7 +834,11 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
     ) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
-        propagateErrors(record, child, assoc.name);
+        // habtm routes through save_collection_association — same gating as
+        // has_many above (non-autosave, validating only).
+        if (!assoc.options.autosave && assoc.options.validate !== false) {
+          propagateErrors(record, assoc.name);
+        }
         return false;
       }
     }
@@ -832,11 +846,19 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
   return true;
 }
 
-function propagateErrors(parent: Base, child: Base, assocName: string): void {
-  parent.errors.add("base", "invalid", { message: `${assocName} is invalid` });
-  for (const msg of child.errors.fullMessages) {
-    parent.errors.add("base", "invalid", { message: msg });
-  }
+// Mirrors Rails `save_collection_association` (autosave_association.rb:466-468):
+// when a child insert fails and the reflection validates, the owner gets a
+// single humanized `errors.add(reflection.name)` ("Published books is invalid")
+// — NOT a `base`/"X is invalid" error plus a duplicate of every child
+// full-message. has_one/belongs_to save failures add nothing on the owner
+// (Rails' save_has_one_association / save_belongs_to_association just abort);
+// any child validation errors were already imported on the owner during the
+// validation phase via `association_valid?` (isAssociationValid).
+function propagateErrors(parent: Base, reflectionName: string): void {
+  // Rails reflection names are snake_case (`:published_books`), so the default
+  // humanized full message reads "Published books is invalid". trails reflection
+  // names are camelCase, so underscore first to reproduce the same humanization.
+  parent.errors.add(underscore(reflectionName));
 }
 
 /** @internal */

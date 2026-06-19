@@ -289,6 +289,33 @@ export function validates(
     delete arRules.numericality;
     this.validatesWith(NumericalityValidator, buildOpts(opts));
   }
+  if (arRules.uniqueness) {
+    const opts = arRules.uniqueness === true ? {} : (arRules.uniqueness as Record<string, unknown>);
+    delete arRules.uniqueness;
+    // Uniqueness needs a DB round-trip, so it routes to the deferred
+    // _asyncValidations registry via validatesUniqueness rather than the
+    // synchronous validatesWith chain (matching Rails' UniquenessValidator).
+    //
+    // Drop the context-guard keys (`on`/`if`/`unless`/`strict`): the async path
+    // (`_runAsyncValidations`) invokes `validateEach` directly and never wires
+    // up the `validatesWith` context guard, so forwarding them would silently
+    // imply support that doesn't exist. Stripping them keeps the limitation
+    // explicit. Tracked for convergence:
+    // 0030/async-validations-honor-validation-context.
+    const {
+      attributes: _attributes,
+      on: _on,
+      if: _if,
+      unless: _unless,
+      strict: _strict,
+      ...uniqOpts
+    } = buildOpts(opts) as Record<string, unknown>;
+    validatesUniqueness.call(
+      this,
+      attribute,
+      uniqOpts as Parameters<typeof validatesUniqueness>[1],
+    );
+  }
   // Delegate remaining rules (inclusion/exclusion/format/...) to ActiveModel's validates.
   const hasRemaining = Object.keys(arRules).some(
     (k) => !["on", "if", "unless", "strict", "allowNil", "allowBlank"].includes(k),
