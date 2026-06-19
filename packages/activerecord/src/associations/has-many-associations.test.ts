@@ -7061,27 +7061,27 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("can unscope the default scope of the associated model", async () => {
-    // Rails: car.bulbs => [defaulty]; car.all_bulbs => [defaulty, other]
+    // Rails: car.bulbs => [defaulty]; car.all_bulbs.sort_by(&:id) => [bulb1, bulb2]
     const car = await HmCar.create({});
-    await HmBulb.create({ name: "defaulty", car_id: car.id });
-    await HmBulb.create({ name: "other", car_id: car.id });
+    const bulb1 = await HmBulb.create({ name: "defaulty", car_id: car.id });
+    const bulb2 = await HmBulb.create({ name: "other", car_id: car.id });
 
     const bulbs = await (car as any).bulbs.toArray();
-    expect(bulbs.map((b: any) => b.name)).toEqual(["defaulty"]);
+    expect(bulbs.map((b: any) => b.id)).toEqual([bulb1.id]);
 
-    const allBulbs = await (car as any).allBulbs.toArray();
-    expect(allBulbs.map((b: any) => b.name).sort()).toEqual(["defaulty", "other"]);
+    const allBulbs = await (car as any).allBulbs.sortBy((b: any) => b.id);
+    expect(allBulbs.map((b: any) => b.id)).toEqual([bulb1.id, bulb2.id]);
 
     const includesCar = (await HmCar.includes("allBulbs").find(car.id)) as any;
-    expect((await includesCar.allBulbs.toArray()).map((b: any) => b.name).sort()).toEqual([
-      "defaulty",
-      "other",
+    expect((await includesCar.allBulbs.sortBy((b: any) => b.id)).map((b: any) => b.id)).toEqual([
+      bulb1.id,
+      bulb2.id,
     ]);
 
     const eagerCar = (await HmCar.eagerLoad("allBulbs").find(car.id)) as any;
-    expect((await eagerCar.allBulbs.toArray()).map((b: any) => b.name).sort()).toEqual([
-      "defaulty",
-      "other",
+    expect((await eagerCar.allBulbs.sortBy((b: any) => b.id)).map((b: any) => b.id)).toEqual([
+      bulb1.id,
+      bulb2.id,
     ]);
   });
 

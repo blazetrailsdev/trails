@@ -2493,6 +2493,27 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Return a new array of the records sorted ascending by the block's return
+   * key. The sort is stable (equal keys keep their original relative order)
+   * and non-mutating (Ruby's `sort_by`, not `sort_by!`). Loads first — JS has
+   * no blocking IO, so where Rails reaches `records`/`load_target` lazily we
+   * evaluate the relation up front via `toArray()`.
+   *
+   * Mirrors: Enumerable#sort_by (via Relation#include Enumerable)
+   */
+  async sortBy(key: (record: T) => any): Promise<T[]> {
+    const records = await this.toArray();
+    return records
+      .map((record, index) => ({ record, index, sortKey: key(record) }))
+      .sort((a, b) => {
+        if (a.sortKey < b.sortKey) return -1;
+        if (a.sortKey > b.sortKey) return 1;
+        return a.index - b.index;
+      })
+      .map((entry) => entry.record);
+  }
+
+  /**
    * Filter to only records where the given column is not null/undefined.
    *
    * Mirrors: Rails where.not(column: nil) pattern
