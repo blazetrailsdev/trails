@@ -3383,6 +3383,7 @@ export class Base extends Model {
   declare toParam: () => string | null;
 
   declare inspect: () => string;
+  declare prettyPrint: typeof _Core.prettyPrint;
   declare attributeForInspect: (attr: string) => string;
 
   // slice extracted to persistence.ts.
@@ -4048,6 +4049,7 @@ include(Base, {
   becomesBang: _Persistence.becomesBang,
   // Core
   inspect: _inspect,
+  prettyPrint: _Core.prettyPrint,
   attributeForInspect: _attributeForInspect,
   isEqual: _isEqual,
   isPresent: _isPresent,
