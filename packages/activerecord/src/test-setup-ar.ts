@@ -12,6 +12,7 @@
 // non-test consumers.
 import "./sqlite/better-sqlite3.js";
 import { beforeEach } from "vitest";
+import { Base } from "./base.js";
 import { loadDefaults } from "./trailtie.js";
 import { resetTestAdapterState } from "./test-adapter.js";
 import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
@@ -21,6 +22,9 @@ import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
 // stays true). Use the versioned-defaults mechanism rather than poking Base
 // directly; this exercises the real code path that a consuming app would use.
 loadDefaults("7.0");
+
+// Mirror Rails activerecord/test/cases/helper.rb:40
+Base.automaticallyInvertPluralAssociations = true;
 
 // Wipe shared test-adapter state before every test so each test starts
 // from a clean slate.
