@@ -1,4 +1,4 @@
-import { Gzip } from "../gzip.js";
+import { deflate, inflate } from "../gzip.js";
 
 export interface CacheEntry {
   value: unknown;
@@ -80,11 +80,14 @@ export class Entry {
       uncompressedSize = byteLength(serialized);
     }
 
+    // Mirrors Rails' shape: the threshold is checked against the raw value size
+    // (entry.rb:84 `@value.bytesize`) while what actually gets compressed is the
+    // serialized form (entry.rb:90 `Marshal.dump`) — here JSON.
     if (uncompressedSize >= compressThreshold) {
       serialized ??= JSON.stringify(this._value);
-      const compressed = Gzip.compress(serialized);
-      // Gzip.compress returns a latin1 string (one char per byte), so its byte
-      // size is its length; serialized is utf8, counted by byteLength above.
+      const compressed = deflate(serialized);
+      // deflate returns a latin1 string (one char per byte), so its byte size is
+      // its length; serialized is utf8, counted by byteLength above.
       if (compressed.length < uncompressedSize) {
         return new Entry(compressed, {
           compressed: true,
@@ -97,16 +100,27 @@ export class Entry {
   }
 
   private uncompress(value: string): unknown {
-    return JSON.parse(Gzip.decompress(value));
+    return JSON.parse(inflate(value));
   }
 }
 
 function byteLength(value: string): number {
-  // latin1-safe byte count without a node:buffer import.
+  // Exact UTF-8 byte count without a node:buffer import. Supplementary code
+  // points (U+10000+) arrive as a surrogate pair but encode to 4 bytes, so the
+  // high surrogate accounts for the whole pair and we skip its low surrogate.
   let bytes = 0;
   for (let i = 0; i < value.length; i++) {
     const code = value.charCodeAt(i);
-    bytes += code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3;
+    if (code <= 0x7f) {
+      bytes += 1;
+    } else if (code <= 0x7ff) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      bytes += 4;
+      i++;
+    } else {
+      bytes += 3;
+    }
   }
   return bytes;
 }
