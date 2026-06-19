@@ -17,61 +17,76 @@ describeIfMysql("Mysql2Adapter", () => {
 
   describe("ActiveSchemaTest", () => {
     it("add index", async () => {
-      let sqls = await captureSql(() => adapter.addIndex("people", "last_name", { length: null }));
+      let sqls = await captureSql(() => adapter.addIndex("people", "last_name", { length: null }), {
+        stub: adapter,
+      });
       expect(sqls[0]).toBe("CREATE INDEX `index_people_on_last_name` ON `people` (`last_name`)");
 
-      sqls = await captureSql(() => adapter.addIndex("people", "last_name", { length: 10 }));
+      sqls = await captureSql(() => adapter.addIndex("people", "last_name", { length: 10 }), {
+        stub: adapter,
+      });
       expect(sqls[0]).toBe(
         "CREATE INDEX `index_people_on_last_name` ON `people` (`last_name`(10))",
       );
 
-      sqls = await captureSql(() =>
-        adapter.addIndex("people", ["last_name", "first_name"], { length: 15 }),
+      sqls = await captureSql(
+        () => adapter.addIndex("people", ["last_name", "first_name"], { length: 15 }),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe(
         "CREATE INDEX `index_people_on_last_name_and_first_name` ON `people` (`last_name`(15), `first_name`(15))",
       );
 
-      sqls = await captureSql(() =>
-        adapter.addIndex("people", ["last_name", "first_name"], { length: { last_name: 15 } }),
+      sqls = await captureSql(
+        () =>
+          adapter.addIndex("people", ["last_name", "first_name"], { length: { last_name: 15 } }),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe(
         "CREATE INDEX `index_people_on_last_name_and_first_name` ON `people` (`last_name`(15), `first_name`)",
       );
 
-      sqls = await captureSql(() =>
-        adapter.addIndex("people", ["last_name", "first_name"], {
-          length: { last_name: 15, first_name: 10 },
-        }),
+      sqls = await captureSql(
+        () =>
+          adapter.addIndex("people", ["last_name", "first_name"], {
+            length: { last_name: 15, first_name: 10 },
+          }),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe(
         "CREATE INDEX `index_people_on_last_name_and_first_name` ON `people` (`last_name`(15), `first_name`(10))",
       );
 
       for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
-        sqls = await captureSql(() => adapter.addIndex("people", "last_name", { type }));
+        sqls = await captureSql(() => adapter.addIndex("people", "last_name", { type }), {
+          stub: adapter,
+        });
         expect(sqls[0]).toBe(
           `CREATE ${type} INDEX \`index_people_on_last_name\` ON \`people\` (\`last_name\`)`,
         );
       }
 
       for (const using of ["btree", "hash"]) {
-        sqls = await captureSql(() => adapter.addIndex("people", "last_name", { using }));
+        sqls = await captureSql(() => adapter.addIndex("people", "last_name", { using }), {
+          stub: adapter,
+        });
         expect(sqls[0]).toBe(
           `CREATE INDEX \`index_people_on_last_name\` USING ${using} ON \`people\` (\`last_name\`)`,
         );
       }
 
-      sqls = await captureSql(() =>
-        adapter.addIndex("people", "last_name", { length: 10, using: "btree" }),
+      sqls = await captureSql(
+        () => adapter.addIndex("people", "last_name", { length: 10, using: "btree" }),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe(
         "CREATE INDEX `index_people_on_last_name` USING btree ON `people` (`last_name`(10))",
       );
 
       for (const algorithm of ["default", "copy", "inplace", "instant"]) {
-        sqls = await captureSql(() =>
-          adapter.addIndex("people", "last_name", { length: 10, using: "btree", algorithm }),
+        sqls = await captureSql(
+          () => adapter.addIndex("people", "last_name", { length: 10, using: "btree", algorithm }),
+          { stub: adapter },
         );
         expect(sqls[0]).toBe(
           `CREATE INDEX \`index_people_on_last_name\` USING btree ON \`people\` (\`last_name\`(10)) ALGORITHM = ${algorithm.toUpperCase()}`,
@@ -82,8 +97,10 @@ describeIfMysql("Mysql2Adapter", () => {
         adapter.addIndex("people", "last_name", { algorithm: "coyp" }),
       ).rejects.toThrow(ArgumentError);
 
-      sqls = await captureSql(() =>
-        adapter.addIndex("people", ["last_name", "first_name"], { length: 15, using: "btree" }),
+      sqls = await captureSql(
+        () =>
+          adapter.addIndex("people", ["last_name", "first_name"], { length: 15, using: "btree" }),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe(
         "CREATE INDEX `index_people_on_last_name_and_first_name` USING btree ON `people` (`last_name`(15), `first_name`(15))",
@@ -92,10 +109,12 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("index in create", async () => {
       for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
-        const sqls = await captureSql(() =>
-          adapter.schemaStatements().createTable("people", { id: false }, (t) => {
-            t.index(["last_name"], { type });
-          }),
+        const sqls = await captureSql(
+          () =>
+            adapter.schemaStatements().createTable("people", { id: false }, (t) => {
+              t.index(["last_name"], { type });
+            }),
+          { stub: adapter },
         );
         expect(sqls[0]).toMatch(
           new RegExp(
@@ -104,10 +123,12 @@ describeIfMysql("Mysql2Adapter", () => {
         );
       }
 
-      const sqls = await captureSql(() =>
-        adapter.schemaStatements().createTable("people", { id: false }, (t) => {
-          t.index(["last_name"], { length: { last_name: 10 }, using: "btree" });
-        }),
+      const sqls = await captureSql(
+        () =>
+          adapter.schemaStatements().createTable("people", { id: false }, (t) => {
+            t.index(["last_name"], { length: { last_name: 10 }, using: "btree" });
+          }),
+        { stub: adapter },
       );
       expect(sqls[0]).toMatch(
         /^CREATE TABLE `people` \(INDEX `index_people_on_last_name` USING btree \(`last_name`\(10\)\)\)/,
@@ -115,20 +136,24 @@ describeIfMysql("Mysql2Adapter", () => {
     });
     it("index in bulk change", async () => {
       for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
-        const sqls = await captureSql(() =>
-          adapter.schemaStatements().changeTable("people", { bulk: true }, (t) => {
-            return t.index("last_name", { type });
-          }),
+        const sqls = await captureSql(
+          () =>
+            adapter.schemaStatements().changeTable("people", { bulk: true }, (t) => {
+              return t.index("last_name", { type });
+            }),
+          { stub: adapter },
         );
         expect(sqls[0]).toBe(
           `ALTER TABLE \`people\` ADD ${type} INDEX \`index_people_on_last_name\` (\`last_name\`)`,
         );
       }
 
-      const sqls = await captureSql(() =>
-        adapter.schemaStatements().changeTable("people", { bulk: true }, (t) => {
-          return t.index("last_name", { length: 10, using: "btree", algorithm: "copy" });
-        }),
+      const sqls = await captureSql(
+        () =>
+          adapter.schemaStatements().changeTable("people", { bulk: true }, (t) => {
+            return t.index("last_name", { length: 10, using: "btree", algorithm: "copy" });
+          }),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe(
         "ALTER TABLE `people` ADD INDEX `index_people_on_last_name` USING btree (`last_name`(10)), ALGORITHM = COPY",
@@ -136,52 +161,64 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("drop table", async () => {
-      const sqls = await captureSql(() => adapter.dropTable("people"));
+      const sqls = await captureSql(() => adapter.dropTable("people"), { stub: adapter });
       expect(sqls[0]).toBe("DROP TABLE `people`");
     });
 
     it("drop tables", async () => {
-      const sqls = await captureSql(() => adapter.dropTable("people", "sobrinho"));
+      const sqls = await captureSql(() => adapter.dropTable("people", "sobrinho"), {
+        stub: adapter,
+      });
       expect(sqls[0]).toBe("DROP TABLE `people`, `sobrinho`");
     });
 
     it("create mysql database with encoding", async () => {
-      let sqls = await captureSql(() => adapter.createDatabase("aimonetti", { charset: "latin1" }));
+      let sqls = await captureSql(
+        () => adapter.createDatabase("aimonetti", { charset: "latin1" }),
+        { stub: adapter },
+      );
       expect(sqls[0]).toBe("CREATE DATABASE `aimonetti` DEFAULT CHARACTER SET `latin1`");
 
-      sqls = await captureSql(() =>
-        adapter.createDatabase("matt_aimonetti", { collation: "utf8mb4_bin" }),
+      sqls = await captureSql(
+        () => adapter.createDatabase("matt_aimonetti", { collation: "utf8mb4_bin" }),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe("CREATE DATABASE `matt_aimonetti` DEFAULT COLLATE `utf8mb4_bin`");
     });
 
     it("recreate mysql database with encoding", async () => {
-      const sqls = await captureSql(() => adapter.recreateDatabase("luca", { charset: "latin1" }));
+      const sqls = await captureSql(() => adapter.recreateDatabase("luca", { charset: "latin1" }), {
+        stub: adapter,
+      });
       expect(sqls).toContain("DROP DATABASE IF EXISTS `luca`");
       expect(sqls).toContain("CREATE DATABASE `luca` DEFAULT CHARACTER SET `latin1`");
     });
 
     it("add column", async () => {
-      const sqls = await captureSql(() =>
-        adapter.schemaStatements().addColumn("people", "last_name", "string"),
+      const sqls = await captureSql(
+        () => adapter.schemaStatements().addColumn("people", "last_name", "string"),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe("ALTER TABLE `people` ADD `last_name` varchar(255)");
     });
 
     it("add column with limit", async () => {
-      const sqls = await captureSql(() =>
-        adapter.schemaStatements().addColumn("people", "key", "string", { limit: 32 }),
+      const sqls = await captureSql(
+        () => adapter.schemaStatements().addColumn("people", "key", "string", { limit: 32 }),
+        { stub: adapter },
       );
       expect(sqls[0]).toBe("ALTER TABLE `people` ADD `key` varchar(32)");
     });
 
     it("drop table with specific database", async () => {
-      const sqls = await captureSql(() => adapter.dropTable("otherdb.people"));
+      const sqls = await captureSql(() => adapter.dropTable("otherdb.people"), { stub: adapter });
       expect(sqls[0]).toBe("DROP TABLE `otherdb`.`people`");
     });
 
     it("drop tables with specific database", async () => {
-      const sqls = await captureSql(() => adapter.dropTable("otherdb.people", "otherdb.sobrinho"));
+      const sqls = await captureSql(() => adapter.dropTable("otherdb.people", "otherdb.sobrinho"), {
+        stub: adapter,
+      });
       expect(sqls[0]).toBe("DROP TABLE `otherdb`.`people`, `otherdb`.`sobrinho`");
     });
 
@@ -210,13 +247,12 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
     it("indexes in create", async () => {
-      // Rails stubs `execute` for this case so the CREATE never runs (it only
-      // asserts the generated DDL string). Our captureSql executes-then-swallows
-      // instead, and the `AS SELECT ... a_really_complicated_query` errors out so
-      // `temp` never persists — but require-table-teardown matches statically, so
-      // we balance the create with a guarded drop.
-      try {
-        const sqls = await captureSql(() =>
+      // Stub mode mirrors Rails: `execute` is intercepted so the CREATE never
+      // runs (the test only asserts the generated DDL string). `temp` is never
+      // created, so no teardown is needed.
+      const sqls = await captureSql(
+        () =>
+          // eslint-disable-next-line blazetrails/require-table-teardown -- stub mode intercepts execute, so `temp` is never created (no teardown needed); mirrors Rails ActiveSchemaTest
           adapter
             .schemaStatements()
             .createTable(
@@ -226,13 +262,11 @@ describeIfMysql("Mysql2Adapter", () => {
                 t.index(["zip"]);
               },
             ),
-        );
-        expect(sqls[0]).toMatch(
-          /^CREATE TEMPORARY TABLE `temp` \(INDEX `index_temp_on_zip` \(`zip`\)\)(?: ROW_FORMAT=DYNAMIC)? AS SELECT id, name, zip FROM a_really_complicated_query/,
-        );
-      } finally {
-        await adapter.dropTable("temp", { ifExists: true });
-      }
+        { stub: adapter },
+      );
+      expect(sqls[0]).toMatch(
+        /^CREATE TEMPORARY TABLE `temp` \(INDEX `index_temp_on_zip` \(`zip`\)\)(?: ROW_FORMAT=DYNAMIC)? AS SELECT id, name, zip FROM a_really_complicated_query/,
+      );
     });
   });
 });
