@@ -351,12 +351,7 @@ export class BelongsToAssociation extends SingularAssociation {
     // full array. Without this, the composite FK zip in `replaceKeys` would line
     // a scalar `<name>_id` FK up against a 2-column target PK.
     const pk = ((record?.constructor ?? this.klass) as any)?.primaryKey;
-    if (pk) {
-      if (Array.isArray(pk)) {
-        return pk.includes("id") ? ["id"] : pk;
-      }
-      return [pk];
-    }
+    if (pk) return inferCompositePrimaryKey(pk);
     return ["id"];
   }
 
@@ -469,6 +464,18 @@ export class BelongsToAssociation extends SingularAssociation {
       return (this.owner as any).isSavedChangeToAttribute(attr);
     return false;
   }
+}
+
+/**
+ * Mirrors Rails `BelongsToReflection#association_primary_key`'s composite-PK
+ * branch (reflection.rb:935-938): a composite primary key that includes `"id"`
+ * infers the single `"id"`; otherwise the full composite array is kept. A
+ * scalar primary key is returned as a one-element array.
+ * @internal
+ */
+export function inferCompositePrimaryKey(pk: string | string[]): string[] {
+  if (Array.isArray(pk)) return pk.includes("id") ? ["id"] : pk;
+  return [pk];
 }
 
 /** @internal */
