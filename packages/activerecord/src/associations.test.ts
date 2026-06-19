@@ -230,8 +230,11 @@ describe("AssociationProxyTest", () => {
     const david = authors("david") as any;
     const expected = await david.firstPosts.first();
     await david.firstPosts.reload();
-    const first = await david.firstPosts.firstBang();
-    expect(first.id).toBe(expected!.id);
+    const sqls = await captureSql(async () => {
+      const first = await david.firstPosts.firstBang();
+      expect(first.id).toBe(expected!.id);
+    });
+    expect(sqls).toHaveLength(0);
     expect(david.firstPosts.loaded).toBe(true);
   });
 
