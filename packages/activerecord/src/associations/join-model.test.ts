@@ -1047,7 +1047,6 @@ describe("AssociationsJoinModelTest", () => {
     expect(loadedTags.map((t) => (t as any).id)).toEqual([(tag as any).id]);
   });
 
-
   it("has many distinct through count", async () => {
     const author = (await Author.find(authors("mary").id)) as Author;
     expect((author as any).uniqueCategorizedPosts.loaded).toBe(false);
