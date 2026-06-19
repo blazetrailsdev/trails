@@ -8,14 +8,12 @@ export interface CacheEntry {
 export class Entry {
   protected _value: unknown;
   readonly version: string | null;
-  private _compressed: boolean;
   private _createdAt: number;
   private _expiresIn: number | null;
 
   constructor(
     value: unknown,
     options: {
-      compressed?: boolean;
       version?: string | null;
       expiresIn?: number | null;
       expiresAt?: number | null;
@@ -23,7 +21,6 @@ export class Entry {
   ) {
     this._value = value;
     this.version = options.version ?? null;
-    this._compressed = options.compressed ?? false;
     this._createdAt = 0;
     if (options.expiresAt != null) {
       this._expiresIn = options.expiresAt - this._createdAt;
@@ -52,10 +49,6 @@ export class Entry {
 
   isMismatched(version: string | null | undefined): boolean {
     return !!(this.version && version && this.version !== version);
-  }
-
-  isCompressed(): boolean {
-    return this._compressed;
   }
 }
 
