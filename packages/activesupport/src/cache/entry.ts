@@ -25,7 +25,7 @@ export class Entry {
     if (options.expiresAt != null) {
       this._expiresIn = options.expiresAt - this._createdAt;
     } else if (options.expiresIn != null) {
-      this._expiresIn = options.expiresIn + Date.now();
+      this._expiresIn = options.expiresIn * 1000 + Date.now();
     } else {
       this._expiresIn = null;
     }
