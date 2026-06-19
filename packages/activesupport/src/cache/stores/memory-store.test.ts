@@ -120,3 +120,55 @@ describe("MemoryStorePruningTest", () => {
     expect(r2).toBe("my_string");
   });
 });
+
+describe("MemoryStore coder fidelity", () => {
+  let store: MemoryStore;
+
+  beforeEach(() => {
+    store = new MemoryStore();
+  });
+
+  it("round-trips Date values", () => {
+    const date = new Date("2026-06-19T14:36:26.123Z");
+    store.write("d", date);
+    const result = store.read("d");
+    expect(result).toBeInstanceOf(Date);
+    expect((result as Date).getTime()).toBe(date.getTime());
+  });
+
+  it("round-trips undefined distinct from null", () => {
+    store.write("u", undefined);
+    expect(store.read("u")).toBeUndefined();
+    store.write("n", null);
+    expect(store.read("n")).toBeNull();
+  });
+
+  it("round-trips bigint values", () => {
+    store.write("b", 9007199254740993n);
+    expect(store.read("b")).toBe(9007199254740993n);
+  });
+
+  it("round-trips non-finite numbers", () => {
+    store.write("nan", NaN);
+    expect(store.read("nan")).toBeNaN();
+    store.write("inf", Infinity);
+    expect(store.read("inf")).toBe(Infinity);
+  });
+
+  it("deep-clone isolates stored value from later mutation", () => {
+    const obj = { nested: { count: 1 } };
+    store.write("obj", obj);
+    obj.nested.count = 99;
+    const result = store.read("obj") as typeof obj;
+    expect(result.nested.count).toBe(1);
+  });
+
+  it("deep-clone isolates reads from each other", () => {
+    store.write("obj", { nested: { count: 1 } });
+    const r1 = store.read("obj") as { nested: { count: number } };
+    const r2 = store.read("obj") as { nested: { count: number } };
+    expect(r1).not.toBe(r2);
+    r1.nested.count = 42;
+    expect(r2.nested.count).toBe(1);
+  });
+});

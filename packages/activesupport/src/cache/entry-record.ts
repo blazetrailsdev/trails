@@ -3,8 +3,13 @@
 // these does not pull in entry.ts's node:zlib compression dependency — keeping
 // MemoryStore and the main barrel browser-safe.
 
+// `encodedValue` is the coder-serialized form of the cached value (see
+// coder.ts). Storing the encoded string rather than the raw value keeps
+// FileStore and MemoryStore consistent: both paths go through the same
+// type-preserving codec so Date/undefined/bigint/non-finite numbers survive the
+// round-trip.
 export interface CacheEntry {
-  value: unknown;
+  encodedValue: string;
   expiresAt: number | null; // timestamp ms, null = no expiry
   accessedAt: number;
 }

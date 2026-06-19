@@ -1,5 +1,6 @@
 import { getFs, getPath } from "../fs-adapter.js";
 import type { CacheOptions, CacheStore } from "./index.js";
+import { coder } from "./coder.js";
 import { type CacheEntry, namespaceKey, isExpired } from "./entry-record.js";
 
 const FILENAME_MAX_SIZE = 228;
@@ -65,7 +66,7 @@ export class FileStore implements CacheStore {
       } catch {}
       return null;
     }
-    return entry.value;
+    return coder.load(entry.encodedValue);
   }
 
   write(key: string, value: unknown, options?: CacheOptions): boolean {
@@ -79,7 +80,11 @@ export class FileStore implements CacheStore {
 
     const expiresIn = options?.expiresIn ?? this.defaultExpiresIn;
     const expiresAt = expiresIn != null ? Date.now() + expiresIn : null;
-    const entry: CacheEntry = { value, expiresAt, accessedAt: Date.now() };
+    const entry: CacheEntry = {
+      encodedValue: coder.dump(value),
+      expiresAt,
+      accessedAt: Date.now(),
+    };
     this.writeFile(filePath, entry);
     return true;
   }

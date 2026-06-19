@@ -103,3 +103,46 @@ describe("FileStoreTest", () => {
     expect(store.read("foo")).toBeNull();
   });
 });
+
+describe("FileStore coder fidelity", () => {
+  let cacheDir: string;
+  let store: FileStore;
+
+  beforeEach(() => {
+    cacheDir = mkdtempSync(join(tmpdir(), "file-store-coder-"));
+    store = new FileStore(cacheDir);
+  });
+
+  afterEach(() => {
+    try {
+      rmSync(cacheDir, { recursive: true, force: true });
+    } catch {}
+  });
+
+  it("round-trips Date values", () => {
+    const date = new Date("2026-06-19T14:36:26.123Z");
+    store.write("d", date);
+    const result = store.read("d");
+    expect(result).toBeInstanceOf(Date);
+    expect((result as Date).getTime()).toBe(date.getTime());
+  });
+
+  it("round-trips undefined distinct from null", () => {
+    store.write("u", undefined);
+    expect(store.read("u")).toBeUndefined();
+    store.write("n", null);
+    expect(store.read("n")).toBeNull();
+  });
+
+  it("round-trips bigint values", () => {
+    store.write("b", 9007199254740993n);
+    expect(store.read("b")).toBe(9007199254740993n);
+  });
+
+  it("round-trips non-finite numbers", () => {
+    store.write("nan", NaN);
+    expect(store.read("nan")).toBeNaN();
+    store.write("inf", Infinity);
+    expect(store.read("inf")).toBe(Infinity);
+  });
+});
