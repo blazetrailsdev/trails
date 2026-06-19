@@ -203,8 +203,10 @@ export abstract class Store {
   }
 
   newEntry(value: unknown, options?: StoreOptions): Entry {
+    const merged = this.mergedOptions(options);
     return new Entry(value, {
-      expiresIn: typeof options?.expiresIn === "number" ? options.expiresIn : null,
+      expiresIn: typeof merged.expiresIn === "number" ? merged.expiresIn : null,
+      version: merged.version != null ? String(merged.version) : undefined,
     });
   }
 
