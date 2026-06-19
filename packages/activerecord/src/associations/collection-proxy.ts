@@ -1567,7 +1567,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Add one or more records to the collection by setting the FK and saving.
    *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<<
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<< — which
+   * return `self` (the collection proxy) for chaining. Returned via
+   * `stripThenable` so the (thenable) proxy isn't unwrapped by promise
+   * adoption — otherwise `return this` would call the proxy's `then` and
+   * load the target, breaking Rails' "push does not load target" invariant.
    */
   async push(...records: T[]): Promise<this> {
     this._ensureThroughWritable();
@@ -1575,7 +1579,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
-      return this._proxySelf ?? this;
+      return stripThenable(this._proxySelf ?? this) as this;
     }
 
     const ctor = this._record.constructor as typeof Base;
@@ -1653,7 +1657,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         this._record.isNewRecord() ? Promise.resolve(true) : insertRecord(record),
       );
     }
-    return this._proxySelf ?? this;
+    return stripThenable(this._proxySelf ?? this) as this;
   }
 
   /**

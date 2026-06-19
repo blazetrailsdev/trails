@@ -1211,13 +1211,9 @@ describe("AssociationsJoinModelTest", () => {
 
   it("adding to has many through should return self", async () => {
     const thinking = (await Post.find(posts("thinking").id)) as Post;
+    const tagsProxy = (thinking as any).tags;
     const general = (await Tag.find(tags("general").id)) as Tag;
-    // Rails returns the collection proxy itself; assert_equal compares it
-    // against the collection's records. Awaiting the (thenable) proxy here
-    // flattens to those records, matching the Rails comparison.
-    const returned = (await (thinking as any).tags.push(general)) as Base[];
-    const current = (await (thinking as any).tags.toArray()) as Base[];
-    expect(returned.map((r) => r.id).sort()).toEqual(current.map((c) => c.id).sort());
+    expect(await tagsProxy.push(general)).toBe(tagsProxy);
   });
 
   it("has many through sum uses calculations", async () => {
