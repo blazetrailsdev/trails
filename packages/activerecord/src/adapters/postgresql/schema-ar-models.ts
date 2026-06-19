@@ -4,7 +4,6 @@
  * and from the global model registry.
  */
 import { Base, registerModel, modelRegistry } from "../../index.js";
-import { Associations } from "../../associations.js";
 import type { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 
@@ -83,6 +82,7 @@ export function makeSongAlbumModels(): {
   class Song extends Base {
     static {
       this.tableName = "music.songs";
+      this.hasAndBelongsToMany("albums", { joinTable: "music.albums_songs" });
     }
   }
   class Album extends Base {
@@ -91,7 +91,6 @@ export function makeSongAlbumModels(): {
     }
   }
   // Rails: derive_join_table_name("music.songs", "music.albums") → "music.albums_songs"
-  Associations.hasAndBelongsToMany.call(Song, "albums", { joinTable: "music.albums_songs" });
   registerModel("Song", Song);
   registerModel("Album", Album);
   return {

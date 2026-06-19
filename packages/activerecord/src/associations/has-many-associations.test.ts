@@ -1025,6 +1025,11 @@ describe("HasManyAssociationsTest", () => {
     class DestroyAllAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("destroy_all_posts", {
+          className: "DestroyAllPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class DestroyAllPost extends Base {
@@ -1035,11 +1040,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DestroyAllAuthor);
     registerModel(DestroyAllPost);
-    Associations.hasMany.call(DestroyAllAuthor, "destroy_all_posts", {
-      className: "DestroyAllPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await DestroyAllAuthor.create({ name: "Alice" });
     await DestroyAllPost.create({ author_id: author.id, title: "A" });
     await DestroyAllPost.create({ author_id: author.id, title: "B" });
@@ -1055,6 +1055,11 @@ describe("HasManyAssociationsTest", () => {
     class DeleteAllUnloadedAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("delete_all_unloaded_posts", {
+          className: "DeleteAllUnloadedPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class DeleteAllUnloadedPost extends Base {
@@ -1065,11 +1070,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DeleteAllUnloadedAuthor);
     registerModel(DeleteAllUnloadedPost);
-    Associations.hasMany.call(DeleteAllUnloadedAuthor, "delete_all_unloaded_posts", {
-      className: "DeleteAllUnloadedPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await DeleteAllUnloadedAuthor.create({ name: "Alice" });
     await DeleteAllUnloadedPost.create({ author_id: author.id, title: "A" });
     // delete all without pre-loading the collection
@@ -1085,6 +1085,11 @@ describe("HasManyAssociationsTest", () => {
     class NullifyAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("nullify_posts", {
+          className: "NullifyPost",
+          foreignKey: "author_id",
+          dependent: "nullify",
+        });
       }
     }
     class NullifyPost extends Base {
@@ -1095,11 +1100,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(NullifyAuthor);
     registerModel(NullifyPost);
-    Associations.hasMany.call(NullifyAuthor, "nullify_posts", {
-      className: "NullifyPost",
-      foreignKey: "author_id",
-      dependent: "nullify",
-    });
     const author = await NullifyAuthor.create({ name: "Alice" });
     const post = await NullifyPost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -1113,6 +1113,12 @@ describe("HasManyAssociationsTest", () => {
     class CpkAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("cpk_posts", {
+          className: "CpkPost",
+          foreignKey: ["tenant_id", "author_id"],
+          primaryKey: ["id", "id"],
+          dependent: "nullify",
+        });
       }
     }
     class CpkPost extends Base {
@@ -1124,12 +1130,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CpkAuthor);
     registerModel(CpkPost);
-    Associations.hasMany.call(CpkAuthor, "cpk_posts", {
-      className: "CpkPost",
-      foreignKey: ["tenant_id", "author_id"],
-      primaryKey: ["id", "id"],
-      dependent: "nullify",
-    });
     const author = await CpkAuthor.create({ name: "Alice" });
     const post = await CpkPost.create({
       tenant_id: author.id,
@@ -1151,6 +1151,10 @@ describe("HasManyAssociationsTest", () => {
       declare cachePosts: CollectionProxy<Base>;
       static {
         this.attribute("name", "string");
+        this.hasMany("cache_posts", {
+          className: "CachePost",
+          foreignKey: "cache_author_id",
+        });
       }
     }
     class CachePost extends Base {
@@ -1160,10 +1164,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(CacheAuthor);
     registerModel(CachePost);
-    Associations.hasMany.call(CacheAuthor, "cache_posts", {
-      className: "CachePost",
-      foreignKey: "cache_author_id",
-    });
     const author = await CacheAuthor.create({ name: "Alice" });
 
     expect(isAssociationCached(author, "cache_posts")).toBe(false);
@@ -1305,6 +1305,11 @@ describe("HasManyAssociationsTest", () => {
     class ClearAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("clear_posts", {
+          className: "ClearPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class ClearPost extends Base {
@@ -1315,11 +1320,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(ClearAuthor);
     registerModel(ClearPost);
-    Associations.hasMany.call(ClearAuthor, "clear_posts", {
-      className: "ClearPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await ClearAuthor.create({ name: "Alice" });
     await ClearPost.create({ author_id: author.id, title: "A" });
     await ClearPost.create({ author_id: author.id, title: "B" });
@@ -1335,6 +1335,11 @@ describe("HasManyAssociationsTest", () => {
     class ClearDepAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("clear_dep_posts", {
+          className: "ClearDepPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class ClearDepPost extends Base {
@@ -1345,11 +1350,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(ClearDepAuthor);
     registerModel(ClearDepPost);
-    Associations.hasMany.call(ClearDepAuthor, "clear_dep_posts", {
-      className: "ClearDepPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await ClearDepAuthor.create({ name: "Alice" });
     await ClearDepPost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -1852,6 +1852,10 @@ describe("HasManyAssociationsTest", () => {
     class AnonAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("anon_posts", {
+          className: "AnonPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class AnonPost extends Base {
@@ -1862,10 +1866,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(AnonAuthor);
     registerModel(AnonPost);
-    Associations.hasMany.call(AnonAuthor, "anon_posts", {
-      className: "AnonPost",
-      foreignKey: "author_id",
-    });
     const author = await AnonAuthor.create({ name: "Alice" });
     await AnonPost.create({ author_id: author.id, title: "A" });
     const posts = await loadHasMany(author, "anon_posts", {
@@ -1934,6 +1934,11 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
+        this.hasMany("clr_upd_posts", {
+          className: "ClrUpdPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class ClrUpdPost extends Base {
@@ -1944,11 +1949,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(ClrUpdAuthor);
     registerModel(ClrUpdPost);
-    Associations.hasMany.call(ClrUpdAuthor, "clr_upd_posts", {
-      className: "ClrUpdPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await ClrUpdAuthor.create({ name: "Alice", updated_at: new Date("2020-01-01") });
     await ClrUpdPost.create({ author_id: author.id, title: "A" });
     const originalUpdatedAt = (author as any).updated_at;
@@ -2055,6 +2055,11 @@ describe("HasManyAssociationsTest", () => {
     class DelAllAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("del_all_posts", {
+          className: "DelAllPost",
+          foreignKey: "author_id",
+          dependent: "delete",
+        });
       }
     }
     class DelAllPost extends Base {
@@ -2065,11 +2070,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DelAllAuthor);
     registerModel(DelAllPost);
-    Associations.hasMany.call(DelAllAuthor, "del_all_posts", {
-      className: "DelAllPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
     const author = await DelAllAuthor.create({ name: "Alice" });
     await DelAllPost.create({ author_id: author.id, title: "A" });
     await DelAllPost.create({ author_id: author.id, title: "B" });
@@ -2085,6 +2085,11 @@ describe("HasManyAssociationsTest", () => {
     class NilDepAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("nil_dep_posts", {
+          className: "NilDepPost",
+          foreignKey: "author_id",
+          dependent: "nullify",
+        });
       }
     }
     class NilDepPost extends Base {
@@ -2095,11 +2100,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(NilDepAuthor);
     registerModel(NilDepPost);
-    Associations.hasMany.call(NilDepAuthor, "nil_dep_posts", {
-      className: "NilDepPost",
-      foreignKey: "author_id",
-      dependent: "nullify",
-    });
     const author = await NilDepAuthor.create({ name: "Alice" });
     const post = await NilDepPost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -2134,13 +2134,13 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("stiCompanies", {
+          className: "StiCompany",
+          foreignKey: "firm_id",
+        });
       }
     }
     registerModel(DepFirm);
-    Associations.hasMany.call(DepFirm, "stiCompanies", {
-      className: "StiCompany",
-      foreignKey: "firm_id",
-    });
 
     const firm = new DepFirm({ name: "Test" });
     const proxy = new CollectionProxy(firm, "stiCompanies", (DepFirm as any)._associations[0]);
@@ -2165,13 +2165,13 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm2 extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("stiCompany2s", {
+          className: "StiCompany2",
+          foreignKey: "firm_id",
+        });
       }
     }
     registerModel(DepFirm2);
-    Associations.hasMany.call(DepFirm2, "stiCompany2s", {
-      className: "StiCompany2",
-      foreignKey: "firm_id",
-    });
 
     const firm = new DepFirm2({ name: "Test" });
     const proxy = new CollectionProxy(firm, "stiCompany2s", (DepFirm2 as any)._associations[0]);
@@ -2196,13 +2196,13 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm3 extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("stiCompany3s", {
+          className: "StiCompany3",
+          foreignKey: "firm_id",
+        });
       }
     }
     registerModel(DepFirm3);
-    Associations.hasMany.call(DepFirm3, "stiCompany3s", {
-      className: "StiCompany3",
-      foreignKey: "firm_id",
-    });
 
     const firm = new DepFirm3({ name: "Test" });
     const proxy = new CollectionProxy(firm, "stiCompany3s", (DepFirm3 as any)._associations[0]);
@@ -2224,13 +2224,13 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm4 extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("stiCompany4s", {
+          className: "StiCompany4",
+          foreignKey: "firm_id",
+        });
       }
     }
     registerModel(DepFirm4);
-    Associations.hasMany.call(DepFirm4, "stiCompany4s", {
-      className: "StiCompany4",
-      foreignKey: "firm_id",
-    });
 
     const firm = new DepFirm4({ name: "Test" });
     const proxy = new CollectionProxy(firm, "stiCompany4s", (DepFirm4 as any)._associations[0]);
@@ -2257,13 +2257,13 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm5 extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("stiCompany5s", {
+          className: "StiCompany5",
+          foreignKey: "firm_id",
+        });
       }
     }
     registerModel(DepFirm5);
-    Associations.hasMany.call(DepFirm5, "stiCompany5s", {
-      className: "StiCompany5",
-      foreignKey: "firm_id",
-    });
 
     const firm = new DepFirm5({ name: "Test" });
     const proxy = new CollectionProxy(firm, "stiCompany5s", (DepFirm5 as any)._associations[0]);
@@ -2478,15 +2478,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcResetAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcResetAuthor);
     registerModel(CcResetPost);
-    Associations.belongsTo.call(CcResetPost, "author", {
-      className: "CcResetAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await CcResetAuthor.create({ name: "Alice", posts_count: 0 });
     await CcResetPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcResetAuthor.find(author.id!);
@@ -2773,6 +2773,10 @@ describe("HasManyAssociationsTest", () => {
     class DiffNameAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("articles", {
+          className: "DiffNameArticle",
+          foreignKey: "author_id",
+        });
       }
     }
     class DiffNameArticle extends Base {
@@ -2783,10 +2787,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DiffNameAuthor);
     registerModel(DiffNameArticle);
-    Associations.hasMany.call(DiffNameAuthor, "articles", {
-      className: "DiffNameArticle",
-      foreignKey: "author_id",
-    });
     const author = await DiffNameAuthor.create({ name: "Alice" });
     await DiffNameArticle.create({ author_id: author.id, title: "A" });
     await DiffNameArticle.create({ author_id: author.id, title: "B" });
@@ -3125,6 +3125,10 @@ describe("HasManyAssociationsTest", () => {
     class ReloadQcAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("reloadQcPosts", {
+          className: "ReloadQcPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ReloadQcPost extends Base {
@@ -3133,10 +3137,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(ReloadQcAuthor, "reloadQcPosts", {
-      className: "ReloadQcPost",
-      foreignKey: "author_id",
-    });
     registerModel("ReloadQcAuthor", ReloadQcAuthor);
     registerModel("ReloadQcPost", ReloadQcPost);
     const author = await ReloadQcAuthor.create({ name: "Alice" });
@@ -3156,6 +3156,10 @@ describe("HasManyAssociationsTest", () => {
     class ReloadUlAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("reloadUlPosts", {
+          className: "ReloadUlPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ReloadUlPost extends Base {
@@ -3164,10 +3168,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(ReloadUlAuthor, "reloadUlPosts", {
-      className: "ReloadUlPost",
-      foreignKey: "author_id",
-    });
     registerModel("ReloadUlAuthor", ReloadUlAuthor);
     registerModel("ReloadUlPost", ReloadUlPost);
     const author = await ReloadUlAuthor.create({ name: "Alice" });
@@ -3184,6 +3184,10 @@ describe("HasManyAssociationsTest", () => {
     class FICAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ficPosts", {
+          foreignKey: "fic_author_id",
+          className: "FICPost",
+        });
       }
     }
     class FICPost extends Base {
@@ -3192,10 +3196,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("fic_author_id", "integer");
       }
     }
-    Associations.hasMany.call(FICAuthor, "ficPosts", {
-      foreignKey: "fic_author_id",
-      className: "FICPost",
-    });
     registerModel("FICAuthor", FICAuthor);
     registerModel("FICPost", FICPost);
     const a1 = await FICAuthor.create({ name: "Alice" });
@@ -3481,25 +3481,25 @@ describe("HasManyAssociationsTest", () => {
     class InvValAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("inv_val_posts", {
+          className: "InvValPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class InvValPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "InvValAuthor",
+          foreignKey: "author_id",
+          inverseOf: "inv_val_posts",
+        });
       }
     }
     registerModel(InvValAuthor);
     registerModel(InvValPost);
-    Associations.hasMany.call(InvValAuthor, "inv_val_posts", {
-      className: "InvValPost",
-      foreignKey: "author_id",
-    });
-    Associations.belongsTo.call(InvValPost, "author", {
-      className: "InvValAuthor",
-      foreignKey: "author_id",
-      inverseOf: "inv_val_posts",
-    });
     const author = await InvValAuthor.create({ name: "Alice" });
     const post = await InvValPost.create({ author_id: author.id, title: "A" });
     const loaded = await loadBelongsTo(post, "author", {
@@ -3760,15 +3760,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcConcatAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcConcatAuthor);
     registerModel(CcConcatPost);
-    Associations.belongsTo.call(CcConcatPost, "author", {
-      className: "CcConcatAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await CcConcatAuthor.create({ name: "Alice", posts_count: 0 });
     await CcConcatPost.create({ author_id: author.id, title: "A" });
     // create() automatically calls updateCounterCaches
@@ -3786,15 +3786,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcArrAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcArrAuthor);
     registerModel(CcArrPost);
-    Associations.belongsTo.call(CcArrPost, "author", {
-      className: "CcArrAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await CcArrAuthor.create({ name: "Alice", posts_count: 0 });
     await CcArrPost.create({ author_id: author.id, title: "A" });
     await CcArrPost.create({ author_id: author.id, title: "B" });
@@ -3812,15 +3812,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcUpdDisAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcUpdDisAuthor);
     registerModel(CcUpdDisPost);
-    Associations.belongsTo.call(CcUpdDisPost, "author", {
-      className: "CcUpdDisAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await CcUpdDisAuthor.create({ name: "Alice", posts_count: 0 });
     await CcUpdDisPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcUpdDisAuthor.find(author.id!);
@@ -3837,15 +3837,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcOverlapAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcOverlapAuthor);
     registerModel(CcOverlapPost);
-    Associations.belongsTo.call(CcOverlapPost, "author", {
-      className: "CcOverlapAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await CcOverlapAuthor.create({ name: "Alice", posts_count: 0 });
     await CcOverlapPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcOverlapAuthor.find(author.id!);
@@ -3862,15 +3862,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcUpdEnAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcUpdEnAuthor);
     registerModel(CcUpdEnPost);
-    Associations.belongsTo.call(CcUpdEnPost, "author", {
-      className: "CcUpdEnAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await CcUpdEnAuthor.create({ name: "Alice", posts_count: 0 });
     await CcUpdEnPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcUpdEnAuthor.find(author.id!);
@@ -3887,15 +3887,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcDelNdAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcDelNdAuthor);
     registerModel(CcDelNdPost);
-    Associations.belongsTo.call(CcDelNdPost, "author", {
-      className: "CcDelNdAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await CcDelNdAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await CcDelNdPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
@@ -3907,26 +3907,26 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
+        this.hasMany("posts", {
+          className: "CcDelDaPost",
+          foreignKey: "author_id",
+          dependent: "delete",
+        });
       }
     }
     class CcDelDaPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcDelDaAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcDelDaAuthor);
     registerModel(CcDelDaPost);
-    Associations.belongsTo.call(CcDelDaPost, "author", {
-      className: "CcDelDaAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    Associations.hasMany.call(CcDelDaAuthor, "posts", {
-      className: "CcDelDaPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
     const author = await CcDelDaAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await CcDelDaPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
@@ -3938,26 +3938,26 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
+        this.hasMany("posts", {
+          className: "CcDelDsPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class CcDelDsPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcDelDsAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcDelDsAuthor);
     registerModel(CcDelDsPost);
-    Associations.belongsTo.call(CcDelDsPost, "author", {
-      className: "CcDelDsAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    Associations.hasMany.call(CcDelDsAuthor, "posts", {
-      className: "CcDelDsPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await CcDelDsAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await CcDelDsPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
@@ -3975,15 +3975,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcUpdIdAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcUpdIdAuthor);
     registerModel(CcUpdIdPost);
-    Associations.belongsTo.call(CcUpdIdPost, "author", {
-      className: "CcUpdIdAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author1 = await CcUpdIdAuthor.create({ name: "Alice", posts_count: 0 });
     const author2 = await CcUpdIdAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcUpdIdPost.create({ author_id: author1.id, title: "A" });
@@ -4006,15 +4006,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcChgAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcChgAuthor);
     registerModel(CcChgPost);
-    Associations.belongsTo.call(CcChgPost, "author", {
-      className: "CcChgAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author1 = await CcChgAuthor.create({ name: "Alice", posts_count: 0 });
     const author2 = await CcChgAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcChgPost.create({ author_id: author1.id, title: "A" });
@@ -4036,15 +4036,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcInvAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcInvAuthor);
     registerModel(CcInvPost);
-    Associations.belongsTo.call(CcInvPost, "author", {
-      className: "CcInvAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author1 = await CcInvAuthor.create({ name: "Alice", posts_count: 0 });
     const author2 = await CcInvAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcInvPost.create({ author_id: author1.id, title: "A" });
@@ -4058,26 +4058,26 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
+        this.hasMany("posts", {
+          className: "CcClrPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class CcClrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcClrAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcClrAuthor);
     registerModel(CcClrPost);
-    Associations.belongsTo.call(CcClrPost, "author", {
-      className: "CcClrAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    Associations.hasMany.call(CcClrAuthor, "posts", {
-      className: "CcClrPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await CcClrAuthor.create({ name: "Alice", posts_count: 0 });
     const p1 = await CcClrPost.create({ author_id: author.id, title: "A" });
     const p2 = await CcClrPost.create({ author_id: author.id, title: "B" });
@@ -4092,26 +4092,26 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
+        this.hasMany("posts", {
+          className: "CcClrSymPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class CcClrSymPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcClrSymAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcClrSymAuthor);
     registerModel(CcClrSymPost);
-    Associations.belongsTo.call(CcClrSymPost, "author", {
-      className: "CcClrSymAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    Associations.hasMany.call(CcClrSymAuthor, "posts", {
-      className: "CcClrSymPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await CcClrSymAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await CcClrSymPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
@@ -4122,6 +4122,11 @@ describe("HasManyAssociationsTest", () => {
     class ExclDepAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("excl_dep_posts", {
+          className: "ExclDepPost",
+          foreignKey: "author_id",
+          dependent: "delete",
+        });
       }
     }
     class ExclDepPost extends Base {
@@ -4132,11 +4137,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(ExclDepAuthor);
     registerModel(ExclDepPost);
-    Associations.hasMany.call(ExclDepAuthor, "excl_dep_posts", {
-      className: "ExclDepPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
     const author = await ExclDepAuthor.create({ name: "Alice" });
     await ExclDepPost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -4150,6 +4150,12 @@ describe("HasManyAssociationsTest", () => {
     class DcFirm extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("conditionalClients", {
+          className: "DcClient",
+          foreignKey: "firm_id",
+          dependent: "destroy",
+          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
+        });
       }
     }
     class DcClient extends Base {
@@ -4161,12 +4167,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DcFirm);
     registerModel(DcClient);
     // Only clients named "BigShot Inc." are in the scoped association
-    Associations.hasMany.call(DcFirm, "conditionalClients", {
-      className: "DcClient",
-      foreignKey: "firm_id",
-      dependent: "destroy",
-      scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
-    });
     const firm = await DcFirm.create({ name: "Odegy" });
     await DcClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DcClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
@@ -4184,6 +4184,12 @@ describe("HasManyAssociationsTest", () => {
     class DsFirm extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("conditionalClients", {
+          className: "DsClient",
+          foreignKey: "firm_id",
+          dependent: "destroy",
+          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
+        });
       }
     }
     class DsClient extends Base {
@@ -4194,12 +4200,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DsFirm);
     registerModel(DsClient);
-    Associations.hasMany.call(DsFirm, "conditionalClients", {
-      className: "DsClient",
-      foreignKey: "firm_id",
-      dependent: "destroy",
-      scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
-    });
     const firm = await DsFirm.create({ name: "Odegy" });
     await DsClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DsClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
@@ -4210,6 +4210,12 @@ describe("HasManyAssociationsTest", () => {
     class DhFirm extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("conditionalClients", {
+          className: "DhClient",
+          foreignKey: "firm_id",
+          dependent: "destroy",
+          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
+        });
       }
     }
     class DhClient extends Base {
@@ -4220,12 +4226,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DhFirm);
     registerModel(DhClient);
-    Associations.hasMany.call(DhFirm, "conditionalClients", {
-      className: "DhClient",
-      foreignKey: "firm_id",
-      dependent: "destroy",
-      scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
-    });
     const firm = await DhFirm.create({ name: "Odegy" });
     await DhClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DhClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
@@ -4236,6 +4236,11 @@ describe("HasManyAssociationsTest", () => {
     class DelPkAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("del_pk_posts", {
+          className: "DelPkPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class DelPkPost extends Base {
@@ -4246,11 +4251,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DelPkAuthor);
     registerModel(DelPkPost);
-    Associations.hasMany.call(DelPkAuthor, "del_pk_posts", {
-      className: "DelPkPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author1 = await DelPkAuthor.create({ name: "Alice" });
     const author2 = await DelPkAuthor.create({ name: "Bob" });
     await DelPkPost.create({ author_id: author1.id, title: "A1" });
@@ -4271,6 +4271,11 @@ describe("HasManyAssociationsTest", () => {
     class ClearNoAccessAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("clear_no_access_posts", {
+          className: "ClearNoAccessPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class ClearNoAccessPost extends Base {
@@ -4281,11 +4286,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(ClearNoAccessAuthor);
     registerModel(ClearNoAccessPost);
-    Associations.hasMany.call(ClearNoAccessAuthor, "clear_no_access_posts", {
-      className: "ClearNoAccessPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await ClearNoAccessAuthor.create({ name: "Alice" });
     await ClearNoAccessPost.create({ author_id: author.id, title: "A" });
     await ClearNoAccessPost.create({ author_id: author.id, title: "B" });
@@ -4395,6 +4395,11 @@ describe("HasManyAssociationsTest", () => {
     class DestroyAllScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("destroy_all_scope_posts", {
+          className: "DestroyAllScopePost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class DestroyAllScopePost extends Base {
@@ -4405,11 +4410,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DestroyAllScopeAuthor);
     registerModel(DestroyAllScopePost);
-    Associations.hasMany.call(DestroyAllScopeAuthor, "destroy_all_scope_posts", {
-      className: "DestroyAllScopePost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await DestroyAllScopeAuthor.create({ name: "Alice" });
     await DestroyAllScopePost.create({ author_id: author.id, title: "A" });
     await DestroyAllScopePost.create({ author_id: author.id, title: "B" });
@@ -4426,6 +4426,11 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
+        this.hasMany("dcc_posts", {
+          className: "DccPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class DccPost extends Base {
@@ -4436,11 +4441,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DccAuthor);
     registerModel(DccPost);
-    Associations.hasMany.call(DccAuthor, "dcc_posts", {
-      className: "DccPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await DccAuthor.create({ name: "Alice", posts_count: 0 });
     await DccPost.create({ author_id: author.id, title: "A" });
     await DccPost.create({ author_id: author.id, title: "B" });
@@ -4504,6 +4504,11 @@ describe("HasManyAssociationsTest", () => {
     class HashCondAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hash_cond_posts", {
+          className: "HashCondPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class HashCondPost extends Base {
@@ -4514,11 +4519,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(HashCondAuthor);
     registerModel(HashCondPost);
-    Associations.hasMany.call(HashCondAuthor, "hash_cond_posts", {
-      className: "HashCondPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await HashCondAuthor.create({ name: "Alice" });
     await HashCondPost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -4529,12 +4529,22 @@ describe("HasManyAssociationsTest", () => {
     class Grandparent extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("parents", {
+          className: "Parent",
+          foreignKey: "grandparent_id",
+          dependent: "destroy",
+        });
       }
     }
     class Parent extends Base {
       static {
         this.attribute("grandparent_id", "integer");
         this.attribute("name", "string");
+        this.hasMany("children", {
+          className: "Child",
+          foreignKey: "parent_id",
+          dependent: "destroy",
+        });
       }
     }
     class Child extends Base {
@@ -4546,16 +4556,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Grandparent);
     registerModel(Parent);
     registerModel(Child);
-    Associations.hasMany.call(Grandparent, "parents", {
-      className: "Parent",
-      foreignKey: "grandparent_id",
-      dependent: "destroy",
-    });
-    Associations.hasMany.call(Parent, "children", {
-      className: "Child",
-      foreignKey: "parent_id",
-      dependent: "destroy",
-    });
     const gp = await Grandparent.create({ name: "GP" });
     const p = await Parent.create({ grandparent_id: gp.id, name: "P" });
     await Child.create({ parent_id: p.id, name: "C" });
@@ -4578,6 +4578,11 @@ describe("HasManyAssociationsTest", () => {
     class DepTxAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("dep_tx_posts", {
+          className: "DepTxPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class DepTxPost extends Base {
@@ -4588,11 +4593,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DepTxAuthor);
     registerModel(DepTxPost);
-    Associations.hasMany.call(DepTxAuthor, "dep_tx_posts", {
-      className: "DepTxPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await DepTxAuthor.create({ name: "Alice" });
     await DepTxPost.create({ author_id: author.id, title: "A" });
     // Even if transaction semantics aren't fully implemented, destroy should work
@@ -4608,6 +4608,11 @@ describe("HasManyAssociationsTest", () => {
     class ReLocaleAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("re_locale_posts", {
+          className: "ReLocalePost",
+          foreignKey: "author_id",
+          dependent: "restrictWithError",
+        });
       }
     }
     class ReLocalePost extends Base {
@@ -4618,11 +4623,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(ReLocaleAuthor);
     registerModel(ReLocalePost);
-    Associations.hasMany.call(ReLocaleAuthor, "re_locale_posts", {
-      className: "ReLocalePost",
-      foreignKey: "author_id",
-      dependent: "restrictWithError",
-    });
     const author = await ReLocaleAuthor.create({ name: "Writer" });
     await ReLocalePost.create({ author_id: author.id, title: "P" });
     // With restrict_with_error, destroy aborts (returns false) and populates
@@ -4964,12 +4964,25 @@ describe("HasManyAssociationsTest", () => {
     class ThrIdAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("thr_id_posts", {
+          className: "ThrIdPost",
+          foreignKey: "thr_id_author_id",
+        });
+        this.hasMany("thr_id_comments", {
+          through: "thr_id_posts",
+          className: "ThrIdComment",
+          source: "thr_id_comments",
+        });
       }
     }
     class ThrIdPost extends Base {
       static {
         this.attribute("thr_id_author_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("thr_id_comments", {
+          className: "ThrIdComment",
+          foreignKey: "thr_id_post_id",
+        });
       }
     }
     class ThrIdComment extends Base {
@@ -4981,19 +4994,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ThrIdAuthor);
     registerModel(ThrIdPost);
     registerModel(ThrIdComment);
-    Associations.hasMany.call(ThrIdAuthor, "thr_id_posts", {
-      className: "ThrIdPost",
-      foreignKey: "thr_id_author_id",
-    });
-    Associations.hasMany.call(ThrIdPost, "thr_id_comments", {
-      className: "ThrIdComment",
-      foreignKey: "thr_id_post_id",
-    });
-    Associations.hasMany.call(ThrIdAuthor, "thr_id_comments", {
-      through: "thr_id_posts",
-      className: "ThrIdComment",
-      source: "thr_id_comments",
-    });
     const author = await ThrIdAuthor.create({ name: "Alice" });
     const post = await ThrIdPost.create({ thr_id_author_id: author.id, title: "P" });
     const comment = await ThrIdComment.create({ thr_id_post_id: post.id, body: "C" });
@@ -5078,12 +5078,26 @@ describe("HasManyAssociationsTest", () => {
     class HcAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("hcPosts", {
+          className: "HcPost",
+          foreignKey: "hc_author_id",
+        });
+        this.hasMany("helloPostComments", {
+          className: "HcComment",
+          through: "hcPosts",
+          source: "hcComments",
+          scope: (rel: any) => rel.where({ body: "hello" }),
+        });
       }
     }
     class HcPost extends Base {
       static {
         this.attribute("hc_author_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("hcComments", {
+          className: "HcComment",
+          foreignKey: "hc_post_id",
+        });
       }
     }
     class HcComment extends Base {
@@ -5095,21 +5109,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HcAuthor);
     registerModel(HcPost);
     registerModel(HcComment);
-    Associations.hasMany.call(HcAuthor, "hcPosts", {
-      className: "HcPost",
-      foreignKey: "hc_author_id",
-    });
     // Through association with scope condition
-    Associations.hasMany.call(HcAuthor, "helloPostComments", {
-      className: "HcComment",
-      through: "hcPosts",
-      source: "hcComments",
-      scope: (rel: any) => rel.where({ body: "hello" }),
-    });
-    Associations.hasMany.call(HcPost, "hcComments", {
-      className: "HcComment",
-      foreignKey: "hc_post_id",
-    });
 
     const author = await HcAuthor.create({ name: "David" });
     const post = await HcPost.create({ hc_author_id: author.id, title: "Hello World" });
@@ -5156,6 +5156,10 @@ describe("HasManyAssociationsTest", () => {
     class InclScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("inclScopePosts", {
+          className: "InclScopePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class InclScopePost extends Base {
@@ -5164,10 +5168,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(InclScopeAuthor, "inclScopePosts", {
-      className: "InclScopePost",
-      foreignKey: "author_id",
-    });
     registerModel("InclScopeAuthor", InclScopeAuthor);
     registerModel("InclScopePost", InclScopePost);
     const author1 = await InclScopeAuthor.create({ name: "Alice" });
@@ -5327,6 +5327,10 @@ describe("HasManyAssociationsTest", () => {
     class ManyCountAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("manyCountPosts", {
+          className: "ManyCountPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ManyCountPost extends Base {
@@ -5335,10 +5339,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(ManyCountAuthor, "manyCountPosts", {
-      className: "ManyCountPost",
-      foreignKey: "author_id",
-    });
     registerModel("ManyCountAuthor", ManyCountAuthor);
     registerModel("ManyCountPost", ManyCountPost);
     const author = await ManyCountAuthor.create({ name: "Alice" });
@@ -5354,6 +5354,10 @@ describe("HasManyAssociationsTest", () => {
     class ManyLoadAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("manyLoadPosts", {
+          className: "ManyLoadPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ManyLoadPost extends Base {
@@ -5362,10 +5366,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(ManyLoadAuthor, "manyLoadPosts", {
-      className: "ManyLoadPost",
-      foreignKey: "author_id",
-    });
     registerModel("ManyLoadAuthor", ManyLoadAuthor);
     registerModel("ManyLoadPost", ManyLoadPost);
     const author = await ManyLoadAuthor.create({ name: "Alice" });
@@ -5391,6 +5391,10 @@ describe("HasManyAssociationsTest", () => {
     class ManySubAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("manySubPosts", {
+          className: "ManySubPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ManySubPost extends Base {
@@ -5399,10 +5403,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(ManySubAuthor, "manySubPosts", {
-      className: "ManySubPost",
-      foreignKey: "author_id",
-    });
     registerModel("ManySubAuthor", ManySubAuthor);
     registerModel("ManySubPost", ManySubPost);
     const author = await ManySubAuthor.create({ name: "Alice" });
@@ -5419,6 +5419,10 @@ describe("HasManyAssociationsTest", () => {
     class ManyBlkAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("manyBlkPosts", {
+          className: "ManyBlkPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ManyBlkPost extends Base {
@@ -5427,10 +5431,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(ManyBlkAuthor, "manyBlkPosts", {
-      className: "ManyBlkPost",
-      foreignKey: "author_id",
-    });
     registerModel("ManyBlkAuthor", ManyBlkAuthor);
     registerModel("ManyBlkPost", ManyBlkPost);
     const author = await ManyBlkAuthor.create({ name: "Alice" });
@@ -5448,6 +5448,10 @@ describe("HasManyAssociationsTest", () => {
     class NoneCountAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("noneCountPosts", {
+          className: "NoneCountPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class NoneCountPost extends Base {
@@ -5456,10 +5460,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(NoneCountAuthor, "noneCountPosts", {
-      className: "NoneCountPost",
-      foreignKey: "author_id",
-    });
     registerModel("NoneCountAuthor", NoneCountAuthor);
     registerModel("NoneCountPost", NoneCountPost);
     const author = await NoneCountAuthor.create({ name: "Alice" });
@@ -5473,6 +5473,10 @@ describe("HasManyAssociationsTest", () => {
     class NoneLoadAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("noneLoadPosts", {
+          className: "NoneLoadPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class NoneLoadPost extends Base {
@@ -5481,10 +5485,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(NoneLoadAuthor, "noneLoadPosts", {
-      className: "NoneLoadPost",
-      foreignKey: "author_id",
-    });
     registerModel("NoneLoadAuthor", NoneLoadAuthor);
     registerModel("NoneLoadPost", NoneLoadPost);
     const author = await NoneLoadAuthor.create({ name: "Alice" });
@@ -5508,6 +5508,10 @@ describe("HasManyAssociationsTest", () => {
     class NoneBlkAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("noneBlkPosts", {
+          className: "NoneBlkPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class NoneBlkPost extends Base {
@@ -5516,10 +5520,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(NoneBlkAuthor, "noneBlkPosts", {
-      className: "NoneBlkPost",
-      foreignKey: "author_id",
-    });
     registerModel("NoneBlkAuthor", NoneBlkAuthor);
     registerModel("NoneBlkPost", NoneBlkPost);
     const author = await NoneBlkAuthor.create({ name: "Alice" });
@@ -5701,6 +5701,10 @@ describe("HasManyAssociationsTest", () => {
     class TxProxyAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("tx_proxy_posts", {
+          className: "TxProxyPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class TxProxyPost extends Base {
@@ -5711,10 +5715,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(TxProxyAuthor);
     registerModel(TxProxyPost);
-    Associations.hasMany.call(TxProxyAuthor, "tx_proxy_posts", {
-      className: "TxProxyPost",
-      foreignKey: "author_id",
-    });
     const author = await TxProxyAuthor.create({ name: "Alice" });
     const proxy = association(author, "tx_proxy_posts");
     expect(proxy).toBeDefined();
@@ -5747,6 +5747,11 @@ describe("HasManyAssociationsTest", () => {
     class LazyDelAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("lazy_del_posts", {
+          className: "LazyDelPost",
+          foreignKey: "author_id",
+          dependent: "delete",
+        });
       }
     }
     class LazyDelPost extends Base {
@@ -5756,11 +5761,6 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     // Define association before registering the target model
-    Associations.hasMany.call(LazyDelAuthor, "lazy_del_posts", {
-      className: "LazyDelPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
     registerModel(LazyDelAuthor);
     registerModel(LazyDelPost);
     const author = await LazyDelAuthor.create({ name: "Alice" });
@@ -5776,6 +5776,11 @@ describe("HasManyAssociationsTest", () => {
     class LazyNullAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("lazy_null_posts", {
+          className: "LazyNullPost",
+          foreignKey: "author_id",
+          dependent: "nullify",
+        });
       }
     }
     class LazyNullPost extends Base {
@@ -5784,11 +5789,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(LazyNullAuthor, "lazy_null_posts", {
-      className: "LazyNullPost",
-      foreignKey: "author_id",
-      dependent: "nullify",
-    });
     registerModel(LazyNullAuthor);
     registerModel(LazyNullPost);
     const author = await LazyNullAuthor.create({ name: "Alice" });
@@ -6112,6 +6112,11 @@ describe("HasManyAssociationsTest", () => {
     class NoLoadDelAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("no_load_del_posts", {
+          className: "NoLoadDelPost",
+          foreignKey: "author_id",
+          dependent: "delete",
+        });
       }
     }
     class NoLoadDelPost extends Base {
@@ -6122,11 +6127,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(NoLoadDelAuthor);
     registerModel(NoLoadDelPost);
-    Associations.hasMany.call(NoLoadDelAuthor, "no_load_del_posts", {
-      className: "NoLoadDelPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
     const author = await NoLoadDelAuthor.create({ name: "Alice" });
     await NoLoadDelPost.create({ author_id: author.id, title: "A" });
     await NoLoadDelPost.create({ author_id: author.id, title: "B" });
@@ -6142,6 +6142,10 @@ describe("HasManyAssociationsTest", () => {
     class ExtAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ext_posts", {
+          className: "ExtPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ExtPost extends Base {
@@ -6152,10 +6156,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(ExtAuthor);
     registerModel(ExtPost);
-    Associations.hasMany.call(ExtAuthor, "ext_posts", {
-      className: "ExtPost",
-      foreignKey: "author_id",
-    });
     const author = await ExtAuthor.create({ name: "Alice" });
     await ExtPost.create({ author_id: author.id, title: "A" });
     const posts = await loadHasMany(author, "ext_posts", {
@@ -6168,6 +6168,10 @@ describe("HasManyAssociationsTest", () => {
     class ExtPerAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ext_per_posts", {
+          className: "ExtPerPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ExtPerPost extends Base {
@@ -6178,10 +6182,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(ExtPerAuthor);
     registerModel(ExtPerPost);
-    Associations.hasMany.call(ExtPerAuthor, "ext_per_posts", {
-      className: "ExtPerPost",
-      foreignKey: "author_id",
-    });
     const author = await ExtPerAuthor.create({ name: "Alice" });
     await ExtPerPost.create({ author_id: author.id, title: "A" });
     const posts = await loadHasMany(author, "ext_per_posts", {
@@ -6267,15 +6267,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "CcDsAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(CcDsAuthor);
     registerModel(CcDsPost);
-    Associations.belongsTo.call(CcDsPost, "author", {
-      className: "CcDsAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await CcDsAuthor.create({ name: "Alice", posts_count: 0 });
     await CcDsPost.create({ author_id: author.id, title: "A" });
     const reloaded = await CcDsAuthor.find(author.id!);
@@ -6647,6 +6647,10 @@ describe("HasManyAssociationsTest", () => {
     class KeyValAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("key_val_posts", {
+          className: "KeyValPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class KeyValPost extends Base {
@@ -6658,10 +6662,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(KeyValAuthor);
     registerModel(KeyValPost);
     // Association without dependent option
-    Associations.hasMany.call(KeyValAuthor, "key_val_posts", {
-      className: "KeyValPost",
-      foreignKey: "author_id",
-    });
     const author = await KeyValAuthor.create({ name: "Alice" });
     await KeyValPost.create({ author_id: author.id, title: "A" });
     const posts = await loadHasMany(author, "key_val_posts", {
@@ -6689,6 +6689,11 @@ describe("HasManyAssociationsTest", () => {
     class AsyncDepAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("async_dep_posts", {
+          className: "AsyncDepPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class AsyncDepPost extends Base {
@@ -6699,11 +6704,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(AsyncDepAuthor);
     registerModel(AsyncDepPost);
-    Associations.hasMany.call(AsyncDepAuthor, "async_dep_posts", {
-      className: "AsyncDepPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await AsyncDepAuthor.create({ name: "Alice" });
     await AsyncDepPost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -6772,6 +6772,11 @@ describe("HasManyAssociationsTest", () => {
     class DelAllOptAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("del_all_opt_posts", {
+          className: "DelAllOptPost",
+          foreignKey: "author_id",
+          dependent: "delete",
+        });
       }
     }
     class DelAllOptPost extends Base {
@@ -6782,11 +6787,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DelAllOptAuthor);
     registerModel(DelAllOptPost);
-    Associations.hasMany.call(DelAllOptAuthor, "del_all_opt_posts", {
-      className: "DelAllOptPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
     const author = await DelAllOptAuthor.create({ name: "Alice" });
     await DelAllOptPost.create({ author_id: author.id, title: "A" });
     await DelAllOptPost.create({ author_id: author.id, title: "B" });
@@ -7223,6 +7223,11 @@ describe("HasManyAssociationsTest", () => {
     class NoCbAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("no_cb_posts", {
+          className: "NoCbPost",
+          foreignKey: "author_id",
+          dependent: "delete",
+        });
       }
     }
     class NoCbPost extends Base {
@@ -7233,11 +7238,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(NoCbAuthor);
     registerModel(NoCbPost);
-    Associations.hasMany.call(NoCbAuthor, "no_cb_posts", {
-      className: "NoCbPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
     const author = await NoCbAuthor.create({ name: "Alice" });
     await NoCbPost.create({ author_id: author.id, title: "A" });
     await NoCbPost.create({ author_id: author.id, title: "B" });
@@ -7288,15 +7288,15 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("author", {
+          className: "DelCcAuthor",
+          foreignKey: "author_id",
+          counterCache: "posts_count",
+        });
       }
     }
     registerModel(DelCcAuthor);
     registerModel(DelCcPost);
-    Associations.belongsTo.call(DelCcPost, "author", {
-      className: "DelCcAuthor",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
     const author = await DelCcAuthor.create({ name: "Alice", posts_count: 0 });
     const post = await DelCcPost.create({ author_id: author.id, title: "A" });
     let reloaded = await DelCcAuthor.find(author.id!);
@@ -7310,6 +7310,11 @@ describe("HasManyAssociationsTest", () => {
     class DepDelAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("dep_del_posts", {
+          className: "DepDelPost",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
       }
     }
     class DepDelPost extends Base {
@@ -7320,11 +7325,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DepDelAuthor);
     registerModel(DepDelPost);
-    Associations.hasMany.call(DepDelAuthor, "dep_del_posts", {
-      className: "DepDelPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
     const author = await DepDelAuthor.create({ name: "Alice" });
     await DepDelPost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -7338,6 +7338,11 @@ describe("HasManyAssociationsTest", () => {
     class NullAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("null_posts", {
+          className: "NullPost",
+          foreignKey: "author_id",
+          dependent: "nullify",
+        });
       }
     }
     class NullPost extends Base {
@@ -7348,11 +7353,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(NullAuthor);
     registerModel(NullPost);
-    Associations.hasMany.call(NullAuthor, "null_posts", {
-      className: "NullPost",
-      foreignKey: "author_id",
-      dependent: "nullify",
-    });
     const author = await NullAuthor.create({ name: "Alice" });
     const post = await NullPost.create({ author_id: author.id, title: "A" });
     await author.destroy();
@@ -7392,14 +7392,14 @@ describe("HasManyAssociationsTest", () => {
     class AbsPolyPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("absPolyComments", {
+          as: "commentable",
+          className: "AbsPolyComment",
+        });
       }
     }
     registerModel(AbsPolyComment);
     registerModel(AbsPolyPost);
-    Associations.hasMany.call(AbsPolyPost, "absPolyComments", {
-      as: "commentable",
-      className: "AbsPolyComment",
-    });
     const post = await AbsPolyPost.create({ title: "Hello" });
     const proxy = association(post, "absPolyComments");
     const comment = proxy.build({ body: "nice" });
@@ -7417,14 +7417,14 @@ describe("HasManyAssociationsTest", () => {
     class CustPolyPost extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("custPolyComments", {
+          as: "taggable",
+          className: "CustPolyComment",
+        });
       }
     }
     registerModel(CustPolyComment);
     registerModel(CustPolyPost);
-    Associations.hasMany.call(CustPolyPost, "custPolyComments", {
-      as: "taggable",
-      className: "CustPolyComment",
-    });
     const post = await CustPolyPost.create({ title: "Hello" });
     const proxy = association(post, "custPolyComments");
     const comment = proxy.build({ body: "nice" });
@@ -7547,13 +7547,13 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
+        this.belongsTo("cnPost", {
+          className: "CnPost",
+          foreignKey: "post_id",
+          counterCache: "my_comment_count",
+        });
       }
     }
-    Associations.belongsTo.call(CnComment, "cnPost", {
-      className: "CnPost",
-      foreignKey: "post_id",
-      counterCache: "my_comment_count",
-    });
     registerModel("CnPost", CnPost);
     registerModel("CnComment", CnComment);
 
@@ -7574,13 +7574,13 @@ describe("HasManyAssociationsTest", () => {
     class RContainer extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("rWidgets", {
+          className: "RWidget",
+          foreignKey: "container_id",
+          dependent: "restrictWithException",
+        });
       }
     }
-    Associations.hasMany.call(RContainer, "rWidgets", {
-      className: "RWidget",
-      foreignKey: "container_id",
-      dependent: "restrictWithException",
-    });
     registerModel("RWidget", RWidget);
     registerModel("RContainer", RContainer);
 

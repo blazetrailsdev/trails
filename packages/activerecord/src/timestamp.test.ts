@@ -7,7 +7,6 @@ import { adapterType, createTestAdapter } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, MigrationContext, registerModel } from "./index.js";
-import { Associations } from "./associations.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -931,9 +930,9 @@ describe("TimestampTest", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
+        this.belongsTo("post", { touch: true });
       }
     }
-    Associations.belongsTo.call(Comment, "post", { touch: true });
     registerModel(Comment);
 
     const post = await Post.create({ title: "Hello" });

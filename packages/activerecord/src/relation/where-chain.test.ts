@@ -258,6 +258,10 @@ describe("WhereChainTest", () => {
     class JbAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("jbPosts", {
+          className: "JbPost",
+          foreignKey: "jb_author_id",
+        });
       }
     }
     class JbPost extends Base {
@@ -268,10 +272,6 @@ describe("WhereChainTest", () => {
     }
     registerModel("JbAuthor", JbAuthor);
     registerModel("JbPost", JbPost);
-    Associations.hasMany.call(JbAuthor, "jbPosts", {
-      className: "JbPost",
-      foreignKey: "jb_author_id",
-    });
     const author = await JbAuthor.create({ name: "Alice" });
     await JbPost.create({ title: "P1", jb_author_id: author.id });
     const lonely = await JbAuthor.create({ name: "Lonely" });
@@ -285,6 +285,10 @@ describe("WhereChainTest", () => {
     class LjAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ljPosts", {
+          className: "LjPost",
+          foreignKey: "lj_author_id",
+        });
       }
     }
     class LjPost extends Base {
@@ -295,10 +299,6 @@ describe("WhereChainTest", () => {
     }
     registerModel("LjAuthor", LjAuthor);
     registerModel("LjPost", LjPost);
-    Associations.hasMany.call(LjAuthor, "ljPosts", {
-      className: "LjPost",
-      foreignKey: "lj_author_id",
-    });
     const author = await LjAuthor.create({ name: "Alice" });
     await LjPost.create({ title: "P1", lj_author_id: author.id });
     const lonely = await LjAuthor.create({ name: "Lonely" });
@@ -312,6 +312,10 @@ describe("WhereChainTest", () => {
     class LoAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("loPosts", {
+          className: "LoPost",
+          foreignKey: "lo_author_id",
+        });
       }
     }
     class LoPost extends Base {
@@ -322,10 +326,6 @@ describe("WhereChainTest", () => {
     }
     registerModel("LoAuthor", LoAuthor);
     registerModel("LoPost", LoPost);
-    Associations.hasMany.call(LoAuthor, "loPosts", {
-      className: "LoPost",
-      foreignKey: "lo_author_id",
-    });
     const author = await LoAuthor.create({ name: "Alice" });
     const lonelyAuthor = await LoAuthor.create({ name: "Bob" });
     await LoPost.create({ title: "P1", lo_author_id: author.id });
@@ -347,14 +347,14 @@ describe("WhereChainTest", () => {
         this.attribute("shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("cpk_shop_id", "integer");
+        this.belongsTo("cpkShop", {
+          className: "CpkShop",
+          foreignKey: "cpk_shop_id",
+        });
       }
     }
     registerModel("CpkShop", CpkShop);
     registerModel("CpkOrder", CpkOrder);
-    Associations.belongsTo.call(CpkOrder, "cpkShop", {
-      className: "CpkShop",
-      foreignKey: "cpk_shop_id",
-    });
     const shop = await CpkShop.create({ name: "S" });
     await CpkOrder.create({ shop_id: 1, order_id: 1, cpk_shop_id: shop.id });
     await CpkOrder.create({ shop_id: 1, order_id: 2 });
@@ -378,6 +378,8 @@ describe("WhereChainTest", () => {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
         this.attribute("category_id", "integer");
+        this.belongsTo("artAuthor", { foreignKey: "author_id" });
+        this.belongsTo("artCategory", { foreignKey: "category_id" });
       }
     }
     class ArtAuthor extends Base {
@@ -390,8 +392,6 @@ describe("WhereChainTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.belongsTo.call(Article, "artAuthor", { foreignKey: "author_id" });
-    Associations.belongsTo.call(Article, "artCategory", { foreignKey: "category_id" });
     registerModel(Article);
     registerModel(ArtAuthor);
     registerModel(ArtCategory);
@@ -541,14 +541,14 @@ describe("WhereChainTest", () => {
         this.attribute("author_id", "integer");
         this.attribute("book_id", "integer");
         this.attribute("cpk_author_id", "integer");
+        this.belongsTo("author", {
+          className: "CpkAuthor",
+          foreignKey: "cpk_author_id",
+        });
       }
     }
     registerModel("CpkAuthor", CpkAuthor);
     registerModel("CpkShelfBook", CpkShelfBook);
-    Associations.belongsTo.call(CpkShelfBook, "author", {
-      className: "CpkAuthor",
-      foreignKey: "cpk_author_id",
-    });
     const author = await CpkAuthor.create({ name: "Cpk" });
     // One book WITH an author and one authorless book; missing("author") must
     // return exactly the authorless row (a degraded missing() returning every
@@ -730,10 +730,10 @@ describe("WhereChainTest", () => {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
         this.attribute("category_id", "integer");
+        this.belongsTo("maAuthor", { foreignKey: "author_id" });
+        this.belongsTo("maCategory", { foreignKey: "category_id" });
       }
     }
-    Associations.belongsTo.call(MaPost, "maAuthor", { foreignKey: "author_id" });
-    Associations.belongsTo.call(MaPost, "maCategory", { foreignKey: "category_id" });
     registerModel(MaAuthor);
     registerModel(MaCategory);
     registerModel(MaPost);

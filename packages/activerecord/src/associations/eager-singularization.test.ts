@@ -1,6 +1,5 @@
 import { describe, it, beforeAll, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -39,12 +38,20 @@ describe("EagerSingularizationTest", () => {
         this._tableName = "viri";
         this.attribute("octopus_id", "integer");
         this.attribute("species", "string");
+        this.belongsTo("octopus", {
+          className: "EsOctopus",
+          foreignKey: "octopus_id",
+        });
       }
     }
     class Octopus extends Base {
       static {
         this._tableName = "octopi";
         this.attribute("species", "string");
+        this.hasOne("virus", {
+          className: "EsVirus",
+          foreignKey: "octopus_id",
+        });
       }
     }
     class Pass extends Base {
@@ -52,30 +59,80 @@ describe("EagerSingularizationTest", () => {
         this._tableName = "passes";
         this.attribute("bus_id", "integer");
         this.attribute("rides", "integer");
+        this.belongsTo("bus", {
+          className: "EsBus",
+          foreignKey: "bus_id",
+        });
       }
     }
     class Bus extends Base {
       static {
         this._tableName = "buses";
         this.attribute("name", "string");
+        this.hasMany("passes", {
+          className: "EsPass",
+          foreignKey: "bus_id",
+        });
       }
     }
     class Mess extends Base {
       static {
         this._tableName = "messes";
         this.attribute("name", "string");
+        this.hasAndBelongsToMany("crises", {
+          className: "EsCrisis",
+          joinTable: "crises_messes",
+          foreignKey: "mess_id",
+          associationForeignKey: "crisis_id",
+        });
       }
     }
     class Crisis extends Base {
       static {
         this._tableName = "crises";
         this.attribute("name", "string");
+        this.hasAndBelongsToMany("messes", {
+          className: "EsMess",
+          joinTable: "crises_messes",
+          foreignKey: "crisis_id",
+          associationForeignKey: "mess_id",
+        });
+        this.hasMany("analyses", {
+          className: "EsAnalysis",
+          foreignKey: "crisis_id",
+          dependent: "destroy",
+        });
+        this.hasMany("successes", {
+          className: "EsSuccess",
+          through: "analyses",
+          source: "success",
+        });
+        this.hasMany("dresses", {
+          className: "EsDress",
+          foreignKey: "crisis_id",
+          dependent: "destroy",
+        });
+        this.hasMany("compresses", {
+          className: "EsCompress",
+          through: "dresses",
+          source: "compresses",
+        });
       }
     }
     class Success extends Base {
       static {
         this._tableName = "successes";
         this.attribute("name", "string");
+        this.hasMany("analyses", {
+          className: "EsAnalysis",
+          foreignKey: "success_id",
+          dependent: "destroy",
+        });
+        this.hasMany("crises", {
+          className: "EsCrisis",
+          through: "analyses",
+          source: "crisis",
+        });
       }
     }
     class Analysis extends Base {
@@ -83,18 +140,38 @@ describe("EagerSingularizationTest", () => {
         this._tableName = "analyses";
         this.attribute("crisis_id", "integer");
         this.attribute("success_id", "integer");
+        this.belongsTo("crisis", {
+          className: "EsCrisis",
+          foreignKey: "crisis_id",
+        });
+        this.belongsTo("success", {
+          className: "EsSuccess",
+          foreignKey: "success_id",
+        });
       }
     }
     class Dress extends Base {
       static {
         this._tableName = "dresses";
         this.attribute("crisis_id", "integer");
+        this.belongsTo("crisis", {
+          className: "EsCrisis",
+          foreignKey: "crisis_id",
+        });
+        this.hasMany("compresses", {
+          className: "EsCompress",
+          foreignKey: "dress_id",
+        });
       }
     }
     class Compress extends Base {
       static {
         this._tableName = "compresses";
         this.attribute("dress_id", "integer");
+        this.belongsTo("dress", {
+          className: "EsDress",
+          foreignKey: "dress_id",
+        });
       }
     }
 
@@ -108,85 +185,6 @@ describe("EagerSingularizationTest", () => {
     registerModel("EsAnalysis", Analysis);
     registerModel("EsDress", Dress);
     registerModel("EsCompress", Compress);
-
-    Associations.belongsTo.call(Virus, "octopus", {
-      className: "EsOctopus",
-      foreignKey: "octopus_id",
-    });
-    Associations.hasOne.call(Octopus, "virus", {
-      className: "EsVirus",
-      foreignKey: "octopus_id",
-    });
-    Associations.belongsTo.call(Pass, "bus", {
-      className: "EsBus",
-      foreignKey: "bus_id",
-    });
-    Associations.hasMany.call(Bus, "passes", {
-      className: "EsPass",
-      foreignKey: "bus_id",
-    });
-    Associations.hasAndBelongsToMany.call(Mess, "crises", {
-      className: "EsCrisis",
-      joinTable: "crises_messes",
-      foreignKey: "mess_id",
-      associationForeignKey: "crisis_id",
-    });
-    Associations.hasAndBelongsToMany.call(Crisis, "messes", {
-      className: "EsMess",
-      joinTable: "crises_messes",
-      foreignKey: "crisis_id",
-      associationForeignKey: "mess_id",
-    });
-    Associations.hasMany.call(Crisis, "analyses", {
-      className: "EsAnalysis",
-      foreignKey: "crisis_id",
-      dependent: "destroy",
-    });
-    Associations.hasMany.call(Crisis, "successes", {
-      className: "EsSuccess",
-      through: "analyses",
-      source: "success",
-    });
-    Associations.hasMany.call(Crisis, "dresses", {
-      className: "EsDress",
-      foreignKey: "crisis_id",
-      dependent: "destroy",
-    });
-    Associations.hasMany.call(Crisis, "compresses", {
-      className: "EsCompress",
-      through: "dresses",
-      source: "compresses",
-    });
-    Associations.belongsTo.call(Analysis, "crisis", {
-      className: "EsCrisis",
-      foreignKey: "crisis_id",
-    });
-    Associations.belongsTo.call(Analysis, "success", {
-      className: "EsSuccess",
-      foreignKey: "success_id",
-    });
-    Associations.hasMany.call(Success, "analyses", {
-      className: "EsAnalysis",
-      foreignKey: "success_id",
-      dependent: "destroy",
-    });
-    Associations.hasMany.call(Success, "crises", {
-      className: "EsCrisis",
-      through: "analyses",
-      source: "crisis",
-    });
-    Associations.belongsTo.call(Dress, "crisis", {
-      className: "EsCrisis",
-      foreignKey: "crisis_id",
-    });
-    Associations.hasMany.call(Dress, "compresses", {
-      className: "EsCompress",
-      foreignKey: "dress_id",
-    });
-    Associations.belongsTo.call(Compress, "dress", {
-      className: "EsDress",
-      foreignKey: "dress_id",
-    });
 
     return { Virus, Octopus, Pass, Bus, Mess, Crisis, Success };
   }

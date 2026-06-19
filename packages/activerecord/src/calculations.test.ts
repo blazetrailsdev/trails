@@ -5710,15 +5710,15 @@ describe("CalculationsTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
+        this.hasMany("rgComments", {
+          dependent: "restrictWithException",
+          className: "RGComment",
+          foreignKey: "rg_post_id",
+        });
       }
     }
     registerModel(RGComment);
     registerModel(RGPost);
-    Associations.hasMany.call(RGPost, "rgComments", {
-      dependent: "restrictWithException",
-      className: "RGComment",
-      foreignKey: "rg_post_id",
-    });
 
     const post = await RGPost.create({ title: "Hello" });
     await RGComment.create({ rg_post_id: post.id });
@@ -5741,11 +5741,11 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("rg_author_id", "integer");
         this.attribute("title", "string");
+        this.belongsTo("rgAuthor", { required: true, foreignKey: "rg_author_id" });
       }
     }
     registerModel(RGAuthor);
     registerModel(RGBook);
-    Associations.belongsTo.call(RGBook, "rgAuthor", { required: true, foreignKey: "rg_author_id" });
 
     const book = new RGBook({ title: "Orphan" });
     const saved = await book.save();

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, Rollback } from "./index.js";
-import { Associations } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -25,6 +24,10 @@ describe("HabtmDestroyOrderTest", () => {
     class Student extends Base {
       static {
         this.attribute("name", "string");
+        this.hasAndBelongsToMany("lessons", {
+          className: "Lesson",
+          joinTable: "lessons_students",
+        });
       }
     }
     class Lesson extends Base {
@@ -37,18 +40,14 @@ describe("HabtmDestroyOrderTest", () => {
         this.beforeDestroy(async (r: any) => {
           if (!(await association(r, "students").isEmpty())) throw new LessonError();
         });
+        this.hasAndBelongsToMany("students", {
+          className: "Student",
+          joinTable: "lessons_students",
+        });
       }
     }
     registerModel("Student", Student);
     registerModel("Lesson", Lesson);
-    Associations.hasAndBelongsToMany.call(Lesson, "students", {
-      className: "Student",
-      joinTable: "lessons_students",
-    });
-    Associations.hasAndBelongsToMany.call(Student, "lessons", {
-      className: "Lesson",
-      joinTable: "lessons_students",
-    });
     return { Student, Lesson };
   }
 

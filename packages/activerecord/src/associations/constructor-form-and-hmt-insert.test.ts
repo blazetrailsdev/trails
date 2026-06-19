@@ -7,7 +7,6 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
@@ -46,9 +45,9 @@ describe("constructor-form association writer", () => {
         this._tableName = "b30_owners";
         this.attribute("name", "string");
         this.adapter = _adapter;
+        this.hasMany("items", { className: "B30Item", foreignKey: "owner_id" });
       }
     }
-    Associations.hasMany.call(B30Owner, "items", { className: "B30Item", foreignKey: "owner_id" });
     registerModel("B30Item", B30Item);
     registerModel("B30Owner", B30Owner);
     return { B30Owner, B30Item };
@@ -104,12 +103,12 @@ describe("constructor-form association writer", () => {
         this._tableName = "b30_owners";
         this.attribute("name", "string");
         this.adapter = _adapter;
+        this.hasOne("profile", {
+          className: "B30Profile",
+          foreignKey: "owner_id",
+        });
       }
     }
-    Associations.hasOne.call(B30Owner2, "profile", {
-      className: "B30Profile",
-      foreignKey: "owner_id",
-    });
     registerModel("B30Profile", B30Profile);
     registerModel("B30Owner2", B30Owner2);
 
@@ -126,6 +125,7 @@ describe("HABTM insert_record two-step", () => {
         this._tableName = "b30_posts";
         this.attribute("title", "string");
         this.adapter = _adapter;
+        this.hasAndBelongsToMany("tags", { className: "B30Tag" });
       }
     }
     class B30Tag extends Base {
@@ -135,7 +135,6 @@ describe("HABTM insert_record two-step", () => {
         this.adapter = _adapter;
       }
     }
-    Associations.hasAndBelongsToMany.call(B30Post, "tags", { className: "B30Tag" });
     registerModel("B30Post", B30Post);
     registerModel("B30Tag", B30Tag);
     return { B30Post, B30Tag };
@@ -174,12 +173,12 @@ describe("resetScope on owner save", () => {
         this._tableName = "b30_owners";
         this.attribute("name", "string");
         this.adapter = _adapter;
+        this.hasMany("items", {
+          className: "B30Item2",
+          foreignKey: "owner_id",
+        });
       }
     }
-    Associations.hasMany.call(B30Owner3, "items", {
-      className: "B30Item2",
-      foreignKey: "owner_id",
-    });
     registerModel("B30Item2", B30Item2);
     registerModel("B30Owner3", B30Owner3);
 

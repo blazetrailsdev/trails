@@ -12,7 +12,7 @@ function epochMs(v: unknown): number {
   throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
 }
 import { Base, registerModel } from "../index.js";
-import { Associations, loadHasMany } from "../associations.js";
+import { loadHasMany } from "../associations.js";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -75,6 +75,7 @@ class Pet extends Base {
   static {
     this.tableName = "da_pets";
     this.attribute("name", "string");
+    this.hasMany("toys", { className: "Toy", foreignKey: "pet_id" });
   }
 }
 class Toy extends Base {
@@ -82,12 +83,11 @@ class Toy extends Base {
     this.tableName = "da_toys";
     this.attribute("name", "string");
     this.attribute("pet_id", "integer");
+    this.belongsTo("pet", { className: "Pet", foreignKey: "pet_id" });
   }
 }
 registerModel(Pet);
 registerModel(Toy);
-Associations.hasMany.call(Pet, "toys", { className: "Toy", foreignKey: "pet_id" });
-Associations.belongsTo.call(Toy, "pet", { className: "Pet", foreignKey: "pet_id" });
 
 describe("DeleteAllTest", () => {
   function makeModel() {
@@ -513,6 +513,11 @@ describe("DeleteAllTest", () => {
     class DeleteAllAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("delete_all_posts", {
+          className: "DeleteAllPost",
+          foreignKey: "author_id",
+          dependent: "delete",
+        });
       }
     }
     class DeleteAllPost extends Base {
@@ -523,11 +528,6 @@ describe("DeleteAllTest", () => {
     }
     registerModel(DeleteAllAuthor);
     registerModel(DeleteAllPost);
-    Associations.hasMany.call(DeleteAllAuthor, "delete_all_posts", {
-      className: "DeleteAllPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
     const author = await DeleteAllAuthor.create({ name: "Alice" });
     await DeleteAllPost.create({ author_id: author.id, title: "A" });
     await DeleteAllPost.create({ author_id: author.id, title: "B" });

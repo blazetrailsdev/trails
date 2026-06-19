@@ -4,7 +4,6 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -96,13 +95,13 @@ describe("AssociationValidationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("val_bt_parent_id", "integer");
+        this.belongsTo("valBtParent", {
+          required: true,
+          foreignKey: "val_bt_parent_id",
+          className: "ValBtParent",
+        });
       }
     }
-    Associations.belongsTo.call(ValBtChild, "valBtParent", {
-      required: true,
-      foreignKey: "val_bt_parent_id",
-      className: "ValBtParent",
-    });
     registerModel("ValBtParent", ValBtParent);
     registerModel("ValBtChild", ValBtChild);
     const child = new ValBtChild({ title: "orphan" });
@@ -120,13 +119,13 @@ describe("AssociationValidationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("val_bt_parent2_id", "integer");
+        this.belongsTo("valBtParent2", {
+          required: true,
+          foreignKey: "val_bt_parent2_id",
+          className: "ValBtParent2",
+        });
       }
     }
-    Associations.belongsTo.call(ValBtChild2, "valBtParent2", {
-      required: true,
-      foreignKey: "val_bt_parent2_id",
-      className: "ValBtParent2",
-    });
     registerModel("ValBtParent2", ValBtParent2);
     registerModel("ValBtChild2", ValBtChild2);
     const parent = await ValBtParent2.create({ name: "exists" });

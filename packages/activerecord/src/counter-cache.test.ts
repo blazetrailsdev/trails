@@ -181,13 +181,13 @@ describe("CounterCacheTest", () => {
         this._tableName = "legacy_comments";
         this.attribute("body", "string");
         this.attribute("legacy_post_id", "integer");
+        this.belongsTo("legacyPost", {
+          className: "LegacyPost",
+          foreignKey: "legacy_post_id",
+          counterCache: "comments_count",
+        });
       }
     }
-    Associations.belongsTo.call(LegacyComment, "legacyPost", {
-      className: "LegacyPost",
-      foreignKey: "legacy_post_id",
-      counterCache: "comments_count",
-    });
     registerModel(LegacyPost);
     registerModel(LegacyComment);
 
@@ -320,9 +320,9 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("container_id", "integer");
+        this.belongsTo("container", { counterCache: true });
       }
     }
-    Associations.belongsTo.call(Item, "container", { counterCache: true });
     registerModel(Container);
     registerModel(Item);
 
@@ -411,10 +411,10 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
+        this.belongsTo("parent", {});
       }
     }
     // No counterCache — inactive
-    Associations.belongsTo.call(Child, "parent", {});
     registerModel(Parent);
     registerModel(Child);
 
@@ -544,6 +544,10 @@ describe("CounterCacheTest", () => {
         this._tableName = "topics";
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
+        this.hasMany("replies", {
+          className: "Blog::Reply",
+          foreignKey: "topic_id",
+        });
       }
     }
     class BlogReply extends Base {
@@ -551,17 +555,13 @@ describe("CounterCacheTest", () => {
         this._tableName = "replies";
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
+        this.belongsTo("topic", {
+          className: "Blog::Topic",
+          foreignKey: "topic_id",
+          counterCache: "replies_count",
+        });
       }
     }
-    Associations.hasMany.call(BlogTopic, "replies", {
-      className: "Blog::Reply",
-      foreignKey: "topic_id",
-    });
-    Associations.belongsTo.call(BlogReply, "topic", {
-      className: "Blog::Topic",
-      foreignKey: "topic_id",
-      counterCache: "replies_count",
-    });
     registerModel("Blog::Topic", BlogTopic);
     registerModel("Blog::Reply", BlogReply);
     const t = await BlogTopic.create({ title: "test" });
@@ -986,13 +986,13 @@ describe("CounterCacheTest", () => {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
         this.attribute("children_count", "integer", { default: 0 });
+        this.belongsTo("parent", {
+          className: "Category",
+          foreignKey: "parent_id",
+          counterCache: "children_count",
+        });
       }
     }
-    Associations.belongsTo.call(Category, "parent", {
-      className: "Category",
-      foreignKey: "parent_id",
-      counterCache: "children_count",
-    });
     registerModel(Category);
     const parent = await Category.create({ name: "Parent" });
     await Category.create({ name: "Child", parent_id: parent.id });
@@ -1304,6 +1304,7 @@ describe("CounterCacheTest", () => {
     class Tag extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("taggings", { foreignKey: "tag_id" });
       }
     }
     class Post extends Base {
@@ -1322,7 +1323,6 @@ describe("CounterCacheTest", () => {
     Associations.belongsTo.call(Tagging, "tag");
     Associations.hasMany.call(Post, "taggings", { foreignKey: "post_id" });
     Associations.hasMany.call(Post, "tags", { through: "taggings" });
-    Associations.hasMany.call(Tag, "taggings", { foreignKey: "tag_id" });
     registerModel(Tag);
     registerModel(Post);
     registerModel(Tagging);
@@ -1628,32 +1628,32 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("bred_dogs_count", "integer", { default: 0 });
         this.attribute("trained_dogs_count", "integer", { default: 0 });
+        this.hasMany("bred_dogs", {
+          className: "Dog",
+          foreignKey: "breeder_id",
+        });
+        this.hasMany("trained_dogs", {
+          className: "Dog",
+          foreignKey: "trainer_id",
+        });
       }
     }
     class Dog extends Base {
       static {
         this.attribute("breeder_id", "integer");
         this.attribute("trainer_id", "integer");
+        this.belongsTo("breeder", {
+          className: "DogLover",
+          foreignKey: "breeder_id",
+          counterCache: "bred_dogs_count",
+        });
+        this.belongsTo("trainer", {
+          className: "DogLover",
+          foreignKey: "trainer_id",
+          counterCache: "trained_dogs_count",
+        });
       }
     }
-    Associations.hasMany.call(DogLover, "bred_dogs", {
-      className: "Dog",
-      foreignKey: "breeder_id",
-    });
-    Associations.hasMany.call(DogLover, "trained_dogs", {
-      className: "Dog",
-      foreignKey: "trainer_id",
-    });
-    Associations.belongsTo.call(Dog, "breeder", {
-      className: "DogLover",
-      foreignKey: "breeder_id",
-      counterCache: "bred_dogs_count",
-    });
-    Associations.belongsTo.call(Dog, "trainer", {
-      className: "DogLover",
-      foreignKey: "trainer_id",
-      counterCache: "trained_dogs_count",
-    });
     registerModel(DogLover);
     registerModel(Dog);
     const david = await DogLover.create({});
@@ -1879,26 +1879,26 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("friends_too_count", "integer", { default: 0 });
+        this.hasMany("friends_too", {
+          className: "Friendship",
+          foreignKey: "friend_id",
+        });
       }
     }
     class Friendship extends Base {
       static {
         this.attribute("friend_id", "integer");
+        this.belongsTo("friend", {
+          className: "FriendPerson",
+          foreignKey: "friend_id",
+        });
+        this.belongsTo("friendToo", {
+          className: "FriendPerson",
+          foreignKey: "friend_id",
+          counterCache: "friends_too_count",
+        });
       }
     }
-    Associations.belongsTo.call(Friendship, "friend", {
-      className: "FriendPerson",
-      foreignKey: "friend_id",
-    });
-    Associations.belongsTo.call(Friendship, "friendToo", {
-      className: "FriendPerson",
-      foreignKey: "friend_id",
-      counterCache: "friends_too_count",
-    });
-    Associations.hasMany.call(FriendPerson, "friends_too", {
-      className: "Friendship",
-      foreignKey: "friend_id",
-    });
     registerModel(FriendPerson);
     registerModel(Friendship);
     const michael = await FriendPerson.create({ name: "Michael" });
@@ -1915,12 +1915,23 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("books_count", "integer", { default: 0 });
+        this.hasMany("subscriptions", { foreignKey: "subscriber_id" });
+        this.hasMany("books", {
+          through: "subscriptions",
+          source: "book",
+          className: "Book",
+        });
       }
     }
     class Subscription extends Base {
       static {
         this.attribute("subscriber_id", "integer");
         this.attribute("book_id", "integer");
+        this.belongsTo("subscriber", {
+          foreignKey: "subscriber_id",
+          counterCache: "books_count",
+        });
+        this.belongsTo("book", { foreignKey: "book_id" });
       }
     }
     class Book extends Base {
@@ -1929,17 +1940,6 @@ describe("CounterCacheTest", () => {
         this.attribute("author_id", "integer");
       }
     }
-    Associations.hasMany.call(Subscriber, "subscriptions", { foreignKey: "subscriber_id" });
-    Associations.hasMany.call(Subscriber, "books", {
-      through: "subscriptions",
-      source: "book",
-      className: "Book",
-    });
-    Associations.belongsTo.call(Subscription, "subscriber", {
-      foreignKey: "subscriber_id",
-      counterCache: "books_count",
-    });
-    Associations.belongsTo.call(Subscription, "book", { foreignKey: "book_id" });
     registerModel(Subscriber);
     registerModel(Subscription);
     registerModel(Book);

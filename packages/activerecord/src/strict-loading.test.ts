@@ -640,6 +640,10 @@ describe("StrictLoadingTest", () => {
     class SlHmAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("sl_hm_books", {
+          className: "SlHmBook",
+          foreignKey: "author_id",
+        });
       }
     }
     class SlHmBook extends Base {
@@ -650,10 +654,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlHmAuthor", SlHmAuthor);
     registerModel("SlHmBook", SlHmBook);
-    Associations.hasMany.call(SlHmAuthor, "sl_hm_books", {
-      className: "SlHmBook",
-      foreignKey: "author_id",
-    });
     const author = await SlHmAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     await expect(
@@ -686,12 +686,24 @@ describe("StrictLoadingTest", () => {
     class SlThrAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slThrPosts", { foreignKey: "sl_thr_author_id" });
+        this.hasMany("slThrTags", {
+          through: "slThrPosts",
+          source: "slThrTags",
+          className: "SlThrTag",
+        });
       }
     }
     class SlThrPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("sl_thr_author_id", "integer");
+        this.hasMany("slThrTaggings", { foreignKey: "sl_thr_post_id" });
+        this.hasMany("slThrTags", {
+          through: "slThrTaggings",
+          source: "slThrTag",
+          className: "SlThrTag",
+        });
       }
     }
     class SlThrTag extends Base {
@@ -703,28 +715,16 @@ describe("StrictLoadingTest", () => {
       static {
         this.attribute("sl_thr_post_id", "integer");
         this.attribute("sl_thr_tag_id", "integer");
+        this.belongsTo("slThrTag", {
+          foreignKey: "sl_thr_tag_id",
+          className: "SlThrTag",
+        });
       }
     }
     registerModel("SlThrAuthor", SlThrAuthor);
     registerModel("SlThrPost", SlThrPost);
     registerModel("SlThrTag", SlThrTag);
     registerModel("SlThrTagging", SlThrTagging);
-    Associations.hasMany.call(SlThrAuthor, "slThrPosts", { foreignKey: "sl_thr_author_id" });
-    Associations.hasMany.call(SlThrPost, "slThrTaggings", { foreignKey: "sl_thr_post_id" });
-    Associations.hasMany.call(SlThrPost, "slThrTags", {
-      through: "slThrTaggings",
-      source: "slThrTag",
-      className: "SlThrTag",
-    });
-    Associations.belongsTo.call(SlThrTagging, "slThrTag", {
-      foreignKey: "sl_thr_tag_id",
-      className: "SlThrTag",
-    });
-    Associations.hasMany.call(SlThrAuthor, "slThrTags", {
-      through: "slThrPosts",
-      source: "slThrTags",
-      className: "SlThrTag",
-    });
     const author = await SlThrAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     await expect(
@@ -740,11 +740,24 @@ describe("StrictLoadingTest", () => {
     class SlHotAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("slHotAccount", {
+          foreignKey: "sl_hot_author_id",
+          className: "SlHotAccount",
+        });
+        this.hasOne("slHotProfile", {
+          through: "slHotAccount",
+          source: "slHotProfile",
+          className: "SlHotProfile",
+        });
       }
     }
     class SlHotAccount extends Base {
       static {
         this.attribute("sl_hot_author_id", "integer");
+        this.hasOne("slHotProfile", {
+          foreignKey: "sl_hot_account_id",
+          className: "SlHotProfile",
+        });
       }
     }
     class SlHotProfile extends Base {
@@ -756,19 +769,6 @@ describe("StrictLoadingTest", () => {
     registerModel("SlHotAuthor", SlHotAuthor);
     registerModel("SlHotAccount", SlHotAccount);
     registerModel("SlHotProfile", SlHotProfile);
-    Associations.hasOne.call(SlHotAuthor, "slHotAccount", {
-      foreignKey: "sl_hot_author_id",
-      className: "SlHotAccount",
-    });
-    Associations.hasOne.call(SlHotAccount, "slHotProfile", {
-      foreignKey: "sl_hot_account_id",
-      className: "SlHotProfile",
-    });
-    Associations.hasOne.call(SlHotAuthor, "slHotProfile", {
-      through: "slHotAccount",
-      source: "slHotProfile",
-      className: "SlHotProfile",
-    });
     const author = await SlHotAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     await expect(
@@ -793,6 +793,14 @@ describe("StrictLoadingTest", () => {
     class SlpwpDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slpwpLogs", {
+          className: "SlpwpLog",
+          foreignKey: "slpwp_dev_id",
+        });
+        this.hasMany("slpwpExtras", {
+          className: "SlpwpExtra",
+          foreignKey: "slpwp_dev_id",
+        });
       }
     }
     class SlpwpLog extends Base {
@@ -807,14 +815,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("slpwp_dev_id", "integer");
       }
     }
-    Associations.hasMany.call(SlpwpDev, "slpwpLogs", {
-      className: "SlpwpLog",
-      foreignKey: "slpwp_dev_id",
-    });
-    Associations.hasMany.call(SlpwpDev, "slpwpExtras", {
-      className: "SlpwpExtra",
-      foreignKey: "slpwp_dev_id",
-    });
     registerModel("SlpwpDev", SlpwpDev);
     registerModel("SlpwpLog", SlpwpLog);
     registerModel("SlpwpExtra", SlpwpExtra);
@@ -866,10 +866,10 @@ describe("StrictLoadingTest", () => {
     class SlrmAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slrmBooks", {});
       }
     }
     registerModel("SlrmAuthor", SlrmAuthor);
-    Associations.hasMany.call(SlrmAuthor, "slrmBooks", {});
     const author = await SlrmAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     await expect(loadHasMany(author, "slrmBooks", {})).rejects.toThrow(StrictLoadingViolationError);
@@ -933,6 +933,10 @@ describe("StrictLoadingTest", () => {
     class SlAllAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("sl_all_books", {
+          className: "SlAllBook",
+          foreignKey: "author_id",
+        });
       }
     }
     class SlAllBook extends Base {
@@ -943,10 +947,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlAllAuthor", SlAllAuthor);
     registerModel("SlAllBook", SlAllBook);
-    Associations.hasMany.call(SlAllAuthor, "sl_all_books", {
-      className: "SlAllBook",
-      foreignKey: "author_id",
-    });
     const author = await SlAllAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     await expect(
@@ -957,6 +957,10 @@ describe("StrictLoadingTest", () => {
     class SlpntDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slpntLogs", {
+          className: "SlpntLog",
+          foreignKey: "slpnt_dev_id",
+        });
       }
     }
     class SlpntLog extends Base {
@@ -965,10 +969,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("slpnt_dev_id", "integer");
       }
     }
-    Associations.hasMany.call(SlpntDev, "slpntLogs", {
-      className: "SlpntLog",
-      foreignKey: "slpnt_dev_id",
-    });
     registerModel("SlpntDev", SlpntDev);
     registerModel("SlpntLog", SlpntLog);
     const created = await SlpntDev.create({ name: "D" });
@@ -1152,24 +1152,24 @@ describe("StrictLoadingTest", () => {
     class NpoHmAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("npoHmBooks", {
+          className: "NpoHmBook",
+          foreignKey: "author_id",
+        });
       }
     }
     class NpoHmBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
+        this.belongsTo("npoHmAuthor", {
+          className: "NpoHmAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
     registerModel("NpoHmAuthor", NpoHmAuthor);
     registerModel("NpoHmBook", NpoHmBook);
-    Associations.hasMany.call(NpoHmAuthor, "npoHmBooks", {
-      className: "NpoHmBook",
-      foreignKey: "author_id",
-    });
-    Associations.belongsTo.call(NpoHmBook, "npoHmAuthor", {
-      className: "NpoHmAuthor",
-      foreignKey: "author_id",
-    });
     const author = await NpoHmAuthor.create({ name: "Test" });
     await NpoHmBook.create({ title: "B", author_id: author.id });
     author.strictLoadingBang(true, { mode: "n_plus_one_only" });
@@ -1193,34 +1193,34 @@ describe("StrictLoadingTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("ship_id", "integer");
+        this.belongsTo("npoBtShip", {
+          className: "NpoBtShip",
+          foreignKey: "ship_id",
+        });
       }
     }
     class NpoBtShip extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("npoBtParts", {
+          className: "NpoBtPart",
+          foreignKey: "ship_id",
+        });
       }
     }
     class NpoBtPart extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("ship_id", "integer");
+        this.belongsTo("npoBtShip", {
+          className: "NpoBtShip",
+          foreignKey: "ship_id",
+        });
       }
     }
     registerModel("NpoBtDeveloper", NpoBtDeveloper);
     registerModel("NpoBtShip", NpoBtShip);
     registerModel("NpoBtPart", NpoBtPart);
-    Associations.belongsTo.call(NpoBtDeveloper, "npoBtShip", {
-      className: "NpoBtShip",
-      foreignKey: "ship_id",
-    });
-    Associations.hasMany.call(NpoBtShip, "npoBtParts", {
-      className: "NpoBtPart",
-      foreignKey: "ship_id",
-    });
-    Associations.belongsTo.call(NpoBtPart, "npoBtShip", {
-      className: "NpoBtShip",
-      foreignKey: "ship_id",
-    });
     const ship = await NpoBtShip.create({ name: "S" });
     await NpoBtPart.create({ name: "Stern", ship_id: ship.id });
     const developer = await NpoBtDeveloper.create({ name: "Dev", ship_id: ship.id });
@@ -1245,24 +1245,24 @@ describe("StrictLoadingTest", () => {
     class SlcplAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slcplBooks", {
+          className: "SlcplBook",
+          foreignKey: "author_id",
+        });
       }
     }
     class SlcplBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
+        this.belongsTo("slcplAuthor", {
+          className: "SlcplAuthor",
+          foreignKey: "author_id",
+        });
       }
     }
     registerModel("SlcplAuthor", SlcplAuthor);
     registerModel("SlcplBook", SlcplBook);
-    Associations.hasMany.call(SlcplAuthor, "slcplBooks", {
-      className: "SlcplBook",
-      foreignKey: "author_id",
-    });
-    Associations.belongsTo.call(SlcplBook, "slcplAuthor", {
-      className: "SlcplAuthor",
-      foreignKey: "author_id",
-    });
     const author = await SlcplAuthor.create({ name: "Test" });
     await SlcplBook.create({ title: "B", author_id: author.id });
     author.strictLoadingBang(true, { mode: "n_plus_one_only" });
@@ -1281,34 +1281,34 @@ describe("StrictLoadingTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("ship_id", "integer");
+        this.belongsTo("slcpmShip", {
+          className: "SlcpmShip",
+          foreignKey: "ship_id",
+        });
       }
     }
     class SlcpmShip extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slcpmParts", {
+          className: "SlcpmPart",
+          foreignKey: "ship_id",
+        });
       }
     }
     class SlcpmPart extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("ship_id", "integer");
+        this.belongsTo("slcpmShip", {
+          className: "SlcpmShip",
+          foreignKey: "ship_id",
+        });
       }
     }
     registerModel("SlcpmDeveloper", SlcpmDeveloper);
     registerModel("SlcpmShip", SlcpmShip);
     registerModel("SlcpmPart", SlcpmPart);
-    Associations.belongsTo.call(SlcpmDeveloper, "slcpmShip", {
-      className: "SlcpmShip",
-      foreignKey: "ship_id",
-    });
-    Associations.hasMany.call(SlcpmShip, "slcpmParts", {
-      className: "SlcpmPart",
-      foreignKey: "ship_id",
-    });
-    Associations.belongsTo.call(SlcpmPart, "slcpmShip", {
-      className: "SlcpmShip",
-      foreignKey: "ship_id",
-    });
     const ship = await SlcpmShip.create({ name: "S" });
     await SlcpmPart.create({ name: "Keel", ship_id: ship.id });
     const developer = await SlcpmDeveloper.create({ name: "Dev", ship_id: ship.id });
@@ -1330,6 +1330,10 @@ describe("StrictLoadingTest", () => {
     class SlcpdAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slcpdBooks", {
+          className: "SlcpdBook",
+          foreignKey: "author_id",
+        });
       }
     }
     class SlcpdBook extends Base {
@@ -1340,10 +1344,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlcpdAuthor", SlcpdAuthor);
     registerModel("SlcpdBook", SlcpdBook);
-    Associations.hasMany.call(SlcpdAuthor, "slcpdBooks", {
-      className: "SlcpdBook",
-      foreignKey: "author_id",
-    });
     const author = await SlcpdAuthor.create({ name: "Test" });
     await SlcpdBook.create({ title: "B", author_id: author.id });
     // author is NOT strict loading — cascade would call strictLoadingBang(false)
@@ -1360,6 +1360,10 @@ describe("StrictLoadingTest", () => {
     class SlcpfDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slcpfLogs", {
+          className: "SlcpfLog",
+          foreignKey: "slcpf_dev_id",
+        });
       }
     }
     class SlcpfLog extends Base {
@@ -1370,10 +1374,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlcpfDev", SlcpfDev);
     registerModel("SlcpfLog", SlcpfLog);
-    Associations.hasMany.call(SlcpfDev, "slcpfLogs", {
-      className: "SlcpfLog",
-      foreignKey: "slcpf_dev_id",
-    });
     const dev = await SlcpfDev.create({ name: "Dev" });
     await SlcpfLog.create({ message: "entry", slcpf_dev_id: dev.id });
     dev.strictLoadingBang(true, { mode: "n_plus_one_only" });
@@ -1391,6 +1391,10 @@ describe("StrictLoadingTest", () => {
     class GmAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("gm_books", {
+          className: "GmBook",
+          foreignKey: "author_id",
+        });
       }
     }
     class GmBook extends Base {
@@ -1401,10 +1405,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("GmAuthor", GmAuthor);
     registerModel("GmBook", GmBook);
-    Associations.hasMany.call(GmAuthor, "gm_books", {
-      className: "GmBook",
-      foreignKey: "author_id",
-    });
     const original = Base.strictLoadingByDefault;
     try {
       Base.strictLoadingByDefault = true;
@@ -1422,6 +1422,10 @@ describe("StrictLoadingTest", () => {
     class RslAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("rsl_books", {
+          className: "RslBook",
+          foreignKey: "author_id",
+        });
       }
     }
     class RslBook extends Base {
@@ -1432,10 +1436,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("RslAuthor", RslAuthor);
     registerModel("RslBook", RslBook);
-    Associations.hasMany.call(RslAuthor, "rsl_books", {
-      className: "RslBook",
-      foreignKey: "author_id",
-    });
     const author = await RslAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     await expect(
@@ -1452,14 +1452,14 @@ describe("StrictLoadingTest", () => {
       static {
         this.attribute("message", "string");
         this.attribute("vcbt_dev_id", "integer");
+        this.belongsTo("vcbtDev", {
+          className: "VcbtDev",
+          foreignKey: "vcbt_dev_id",
+        });
       }
     }
     registerModel("VcbtDev", VcbtDev);
     registerModel("VcbtLog", VcbtLog);
-    Associations.belongsTo.call(VcbtLog, "vcbtDev", {
-      className: "VcbtDev",
-      foreignKey: "vcbt_dev_id",
-    });
     const dev = await VcbtDev.create({ name: "Test" });
     const log = await VcbtLog.create({ message: "i am a message", vcbt_dev_id: dev.id });
     log.strictLoadingBang();
@@ -1481,6 +1481,10 @@ describe("StrictLoadingTest", () => {
     class VchmDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("vchmLogs", {
+          className: "VchmLog",
+          foreignKey: "vchm_dev_id",
+        });
       }
     }
     class VchmLog extends Base {
@@ -1491,10 +1495,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("VchmDev", VchmDev);
     registerModel("VchmLog", VchmLog);
-    Associations.hasMany.call(VchmDev, "vchmLogs", {
-      className: "VchmLog",
-      foreignKey: "vchm_dev_id",
-    });
     const dev = await VchmDev.create({ name: "Test" });
     await VchmLog.create({ message: "I am message", vchm_dev_id: dev.id });
     dev.strictLoadingBang();
@@ -1514,6 +1514,10 @@ describe("StrictLoadingTest", () => {
     class SlcnAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slCnBooks", {
+          className: "SlcnBook",
+          foreignKey: "sl_cn_author_id",
+        });
       }
     }
     class SlcnBook extends Base {
@@ -1524,10 +1528,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlcnAuthor", SlcnAuthor);
     registerModel("SlcnBook", SlcnBook);
-    Associations.hasMany.call(SlcnAuthor, "slCnBooks", {
-      className: "SlcnBook",
-      foreignKey: "sl_cn_author_id",
-    });
     const author = await SlcnAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     const proxy = association(author, "slCnBooks");
@@ -1540,6 +1540,10 @@ describe("StrictLoadingTest", () => {
     class SlbdAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slBdBooks", {
+          className: "SlbdBook",
+          foreignKey: "sl_bd_author_id",
+        });
       }
     }
     class SlbdBook extends Base {
@@ -1550,10 +1554,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlbdAuthor", SlbdAuthor);
     registerModel("SlbdBook", SlbdBook);
-    Associations.hasMany.call(SlbdAuthor, "slBdBooks", {
-      className: "SlbdBook",
-      foreignKey: "sl_bd_author_id",
-    });
     const author = await SlbdAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     const proxy = association(author, "slBdBooks");
@@ -1565,6 +1565,10 @@ describe("StrictLoadingTest", () => {
     class SlwrAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slWrBooks", {
+          className: "SlwrBook",
+          foreignKey: "sl_wr_author_id",
+        });
       }
     }
     class SlwrBook extends Base {
@@ -1575,10 +1579,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlwrAuthor", SlwrAuthor);
     registerModel("SlwrBook", SlwrBook);
-    Associations.hasMany.call(SlwrAuthor, "slWrBooks", {
-      className: "SlwrBook",
-      foreignKey: "sl_wr_author_id",
-    });
     const author = await SlwrAuthor.create({ name: "Test" });
     author.strictLoadingBang();
     const proxy = association(author, "slWrBooks");
@@ -1591,6 +1591,10 @@ describe("StrictLoadingTest", () => {
     class SlnrAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slNrBooks", {
+          className: "SlnrBook",
+          foreignKey: "sl_nr_author_id",
+        });
       }
     }
     class SlnrBook extends Base {
@@ -1601,10 +1605,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlnrAuthor", SlnrAuthor);
     registerModel("SlnrBook", SlnrBook);
-    Associations.hasMany.call(SlnrAuthor, "slNrBooks", {
-      className: "SlnrBook",
-      foreignKey: "sl_nr_author_id",
-    });
     const author = new SlnrAuthor({ name: "Test" });
     author.strictLoadingBang();
     const proxy = association(author, "slNrBooks");
@@ -1616,6 +1616,10 @@ describe("StrictLoadingTest", () => {
     class SlnbAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slNbBooks", {
+          className: "SlnbBook",
+          foreignKey: "sl_nb_author_id",
+        });
       }
     }
     class SlnbBook extends Base {
@@ -1626,10 +1630,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlnbAuthor", SlnbAuthor);
     registerModel("SlnbBook", SlnbBook);
-    Associations.hasMany.call(SlnbAuthor, "slNbBooks", {
-      className: "SlnbBook",
-      foreignKey: "sl_nb_author_id",
-    });
     // Rails uses `Developer.new(id: Developer.first.id)` — a new record
     // carrying a pre-assigned PK (strict_loading_test.rb:244).
     const author = new SlnbAuthor({ id: 1, name: "Test" });
@@ -1642,6 +1642,10 @@ describe("StrictLoadingTest", () => {
     class SlnwAuthor extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slNwBooks", {
+          className: "SlnwBook",
+          foreignKey: "sl_nw_author_id",
+        });
       }
     }
     class SlnwBook extends Base {
@@ -1652,10 +1656,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlnwAuthor", SlnwAuthor);
     registerModel("SlnwBook", SlnwBook);
-    Associations.hasMany.call(SlnwAuthor, "slNwBooks", {
-      className: "SlnwBook",
-      foreignKey: "sl_nw_author_id",
-    });
     // Rails uses `Developer.new(id: Developer.first.id)` — a new record
     // carrying a pre-assigned PK (strict_loading_test.rb:253). With the PK
     // present, `foreign_key_present?` is true so the writer's clear path runs
@@ -1671,6 +1671,10 @@ describe("StrictLoadingTest", () => {
     class SlhorDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("slhorShip", {
+          className: "SlhorShip",
+          foreignKey: "slhor_dev_id",
+        });
       }
     }
     class SlhorShip extends Base {
@@ -1681,10 +1685,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlhorDev", SlhorDev);
     registerModel("SlhorShip", SlhorShip);
-    Associations.hasOne.call(SlhorDev, "slhorShip", {
-      className: "SlhorShip",
-      foreignKey: "slhor_dev_id",
-    });
     const created = await SlhorDev.create({ name: "D" });
     const ship = await SlhorShip.create({ name: "The Great Ship", slhor_dev_id: created.id });
     const developer = (await SlhorDev.all().strictLoading().includes("slhorShip").first())!;
@@ -1703,6 +1703,10 @@ describe("StrictLoadingTest", () => {
     class SlhmrDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slhmrLogs", {
+          className: "SlhmrLog",
+          foreignKey: "slhmr_dev_id",
+        });
       }
     }
     class SlhmrLog extends Base {
@@ -1713,10 +1717,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlhmrDev", SlhmrDev);
     registerModel("SlhmrLog", SlhmrLog);
-    Associations.hasMany.call(SlhmrDev, "slhmrLogs", {
-      className: "SlhmrLog",
-      foreignKey: "slhmr_dev_id",
-    });
     const created = await SlhmrDev.create({ name: "D" });
     await SlhmrLog.create({ message: "M", slhmr_dev_id: created.id });
     const devs = await SlhmrDev.all().strictLoading().includes("slhmrLogs").toArray();
@@ -1734,6 +1734,10 @@ describe("StrictLoadingTest", () => {
     class SlhmsDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slhmsLogs", {
+          className: "SlhmsLog",
+          foreignKey: "slhms_dev_id",
+        });
       }
     }
     class SlhmsLog extends Base {
@@ -1744,10 +1748,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("SlhmsDev", SlhmsDev);
     registerModel("SlhmsLog", SlhmsLog);
-    Associations.hasMany.call(SlhmsDev, "slhmsLogs", {
-      className: "SlhmsLog",
-      foreignKey: "slhms_dev_id",
-    });
     const created = await SlhmsDev.create({ name: "D" });
     await SlhmsLog.create({ message: "M", slhms_dev_id: created.id });
     const dev = (await SlhmsDev.all().strictLoading().includes("slhmsLogs").first())!;
@@ -1761,17 +1761,38 @@ describe("StrictLoadingTest", () => {
     class SlthcDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slthcContracts", {
+          className: "SlthcContract",
+          foreignKey: "slthc_dev_id",
+        });
+        this.hasMany("slthcFirms", {
+          through: "slthcContracts",
+          source: "slthcFirm",
+          className: "SlthcFirm",
+        });
+        this.hasOne("slthcShip", {
+          className: "SlthcShip",
+          foreignKey: "slthc_dev_id",
+        });
       }
     }
     class SlthcFirm extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slthcContracts", {
+          className: "SlthcContract",
+          foreignKey: "slthc_firm_id",
+        });
       }
     }
     class SlthcContract extends Base {
       static {
         this.attribute("slthc_dev_id", "integer");
         this.attribute("slthc_firm_id", "integer");
+        this.belongsTo("slthcFirm", {
+          className: "SlthcFirm",
+          foreignKey: "slthc_firm_id",
+        });
       }
     }
     class SlthcShip extends Base {
@@ -1784,27 +1805,6 @@ describe("StrictLoadingTest", () => {
     registerModel("SlthcFirm", SlthcFirm);
     registerModel("SlthcContract", SlthcContract);
     registerModel("SlthcShip", SlthcShip);
-    Associations.hasMany.call(SlthcDev, "slthcContracts", {
-      className: "SlthcContract",
-      foreignKey: "slthc_dev_id",
-    });
-    Associations.hasMany.call(SlthcDev, "slthcFirms", {
-      through: "slthcContracts",
-      source: "slthcFirm",
-      className: "SlthcFirm",
-    });
-    Associations.hasOne.call(SlthcDev, "slthcShip", {
-      className: "SlthcShip",
-      foreignKey: "slthc_dev_id",
-    });
-    Associations.belongsTo.call(SlthcContract, "slthcFirm", {
-      className: "SlthcFirm",
-      foreignKey: "slthc_firm_id",
-    });
-    Associations.hasMany.call(SlthcFirm, "slthcContracts", {
-      className: "SlthcContract",
-      foreignKey: "slthc_firm_id",
-    });
 
     const dev = await SlthcDev.create({ name: "Dev" });
     const firm = await SlthcFirm.create({ name: "NASA" });
@@ -1847,30 +1847,30 @@ describe("StrictLoadingTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("slhotc_firm_id", "integer");
+        this.belongsTo("slhotcFirm", {
+          className: "SlhotcFirm",
+          foreignKey: "slhotc_firm_id",
+        });
       }
     }
     class SlhotcMember extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("slhotc_dev_id", "integer");
+        this.belongsTo("slhotcDev", {
+          className: "SlhotcDev",
+          foreignKey: "slhotc_dev_id",
+        });
+        this.hasOne("slhotcFirm", {
+          className: "SlhotcFirm",
+          through: "slhotcDev",
+          source: "slhotcFirm",
+        });
       }
     }
     registerModel("SlhotcFirm", SlhotcFirm);
     registerModel("SlhotcDev", SlhotcDev);
     registerModel("SlhotcMember", SlhotcMember);
-    Associations.belongsTo.call(SlhotcMember, "slhotcDev", {
-      className: "SlhotcDev",
-      foreignKey: "slhotc_dev_id",
-    });
-    Associations.hasOne.call(SlhotcMember, "slhotcFirm", {
-      className: "SlhotcFirm",
-      through: "slhotcDev",
-      source: "slhotcFirm",
-    });
-    Associations.belongsTo.call(SlhotcDev, "slhotcFirm", {
-      className: "SlhotcFirm",
-      foreignKey: "slhotc_firm_id",
-    });
 
     // Rails wires new strict-loading records through a has_one :through and
     // asserts `save!` does not raise (strict_loading_test.rb:330). Creating the
@@ -1889,6 +1889,10 @@ describe("StrictLoadingTest", () => {
     class SlpplDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slpplLogs", {
+          className: "SlpplLog",
+          foreignKey: "slppl_dev_id",
+        });
       }
     }
     class SlpplLog extends Base {
@@ -1897,10 +1901,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("slppl_dev_id", "integer");
       }
     }
-    Associations.hasMany.call(SlpplDev, "slpplLogs", {
-      className: "SlpplLog",
-      foreignKey: "slppl_dev_id",
-    });
     registerModel("SlpplDev", SlpplDev);
     registerModel("SlpplLog", SlpplLog);
     const developer = await SlpplDev.create({ name: "D" });
@@ -1918,6 +1918,10 @@ describe("StrictLoadingTest", () => {
     class SlpbdDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("slpbdLogs", {
+          className: "SlpbdLog",
+          foreignKey: "slpbd_dev_id",
+        });
       }
     }
     class SlpbdLog extends Base {
@@ -1926,10 +1930,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("slpbd_dev_id", "integer");
       }
     }
-    Associations.hasMany.call(SlpbdDev, "slpbdLogs", {
-      className: "SlpbdLog",
-      foreignKey: "slpbd_dev_id",
-    });
     registerModel("SlpbdDev", SlpbdDev);
     registerModel("SlpbdLog", SlpbdLog);
     SlpbdLog.strictLoadingByDefault = true;
@@ -1952,6 +1952,11 @@ describe("StrictLoadingTest", () => {
     class ElslhmDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("elslhmLogs", {
+          className: "ElslhmLog",
+          foreignKey: "elslhm_dev_id",
+          strictLoading: true,
+        });
       }
     }
     class ElslhmLog extends Base {
@@ -1960,11 +1965,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("elslhm_dev_id", "integer");
       }
     }
-    Associations.hasMany.call(ElslhmDev, "elslhmLogs", {
-      className: "ElslhmLog",
-      foreignKey: "elslhm_dev_id",
-      strictLoading: true,
-    });
     registerModel("ElslhmDev", ElslhmDev);
     registerModel("ElslhmLog", ElslhmLog);
     const dev = await ElslhmDev.create({ name: "D" });
@@ -1979,6 +1979,10 @@ describe("StrictLoadingTest", () => {
     class ElslDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("elslLogs", {
+          className: "ElslLog",
+          foreignKey: "elsl_dev_id",
+        });
       }
     }
     class ElslLog extends Base {
@@ -1987,10 +1991,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("elsl_dev_id", "integer");
       }
     }
-    Associations.hasMany.call(ElslDev, "elslLogs", {
-      className: "ElslLog",
-      foreignKey: "elsl_dev_id",
-    });
     registerModel("ElslDev", ElslDev);
     registerModel("ElslLog", ElslLog);
     const dev = await ElslDev.create({ name: "D" });
@@ -2006,6 +2006,10 @@ describe("StrictLoadingTest", () => {
     class ElslidDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("elslidLogs", {
+          className: "ElslidLog",
+          foreignKey: "elslid_dev_id",
+        });
       }
     }
     class ElslidLog extends Base {
@@ -2014,10 +2018,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("elslid_dev_id", "integer");
       }
     }
-    Associations.hasMany.call(ElslidDev, "elslidLogs", {
-      className: "ElslidLog",
-      foreignKey: "elslid_dev_id",
-    });
     registerModel("ElslidDev", ElslidDev);
     registerModel("ElslidLog", ElslidLog);
     // The *target* model is strict_loading_by_default, so its instances are
@@ -2042,6 +2042,10 @@ describe("StrictLoadingTest", () => {
     class UrmDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("urmLogs", {
+          className: "UrmLog",
+          foreignKey: "urm_dev_id",
+        });
       }
     }
     class UrmLog extends Base {
@@ -2052,10 +2056,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("UrmDev", UrmDev);
     registerModel("UrmLog", UrmLog);
-    Associations.hasMany.call(UrmDev, "urmLogs", {
-      className: "UrmLog",
-      foreignKey: "urm_dev_id",
-    });
     const dev = await UrmDev.create({ name: "Dev" });
     dev.strictLoadingBang();
     expect(dev.isStrictLoading()).toBe(true);
@@ -2067,6 +2067,10 @@ describe("StrictLoadingTest", () => {
     class UrmdDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("urmdLogs", {
+          className: "UrmdLog",
+          foreignKey: "urmd_dev_id",
+        });
       }
     }
     class UrmdLog extends Base {
@@ -2077,10 +2081,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("UrmdDev", UrmdDev);
     registerModel("UrmdLog", UrmdLog);
-    Associations.hasMany.call(UrmdDev, "urmdLogs", {
-      className: "UrmdLog",
-      foreignKey: "urmd_dev_id",
-    });
     UrmdDev.strictLoadingByDefault = true;
     try {
       const created = await UrmdDev.create({ name: "Dev" });
@@ -2098,6 +2098,11 @@ describe("StrictLoadingTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tooa_mentor_id", "integer");
+        this.belongsTo("tooaOffMentor", {
+          className: "TooaMentor",
+          foreignKey: "tooa_mentor_id",
+          strictLoading: false,
+        });
       }
     }
     class TooaMentor extends Base {
@@ -2109,11 +2114,6 @@ describe("StrictLoadingTest", () => {
     registerModel("TooaMentor", TooaMentor);
     // strict_loading: false on the reflection turns enforcement off even
     // though the owning model is strict_loading by default.
-    Associations.belongsTo.call(TooaDev, "tooaOffMentor", {
-      className: "TooaMentor",
-      foreignKey: "tooa_mentor_id",
-      strictLoading: false,
-    });
     TooaDev.strictLoadingByDefault = true;
     try {
       const mentor = await TooaMentor.create({ name: "Mentor" });
@@ -2135,6 +2135,11 @@ describe("StrictLoadingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("ebts_publisher_id", "integer");
+        this.belongsTo("ebtsPublisher", {
+          className: "EbtsPublisher",
+          foreignKey: "ebts_publisher_id",
+          strictLoading: true,
+        });
       }
     }
     class EbtsPublisher extends Base {
@@ -2144,11 +2149,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("EbtsBook", EbtsBook);
     registerModel("EbtsPublisher", EbtsPublisher);
-    Associations.belongsTo.call(EbtsBook, "ebtsPublisher", {
-      className: "EbtsPublisher",
-      foreignKey: "ebts_publisher_id",
-      strictLoading: true,
-    });
     const publisher = await EbtsPublisher.create({ name: "Press" });
     const book = await EbtsBook.create({ title: "Guide", ebts_publisher_id: publisher.id });
     (book as any)._preloadedAssociations = new Map([["ebtsPublisher", publisher]]);
@@ -2163,6 +2163,11 @@ describe("StrictLoadingTest", () => {
     class EhosDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("ehosProfile", {
+          className: "EhosProfile",
+          foreignKey: "ehos_dev_id",
+          strictLoading: true,
+        });
       }
     }
     class EhosProfile extends Base {
@@ -2173,11 +2178,6 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("EhosDev", EhosDev);
     registerModel("EhosProfile", EhosProfile);
-    Associations.hasOne.call(EhosDev, "ehosProfile", {
-      className: "EhosProfile",
-      foreignKey: "ehos_dev_id",
-      strictLoading: true,
-    });
     const dev = await EhosDev.create({ name: "D" });
     const profile = await EhosProfile.create({ bio: "I am bio", ehos_dev_id: dev.id });
     (dev as any)._preloadedAssociations = new Map([["ehosProfile", profile]]);
@@ -2192,6 +2192,10 @@ describe("StrictLoadingTest", () => {
     class EhosdDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasOne("ehosdProfile", {
+          className: "EhosdProfile",
+          foreignKey: "ehosd_dev_id",
+        });
       }
     }
     class EhosdProfile extends Base {
@@ -2200,10 +2204,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("ehosd_dev_id", "integer");
       }
     }
-    Associations.hasOne.call(EhosdDev, "ehosdProfile", {
-      className: "EhosdProfile",
-      foreignKey: "ehosd_dev_id",
-    });
     registerModel("EhosdDev", EhosdDev);
     registerModel("EhosdProfile", EhosdProfile);
     EhosdDev.strictLoadingByDefault = true;
@@ -2228,6 +2228,10 @@ describe("StrictLoadingTest", () => {
     class EhmdDev extends Base {
       static {
         this.attribute("name", "string");
+        this.hasMany("ehmdLogs", {
+          className: "EhmdLog",
+          foreignKey: "ehmd_dev_id",
+        });
       }
     }
     class EhmdLog extends Base {
@@ -2236,10 +2240,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("ehmd_dev_id", "integer");
       }
     }
-    Associations.hasMany.call(EhmdDev, "ehmdLogs", {
-      className: "EhmdLog",
-      foreignKey: "ehmd_dev_id",
-    });
     registerModel("EhmdDev", EhmdDev);
     registerModel("EhmdLog", EhmdLog);
     EhmdDev.strictLoadingByDefault = true;
@@ -2475,14 +2475,14 @@ describe("StrictLoadingFixturesTest", () => {
     class SlfZine extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("slfInterests", {
+          className: "SlfInterest",
+          foreignKey: "slf_zine_id",
+        });
       }
     }
     registerModel("SlfInterest", SlfInterest);
     registerModel("SlfZine", SlfZine);
-    Associations.hasMany.call(SlfZine, "slfInterests", {
-      className: "SlfInterest",
-      foreignKey: "slf_zine_id",
-    });
 
     const created = await SlfZine.create({ title: "Going Out" });
     await SlfInterest.create({ topic: "Hiking", slf_zine_id: created.id });
