@@ -14,7 +14,10 @@ export class Entry {
   // Mirrors Rails Entry.unpack (entry.rb:15-17): rebuilds an Entry from the
   // array produced by #pack.
   static unpack(members: unknown[]): Entry {
-    return new Entry(members[0], {
+    // A nil value is popped from #pack's trailing nils, so members[0] is absent
+    // (undefined) here; normalize to null to mirror Ruby's `members[0]` nil and
+    // stay consistent with the `?? null` already applied to the other members.
+    return new Entry(members[0] ?? null, {
       expiresAt: (members[1] as number | null) ?? null,
       version: (members[2] as string | null) ?? null,
     });
