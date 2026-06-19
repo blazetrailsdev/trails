@@ -57,7 +57,7 @@ export async function initializeAssociations(): Promise<void> {
     import("./associations/disable-joins-association-scope.js"),
   ]);
 }
-import { ConfigurationError, Rollback } from "./errors.js";
+import { ConfigurationError, NameError, Rollback } from "./errors.js";
 import { strictLoadingViolationBang } from "./core.js";
 import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
 import {
@@ -271,7 +271,9 @@ export function registerModel(
 export function resolveModel(name: string): typeof Base {
   const model = modelRegistry.get(name);
   if (!model) {
-    throw new Error(`Model "${name}" not found in registry. Did you call registerModel(${name})?`);
+    throw new NameError(
+      `Model "${name}" not found in registry. Did you call registerModel(${name})?`,
+    );
   }
   return model;
 }

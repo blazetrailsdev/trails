@@ -29,6 +29,7 @@ import "./test-helpers/models/reader.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 
+registerModel(Post);
 registerModel(Comment);
 registerModel(Project);
 

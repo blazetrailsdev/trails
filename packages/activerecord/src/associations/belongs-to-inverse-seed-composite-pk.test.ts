@@ -1,15 +1,21 @@
 /**
  * Regression guard for RFC 0022 b1: seeding an inverse belongs_to target
  * through the holder (`record.association(name).setTarget(target)`) marks the
- * holder loaded, which captures `staleState()` → `foreignKeyNames()`. The
- * target need not be registered in the model registry, since we hold the
- * instance. Before the fix, the target class was resolved from the registry
- * (throwing `Model '...' not found`) instead of being read from the instance.
+ * holder loaded, which captures `staleState()` → `foreignKeyNames()`. Before
+ * the fix, the target class was resolved from the registry (throwing
+ * `Model '...' not found`) instead of being read from the instance.
  *
  * Also covers scalar-FK + composite-PK-target assignment: when the target has
  * composite PK `[shop_id, id]` and no explicit `foreignKey`, the inferred
  * scalar FK (`composite_pk_parent_id`) must write the `"id"` component —
  * mirrors Rails `BelongsToReflection#association_primary_key` (reflection.rb:936-938).
+ *
+ * NOTE: Both models must now be registered because constructor-level
+ * `checkKlass()` (matching Rails' `Association#initialize → check_validity!`)
+ * requires the target class in the registry before `association()` is called.
+ * This weakens the original guard: a future regression where `staleState()`
+ * falls back to a registry lookup instead of reading from the held instance
+ * would go undetected. Catching that would require a spy on `resolveModel`.
  */
 import { describe, it, expect } from "vitest";
 
@@ -34,8 +40,7 @@ class CpkSeedChild extends Base {
 }
 
 describe("belongs_to inverse seeding with a composite-PK target", () => {
-  // Register only the child — the parent is deliberately left out of the
-  // registry to prove the seed path does not resolve the target class.
+  registerModel(CompositePkParent);
   registerModel(CpkSeedChild);
 
   it("seeds the holder without resolving the target class from the registry", () => {
