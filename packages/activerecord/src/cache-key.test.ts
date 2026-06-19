@@ -6,6 +6,7 @@ import { Base } from "./index.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
+import { setDefaultTimezone } from "./type/internal/timezone.js";
 
 // Mirrors Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars).
 function usec(ts: unknown): string {
@@ -161,6 +162,27 @@ describe("CacheKeyTest", () => {
     },
   );
 
+  // No Rails counterpart (Rails inlines the `default_timezone == :utc` guard in
+  // can_use_fast_cache_version?). When the connection's default_timezone is not
+  // UTC, the raw DB string can't be reused verbatim, so the fast path must NOT
+  // fire and cache_version falls through to the type-casting reader.
+  it.skipIf(adapterType !== "sqlite")(
+    "cache_version does call updated_at when default_timezone is not utc",
+    async () => {
+      const CacheMeWithVersion = cacheMeWithVersion();
+      const record = await CacheMeWithVersion.create({});
+      const recordFromDb = await CacheMeWithVersion.find(record.id);
+      const spy = vi.spyOn(recordFromDb, "readAttribute");
+      setDefaultTimezone("local");
+      try {
+        recordFromDb.cacheVersion();
+        expect(spy).toHaveBeenCalledWith("updated_at");
+      } finally {
+        setDefaultTimezone("utc");
+      }
+    },
+  );
+
   it("cache_version does call updated_at when it is assigned via a Time object", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
@@ -183,10 +205,8 @@ describe("CacheKeyTest", () => {
     expect(version).toBe("20161112010203000000");
   });
 
-  // No Rails counterpart: in Rails the `default_timezone == :utc` check is the
-  // primary fast-path guard. trails omits that (it needs an async connection
-  // call) and relies on `!cameFromUser` to reject user-assigned values, so this
-  // test pins the DB-format-string-from-user case the guard exists to cover.
+  // No Rails counterpart: pins the DB-format-string-from-user case that the
+  // `!cameFromUser` guard rejects (independent of the default_timezone guard).
   it("cache_version does call updated_at when a DB-format string is assigned by the user", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
