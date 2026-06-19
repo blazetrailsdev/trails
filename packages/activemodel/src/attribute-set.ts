@@ -85,7 +85,7 @@ export class AttributeSet {
       // materializes a fresh attribute below, because trails populates the set
       // lazily rather than from a complete schema like Rails — so map-absence
       // does not yet imply "unknown column" for a real name.
-      this.getAttribute(name).withValueFromUser(value);
+      this.attributes.set(name, this.getAttribute(name).withValueFromUser(value));
     } else {
       // New attribute not previously declared — create a FromUser with default type
       this.attributes.set(name, Attribute.fromUser(name, value, typeRegistry.lookup("value")));
