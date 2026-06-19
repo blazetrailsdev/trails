@@ -66,3 +66,44 @@ export function validateThroughReflection(modelClass: typeof Base, assocName: st
     throw err;
   }
 }
+
+/**
+ * Run the full `reflection.check_validity!` for every macro at first use —
+ * Rails calls this in `Association#initialize` (association.rb:39), so EVERY
+ * association misconfiguration (missing/recursive inverse, composite-PK/FK
+ * length mismatch, and the through/source errors) surfaces on first
+ * association access regardless of macro, not just through-reflections.
+ *
+ * Shares the same per-reflection memo as `validateThroughReflection`: a
+ * through-reflection's `checkValidityBang` subsumes the inverse-of check, so
+ * caching here and there cannot double-raise or disagree. Success
+ * short-circuits; a cached error re-throws on every call.
+ *
+ * Mirrors: `ActiveRecord::Reflection::AbstractReflection#check_validity!`
+ * (and the `ThroughReflection` / `AssociationReflection` overrides).
+ */
+export function validateReflectionValidity(modelClass: typeof Base, assocName: string): void {
+  const full = (
+    modelClass as unknown as { _reflectOnAssociation?: (n: string) => unknown }
+  )._reflectOnAssociation?.(assocName);
+  const refl = full as
+    | {
+        checkValidityBang?: () => void;
+        [CHECKED_OK]?: boolean;
+        [CHECKED_ERROR]?: unknown;
+      }
+    | null
+    | undefined;
+  if (!refl) return;
+  if (refl[CHECKED_ERROR] !== undefined) throw refl[CHECKED_ERROR];
+  if (refl[CHECKED_OK]) return;
+  if (typeof refl.checkValidityBang !== "function") return;
+
+  try {
+    refl.checkValidityBang();
+    refl[CHECKED_OK] = true;
+  } catch (err) {
+    refl[CHECKED_ERROR] = err;
+    throw err;
+  }
+}

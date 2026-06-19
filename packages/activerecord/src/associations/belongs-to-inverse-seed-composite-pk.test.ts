@@ -116,12 +116,18 @@ describe("belongs_to to a composite-PK target without an id column", () => {
   registerModel(TenantPkParent);
   registerModel(CpkTenantChild);
 
-  it("keeps the full composite array as the association primary key", () => {
+  it("raises a composite-PK/FK length mismatch at first association access", () => {
     const child = new CpkTenantChild();
-    const parent = new TenantPkParent({ shop_id: 7, tenant_id: 42 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const holder = child.association("tenantPkParent") as any;
-    expect(holder.associationPrimaryKeys(parent)).toEqual(["shop_id", "tenant_id"]);
+    // The target's composite PK `[shop_id, tenant_id]` (no `id` column) keeps
+    // its full two-column array as the association primary key, but the
+    // belongs_to's default foreign key (`tenant_pk_parent_id`) is scalar — a
+    // 2-vs-1 length mismatch. Rails runs `reflection.check_validity!` in
+    // `Association#initialize` (now mirrored in the `Association` constructor),
+    // so this misconfiguration raises on first `association()` access rather
+    // than being silently inferred.
+    expect(() => child.association("tenantPkParent")).toThrow(
+      /composite primary key \/ foreign key length mismatch/,
+    );
   });
 });

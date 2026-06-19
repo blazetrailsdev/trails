@@ -385,13 +385,27 @@ export class AbstractReflection {
       const inverse = this.inverseOf();
       if (inverse == null) {
         const inverseOf = this.inverseName()!;
+        // Rails' `InverseOfAssociationNotFoundError#corrections` builds a
+        // "Did you mean?" list from `associated_class.reflections.keys`
+        // (errors.rb) — the target model's declared association names ranked
+        // against the missing inverse name. Compute the same here so the
+        // constructor-time check surfaces suggestions, matching the load-time
+        // `validateInverseOf` path. `klass` may be unresolvable for some
+        // configs; fall back to no corrections rather than masking the error.
+        let corrections: string[] = [];
+        try {
+          const dictionary = (this.klass._associations ?? []).map((a) => a.name);
+          corrections = _correctNames(dictionary, inverseOf);
+        } catch {
+          corrections = [];
+        }
         // Rails passes the reflection; with no explicit associated_class the
         // message falls back to `reflection.class_name` (errors.rb). Thread the
         // target class name so the `in <class>` clause is always present.
         throw new InverseOfAssociationNotFoundError(
           this._concrete().name,
           inverseOf,
-          [],
+          corrections,
           this._concrete().className,
         );
       }
