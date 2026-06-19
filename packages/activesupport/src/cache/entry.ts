@@ -73,8 +73,10 @@ export class Entry {
   // size when the data is compressed. Mirrors Rails Entry#bytesize
   // (entry.rb:60-69); the non-String branch is memoized like Rails' `@s`.
   bytesize(): number {
-    // Rails selects the branch on the uncompressed `value` but measures the raw
-    // `@value`, so a compressed entry reports its stored (compressed) size.
+    // A compressed entry stores a deflated latin1 string in _value; its byte
+    // size is its character count (one byte per latin1 char). Re-encoding
+    // through coder.dump would JSON-escape binary bytes and over-report.
+    if (this._compressed) return (this._value as string).length;
     const value = this.value;
     if (value == null) {
       return 0;
