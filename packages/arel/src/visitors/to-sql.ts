@@ -1788,13 +1788,8 @@ export class ToSql extends Visitor {
     // inlining `SubstituteBinds` collector still renders the quoted literal for
     // `to_sql`.
     //
-    // DEVIATION (tracked): Rails wraps each scalar in
-    // `@connection.cast_bound_value(value)` before `add_bind`; trails passes the
-    // raw value. `castBoundValue` isn't on the `ArelConnection` boundary
-    // interface, and BoundSqlLiteral isn't yet wired into `where`
-    // (`converge-build-where-clause-bound-sql-literal`), so no runtime path
-    // currently consumes the cast. Tracked by
-    // `bound-sql-literal-cast-bound-value-in-visitor`.
+    // Each non-Arel scalar is wrapped in `@connection.cast_bound_value(value)`
+    // before `add_bind`, mirroring Rails' `new_bind` lambda (to_sql.rb:775-778).
     if (value instanceof Node) {
       this.visit(value, collector);
     } else if (Array.isArray(value)) {
@@ -1803,7 +1798,11 @@ export class ToSql extends Visitor {
         // list → NULL.
         collector.append(this.quote(null));
       } else if (value.every((v) => !(v instanceof Node))) {
-        collector.addBinds(value, null, this.bindBlock());
+        collector.addBinds(
+          value.map((v) => this.connection.castBoundValue(v)),
+          null,
+          this.bindBlock(),
+        );
       } else {
         // Mixed Arel-node / scalar list (to_sql.rb:784-791): visit nodes,
         // single-`add_bind` every other element. A *nested* array here is bound
@@ -1814,12 +1813,12 @@ export class ToSql extends Visitor {
           if (v instanceof Node) {
             this.visit(v, collector);
           } else {
-            collector.addBind(v, this.bindBlock());
+            collector.addBind(this.connection.castBoundValue(v), this.bindBlock());
           }
         });
       }
     } else {
-      collector.addBind(value, this.bindBlock());
+      collector.addBind(this.connection.castBoundValue(value), this.bindBlock());
     }
   }
 

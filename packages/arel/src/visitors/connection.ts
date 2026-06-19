@@ -31,4 +31,12 @@ export interface ArelConnection {
    * @internal
    */
   sanitizeAsSqlComment(value: string): string;
+  /**
+   * Cast a value to be used as a bound parameter of unknown type. Mirrors
+   * Rails' `@connection.cast_bound_value`, which `visit_Arel_Nodes_BoundSqlLiteral`
+   * applies to every non-Arel scalar before `collector.add_bind`. The abstract
+   * adapter returns the value unchanged; MySQL stringifies numerics/booleans.
+   * @internal
+   */
+  castBoundValue(value: unknown): unknown;
 }

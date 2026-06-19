@@ -68,6 +68,15 @@ export const mysqlDefaultQuoter: ArelConnection = {
     return "FALSE";
   },
 
+  // Mirrors ActiveRecord MySQL::Quoting#cast_bound_value: numerics/booleans
+  // serialize to their string form (1/0 for booleans) before binding.
+  castBoundValue(value: unknown): unknown {
+    if (typeof value === "number" || typeof value === "bigint") return String(value);
+    if (value === true) return "1";
+    if (value === false) return "0";
+    return value;
+  },
+
   sanitizeAsSqlComment: defaultSanitizeAsSqlComment,
 };
 
@@ -111,6 +120,12 @@ export const defaultQuoter: ArelConnection = {
   },
   quotedFalse(): string {
     return "FALSE";
+  },
+
+  // Mirrors ActiveRecord Quoting#cast_bound_value: the abstract adapter
+  // returns the value unchanged.
+  castBoundValue(value: unknown): unknown {
+    return value;
   },
 
   sanitizeAsSqlComment: defaultSanitizeAsSqlComment,
