@@ -2558,15 +2558,22 @@ function wrapCollectionProxy<T extends Base = Base>(
         });
       }
 
-      // Enumerable-method delegation (`partition`) — resolved on the proxy
-      // *before* the scope lookup. The scoped AssociationRelation now also
-      // responds to `partition` (delegation.ts), but routing through it would
-      // load the relation's own `_records` and bypass the collection cache.
-      // Rails' `CollectionProxy#records` calls `load_target`, which hydrates
-      // `@target` and marks the association loaded (collection_proxy.rb,
-      // collection_association.rb#load_target); `target.load()` does the same,
-      // so an awaited `post.comments.partition(...)` leaves `loaded?`/`target`
-      // populated. Async + self-loading (JS has no blocking IO).
+      // Array-method delegation (sync fast-path) — when already loaded, delegate
+      // synchronously against `target.target` (the hydrated records array).
+      // Checked before scope lookup so it matches `wrapWithScopeProxy`'s pattern
+      // and returns the same sync value a caller expects post-load.
+      if (target.loaded) {
+        const arrayDelegate = delegateArrayMethod(prop, () => target.target);
+        if (arrayDelegate) return arrayDelegate;
+      }
+
+      // Enumerable-method delegation — async + self-loading, checked before
+      // scope lookup so it routes to the collection cache via `target.load()`
+      // rather than the scope relation's `_records`. Covers `partition` and all
+      // DELEGATED_ARRAY_METHODS on *unloaded* proxies (the sync path above
+      // handles loaded proxies). Rails' `CollectionProxy#records` calls
+      // `load_target`, hydrating `@target` and marking the association loaded;
+      // `target.load()` does the same.
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.load());
       if (enumerableDelegate) return enumerableDelegate;
 
@@ -2602,17 +2609,6 @@ function wrapCollectionProxy<T extends Base = Base>(
           ScopeRegistry.setCurrentScope(modelClass, prev);
           return result;
         };
-      }
-
-      // Array-method delegation (sync path) — mirrors Rails' CollectionProxy
-      // `delegate ... to: :records` (delegation.rb). Only reached when the
-      // proxy is already loaded; the async/unloaded path is handled above by
-      // `delegateEnumerableMethod` (before scope lookup), which routes to the
-      // collection cache via `target.load()`. Placed after scope lookup so it
-      // never shadows own/scope/model methods.
-      if (scopeVal === undefined && target.loaded) {
-        const arrayDelegate = delegateArrayMethod(prop, () => target.target);
-        if (arrayDelegate) return arrayDelegate;
       }
 
       return scopeVal;

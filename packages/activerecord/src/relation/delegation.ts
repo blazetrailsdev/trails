@@ -329,16 +329,12 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
         const arrayDelegate = delegateArrayMethod(prop, records);
         if (arrayDelegate) return arrayDelegate;
       }
-        if (arrayDelegate) return arrayDelegate;
-      }
 
       // Enumerable-method delegation — async + self-loading. Covers `partition`
       // and all DELEGATED_ARRAY_METHODS on unloaded relations (mirrors Rails'
       // `records` → `load` path). Always present so `assert_respond_to` passes.
       // `toArray()` forces a load and returns the rows.
-      const enumerableDelegate = delegateEnumerableMethod(prop as string, () =>
-        (target as any).toArray(),
-      );
+      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.toArray());
       if (enumerableDelegate) return enumerableDelegate;
       return value;
     },
