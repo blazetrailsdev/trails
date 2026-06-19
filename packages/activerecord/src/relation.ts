@@ -2481,6 +2481,18 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Return the first loaded record for which the block is truthy, else
+   * undefined. Named `detect` (Ruby's Enumerable#detect) rather than `find`
+   * because `find` on a Relation is the AR PK finder, not a block search.
+   *
+   * Mirrors: Enumerable#detect / #find (via Relation#include Enumerable)
+   */
+  async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
+    const records = await this.toArray();
+    return records.find(fn);
+  }
+
+  /**
    * Filter to only records where the given column is not null/undefined.
    *
    * Mirrors: Rails where.not(column: nil) pattern
