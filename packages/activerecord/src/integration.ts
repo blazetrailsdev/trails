@@ -6,7 +6,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { squish, parameterize, truncate, tableize } from "@blazetrails/activesupport";
+import { squish, parameterize, truncate } from "@blazetrails/activesupport";
 
 interface Identifiable {
   id: unknown;
@@ -112,10 +112,11 @@ function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
  */
 export function cacheKey(this: Identifiable): string {
   const klass = this.constructor as any;
-  // Rails uses `model_name.cache_key` (tableize of the class name), not the
-  // table name — so a model whose table is overridden (e.g. CachedDeveloper,
+  // Rails keys on `model_name.cache_key` (ActiveModel::Name#cache_key, the
+  // underscored/pluralized/namespace-preserving collection key), not the table
+  // name — so a model whose table is overridden (e.g. CachedDeveloper,
   // `self.table_name = "developers"`) still keys on `cached_developers`.
-  const modelKey: string = klass.name ? tableize(klass.name) : klass.tableName;
+  const modelKey: string = klass.name ? klass.modelName.cacheKey : klass.tableName;
   const pk = this.id;
 
   if (this.isNewRecord()) {
