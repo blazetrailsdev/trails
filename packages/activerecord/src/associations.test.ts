@@ -912,7 +912,9 @@ describe("PreloaderTest", () => {
     const davidPost = await Post.create({
       author_id: david.id,
       title: "test post",
-      body: "this post is about David",
+      // Lowercased so the `postsMentioningAuthor` LIKE `%david%` scope matches
+      // regardless of the column collation (MariaDB CI uses a case-sensitive one).
+      body: "this post is about david",
     });
     // Second david post also matches the body scope but has no comments.
     await Post.create({
@@ -923,7 +925,7 @@ describe("PreloaderTest", () => {
     const bobPost = await Post.create({
       author_id: bob.id,
       title: "test post 3",
-      body: "this post is about Bob",
+      body: "this post is about bob",
     });
     const comment1 = await Comment.create({ post_id: davidPost.id, body: "hi!" });
     const comment2 = await Comment.create({ post_id: davidPost.id, body: "hello!" });
