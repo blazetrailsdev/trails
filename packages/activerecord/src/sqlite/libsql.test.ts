@@ -245,4 +245,21 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
     expect(count.c).toBe(2);
     await probe.close();
   });
+
+  it("decodes a file: URI destination to a real path", async () => {
+    await libsqlDriver.restoreFromPath!(templatePath, `file://${destPath}`);
+
+    const probe = await libsqlDriver.open({ database: destPath });
+    const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
+      c: number;
+    };
+    expect(count.c).toBe(2);
+    await probe.close();
+  });
+
+  it("rejects an in-memory destination URI in the file-clone fallback", async () => {
+    await expect(
+      libsqlDriver.restoreFromPath!(templatePath, "file:restored?mode=memory&cache=shared"),
+    ).rejects.toThrow(/in-memory destination/);
+  });
 });

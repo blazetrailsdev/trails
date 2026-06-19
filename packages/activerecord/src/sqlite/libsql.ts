@@ -177,9 +177,19 @@ export const libsqlDriver: SqliteDriver = {
     } finally {
       source.close();
     }
-    // File-clone fallback: copy the source DB file's bytes into destination.
-    // The source is opened read-only above and closed before we read it, so a
-    // cleanly-closed template (no outstanding WAL pages) clones consistently.
+    // File-clone fallback: copy the cleanly-closed source DB file's bytes into
+    // destination. Unlike the native backup primitive (which sets
+    // SQLITE_OPEN_URI and resolves the destination), a raw file write needs a
+    // real path: decode `file:` URIs, and reject in-memory destination URIs
+    // since a clone cannot populate the held shared-cache memory DB.
+    const destPath = resolveDatabasePath(destination);
+    if (destPath === null) {
+      throw new ConfigurationError(
+        "libsql restoreFromPath cannot populate an in-memory destination " +
+          `(${destination}) via the file-clone fallback; libsql's backup() ` +
+          "primitive is required for memory-backed restores.",
+      );
+    }
     const fs = getFs();
     if (fs.readFile === undefined || fs.writeFile === undefined) {
       throw new ConfigurationError(
@@ -187,7 +197,7 @@ export const libsqlDriver: SqliteDriver = {
           "the configured fs adapter provides neither.",
       );
     }
-    const bytes = await fs.readFile(sourcePath);
-    await fs.writeFile(destination, bytes);
+    const bytes = await fs.readFile(resolveDatabasePath(sourcePath) ?? sourcePath);
+    await fs.writeFile(destPath, bytes);
   },
 };
