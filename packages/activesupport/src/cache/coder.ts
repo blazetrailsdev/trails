@@ -27,6 +27,10 @@
 // a record). Because tags are arrays, plain objects never collide and pass
 // through untouched; only a real array whose head is itself a sentinel string
 // needs escaping (see ARRAY_ESCAPE below).
+// entry.ts imports `coder` from here; `LazyEntry` extends `Entry` lazily (see
+// lazyEntryClass) so this cyclic import is never dereferenced at module-eval.
+import { Entry } from "./entry.js";
+
 const PREFIX = "~#";
 const UNDEF = "~#u";
 const BIGINT = "~#b";
@@ -118,3 +122,150 @@ export const coder = {
     return decode(JSON.parse(dumped));
   },
 };
+
+/** Serializer surface a {@link Coder} wraps. @internal */
+export interface CoderSerializer {
+  dump(value: unknown): string;
+  load(dumped: string): unknown;
+  dumpCompressed?(entry: Entry, threshold: number): string;
+}
+
+/** @internal */
+export interface CoderCompressor {
+  deflate(value: string): string;
+  inflate(value: string): string;
+}
+
+// Rails' Coder framing (coder.rb): a signature prefix lets `load` tell framed
+// payloads from a bare legacy dump; the type byte flags serializer + compression
+// and the header carries expires_at/version. Rails packs a fixed-width binary
+// header; trails has no Ruby wire to interop with, so we frame with a JSON header
+// (control-char-free) and a NUL separator — the first NUL after the signature.
+const SIGNATURE = "\x00\x11";
+const HEADER_SEP = "\x00";
+const OBJECT_DUMP_TYPE = 0x01;
+const STRING_TYPE = 0x02;
+const COMPRESSED_FLAG = 0x80;
+
+// Rails stores UTF-8/BINARY/US-ASCII strings as the payload verbatim (skipping
+// the serializer); JS strings carry no encoding tag, so trails collapses all of
+// them onto one string fast path whose deserializer is the identity.
+const stringDeserializer: CoderSerializer = {
+  dump: (value) => value as string,
+  load: (dumped) => dumped,
+};
+
+type LazyEntryOptions = { version: string | null; expiresAt: number | null };
+let lazyEntry:
+  | (new (s: CoderSerializer, c: CoderCompressor | null, p: string, o: LazyEntryOptions) => Entry)
+  | undefined;
+
+// Rails' Coder::LazyEntry: an Entry whose value stays serialized (and
+// compressed) until first read. Defined lazily to keep the cyclic Entry import
+// safe (see the import note above).
+function lazyEntryClass(): NonNullable<typeof lazyEntry> {
+  return (lazyEntry ??= class LazyEntry extends Entry {
+    private _lazySerializer: CoderSerializer;
+    private _lazyCompressor: CoderCompressor | null;
+    private _resolved = false;
+
+    constructor(
+      serializer: CoderSerializer,
+      compressor: CoderCompressor | null,
+      payload: string,
+      options: LazyEntryOptions,
+    ) {
+      super(payload, options);
+      this._lazySerializer = serializer;
+      this._lazyCompressor = compressor;
+    }
+
+    override get value(): unknown {
+      if (!this._resolved) {
+        const raw = this._lazyCompressor
+          ? this._lazyCompressor.inflate(this._value as string)
+          : (this._value as string);
+        this._value = this._lazySerializer.load(raw);
+        this._resolved = true;
+      }
+      return this._value;
+    }
+  });
+}
+
+/**
+ * The trails equivalent of Rails' `Cache::Coder`: wraps a serializer +
+ * compressor, framing entries so `load` can lazily deserialize/decompress and
+ * fall back to a bare serializer dump. Framing is not Ruby-wire-compatible.
+ * @internal
+ */
+export class Coder {
+  private legacySerializer: boolean;
+
+  constructor(
+    private serializer: CoderSerializer,
+    private compressor: CoderCompressor | null,
+    options: { legacySerializer?: boolean } = {},
+  ) {
+    this.legacySerializer = options.legacySerializer ?? false;
+  }
+
+  dump(entry: Entry): string {
+    if (this.legacySerializer) return this.serializer.dump(entry);
+    return this.dumpCompressed(entry, Infinity);
+  }
+
+  dumpCompressed(entry: Entry, threshold: number): string {
+    if (this.legacySerializer) return this.serializer.dumpCompressed!(entry, threshold);
+
+    const value = entry.value;
+    let type: number;
+    let payload: string;
+    if (typeof value === "string") {
+      type = STRING_TYPE;
+      payload = value;
+    } else {
+      type = OBJECT_DUMP_TYPE;
+      payload = this.serializer.dump(value);
+    }
+
+    const compressed = this.tryCompress(payload, threshold);
+    if (compressed !== undefined) {
+      payload = compressed;
+      type |= COMPRESSED_FLAG;
+    }
+
+    const header = JSON.stringify([type, entry.expiresAt ?? -1, entry.version]);
+    return SIGNATURE + header + HEADER_SEP + payload;
+  }
+
+  load(dumped: unknown): unknown {
+    if (typeof dumped !== "string" || !dumped.startsWith(SIGNATURE)) {
+      return this.serializer.load(dumped as string);
+    }
+
+    const rest = dumped.slice(SIGNATURE.length);
+    const sep = rest.indexOf(HEADER_SEP);
+    const [type, rawExpiresAt, version] = JSON.parse(rest.slice(0, sep)) as [
+      number,
+      number,
+      string | null,
+    ];
+    const payload = rest.slice(sep + 1);
+
+    const expiresAt = rawExpiresAt < 0 ? null : rawExpiresAt;
+    const compressor = type & COMPRESSED_FLAG ? this.compressor : null;
+    const serializer =
+      (type & ~COMPRESSED_FLAG) === STRING_TYPE ? stringDeserializer : this.serializer;
+
+    return new (lazyEntryClass())(serializer, compressor, payload, { version, expiresAt });
+  }
+
+  private tryCompress(payload: string, threshold: number): string | undefined {
+    if (this.compressor && Buffer.byteLength(payload) >= threshold) {
+      const compressed = this.compressor.deflate(payload);
+      if (compressed.length < Buffer.byteLength(payload)) return compressed;
+    }
+    return undefined;
+  }
+}

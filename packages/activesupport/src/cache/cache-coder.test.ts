@@ -1,90 +1,145 @@
 import { describe, it, expect } from "vitest";
+import { Coder } from "./coder.js";
 import { coder } from "./coder.js";
+import { Entry } from "./entry.js";
+import { deflate, inflate } from "../gzip.js";
+
+// Port of Rails' CacheCoderTest (test/cache/cache_coder_test.rb). The custom
+// Serializer/Compressor mirror the Rails test doubles; the fidelity `coder`
+// (coder.ts) stands in for Marshal. Serializer#dump round-trips both Entries
+// (legacy/no-signature path) and bare values (Coder's framed path), tagged so
+// load can tell them apart — Marshal does this implicitly in Rails.
+const Serializer = {
+  dump(value: unknown): string {
+    return value instanceof Entry ? "E" + coder.dump(value.pack()) : "V" + coder.dump(value);
+  },
+  dumpCompressed(): string {
+    return "via Serializer#dumpCompressed";
+  },
+  load(dumped: string): unknown {
+    const body = dumped.slice(1);
+    return dumped[0] === "E" ? Entry.unpack(coder.load(body) as unknown[]) : coder.load(body);
+  },
+};
+
+const Compressor = { deflate, inflate };
+
+const STRING = "x".repeat(100);
+const COMPRESSIBLE_VALUES: unknown[] = [{ string: STRING }, STRING];
+const VALUES: unknown[] = [null, true, 1, "", "ümlaut", ...COMPRESSIBLE_VALUES];
+const VERSIONS: (string | null)[] = [null, "", "ümlaut", "x".repeat(256)];
+const EXPIRIES: (number | null)[] = [null, 0, 100 * 365 * 24 * 3600];
+
+const ENTRIES = VALUES.flatMap((value) =>
+  VERSIONS.flatMap((version) =>
+    EXPIRIES.map((expiresIn) => new Entry(value, { version, expiresIn })),
+  ),
+);
+
+const COMPRESSIBLE_ENTRIES = ENTRIES.filter((entry) => COMPRESSIBLE_VALUES.includes(entry.value));
+
+function assertEntry(expected: Entry, actual: Entry): void {
+  expect([actual.value, actual.version, actual.expiresAt]).toEqual([
+    expected.value,
+    expected.version,
+    expected.expiresAt,
+  ]);
+}
 
 describe("CacheCoderTest", () => {
+  const c = new Coder(Serializer, Compressor);
+
   it("roundtrips entry", () => {
-    const value = { name: "test", count: 42 };
-    const dumped = coder.dump(value);
-    expect(coder.load(dumped)).toEqual(value);
+    for (const entry of ENTRIES) {
+      assertEntry(entry, c.load(c.dump(entry)) as Entry);
+    }
   });
 
   it("roundtrips entry when using compression", () => {
-    // Simulate: large string gets "compressed" (here just encoded)
-    const large = "x".repeat(100);
-    const dumped = coder.dump(large);
-    expect(coder.load(dumped)).toBe(large);
+    for (const entry of ENTRIES) {
+      assertEntry(entry, c.load(c.dumpCompressed(entry, 1)) as Entry);
+    }
   });
 
   it("compresses values that are larger than the threshold", () => {
-    const threshold = 50;
-    const large = "x".repeat(threshold + 1);
-    const compressed = large.length > threshold;
-    expect(compressed).toBe(true);
+    for (const entry of COMPRESSIBLE_ENTRIES) {
+      const dumped = c.dump(entry);
+      const compressed = c.dumpCompressed(entry, 1);
+      expect(compressed.length).toBeLessThan(dumped.length);
+    }
   });
 
   it("does not compress values that are smaller than the threshold", () => {
-    const threshold = 50;
-    const small = "x".repeat(10);
-    const compressed = small.length > threshold;
-    expect(compressed).toBe(false);
+    for (const entry of COMPRESSIBLE_ENTRIES) {
+      const dumped = c.dump(entry);
+      const notCompressed = c.dumpCompressed(entry, 1_000_000);
+      expect(notCompressed).toBe(dumped);
+    }
   });
 
   it("does not apply compression to incompressible values", () => {
-    // Binary/already-compressed data: short random string
-    const incompressible = "\x00\x01\x02\x03";
-    const dumped = coder.dump(incompressible);
-    expect(coder.load(dumped)).toBe(incompressible);
+    for (const entry of ENTRIES.filter((e) => !COMPRESSIBLE_VALUES.includes(e.value))) {
+      const dumped = c.dump(entry);
+      const notCompressed = c.dumpCompressed(entry, 1);
+      expect(notCompressed).toBe(dumped);
+    }
   });
 
   it("loads dumped entries from original serializer", () => {
-    const original = { a: 1, b: [2, 3] };
-    const serialized = JSON.stringify(original);
-    expect(JSON.parse(serialized)).toEqual(original);
+    for (const entry of ENTRIES) {
+      assertEntry(entry, c.load(Serializer.dump(entry)) as Entry);
+    }
   });
 
   it("matches output of original serializer when legacy_serializer: true", () => {
-    const value = "hello world";
-    expect(coder.load(coder.dump(value))).toBe(value);
+    const legacy = new Coder(Serializer, Compressor, { legacySerializer: true });
+    for (const entry of ENTRIES) {
+      expect(legacy.dump(entry)).toBe(Serializer.dump(entry));
+      expect(legacy.dumpCompressed(entry, 1)).toBe(Serializer.dumpCompressed());
+    }
   });
 
   it("dumps bare strings with reduced overhead when possible", () => {
-    const str = "simple string";
-    const dumped = coder.dump(str);
-    expect(typeof dumped).toBe("string");
-    expect(coder.load(dumped)).toBe(str);
+    // Rails compares supported vs unsupported string encodings; JS strings carry
+    // no encoding, so trails collapses all strings onto one fast path. The
+    // equivalent saving: a bare string skips the serializer that an object pays.
+    const unoptimized = c.dump(new Entry({ s: "" }));
+    const optimized = c.dump(new Entry(""));
+    expect(optimized.length).toBeLessThan(unoptimized.length);
   });
 
   it("lazily deserializes values", () => {
-    // Lazy deserialization: value is deserialized only when accessed
-    let accessed = false;
-    const lazy = {
-      _raw: coder.dump({ x: 1 }),
-      _value: null as unknown,
-      get value(): unknown {
-        if (!this._value) {
-          accessed = true;
-          this._value = coder.load(this._raw);
-        }
-        return this._value;
+    const serializer = {
+      dump: () => "",
+      load: () => {
+        throw new Error("LOAD!");
       },
     };
-    expect(accessed).toBe(false);
-    expect(lazy.value).toEqual({ x: 1 });
-    expect(accessed).toBe(true);
+    const lazy = new Coder(serializer, Compressor);
+    const entry = new Entry([], { version: "abc", expiresIn: 123 });
+    const roundtripped = lazy.load(lazy.dump(entry)) as Entry;
+
+    expect(roundtripped.version).toBe(entry.version);
+    expect(roundtripped.expiresAt).toBe(entry.expiresAt);
+    expect(() => roundtripped.value).toThrow("LOAD!");
   });
 
   it("lazily decompresses values", () => {
-    // Similar lazy pattern for decompression
-    const compressed = coder.dump("test data");
-    let decompressed = false;
-    const lazy = {
-      get data() {
-        decompressed = true;
-        return coder.load(compressed);
+    const compressor = {
+      deflate: () => "",
+      inflate: () => {
+        throw new Error("INFLATE!");
       },
     };
-    expect(decompressed).toBe(false);
-    expect(lazy.data).toBe("test data");
-    expect(decompressed).toBe(true);
+    const lazy = new Coder(Serializer, compressor);
+
+    for (const value of [[STRING], STRING]) {
+      const entry = new Entry(value, { version: "abc", expiresIn: 123 });
+      const roundtripped = lazy.load(lazy.dumpCompressed(entry, 1)) as Entry;
+
+      expect(roundtripped.version).toBe(entry.version);
+      expect(roundtripped.expiresAt).toBe(entry.expiresAt);
+      expect(() => roundtripped.value).toThrow("INFLATE!");
+    }
   });
 });

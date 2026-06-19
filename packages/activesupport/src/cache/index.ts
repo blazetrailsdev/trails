@@ -34,4 +34,6 @@ export { MemoryStore } from "./memory-store.js";
 export { NullStore } from "./null-store.js";
 export { FileStore } from "./file-store.js";
 export { expandCacheKey } from "./expand-cache-key.js";
-export { coder } from "./coder.js";
+export { coder, Coder } from "./coder.js";
+export type { CoderSerializer, CoderCompressor } from "./coder.js";
+export { Entry } from "./entry.js";
