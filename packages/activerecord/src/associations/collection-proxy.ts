@@ -38,6 +38,7 @@ import { getInheritanceColumn, findStiClass, stiEnabled, polymorphicName } from 
 import {
   hasQueryConstraints as ownerHasQueryConstraints,
   queryConstraintsList as ownerQueryConstraintsList,
+  compositeQueryConstraintsList,
 } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
@@ -2063,20 +2064,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ? (records as T[])
       : ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[]);
 
-    const ctor = this._record.constructor as typeof Base;
-    const asName = this._assocDef.options.as;
-    const ownerPk = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-    const foreignKey = asName
-      ? (this._assocDef.options.foreignKey ??
-        this._reflectionForeignKey() ??
-        `${underscore(asName)}_id`)
-      : (this._assocDef.options.foreignKey ??
-        this._reflectionForeignKey() ??
-        this._assocDef.options.queryConstraints ??
-        (Array.isArray(ownerPk)
-          ? ownerPk.map((col: string) => `${underscore(ctor.name)}_${col}`)
-          : `${underscore(ctor.name)}_id`));
-    const typeCol = asName ? `${underscore(asName)}_type` : null;
     // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
     // return` (collection_association.rb#remove_records): if any record's
     // before_remove halts, the entire operation aborts and nothing is deleted.
@@ -2084,24 +2071,43 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true))
         return [];
     }
-    const removed: Base[] = [];
-    for (const record of modelRecords) {
-      if (Array.isArray(foreignKey)) {
-        for (const fk of foreignKey) {
-          record._writeAttribute(fk, null);
-        }
+    // Persisted children are nullified via update_all (Rails delete_records
+    // else-branch), bypassing validations/callbacks. New-record children have
+    // no DB row — skip the DB call.
+    const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
+    if (persistedRecords.length > 0) {
+      const nullUpdates = this._buildNullifyUpdates();
+      // Mirror Rails delete_records else-branch: scope to the specific records via
+      // composite_query_constraints_list (persistence.rb:234). Single-column: use
+      // `where({col: ids})`; composite: use `where(cols, tuples)` (OR-of-AND) to
+      // avoid the cartesian-product that `AND col1 IN (...) AND col2 IN (...)` produces.
+      const queryCols = compositeQueryConstraintsList.call(
+        (this as any)._modelClass as typeof Base,
+      );
+      const readCol = (r: Base, col: string) => (r as any)._readAttribute(col);
+      let scope = this.scope();
+      if (queryCols.length === 1) {
+        scope = scope.where({
+          [queryCols[0]]: persistedRecords.map((r) => readCol(r, queryCols[0])),
+        });
       } else {
-        record._writeAttribute(foreignKey as string, null);
+        const tuples = persistedRecords.map((r) => queryCols.map((col) => readCol(r, col)));
+        scope = scope.where(queryCols, tuples);
       }
-      if (typeCol) record._writeAttribute(typeCol, null);
-      const saved = await record.save();
-      if (saved) {
-        removed.push(record);
-        fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+      await scope.updateAll(nullUpdates);
+      for (const record of persistedRecords) {
+        for (const [col, val] of Object.entries(nullUpdates)) {
+          record._writeAttribute(col, val);
+        }
       }
     }
-    this._removeFromTarget(removed);
-    return removed;
+    // Mirror Rails remove_records: remove from target first, then fire after_remove
+    // for all records (collection_association.rb#remove_records).
+    this._removeFromTarget(modelRecords as Base[]);
+    for (const record of modelRecords) {
+      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+    }
+    return modelRecords as Base[];
   }
 
   private _removeFromTarget(records: Base[]): void {
