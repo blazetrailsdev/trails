@@ -83,6 +83,16 @@ describeIfMysql("Mysql2Adapter", () => {
         "CREATE INDEX `index_people_on_last_name` USING btree ON `people` (`last_name`(10))",
       );
 
+      for (const algorithm of ["default", "copy", "inplace", "instant"]) {
+        sqls = await captureSql(
+          () => adapter.addIndex("people", "last_name", { length: 10, using: "btree", algorithm }),
+          { stub: adapter },
+        );
+        expect(sqls[0]).toBe(
+          `CREATE INDEX \`index_people_on_last_name\` USING btree ON \`people\` (\`last_name\`(10)) ALGORITHM = ${algorithm.toUpperCase()}`,
+        );
+      }
+
       // Rails `with_real_execute` block: actually create the index against the
       // canonical `people` table (no stub), confirm introspection sees it, then
       // verify the `if_not_exists: true` pre-flight short-circuits without raising.
@@ -94,16 +104,6 @@ describeIfMysql("Mysql2Adapter", () => {
         ).resolves.toBeUndefined();
       } finally {
         await adapter.removeIndex("people", "first_name", { ifExists: true });
-      }
-
-      for (const algorithm of ["default", "copy", "inplace", "instant"]) {
-        sqls = await captureSql(
-          () => adapter.addIndex("people", "last_name", { length: 10, using: "btree", algorithm }),
-          { stub: adapter },
-        );
-        expect(sqls[0]).toBe(
-          `CREATE INDEX \`index_people_on_last_name\` USING btree ON \`people\` (\`last_name\`(10)) ALGORITHM = ${algorithm.toUpperCase()}`,
-        );
       }
 
       await expect(() =>
