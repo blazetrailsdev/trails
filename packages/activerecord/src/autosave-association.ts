@@ -1291,7 +1291,7 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
 }
 
 /** @internal */
-function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
+export function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
   if (!reflection.validate) return;
   const validationName = `validateAssociatedRecordsFor_${reflection.name}`;
   if (!klass.prototype) return;
