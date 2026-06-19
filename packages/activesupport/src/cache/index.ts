@@ -1,3 +1,10 @@
+/**
+ * Raised when a serialized cache entry cannot be deserialized.
+ * Mirrors Rails `ActiveSupport::Cache::DeserializationError` (cache.rb:49).
+ * @internal
+ */
+export class DeserializationError extends Error {}
+
 export interface CacheOptions {
   expiresIn?: number; // milliseconds
   namespace?: string;

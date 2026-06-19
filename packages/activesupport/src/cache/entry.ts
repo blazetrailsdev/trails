@@ -1,4 +1,5 @@
 import { deflate, inflate } from "../gzip.js";
+import { DeserializationError } from "./index.js";
 
 /** @internal */
 export class Entry {
@@ -7,6 +8,16 @@ export class Entry {
   private _createdAt: number;
   private _expiresIn: number | null;
   private _compressed: boolean;
+  private _bytesize?: number;
+
+  // Mirrors Rails Entry.unpack (entry.rb:15-17): rebuilds an Entry from the
+  // array produced by #pack.
+  static unpack(members: unknown[]): Entry {
+    return new Entry(members[0], {
+      expiresAt: (members[1] as number | null) ?? null,
+      version: (members[2] as string | null) ?? null,
+    });
+  }
 
   constructor(
     value: unknown,
@@ -54,6 +65,54 @@ export class Entry {
     return this._compressed;
   }
 
+  // Returns the size of the cached value. May be less than the value's byte
+  // size when the data is compressed. Mirrors Rails Entry#bytesize
+  // (entry.rb:60-69); the non-String branch is memoized like Rails' `@s`.
+  bytesize(): number {
+    // Rails selects the branch on the uncompressed `value` but measures the raw
+    // `@value`, so a compressed entry reports its stored (compressed) size.
+    const value = this.value;
+    if (value == null) {
+      return 0;
+    } else if (typeof value === "string") {
+      return byteLength(this._value as string);
+    } else {
+      return (this._bytesize ??= byteLength(JSON.stringify(this._value)));
+    }
+  }
+
+  // Mirrors Rails Entry#local? (entry.rb:100-102).
+  isLocal(): boolean {
+    return false;
+  }
+
+  // Duplicates the value to protect against accidental cache modifications,
+  // unless it is compressed, Numeric, or boolean. Mirrors Rails Entry#dup_value!
+  // (entry.rb:105-112). JS strings are immutable so the String branch is a
+  // no-op; non-String values are deep-cloned via the JSON round-trip that
+  // stands in for Marshal here.
+  dupValueBang(): void {
+    if (
+      this._value != null &&
+      !this._compressed &&
+      !(typeof this._value === "number" || typeof this._value === "boolean")
+    ) {
+      if (typeof this._value !== "string") {
+        this._value = JSON.parse(JSON.stringify(this._value));
+      }
+    }
+  }
+
+  // Mirrors Rails Entry#pack (entry.rb:114-118): [value, expires_at, version]
+  // with trailing nils popped.
+  pack(): unknown[] {
+    const members: unknown[] = [this.value, this.expiresAt, this.version];
+    while (members.length > 0 && members[members.length - 1] == null) {
+      members.pop();
+    }
+    return members;
+  }
+
   // Mirrors Rails Entry#compressed(compress_threshold): returns self unless the
   // serialized value meets the threshold and actually shrinks once compressed.
   compressed(compressThreshold: number): Entry {
@@ -94,7 +153,18 @@ export class Entry {
   }
 
   private uncompress(value: string): unknown {
-    return JSON.parse(inflate(value));
+    return this.marshalLoad(inflate(value));
+  }
+
+  // Mirrors Rails Entry#marshal_load (entry.rb:127-130): deserialize, raising
+  // Cache::DeserializationError when the payload is malformed. JSON.parse stands
+  // in for Marshal.load here.
+  private marshalLoad(payload: string): unknown {
+    try {
+      return JSON.parse(payload);
+    } catch (error) {
+      throw new DeserializationError(error instanceof Error ? error.message : String(error));
+    }
   }
 }
 
