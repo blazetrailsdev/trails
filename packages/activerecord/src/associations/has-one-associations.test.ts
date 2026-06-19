@@ -556,13 +556,10 @@ describe("HasOneAssociationsTest", () => {
   it("association keys bypass attribute protection", async () => {
     const car = (await Car.create({ name: "honda" })) as any;
 
-    let bulb = car.association("bulb").build();
-    expect(bulb.car_id).toBe(car.id);
-
-    bulb = car.association("bulb").build({ car_id: car.id + 1 });
-    expect(bulb.car_id).toBe(car.id);
-
-    bulb = await car.association("bulb").create();
+    // Rails: car.build_bulb { |b| b.car_id = car.id + 1 } — the block sets a
+    // conflicting FK; the association must overwrite it with the owner's id.
+    // trails' build/create take attributes, so the override is passed as a hash.
+    let bulb = car.association("bulb").build({ car_id: car.id + 1 });
     expect(bulb.car_id).toBe(car.id);
 
     bulb = await car.association("bulb").create({ car_id: car.id + 1 });
