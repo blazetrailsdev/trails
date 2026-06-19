@@ -97,8 +97,14 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
 /**
  * Decode `file:` URIs (including `file://`, percent-encoding, and `?mode=`
  * query strings) and `:memory:` aliases. Returns `null` for memory databases,
- * otherwise the bare decoded filesystem path. Mirrors the better-sqlite3
- * driver's resolver.
+ * otherwise the decoded filesystem path.
+ *
+ * Unlike better-sqlite3 (whose build doesn't set `SQLITE_OPEN_URI`, so it
+ * treats the string literally), libsql is URI-aware and opens a rootless
+ * `file:foo.db` relative to the cwd. So this resolver preserves relative
+ * `file:` paths (returning `foo.db`, not `/foo.db`) so `databaseExists()`
+ * checks the path libsql actually opens; only `file:/...` / `file://host/...`
+ * is absolute.
  * @internal
  */
 function resolveDatabasePath(database: string): string | null {
@@ -112,11 +118,23 @@ function resolveDatabasePath(database: string): string | null {
     return database;
   }
   if (url.searchParams.get("mode") === "memory") return null;
-  try {
-    return decodeURIComponent(url.pathname);
-  } catch {
-    return url.pathname;
+  const decode = (s: string): string => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      // Malformed escapes (e.g. lone "%") keep databaseExists() total.
+      return s;
+    }
+  };
+  // `new URL` anchors a rootless path at "/", losing relativity. A `file:` body
+  // that doesn't start with "/" (e.g. `file:foo.db`, `file:./foo.db`) is a
+  // cwd-relative SQLite URI; strip any `?query`/`#frag` and return it as-is.
+  const body = database.slice("file:".length);
+  if (!body.startsWith("/")) {
+    const sep = body.search(/[?#]/);
+    return decode(sep === -1 ? body : body.slice(0, sep));
   }
+  return decode(url.pathname);
 }
 
 /** @internal */

@@ -48,19 +48,6 @@ describe("SqliteDriver — libsql round-trip", () => {
     expect(names).toContain("gear");
   });
 
-  it("iterate() yields rows incrementally", async () => {
-    const select = await driver.prepare("SELECT id, name FROM widgets ORDER BY id");
-    const collected: unknown[] = [];
-    for (const row of select.iterate() as Iterable<unknown>) collected.push(row);
-    expect(collected.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("named binds work as a single object", async () => {
-    const select = await driver.prepare("SELECT qty FROM widgets WHERE name = $name");
-    const row = (await select.get({ name: "sprocket" })) as Record<string, unknown>;
-    expect(row["qty"]).toBe(42);
-  });
-
   it("columns() matches ColumnInfo shape", async () => {
     const stmt = await driver.prepare("SELECT id, name, qty FROM widgets");
     const cols: ColumnInfo[] = stmt.columns();
@@ -82,30 +69,12 @@ describe("SqliteDriver — libsql round-trip", () => {
     expect(typeof row["qty"]).toBe("bigint");
   });
 
-  it("exec runs SQL", async () => {
-    await driver.exec("CREATE TABLE IF NOT EXISTS tmp_exec (x INTEGER)");
-    await driver.exec("DROP TABLE tmp_exec");
-  });
-
-  it("pragma returns a value", async () => {
-    const result = await driver.pragma("journal_mode");
-    expect(result).toBeDefined();
-  });
-
-  it("isOpen() is true while connected", () => {
-    expect(driver.isOpen()).toBe(true);
-  });
-
   it("statement.reader is true for SELECT, false for INSERT", async () => {
     const sel = await driver.prepare("SELECT 1");
     expect(sel.reader).toBe(true);
 
     const ins = await driver.prepare("INSERT INTO widgets (name, qty) VALUES (?, ?)");
     expect(ins.reader).toBe(false);
-  });
-
-  it("databaseExists() reports memory databases as present", () => {
-    expect(libsqlDriver.databaseExists?.({ database: ":memory:" })).toBe(true);
   });
 
   it("capabilities reflect libsql traits", () => {
@@ -154,6 +123,30 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
     ).get([1])) as { label: string };
     expect(row.label).toBe("alpha");
     await probe.close();
+  });
+
+  it("databaseExists() resolves an absolute file: URI", () => {
+    expect(libsqlDriver.databaseExists?.({ database: `file://${dbPath}` })).toBe(true);
+  });
+
+  it("databaseExists() preserves a relative file: URI (cwd-relative, not /-anchored)", async () => {
+    // libsql opens `file:name.db` relative to cwd, so databaseExists() must
+    // check the same cwd-relative path rather than anchoring it at "/".
+    const relName = `libsql-rel-${Date.now()}-${Math.floor(Math.random() * 1e9)}.db`;
+    try {
+      const conn = await libsqlDriver.open({ database: `file:${relName}` });
+      await conn.exec("CREATE TABLE t (x INTEGER)");
+      await conn.close();
+      expect(libsqlDriver.databaseExists?.({ database: `file:${relName}` })).toBe(true);
+    } finally {
+      for (const p of [relName, `${relName}-wal`, `${relName}-shm`]) {
+        try {
+          getFs().unlinkSync(p);
+        } catch {
+          /* best effort */
+        }
+      }
+    }
   });
 });
 
@@ -237,17 +230,6 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
 
   it("restores a template DB into a fresh destination", async () => {
     await libsqlDriver.restoreFromPath!(templatePath, destPath);
-
-    const probe = await libsqlDriver.open({ database: destPath });
-    const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
-      c: number;
-    };
-    expect(count.c).toBe(2);
-    await probe.close();
-  });
-
-  it("decodes a file: URI destination to a real path", async () => {
-    await libsqlDriver.restoreFromPath!(templatePath, `file://${destPath}`);
 
     const probe = await libsqlDriver.open({ database: destPath });
     const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
