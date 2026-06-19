@@ -7,6 +7,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, truncate } from "@blazetrails/activesupport";
+import { getDefaultTimezone } from "./type/internal/timezone.js";
 
 interface Identifiable {
   id: unknown;
@@ -251,13 +252,18 @@ const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
 /**
  * Returns true when the raw DB timestamp string can be converted directly
  * to a cache version without re-parsing (fast path). Checks: string type,
- * usec format, not user-assigned, and expected DB timestamp shape. Rails'
- * `with_connection(&:default_timezone) == :utc` guard is omitted — it requires
- * an async connection call that can't be made synchronously here; the shape
- * check acts as a partial proxy that prevents broken cache keys. The
- * `!updated_at_came_from_user?` guard IS implemented (cameFromUser is sync), so
- * a user-assigned DB-format string (e.g. `record.updated_at = "2020-01-01
- * 00:00:00"`) correctly falls through to the type-casting reader.
+ * usec format, default_timezone == utc, not user-assigned, and expected DB
+ * timestamp shape. Rails reads the timezone via
+ * `with_connection(&:default_timezone) == :utc`; trails reads it synchronously
+ * from the process-wide `getDefaultTimezone()` (kept in lockstep with the
+ * connection's configured `default_timezone` by `establishConnection`), which
+ * realizes Rails' own FIXME to cache this rather than checking out a connection.
+ * When default_timezone is not UTC, the raw DB string can't be reused verbatim,
+ * so we fall through to the type-casting reader. The `!updated_at_came_from_user?`
+ * guard IS implemented (cameFromUser is sync), so a user-assigned DB-format
+ * string (e.g. `record.updated_at = "2020-01-01 00:00:00"`) also correctly
+ * falls through to the type-casting reader. The shape check (TIMESTAMP_RE) is an
+ * additional trails-only safeguard against sub-microsecond raw strings.
  *
  * Mirrors: ActiveRecord::Integration#can_use_fast_cache_version? (private)
  *
@@ -267,6 +273,7 @@ export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown)
   if (typeof timestamp !== "string") return false;
   const klass = record.constructor as any;
   if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
+  if (getDefaultTimezone() !== "utc") return false;
   if (record.cameFromUser("updated_at")) return false;
   return TIMESTAMP_RE.test(timestamp);
 }
