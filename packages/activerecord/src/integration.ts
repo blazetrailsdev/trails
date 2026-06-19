@@ -260,7 +260,7 @@ export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown)
   if (typeof timestamp !== "string") return false;
   const klass = record.constructor as any;
   if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
-  if (record.cameFromUser?.("updated_at")) return false;
+  if (record.cameFromUser("updated_at")) return false;
   return TIMESTAMP_RE.test(timestamp);
 }
 

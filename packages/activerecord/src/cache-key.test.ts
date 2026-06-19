@@ -171,6 +171,21 @@ describe("CacheKeyTest", () => {
     expect(version).toBe("20161112010203000000");
   });
 
+  // No Rails counterpart: in Rails the `default_timezone == :utc` check is the
+  // primary fast-path guard. trails omits that (it needs an async connection
+  // call) and relies on `!cameFromUser` to reject user-assigned values, so this
+  // test pins the DB-format-string-from-user case the guard exists to cover.
+  it("cache_version does call updated_at when a DB-format string is assigned by the user", async () => {
+    const CacheMeWithVersion = cacheMeWithVersion();
+    const record = await CacheMeWithVersion.create({});
+    const recordFromDb = await CacheMeWithVersion.find(record.id);
+    const spy = vi.spyOn(recordFromDb, "readAttribute");
+    recordFromDb.updated_at = "2016-11-12 01:02:03.000000";
+    const version = recordFromDb.cacheVersion();
+    expect(spy).toHaveBeenCalledWith("updated_at");
+    expect(version).toBe("20161112010203000000");
+  });
+
   it("cache_version does call updated_at when it is assigned via a hash", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
