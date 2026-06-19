@@ -139,9 +139,13 @@ describe("NestedAttributesTest", () => {
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
   });
-  // Rails: TestNestedAttributesOnAHasManyAssociation drives these against
-  // Pirate has_many :birds. Each test re-declares accepts_nested_attributes_for
-  // on the shared Pirate with its own options, mirroring the per-test setup.
+  // These names come from Rails' TestNestedAttributesInGeneral (and the limit
+  // cases from NestedAttributesLimitTests) in nested_attributes_test.rb. Rails
+  // exercises has_many nested attributes there via Human has_many :interests; we
+  // use the canonical Pirate has_many :birds pair, which fits the same has_many
+  // nested-attributes pattern. Each test re-declares accepts_nested_attributes_for
+  // on the shared Pirate with its own options (an upsert keyed by association
+  // name), mirroring Rails' per-test setup.
   function registerPirateBird(): void {
     registerModel(CanonicalBird);
     registerModel(CanonicalPirate);
@@ -369,6 +373,9 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const configs = (Pirate as any)._nestedAttributeConfigs;
     expect(configs).toBeDefined();
     expect(configs.length).toBeGreaterThan(0);
+    // NestedAttributesTest runs first and upserts a "birds" config onto the
+    // shared CanonicalPirate, so "ship" is no longer guaranteed at index 0 —
+    // assert by membership rather than position.
     expect(configs.some((c: any) => c.associationName === "ship")).toBe(true);
   });
 
