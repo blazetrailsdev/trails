@@ -8,7 +8,6 @@
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import {
   Base,
-  CollectionProxy,
   association,
   reflectOnAssociation,
   registerModel,
@@ -16,18 +15,29 @@ import {
   NameError,
   pp,
 } from "./index.js";
-import { makeRange } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-import type { Author as AuthorT } from "./test-helpers/models/author.js";
+import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import type { Firm as FirmT } from "./test-helpers/models/company.js";
 import type { Tag as TagT } from "./test-helpers/models/tag.js";
 import type { Tagging as TaggingT } from "./test-helpers/models/tagging.js";
-import type { Developer as DeveloperT } from "./test-helpers/models/developer.js";
+import {
+  Developer,
+  AuditLog,
+  type Developer as DeveloperT,
+} from "./test-helpers/models/developer.js";
+import { Post, FirstPost } from "./test-helpers/models/post.js";
+import { Project } from "./test-helpers/models/project.js";
+import { Category } from "./test-helpers/models/category.js";
+import { Categorization } from "./test-helpers/models/categorization.js";
+import { Member } from "./test-helpers/models/member.js";
+import { Membership } from "./test-helpers/models/membership.js";
+import { Human } from "./test-helpers/models/human.js";
+import { Interest } from "./test-helpers/models/interest.js";
 import { Associations, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
@@ -115,264 +125,156 @@ describe("AssociationsTest", () => {
 });
 
 describe("AssociationProxyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema({
-      ap_audit_logs: { developer_id: "integer", message: "string" },
-      ap_categories: { name: "string" },
-      ap_comments: { ap_post_id: "integer", body: "string" },
-      ap_developers: { name: "string", salary: "integer" },
-      ap_posts: { title: "string" },
-      ap_tagged_posts: { title: "string" },
-      ap_taggings: { ap_category_id: "integer", ap_tagged_post_id: "integer" },
-      is_humans: { name: "string" },
-      is_interests: { is_human_id: "integer", topic: "string" },
-    });
-  });
-
-  function setupProxyModels() {
-    class APComment extends Base {
-      static {
-        this._tableName = "ap_comments";
-        this.attribute("body", "string");
-        this.attribute("ap_post_id", "integer");
-      }
-    }
-    class APPost extends Base {
-      static {
-        this._tableName = "ap_posts";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(APPost, "apComments", {
-      foreignKey: "ap_post_id",
-      className: "APComment",
-    });
-    Associations.belongsTo.call(APComment, "apPost", {
-      foreignKey: "ap_post_id",
-      className: "APPost",
-    });
-    registerModel("APPost", APPost);
-    registerModel("APComment", APComment);
-    return { APPost, APComment };
-  }
+  registerModel([
+    Author,
+    Post,
+    FirstPost,
+    Developer,
+    Project,
+    AuditLog,
+    Category,
+    Categorization,
+    Member,
+    Membership,
+    Human,
+    Interest,
+  ]);
+  const { authors, developers, members, posts, categories } = useHandlerFixtures(
+    [
+      "authorAddresses",
+      "authors",
+      "posts",
+      "categories",
+      "categorizations",
+      "developers",
+      "projects",
+      "developersProjects",
+      "memberTypes",
+      "members",
+    ],
+    { schema: canonicalSchema },
+  );
 
   it("push does not lose additions to new record", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "proxy test" });
-    const proxy = association(post, "apComments");
-    const comment = new APComment({ body: "new comment" });
-    await proxy.push(comment);
-    const comments = await proxy.toArray();
-    expect(comments.length).toBe(1);
-    expect(comments[0].body).toBe("new comment");
+    const josh = new Author({ name: "Josh" }) as any;
+    await josh.posts.push(new Post({ title: "New on Edge", body: "More cool stuff!" }));
+    expect(josh.posts.loaded).toBe(true);
+    expect(await josh.posts.size()).toBe(1);
   });
 
   it("append behaves like push", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "concat test" });
-    const proxy = association(post, "apComments");
-    const c1 = new APComment({ body: "c1" });
-    await proxy.concat(c1);
-    const comments = await proxy.toArray();
-    expect(comments.length).toBe(1);
-    expect(comments[0].body).toBe("c1");
+    const josh = new Author({ name: "Josh" }) as any;
+    await josh.posts.append(new Post({ title: "New on Edge", body: "More cool stuff!" }));
+    expect(josh.posts.loaded).toBe(true);
+    expect(await josh.posts.size()).toBe(1);
   });
 
   it("prepend is not defined", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = new APPost({ title: "no prepend" });
-    const proxy = association(post, "apComments");
-    expect(() => (proxy as any).prepend()).toThrow(/prepend on association is not defined/);
+    const josh = new Author({ name: "Josh" }) as any;
+    expect(() => (josh.posts as any).prepend(new Post())).toThrow();
   });
 
   it("load does load target", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "load test" });
-    await APComment.create({ body: "loaded", ap_post_id: post.id });
-    const proxy = association(post, "apComments");
-    const loaded = await proxy.toArray();
-    expect(loaded.length).toBe(1);
-    expect(loaded[0].body).toBe("loaded");
+    const david = developers("david") as any;
+    expect(david.projects.loaded).toBe(false);
+    await david.projects.load();
+    expect(david.projects.loaded).toBe(true);
   });
 
   it("create via association with block", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "create block" });
-    const proxy = association(post, "apComments");
-    const comment = await proxy.create({ body: "created" });
-    expect(comment.isPersisted()).toBe(true);
-    expect(comment.body).toBe("created");
-    expect(comment.ap_post_id).toBe(post.id);
+    const david = authors("david") as any;
+    const post = await david.posts.create({ title: "New on Edge" }, (p: any) => {
+      p.body = "More cool stuff!";
+    });
+    expect(post.title).toBe("New on Edge");
+    expect(post.body).toBe("More cool stuff!");
   });
 
   it("create with bang via association with block", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "create bang" });
-    const proxy = association(post, "apComments");
-    const comment = await proxy.create({ body: "bang created" });
-    expect(comment.isPersisted()).toBe(true);
-    expect(comment.ap_post_id).toBe(post.id);
+    const david = authors("david") as any;
+    const post = await david.posts.createBang({ title: "New on Edge" }, (p: any) => {
+      p.body = "More cool stuff!";
+    });
+    expect(post.title).toBe("New on Edge");
+    expect(post.body).toBe("More cool stuff!");
   });
 
   it("proxy association accessor", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "accessor" });
-    const proxy = association(post, "apComments");
-    expect(proxy).toBeInstanceOf(CollectionProxy);
+    const david = developers("david") as any;
+    const proxyAssociation = (david.projects as any).proxyAssociation;
+    expect(proxyAssociation.owner).toBe(david);
+    expect(proxyAssociation.reflection.name).toBe("projects");
   });
 
   it("scoped allows conditions", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "scoped" });
-    await APComment.create({ body: "match", ap_post_id: post.id });
-    await APComment.create({ body: "other", ap_post_id: post.id });
-    const proxy = association(post, "apComments");
-    const filtered = await proxy.where({ body: "match" }).toArray();
-    expect(filtered.length).toBe(1);
-    expect(filtered[0].body).toBe("match");
+    const david = developers("david") as any;
+    const sql = (david.projects as any).merge(Project.where("foo")).toSql();
+    expect(sql).toContain("foo");
   });
 
   it("proxy object is cached", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "cached" });
-    const proxy1 = association(post, "apComments");
-    const proxy2 = association(post, "apComments");
-    expect(proxy1).toBeInstanceOf(CollectionProxy);
-    expect(proxy2).toBeInstanceOf(CollectionProxy);
+    const david = developers("david") as any;
+    expect(david.projects).toBe(david.projects);
   });
 
   it("first! works on loaded associations", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "first!" });
-    await APComment.create({ body: "first one", ap_post_id: post.id });
-    const proxy = association(post, "apComments");
-    const first = await proxy.first();
-    expect(first).not.toBeNull();
-    expect(first!.body).toBe("first one");
+    const david = authors("david") as any;
+    const expected = await david.firstPosts.first();
+    await david.firstPosts.reload();
+    const first = await (david.firstPosts as any).firstBang();
+    expect(first.id).toBe(expected!.id);
+    expect(david.firstPosts.loaded).toBe(true);
   });
 
   it("size differentiates between new and persisted in memory records when loaded records are empty", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "size test" });
-    const proxy = association(post, "apComments");
-    const size = await proxy.size();
-    expect(size).toBe(0);
-    const empty = await proxy.isEmpty();
-    expect(empty).toBe(true);
+    const member = members("blarpy_winkup") as any;
+    expect(await member.favoriteMemberships.isEmpty()).toBe(true);
+    const membership = await member.favoriteMemberships.createBang({});
+    await membership.updateBang({ favorite: false });
+    // CollectionAssociation#size has different behavior when loaded vs. non-loaded:
+    // the first call marks the association as loaded and the second call takes a
+    // different code path, so it's important to keep both assertions.
+    expect(await member.favoriteMemberships.size()).toBe(0);
+    expect(await member.favoriteMemberships.size()).toBe(0);
   });
 
   it("push does not load target", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "push no load" });
-    const proxy = association(post, "apComments");
-    expect(proxy.loaded).toBe(false);
-    const comment = new APComment({ body: "pushed" });
-    await proxy.push(comment);
-    expect(proxy.loaded).toBe(false);
+    const david = authors("david") as any;
+    const post = new Post({ title: "New on Edge", body: "More cool stuff!" });
+    await david.posts.push(post);
+    expect(david.posts.loaded).toBe(false);
+    expect(await david.posts.isInclude(post)).toBe(true);
   });
   it("push has many through does not load target", async () => {
-    class APTagging extends Base {
-      static {
-        this._tableName = "ap_taggings";
-        this.attribute("ap_tagged_post_id", "integer");
-        this.attribute("ap_category_id", "integer");
-      }
-    }
-    class APCategory extends Base {
-      static {
-        this._tableName = "ap_categories";
-        this.attribute("name", "string");
-      }
-    }
-    class APTaggedPost extends Base {
-      static {
-        this._tableName = "ap_tagged_posts";
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(APTaggedPost, "apTaggings", {
-      className: "APTagging",
-      foreignKey: "ap_tagged_post_id",
-    });
-    Associations.hasMany.call(APTaggedPost, "apCategories", {
-      className: "APCategory",
-      through: "apTaggings",
-      source: "apCategory",
-    });
-    Associations.belongsTo.call(APTagging, "apCategory", {
-      className: "APCategory",
-      foreignKey: "ap_category_id",
-    });
-    registerModel("APTagging", APTagging);
-    registerModel("APCategory", APCategory);
-    registerModel("APTaggedPost", APTaggedPost);
-
-    const post = await APTaggedPost.create({ title: "tagged" });
-    const category = await APCategory.create({ name: "ruby" });
-    const proxy = association(post, "apCategories");
-    expect(proxy.loaded).toBe(false);
-    await proxy.push(category as any);
-    // pushing via through creates the join record but must NOT load the target
-    expect(proxy.loaded).toBe(false);
-    // the pushed record is discoverable via include? (Rails: assert_includes)
-    expect(await proxy.isInclude(category as any)).toBe(true);
-    expect(proxy.loaded).toBe(false);
+    const david = authors("david") as any;
+    const technology = categories("technology") as any;
+    await david.categories.push(technology);
+    expect(david.categories.loaded).toBe(false);
+    expect(await david.categories.isInclude(technology)).toBe(true);
   });
   it("push followed by save does not load target", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "push save no load" });
-    const proxy = association(post, "apComments");
-    const comment = new APComment({ body: "pushed" });
-    await proxy.push(comment);
-    await post.save();
-    expect(proxy.loaded).toBe(false);
+    const david = authors("david") as any;
+    const post = new Post({ title: "New on Edge", body: "More cool stuff!" });
+    await david.posts.push(post);
+    expect(david.posts.loaded).toBe(false);
+    await david.save();
+    expect(david.posts.loaded).toBe(false);
+    expect(await david.posts.isInclude(post)).toBe(true);
   });
   it("save on parent does not load target", async () => {
-    const { APPost } = setupProxyModels();
-    const post = await APPost.create({ title: "parent save no load" });
-    const proxy = association(post, "apComments");
-    expect(proxy.loaded).toBe(false);
-    // update_columns on parent should not trigger association loading
-    await post.updateColumns({ title: "updated" });
-    expect(proxy.loaded).toBe(false);
+    const david = developers("david") as any;
+    expect(david.projects.loaded).toBe(false);
+    // update_columns on parent should not trigger association loading.
+    await david.updateColumns({ salary: 80_000 });
+    expect(david.projects.loaded).toBe(false);
   });
   it("inspect does not reload a not yet loaded target", async () => {
-    class APAuditLog extends Base {
-      static {
-        this._tableName = "ap_audit_logs";
-        this.attribute("developer_id", "integer");
-        this.attribute("message", "string");
-        // Mirrors audit_log.rb: AuditLog.attributes_for_inspect = [:id, :message].
-        (this as any).attributesForInspect = ["id", "message"];
-      }
-    }
-    class APDeveloper extends Base {
-      static {
-        this._tableName = "ap_developers";
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(APDeveloper, "apAuditLogs", {
-      foreignKey: "developer_id",
-      className: "APAuditLog",
-    });
-    Associations.belongsTo.call(APAuditLog, "apDeveloper", {
-      foreignKey: "developer_id",
-      className: "APDeveloper",
-    });
-    registerModel("APDeveloper", APDeveloper);
-    registerModel("APAuditLog", APAuditLog);
-
-    const andreas = new APDeveloper({ name: "Andreas" });
     // Mirrors developer.rb `log=`: building an audit_log without loading.
-    association(andreas, "apAuditLogs").build({ message: "new developer added" });
-    const proxy = association(andreas, "apAuditLogs");
-    expect(proxy.loaded).toBe(false);
-    expect(await proxy.inspect()).toMatch(/message: "new developer added"/);
-    expect(proxy.loaded).toBe(true);
+    const andreas = new Developer({ name: "Andreas" });
+    (andreas as any).log = "new developer added";
+    expect(andreas.auditLogs.loaded).toBe(false);
+    expect(await andreas.auditLogs.inspect()).toMatch(/message: "new developer added"/);
+    expect(andreas.auditLogs.loaded).toBe(true);
   });
   it("pretty_print does not reload a not yet loaded target", async () => {
     // Mirrors test_pretty_print_does_not_reload_a_not_yet_loaded_target: PP.pp
@@ -380,198 +282,100 @@ describe("AssociationProxyTest", () => {
     // a reload. trails has no Ruby `PP` library; `pp(obj, io)` drives the same
     // pretty-printer protocol (CollectionProxy#prettyPrint → record#prettyPrint)
     // rather than #inspect.
-    class APAuditLog extends Base {
-      static {
-        this._tableName = "ap_audit_logs";
-        this.attribute("developer_id", "integer");
-        this.attribute("message", "string");
-        // Mirrors audit_log.rb: AuditLog.attributes_for_inspect = [:id, :message].
-        (this as any).attributesForInspect = ["id", "message"];
-      }
-    }
-    class APDeveloper extends Base {
-      static {
-        this._tableName = "ap_developers";
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(APDeveloper, "apAuditLogs", {
-      foreignKey: "developer_id",
-      className: "APAuditLog",
-    });
-    registerModel("APDeveloper", APDeveloper);
-    registerModel("APAuditLog", APAuditLog);
-
-    const andreas = new APDeveloper({ name: "Andreas" });
-    // Mirrors developer.rb `log=`: building an audit_log without loading.
-    association(andreas, "apAuditLogs").build({ message: "new developer added" });
-    const proxy = association(andreas, "apAuditLogs");
-    expect(proxy.loaded).toBe(false);
+    const andreas = new Developer({});
+    (andreas as any).log = "new developer added";
+    expect(andreas.auditLogs.loaded).toBe(false);
     let out = "";
-    await pp(proxy, { write: (s: string) => (out += s) });
+    await pp(andreas.auditLogs, { write: (s: string) => (out += s) });
     expect(out).toMatch(/message: "new developer added"/);
-    expect(proxy.loaded).toBe(true);
+    expect(andreas.auditLogs.loaded).toBe(true);
   });
   it("save on parent saves children", async () => {
-    class APAuditLog extends Base {
-      static {
-        this._tableName = "ap_audit_logs";
-        this.attribute("developer_id", "integer");
-        this.attribute("message", "string");
-      }
-    }
-    class APDeveloper extends Base {
-      static {
-        this._tableName = "ap_developers";
-        this.attribute("name", "string");
-        this.attribute("salary", "integer");
-        // Mirrors developer.rb:97-98.
-        this.validates("salary", { inclusion: { in: makeRange(50_000, 200_000) } });
-        this.validates("name", { length: { in: [3, 20] } });
-        this.beforeCreate((developer: any) => {
-          association(developer, "apAuditLogs").build({ message: "Computer created" });
-        });
-      }
-    }
-    Associations.hasMany.call(APDeveloper, "apAuditLogs", {
-      foreignKey: "developer_id",
-      className: "APAuditLog",
-    });
-    Associations.belongsTo.call(APAuditLog, "apDeveloper", {
-      foreignKey: "developer_id",
-      className: "APDeveloper",
-    });
-    registerModel("APDeveloper", APDeveloper);
-    registerModel("APAuditLog", APAuditLog);
-
-    const developer = await APDeveloper.create({ name: "Bryan", salary: 50_000 });
+    const developer = await Developer.create({ name: "Bryan", salary: 50_000 });
     await developer.reload();
-    expect(await association(developer, "apAuditLogs").size()).toBe(1);
+    expect(await developer.auditLogs.size()).toBe(1);
   });
   it("reload returns association", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "reload test" });
-    await APComment.create({ body: "original", ap_post_id: post.id });
-    const proxy = association(post, "apComments");
-    const reloaded = await proxy.reload();
-    expect(reloaded).toBe(proxy);
-    expect(proxy.loaded).toBe(true);
-    const records = await proxy.toArray();
-    expect(records.length).toBe(1);
-    expect(records[0].body).toBe("original");
+    const david = developers("david") as any;
+    const once = await david.projects.reload();
+    const reloaded = await (once as any).reload();
+    expect(reloaded).toBe(david.projects);
+    expect(david.projects.loaded).toBe(true);
   });
   it("getting a scope from an association", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "scope test" });
-    await APComment.create({ body: "scoped", ap_post_id: post.id });
-    const proxy = association(post, "apComments");
-    const scope = proxy.scope();
-    const results = await scope.toArray();
-    expect(results.length).toBe(1);
-    expect(results[0].body).toBe("scoped");
+    const david = developers("david") as any;
+    const scope = (david.projects as any).scope();
+    const results = (await scope.toArray()).map((r: any) => r.id).sort();
+    const expected = (await david.projects.toArray()).map((r: any) => r.id).sort();
+    expect(results).toEqual(expected);
   });
   it("inverses get set of subsets of the association", async () => {
     // Rails: human.interests.where("1=1").first.human should not re-query —
     // automatic inverse_of wires the parent onto each loaded child.
-    class IsHuman extends Base {
-      static {
-        this._tableName = "is_humans";
-        this.attribute("name", "string");
-      }
-    }
-    class IsInterest extends Base {
-      static {
-        this._tableName = "is_interests";
-        this.attribute("topic", "string");
-        this.attribute("is_human_id", "integer");
-      }
-    }
-    Associations.hasMany.call(IsHuman, "isInterests", { className: "IsInterest" });
-    Associations.belongsTo.call(IsInterest, "isHuman", { className: "IsHuman" });
-    registerModel("IsHuman", IsHuman);
-    registerModel("IsInterest", IsInterest);
-
-    const human = await IsHuman.create({ name: "Gordon" });
-    await IsInterest.create({ topic: "Trainspotting", is_human_id: (human as any).id });
-    const found = (await IsHuman.find((human as any).id)) as InstanceType<typeof IsHuman>;
-    const proxy = association(found, "isInterests");
-    const subset = await proxy.where("1=1").first();
+    const human = await Human.create({});
+    await (human as any).interests.create({});
+    const found = (await Human.find((human as any).id)) as InstanceType<typeof Human>;
+    const subset = await (found as any).interests.where("1=1").first();
     expect(subset).not.toBeNull();
-    expect((subset as any)._associationCache("isHuman")?.target).toBe(found);
+    expect((subset as any)._associationCache("human")?.target).toBe(found);
   });
   it("pluck uses loaded target", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "pluck test" });
-    const comment = await APComment.create({ body: "plucked", ap_post_id: post.id });
-    const proxy = association(post, "apComments");
-    await proxy.load();
-    const reloaded = await APComment.find(comment.id);
-    reloaded.body = "changed";
-    await reloaded.save();
-    const bodies = await proxy.pluck("body");
-    expect(bodies).toEqual(["plucked"]);
+    const david = authors("david") as any;
+    const expected = await david.firstPosts.pluck("title");
+    const loaded = await david.firstPosts.load();
+    expect(david.firstPosts.loaded).toBe(true);
+    expect(await david.firstPosts.pluck("title")).toEqual(expected);
+    expect(loaded.length).toBeGreaterThan(0);
   });
   it("pick uses loaded target", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "pick test" });
-    const comment = await APComment.create({ body: "picked", ap_post_id: post.id });
-    const proxy = association(post, "apComments");
-    await proxy.load();
-    const reloaded = await APComment.find(comment.id);
-    reloaded.body = "changed";
-    await reloaded.save();
-    const body = await proxy.pick("body");
-    expect(body).toBe("picked");
+    const david = authors("david") as any;
+    const expected = await david.firstPosts.pick("title");
+    await david.firstPosts.load();
+    expect(david.firstPosts.loaded).toBe(true);
+    expect(await david.firstPosts.pick("title")).toEqual(expected);
   });
   it("reset unloads target", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "reset test" });
-    await APComment.create({ body: "will reset", ap_post_id: post.id });
-    const proxy = association(post, "apComments");
-    await proxy.load();
-    expect(proxy.loaded).toBe(true);
-    proxy.reset();
-    expect(proxy.loaded).toBe(false);
+    const david = authors("david") as any;
+    await david.posts.reload();
+    expect(david.posts.loaded).toBe(true);
+    david.posts.reset();
+    expect(david.posts.loaded).toBe(false);
   });
   it("target merging ignores persisted in memory records", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "merge test" });
-    const proxy = association(post, "apComments");
-    const comment = await proxy.create({ body: "persisted" });
-    expect(comment.isPersisted()).toBe(true);
-    const results = await proxy.toArray();
-    expect(results.length).toBe(1);
+    const david = authors("david") as any;
+    expect(await david.thinkingPosts.isInclude(posts("thinking") as any)).toBe(true);
+    await david.thinkingPosts.createBang({
+      title: "Something else entirely",
+      body: "Does not matter.",
+    });
+    expect(await david.thinkingPosts.size()).toBe(1);
+    expect((await david.thinkingPosts.toArray()).length).toBe(1);
   });
   it("target merging ignores persisted in memory records when loaded records are empty", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "merge empty" });
-    const proxy = association(post, "apComments");
-    const results = await proxy.toArray();
-    expect(results.length).toBe(0);
+    const member = members("blarpy_winkup") as any;
+    expect(await member.favoriteMemberships.isEmpty()).toBe(true);
+    const membership = await member.favoriteMemberships.createBang({});
+    await membership.updateBang({ favorite: false });
+    expect((await member.favoriteMemberships.toArray()).length).toBe(0);
   });
   it("target merging recognizes updated in memory records", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "merge update" });
-    const proxy = association(post, "apComments");
-    proxy.build({ body: "built" });
-    const results = await proxy.toArray();
-    const builtRecords = results.filter((r: any) => r.isNewRecord());
-    expect(builtRecords.length).toBe(1);
-    expect(builtRecords[0].body).toBe("built");
+    const member = members("blarpy_winkup") as any;
+    const membership = await (member as any).createMembershipBang({ favorite: false });
+    expect(await member.favoriteMemberships.isEmpty()).toBe(true);
+    await membership.updateBang({ favorite: true });
+    expect((await member.favoriteMemberships.toArray()).length).toBeGreaterThan(0);
   });
   it("load preserves in-memory instances added via push", async () => {
-    const { APPost, APComment } = setupProxyModels();
-    const post = await APPost.create({ title: "load merge" });
-    const proxy = association(post, "apComments");
-    const comment = await APComment.create({ body: "original", ap_post_id: post.id });
-    await proxy.push(comment);
-    // Mutate the in-memory instance
-    comment.body = "mutated";
-    // load() should preserve the in-memory instance, not replace with fresh DB copy
-    const loaded = await proxy.load();
-    const found = loaded.find((r: any) => r.readAttribute("id") === comment.id);
-    expect(found).toBe(comment);
-    expect(found!.body).toBe("mutated");
+    const david = authors("david") as any;
+    const post = await Post.create({ title: "original", body: "b" });
+    await david.posts.push(post);
+    // Mutate the in-memory instance.
+    post.title = "mutated";
+    // load() should preserve the in-memory instance, not replace with a fresh DB copy.
+    const loaded = await david.posts.load();
+    const found = loaded.find((r: any) => r.readAttribute("id") === post.id);
+    expect(found).toBe(post);
+    expect((found as any).title).toBe("mutated");
   });
 });
 

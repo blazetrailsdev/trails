@@ -1636,6 +1636,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stripThenable(this._proxySelf ?? this) as this;
     }
 
+    // Mirror Rails CollectionAssociation#concat: a new-record owner loads the
+    // target up front (`load_target` marks the association loaded; with a null
+    // owner key loadHasMany short-circuits to []) so the pushed records merge
+    // into and are tracked against the in-memory target rather than being lost.
+    if (this._record.isNewRecord() && !this._targetLoaded) {
+      await this.loadTarget();
+    }
+
     const ctor = this._record.constructor as typeof Base;
     const asName = this._assocDef.options.as;
     let primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
