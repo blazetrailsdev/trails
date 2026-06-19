@@ -1,219 +1,234 @@
 /**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Port of vendor/rails/activerecord/test/cases/dup_test.rb — canonical
+ * Topic/Car/Movie models + handler `topics`/`cars` fixtures and the canonical
+ * `parrots_pirates` table, test names verbatim from the Ruby methods.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { describe, it, expect } from "vitest";
+import { Base, registerModel } from "./index.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { repairValidations } from "./test-helpers/repair-validations.js";
+import { clearTimestampAttributes } from "./timestamp.js";
+import { DefaultScope } from "./scoping/default.js";
+import type { Relation } from "./relation.js";
+import { RecordInvalid } from "./validations.js";
+import { Topic } from "./test-helpers/models/topic.js";
+// Registers the Reply STI subclass so Topic#destroy can resolve the `replies`
+// association (vendor/rails/.../dup_test.rb requires "models/reply").
+import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
+import { Car } from "./test-helpers/models/car.js";
+import { Movie } from "./test-helpers/models/movie.js";
+
+for (const klass of [Topic, Reply, SillyReply, UniqueReply, SillyUniqueReply]) {
+  registerModel(klass);
+}
 
 describe("DupTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ topics: { title: "string", body: "string" } });
-  });
+  // Mirrors Rails `fixtures :topics, :cars`.
+  useHandlerFixtures(["topics", "cars"], { schema: canonicalSchema });
 
-  function makeModel() {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    return { Topic };
-  }
+  it("dup", () => {
+    const topic = new Topic({});
+    topic.freeze();
+    expect(topic.dup().isFrozen()).toBe(false);
+  });
 
   it("not readonly", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "original" });
-    const d = t.dup();
-    expect(d.isNewRecord()).toBe(true);
+    const topic = await Topic.first();
+    const duped = topic!.dup();
+    expect(duped.isReadonly()).toBe(false);
   });
 
-  it("is readonly", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "original" });
-    const d = t.dup();
-    expect(d.id == null).toBe(true);
-  });
-
-  it("dup not previously new record", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "orig" });
-    expect(t.isPersisted()).toBe(true);
-    const d = t.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("dup not destroyed", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "orig" });
-    const d = t.dup();
-    expect(d.isDestroyed()).toBe(false);
-  });
-
-  it("dup has no id", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "orig" });
-    const d = t.dup();
-    expect(d.id == null).toBe(true);
-  });
-
-  it("dup with modified attributes", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "orig", body: "content" });
-    const d = t.dup();
-    expect(d.title).toBe("orig");
-    expect(d.body).toBe("content");
-  });
-
-  it("dup with changes", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "orig" });
-    t.title = "changed";
-    const d = t.dup();
-    expect(d.title).toBe("changed");
-  });
-
-  it("dup topics are independent", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "orig" });
-    const d = t.dup();
-    d.title = "copy";
-    expect(t.title).toBe("orig");
-    expect(d.title).toBe("copy");
-  });
-
-  it("dup attributes are independent", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "a", body: "b" });
-    const d = t.dup();
-    d.body = "different";
-    expect(t.body).toBe("b");
-  });
-
-  it("dup timestamps are cleared", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "ts" });
-    const d = t.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("dup locking column is cleared", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "lock" });
-    const d = t.dup();
-    expect(d.id == null).toBe(true);
-  });
-
-  it("dup locking column is not dirty", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "lock2" });
-    const d = t.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("dup after initialize callbacks", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "cb" });
-    const d = t.dup();
-    expect(d.title).toBe("cb");
-  });
-
-  it("dup validity is independent", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "valid" });
-    const d = t.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("dup with default scope", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "scoped" });
-    const d = t.dup();
-    expect(d.title).toBe("scoped");
-  });
-
-  it("dup without primary key", () => {
-    const { Topic } = makeModel();
-    const t = new Topic({ title: "no-pk" });
-    const d = t.dup();
-    expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("dup record not persisted after rollback transaction", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "rb" });
-    const d = t.dup();
-    expect(d.isPersisted()).toBe(false);
+  // BLOCKED (dup-initialize-dup-convergence): `dup` rebuilds via `new ctor`,
+  // not Ruby's ivar-copying `Object#dup`, so `@readonly` is not carried over.
+  it.skip("is readonly", async () => {
+    const topic = await Topic.first();
+    topic!.readonlyBang();
+    const duped = topic!.dup();
+    expect(duped.isReadonly()).toBe(true);
   });
 
   it("dup not persisted", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "original" });
-    expect(t.isPersisted()).toBe(true);
-    const d = t.dup();
-    expect(d.isPersisted()).toBe(false);
-    expect(d.isNewRecord()).toBe(true);
+    const topic = await Topic.first();
+    const duped = topic!.dup();
+    expect(duped.isPersisted()).toBe(false);
+    expect(duped.isNewRecord()).toBe(true);
   });
-});
 
-describe("DupTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { name: "string" } });
+  it("dup not previously new record", async () => {
+    const topic = await Topic.first();
+    const duped = topic!.dup();
+    expect(duped.isPreviouslyNewRecord()).toBe(false);
   });
-  it("creates an unsaved copy without primary key", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    const original = await Item.create({ name: "Original" });
-    const copy = original.dup();
-    expect(copy.isNewRecord()).toBe(true);
-    expect(copy.id).toBeNull();
-    expect(copy.name).toBe("Original");
-  });
-});
 
-describe("DupTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ animals: { name: "string" }, users: { name: "string" } });
+  it("dup not destroyed", async () => {
+    const topic = await Topic.first();
+    await topic!.destroy();
+    const duped = topic!.dup();
+    expect(duped.isDestroyed()).toBe(false);
   });
-  it("transforms a record to another class", async () => {
-    class Animal extends Base {
-      static _tableName = "animals";
-    }
-    Animal.attribute("id", "integer");
-    Animal.attribute("name", "string");
 
-    class Dog extends Base {
-      static _tableName = "animals";
-    }
-    Dog.attribute("id", "integer");
-    Dog.attribute("name", "string");
-    const animal = await Animal.create({ name: "Rex" });
-    const dog = animal.becomes(Dog);
-    expect(dog).toBeInstanceOf(Dog);
-    expect(dog.name).toBe("Rex");
-    expect(dog.isPersisted()).toBe(true);
+  it("dup has no id", async () => {
+    const topic = await Topic.first();
+    const duped = topic!.dup();
+    expect(duped.id).toBeNull();
   });
-  it("dup", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+
+  it("dup with modified attributes", async () => {
+    const topic = await Topic.first();
+    topic!.author_name = "Aaron";
+    const duped = topic!.dup();
+    expect(duped.author_name).toBe("Aaron");
+  });
+
+  // BLOCKED (dup-initialize-dup-convergence): `dup` skips the `initialize_dup`
+  // chain, so the duplicate's dirty `changes` snapshot diverges from Rails.
+  it.skip("dup with changes", async () => {
+    const dbtopic = await Topic.first();
+    const topic = new Topic({});
+
+    const attrs = { ...dbtopic!.attributes } as Record<string, unknown>;
+    delete attrs.id;
+    topic.assignAttributes(attrs);
+
+    // duped has no timestamp values
+    const duped = dbtopic!.dup();
+
+    // clear topic timestamp values
+    clearTimestampAttributes.call(
+      topic as unknown as ThisParameterType<typeof clearTimestampAttributes>,
+    );
+
+    expect(topic.changes).toEqual(duped.changes);
+  });
+
+  it("dup topics are independent", async () => {
+    const topic = await Topic.first();
+    topic!.author_name = "Aaron";
+    const duped = topic!.dup();
+
+    duped.author_name = "meow";
+
+    expect(topic!.changes).not.toEqual(duped.changes);
+  });
+
+  it("dup attributes are independent", async () => {
+    const topic = await Topic.first();
+    const duped = topic!.dup();
+
+    duped.author_name = "meow";
+    topic!.author_name = "Aaron";
+
+    expect(topic!.author_name).toBe("Aaron");
+    expect(duped.author_name).toBe("meow");
+  });
+
+  // BLOCKED (dup-initialize-dup-convergence): `dup` never calls
+  // `Timestamp#initialize_dup`, so created_at/updated_at survive the dup.
+  it.skip("dup timestamps are cleared", async () => {
+    const topic = await Topic.first();
+    expect(topic!.updated_at).not.toBeNull();
+    expect(topic!.created_at).not.toBeNull();
+
+    const newTopic = topic!.dup();
+    expect(newTopic.updated_at).toBeNull();
+    expect(newTopic.created_at).toBeNull();
+
+    await newTopic.save();
+    expect(newTopic.updated_at).not.toBeNull();
+    expect(newTopic.created_at).not.toBeNull();
+  });
+
+  // BLOCKED (dup-initialize-dup-convergence): `dup` never calls
+  // `Locking::Optimistic#initialize_dup`, so lock_version is not reset to 0.
+  it.skip("dup locking column is cleared", async () => {
+    const car = await Car.first();
+    await car!.touch();
+    expect(car!.lock_version).not.toBe(0);
+
+    car!.lock_version = 1000;
+
+    const newCar = car!.dup();
+    expect(newCar.lock_version).toBe(0);
+  });
+
+  it("dup locking column is not dirty", async () => {
+    const car = await Car.first();
+    await car!.touch();
+    expect(car!.lock_version).not.toBe(0);
+
+    car!.lock_version += 1;
+    const newCar = car!.dup();
+    expect(newCar.attributeChanged("lock_version")).toBe(false);
+  });
+
+  it("dup after initialize callbacks", () => {
+    const topic = new Topic({});
+    expect(Topic.afterInitializeCalled).toBe(true);
+    Topic.afterInitializeCalled = false;
+    topic.dup();
+    expect(Topic.afterInitializeCalled).toBe(true);
+  });
+
+  it("dup validity is independent", async () => {
+    await repairValidations(Topic, async () => {
+      Topic.validates("title", { presence: true });
+      const topic = new Topic({ title: "Literature" });
+      await topic.isValid();
+
+      const duped = topic.dup();
+      duped.title = null;
+      expect(await duped.isInvalid()).toBe(true);
+
+      topic.title = null;
+      duped.title = "Mathematics";
+      expect(await topic.isInvalid()).toBe(true);
+      expect(await duped.isValid()).toBe(true);
+    });
+  });
+
+  it("dup with default scope", async () => {
+    const prevDefaultScopes = Topic.defaultScopes;
+    Topic.defaultScopes = [new DefaultScope((q: Relation<Topic>) => q.where({ approved: true }))];
+    try {
+      const topic = new Topic({ approved: false });
+      expect(topic.dup().approved).toBeFalsy();
+    } finally {
+      Topic.defaultScopes = prevDefaultScopes;
     }
-    const u = await User.create({ name: "original" });
-    const d = u.dup();
-    expect(d.isNewRecord()).toBe(true);
-    expect(d.name).toBe("original");
-    expect(d.id).toBeNull();
+  });
+
+  it("dup without primary key", async () => {
+    class ParrotsPirate extends Base {
+      static _tableName = "parrots_pirates";
+    }
+    const record = await ParrotsPirate.create({});
+
+    let raised = false;
+    try {
+      record.dup();
+    } catch {
+      raised = true;
+    }
+    expect(raised).toBe(false);
+  });
+
+  it("dup record not persisted after rollback transaction", async () => {
+    const movie = new Movie({ name: "test" });
+
+    let raised = false;
+    try {
+      await Movie.transaction(async () => {
+        await movie.saveBang();
+        const duped = movie.dup();
+        duped.assignAttributes({ name: null });
+        await duped.saveBang();
+      });
+    } catch (e) {
+      if (e instanceof RecordInvalid) raised = true;
+      else throw e;
+    }
+    expect(raised).toBe(true);
+    expect(movie.isPersisted()).toBe(false);
   });
 });
