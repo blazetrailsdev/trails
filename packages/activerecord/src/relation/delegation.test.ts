@@ -197,7 +197,16 @@ describe("DelegationTest", () => {
     const records = () => ["a", "b", "c"];
 
     it("delegates curated/Enumerable members to the records", () => {
-      for (const method of ["forEach", "join", "reverse", "slice", "map", "sort", "indexOf"]) {
+      for (const method of [
+        "forEach",
+        "join",
+        "reverse",
+        "slice",
+        "map",
+        "sort",
+        "indexOf",
+        "lastIndexOf", // Rails `rindex`
+      ]) {
         expect(typeof delegateArrayMethod(method, records)).toBe("function");
       }
       expect(delegateArrayMethod("join", records)!(",")).toBe("a,b,c");
@@ -206,7 +215,7 @@ describe("DelegationTest", () => {
     it("does not delegate JS-only Array methods absent from Rails", () => {
       // These raise NoMethodError in Rails; returning undefined lets the proxy
       // fall through so the call is rejected rather than silently succeeding.
-      for (const method of ["findIndex", "flat", "copyWithin", "fill", "lastIndexOf"]) {
+      for (const method of ["findIndex", "flat", "copyWithin", "fill", "findLast"]) {
         expect(delegateArrayMethod(method, records)).toBeUndefined();
       }
     });

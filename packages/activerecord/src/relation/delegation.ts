@@ -167,11 +167,12 @@ export function name(): string {
  * `NoMethodError`.
  *
  * We mirror that boundary: only JS `Array.prototype` methods whose behavior maps
- * to a Rails-reachable method are delegated. Ruby-only entries (`sample`,
- * `rotate`, `compact`, `in_groups`, `to_sentence`, …) have no JS analogue and
- * are dropped. JS-only methods absent from Rails (`findIndex`, `flat`,
- * `copyWithin`, `fill`, `lastIndexOf`, …) are intentionally excluded so they
- * raise like Rails rather than silently succeeding.
+ * to a Rails-reachable method are delegated (e.g. `index` → `indexOf`,
+ * `rindex` → `lastIndexOf`). Ruby-only entries (`sample`, `rotate`, `compact`,
+ * `in_groups`, `to_sentence`, …) have no JS analogue and are dropped. JS-only
+ * methods absent from Rails (`findIndex`, `flat`, `copyWithin`, `fill`, …) are
+ * intentionally excluded so they raise like Rails rather than silently
+ * succeeding.
  */
 const DELEGATED_ARRAY_METHODS = new Set<string>([
   // curated delegate-to-records list (delegation.rb) → JS equivalents
@@ -181,6 +182,7 @@ const DELEGATED_ARRAY_METHODS = new Set<string>([
   "slice", // slice / []
   "at", // []
   "indexOf", // index
+  "lastIndexOf", // rindex
   "concat", // +
   // Enumerable methods (`Relation` includes Enumerable) with JS analogues
   "map", // map / collect
