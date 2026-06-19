@@ -590,6 +590,12 @@ describe("PreloaderTest", () => {
       author_favorites: canonicalSchema.author_favorites,
       postesques: canonicalSchema.postesques,
       essays: canonicalSchema.essays,
+      invoices: canonicalSchema.invoices,
+      line_items: canonicalSchema.line_items,
+      line_item_discount_applications: canonicalSchema.line_item_discount_applications,
+      shipping_lines: canonicalSchema.shipping_lines,
+      shipping_line_discount_applications: canonicalSchema.shipping_line_discount_applications,
+      discounts: canonicalSchema.discounts,
       cfk_bt_authors: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
@@ -642,6 +648,12 @@ describe("PreloaderTest", () => {
   let Tagging: typeof Base;
   let AuthorFavorite: typeof Base;
   let Essay: typeof Base;
+  let Invoice: typeof Base;
+  let LineItem: typeof Base;
+  let LineItemDiscountApplication: typeof Base;
+  let ShippingLine: typeof Base;
+  let ShippingLineDiscountApplication: typeof Base;
+  let Discount: typeof Base;
 
   beforeAll(async () => {
     Author = (await import("./test-helpers/models/author.js")).Author as never;
@@ -657,6 +669,14 @@ describe("PreloaderTest", () => {
     Tag = (await import("./test-helpers/models/tag.js")).Tag as never;
     Tagging = (await import("./test-helpers/models/tagging.js")).Tagging as never;
     Essay = (await import("./test-helpers/models/essay.js")).Essay as never;
+    Invoice = (await import("./test-helpers/models/invoice.js")).Invoice as never;
+    const liMod = await import("./test-helpers/models/line-item.js");
+    LineItem = liMod.LineItem as never;
+    LineItemDiscountApplication = liMod.LineItemDiscountApplication as never;
+    const slMod = await import("./test-helpers/models/shipping-line.js");
+    ShippingLine = slMod.ShippingLine as never;
+    ShippingLineDiscountApplication = slMod.ShippingLineDiscountApplication as never;
+    Discount = (await import("./test-helpers/models/discount.js")).Discount as never;
   });
 
   beforeEach(() => {
@@ -671,6 +691,12 @@ describe("PreloaderTest", () => {
     registerModel("Tag", Tag);
     registerModel("Tagging", Tagging);
     registerModel("Essay", Essay);
+    registerModel("Invoice", Invoice);
+    registerModel("LineItem", LineItem);
+    registerModel("LineItemDiscountApplication", LineItemDiscountApplication);
+    registerModel("ShippingLine", ShippingLine);
+    registerModel("ShippingLineDiscountApplication", ShippingLineDiscountApplication);
+    registerModel("Discount", Discount);
   });
 
   it("preload with scope", async () => {
@@ -987,33 +1013,57 @@ describe("PreloaderTest", () => {
   });
 
   it("some already loaded associations", async () => {
-    class SAAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class SAPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(SAPost, "saAuthor", {
-      className: "SAAuthor",
-      foreignKey: "author_id",
+    const itemDiscount = await Discount.create({ amount: 5 });
+    const shippingDiscount = await Discount.create({ amount: 20 });
+    const invoice = await Invoice.create({});
+    const lineItem = await LineItem.create({ amount: 20, invoice_id: invoice.id });
+    await LineItemDiscountApplication.create({
+      line_item_id: lineItem.id,
+      discount_id: itemDiscount.id,
     });
-    registerModel("SAAuthor", SAAuthor);
-    registerModel("SAPost", SAPost);
+    const shippingLine = await ShippingLine.create({ amount: 50, invoice_id: invoice.id });
+    await ShippingLineDiscountApplication.create({
+      shipping_line_id: shippingLine.id,
+      discount_id: shippingDiscount.id,
+    });
 
-    const a = await SAAuthor.create({ name: "Auth" });
-    await SAPost.create({ title: "P1", body: "body", author_id: a.id });
-    await SAPost.create({ title: "P2", body: "body", author_id: a.id });
+    const nested = [
+      { lineItems: { discountApplications: "discount" } },
+      { shippingLines: { discountApplications: "discount" } },
+    ];
+    const readDiscounts = (inv: Base) => {
+      const li = (association(inv, "lineItems").target as Base[])[0]!;
+      const sl = (association(inv, "shippingLines").target as Base[])[0]!;
+      expect(
+        (association(li, "discountApplications").target as Base[])[0]!.discount,
+      ).not.toBeNull();
+      expect(
+        (association(sl, "discountApplications").target as Base[])[0]!.discount,
+      ).not.toBeNull();
+    };
 
-    // One post already has preloaded, the other doesn't; includes should fill both
-    const posts = await SAPost.all().includes("saAuthor").toArray();
-    expect(posts).toHaveLength(2);
-    for (const p of posts) {
-      expect((p as any)._preloadedAssociations.has("saAuthor")).toBe(true);
-    }
+    // First preload: nothing loaded, so all five levels query —
+    // line_items, shipping_lines, both discount_applications, and discounts.
+    const fresh = (await Invoice.where({ id: invoice.id }).toArray())[0]!;
+    const firstSqls = await captureSql(async () => {
+      await new Preloader({ records: [fresh], associations: nested }).call();
+    });
+    expect(firstSqls).toHaveLength(5);
+    const firstReads = await captureSql(async () => readDiscounts(fresh));
+    expect(firstReads).toHaveLength(0);
+
+    // Reload, then force-load the line_items branch (line_items +
+    // line_item_discount_applications). The second preload must skip that branch
+    // and issue only the three shipping/discount queries.
+    const reloaded = (await Invoice.where({ id: invoice.id }).toArray())[0]!;
+    const lineItems = (await loadHasMany(reloaded, "lineItems", {})) as Base[];
+    for (const li of lineItems) await loadHasMany(li, "discountApplications", {});
+    const secondSqls = await captureSql(async () => {
+      await new Preloader({ records: [reloaded], associations: nested }).call();
+    });
+    expect(secondSqls).toHaveLength(3);
+    const secondReads = await captureSql(async () => readDiscounts(reloaded));
+    expect(secondReads).toHaveLength(0);
   });
 
   it("preload through", async () => {
@@ -1403,31 +1453,21 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records", async () => {
-    class PAAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PAPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(PAPost, "paAuthor", {
-      className: "PAAuthor",
-      foreignKey: "author_id",
+    const david = await Author.create({ name: "David" });
+    const post = await Post.create({ title: "Welcome", body: "body", author_id: david.id });
+
+    // availableRecords supplies david, so the belongs_to preload runs no query
+    // and attaches the supplied instance itself.
+    const sqls = await captureSql(async () => {
+      await new Preloader({
+        records: [post],
+        associations: "author",
+        availableRecords: [[david]],
+      }).call();
+      expect(post.association("author").isLoaded()).toBe(true);
+      expect(post.association("author").target).toBe(david);
     });
-    registerModel("PAAuthor", PAAuthor);
-    registerModel("PAPost", PAPost);
-
-    const a = await PAAuthor.create({ name: "Available" });
-    await PAPost.create({ title: "P1", body: "body", author_id: a.id });
-
-    const posts = await PAPost.all().includes("paAuthor").toArray();
-    expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any)._preloadedAssociations.get("paAuthor");
-    expect(preloaded).toBeDefined();
-    expect(preloaded.name).toBe("Available");
+    expect(sqls).toHaveLength(0);
   });
 
   it("preload with available records sti", async () => {
@@ -1467,65 +1507,57 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with only some records available", async () => {
-    class PSAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PSPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(PSPost, "psAuthor", {
-      className: "PSAuthor",
-      foreignKey: "author_id",
+    const bob = await Author.create({ name: "Bob" });
+    const mary = await Author.create({ name: "Mary" });
+    const bobPost = await Post.create({ title: "misc by bob", body: "body", author_id: bob.id });
+    const maryPost = await Post.create({ title: "misc by mary", body: "body", author_id: mary.id });
+
+    // availableRecords satisfies bob from memory; only mary requires a query.
+    const sqls = await captureSql(async () => {
+      await new Preloader({
+        records: [bobPost, maryPost],
+        associations: "author",
+        availableRecords: [bob],
+      }).call();
     });
-    registerModel("PSAuthor", PSAuthor);
-    registerModel("PSPost", PSPost);
+    expect(sqls).toHaveLength(1);
 
-    const a1 = await PSAuthor.create({ name: "A1" });
-    const a2 = await PSAuthor.create({ name: "A2" });
-    await PSPost.create({ title: "P1", body: "body", author_id: a1.id });
-    await PSPost.create({ title: "P2", body: "body", author_id: a2.id });
-
-    const posts = await PSPost.all().includes("psAuthor").toArray();
-    expect(posts).toHaveLength(2);
-    // Both should have preloaded authors
-    const names = posts.map((p: any) => p._preloadedAssociations.get("psAuthor")?.name);
-    expect(names).toContain("A1");
-    expect(names).toContain("A2");
+    const reads = await captureSql(async () => {
+      // assert_same bob — the supplied instance; assert_equal mary — freshly loaded
+      expect(bobPost.association("author").target).toBe(bob);
+      expect((maryPost.association("author").target as any).id).toBe(mary.id);
+    });
+    expect(reads).toHaveLength(0);
   });
 
   it("preload with some records already loaded", async () => {
-    class PLAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PLPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(PLPost, "plAuthor", {
-      className: "PLAuthor",
-      foreignKey: "author_id",
+    const bob = await Author.create({ name: "Bob" });
+    const mary = await Author.create({ name: "Mary" });
+    const bobPostId = (await Post.create({ title: "misc by bob", body: "body", author_id: bob.id }))
+      .id;
+    const maryPostId = (
+      await Post.create({ title: "misc by mary", body: "body", author_id: mary.id })
+    ).id;
+    // Fresh instances so association load state mirrors Rails' fixtures.
+    const bobPost = (await Post.where({ id: bobPostId }).toArray())[0]!;
+    const maryPost = (await Post.where({ id: maryPostId }).toArray())[0]!;
+
+    // Force-load bob's author; mary's stays unloaded.
+    const loadedBob = await loadBelongsTo(bobPost, "author", {});
+    expect(bobPost.association("author").isLoaded()).toBe(true);
+    expect(maryPost.association("author").isLoaded()).toBe(false);
+
+    // Only mary's author is missing, so the preload runs a single query.
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [bobPost, maryPost], associations: "author" }).call();
     });
-    registerModel("PLAuthor", PLAuthor);
-    registerModel("PLPost", PLPost);
+    expect(sqls).toHaveLength(1);
 
-    const a = await PLAuthor.create({ name: "Loaded" });
-    await PLPost.create({ title: "P1", body: "body", author_id: a.id });
-    await PLPost.create({ title: "P2", body: "body", author_id: a.id });
-
-    const posts = await PLPost.all().includes("plAuthor").toArray();
-    expect(posts).toHaveLength(2);
-    // Both should point to the same author
-    const author1 = (posts[0] as any)._preloadedAssociations.get("plAuthor");
-    const author2 = (posts[1] as any)._preloadedAssociations.get("plAuthor");
-    expect(author1.name).toBe("Loaded");
-    expect(author2.name).toBe("Loaded");
+    const reads = await captureSql(async () => {
+      expect(bobPost.association("author").target).toBe(loadedBob);
+      expect((maryPost.association("author").target as any).id).toBe(mary.id);
+    });
+    expect(reads).toHaveLength(0);
   });
 
   it("preload with available records with through association", async () => {
@@ -1594,97 +1626,54 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records with multiple classes", async () => {
-    class PMAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PMComment extends Base {
-      static {
-        this._tableName = "comments";
-      }
-    }
-    class PMPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(PMPost, "pmAuthor", {
-      className: "PMAuthor",
-      foreignKey: "author_id",
+    // Essay belongs_to :author and :category (both primary_key: :name), so the
+    // two available records are of different classes.
+    const david = await Author.create({ name: "David" });
+    const general = await Category.create({ name: "General" });
+    const essay = await Essay.create({
+      name: "A Modest Proposal",
+      author_id: "David",
+      category_id: "General",
     });
 
-    Associations.hasMany.call(PMPost, "pmComments", {
-      className: "PMComment",
-      foreignKey: "post_id",
+    // Both supplied from availableRecords → no queries, supplied instances attached.
+    const sqls = await captureSql(async () => {
+      await new Preloader({
+        records: [essay],
+        associations: ["category", "author"],
+        availableRecords: [general, david],
+      }).call();
+      expect(essay.association("category").isLoaded()).toBe(true);
+      expect(essay.association("author").isLoaded()).toBe(true);
+      expect(essay.association("category").target).toBe(general);
+      expect(essay.association("author").target).toBe(david);
     });
-    registerModel("PMAuthor", PMAuthor);
-    registerModel("PMComment", PMComment);
-    registerModel("PMPost", PMPost);
-
-    const a = await PMAuthor.create({ name: "Auth" });
-    const post = await PMPost.create({ title: "P1", body: "body", author_id: a.id });
-    await PMComment.create({ body: "C1", post_id: post.id });
-
-    // Preload both belongsTo and hasMany
-    const posts = await PMPost.all().includes("pmAuthor").toArray();
-    expect(posts).toHaveLength(1);
-    expect((posts[0] as any)._preloadedAssociations.get("pmAuthor").name).toBe("Auth");
+    expect(sqls).toHaveLength(0);
   });
 
   it("preload with available records queries when scoped", async () => {
-    class QSAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class QSPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(QSPost, "author", {
-      className: "QSAuthor",
-      foreignKey: "author_id",
-    });
-    registerModel("QSAuthor", QSAuthor);
-    registerModel("QSPost", QSPost);
-
-    const david = await QSAuthor.create({ name: "David" });
-    const post = await QSPost.create({ title: "P", body: "body", author_id: david.id });
+    const david = await Author.create({ name: "David" });
+    const post = await Post.create({ title: "P", body: "body", author_id: david.id });
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({
       records: [post],
       associations: "author",
-      scope: QSAuthor.where({ name: "David" }) as any,
+      scope: Author.where({ name: "David" }) as any,
       availableRecords: [david],
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     // Scope present → availableRecords ignored, runs the query
     expect(queryCalls).toHaveLength(1);
+    // The author is loaded from the query, NOT the supplied instance (Rails'
+    // assert_not_equal david.__id__, post.author.__id__).
+    expect(post.association("author").isLoaded()).toBe(true);
+    expect(post.association("author").target).not.toBe(david);
   });
 
   it("preload with available records queries when collection", async () => {
-    class QCPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    class QCComment extends Base {
-      static {
-        this._tableName = "comments";
-      }
-    }
-    Associations.hasMany.call(QCPost, "comments", {
-      className: "QCComment",
-      foreignKey: "post_id",
-    });
-    registerModel("QCPost", QCPost);
-    registerModel("QCComment", QCComment);
-
-    const post = await QCPost.create({ title: "P", body: "body" });
-    const c1 = await QCComment.create({ body: "c1", post_id: post.id });
+    const post = await Post.create({ title: "P", body: "body" });
+    const c1 = await Comment.create({ body: "c1", post_id: post.id });
     const comments = [c1];
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
@@ -1696,29 +1685,18 @@ describe("PreloaderTest", () => {
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     // Collection association → availableRecords skipped, runs the query
     expect(queryCalls).toHaveLength(1);
+    // The loaded comments come from the query, sharing no object identity with
+    // the supplied availableRecords (Rails' assert_empty intersection).
+    expect(post.association("comments").isLoaded()).toBe(true);
+    const loaded = post.association("comments").target as any[];
+    expect(loaded.some((lc) => comments.includes(lc))).toBe(false);
+    expect(loaded.map((lc) => lc.id)).toEqual([(c1 as any).id]);
   });
 
   it("preload with available records queries when incomplete", async () => {
-    class QIAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class QIPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(QIPost, "author", {
-      className: "QIAuthor",
-      foreignKey: "author_id",
-    });
-    registerModel("QIAuthor", QIAuthor);
-    registerModel("QIPost", QIPost);
-
-    const david = await QIAuthor.create({ name: "David" });
-    const bob = await QIAuthor.create({ name: "Bob" });
-    const post = await QIPost.create({ title: "P", body: "body", author_id: david.id });
+    const david = await Author.create({ name: "David" });
+    const bob = await Author.create({ name: "Bob" });
+    const post = await Post.create({ title: "P", body: "body", author_id: david.id });
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({
@@ -1729,66 +1707,41 @@ describe("PreloaderTest", () => {
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     // Bob doesn't match david's key → still 1 query
     expect(queryCalls).toHaveLength(1);
-    const preloaded = (post as any)._preloadedAssociations.get("author");
+    const preloaded = post.association("author").target as any;
     expect(preloaded?.id).toBe(david.id);
   });
 
   it("preload with unpersisted records no ops", async () => {
-    class PUAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PUPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(PUPost, "puAuthor", {
-      className: "PUAuthor",
-      foreignKey: "author_id",
+    const author = new Author({});
+    const newPostWithAuthor = new Post({ author });
+    const newPostWithoutAuthor = new Post({});
+    const posts = [newPostWithAuthor, newPostWithoutAuthor];
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: posts, associations: ["author"] }).call();
+      expect(newPostWithAuthor.association("author").target).toBe(author);
+      expect(newPostWithoutAuthor.association("author").target).toBeNull();
     });
-    registerModel("PUAuthor", PUAuthor);
-    registerModel("PUPost", PUPost);
-
-    // Unpersisted record - no id, so preloading should be a no-op
-    const post = new PUPost({ title: "Unsaved", body: "body", author_id: null });
-    // Manually test that preloading doesn't crash for unpersisted
-    const posts = [post];
-    // The record has no _preloadedAssociations by default or it's empty
-    expect(
-      (post as any)._preloadedAssociations === undefined ||
-        (post as any)._preloadedAssociations.size === 0,
-    ).toBe(true);
+    expect(sqls).toHaveLength(0);
   });
 
   it("preload wont set the wrong target", async () => {
-    class PWAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PWPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    Associations.belongsTo.call(PWPost, "pwAuthor", {
-      className: "PWAuthor",
-      foreignKey: "author_id",
-    });
-    registerModel("PWAuthor", PWAuthor);
-    registerModel("PWPost", PWPost);
+    // A wrong-class available record whose id matches post.author_id must NOT be
+    // attached: the preloader keys loaders by class, so a Category can't satisfy
+    // a belongs_to :author even when the foreign key value collides.
+    const general = await Category.create({ name: "General" });
+    const post = await Post.create({ title: "Welcome", body: "body", author_id: general.id });
 
-    const a1 = await PWAuthor.create({ name: "Right" });
-    const a2 = await PWAuthor.create({ name: "Wrong" });
-    await PWPost.create({ title: "P1", body: "body", author_id: a1.id });
+    // Category has no :author association — mirrors Rails' assert_raises.
+    expect(() => general.association("author")).toThrow();
 
-    const posts = await PWPost.all().includes("pwAuthor").toArray();
-    expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any)._preloadedAssociations.get("pwAuthor");
-    expect(preloaded.name).toBe("Right");
-    expect(preloaded.name).not.toBe("Wrong");
+    await new Preloader({
+      records: [post],
+      associations: "author",
+      availableRecords: [[general]],
+    }).call();
+    expect(post.association("author").isLoaded()).toBe(true);
+    // assert_not_equal some_other_record, post.author
+    expect(post.association("author").target).not.toBe(general);
   });
 
   it("preload has many association with composite foreign key", async () => {
