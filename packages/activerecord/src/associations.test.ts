@@ -171,7 +171,7 @@ describe("AssociationProxyTest", () => {
 
   it("prepend is not defined", async () => {
     const josh = new Author({ name: "Josh" }) as any;
-    expect(() => (josh.posts as any).prepend(new Post())).toThrow();
+    expect(() => josh.posts.prepend(new Post())).toThrow();
   });
 
   it("load does load target", async () => {
@@ -201,14 +201,14 @@ describe("AssociationProxyTest", () => {
 
   it("proxy association accessor", async () => {
     const david = developers("david") as any;
-    const proxyAssociation = (david.projects as any).proxyAssociation;
+    const proxyAssociation = david.projects.proxyAssociation;
     expect(proxyAssociation.owner).toBe(david);
     expect(proxyAssociation.reflection.name).toBe("projects");
   });
 
   it("scoped allows conditions", async () => {
     const david = developers("david") as any;
-    const sql = (david.projects as any).merge(Project.where("foo")).toSql();
+    const sql = david.projects.merge(Project.where("foo")).toSql();
     expect(sql).toContain("foo");
   });
 
@@ -230,7 +230,7 @@ describe("AssociationProxyTest", () => {
     const david = authors("david") as any;
     const expected = await david.firstPosts.first();
     await david.firstPosts.reload();
-    const first = await (david.firstPosts as any).firstBang();
+    const first = await david.firstPosts.firstBang();
     expect(first.id).toBe(expected!.id);
     expect(david.firstPosts.loaded).toBe(true);
   });
@@ -307,13 +307,13 @@ describe("AssociationProxyTest", () => {
   it("reload returns association", async () => {
     const david = developers("david") as any;
     const once = await david.projects.reload();
-    const reloaded = await (once as any).reload();
+    const reloaded = await once.reload();
     expect(reloaded).toBe(david.projects);
     expect(david.projects.loaded).toBe(true);
   });
   it("getting a scope from an association", async () => {
     const david = developers("david") as any;
-    const scope = (david.projects as any).scope();
+    const scope = david.projects.scope();
     const results = (await scope.toArray()).map((r: any) => r.id).sort();
     const expected = (await david.projects.toArray()).map((r: any) => r.id).sort();
     expect(results).toEqual(expected);
@@ -323,10 +323,10 @@ describe("AssociationProxyTest", () => {
     // automatic inverse_of wires the parent onto each loaded child.
     const human = await Human.create({});
     await (human as any).interests.create({});
-    const found = (await Human.find((human as any).id)) as InstanceType<typeof Human>;
+    const found = await Human.find((human as any).id);
     const subset = await (found as any).interests.where("1=1").first();
     expect(subset).not.toBeNull();
-    expect((subset as any)._associationCache("human")?.target).toBe(found);
+    expect(subset._associationCache("human")?.target).toBe(found);
   });
   it("pluck uses loaded target", async () => {
     const david = authors("david") as any;
@@ -379,7 +379,7 @@ describe("AssociationProxyTest", () => {
   });
   it("target merging recognizes updated in memory records", async () => {
     const member = members("blarpy_winkup") as any;
-    const membership = await (member as any).createMembershipBang({ favorite: false });
+    const membership = await member.createMembershipBang({ favorite: false });
     expect(await member.favoriteMemberships.isEmpty()).toBe(true);
     await membership.updateBang({ favorite: true });
     expect((await member.favoriteMemberships.toArray()).length).toBeGreaterThan(0);
@@ -394,7 +394,7 @@ describe("AssociationProxyTest", () => {
     const loaded = await david.posts.load();
     const found = loaded.find((r: any) => r.readAttribute("id") === post.id);
     expect(found).toBe(post);
-    expect((found as any).title).toBe("mutated");
+    expect(found.title).toBe("mutated");
   });
 });
 
@@ -855,19 +855,15 @@ describe("PreloaderTest", () => {
       { shippingLines: { discountApplications: "discount" } },
     ];
     const readDiscounts = (inv: Base) => {
-      const li = (association(inv, "lineItems").target as Base[])[0]!;
-      const sl = (association(inv, "shippingLines").target as Base[])[0]!;
-      expect(
-        (association(li, "discountApplications").target as Base[])[0]!.discount,
-      ).not.toBeNull();
-      expect(
-        (association(sl, "discountApplications").target as Base[])[0]!.discount,
-      ).not.toBeNull();
+      const li = association(inv, "lineItems").target[0];
+      const sl = association(inv, "shippingLines").target[0];
+      expect(association(li, "discountApplications").target[0].discount).not.toBeNull();
+      expect(association(sl, "discountApplications").target[0].discount).not.toBeNull();
     };
 
     // First preload: nothing loaded, so all five levels query —
     // line_items, shipping_lines, both discount_applications, and discounts.
-    const fresh = (await Invoice.where({ id: invoice.id }).toArray())[0]!;
+    const fresh = (await Invoice.where({ id: invoice.id }).toArray())[0];
     const firstSqls = await captureSql(async () => {
       await new Preloader({ records: [fresh], associations: nested }).call();
     });
@@ -878,8 +874,8 @@ describe("PreloaderTest", () => {
     // Reload, then force-load the line_items branch (line_items +
     // line_item_discount_applications). The second preload must skip that branch
     // and issue only the three shipping/discount queries.
-    const reloaded = (await Invoice.where({ id: invoice.id }).toArray())[0]!;
-    const lineItems = (await loadHasMany(reloaded, "lineItems", {})) as Base[];
+    const reloaded = (await Invoice.where({ id: invoice.id }).toArray())[0];
+    const lineItems = await loadHasMany(reloaded, "lineItems", {});
     for (const li of lineItems) await loadHasMany(li, "discountApplications", {});
     const secondSqls = await captureSql(async () => {
       await new Preloader({ records: [reloaded], associations: nested }).call();
@@ -1362,8 +1358,8 @@ describe("PreloaderTest", () => {
       await Post.create({ title: "misc by mary", body: "body", author_id: mary.id })
     ).id;
     // Fresh instances so association load state mirrors Rails' fixtures.
-    const bobPost = (await Post.where({ id: bobPostId }).toArray())[0]!;
-    const maryPost = (await Post.where({ id: maryPostId }).toArray())[0]!;
+    const bobPost = (await Post.where({ id: bobPostId }).toArray())[0];
+    const maryPost = (await Post.where({ id: maryPostId }).toArray())[0];
 
     // Force-load bob's author; mary's stays unloaded.
     const loadedBob = await loadBelongsTo(bobPost, "author", {});
