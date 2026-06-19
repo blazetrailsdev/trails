@@ -22,6 +22,7 @@ import {
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
+import type { PrettyPrinter } from "./pretty-print.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
@@ -86,6 +87,50 @@ export function attributeForInspect(this: CoreRecord, attr: string): string {
   const raw = this.readAttribute(attr);
   // Rails: attribute_for_inspect calls format_for_inspect(attr_name, value)
   return formatForInspect.call(this, attr, raw);
+}
+
+/**
+ * Pretty-print this record through the `PP` protocol, rendering
+ * `#<ClassName attr: value, ...>` so a record nested inside a relation /
+ * collection-proxy `prettyPrint` is rendered the same way Rails does.
+ *
+ * Mirrors: ActiveRecord::Core#pretty_print
+ */
+export async function prettyPrint(
+  this: CoreRecord & { _attributes: any; constructor: { prototype: object } },
+  pp: PrettyPrinter,
+): Promise<void> {
+  if (isCustomInspectMethodDefined.call(this)) {
+    // Rails returns `super` here, so Ruby PP renders the record's own
+    // (overridden) `inspect`. Dispatch dynamically rather than calling the
+    // core `inspect` helper, so a model that overrides `inspect` is honored.
+    pp.text((this as unknown as { inspect(): string }).inspect());
+    return;
+  }
+  await pp.objectAddressGroup(this as object, async () => {
+    if (!this._attributes) {
+      pp.breakable(" ");
+      pp.text("not initialized");
+      return;
+    }
+    const knownKeys = new Set<string>(
+      Array.from(this._attributes as Iterable<[string, unknown]>).map(([k]) => k),
+    );
+    const attrNames = attributesForInspect.call(this).filter((name) => knownKeys.has(name));
+    await pp.seplist(
+      attrNames,
+      () => pp.text(","),
+      async (attrName) => {
+        pp.breakable(" ");
+        await pp.group(1, "", "", () => {
+          pp.text(attrName);
+          pp.text(":");
+          pp.breakable();
+          pp.text(attributeForInspect.call(this, attrName));
+        });
+      },
+    );
+  });
 }
 
 /**

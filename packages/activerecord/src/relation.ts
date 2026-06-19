@@ -124,6 +124,7 @@ import {
 import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { rubyInspectArray, inspectArelValue, inspectOrderClause } from "./relation/ruby-inspect.js";
+import type { PrettyPrinter } from "./pretty-print.js";
 import { JoinDependency } from "./associations/join-dependency.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
@@ -1430,6 +1431,27 @@ export class Relation<T extends Base> {
       parts.push(`.none`);
     }
     return parts.join("");
+  }
+
+  /**
+   * Pretty-print this relation through the `PP` protocol, rendering its
+   * records (loading a bounded `annotate("loading for pp")` subject when not
+   * yet loaded) and truncating at 11 with `...`.
+   *
+   * Rails' `Relation#pretty_print` loads synchronously (blocking DB I/O); JS
+   * has no blocking I/O, so loading the subject here is async — widening the
+   * return to `Promise<void>` vs Ruby's `void`.
+   *
+   * Mirrors: ActiveRecord::Relation#pretty_print
+   */
+  async prettyPrint(pp: PrettyPrinter): Promise<void> {
+    const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
+    const subject = this._loaded
+      ? this._records
+      : ((await this.annotate("loading for pp").limit(max).toArray()) as T[]);
+    const entries = subject.slice(0, max) as (T | string)[];
+    if (entries.length === 11) entries[10] = "...";
+    await pp.pp(entries);
   }
 
   /**

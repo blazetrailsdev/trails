@@ -14,6 +14,7 @@ import {
   registerModel,
   ConfigurationError,
   NameError,
+  pp,
 } from "./index.js";
 import { makeRange } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -371,6 +372,44 @@ describe("AssociationProxyTest", () => {
     const proxy = association(andreas, "apAuditLogs");
     expect(proxy.loaded).toBe(false);
     expect(await proxy.inspect()).toMatch(/message: "new developer added"/);
+    expect(proxy.loaded).toBe(true);
+  });
+  it("pretty_print does not reload a not yet loaded target", async () => {
+    // Mirrors test_pretty_print_does_not_reload_a_not_yet_loaded_target: PP.pp
+    // on an unloaded proxy renders the built (in-memory) target without forcing
+    // a reload. trails has no Ruby `PP` library; `pp(obj, io)` drives the same
+    // pretty-printer protocol (CollectionProxy#prettyPrint → record#prettyPrint)
+    // rather than #inspect.
+    class APAuditLog extends Base {
+      static {
+        this._tableName = "ap_audit_logs";
+        this.attribute("developer_id", "integer");
+        this.attribute("message", "string");
+        // Mirrors audit_log.rb: AuditLog.attributes_for_inspect = [:id, :message].
+        (this as any).attributesForInspect = ["id", "message"];
+      }
+    }
+    class APDeveloper extends Base {
+      static {
+        this._tableName = "ap_developers";
+        this.attribute("name", "string");
+      }
+    }
+    Associations.hasMany.call(APDeveloper, "apAuditLogs", {
+      foreignKey: "developer_id",
+      className: "APAuditLog",
+    });
+    registerModel("APDeveloper", APDeveloper);
+    registerModel("APAuditLog", APAuditLog);
+
+    const andreas = new APDeveloper({ name: "Andreas" });
+    // Mirrors developer.rb `log=`: building an audit_log without loading.
+    association(andreas, "apAuditLogs").build({ message: "new developer added" });
+    const proxy = association(andreas, "apAuditLogs");
+    expect(proxy.loaded).toBe(false);
+    let out = "";
+    await pp(proxy, { write: (s: string) => (out += s) });
+    expect(out).toMatch(/message: "new developer added"/);
     expect(proxy.loaded).toBe(true);
   });
   it("save on parent saves children", async () => {

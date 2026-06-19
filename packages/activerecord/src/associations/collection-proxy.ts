@@ -1,5 +1,6 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
+import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
 
@@ -3028,6 +3029,28 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
     if (entries.length === 11) entries[10] = "...";
     return `#<${this.constructor.name} [${entries.join(", ")}]>`;
+  }
+
+  /**
+   * Pretty-print this proxy through the `PP` protocol, loading the target
+   * from memory when `find_from_target?` (otherwise via a bounded query) and
+   * delegating record rendering to `pp.pp`.
+   *
+   * Mirrors ActiveRecord::Associations::CollectionProxy#pretty_print, which
+   * runs `load_target if find_from_target?` then delegates to
+   * Relation#pretty_print. As with `inspect`, loading is async in trails,
+   * widening the return to `Promise<void>`.
+   */
+  async prettyPrint(pp: PrettyPrinter): Promise<void> {
+    if (this.isFindFromTarget()) await this.loadTarget();
+    const limitValue = (this as any)._limitValue as number | null;
+    const take = limitValue != null ? Math.min(limitValue, 11) : 11;
+    const subject = this._targetLoaded
+      ? this._target
+      : ((await this.annotate("loading for pp").limit(take).toArray()) as T[]);
+    const entries = subject.slice(0, take) as (T | string)[];
+    if (entries.length === 11) entries[10] = "...";
+    await pp.pp(entries);
   }
 
   /**
