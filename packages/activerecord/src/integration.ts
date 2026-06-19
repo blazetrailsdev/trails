@@ -14,6 +14,7 @@ interface Identifiable {
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
   readAttributeBeforeTypeCast(name: string): unknown;
+  cameFromUser(name: string): boolean;
 }
 
 // ──────────────────────────────────────────────
@@ -243,10 +244,13 @@ const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/;
 /**
  * Returns true when the raw DB timestamp string can be converted directly
  * to a cache version without re-parsing (fast path). Checks: string type,
- * usec format, and expected DB timestamp shape. The UTC-timezone and
- * updatedAtCameFromUser? guards from Rails are omitted — they require an
- * async connection call that can't be made synchronously here; the shape
- * check acts as a partial proxy that prevents broken cache keys.
+ * usec format, not user-assigned, and expected DB timestamp shape. Rails'
+ * `with_connection(&:default_timezone) == :utc` guard is omitted — it requires
+ * an async connection call that can't be made synchronously here; the shape
+ * check acts as a partial proxy that prevents broken cache keys. The
+ * `!updated_at_came_from_user?` guard IS implemented (cameFromUser is sync), so
+ * a user-assigned DB-format string (e.g. `record.updated_at = "2020-01-01
+ * 00:00:00"`) correctly falls through to the type-casting reader.
  *
  * Mirrors: ActiveRecord::Integration#can_use_fast_cache_version? (private)
  *
@@ -256,6 +260,7 @@ export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown)
   if (typeof timestamp !== "string") return false;
   const klass = record.constructor as any;
   if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
+  if (record.cameFromUser?.("updated_at")) return false;
   return TIMESTAMP_RE.test(timestamp);
 }
 
