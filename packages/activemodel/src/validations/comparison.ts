@@ -51,9 +51,10 @@ export class ComparisonValidator extends EachValidator {
           );
         }
       } catch (e) {
+        if (!(e instanceof ArgumentError)) throw e;
         // Rails comparison.rb:30 — uses the ArgumentError message as the
         // error key/message and continues to the next compare option.
-        record.errors.add(attribute, (e as Error).message);
+        record.errors.add(attribute, e.message);
       }
     }
   }
