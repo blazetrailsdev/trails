@@ -12,7 +12,8 @@
  */
 
 import { Entry } from "./entry.js";
-import { Store, DeserializationError } from "./index.js";
+import { DeserializationError } from "./index.js";
+import { Store } from "./store.js";
 import { coder } from "./coder.js";
 import { deflate, inflate } from "../gzip.js";
 import { CacheSerializer } from "../message-pack/cache-serializer.js";
