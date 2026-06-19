@@ -4,7 +4,7 @@
  * Mirrors: activerecord/test/cases/relation/delegation_test.rb
  */
 import { describe, it, expect } from "vitest";
-import { Relation } from "../index.js";
+import { Relation, registerModel } from "../index.js";
 import { delegateArrayMethod } from "./delegation.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -14,7 +14,12 @@ import { Comment } from "../test-helpers/models/comment.js";
 
 describe("DelegationTest", () => {
   // Mirrors Rails `fixtures :posts` (DelegationCachingTest declares fixtures).
-  useHandlerFixtures(["posts"], { schema: canonicalSchema });
+  // `comments` is added for the Enumerable delegation sweep below
+  // (DelegationRelationTest declares `fixtures :comments`).
+  useHandlerFixtures(["posts", "comments"], { schema: canonicalSchema });
+
+  registerModel(Post);
+  registerModel(Comment);
 
   it("not respond to arel method", () => {
     // Rails: `assert_not_respond_to target, :exists` — `:exists` is an Arel
@@ -220,4 +225,59 @@ describe("DelegationTest", () => {
       }
     });
   });
+
+  // Mirrors Rails' DelegationWhitelistBlacklistTests, which generates a
+  // `test_delegates_<method>_to_Array` per ARRAY_DELEGATES entry; `partition`
+  // is an `Enumerable` method `Relation`/`CollectionProxy` mix in. It is
+  // present on an *unloaded* target (Rails' `assert_respond_to`) and — because
+  // JS has no blocking IO — is async: invoking it loads the records itself
+  // (mirroring Rails' `records` → `load`), then splits them. `partition`
+  // returns `[matched, unmatched]` preserving order.
+  describe("DelegationAssociationTest", () => {
+    it("delegates partition to Array", async () => {
+      const post = await Post.first();
+      const target = (post as any).comments;
+      // Unloaded — partition is still present and loads the rows on call.
+      expect(typeof (target as any).partition).toBe("function");
+      expect((target as any).loaded).toBe(false);
+
+      // Predicate value from an independent query so the proxy stays unloaded.
+      const someId = (await Comment.first())!.id;
+      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === someId);
+
+      // Rails' CollectionProxy#records → load_target hydrates @target and marks
+      // the association loaded; the awaited partition does the same.
+      expect((target as any).loaded).toBe(true);
+      const records: any[] = (target as any).target;
+      expect(records.length).toBeGreaterThan(0);
+      // [matched, unmatched] preserve the records' relative order.
+      expect(matched.map((c: any) => c.id)).toEqual(
+        records.filter((c: any) => c.id === someId).map((c: any) => c.id),
+      );
+      expect(unmatched.map((c: any) => c.id)).toEqual(
+        records.filter((c: any) => c.id !== someId).map((c: any) => c.id),
+      );
+    });
+  }); // DelegationAssociationTest
+
+  describe("DelegationRelationTest", () => {
+    it("delegates partition to Array", async () => {
+      const target = Comment.all();
+      // Unloaded — partition is still present and loads the rows on call.
+      expect(typeof (target as any).partition).toBe("function");
+
+      const someId = (await Comment.first())!.id;
+      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === someId);
+
+      const records: any[] = await (target as any).toArray();
+      expect(records.length).toBeGreaterThan(0);
+      // [matched, unmatched] preserve the records' relative order.
+      expect(matched.map((c: any) => c.id)).toEqual(
+        records.filter((c: any) => c.id === someId).map((c: any) => c.id),
+      );
+      expect(unmatched.map((c: any) => c.id)).toEqual(
+        records.filter((c: any) => c.id !== someId).map((c: any) => c.id),
+      );
+    });
+  }); // DelegationRelationTest
 });

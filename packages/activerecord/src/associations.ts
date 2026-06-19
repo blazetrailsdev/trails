@@ -5,7 +5,7 @@ import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { ScopeRegistry } from "./scoping.js";
-import { delegateArrayMethod } from "./relation/delegation.js";
+import { delegateArrayMethod, delegateEnumerableMethod } from "./relation/delegation.js";
 // Re-export the slot's setter so the package entry and other internal
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -2559,6 +2559,18 @@ function wrapCollectionProxy<T extends Base = Base>(
           className: target._assocDef.options.className ?? camelize(singularize(target._assocName)),
         });
       }
+
+      // Enumerable-method delegation (`partition`) — resolved on the proxy
+      // *before* the scope lookup. The scoped AssociationRelation now also
+      // responds to `partition` (delegation.ts), but routing through it would
+      // load the relation's own `_records` and bypass the collection cache.
+      // Rails' `CollectionProxy#records` calls `load_target`, which hydrates
+      // `@target` and marks the association loaded (collection_proxy.rb,
+      // collection_association.rb#load_target); `target.load()` does the same,
+      // so an awaited `post.comments.partition(...)` leaves `loaded?`/`target`
+      // populated. Async + self-loading (JS has no blocking IO).
+      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.load());
+      if (enumerableDelegate) return enumerableDelegate;
 
       const scope = target.scope();
       const scopeVal = Reflect.get(scope, prop, scope);
