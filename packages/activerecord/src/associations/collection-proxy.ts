@@ -33,6 +33,7 @@ import {
   HasManyThroughNestedAssociationsAreReadonly,
   HasOneThroughNestedAssociationsAreReadonly,
   HasManyThroughOrderError,
+  CompositePrimaryKeyMismatchError,
 } from "./errors.js";
 import { getInheritanceColumn, findStiClass, stiEnabled, polymorphicName } from "../inheritance.js";
 import {
@@ -1792,17 +1793,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // We match that: if the CPK includes "id", use "id"; otherwise the CPK
     // cannot collapse to a scalar and we raise CompositePrimaryKeyMismatchError.
     const ownerPkOption = throughAssoc.options.primaryKey;
-    const resolvedPkOption = Array.isArray(ownerPkOption)
-      ? ownerPkOption.includes("id")
-        ? "id"
-        : ownerPkOption[0]
-      : ownerPkOption;
+    if (Array.isArray(ownerPkOption) && !(ownerPkOption as string[]).includes("id")) {
+      throw new CompositePrimaryKeyMismatchError(
+        ctor.name,
+        `${this._assocName} (primaryKey: option)`,
+      );
+    }
+    const resolvedPkOption = Array.isArray(ownerPkOption) ? "id" : ownerPkOption;
     const ctorPk = ctor.primaryKey;
-    const resolvedCtorPk = Array.isArray(ctorPk)
-      ? ctorPk.includes("id")
-        ? "id"
-        : ctorPk[0]
-      : ctorPk;
+    if (Array.isArray(ctorPk) && !(ctorPk as string[]).includes("id")) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, this._assocName);
+    }
+    const resolvedCtorPk = Array.isArray(ctorPk) ? "id" : (ctorPk as string);
     const polyPk = (resolvedPkOption ?? resolvedCtorPk) as string;
     return {
       idCol,

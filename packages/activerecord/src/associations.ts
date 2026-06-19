@@ -1323,8 +1323,9 @@ export async function loadHasOne(
       result = await targetModel.findBy(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
+      const inlinePk = Array.isArray(primaryKey) ? "id" : (primaryKey as string);
       result = await targetModel.findBy({
-        [foreignKey as string]: record._readAttribute(primaryKey as string),
+        [foreignKey as string]: record._readAttribute(inlinePk),
         [typeCol]: polymorphicName(ctor),
       });
     } else if (options.scope) {
@@ -1566,8 +1567,9 @@ export async function loadHasMany(
       rel = targetModel.all().where(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
+      const inlinePk = Array.isArray(primaryKey) ? "id" : (primaryKey as string);
       rel = targetModel.all().where({
-        [foreignKey as string]: record._readAttribute(primaryKey as string),
+        [foreignKey as string]: record._readAttribute(inlinePk),
         [typeCol]: polymorphicName(ctor),
       });
     } else {
@@ -1640,11 +1642,11 @@ export function computeHasManyWhere(
       throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
     }
     // Collapse CPK to "id" when present (matching Rails' join_id_for).
-    const scalarPk = Array.isArray(primaryKey)
-      ? primaryKey.includes("id")
-        ? "id"
-        : primaryKey[0]
-      : (primaryKey as string);
+    // CPK without "id" cannot map to a scalar <as>_id column.
+    if (Array.isArray(primaryKey) && !(primaryKey as string[]).includes("id")) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+    }
+    const scalarPk = Array.isArray(primaryKey) ? "id" : (primaryKey as string);
     const pkValue = record._readAttribute(scalarPk);
     if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
@@ -2320,11 +2322,12 @@ export function buildThroughAssociation(
     }
     const polyFk = rawPolyFk ?? `${underscore(throughAssoc.options.as)}_id`;
     const rawOwnerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-    const ownerPk = Array.isArray(rawOwnerPk)
-      ? rawOwnerPk.includes("id")
-        ? "id"
-        : rawOwnerPk[0]
-      : (rawOwnerPk as string);
+    if (Array.isArray(rawOwnerPk) && !(rawOwnerPk as string[]).includes("id")) {
+      throw new ConfigurationError(
+        "Composite foreignKey/primaryKey is not supported for through associations",
+      );
+    }
+    const ownerPk = Array.isArray(rawOwnerPk) ? "id" : (rawOwnerPk as string);
     throughAttrs[polyFk] = record._readAttribute(ownerPk);
     throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
   } else {
