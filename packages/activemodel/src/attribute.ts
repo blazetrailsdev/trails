@@ -324,11 +324,11 @@ export class Null extends Attribute {
   }
 
   withValueFromUser(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name}\``);
+    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
   }
 
   withValueFromDatabase(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name}\``);
+    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
   }
 
   override withType(type: Type): Attribute {

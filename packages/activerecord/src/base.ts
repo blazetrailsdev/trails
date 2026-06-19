@@ -3038,7 +3038,14 @@ export class Base extends Model {
           typeof (ctor.connection as any).lastInsertedId === "function"
             ? (ctor.connection as any).lastInsertedId(rawId)
             : rawId;
-        if (!Array.isArray(ctor.primaryKey) && this.id === null) {
+        if (!Array.isArray(ctor.primaryKey) && ctor.primaryKey != null && this.id === null) {
+          // This trails path writes the generated id back via a direct
+          // `_writeAttribute(pk, …)`, unlike Rails which routes write-back
+          // through `_returning_columns_for_insert` — that returns no columns
+          // for a key-less table, so its zip/each loop is simply empty. We get
+          // no such free safety here, so guard explicitly: `_writeAttribute(nil,
+          // …)` would otherwise raise MissingAttributeError via the Null
+          // attribute.
           this._writeAttribute(ctor.primaryKey as string, insertedId);
         } else if (
           Array.isArray(ctor.primaryKey) &&
