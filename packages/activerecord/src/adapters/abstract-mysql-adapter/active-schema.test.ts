@@ -5,6 +5,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
+import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -16,6 +18,12 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("ActiveSchemaTest", () => {
+    // The stub-mode assertions never execute, but the `with_real_execute` block
+    // in "add index" runs real DDL against the canonical `people` table. Seed it
+    // via the fixtures framework so its lifecycle (and teardown) is owned by the
+    // canonical-schema machinery rather than a destructive create/drop here.
+    useHandlerFixtures(["people"], { schema: canonicalSchema });
+
     it("add index", async () => {
       let sqls = await captureSql(() => adapter.addIndex("people", "last_name", { length: null }), {
         stub: adapter,
@@ -94,22 +102,18 @@ describeIfMysql("Mysql2Adapter", () => {
       }
 
       // Rails `with_real_execute` block: actually create the index against the
-      // `people` table (no stub), confirm introspection sees it, then verify the
-      // `if_not_exists: true` pre-flight short-circuits without raising. Rails
-      // runs against the seeded schema; this adapter's DB has no `people` table
-      // (the stub assertions above never execute), so create/drop it here.
-      const ss = adapter.schemaStatements();
+      // seeded `people` table (no stub), confirm introspection sees it, then
+      // verify the `if_not_exists: true` pre-flight short-circuits without
+      // raising. Only the index we add is torn down — the canonical `people`
+      // table is owned by the fixtures framework.
       try {
-        await ss.createTable("people", { force: true }, (t) => {
-          t.string("first_name");
-        });
         await adapter.addIndex("people", "first_name");
         expect(await adapter.indexExists("people", "first_name")).toBe(true);
         await expect(
           adapter.addIndex("people", "first_name", { ifNotExists: true }),
         ).resolves.toBeUndefined();
       } finally {
-        await ss.dropTable("people", { ifExists: true });
+        await adapter.removeIndex("people", "first_name", { ifExists: true });
       }
 
       await expect(() =>
