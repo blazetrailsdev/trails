@@ -214,8 +214,12 @@ export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
       primaryKey !== undefined &&
       foreignKey !== undefined
     ) {
-      const pk = Array.isArray(primaryKey) ? JSON.stringify(primaryKey) : primaryKey;
-      const fk = Array.isArray(foreignKey) ? JSON.stringify(foreignKey) : foreignKey;
+      const pk = Array.isArray(primaryKey)
+        ? `[${primaryKey.map((k) => `"${k}"`).join(", ")}]`
+        : primaryKey;
+      const fk = Array.isArray(foreignKey)
+        ? `[${foreignKey.map((k) => `"${k}"`).join(", ")}]`
+        : foreignKey;
       message = `Association ${owner}#${association} primary key ${pk} doesn't match with foreign key ${fk}. Please specify query_constraints, or primary_key and foreign_key values.`;
     } else {
       message = "Association primary key doesn't match with foreign key.";
