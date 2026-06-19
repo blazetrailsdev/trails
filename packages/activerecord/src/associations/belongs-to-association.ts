@@ -367,12 +367,7 @@ export class BelongsToAssociation extends SingularAssociation {
    */
   protected replaceKeys(record: Base | null): void {
     const fks = this.foreignKeyNames();
-    let pks = this.associationPrimaryKeys(record);
-    // Mirrors Rails `BelongsToReflection#association_primary_key` (reflection.rb:936-938):
-    // scalar FK + composite PK → collapse to ["id"] when present.
-    if (fks.length === 1 && pks.length > 1) {
-      pks = pks.includes("id") ? ["id"] : pks;
-    }
+    const pks = this.associationPrimaryKeys(record);
 
     for (let i = 0; i < fks.length; i++) {
       const pkCol = pks[i] ?? pks[0];
