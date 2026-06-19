@@ -2777,11 +2777,7 @@ export function setBelongsTo(
   }
   const primaryKey = resolvedPk;
   const foreignKey =
-    options.foreignKey ??
-    options.queryConstraints ??
-    (Array.isArray(primaryKey)
-      ? primaryKey.map((col: string) => `${underscore(assocName)}_${col}`)
-      : `${underscore(assocName)}_id`);
+    options.foreignKey ?? options.queryConstraints ?? `${underscore(assocName)}_id`;
 
   // Rails BelongsToPolymorphicAssociation: `polymorphic_inverse_of` raises
   // when the configured inverse name doesn't resolve on the assigned
@@ -2820,12 +2816,20 @@ export function setBelongsTo(
         record._writeAttribute(foreignKey[i], target._readAttribute(pkCols[i]));
       }
     } else {
-      if (Array.isArray(primaryKey)) {
+      // Mirrors Rails `BelongsToReflection#association_primary_key` (reflection.rb:936-938):
+      // composite-PK target + scalar FK → collapse to "id" if present, else keep the array
+      // (which would be misconfigured; explicit foreignKey/primaryKey required in that case).
+      const scalarPk = Array.isArray(primaryKey)
+        ? (primaryKey as string[]).includes("id")
+          ? "id"
+          : primaryKey
+        : primaryKey;
+      if (Array.isArray(scalarPk)) {
         throw new Error(
-          `belongs_to "${assocName}" has a single foreignKey but the target model has a composite primaryKey. Provide an explicit foreignKey array or primaryKey option.`,
+          `belongs_to "${assocName}" has a scalar foreignKey but the target model has a composite primaryKey with no "id" component. Provide an explicit foreignKey array or primaryKey option.`,
         );
       }
-      record._writeAttribute(foreignKey as string, target._readAttribute(primaryKey as string));
+      record._writeAttribute(foreignKey as string, target._readAttribute(scalarPk));
     }
     if (options.polymorphic) {
       const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;

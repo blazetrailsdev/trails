@@ -319,17 +319,6 @@ export class BelongsToAssociation extends SingularAssociation {
       if (computed) return Array.isArray(computed) ? computed : [computed];
     }
 
-    // Derive composite FKs when target has composite PK (mirrors loadBelongsTo).
-    // Prefer the already-loaded target's class for the PK lookup so seeding an
-    // inverse target (which marks the holder loaded → staleState → here) reads
-    // the PK off the instance in hand instead of forcing a registry resolve of
-    // a target class that need not be registered.
-    const pks = this.associationPrimaryKeys((this.target as Base | null) ?? null);
-    if (pks.length > 1) {
-      const assocName = underscore(this.reflection.name);
-      return pks.map((pk) => `${assocName}_${pk}`);
-    }
-
     return [`${underscore(this.reflection.name)}_id`];
   }
 
@@ -370,7 +359,12 @@ export class BelongsToAssociation extends SingularAssociation {
    */
   protected replaceKeys(record: Base | null): void {
     const fks = this.foreignKeyNames();
-    const pks = this.associationPrimaryKeys(record);
+    let pks = this.associationPrimaryKeys(record);
+    // Mirrors Rails `BelongsToReflection#association_primary_key` (reflection.rb:936-938):
+    // scalar FK + composite PK → collapse to ["id"] when present.
+    if (fks.length === 1 && pks.length > 1) {
+      pks = pks.includes("id") ? ["id"] : pks;
+    }
 
     for (let i = 0; i < fks.length; i++) {
       const pkCol = pks[i] ?? pks[0];
