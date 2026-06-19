@@ -602,8 +602,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async toArray(): Promise<T[]> {
     const results = await this._execLoad();
-    const unsaved = this._target.filter((r) => r.isNewRecord());
-    return unsaved.length > 0 ? [...results, ...unsaved] : results;
+    return this._mergeTargetLists(results);
   }
 
   // @ts-expect-error CP's load returns the hydrated T[] (loaded records);
@@ -612,7 +611,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async load(): Promise<T[]> {
     if (this._targetLoaded) return this._target;
     const results = await this._execLoad();
-    // Merge: prefer existing in-memory instances (from push/build) over fresh DB records
+    this._target = this._mergeTargetLists(results);
+    this._targetLoaded = true;
+    return this._target;
+  }
+
+  /**
+   * Merge freshly-loaded DB rows with the in-memory `_target`, mirroring Rails'
+   * `CollectionAssociation#merge_target_lists` (collection_association.rb): for
+   * each DB row, prefer the matching in-memory instance by primary key (so
+   * unsaved attribute changes and scheduled destroys are preserved), copying DB
+   * values only onto attributes not changed in memory; then append the in-memory
+   * new records that have no DB counterpart. Used by both `toArray` (Rails
+   * `to_a`) and `load` so both surface in-memory state the same way.
+   * @internal
+   */
+  private _mergeTargetLists(results: T[]): T[] {
     const existingByPk = new Map<string, T>();
     for (const r of this._target) {
       const id = this._identityFor(r);
@@ -626,9 +640,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return memRecord;
     });
     const unsaved = this._target.filter((r) => r.isNewRecord());
-    this._target = unsaved.length > 0 ? [...merged, ...unsaved] : merged;
-    this._targetLoaded = true;
-    return this._target;
+    return unsaved.length > 0 ? [...merged, ...unsaved] : merged;
   }
 
   /**
