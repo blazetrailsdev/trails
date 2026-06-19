@@ -22,7 +22,14 @@ describeIfMysql("Mysql2Adapter", () => {
     // in "add index" runs real DDL against the canonical `people` table. Seed it
     // via the fixtures framework so its lifecycle (and teardown) is owned by the
     // canonical-schema machinery rather than a destructive create/drop here.
-    useHandlerFixtures(["people"], { schema: canonicalSchema });
+    // "add index" opts out of transactional fixtures: its real addIndex/
+    // removeIndex DDL runs through this file's separate adapter connection, which
+    // must not happen while Base.connection holds a fixture transaction on
+    // `people` (MySQL DDL implicitly commits and would strand that state).
+    useHandlerFixtures(["people"], {
+      schema: canonicalSchema,
+      usesTransaction: ["add index"],
+    });
 
     it("add index", async () => {
       let sqls = await captureSql(() => adapter.addIndex("people", "last_name", { length: null }), {
