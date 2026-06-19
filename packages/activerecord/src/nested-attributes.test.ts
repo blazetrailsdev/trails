@@ -94,8 +94,6 @@ const TEST_SCHEMA = {
   n_tag7s: { name: "string", narticle7_id: "integer" },
   n_tag8s: { name: "string", narticle8_id: "integer" },
   n_tag9s: { name: "string", narticle9_id: "integer" },
-  ov_pirates: { catchphrase: "string" },
-  ov_ships: { name: "string", ov_pirate_id: "integer" },
   parts: { name: "string", ship_id: "integer" },
   pirates: { catchphrase: "string" },
   plains: { name: "string" },
@@ -1718,16 +1716,15 @@ describe("should not load association when updating existing records", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("should not load association when updating existing records", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "original" });
-    const bird = await CanonicalBird.create({ name: "existing", pirate_id: pirate.id });
-    // Update existing record via nested attributes
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, name: "updated" }]);
+    const { pirate, child1 } = await seedPirate();
+    // The nested-attributes writer must update the in-memory target without
+    // eagerly loading the association — `loaded?` stays false before and
+    // after the parent is saved.
+    (pirate as any).birdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
+    expect(collectionProxyFor(pirate, "birds").loaded).toBe(false);
     await pirate.save();
-    const reloaded = await CanonicalBird.find(bird.id);
-    expect(reloaded.name).toBe("updated");
+    expect(collectionProxyFor(pirate, "birds").loaded).toBe(false);
+    expect((await CanonicalBird.find(child1.id)).name).toBe("Grace OMalley");
   });
 });
 
