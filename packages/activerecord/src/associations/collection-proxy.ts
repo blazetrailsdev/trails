@@ -1636,6 +1636,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stripThenable(this._proxySelf ?? this) as this;
     }
 
+    // Mirror Rails CollectionAssociation#concat: a new-record owner loads the
+    // target up front. Rails' `load_target` skips the query entirely for a
+    // new-record owner (`find_target?` is false) and just runs `loaded!`, so we
+    // mark the association loaded over its current in-memory target rather than
+    // routing through the full load path — which would also raise the
+    // strict-loading check that Rails never reaches for a new record.
+    if (this._record.isNewRecord() && !this._targetLoaded) {
+      this._targetLoaded = true;
+    }
+
     const ctor = this._record.constructor as typeof Base;
     const asName = this._assocDef.options.as;
     let primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
