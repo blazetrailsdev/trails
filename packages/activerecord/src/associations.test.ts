@@ -324,15 +324,25 @@ describe("AssociationProxyTest", () => {
     const expected = await david.firstPosts.pluck("title");
     const loaded = await david.firstPosts.load();
     expect(david.firstPosts.loaded).toBe(true);
-    expect(await david.firstPosts.pluck("title")).toEqual(expected);
     expect(loaded.length).toBeGreaterThan(0);
+    // Rails: assert_no_queries { david.first_posts.pluck(:title) } — pluck reads
+    // the loaded target rather than issuing a fresh SELECT.
+    const sqls = await captureSql(async () => {
+      expect(await david.firstPosts.pluck("title")).toEqual(expected);
+    });
+    expect(sqls).toHaveLength(0);
   });
   it("pick uses loaded target", async () => {
     const david = authors("david") as any;
     const expected = await david.firstPosts.pick("title");
     await david.firstPosts.load();
     expect(david.firstPosts.loaded).toBe(true);
-    expect(await david.firstPosts.pick("title")).toEqual(expected);
+    // Rails: assert_no_queries { david.first_posts.pick(:title) } — pick reads
+    // the loaded target rather than issuing a fresh SELECT.
+    const sqls = await captureSql(async () => {
+      expect(await david.firstPosts.pick("title")).toEqual(expected);
+    });
+    expect(sqls).toHaveLength(0);
   });
   it("reset unloads target", async () => {
     const david = authors("david") as any;
