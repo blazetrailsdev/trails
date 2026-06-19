@@ -22,7 +22,7 @@ describe("CacheKeyTest", () => {
   it("entry legacy optional ivars", () => {
     class LegacyEntry extends Entry {
       constructor(value: unknown) {
-        super(value, { expiresIn: null, createdAt: null });
+        super(value);
       }
     }
     const entry = new LegacyEntry("foo");
@@ -89,5 +89,17 @@ describe("CacheKeyTest", () => {
 
   it("expand cache key of array like object", () => {
     expect(expandCacheKey(["foo", "bar", "baz"].values())).toBe("foo/bar/baz");
+  });
+
+  it("expand cache key prefers cache key with version over cache key", () => {
+    const key = {
+      cacheKeyWithVersion() {
+        return "versioned_key";
+      },
+      cacheKey() {
+        return "plain_key";
+      },
+    };
+    expect(expandCacheKey(key)).toBe("versioned_key");
   });
 });

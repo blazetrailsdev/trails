@@ -1,6 +1,6 @@
 import { env } from "../process-adapter.js";
 
-export function expandCacheKey(key: unknown, namespace?: string | symbol): string {
+export function expandCacheKey(key: unknown, namespace?: string): string {
   const prefix = namespace !== undefined ? `${String(namespace)}/` : "";
   const version = env["RAILS_CACHE_ID"] ?? env["RAILS_APP_VERSION"];
   const versionPrefix = version ? `${version}/` : "";
