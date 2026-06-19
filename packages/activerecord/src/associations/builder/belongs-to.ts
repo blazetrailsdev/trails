@@ -287,11 +287,11 @@ export class BelongsTo extends SingularAssociation {
   }
 
   static addDefaultCallbacks(model: any, reflection: any): void {
-    beforeValidation(model, (record: any) => {
+    beforeValidation(model, async (record: any) => {
       if (typeof record.association === "function") {
         const assoc = record.association(reflection.name);
         if (typeof assoc.default === "function") {
-          assoc.default(reflection.options?.default);
+          await assoc.default(reflection.options?.default);
         }
       }
     });
