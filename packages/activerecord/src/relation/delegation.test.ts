@@ -291,7 +291,7 @@ describe("DelegationTest", () => {
         const target = (post as any).comments;
         // assert_respond_to: method is present on an *unloaded* proxy.
         expect(target.loaded).toBe(false);
-        expect(typeof (target as any)[method]).toBe("function");
+        expect(typeof target[method]).toBe("function");
       });
     }
 
@@ -301,7 +301,7 @@ describe("DelegationTest", () => {
       expect(target.loaded).toBe(false);
       // Calling sort on an unloaded proxy loads the association and returns
       // a sorted copy — mirrors Rails' records → load_target → Array#sort.
-      const sorted = await (target as any).sort((a: any, b: any) => a.id - b.id);
+      const sorted = await target.sort((a: any, b: any) => a.id - b.id);
       expect(target.loaded).toBe(true);
       expect(Array.isArray(sorted)).toBe(true);
       expect(sorted.length).toBeGreaterThan(0);
