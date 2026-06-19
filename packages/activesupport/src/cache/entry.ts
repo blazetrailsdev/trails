@@ -1,3 +1,5 @@
+import { Gzip } from "../gzip.js";
+
 export interface CacheEntry {
   value: unknown;
   expiresAt: number | null; // timestamp ms, null = no expiry
@@ -10,10 +12,12 @@ export class Entry {
   readonly version: string | null;
   private _createdAt: number;
   private _expiresIn: number | null;
+  private _compressed: boolean;
 
   constructor(
     value: unknown,
     options: {
+      compressed?: boolean;
       version?: string | null;
       expiresIn?: number | null;
       expiresAt?: number | null;
@@ -29,10 +33,11 @@ export class Entry {
     } else {
       this._expiresIn = null;
     }
+    this._compressed = options.compressed === true;
   }
 
   get value(): unknown {
-    return this._value;
+    return this._compressed ? this.uncompress(this._value as string) : this._value;
   }
 
   get expiresAt(): number | null {
@@ -50,6 +55,60 @@ export class Entry {
   isMismatched(version: string | null | undefined): boolean {
     return !!(this.version && version && this.version !== version);
   }
+
+  isCompressed(): boolean {
+    return this._compressed;
+  }
+
+  // Mirrors Rails Entry#compressed(compress_threshold): returns self unless the
+  // serialized value meets the threshold and actually shrinks once compressed.
+  compressed(compressThreshold: number): Entry {
+    if (this._compressed) return this;
+
+    let serialized: string | undefined;
+    let uncompressedSize: number;
+    if (
+      this._value == null ||
+      typeof this._value === "boolean" ||
+      typeof this._value === "number"
+    ) {
+      uncompressedSize = 0;
+    } else if (typeof this._value === "string") {
+      uncompressedSize = byteLength(this._value);
+    } else {
+      serialized = JSON.stringify(this._value);
+      uncompressedSize = byteLength(serialized);
+    }
+
+    if (uncompressedSize >= compressThreshold) {
+      serialized ??= JSON.stringify(this._value);
+      const compressed = Gzip.compress(serialized);
+      // Gzip.compress returns a latin1 string (one char per byte), so its byte
+      // size is its length; serialized is utf8, counted by byteLength above.
+      if (compressed.length < uncompressedSize) {
+        return new Entry(compressed, {
+          compressed: true,
+          expiresAt: this.expiresAt,
+          version: this.version,
+        });
+      }
+    }
+    return this;
+  }
+
+  private uncompress(value: string): unknown {
+    return JSON.parse(Gzip.decompress(value));
+  }
+}
+
+function byteLength(value: string): number {
+  // latin1-safe byte count without a node:buffer import.
+  let bytes = 0;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    bytes += code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3;
+  }
+  return bytes;
 }
 
 /** @internal */
