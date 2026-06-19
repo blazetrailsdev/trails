@@ -28,6 +28,14 @@ import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Sponsor } from "../test-helpers/models/sponsor.js";
 import { Club } from "../test-helpers/models/club.js";
+import { AdminAccount } from "../test-helpers/models/admin/account.js";
+import { AdminUser } from "../test-helpers/models/admin/user.js";
+import { User } from "../test-helpers/models/user.js";
+import { Room } from "../test-helpers/models/room.js";
+import { Company } from "../test-helpers/models/company.js";
+import { SpecialContract } from "../test-helpers/models/contract.js";
+import { Book } from "../test-helpers/models/book.js";
+import { Subscription } from "../test-helpers/models/subscription.js";
 
 /**
  * Rails' `with_has_many_inversing(model = ActiveRecord::Base)` toggles
@@ -47,14 +55,62 @@ async function withHasManyInversing(
   }
 }
 
+/**
+ * Rails' `with_automatic_scope_inversing(*reflections)` temporarily marks each
+ * reflection's target class as allowing automatic inverse detection through
+ * scoped associations.
+ */
+async function withAutomaticScopeInversing(
+  reflections: any[],
+  fn: () => Promise<void> | void,
+): Promise<void> {
+  const saved = reflections.map((r) => ({
+    r,
+    prevAutoScope: r.klass.automaticScopeInversing,
+    prevNameCache: r._inverseNameCache,
+    prevOfCache: r._inverseOfCache,
+  }));
+  for (const { r } of saved) {
+    r.klass.automaticScopeInversing = true;
+    r._inverseNameCache = undefined;
+    r._inverseOfCache = undefined;
+  }
+  try {
+    await fn();
+  } finally {
+    for (const { r, prevAutoScope, prevNameCache, prevOfCache } of saved) {
+      r.klass.automaticScopeInversing = prevAutoScope;
+      r._inverseNameCache = prevNameCache;
+      r._inverseOfCache = prevOfCache;
+    }
+  }
+}
+
 describe("AutomaticInverseFindingTests", () => {
-  useHandlerFixtures(["ratings", "comments", "cars", "bulbs", "books"], {
+  const { books } = useHandlerFixtures(["ratings", "comments", "cars", "bulbs", "books"], {
     schema: canonicalSchema,
   });
   beforeAll(() => {
-    [MixedCaseMonkey, Human, Car, Bulb, Comment, Rating, Post, Author].forEach((m) =>
-      registerModel(m),
-    );
+    [
+      MixedCaseMonkey,
+      Human,
+      Face,
+      Car,
+      Bulb,
+      Comment,
+      Rating,
+      Post,
+      SpecialPost,
+      Author,
+      AdminAccount,
+      AdminUser,
+      User,
+      Room,
+      Company,
+      SpecialContract,
+      Book,
+      Subscription,
+    ].forEach((m) => registerModel(m));
   });
 
   it("has one and belongs to should find inverse automatically on multiple word name", () => {
@@ -68,9 +124,11 @@ describe("AutomaticInverseFindingTests", () => {
     expect(humanReflection.inverseOf()).toBe(monkeyReflection);
   });
 
-  it.skip("has many and belongs to should find inverse automatically for model in module", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs the
-    // namespaced Admin::Account / Admin::User canonical models.
+  it("has many and belongs to should find inverse automatically for model in module", () => {
+    const accountReflection = (AdminAccount as any).reflectOnAssociation("users");
+    const userReflection = (AdminUser as any).reflectOnAssociation("account");
+    expect(accountReflection.hasInverse()).toBe(true);
+    expect(accountReflection.inverseOf()).toBe(userReflection);
   });
 
   it("has one and belongs to should find inverse automatically", () => {
@@ -100,9 +158,7 @@ describe("AutomaticInverseFindingTests", () => {
     expect(postReflection.inverseOf()).toBe(commentReflection);
   });
 
-  it.skip("has many and belongs to should find inverse automatically for sti", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Author.specialPosts
-    // (STI-inferred SpecialPost) does not resolve its automatic inverse.
+  it("has many and belongs to should find inverse automatically for sti", () => {
     const authorReflection = (Author as any).reflectOnAssociation("posts");
     const authorChildReflection = (Author as any).reflectOnAssociation("specialPosts");
     const postReflection = (Post as any).reflectOnAssociation("author");
@@ -114,29 +170,59 @@ describe("AutomaticInverseFindingTests", () => {
     expect(authorChildReflection.inverseOf()).toBe(postReflection);
   });
 
-  it.skip("has one and belongs to with non default foreign key should not find inverse automatically", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs User/Room
-    // create + owner association round-trip.
+  it("has one and belongs to with non default foreign key should not find inverse automatically", async () => {
+    const user = await User.create({});
+    const ownedRoom = await Room.create({ owner_id: (user as any).id });
+    expect((user as any).room).toBeNull();
+    expect((ownedRoom as any).user).toBeNull();
+    expect((await (ownedRoom as any).loadBelongsTo("owner")).id).toBe((user as any).id);
+    expect((await (user as any).loadHasOne("ownedRoom")).id).toBe((ownedRoom as any).id);
   });
 
-  it.skip("has one and belongs to with custom association name should not find wrong inverse automatically", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs Room/User
-    // user/owner reflection semantics.
+  it("has one and belongs to with custom association name should not find wrong inverse automatically", () => {
+    const userReflection = (Room as any).reflectOnAssociation("user");
+    const ownerReflection = (Room as any).reflectOnAssociation("owner");
+    const roomReflection = (User as any).reflectOnAssociation("room");
+    expect(userReflection.hasInverse()).toBe(true);
+    expect(userReflection.inverseOf()).toBe(roomReflection);
+    expect(ownerReflection.hasInverse()).toBe(false);
+    expect(ownerReflection.inverseOf()).not.toBe(roomReflection);
   });
 
-  it.skip("has many and belongs to with a scope and automatic scope inversing should find inverse automatically", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs the
-    // with_automatic_scope_inversing test helper.
+  it("has many and belongs to with a scope and automatic scope inversing should find inverse automatically", async () => {
+    const contactsReflection = (Company as any).reflectOnAssociation("specialContracts");
+    const companyReflection = (SpecialContract as any).reflectOnAssociation("company");
+    expect(contactsReflection.scope).toBeTruthy();
+    expect(companyReflection.scope).toBeFalsy();
+    await withAutomaticScopeInversing([contactsReflection, companyReflection], () => {
+      expect(contactsReflection.hasInverse()).toBe(true);
+      expect(contactsReflection.inverseOf()).toBe(companyReflection);
+      expect(companyReflection.inverseOf()).not.toBe(contactsReflection);
+    });
   });
 
-  it.skip("has one and belongs to with a scope and automatic scope inversing should find inverse automatically", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs the
-    // with_automatic_scope_inversing test helper.
+  it("has one and belongs to with a scope and automatic scope inversing should find inverse automatically", async () => {
+    const postReflection = (Author as any).reflectOnAssociation("recentPost");
+    const authorReflection = (Post as any).reflectOnAssociation("author");
+    expect(postReflection.scope).toBeTruthy();
+    expect(authorReflection.scope).toBeFalsy();
+    await withAutomaticScopeInversing([postReflection, authorReflection], () => {
+      expect(postReflection.hasInverse()).toBe(true);
+      expect(postReflection.inverseOf()).toBe(authorReflection);
+      expect(authorReflection.inverseOf()).not.toBe(postReflection);
+    });
   });
 
-  it.skip("has many with scoped belongs to does not find inverse automatically", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs the
-    // with_automatic_scope_inversing test helper + books(:tlg) author_visibility.
+  it("has many with scoped belongs to does not find inverse automatically", async () => {
+    const subscriptionReflection = (Book as any).reflectOnAssociation("subscriptions");
+    const bookReflection = (Subscription as any).reflectOnAssociation("book");
+    expect(subscriptionReflection.scope).toBeFalsy();
+    expect(bookReflection.scope).toBeTruthy();
+    const book = books("tlg");
+    await withAutomaticScopeInversing([bookReflection, subscriptionReflection], () => {
+      const sub = association(book, "subscriptions").build({});
+      expect((sub as any).book).toBeNull();
+    });
   });
 
   it("has one and belongs to automatic inverse shares objects", async () => {
@@ -188,9 +274,7 @@ describe("AutomaticInverseFindingTests", () => {
     expect(clubReflection.hasInverse()).toBe(false);
   });
 
-  it.skip("polymorphic has one should find inverse automatically", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Automatic inverse
-    // detection via `as:` (polymorphicFaceWithoutInverse) is not implemented.
+  it("polymorphic has one should find inverse automatically", () => {
     const humanReflection = (Human as any).reflectOnAssociation("polymorphicFaceWithoutInverse");
     expect(humanReflection.hasInverse()).toBe(true);
   });
@@ -614,9 +698,15 @@ describe("InverseHasManyTests", () => {
     ).rejects.toThrow();
   });
 
-  it.skip("raise record not found error when no ids are passed", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs RecordNotFound
-    // model/primaryKey attributes on the empty-find path.
+  it("raise record not found error when no ids are passed", async () => {
+    const human = await Human.create({});
+    const proxy = association(human, "interests");
+    await proxy.load();
+    const err = await (proxy as any).find().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as any).name).toBe("RecordNotFound");
+    expect((err as any).model).toBe("Interest");
+    expect((err as any).primaryKey).toBe("id");
   });
 
   it("trying to use inverses that dont exist should raise an error", async () => {
@@ -838,11 +928,6 @@ describe("InverseBelongsToTests", () => {
     });
   });
 
-  it.skip("recursive model has many inversing", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs Branch
-    // recursive build inverse chain (topic.branch.branch).
-  });
-
   it.skip("unscope does not set inverse when incorrect", () => {
     // Tracked: inverse-associations-fixture-port follow-up. Needs relation
     // .or()/.unscope() inversable? guard semantics.
@@ -922,22 +1007,43 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it.skip("eager loaded child instance should be shared with parent on find", () => {
     // Tracked: inverse-associations-fixture-port follow-up. Polymorphic eager
-    // load + inverse wiring on the preloaded child.
+    // load via includes() throws EagerLoadPolymorphicError — preloading
+    // (separate queries per type, as Rails does) is not yet implemented.
   });
 
-  it.skip("child instance should be shared with replaced via accessor parent", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Polymorphic
-    // belongs_to writer inverse wiring (face.polymorphic_human = new_human).
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const face = faces("confused");
+    expect((face as any).polymorphicHuman).toBeNull();
+    await (face as any).loadBelongsTo("polymorphicHuman", {
+      polymorphic: true,
+      inverseOf: "polymorphicFace",
+    });
+    expect((face as any).polymorphicHuman).not.toBeNull();
+    const newHuman = new Human();
+    (face as any).polymorphicHuman = newHuman;
+    expect((newHuman as any).polymorphicFace.description).toBe((face as any).description);
+    (face as any).description = "Bongo";
+    expect((newHuman as any).polymorphicFace.description).toBe((face as any).description);
+    (newHuman as any).polymorphicFace.description = "Mungo";
+    expect((newHuman as any).polymorphicFace.description).toBe((face as any).description);
   });
 
-  it.skip("inversed instance should not be reloaded after stale state changed", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. has_one inverse
-    // stale-state preservation across owner save.
+  it("inversed instance should not be reloaded after stale state changed", async () => {
+    const newHuman = new Human();
+    const face = new Face();
+    (newHuman as any).face = face;
+    const oldInversedHuman = (face as any).human;
+    await (newHuman as any).saveBang();
+    const newInversedHuman = (face as any).human;
+    expect(oldInversedHuman).toBe(newInversedHuman);
   });
 
-  it.skip("inversed instance should not be reloaded after stale state changed with validation", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. has_one inverse
-    // stale-state preservation across child save with validation.
+  it("inversed instance should not be reloaded after stale state changed with validation", async () => {
+    const face = new Face({ human: new Human() });
+    const oldInversedHuman = (face as any).human;
+    await (face as any).saveBang();
+    const newInversedHuman = (face as any).human;
+    expect(oldInversedHuman).toBe(newInversedHuman);
   });
 
   it("inversed instance should load after autosave if it is not already loaded", async () => {
@@ -994,9 +1100,12 @@ describe("InversePolymorphicBelongsToTests", () => {
     });
   });
 
-  it.skip("with has many inversing does not trigger association callbacks on set when the inverse is a has many", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs
-    // polymorphic_human_with_callbacks fixture wiring on llama_wrangling.
+  it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
+    await withHasManyInversing(Interest, async () => {
+      const interest = interests("llama_wrangling");
+      const human = (await (interest as any).loadBelongsTo("polymorphicHumanWithCallbacks")) as any;
+      expect(human.addCallbackCalled).toBe(false);
+    });
   });
 
   it("trying to access inverses that dont exist shouldnt raise an error", async () => {
@@ -1007,14 +1116,25 @@ describe("InversePolymorphicBelongsToTests", () => {
     });
   });
 
-  it.skip("trying to set polymorphic inverses that dont exist at all should raise an error", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs the
-    // polymorphic belongs_to writer (face.puzzled_polymorphic_human = ...) path.
+  it("trying to set polymorphic inverses that dont exist at all should raise an error", async () => {
+    const face = (await Face.first())!;
+    const human = (await Human.first())!;
+    expect(() => {
+      (face as any).puzzledPolymorphicHuman = human;
+    }).toThrow(InverseOfAssociationNotFoundError);
   });
 
-  it.skip("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", () => {
-    // Tracked: inverse-associations-fixture-port follow-up. Needs the
-    // polymorphic belongs_to writer inverse validation path.
+  it("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", async () => {
+    const face1 = (await Face.first())!;
+    const human = (await Human.first())!;
+    expect(() => {
+      (face1 as any).polymorphicHuman = human;
+    }).not.toThrow();
+    const face2 = (await Face.first())!;
+    const interest = (await Interest.first())!;
+    expect(() => {
+      (face2 as any).polymorphicHuman = interest;
+    }).toThrow(InverseOfAssociationNotFoundError);
   });
 });
 
@@ -1049,6 +1169,15 @@ describe("InverseBelongsToTests", () => {
   beforeAll(async () => {
     await defineSchema(canonicalSchema);
     [Branch, BrokenBranch].forEach((m) => registerModel(m));
+  });
+
+  it("recursive model has many inversing", async () => {
+    await withHasManyInversing(Branch, async () => {
+      const main = await Branch.create({});
+      const feature = (await association(main, "branches").create({})) as any;
+      const topic = association(feature, "branches").build({}) as any;
+      expect((topic.branch as any).branch).toBe(main);
+    });
   });
 
   it("recursive inverse on recursive model has many inversing", async () => {

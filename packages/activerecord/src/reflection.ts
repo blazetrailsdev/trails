@@ -771,7 +771,8 @@ export class AssociationReflection extends MacroReflection {
       const inv = this.inverseOf();
       if (inv) return String((inv as any).computeForeignKey?.(false) ?? (inv as any).foreignKey);
     }
-    return `${underscore(this.activeRecord.name)}_id`;
+    const baseName = (this.activeRecord as any)._demodulizedName ?? this.activeRecord.name;
+    return `${underscore(baseName)}_id`;
   }
 
   private deriveFkQueryConstraints(foreignKey: string): string | string[] {
@@ -869,9 +870,10 @@ export class AssociationReflection extends MacroReflection {
   private automaticInverseOf(): string | null {
     if (!this.canFindInverseOfAutomatically(this)) return null;
 
+    const modelBaseName = (this.activeRecord as any)._demodulizedName ?? this.activeRecord.name;
     const snakeInverseName = this.options.as
       ? underscore(this.options.as as string)
-      : underscore(demodulize(this.activeRecord.name));
+      : underscore(demodulize(modelBaseName));
     // Codebase convention is camelCase association names; Rails uses
     // snake_case. Try both so automatic inverse detection works regardless
     // of which form the user registered the inverse under.
