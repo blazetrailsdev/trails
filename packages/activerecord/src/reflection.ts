@@ -1057,21 +1057,18 @@ export class AssociationReflection extends MacroReflection {
 
     if (
       !this.isPolymorphic() &&
-      ((this.klass as any).compositePrimaryKey ||
-        (this.activeRecord as any).compositePrimaryKey ||
-        Array.isArray(this.foreignKey))
+      ((this.klass as any).compositePrimaryKey || (this.activeRecord as any).compositePrimaryKey)
     ) {
       const fk = this.foreignKey;
-      // Rails raises `CompositePrimaryKeyMismatchError` here (reflection.rb:618).
-      // has_one/collection compare against the owner's active_record_primary_key;
-      // belongs_to against the target's association_primary_key.
       if (this.hasOne() || this.isCollection()) {
-        if (arrayLen(this.activeRecordPrimaryKey) !== arrayLen(fk)) {
-          throw new CompositePrimaryKeyMismatchError(this.activeRecord.name, this.name);
+        const pk = this.activeRecordPrimaryKey;
+        if (arrayLen(pk) !== arrayLen(fk)) {
+          throw new CompositePrimaryKeyMismatchError(this.activeRecord.name, this.name, pk, fk);
         }
       } else if (this.belongsTo()) {
-        if (arrayLen(this.associationPrimaryKey) !== arrayLen(fk)) {
-          throw new CompositePrimaryKeyMismatchError(this.activeRecord.name, this.name);
+        const pk = this.associationPrimaryKey;
+        if (arrayLen(pk) !== arrayLen(fk)) {
+          throw new CompositePrimaryKeyMismatchError(this.activeRecord.name, this.name, pk, fk);
         }
       }
     }
