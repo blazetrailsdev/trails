@@ -217,6 +217,15 @@ describe("AssociationProxyTest", () => {
     expect(david.projects).toBe(david.projects);
   });
 
+  it("proxy object can be stubbed", async () => {
+    // Rails defines a singleton method on the proxy and asserts the cached
+    // proxy keeps it; the trails proxy is cached (same object), so a property
+    // assigned to it survives across accessor reads.
+    const david = developers("david") as any;
+    david.projects.extraMethod = () => 42;
+    expect(david.projects.extraMethod()).toBe(42);
+  });
+
   it("first! works on loaded associations", async () => {
     const david = authors("david") as any;
     const expected = await david.firstPosts.first();
