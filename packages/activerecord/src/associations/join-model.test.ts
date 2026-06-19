@@ -1209,8 +1209,11 @@ describe("AssociationsJoinModelTest", () => {
     expect((c as any).categorizations.loaded).toBe(false);
   });
 
-  it.skip("adding to has many through should return self", async () => {
-    // trails: CollectionProxy#push returns void, not self — convergence tracked in RFC 0023
+  it("adding to has many through should return self", async () => {
+    const thinking = (await Post.find(posts("thinking").id)) as Post;
+    const tagsProxy = (thinking as any).tags;
+    const general = (await Tag.find(tags("general").id)) as Tag;
+    expect(await tagsProxy.push(general)).toBe(tagsProxy);
   });
 
   it("has many through sum uses calculations", async () => {

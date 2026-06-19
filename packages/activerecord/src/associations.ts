@@ -2516,6 +2516,10 @@ export function association<T extends Base = Base>(
   }
 
   const wrapped = wrapCollectionProxy<T>(proxy);
+  // Record the JS Proxy wrapper on the underlying instance so methods that
+  // return `self` (push / concat / append) hand back the same object callers
+  // hold — `this` inside a method is the raw target, not the wrapper.
+  (proxy as any)._proxySelf = wrapped;
   record._collectionProxies.set(assocName, wrapped);
   return wrapped;
 }
