@@ -2488,13 +2488,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override first(n: number): Promise<T[]>;
   override async first(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
+    if (this.isFindFromTarget()) await this.loadTarget();
     const records = this._targetLoaded ? this._target : await this.toArray();
     if (n === undefined) return records[0] ?? null;
     return records.slice(0, n);
   }
 
   /**
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#first!
+   * Mirrors: ActiveRecord::Relation::FinderMethods#first!
    */
   override async firstBang(): Promise<T> {
     const record = await this.first();
@@ -2513,6 +2514,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override last(n: number): Promise<T[]>;
   override async last(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
+    if (this.isFindFromTarget()) await this.loadTarget();
     const records = this._targetLoaded ? this._target : await this.toArray();
     if (n === undefined) return records[records.length - 1] ?? null;
     return records.slice(Math.max(0, records.length - n));
@@ -2527,6 +2529,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override take(limit: number): Promise<T[]>;
   override async take(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
+    if (this.isFindFromTarget()) await this.loadTarget();
     const records = this._targetLoaded ? this._target : await this.toArray();
     if (n === undefined) return records[0] ?? null;
     return records.slice(0, n);
