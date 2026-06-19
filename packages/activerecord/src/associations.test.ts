@@ -999,7 +999,7 @@ describe("PreloaderTest", () => {
   it("preload does not group same class different scope", async () => {
     const alice = await Author.create({ name: "Alice" });
     const post = await Post.create({ title: "P1", body: "body", author_id: alice.id });
-    const postesque = await PostesquePL.create({ author_id: alice.id, author_name: alice.name });
+    const postesque = await PostesquePL.create({ author_name: alice.name });
 
     // Sub-scenario 1: scopes differ in generated SQL.
     // Post#authorWithTheLetterA has `name LIKE '%a%'`; Postesque#authorWithTheLetterA has none.
