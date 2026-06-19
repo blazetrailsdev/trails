@@ -323,7 +323,59 @@ export class AbstractReflection {
     const self = this._concrete();
     const counterCache = self.options?.counterCache;
     if (this.belongsTo()) {
-      return belongsToCounterCacheColumn(counterCache, self.activeRecord?.name ?? "");
+      const explicit = counterCacheColumnOption(counterCache);
+      if (explicit) return explicit;
+      if (!counterCache) return null;
+      // Rails: `active_record.name.demodulize.underscore.pluralize + "_count"`.
+      // Trails class names are flat (CpkBook vs Cpk::Book), so demodulize is a
+      // no-op and produces cpk_books_count instead of books_count. Fall back to
+      // the inverse hasMany's name on the target, which is already the
+      // demodulized plural form (CpkOrder.books → books_count).
+      try {
+        const ownerName = self.activeRecord?.name ?? "";
+        // FK on the child table that points to the target (e.g. "dog_lover_id").
+        // CPK models normalize foreignKey into queryConstraints in the reflection.
+        const btFk =
+          self.options?.foreignKey ??
+          self.options?.queryConstraints ??
+          `${underscore(self.name)}_id`;
+        const normFk = (fk: unknown): string[] =>
+          Array.isArray(fk) ? fk.map(String) : [String(fk)];
+        const btFkNorm = normFk(btFk);
+        // Use a live registry lookup (not self.klass) to avoid poisoning _klassCache
+        // with a stale registry entry during class-definition time (addCounterCacheCallbacks
+        // fires while the module is first loaded, potentially before the target class
+        // is properly registered — a bespoke registration in an earlier test would
+        // otherwise be cached permanently on the reflection's _klassCache).
+        const klassName = self.className;
+        const resolvedKlass = modelRegistry.get(klassName);
+        if (!resolvedKlass) throw new Error(`${klassName} not in registry`);
+        const targetAssocs: Array<{ type: string; name: string; options: any }> =
+          (resolvedKlass as any)._associations ?? [];
+        // Match on both class name AND FK so that when a target declares multiple
+        // hasManyS to the same class with different FKs (e.g. DogLover has
+        // hasMany("trainedDogs") and hasMany("dogs")), we pick the one whose FK
+        // matches the belongsTo's FK rather than the first class-name match.
+        const hmDefaultFk = `${underscore((resolvedKlass as any).name)}_id`;
+        const inverseHm = targetAssocs.find((a) => {
+          if (a.type !== "hasMany") return false;
+          if ((a.options.className ?? camelize(singularize(a.name))) !== ownerName) return false;
+          const hmFkNorm = normFk(a.options.foreignKey ?? hmDefaultFk);
+          return hmFkNorm.length === btFkNorm.length && hmFkNorm.every((k, i) => k === btFkNorm[i]);
+        });
+        // Only use the inverse hasMany's name when its singular camelCase form is
+        // a suffix of the owner class name. This covers CPK flat-prefix cases
+        // (CpkBook ends with "Book" ← singularize("books")) while correctly
+        // rejecting aliased hasManyS (Comment does NOT end with "LatestComment"
+        // ← singularize("latestComments")), for which Rails still derives from
+        // the child model name (comments_count, not latest_comments_count).
+        if (inverseHm && ownerName.endsWith(camelize(singularize(inverseHm.name)))) {
+          return `${underscore(inverseHm.name)}_count`;
+        }
+        return belongsToCounterCacheColumn(counterCache, ownerName);
+      } catch {
+        return belongsToCounterCacheColumn(counterCache, self.activeRecord?.name ?? "");
+      }
     }
     return counterCacheColumnOption(counterCache) || `${self.name}_count`;
   }

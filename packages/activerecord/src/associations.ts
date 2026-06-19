@@ -567,6 +567,12 @@ export function resolveCounterColumn(
       if (typeof belongsTo.options.counterCache === "string") {
         return belongsTo.options.counterCache;
       }
+      // Delegate to the belongs_to reflection's counterCacheColumn(), which
+      // handles flat class names (CpkBook → books_count) via inverse lookup.
+      const col = (childModel as any)
+        ._reflectOnAssociation?.(belongsTo.name)
+        ?.counterCacheColumn?.();
+      if (col) return col;
       return `${pluralize(underscore(childModel.name))}_count`;
     }
   }
