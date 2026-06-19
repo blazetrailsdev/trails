@@ -44,6 +44,7 @@ import { Rating } from "../test-helpers/models/rating.js";
 import { Aircraft } from "../test-helpers/models/aircraft.js";
 import { Engine } from "../test-helpers/models/engine.js";
 import { Car } from "../test-helpers/models/car.js";
+import { CpkOrder } from "../test-helpers/models/cpk.js";
 
 // Mirrors the dynamic subclasses built by Rails' `find_post_with_dependency`
 // helper: `Class.new(ActiveRecord::Base)` on the `posts` table carrying a
@@ -96,6 +97,7 @@ describe("AssociationsJoinModelTest", () => {
       "books",
       "vertices",
       "authorFavorites",
+      "cpkOrders",
     ]);
   registerModel(Author);
   registerModel(Post);
@@ -119,6 +121,7 @@ describe("AssociationsJoinModelTest", () => {
   registerModel(Aircraft);
   registerModel(Engine);
   registerModel(Car);
+  registerModel(CpkOrder);
   registerModel(PostWithHasManyDeleteAll);
   registerModel(PostWithHasManyDestroy);
   registerModel(PostWithHasManyNullify);
@@ -1021,6 +1024,31 @@ describe("AssociationsJoinModelTest", () => {
     expect(((await (aircraft as any).engines.toArray()) as Base[]).map((e) => e.id)).toEqual([
       engine.id,
     ]);
+  });
+
+  // Convergence test: a composite-PK owner (CpkOrder, PK = [shop_id, id]) can own
+  // a polymorphic-through association using the scalar taggings.taggable_id column
+  // without requiring an explicit `primaryKey:` option. The "id" component of the
+  // CPK is derived automatically (matching Rails' join_id_for behaviour).
+  it("polymorphic has many through with composite owner primary key", async () => {
+    class CpkOrderWithTaggings extends CpkOrder {
+      static {
+        this.hasMany("orderTaggings", { className: "Tagging", as: "taggable" });
+        this.hasMany("orderTagNames", {
+          className: "Tag",
+          through: "orderTaggings",
+          source: "tag",
+        });
+      }
+    }
+    registerModel(CpkOrderWithTaggings);
+
+    const order = await CpkOrderWithTaggings.createBang({ shop_id: 42, status: "paid" });
+    const tag = await Tag.createBang({ name: "rails-faithful" });
+    await (order as any).orderTaggings.createBang({ tag_id: (tag as any).id });
+
+    const loadedTags = (await (order as any).orderTagNames.toArray()) as Base[];
+    expect(loadedTags.map((t) => (t as any).id)).toEqual([(tag as any).id]);
   });
 
   it("has many through goes through all sti classes", async () => {
