@@ -426,6 +426,7 @@ describe("PreloaderTest", () => {
       sharded_blog_posts_tags: canonicalSchema.sharded_blog_posts_tags,
       cpk_orders: canonicalSchema.cpk_orders,
       cpk_order_agreements: canonicalSchema.cpk_order_agreements,
+      dogs: canonicalSchema.dogs,
     });
   });
 
@@ -456,6 +457,8 @@ describe("PreloaderTest", () => {
   let ShardedBlogPostTagPL: typeof Base;
   let CpkOrderPL: typeof Base;
   let CpkOrderAgreementPL: typeof Base;
+  let Dog: typeof Base;
+  let EssaySpecial: typeof Base;
 
   beforeAll(async () => {
     Author = (await import("./test-helpers/models/author.js")).Author as never;
@@ -488,6 +491,8 @@ describe("PreloaderTest", () => {
     const cpkMod = await import("./test-helpers/models/cpk.js");
     CpkOrderPL = cpkMod.CpkOrder as never;
     CpkOrderAgreementPL = cpkMod.CpkOrderAgreement as never;
+    Dog = (await import("./test-helpers/models/dog.js")).Dog as never;
+    EssaySpecial = (await import("./test-helpers/models/essay.js")).EssaySpecial as never;
   });
 
   beforeEach(() => {
@@ -515,6 +520,8 @@ describe("PreloaderTest", () => {
     registerModel("ShardedBlogPostTag", ShardedBlogPostTagPL);
     registerModel("CpkOrder", CpkOrderPL);
     registerModel("CpkOrderAgreement", CpkOrderAgreementPL);
+    registerModel("Dog", Dog);
+    registerModel("EssaySpecial", EssaySpecial);
   });
 
   it("preload with scope", async () => {
@@ -1204,54 +1211,35 @@ describe("PreloaderTest", () => {
   // second database), both backed by a table named `dogs`. A polymorphic
   // preload over comments pointing at each must run two queries rather than
   // batch them together, because LoaderQuery#hashKey distinguishes loaders by
-  // connection identity. The original test expressed the two databases by
-  // assigning adapters directly (bypassing the handler); this reimplementation
-  // routes the second `dogs` through a real pooled connection.
+  // connection identity.
   it("multi database polymorphic preload with same table name", async () => {
-    class MdpDog extends Base {
-      static {
-        this.tableName = "dogs";
-      }
-    }
-    // Second database, same `dogs` table name (Rails: OtherDog < ARUnit2Model,
-    // an abstract class connected to the `arunit2` database).
-    class MdpAnimalsBase extends Base {
+    // Second database base (Rails: ARUnit2Model connected to arunit2 DB).
+    // Kept inline so connectsTo doesn't pollute the shared canonical ARUnit2Model.
+    class AnimalsBase extends Base {
       static {
         this.abstractClass = true;
-        this.connectionClass = true;
       }
     }
-    class MdpOtherDog extends MdpAnimalsBase {
+    class OtherDog extends AnimalsBase {
       static {
         this.tableName = "dogs";
       }
     }
-    class MdpComment extends Base {
-      static {
-        this.tableName = "comments";
-        this.attribute("origin_id", "integer");
-        this.attribute("origin_type", "string");
-      }
-    }
-    Associations.belongsTo.call(MdpComment, "origin", { polymorphic: true });
-    registerModel("MdpDog", MdpDog);
-    registerModel("MdpOtherDog", MdpOtherDog);
-    registerModel("MdpComment", MdpComment);
+    registerModel("OtherDog", OtherDog);
 
-    const [secondaryPool] = MdpAnimalsBase.connectsTo({
+    const [secondaryPool] = AnimalsBase.connectsTo({
       database: { writing: { adapter: "sqlite3", database: ":memory:", pool: 1 } },
     });
     try {
       await secondaryPool.adapterReady;
-      // The canonical `dogs` table, created in the secondary database so its
-      // SELECT resolves against this pool rather than the primary one.
-      await MdpOtherDog.leaseConnection().executeMutation(
+      // Canonical dogs shape in the secondary database.
+      await OtherDog.leaseConnection().executeMutation(
         "CREATE TABLE `dogs` (`id` INTEGER PRIMARY KEY, `trainer_id` INTEGER, " +
           "`breeder_id` INTEGER, `dog_lover_id` INTEGER, `alias` VARCHAR(255))",
       );
 
-      const dogComment = new MdpComment({ origin_id: 1, origin_type: "MdpDog" });
-      const otherDogComment = new MdpComment({ origin_id: 1, origin_type: "MdpOtherDog" });
+      const dogComment = new (Comment as any)({ origin_id: 1, origin_type: "Dog" });
+      const otherDogComment = new (Comment as any)({ origin_id: 1, origin_type: "OtherDog" });
 
       // Same table name, same key, same id — these two loaders would coalesce
       // into a single query were it not for their distinct connections.
@@ -1262,7 +1250,7 @@ describe("PreloaderTest", () => {
       }).call();
       expect(spy).toHaveBeenCalledTimes(2);
     } finally {
-      Base.connectionHandler.removeConnectionPool("MdpAnimalsBase");
+      Base.connectionHandler.removeConnectionPool("AnimalsBase");
     }
   });
 
@@ -1285,39 +1273,22 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records sti", async () => {
-    class StiBook extends Base {
-      static {
-        this._tableName = "books";
-      }
-    }
-    class StiEssay extends Base {
-      static {
-        this._tableName = "essays";
-        this.inheritanceColumn = "type";
-      }
-    }
-    class StiEssaySpecial extends StiEssay {}
-    Associations.hasOne.call(StiBook, "essay", {
-      className: "StiEssay",
-      foreignKey: "book_id",
+    const book = await (Book as any).create({});
+    const essaySpecial = await (EssaySpecial as any).create({ book_id: book.id });
+
+    expect(book.association("essay").isLoaded()).toBe(false);
+
+    const sqls = await captureSql(async () => {
+      await new Preloader({
+        records: [book],
+        associations: "essay",
+        availableRecords: [[essaySpecial]],
+      }).call();
     });
-    registerModel("StiBook", StiBook);
-    registerModel("StiEssay", StiEssay);
-    registerModel("StiEssaySpecial", StiEssaySpecial);
+    expect(sqls).toHaveLength(0);
 
-    const book = await StiBook.create({ name: "B" });
-    const essaySpecial = await StiEssaySpecial.create({ name: "s", book_id: book.id });
-
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({
-      records: [book],
-      associations: "essay",
-      availableRecords: [[essaySpecial]],
-    }).call();
-    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    expect(queryCalls).toHaveLength(0);
-    const preloaded = (book as any)._preloadedAssociations.get("essay");
-    expect(preloaded).toBe(essaySpecial);
+    expect(book.association("essay").isLoaded()).toBe(true);
+    expect(book.association("essay").target).toBe(essaySpecial);
   });
 
   it("preload with only some records available", async () => {
@@ -1652,7 +1623,7 @@ describe("PreloaderTest", () => {
     const preloadSql = sqls[1];
     expectQuotedColumnInSql(preloadSql, "cpk_order_agreements.order_id", { inWhere: true });
     expect(orders![0].association("orderAgreements").isLoaded()).toBe(true);
-    const loaded = (orders![0] as any)._preloadedAssociations.get("orderAgreements");
+    const loaded = orders![0]._preloadedAssociations.get("orderAgreements");
     expect(loaded.map((a: any) => a.signature).sort()).toEqual(["abc", "def"]);
   });
 
@@ -1669,7 +1640,7 @@ describe("PreloaderTest", () => {
     const preloadSql = sqls[1];
     expectQuotedColumnInSql(preloadSql, "cpk_orders.id", { inWhere: true });
     expect(agreements![0].association("order").isLoaded()).toBe(true);
-    const loadedOrder = (agreements![0] as any)._preloadedAssociations.get("order");
+    const loadedOrder = agreements![0]._preloadedAssociations.get("order");
     expect(loadedOrder).not.toBeNull();
     expect((loadedOrder.id as [number, number])[1]).toBe(orderId);
   });
