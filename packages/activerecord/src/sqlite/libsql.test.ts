@@ -383,12 +383,12 @@ describe.skipIf(!hasCredentials)("libsqlRemoteDriver — network round-trip (TUR
 });
 
 describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke (TURSO_*)", () => {
-  let adapter: LibSQLRemoteAdapter;
+  let adapter: Awaited<ReturnType<typeof LibSQLRemoteAdapter.openAsync>>;
 
   beforeAll(async () => {
-    adapter = (await LibSQLRemoteAdapter.openAsync(tursoUrl!, {
+    adapter = await LibSQLRemoteAdapter.openAsync(tursoUrl, {
       driverOptions: { authToken: tursoToken },
-    })) as LibSQLRemoteAdapter;
+    });
   });
 
   afterAll(async () => {
