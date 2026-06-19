@@ -95,6 +95,7 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
 });
 
 describe("belongs_to to a composite-PK target without an id column", () => {
+  registerModel(TenantPkParent);
   registerModel(CpkTenantChild);
 
   it("keeps the full composite array as the association primary key", () => {
