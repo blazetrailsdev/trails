@@ -761,7 +761,10 @@ describe("SelectManagerTest", () => {
         new Nodes.BoundSqlLiteral("foo = ?", [1], {}),
         users.get("id"),
       );
-      expect(stmt.toSql()).toBe('UPDATE "users" SET foo = 1');
+      // `to_sql` compiles through a plain SQLString collector, where the
+      // BoundSqlLiteral's `add_bind` emits a `?` placeholder (Rails parity) —
+      // not the inlined value.
+      expect(stmt.toSql()).toBe('UPDATE "users" SET foo = ?');
     });
 
     it("copies limits", () => {

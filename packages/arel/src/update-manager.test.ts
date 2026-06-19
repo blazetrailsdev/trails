@@ -101,7 +101,10 @@ describe("UpdateManagerTest", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
       mgr.set(new Nodes.BoundSqlLiteral("name = ?", ["dean"], {}));
-      expect(mgr.toSql()).toBe(`UPDATE "users" SET name = 'dean'`);
+      // `to_sql` compiles through a plain SQLString collector, where the
+      // BoundSqlLiteral's `add_bind` emits a `?` placeholder (Rails parity) —
+      // not the inlined value.
+      expect(mgr.toSql()).toBe(`UPDATE "users" SET name = ?`);
     });
 
     // Mirrors Rails: `set` wraps each LHS in `Nodes::UnqualifiedColumn`
