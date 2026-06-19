@@ -586,28 +586,6 @@ describe("PreloaderTest", () => {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      // wave-3 deferred: through/polymorphic-taggings tests (GMM/GGT/GAT/PT), SL (favorites join), PP
-      gat_posts: { title: "string" },
-      gat_taggings: { gat_post_id: "integer", gat_tag_id: "integer" },
-      gat_tags: { name: "string" },
-      ggt_posts: { title: "string" },
-      ggt_taggings: { ggt_post_id: "integer", ggt_tag_id: "integer" },
-      ggt_tags: { name: "string" },
-      gmm_posts: { title: "string" },
-      gmm_taggings: { gmm_post_id: "integer", gmm_tag_id: "integer" },
-      gmm_tags: { name: "string" },
-      pp_author_favorites: { pp_author_id: "integer", pp_favorite_author_id: "integer" },
-      pp_authors: { name: "string" },
-      pp_comments: { body: "string", pp_post_id: "integer" },
-      pp_posts: { pp_author_id: "integer", title: "string" },
-      pp_taggings: { pp_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
-      pp_tags: { name: "string" },
-      pt_posts: { title: "string" },
-      pt_taggings: { pt_post_id: "integer", pt_tag_id: "integer" },
-      pt_tags: { name: "string" },
-      sl_author_favorites: { sl_author_id: "integer", sl_favorite_author_id: "integer" },
-      sl_authors: { name: "string" },
-      sl_posts: { sl_author_id: "integer", title: "string" },
       // ta/tb essays-through tests cannot use canonical essays (author_id is varchar there)
       ta_authors: { name: "string" },
       ta_categories: { name: "string" },
@@ -628,9 +606,13 @@ describe("PreloaderTest", () => {
   let Category: typeof Base;
   let SpecialCategory: typeof Base;
   let CategoryPost: typeof Base;
+  let Tag: typeof Base;
+  let Tagging: typeof Base;
+  let AuthorFavorite: typeof Base;
 
   beforeAll(async () => {
     Author = (await import("./test-helpers/models/author.js")).Author as never;
+    AuthorFavorite = (await import("./test-helpers/models/author.js")).AuthorFavorite as never;
     const postMod = await import("./test-helpers/models/post.js");
     Post = postMod.Post as never;
     CategoryPost = postMod.CategoryPost as never;
@@ -639,16 +621,21 @@ describe("PreloaderTest", () => {
     const catMod = await import("./test-helpers/models/category.js");
     Category = catMod.Category as never;
     SpecialCategory = catMod.SpecialCategory as never;
+    Tag = (await import("./test-helpers/models/tag.js")).Tag as never;
+    Tagging = (await import("./test-helpers/models/tagging.js")).Tagging as never;
   });
 
   beforeEach(() => {
     registerModel("Author", Author);
+    registerModel("AuthorFavorite", AuthorFavorite);
     registerModel("Post", Post);
     registerModel("CategoryPost", CategoryPost);
     registerModel("Comment", Comment);
     registerModel("Book", Book);
     registerModel("Category", Category);
     registerModel("SpecialCategory", SpecialCategory);
+    registerModel("Tag", Tag);
+    registerModel("Tagging", Tagging);
   });
 
   it("preload with scope", async () => {
@@ -752,165 +739,73 @@ describe("PreloaderTest", () => {
     expect((postFresh as any)._preloadedAssociations.get("author").id).toBe(author.id);
   });
   it("preload grouped queries of middle records", async () => {
-    class GMMPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class GMMTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class GMMTagging extends Base {
-      static {
-        this.attribute("gmm_post_id", "integer");
-        this.attribute("gmm_tag_id", "integer");
-      }
-    }
-    Associations.hasMany.call(GMMPost, "gmmTaggings", {
-      className: "GMMTagging",
-      foreignKey: "gmm_post_id",
-    });
-    Associations.hasMany.call(GMMPost, "gmmTags", {
-      through: "gmmTaggings",
-      source: "gmmTag",
-      className: "GMMTag",
-    });
-    Associations.belongsTo.call(GMMTagging, "gmmTag", {
-      className: "GMMTag",
-      foreignKey: "gmm_tag_id",
-    });
-    registerModel("GMMPost", GMMPost);
-    registerModel("GMMTag", GMMTag);
-    registerModel("GMMTagging", GMMTagging);
-    const post1 = await GMMPost.create({ title: "P1" });
-    const post2 = await GMMPost.create({ title: "P2" });
-    const tag1 = await GMMTag.create({ name: "ruby" });
-    const tag2 = await GMMTag.create({ name: "rails" });
-    await GMMTagging.create({ gmm_post_id: post1.id, gmm_tag_id: tag1.id });
-    await GMMTagging.create({ gmm_post_id: post2.id, gmm_tag_id: tag2.id });
-    // Two separate preloaders for a through association — middle-record (gmmTaggings) loaders
+    const post1 = await Post.create({ title: "P1", body: "b1" });
+    const post2 = await Post.create({ title: "P2", body: "b2" });
+    const tag1 = await Tag.create({ name: "ruby" });
+    const tag2 = await Tag.create({ name: "rails" });
+    await Tagging.create({ taggable_id: post1.id, taggable_type: "Post", tag_id: tag1.id });
+    await Tagging.create({ taggable_id: post2.id, taggable_type: "Post", tag_id: tag2.id });
+    // Two separate preloaders for a through association — middle-record (taggings) loaders
     // from both branches share the same scope/key and are coalesced into 1 batch call
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    const p1 = new Preloader({ records: [post1], associations: ["gmmTags"] });
-    const p2 = new Preloader({ records: [post2], associations: ["gmmTags"] });
+    const p1 = new Preloader({ records: [post1], associations: ["tags"] });
+    const p2 = new Preloader({ records: [post2], associations: ["tags"] });
     await new Batch([p1, p2]).call();
-    // 2 batch calls: 1 for grouped gmmTaggings loaders, 1 for grouped gmmTag loaders
-    expect(spy).toHaveBeenCalledTimes(2);
-    expect((post1 as any)._preloadedAssociations.get("gmmTags").map((t: any) => t.name)).toEqual([
+    // 3 batch calls: grouped taggings loaders, grouped tag loaders, and the
+    // tag→tagging preload from Tagging#tag's `includes(:tagging)` scope.
+    expect(spy).toHaveBeenCalledTimes(3);
+    expect((post1 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
       "ruby",
     ]);
-    expect((post2 as any)._preloadedAssociations.get("gmmTags").map((t: any) => t.name)).toEqual([
+    expect((post2 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
       "rails",
     ]);
   });
   it("preload grouped queries of through records", async () => {
-    class GGTPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class GGTTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class GGTTagging extends Base {
-      static {
-        this.attribute("ggt_post_id", "integer");
-        this.attribute("ggt_tag_id", "integer");
-      }
-    }
-    Associations.hasMany.call(GGTPost, "ggtTaggings", {
-      className: "GGTTagging",
-      foreignKey: "ggt_post_id",
-    });
-    Associations.hasMany.call(GGTPost, "ggtTags", {
-      through: "ggtTaggings",
-      source: "ggtTag",
-      className: "GGTTag",
-    });
-    Associations.belongsTo.call(GGTTagging, "ggtTag", {
-      className: "GGTTag",
-      foreignKey: "ggt_tag_id",
-    });
-    registerModel("GGTPost", GGTPost);
-    registerModel("GGTTag", GGTTag);
-    registerModel("GGTTagging", GGTTagging);
-    const post1 = await GGTPost.create({ title: "P1" });
-    const post2 = await GGTPost.create({ title: "P2" });
-    const tag1 = await GGTTag.create({ name: "ruby" });
-    const tag2 = await GGTTag.create({ name: "rails" });
-    await GGTTagging.create({ ggt_post_id: post1.id, ggt_tag_id: tag1.id });
-    await GGTTagging.create({ ggt_post_id: post2.id, ggt_tag_id: tag2.id });
-    // includes() creates one Preloader; source (ggtTag) loaders for both posts share the
-    // same scope and are coalesced — 2 batch calls total (taggings + tags), not 4
+    const post1 = await Post.create({ title: "P1", body: "b1" });
+    const post2 = await Post.create({ title: "P2", body: "b2" });
+    const tag1 = await Tag.create({ name: "ruby" });
+    const tag2 = await Tag.create({ name: "rails" });
+    await Tagging.create({ taggable_id: post1.id, taggable_type: "Post", tag_id: tag1.id });
+    await Tagging.create({ taggable_id: post2.id, taggable_type: "Post", tag_id: tag2.id });
+    // includes() creates one Preloader; source (tag) loaders for both posts share the
+    // same scope and are coalesced — 3 batch calls total (taggings, tags, and the
+    // tag→tagging preload from Tagging#tag's `includes(:tagging)` scope), not 5.
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    const posts = await GGTPost.includes("ggtTags").toArray();
-    expect(spy).toHaveBeenCalledTimes(2);
+    const posts = await Post.where({ id: [post1.id, post2.id] })
+      .includes("tags")
+      .toArray();
+    expect(spy).toHaveBeenCalledTimes(3);
     const p1tags = (posts.find((p: any) => p.title === "P1") as any)._preloadedAssociations.get(
-      "ggtTags",
+      "tags",
     );
     const p2tags = (posts.find((p: any) => p.title === "P2") as any)._preloadedAssociations.get(
-      "ggtTags",
+      "tags",
     );
     expect(p1tags[0].name).toBe("ruby");
     expect(p2tags[0].name).toBe("rails");
   });
   it("preload through records with already loaded middle record", async () => {
-    class GATPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class GATTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class GATTagging extends Base {
-      static {
-        this.attribute("gat_post_id", "integer");
-        this.attribute("gat_tag_id", "integer");
-      }
-    }
-    Associations.hasMany.call(GATPost, "gatTaggings", {
-      className: "GATTagging",
-      foreignKey: "gat_post_id",
-    });
-    Associations.hasMany.call(GATPost, "gatTags", {
-      through: "gatTaggings",
-      source: "gatTag",
-      className: "GATTag",
-    });
-    Associations.belongsTo.call(GATTagging, "gatTag", {
-      className: "GATTag",
-      foreignKey: "gat_tag_id",
-    });
-    registerModel("GATPost", GATPost);
-    registerModel("GATTag", GATTag);
-    registerModel("GATTagging", GATTagging);
-    const post1 = await GATPost.create({ title: "P1" });
-    const post2 = await GATPost.create({ title: "P2" });
-    const tag1 = await GATTag.create({ name: "ruby" });
-    const tag2 = await GATTag.create({ name: "rails" });
-    await GATTagging.create({ gat_post_id: post1.id, gat_tag_id: tag1.id });
-    await GATTagging.create({ gat_post_id: post2.id, gat_tag_id: tag2.id });
-    // Pre-load middle records (gatTaggings) for post1 only
-    const p1 = (await GATPost.where({ title: "P1" }).includes("gatTaggings").toArray())[0]!;
-    const p2 = (await GATPost.where({ title: "P2" }).toArray())[0]!;
-    // Preload gatTags for both posts. The through-preloader's tagging loader finds p1's key
+    const post1 = await Post.create({ title: "P1", body: "b1" });
+    const post2 = await Post.create({ title: "P2", body: "b2" });
+    const tag1 = await Tag.create({ name: "ruby" });
+    const tag2 = await Tag.create({ name: "rails" });
+    await Tagging.create({ taggable_id: post1.id, taggable_type: "Post", tag_id: tag1.id });
+    await Tagging.create({ taggable_id: post2.id, taggable_type: "Post", tag_id: tag2.id });
+    // Pre-load middle records (taggings) for post1 only
+    const p1 = (await Post.where({ title: "P1" }).includes("taggings").toArray())[0]!;
+    const p2 = (await Post.where({ title: "P2" }).toArray())[0]!;
+    // Preload tags for both posts. The through-preloader's tagging loader finds p1's key
     // already loaded (LoaderRecords merge path) and only queries DB for p2's taggings
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({ records: [p1, p2], associations: ["gatTags"] }).call();
+    await new Preloader({ records: [p1, p2], associations: ["tags"] }).call();
     // First call is for taggings: only p2's key goes to DB (p1's already loaded)
     const taggingKeys = spy.mock.calls[0]?.[0] as unknown[];
     expect(taggingKeys).toHaveLength(1);
-    expect((p1 as any)._preloadedAssociations.get("gatTags").map((t: any) => t.name)).toEqual([
+    expect((p1 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
       "ruby",
     ]);
-    expect((p2 as any)._preloadedAssociations.get("gatTags").map((t: any) => t.name)).toEqual([
+    expect((p2 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
       "rails",
     ]);
   });
@@ -1011,66 +906,44 @@ describe("PreloaderTest", () => {
     expect(bobComments).toEqual([]);
   });
   it("preload with through instance dependent scope", async () => {
-    class PWTISSAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PWTISSPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    class PWTISSComment extends Base {
-      static {
-        this._tableName = "comments";
-      }
-    }
-    registerModel("PWTISSAuthor", PWTISSAuthor);
-    registerModel("PWTISSPost", PWTISSPost);
-    registerModel("PWTISSComment", PWTISSComment);
-    Associations.hasMany.call(PWTISSAuthor, "pwtissPostsMentioning", {
-      className: "PWTISSPost",
-      foreignKey: "author_id",
-      scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
-    });
-    Associations.hasMany.call(PWTISSPost, "pwtissPostComments", {
-      className: "PWTISSComment",
-      foreignKey: "post_id",
-    });
-    Associations.hasMany.call(PWTISSAuthor, "pwtissCommentsOnPostsMentioning", {
-      className: "PWTISSComment",
-      through: "pwtissPostsMentioning",
-      source: "pwtissPostComments",
-    });
-
-    const david = await PWTISSAuthor.create({ name: "David" });
-    const david2 = await PWTISSAuthor.create({ name: "David" });
-    const bob = await PWTISSAuthor.create({ name: "Bob" });
-    const davidPost = await PWTISSPost.create({
+    const david = await Author.create({ name: "David" });
+    const david2 = await Author.create({ name: "David" });
+    const bob = await Author.create({ name: "Bob" });
+    const davidPost = await Post.create({
       author_id: david.id,
-      title: "Post 1",
-      body: "david",
+      title: "test post",
+      // Lowercased so the `postsMentioningAuthor` LIKE `%david%` scope matches
+      // regardless of the column collation (MariaDB CI uses a case-sensitive one).
+      body: "this post is about david",
     });
-    const bobPost = await PWTISSPost.create({ author_id: bob.id, title: "Post 3", body: "bob" });
-    await PWTISSPost.create({ author_id: david.id, title: "Post 2", body: "other" });
-    const comment1 = await PWTISSComment.create({ post_id: davidPost.id, body: "hi!" });
-    const comment2 = await PWTISSComment.create({ post_id: davidPost.id, body: "hello!" });
-    const comment3 = await PWTISSComment.create({ post_id: bobPost.id, body: "hi bob!" });
+    // Second david post also matches the body scope but has no comments.
+    await Post.create({
+      author_id: david.id,
+      title: "test post 2",
+      body: "this post is also about david",
+    });
+    const bobPost = await Post.create({
+      author_id: bob.id,
+      title: "test post 3",
+      body: "this post is about bob",
+    });
+    const comment1 = await Comment.create({ post_id: davidPost.id, body: "hi!" });
+    const comment2 = await Comment.create({ post_id: davidPost.id, body: "hello!" });
+    const comment3 = await Comment.create({ post_id: bobPost.id, body: "HI BOB!" });
 
     await new Preloader({
       records: [david, david2, bob],
-      associations: ["pwtissCommentsOnPostsMentioning"],
+      associations: ["commentsOnPostsMentioningAuthor"],
     }).call();
 
     const davidComments = (david as any)._preloadedAssociations.get(
-      "pwtissCommentsOnPostsMentioning",
+      "commentsOnPostsMentioningAuthor",
     ) as any[];
     const david2Comments = (david2 as any)._preloadedAssociations.get(
-      "pwtissCommentsOnPostsMentioning",
+      "commentsOnPostsMentioningAuthor",
     ) as any[];
     const bobComments = (bob as any)._preloadedAssociations.get(
-      "pwtissCommentsOnPostsMentioning",
+      "commentsOnPostsMentioningAuthor",
     ) as any[];
 
     expect(davidComments.map((c: any) => c.id).sort()).toEqual([comment1.id, comment2.id].sort());
@@ -1109,49 +982,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload through", async () => {
-    class PTTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PTTagging extends Base {
-      static {
-        this.attribute("pt_post_id", "integer");
-        this.attribute("pt_tag_id", "integer");
-      }
-    }
-    class PTPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(PTPost, "ptTaggings", {
-      className: "PTTagging",
-      foreignKey: "pt_post_id",
-    });
+    const post = await Post.create({ title: "Hello", body: "body" });
+    const tag1 = await Tag.create({ name: "ruby" });
+    const tag2 = await Tag.create({ name: "rails" });
+    await Tagging.create({ taggable_id: post.id, taggable_type: "Post", tag_id: tag1.id });
+    await Tagging.create({ taggable_id: post.id, taggable_type: "Post", tag_id: tag2.id });
 
-    Associations.hasMany.call(PTPost, "ptTags", {
-      through: "ptTaggings",
-      source: "ptTag",
-      className: "PTTag",
-    });
-    Associations.belongsTo.call(PTTagging, "ptTag", {
-      className: "PTTag",
-      foreignKey: "pt_tag_id",
-    });
-    registerModel("PTTag", PTTag);
-    registerModel("PTTagging", PTTagging);
-    registerModel("PTPost", PTPost);
-
-    const post = await PTPost.create({ title: "Hello" });
-    const tag1 = await PTTag.create({ name: "ruby" });
-    const tag2 = await PTTag.create({ name: "rails" });
-    await PTTagging.create({ pt_post_id: post.id, pt_tag_id: tag1.id });
-    await PTTagging.create({ pt_post_id: post.id, pt_tag_id: tag2.id });
-
-    const posts = await PTPost.all().includes("ptTaggings").toArray();
+    const posts = await Post.where({ id: post.id }).includes("taggings").toArray();
     expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any)._preloadedAssociations.get("ptTaggings");
+    const preloaded = (posts[0] as any)._preloadedAssociations.get("taggings");
     expect(preloaded).toHaveLength(2);
   });
 
@@ -1319,209 +1158,71 @@ describe("PreloaderTest", () => {
     expect(spy).not.toHaveBeenCalled();
   });
   it("preload can group separate levels", async () => {
-    class SLAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class SLPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("sl_author_id", "integer");
-      }
-    }
-    class SLAuthorFavorite extends Base {
-      static {
-        this.attribute("sl_author_id", "integer");
-        this.attribute("sl_favorite_author_id", "integer");
-      }
-    }
-    Associations.hasMany.call(SLAuthor, "slPosts", {
-      className: "SLPost",
-      foreignKey: "sl_author_id",
-    });
-    Associations.hasMany.call(SLAuthor, "slAuthorFavorites", {
-      className: "SLAuthorFavorite",
-      foreignKey: "sl_author_id",
-    });
-    Associations.hasMany.call(SLAuthor, "slFavoriteAuthors", {
-      through: "slAuthorFavorites",
-      source: "slFavoriteAuthor",
-      className: "SLAuthor",
-    });
-    Associations.belongsTo.call(SLAuthorFavorite, "slFavoriteAuthor", {
-      className: "SLAuthor",
-      foreignKey: "sl_favorite_author_id",
-    });
-    registerModel("SLAuthor", SLAuthor);
-    registerModel("SLPost", SLPost);
-    registerModel("SLAuthorFavorite", SLAuthorFavorite);
-    const mary = await SLAuthor.create({ name: "Mary" });
-    const bob = await SLAuthor.create({ name: "Bob" });
-    await SLAuthorFavorite.create({ sl_author_id: mary.id, sl_favorite_author_id: bob.id });
-    await SLPost.create({ title: "M1", sl_author_id: mary.id });
-    await SLPost.create({ title: "B1", sl_author_id: bob.id });
+    const mary = await Author.create({ name: "Mary" });
+    const bob = await Author.create({ name: "Bob" });
+    await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
+    await Post.create({ title: "M1", body: "b", author_id: mary.id });
+    await Post.create({ title: "B1", body: "b", author_id: bob.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [mary],
-      associations: ["slPosts", { slFavoriteAuthors: "slPosts" }],
+      associations: ["posts", { favoriteAuthors: "posts" }],
     }).call();
-    // Rails: 3 queries. Through-target authors share the slAuthorFavorites
-    // load, and the two slPosts loaders (mary's + bob's) coalesce into one
+    // Rails: 3 queries. Through-target authors share the authorFavorites
+    // load, and the two posts loaders (mary's + bob's) coalesce into one
     // batched call.
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload can group multi level ping pong through", async () => {
-    // Rails' Author#similar_posts "ping pongs" back to posts:
+    // Author#similarPosts "ping pongs" back to posts:
     //   Author → posts → taggings → tags  (has_many :tags, through: :posts)
-    //   Tag    → taggings → taggable(Post) (has_many :tagged_posts, source_type)
-    //   Author → tags → tagged_posts       (has_many :similar_posts)
-    // and favorite_authors loops the same chain a level down. We rebuild that
-    // graph with a `PP` prefix so the preloader has to coalesce the repeated
-    // posts/comments levels across both branches.
-    class PPAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PPPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("pp_author_id", "integer");
-      }
-    }
-    class PPTagging extends Base {
-      static {
-        this.attribute("pp_tag_id", "integer");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-      }
-    }
-    class PPTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PPComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("pp_post_id", "integer");
-      }
-    }
-    class PPAuthorFavorite extends Base {
-      static {
-        this.attribute("pp_author_id", "integer");
-        this.attribute("pp_favorite_author_id", "integer");
-      }
-    }
-    Associations.hasMany.call(PPAuthor, "ppPosts", {
-      className: "PPPost",
-      foreignKey: "pp_author_id",
-    });
-    Associations.hasMany.call(PPPost, "ppTaggings", {
-      className: "PPTagging",
-      as: "taggable",
-    });
-    Associations.belongsTo.call(PPTagging, "ppTag", {
-      className: "PPTag",
-      foreignKey: "pp_tag_id",
-    });
-    Associations.belongsTo.call(PPTagging, "taggable", { polymorphic: true });
-    Associations.hasMany.call(PPPost, "ppTags", {
-      className: "PPTag",
-      through: "ppTaggings",
-      source: "ppTag",
-    });
-    Associations.hasMany.call(PPPost, "ppComments", {
-      className: "PPComment",
-      foreignKey: "pp_post_id",
-    });
-    Associations.hasMany.call(PPAuthor, "ppTags", {
-      className: "PPTag",
-      through: "ppPosts",
-      source: "ppTags",
-    });
-    Associations.hasMany.call(PPTag, "ppTaggings", {
-      className: "PPTagging",
-      foreignKey: "pp_tag_id",
-    });
-    Associations.hasMany.call(PPTag, "ppTaggedPosts", {
-      className: "PPPost",
-      through: "ppTaggings",
-      source: "taggable",
-      sourceType: "PPPost",
-    });
-    Associations.hasMany.call(PPAuthor, "ppSimilarPosts", {
-      className: "PPPost",
-      through: "ppTags",
-      source: "ppTaggedPosts",
-      scope: (rel: any) => rel.distinct(),
-    });
-    Associations.hasMany.call(PPAuthor, "ppAuthorFavorites", {
-      className: "PPAuthorFavorite",
-      foreignKey: "pp_author_id",
-    });
-    Associations.belongsTo.call(PPAuthorFavorite, "ppFavoriteAuthor", {
-      className: "PPAuthor",
-      foreignKey: "pp_favorite_author_id",
-    });
-    Associations.hasMany.call(PPAuthor, "ppFavoriteAuthors", {
-      className: "PPAuthor",
-      through: "ppAuthorFavorites",
-      source: "ppFavoriteAuthor",
-      scope: (rel: any) => rel.order("name"),
-    });
-    registerModel("PPAuthor", PPAuthor);
-    registerModel("PPPost", PPPost);
-    registerModel("PPTagging", PPTagging);
-    registerModel("PPTag", PPTag);
-    registerModel("PPComment", PPComment);
-    registerModel("PPAuthorFavorite", PPAuthorFavorite);
-
-    const mary = await PPAuthor.create({ name: "Mary" });
-    const bob = await PPAuthor.create({ name: "Bob" });
-    await PPAuthorFavorite.create({ pp_author_id: mary.id, pp_favorite_author_id: bob.id });
-    const maryPost = await PPPost.create({ title: "M1", pp_author_id: mary.id });
-    const bobPost = await PPPost.create({ title: "B1", pp_author_id: bob.id });
-    const tag = await PPTag.create({ name: "ruby" });
-    await PPTagging.create({
-      pp_tag_id: tag.id,
+    //   Tag    → taggings → taggable(Post) (has_many :taggedPosts, source_type)
+    //   Author → tags → taggedPosts        (has_many :similarPosts)
+    // and favoriteAuthors loops the same chain a level down, so the preloader
+    // has to coalesce the repeated posts/comments levels across both branches.
+    const mary = await Author.create({ name: "Mary" });
+    const bob = await Author.create({ name: "Bob" });
+    await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
+    const maryPost = await Post.create({ title: "M1", body: "b", author_id: mary.id });
+    const bobPost = await Post.create({ title: "B1", body: "b", author_id: bob.id });
+    const tag = await Tag.create({ name: "ruby" });
+    await Tagging.create({
+      tag_id: tag.id,
       taggable_id: maryPost.id,
-      taggable_type: "PPPost",
+      taggable_type: "Post",
     });
-    await PPTagging.create({ pp_tag_id: tag.id, taggable_id: bobPost.id, taggable_type: "PPPost" });
-    await PPComment.create({ body: "on mary post", pp_post_id: maryPost.id });
-    await PPComment.create({ body: "on bob post", pp_post_id: bobPost.id });
+    await Tagging.create({ tag_id: tag.id, taggable_id: bobPost.id, taggable_type: "Post" });
+    await Comment.create({ body: "on mary post", post_id: maryPost.id });
+    await Comment.create({ body: "on bob post", post_id: bobPost.id });
 
     const associations = [
-      { ppSimilarPosts: "ppComments" },
-      { ppFavoriteAuthors: { ppSimilarPosts: "ppComments" } },
+      { similarPosts: "comments" },
+      { favoriteAuthors: { similarPosts: "comments" } },
     ];
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({ records: [mary], associations }).call();
-    // Both branches walk the same posts→taggings→tags→tagged_posts→comments
-    // levels, so the preloader coalesces them into 8 batched loads rather than
-    // re-querying each branch independently. (Rails counts 9 SQL queries for
-    // its richer fixture graph, then 8 once automatic scope inversing lets the
-    // tag/tagging step reuse its inverse — trails' preloader already coalesces
-    // to that floor.)
+    // Both branches walk the same posts→taggings→tags→taggedPosts→comments
+    // levels, so the preloader coalesces them rather than re-querying each
+    // branch independently. Rails' `assert_queries_count(9)` — the count drops
+    // to 8 only with automatic scope inversing (Tagging#tag's `includes(:tagging)`
+    // scope reusing its inverse), which this test doesn't enable.
     const preloadCalls = spy.mock.calls.length;
-    expect(preloadCalls).toBe(8);
+    expect(preloadCalls).toBe(9);
 
     // assert_no_queries: every level is now preloaded, so re-walking the whole
     // ping-pong chain reads from the cache without issuing further loads.
-    const marySimilar = (mary as any)._preloadedAssociations.get("ppSimilarPosts");
+    const marySimilar = (mary as any)._preloadedAssociations.get("similarPosts");
     expect(marySimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
     for (const post of marySimilar) {
-      expect(post._preloadedAssociations.get("ppComments").length).toBe(1);
+      expect(post._preloadedAssociations.get("comments").length).toBe(1);
     }
-    const maryFavs = (mary as any)._preloadedAssociations.get("ppFavoriteAuthors");
+    const maryFavs = (mary as any)._preloadedAssociations.get("favoriteAuthors");
     expect(maryFavs.map((a: any) => a.id)).toEqual([bob.id]);
-    const bobSimilar = (maryFavs[0] as any)._preloadedAssociations.get("ppSimilarPosts");
+    const bobSimilar = (maryFavs[0] as any)._preloadedAssociations.get("similarPosts");
     expect(bobSimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
     for (const post of bobSimilar) {
-      expect(post._preloadedAssociations.get("ppComments").length).toBe(1);
+      expect(post._preloadedAssociations.get("comments").length).toBe(1);
     }
     // Walking the cached graph above triggered no new batched loads.
     expect(spy.mock.calls.length).toBe(preloadCalls);
