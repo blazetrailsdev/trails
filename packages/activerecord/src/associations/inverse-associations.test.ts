@@ -173,28 +173,17 @@ describe("AutomaticInverseFindingTests", () => {
   it("has one and belongs to with non default foreign key should not find inverse automatically", async () => {
     const user = await User.create({});
     const ownedRoom = await Room.create({ owner_id: (user as any).id });
-    const getterSrc = Object.getOwnPropertyDescriptor((User as any).prototype, "room")
-      ?.get?.toString()
-      .slice(0, 80);
-    const preloadedHas = (user as any)._preloadedAssociations?.has("room");
-    const preloadedVal = (user as any)._preloadedAssociations?.get("room");
-    const assocInst = (user as any)._associationInstances?.get("room");
-
-    console.error("DIAG user.room getter:", getterSrc);
+    const ownRoomDesc = Object.getOwnPropertyDescriptor(user, "room");
+    const userAssocFnSrc =
+      typeof (user as any).association === "function"
+        ? (user as any).association.toString().slice(0, 60)
+        : String((user as any).association);
 
     console.error(
-      "DIAG user preloaded room:",
-      preloadedHas,
-      typeof preloadedVal,
-      String(preloadedVal),
+      "DIAG user own room prop:",
+      ownRoomDesc ? `val=${String(ownRoomDesc.value)} get=${String(ownRoomDesc.get)}` : "none",
     );
-
-    console.error(
-      "DIAG user assocInst room:",
-      typeof assocInst,
-      assocInst?.target?.constructor?.name,
-      String(assocInst?.target),
-    );
+    console.error("DIAG user.association fn:", userAssocFnSrc);
     const roomVal = (user as any).room;
 
     console.error("DIAG room:", typeof roomVal, roomVal?.constructor?.name, String(roomVal));
