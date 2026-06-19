@@ -12,13 +12,25 @@
  */
 
 import { Entry } from "./entry.js";
-import { Store } from "./index.js";
+import { Store, DeserializationError } from "./index.js";
 import { coder } from "./coder.js";
 import { deflate, inflate } from "../gzip.js";
 import { CacheSerializer } from "../message-pack/cache-serializer.js";
 
 // Singleton used by message_pack serializer.
 const messagePack = new CacheSerializer();
+
+// Mirrors Rails SerializerWithFallback#marshal_load: deserializes via the
+// fidelity coder (trails' Marshal-equivalent) and converts parse errors to
+// Cache::DeserializationError (same rescue-ArgumentError pattern as Rails).
+/** @internal */
+function marshalLoad(payload: string): unknown {
+  try {
+    return coder.load(payload);
+  } catch (error) {
+    throw new DeserializationError(error instanceof Error ? error.message : String(error));
+  }
+}
 
 /** Thrown by `SerializerWithFallback.get` on unknown format. @internal */
 export class KeyError extends Error {
@@ -34,6 +46,8 @@ export interface Serializer {
   dumpCompressed?(entry: Entry, threshold: number): string | Entry;
   _load(dumped: string | Entry): unknown;
   dumped(dumped: unknown): boolean;
+  /** @internal */
+  isAvailable?(): boolean;
 }
 
 // Rails marshal_7_0 mark bytes (\x00 uncompressed, \x01 compressed).
@@ -83,7 +97,7 @@ const marshal70WithFallback: Serializer = {
     const compressed = s[0] === MARK_COMPRESSED;
     const rest = s.slice(1);
     const payload = compressed ? inflate(rest) : rest;
-    return Entry.unpack(coder.load(payload) as unknown[]);
+    return Entry.unpack(marshalLoad(payload) as unknown[]);
   },
 
   dumped(dumped: unknown): boolean {
@@ -100,7 +114,7 @@ const marshal71WithFallback: Serializer = {
   },
 
   _load(dumped: string | Entry): unknown {
-    return coder.load((dumped as string).slice(MARSHAL_SIGNATURE.length));
+    return marshalLoad((dumped as string).slice(MARSHAL_SIGNATURE.length));
   },
 
   dumped(dumped: unknown): boolean {
@@ -124,6 +138,12 @@ const messagePackWithFallback: Serializer = {
     return (
       typeof dumped === "string" && dumped.charCodeAt(0) === 0xcc && dumped.charCodeAt(1) === 0x80
     );
+  },
+
+  // Mirrors Rails MessagePackWithFallback#available?: message_pack is a
+  // bundled dep in trails, so this always returns true (no dynamic require).
+  isAvailable(): boolean {
+    return true;
   },
 };
 
@@ -159,6 +179,10 @@ function sharedLoad(dumped: unknown): unknown {
 /** Mirrors Rails `ActiveSupport::Cache::SerializerWithFallback`. @internal */
 export const SerializerWithFallback = {
   SERIALIZERS,
+
+  load: sharedLoad,
+
+  marshalLoad,
 
   get(format: string): Serializer & { load(dumped: unknown): unknown } {
     const s = SERIALIZERS[format];
