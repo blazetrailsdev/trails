@@ -1599,34 +1599,47 @@ describe("PreloaderTest", () => {
   it("preload loaded belongs to association with composite foreign key", async () => {
     const blog = await ShardedBlogPL.create({ name: "Blog" });
     const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
-    await ShardedCommentPL.create({ blog_id: blog.id, blog_post_id: bp1.id, body: "C1" });
-
-    const comments = await ShardedCommentPL.all().toArray();
-    await loadBelongsTo(comments[0], "blogPost", {
-      className: "ShardedBlogPost",
-      foreignKey: ["blog_id", "blog_post_id"],
+    const comment = await ShardedCommentPL.create({
+      blog_id: blog.id,
+      blog_post_id: bp1.id,
+      body: "C1",
     });
 
-    // Now run preload — should reuse the already-loaded record, not crash.
-    const reloaded = await ShardedCommentPL.all().includes("blogPost").toArray();
-    expect(reloaded).toHaveLength(1);
-    const preloaded = (reloaded[0] as any)._preloadedAssociations.get("blogPost");
-    expect(preloaded).toBeDefined();
-    expect(preloaded.title).toBe("Post1");
+    // Load the blogPost on the comment instance first (warms the association cache).
+    await loadBelongsTo(comment, "blogPost", { className: "ShardedBlogPost" });
+
+    // Preloading on the already-loaded record must not fire any SQL queries
+    // (mirrors Rails' assert_no_queries block).
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [comment], associations: ["blogPost"] }).call();
+    });
+    expect(sqls).toHaveLength(0);
   });
 
   it("preload has many through association with composite query constraints", async () => {
     const blog = await ShardedBlogPL.create({ name: "Blog" });
+    const blog2 = await ShardedBlogPL.create({ name: "Blog2" });
     const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
+    await ShardedBlogPostPL.create({ blog_id: blog2.id, title: "Post2" });
     const tag = await ShardedTagPL.create({ blog_id: blog.id, name: "Tag1" });
+    const tag2 = await ShardedTagPL.create({ blog_id: blog2.id, name: "Tag2" });
     await ShardedBlogPostTagPL.create({ blog_id: blog.id, blog_post_id: bp1.id, tag_id: tag.id });
 
     const tags = await ShardedTagPL.all().includes("blogPosts").toArray();
-    expect(tags).toHaveLength(1);
-    expect(tags[0].association("blogPosts").isLoaded()).toBe(true);
-    const preloaded = (tags[0] as any)._preloadedAssociations.get("blogPosts");
-    expect(preloaded).toHaveLength(1);
-    expect(preloaded[0].title).toBe("Post1");
+    expect(tags).toHaveLength(2);
+    expect(tags.every((t) => t.association("blogPosts").isLoaded())).toBe(true);
+
+    const tag1 = tags.find((t) => (t as any).name === "Tag1")!;
+    const expectedBlogPostIds = await ShardedBlogPostTagPL.where(
+      "blog_id = ? AND tag_id = ?",
+      blog.id,
+      tag.id,
+    )
+      .toArray()
+      .then((rows) => rows.map((r) => (r as any).blog_post_id).sort());
+    expect(expectedBlogPostIds).not.toHaveLength(0);
+    const preloaded = (tag1 as any)._preloadedAssociations.get("blogPosts");
+    expect(preloaded.map((p: any) => p.id).sort()).toEqual(expectedBlogPostIds);
   });
 
   it("preloads has many on model with a composite primary key through id attribute", async () => {
