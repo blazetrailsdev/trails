@@ -427,6 +427,7 @@ describe("PreloaderTest", () => {
       cpk_orders: canonicalSchema.cpk_orders,
       cpk_order_agreements: canonicalSchema.cpk_order_agreements,
       dogs: canonicalSchema.dogs,
+      author_addresses: canonicalSchema.author_addresses,
     });
   });
 
@@ -460,10 +461,13 @@ describe("PreloaderTest", () => {
   let Dog: typeof Base;
   let EssaySpecial: typeof Base;
   let PostesquePL: typeof Base;
+  let AuthorAddress: typeof Base;
 
   beforeAll(async () => {
-    Author = (await import("./test-helpers/models/author.js")).Author as never;
-    AuthorFavorite = (await import("./test-helpers/models/author.js")).AuthorFavorite as never;
+    const authorMod = await import("./test-helpers/models/author.js");
+    Author = authorMod.Author as never;
+    AuthorFavorite = authorMod.AuthorFavorite as never;
+    AuthorAddress = authorMod.AuthorAddress as never;
     const postMod = await import("./test-helpers/models/post.js");
     Post = postMod.Post as never;
     CategoryPost = postMod.CategoryPost as never;
@@ -525,6 +529,7 @@ describe("PreloaderTest", () => {
     registerModel("Dog", Dog);
     registerModel("EssaySpecial", EssaySpecial);
     registerModel("Postesque", PostesquePL);
+    registerModel("AuthorAddress", AuthorAddress);
   });
 
   it("preload with scope", async () => {
@@ -992,17 +997,31 @@ describe("PreloaderTest", () => {
     expect(spy.mock.calls.length).toBe(preloadCalls);
   });
   it("preload does not group same class different scope", async () => {
-    // Post#authorWithTheLetterA has scope `name LIKE '%a%'`; Postesque#authorWithTheLetterA
-    // has no scope — same association name, different SQL → must NOT coalesce.
     const alice = await Author.create({ name: "Alice" });
     const post = await Post.create({ title: "P1", body: "body", author_id: alice.id });
     const postesque = await PostesquePL.create({ author_id: alice.id, author_name: alice.name });
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+
+    // Sub-scenario 1: scopes differ in generated SQL.
+    // Post#authorWithTheLetterA has `name LIKE '%a%'`; Postesque#authorWithTheLetterA has none.
+    let spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [post, postesque],
       associations: ["authorWithTheLetterA"],
     }).call();
     expect(spy).toHaveBeenCalledTimes(2);
+
+    (post as any)._resetAssociationCaches();
+    (postesque as any)._resetAssociationCaches();
+
+    // Sub-scenario 2: SQL is identical but Post#authorWithAddress carries a preload value
+    // (includes authorAddress) while Postesque#authorWithAddress does not — the preload
+    // difference still prevents coalescing, and the address load adds a third query.
+    spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({
+      records: [post, postesque],
+      associations: ["authorWithAddress"],
+    }).call();
+    expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload does not group same scope different key name", async () => {
     // Mirrors Rails Postesque.belongs_to :author, foreign_key: :author_name, primary_key: :name.
