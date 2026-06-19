@@ -973,12 +973,7 @@ describe("InverseBelongsToTests", () => {
     expect(err.corrections[0]).toBe("confusedFace");
   });
 
-  it.skip("building has many parent association inverses one record", async () => {
-    // Tracked: build-human-inverses-has-many. The fixture-id collision is fixed
-    // (SingularAssociation#scopeForCreate now strips the klass PK), so this no
-    // longer raises `UNIQUE constraint failed: humans.id`. It still fails on a
-    // separate gap: under has_many_inversing, `build_human` does not wire the
-    // inverse has_many, so `human.interests.size` is 0 (expected 1).
+  it("building has many parent association inverses one record", async () => {
     await withHasManyInversing(Interest, async () => {
       const interest = new Interest();
       (interest as any).buildHuman();

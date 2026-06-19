@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { resolveModel } from "../associations.js";
+import { resolveModel, association as associationProxy } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { ScopeRegistry } from "../scoping.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
@@ -222,7 +222,21 @@ export class Association {
   setInverseInstance(record: Base): Base {
     const inverse = this.inverseAssociationFor(record);
     if (inverse) {
-      inverse.inversedFrom(this.owner);
+      if (inverse.isCollection()) {
+        // The CollectionProxy — not the holder's plain `target` array — is the
+        // canonical has_many store (`Base#_associationCache`). Route the inverse
+        // write through the proxy's `_wireInverseTarget` so a belongs_to build
+        // under `has_many_inversing` folds the owner into the parent's
+        // collection where readers (`size()`/`load()`) see it. The
+        // `has_many_inversing` / FK gate has already passed via
+        // `inverseAssociationFor` → `isInvertibleFor`.
+        const proxy = associationProxy(record, inverse.reflection.name) as unknown as {
+          _wireInverseTarget: (r: Base) => void;
+        };
+        proxy._wireInverseTarget(this.owner);
+      } else {
+        inverse.inversedFrom(this.owner);
+      }
     }
     return record;
   }
