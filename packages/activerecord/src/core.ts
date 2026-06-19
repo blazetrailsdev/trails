@@ -101,7 +101,10 @@ export async function prettyPrint(
   pp: PrettyPrinter,
 ): Promise<void> {
   if (isCustomInspectMethodDefined.call(this)) {
-    pp.text(inspect.call(this));
+    // Rails returns `super` here, so Ruby PP renders the record's own
+    // (overridden) `inspect`. Dispatch dynamically rather than calling the
+    // core `inspect` helper, so a model that overrides `inspect` is honored.
+    pp.text((this as unknown as { inspect(): string }).inspect());
     return;
   }
   await pp.objectAddressGroup(this as object, async () => {
