@@ -69,9 +69,9 @@ export class Association {
 
   /**
    * Resolve the target class name eagerly — mirrors the Rails path
-   * `check_validity! → klass → compute_class` (association.rb:56-58).
-   * Called from the constructor so `record.association(:name)` raises
-   * synchronously for unknown classes. Skipped for polymorphic, through,
+   * `check_validity!` (association.rb:42) → `klass` → `compute_class`
+   * (reflection.rb). Called from the constructor so `record.association(:name)`
+   * raises synchronously for unknown classes. Skipped for polymorphic, through,
    * and anonymous-class associations (HABTM join model side).
    */
   protected checkKlass(): void {
