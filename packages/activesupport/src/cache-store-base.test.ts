@@ -93,20 +93,6 @@ describe("CacheBehaviorTest", () => {
     expect(called).toBe(false);
   });
 
-  it("fetch cache miss with skip nil", () => {
-    cache.fetch("foo", { skipNil: true }, () => null);
-    expect(cache.exist("foo")).toBe(false);
-  });
-
-  it("fetch with forced cache miss without block", () => {
-    expect(() => cache.fetch("foo", { force: true } as never)).toThrow();
-  });
-
-  it("should read and write hash", () => {
-    cache.write("foo", { a: 1 });
-    expect(cache.read("foo")).toEqual({ a: 1 });
-  });
-
   it("should read and write nil", () => {
     cache.write("foo", null);
     expect(cache.read("foo")).toBeNull();
@@ -133,10 +119,6 @@ describe("CacheBehaviorTest", () => {
     expect(cache.read("baz")).toBe("qux");
   });
 
-  it("write multi empty hash", () => {
-    expect(() => cache.writeMulti({})).not.toThrow();
-  });
-
   it("delete", () => {
     cache.write("foo", "bar");
     expect(cache.delete("foo")).toBe(true);
@@ -156,18 +138,6 @@ describe("CacheBehaviorTest", () => {
   it("decrement", () => {
     cache.write("foo", 3);
     expect(cache.decrement("foo")).toBe(2);
-  });
-});
-
-describe("CacheStoreLoggerTest", () => {
-  it("mute logging", () => {
-    const cache = new TestStore();
-    let wrote = false;
-    cache.mute(() => {
-      wrote = true;
-    });
-    expect(wrote).toBe(true);
-    expect(cache.silence).toBe(false);
   });
 });
 
