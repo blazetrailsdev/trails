@@ -604,9 +604,6 @@ describe("PreloaderTest", () => {
       pt_posts: { title: "string" },
       pt_taggings: { pt_post_id: "integer", pt_tag_id: "integer" },
       pt_tags: { name: "string" },
-      pwtiss_authors: { name: "string" },
-      pwtiss_comments: { pwtiss_post_id: "integer" },
-      pwtiss_posts: { mention: "string", pwtiss_author_id: "integer" },
       sl_author_favorites: { sl_author_id: "integer", sl_favorite_author_id: "integer" },
       sl_authors: { name: "string" },
       sl_posts: { sl_author_id: "integer", title: "string" },
@@ -932,14 +929,14 @@ describe("PreloaderTest", () => {
     Associations.hasMany.call(PIDSAuthor, "pidsPostsMentioning", {
       className: "PIDSPost",
       foreignKey: "author_id",
-      scope: (_rel: any, owner: any) => _rel.where({ title: owner.name.toLowerCase() }),
+      scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
     });
 
     const david = await PIDSAuthor.create({ name: "David" });
     const david2 = await PIDSAuthor.create({ name: "David" });
     const bob = await PIDSAuthor.create({ name: "Bob" });
-    const post1 = await PIDSPost.create({ author_id: david.id, title: "david", body: "body" });
-    const post2 = await PIDSPost.create({ author_id: david.id, title: "david", body: "body" });
+    const post1 = await PIDSPost.create({ author_id: david.id, title: "Post 1", body: "david" });
+    const post2 = await PIDSPost.create({ author_id: david.id, title: "Post 2", body: "david" });
 
     await new Preloader({
       records: [david, david2, bob],
@@ -981,7 +978,6 @@ describe("PreloaderTest", () => {
       className: "PWITSComment",
       foreignKey: "post_id",
     });
-    // Instance-dependent scope on through association: filter comments by body == owner.name
     Associations.hasMany.call(PWITSAuthor, "pwitsCommentsMentioning", {
       className: "PWITSComment",
       through: "pwitsAuthorPosts",
@@ -1016,34 +1012,31 @@ describe("PreloaderTest", () => {
   it("preload with through instance dependent scope", async () => {
     class PWTISSAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PWTISSPost extends Base {
       static {
-        this.attribute("pwtiss_author_id", "integer");
-        this.attribute("mention", "string");
+        this._tableName = "posts";
       }
     }
     class PWTISSComment extends Base {
       static {
-        this.attribute("pwtiss_post_id", "integer");
+        this._tableName = "comments";
       }
     }
     registerModel("PWTISSAuthor", PWTISSAuthor);
     registerModel("PWTISSPost", PWTISSPost);
     registerModel("PWTISSComment", PWTISSComment);
-    // posts_mentioning_author: instance-dependent — filter posts where mention == owner.name
     Associations.hasMany.call(PWTISSAuthor, "pwtissPostsMentioning", {
       className: "PWTISSPost",
-      foreignKey: "pwtiss_author_id",
-      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
+      foreignKey: "author_id",
+      scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
     });
     Associations.hasMany.call(PWTISSPost, "pwtissPostComments", {
       className: "PWTISSComment",
-      foreignKey: "pwtiss_post_id",
+      foreignKey: "post_id",
     });
-    // through the instance-dependent pwtissPostsMentioning
     Associations.hasMany.call(PWTISSAuthor, "pwtissCommentsOnPostsMentioning", {
       className: "PWTISSComment",
       through: "pwtissPostsMentioning",
@@ -1053,13 +1046,16 @@ describe("PreloaderTest", () => {
     const david = await PWTISSAuthor.create({ name: "David" });
     const david2 = await PWTISSAuthor.create({ name: "David" });
     const bob = await PWTISSAuthor.create({ name: "Bob" });
-    const davidPost = await PWTISSPost.create({ pwtiss_author_id: david.id, mention: "david" });
-    const bobPost = await PWTISSPost.create({ pwtiss_author_id: bob.id, mention: "bob" });
-    // Non-mentioning post by david — should NOT be in through since filtered
-    await PWTISSPost.create({ pwtiss_author_id: david.id, mention: "other" });
-    const comment1 = await PWTISSComment.create({ pwtiss_post_id: davidPost.id });
-    const comment2 = await PWTISSComment.create({ pwtiss_post_id: davidPost.id });
-    const comment3 = await PWTISSComment.create({ pwtiss_post_id: bobPost.id });
+    const davidPost = await PWTISSPost.create({
+      author_id: david.id,
+      title: "Post 1",
+      body: "david",
+    });
+    const bobPost = await PWTISSPost.create({ author_id: bob.id, title: "Post 3", body: "bob" });
+    await PWTISSPost.create({ author_id: david.id, title: "Post 2", body: "other" });
+    const comment1 = await PWTISSComment.create({ post_id: davidPost.id, body: "hi!" });
+    const comment2 = await PWTISSComment.create({ post_id: davidPost.id, body: "hello!" });
+    const comment3 = await PWTISSComment.create({ post_id: bobPost.id, body: "hi bob!" });
 
     await new Preloader({
       records: [david, david2, bob],
