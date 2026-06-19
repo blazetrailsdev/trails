@@ -233,6 +233,32 @@ describe("DelegationTest", () => {
   // JS has no blocking IO — is async: invoking it loads the records itself
   // (mirroring Rails' `records` → `load`), then splits them. `partition`
   // returns `[matched, unmatched]` preserving order.
+  // Mirrors Rails' DelegationWhitelistBlacklistTests sweep:
+  // `assert_respond_to target, method` for every entry in ARRAY_DELEGATES.
+  // In Rails every array/Enumerable method is always present on an unloaded
+  // relation/proxy because `method_missing` delegates to `records`, which
+  // forces a load. JS has no blocking IO, so unloaded targets return an async
+  // callable that loads first — but `typeof` still reports "function".
+  const DELEGATED_ARRAY_METHODS = [
+    "forEach",
+    "join",
+    "reverse",
+    "slice",
+    "at",
+    "indexOf",
+    "lastIndexOf",
+    "concat",
+    "map",
+    "filter",
+    "find",
+    "some",
+    "every",
+    "includes",
+    "reduce",
+    "sort",
+    "flatMap",
+  ] as const;
+
   describe("DelegationAssociationTest", () => {
     it("delegates partition to Array", async () => {
       const post = await Post.first();
@@ -258,6 +284,30 @@ describe("DelegationTest", () => {
         records.filter((c: any) => c.id !== someId).map((c: any) => c.id),
       );
     });
+
+    for (const method of DELEGATED_ARRAY_METHODS) {
+      it(`test_delegates_${method}_to_Array`, async () => {
+        const post = await Post.first();
+        const target = (post as any).comments;
+        // assert_respond_to: method is present on an *unloaded* proxy.
+        expect(target.loaded).toBe(false);
+        expect(typeof target[method]).toBe("function");
+      });
+    }
+
+    it("delegates sort to Array loading records on call", async () => {
+      const post = await Post.first();
+      const target = (post as any).comments;
+      expect(target.loaded).toBe(false);
+      // Calling sort on an unloaded proxy loads the association and returns
+      // a sorted copy — mirrors Rails' records → load_target → Array#sort.
+      const sorted = await target.sort((a: any, b: any) => a.id - b.id);
+      expect(target.loaded).toBe(true);
+      expect(Array.isArray(sorted)).toBe(true);
+      expect(sorted.length).toBeGreaterThan(0);
+      const ids = sorted.map((c: any) => c.id);
+      expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    });
   }); // DelegationAssociationTest
 
   describe("DelegationRelationTest", () => {
@@ -278,6 +328,24 @@ describe("DelegationTest", () => {
       expect(unmatched.map((c: any) => c.id)).toEqual(
         records.filter((c: any) => c.id !== someId).map((c: any) => c.id),
       );
+    });
+
+    for (const method of DELEGATED_ARRAY_METHODS) {
+      it(`test_delegates_${method}_to_Array`, () => {
+        const target = Comment.all();
+        // assert_respond_to: method is present on an *unloaded* relation.
+        expect(typeof (target as any)[method]).toBe("function");
+      });
+    }
+
+    it("delegates sort to Array loading records on call", async () => {
+      const target = Comment.all();
+      // sort on an unloaded relation loads via toArray() and returns a sorted copy.
+      const sorted = await (target as any).sort((a: any, b: any) => a.id - b.id);
+      expect(Array.isArray(sorted)).toBe(true);
+      expect(sorted.length).toBeGreaterThan(0);
+      const ids = sorted.map((c: any) => c.id);
+      expect(ids).toEqual([...ids].sort((a, b) => a - b));
     });
   }); // DelegationRelationTest
 });
