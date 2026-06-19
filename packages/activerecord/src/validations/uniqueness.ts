@@ -44,6 +44,12 @@ export function validatesUniqueness(
     message?: string;
     conditions?: (this: any) => any;
     caseSensitive?: boolean;
+    // Context-guard keys honored by Base#_runAsyncValidations (it re-applies
+    // the on:/if:/unless: intersection that the sync callback chain installs).
+    on?: string | string[];
+    if?: unknown;
+    unless?: unknown;
+    strict?: boolean;
   } = {},
 ): void {
   // Validate options eagerly to match Rails' ArgumentError at declaration time.
