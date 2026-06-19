@@ -149,6 +149,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // replaced on the in-memory target. `replace_on_target` consults it to
   // dedup by identity rather than appending the same record twice.
   private _replacedOrAddedTargets = new Set<T>();
+  // The JS Proxy wrapper returned by association() — methods that return
+  // `self` (push / concat / append) hand this back so callers get the same
+  // object they hold, since `this` is the raw target, not the wrapper.
+  private _proxySelf?: this;
   // Flag flipped by ANY post-ctor bang-style mutation on the inherited
   // Relation state (whereBang / orderBang / reorderBang / regroupBang /
   // reverseOrderBang / rewhereBang / limitBang / offsetBang / ... — all
@@ -1565,13 +1569,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<<
    */
-  async push(...records: T[]): Promise<void> {
+  async push(...records: T[]): Promise<this> {
     this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
     // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
-      return;
+      return this._proxySelf ?? this;
     }
 
     const ctor = this._record.constructor as typeof Base;
@@ -1649,6 +1653,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         this._record.isNewRecord() ? Promise.resolve(true) : insertRecord(record),
       );
     }
+    return this._proxySelf ?? this;
   }
 
   /**
@@ -2027,7 +2032,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Alias for push.
    */
-  async concat(...records: T[]): Promise<void> {
+  async concat(...records: T[]): Promise<this> {
     return this.push(...records);
   }
 
@@ -3267,7 +3272,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#append
    */
-  async append(...records: T[]): Promise<void> {
+  async append(...records: T[]): Promise<this> {
     return this.push(...records);
   }
 
