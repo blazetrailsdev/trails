@@ -891,9 +891,15 @@ export function buildWhereClause(
       const adapter = connectionFor((this as any)._modelClass);
       for (const [name, value] of Object.entries(namedBinds)) {
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const replacement = Array.isArray(value)
-          ? value.map((v) => adapter.quote(v)).join(", ")
-          : adapter.quote(value);
+        // A Relation bind inlines its SQL as a subquery rather than being
+        // quoted as a scalar — mirrors the `ActiveRecord::Relation === value`
+        // branch of Rails' `replace_bind_variable` (sanitization.rb:211-216),
+        // which `replace_named_bind_variables` delegates to per token.
+        const replacement = isRelationLike(value)
+          ? (value as { toSql(): string }).toSql()
+          : Array.isArray(value)
+            ? value.map((v) => adapter.quote(v)).join(", ")
+            : adapter.quote(value);
         // Named-bind substitution on a user-supplied SQL fragment, not an arel
         // AST — mirrors Rails `sanitize_sql` → `replace_named_bind_variables`
         // (sanitization.rb), which likewise `gsub`s `:name` tokens with quoted
@@ -1640,6 +1646,32 @@ export function buildCastValue(name: string, value: unknown): Attribute {
   return Attribute.withCastValue(name, value, new ValueType());
 }
 
+/**
+ * Normalize a bind value before handing it to `BoundSqlLiteral`. Mirrors the
+ * `ActiveRecord::Relation === value` branch of Rails' `build_bound_sql_literal`
+ * / `build_named_bound_sql_literal` (query_methods.rb): a Relation is inlined as
+ * `Arel.sql(value.to_sql)` so `where("id IN (?)", SomeRelation)` produces a
+ * subquery rather than reaching `visitBindValue`'s `quote()`. Arel nodes are
+ * rendered to SQL the same way (trails passes nodes here where Rails would not).
+ *
+ * NOTE: `buildBoundSqlLiteral` / `buildNamedBoundSqlLiteral` are not yet wired
+ * into `buildWhereClause` — trails' `where` still routes `?`/`:name` fragments
+ * through `sanitizeSqlArray` / the named-bind substitution loop above, where the
+ * same Relation handling lives. Converging `buildWhereClause` onto these
+ * `BoundSqlLiteral` builders (as Rails' `build_where_clause` does) is tracked by
+ * the `converge-build-where-clause-bound-sql-literal` story.
+ * @internal
+ */
+function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
+  if (value instanceof Nodes.Node) {
+    return arelSql(this._modelClass.connection.toSql(value));
+  }
+  if (isRelationLike(value)) {
+    return arelSql((value as { toSql(): string }).toSql());
+  }
+  return value;
+}
+
 /** @internal */
 export function buildNamedBoundSqlLiteral(
   this: QueryMethodsHost,
@@ -1648,11 +1680,7 @@ export function buildNamedBoundSqlLiteral(
 ): Nodes.BoundSqlLiteral {
   const namedBinds: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
-    if (value instanceof Nodes.Node) {
-      namedBinds[key] = arelSql(this._modelClass.connection.toSql(value));
-    } else {
-      namedBinds[key] = value;
-    }
+    namedBinds[key] = normalizeBoundValue.call(this, value);
   }
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, [], namedBinds);
@@ -1667,12 +1695,7 @@ export function buildBoundSqlLiteral(
   statement: string,
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
-  const positionalBinds = values.map((value) => {
-    if (value instanceof Nodes.Node) {
-      return arelSql(this._modelClass.connection.toSql(value));
-    }
-    return value;
-  });
+  const positionalBinds = values.map((value) => normalizeBoundValue.call(this, value));
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, positionalBinds, {});
   } catch (e: any) {
