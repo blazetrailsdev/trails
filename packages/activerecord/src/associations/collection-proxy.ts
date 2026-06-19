@@ -25,7 +25,12 @@ import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { filterScopeForCreate } from "./association.js";
-import { RecordNotSaved, ConfigurationError, AssociationTypeMismatch } from "../errors.js";
+import {
+  RecordNotSaved,
+  ConfigurationError,
+  AssociationTypeMismatch,
+  RecordNotFound,
+} from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
@@ -2483,9 +2488,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override first(n: number): Promise<T[]>;
   override async first(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    const records = await this.toArray();
+    if (this.isFindFromTarget()) await this.loadTarget();
+    const records = this._targetLoaded ? this._target : await this.toArray();
     if (n === undefined) return records[0] ?? null;
     return records.slice(0, n);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#first!
+   */
+  override async firstBang(): Promise<T> {
+    const record = await this.first();
+    if (!record) {
+      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
+    }
+    return record;
   }
 
   /**
@@ -2497,7 +2514,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override last(n: number): Promise<T[]>;
   override async last(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    const records = await this.toArray();
+    if (this.isFindFromTarget()) await this.loadTarget();
+    const records = this._targetLoaded ? this._target : await this.toArray();
     if (n === undefined) return records[records.length - 1] ?? null;
     return records.slice(Math.max(0, records.length - n));
   }
@@ -2511,7 +2529,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override take(limit: number): Promise<T[]>;
   override async take(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    const records = await this.toArray();
+    if (this.isFindFromTarget()) await this.loadTarget();
+    const records = this._targetLoaded ? this._target : await this.toArray();
     if (n === undefined) return records[0] ?? null;
     return records.slice(0, n);
   }
