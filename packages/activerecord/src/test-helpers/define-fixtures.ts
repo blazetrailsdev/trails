@@ -7,7 +7,7 @@ import { Base } from "../base.js";
 import { findStiClass } from "../inheritance.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 import { currentTimeFromProperTimezone } from "../timestamp.js";
-import { singularize } from "@blazetrails/activesupport";
+import { singularize, underscore } from "@blazetrails/activesupport";
 import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
 import { EncryptableRecord } from "../encryption/encryptable-record.js";
 import { Configurable } from "../encryption/configurable.js";
@@ -162,6 +162,52 @@ function declaredIdsFor(adapter: object): Map<string, Map<string, number | strin
   return m;
 }
 
+// Static fallback derived from the canonical fixture-data registry: table name →
+// (label → explicit `id:`). Lets a `ref()` resolve to a target row's pinned id even
+// when that fixture set has NOT been loaded into the adapter-scoped registry — a
+// cross-table reference (e.g. authors.author_address_extra_id ->
+// author_addresses.david_address_extra) needs the pinned id 2 regardless of whether
+// the author_addresses rows were inserted. The fixture-data modules import `ref`
+// from this file, so the registry is loaded via a deferred dynamic import (a static
+// import would form an initialization cycle) and primed before any row is resolved.
+//
+// The DB table name is derived by underscoring the registry key, which matches
+// `model.tableName` for ordinary sets but not for the few deliberately-misnamed
+// ones (e.g. `all/namespaced/accounts` -> AdminAccount#admin_accounts). Loading
+// every model to read `tableName` is unsafe (import-time `encrypts()` side effects
+// need add-ons), so when two keys collapse to the same derived table and disagree
+// on a label's id, that label is dropped — resolution falls back to CRC32 rather
+// than guess the wrong pinned id.
+let staticDeclaredIds: Map<string, Map<string, number | string>> | null = null;
+
+async function ensureStaticDeclaredIds(): Promise<void> {
+  if (staticDeclaredIds) return;
+  const { fixtureRegistry, isJoinTableEntry } = await import("./fixtures-registry.js");
+  const map = new Map<string, Map<string, number | string>>();
+  const ambiguous = new Set<string>();
+  for (const [key, entry] of Object.entries(fixtureRegistry)) {
+    if (isJoinTableEntry(entry)) continue;
+    const table = underscore(key.split("/").pop() ?? key);
+    let labelIds = map.get(table);
+    if (!labelIds) {
+      labelIds = new Map<string, number | string>();
+      map.set(table, labelIds);
+    }
+    for (const [label, attrs] of Object.entries(entry.data)) {
+      const id = (attrs as FixtureAttrs).id;
+      if (!((typeof id === "number" && Number.isInteger(id)) || typeof id === "string")) continue;
+      const prior = labelIds.get(label);
+      if (prior !== undefined && prior !== id) {
+        ambiguous.add(`${table} ${label}`);
+        labelIds.delete(label);
+      } else if (!ambiguous.has(`${table} ${label}`)) {
+        labelIds.set(label, id);
+      }
+    }
+  }
+  staticDeclaredIds = map;
+}
+
 /** @internal */
 export function resolveFixtureId(
   adapter: DatabaseAdapter,
@@ -169,7 +215,9 @@ export function resolveFixtureId(
   fixtureName: string,
 ): number | string {
   const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
-  return declared ?? fixtureId(fixtureName);
+  if (declared !== undefined) return declared;
+  const pinned = staticDeclaredIds?.get(tableName)?.get(fixtureName);
+  return pinned ?? fixtureId(fixtureName);
 }
 
 /**
@@ -418,6 +466,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   ModelClass: T,
   fixtures: Record<K, FixtureAttrs>,
 ): Promise<{ [P in K]: InstanceType<T> }> {
+  await ensureStaticDeclaredIds();
   const tableName = ModelClass.tableName;
   const declaredPk = ModelClass.primaryKey;
 
@@ -818,6 +867,7 @@ export async function defineJoinTableFixtures(
   tableName: string,
   fixtures: Record<string, FixtureAttrs>,
 ): Promise<Record<string, FixtureAttrs>> {
+  await ensureStaticDeclaredIds();
   // Read the live schema columns so a fixture row referencing a column the join
   // table doesn't have fails loudly here, not as an opaque INSERT error.
   let columnNames: Set<string> | null = null;

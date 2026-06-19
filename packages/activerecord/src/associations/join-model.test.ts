@@ -509,14 +509,7 @@ describe("AssociationsJoinModelTest", () => {
     ).toEqual([tags("general").id]);
   });
 
-  // DEFERRED (tracked: canonical-fixture-ref-resolves-explicit-id): this test
-  // relies on a cross-table id coincidence (Rails authors.author_address_extra_id
-  // == categorizations.author_id == 2). In the canonical fixtures
-  // `ref("author_addresses", "david_address_extra")` resolves to a label-hash
-  // (1006418192) rather than the explicit `id: 2` pinned in the author_addresses
-  // fixture, so the belongs_to custom-primary_key join never matches. Un-skip once
-  // refs resolve to the target fixture's explicit id.
-  it.skip("has many through with custom primary key on belongs to source", async () => {
+  it("has many through with custom primary key on belongs to source", async () => {
     const thinking = (await Post.find(posts("thinking").id)) as Post;
     expect(
       ((await (thinking as any).authorUsingCustomPk.toArray()) as Base[]).map((a) => a.id),
