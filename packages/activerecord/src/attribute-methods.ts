@@ -323,13 +323,29 @@ function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
       }
       continue;
     }
-    // Skip when this class (or a parent in the prototype chain) already exposes
-    // a custom accessor, so generation never clobbers an override.
-    const parentProto = Object.getPrototypeOf(proto);
-    const inheritedFromParent = parentProto != null && name in (parentProto as object);
-    if (!Object.prototype.hasOwnProperty.call(proto, name) && !inheritedFromParent) {
-      Object.defineProperty(proto, name, {
-        get(
+    // Gate get and set independently: a user-defined setter should not suppress
+    // the generated reader, and vice versa — mirrors Rails' per-method generation.
+    // Walk the full prototype chain to find an existing descriptor for this name.
+    const existingDesc = (() => {
+      let p: object | null = proto;
+      while (p != null) {
+        const d = Object.getOwnPropertyDescriptor(p, name);
+        if (d) return d;
+        p = Object.getPrototypeOf(p) as object | null;
+      }
+      return undefined;
+    })();
+    const needsGetter =
+      existingDesc == null || (existingDesc.get == null && !("value" in existingDesc));
+    const needsSetter =
+      existingDesc == null || (existingDesc.set == null && !("value" in existingDesc));
+    if (needsGetter || needsSetter) {
+      // If a partial accessor already exists on the proto, we must redefine it to
+      // add the missing half; otherwise install a fresh descriptor.
+      const ownDesc = Object.getOwnPropertyDescriptor(proto, name);
+      const newDesc: PropertyDescriptor = { configurable: true };
+      if (needsGetter) {
+        newDesc.get = function (
           this: AttributeAccessorHost & {
             _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
           },
@@ -340,12 +356,18 @@ function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
             );
           }
           return this.readAttribute(name);
-        },
-        set(this: AttributeAccessorHost, value: unknown) {
+        };
+      } else if (ownDesc?.get) {
+        newDesc.get = ownDesc.get;
+      }
+      if (needsSetter) {
+        newDesc.set = function (this: AttributeAccessorHost, value: unknown) {
           this.writeAttribute(name, value);
-        },
-        configurable: true,
-      });
+        };
+      } else if (ownDesc?.set) {
+        newDesc.set = ownDesc.set;
+      }
+      Object.defineProperty(proto, name, newDesc);
     }
     // Per-attribute *BeforeTypeCast / *ForDatabase aliases. Rails generates
     // these via `attribute_method_suffix "_before_type_cast", "_for_database"`
