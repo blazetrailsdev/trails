@@ -60,8 +60,9 @@ export namespace Gzip {
   }
 }
 
-// Raw zlib DEFLATE (RFC 1950), matching Ruby's Zlib::Deflate.deflate /
-// Zlib::Inflate.inflate — distinct from the gzip-framed Gzip namespace above.
+// zlib-framed DEFLATE (RFC 1950), matching Ruby's Zlib::Deflate.deflate /
+// Zlib::Inflate.inflate — distinct from the gzip-framed Gzip namespace above
+// and from headerless raw DEFLATE (RFC 1951 / deflateRawSync).
 export function deflate(source: string): string {
   return deflateSync(Buffer.from(source, "utf8")).toString("latin1");
 }
