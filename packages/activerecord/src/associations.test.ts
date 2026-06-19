@@ -730,7 +730,8 @@ describe("PreloaderTest", () => {
     const david2 = await Author.create({ name: "David" });
     const bob = await Author.create({ name: "Bob" });
     const davidPost = await Post.create({ author_id: david.id, title: "Post", body: "body" });
-    const comment1 = await Comment.create({ post_id: davidPost.id, body: "Hi David!" });
+    // Lowercased so LIKE '%david%' matches on MariaDB (case-sensitive collation).
+    const comment1 = await Comment.create({ post_id: davidPost.id, body: "Hi david!" });
     const comment2 = await Comment.create({
       post_id: davidPost.id,
       body: "This comment mentions david",
