@@ -590,6 +590,12 @@ describe("PreloaderTest", () => {
       author_favorites: canonicalSchema.author_favorites,
       postesques: canonicalSchema.postesques,
       essays: canonicalSchema.essays,
+      invoices: canonicalSchema.invoices,
+      line_items: canonicalSchema.line_items,
+      line_item_discount_applications: canonicalSchema.line_item_discount_applications,
+      shipping_lines: canonicalSchema.shipping_lines,
+      shipping_line_discount_applications: canonicalSchema.shipping_line_discount_applications,
+      discounts: canonicalSchema.discounts,
       cfk_bt_authors: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
@@ -642,6 +648,12 @@ describe("PreloaderTest", () => {
   let Tagging: typeof Base;
   let AuthorFavorite: typeof Base;
   let Essay: typeof Base;
+  let Invoice: typeof Base;
+  let LineItem: typeof Base;
+  let LineItemDiscountApplication: typeof Base;
+  let ShippingLine: typeof Base;
+  let ShippingLineDiscountApplication: typeof Base;
+  let Discount: typeof Base;
 
   beforeAll(async () => {
     Author = (await import("./test-helpers/models/author.js")).Author as never;
@@ -657,6 +669,14 @@ describe("PreloaderTest", () => {
     Tag = (await import("./test-helpers/models/tag.js")).Tag as never;
     Tagging = (await import("./test-helpers/models/tagging.js")).Tagging as never;
     Essay = (await import("./test-helpers/models/essay.js")).Essay as never;
+    Invoice = (await import("./test-helpers/models/invoice.js")).Invoice as never;
+    const liMod = await import("./test-helpers/models/line-item.js");
+    LineItem = liMod.LineItem as never;
+    LineItemDiscountApplication = liMod.LineItemDiscountApplication as never;
+    const slMod = await import("./test-helpers/models/shipping-line.js");
+    ShippingLine = slMod.ShippingLine as never;
+    ShippingLineDiscountApplication = slMod.ShippingLineDiscountApplication as never;
+    Discount = (await import("./test-helpers/models/discount.js")).Discount as never;
   });
 
   beforeEach(() => {
@@ -671,6 +691,12 @@ describe("PreloaderTest", () => {
     registerModel("Tag", Tag);
     registerModel("Tagging", Tagging);
     registerModel("Essay", Essay);
+    registerModel("Invoice", Invoice);
+    registerModel("LineItem", LineItem);
+    registerModel("LineItemDiscountApplication", LineItemDiscountApplication);
+    registerModel("ShippingLine", ShippingLine);
+    registerModel("ShippingLineDiscountApplication", ShippingLineDiscountApplication);
+    registerModel("Discount", Discount);
   });
 
   it("preload with scope", async () => {
@@ -987,16 +1013,57 @@ describe("PreloaderTest", () => {
   });
 
   it("some already loaded associations", async () => {
-    const a = await Author.create({ name: "Auth" });
-    await Post.create({ title: "P1", body: "body", author_id: a.id });
-    await Post.create({ title: "P2", body: "body", author_id: a.id });
+    const itemDiscount = await Discount.create({ amount: 5 });
+    const shippingDiscount = await Discount.create({ amount: 20 });
+    const invoice = await Invoice.create({});
+    const lineItem = await LineItem.create({ amount: 20, invoice_id: invoice.id });
+    await LineItemDiscountApplication.create({
+      line_item_id: lineItem.id,
+      discount_id: itemDiscount.id,
+    });
+    const shippingLine = await ShippingLine.create({ amount: 50, invoice_id: invoice.id });
+    await ShippingLineDiscountApplication.create({
+      shipping_line_id: shippingLine.id,
+      discount_id: shippingDiscount.id,
+    });
 
-    // One post already has preloaded, the other doesn't; includes should fill both
-    const posts = await Post.all().includes("author").toArray();
-    expect(posts).toHaveLength(2);
-    for (const p of posts) {
-      expect(p.association("author").isLoaded()).toBe(true);
-    }
+    const nested = [
+      { lineItems: { discountApplications: "discount" } },
+      { shippingLines: { discountApplications: "discount" } },
+    ];
+    const readDiscounts = (inv: Base) => {
+      const li = (association(inv, "lineItems").target as Base[])[0]!;
+      const sl = (association(inv, "shippingLines").target as Base[])[0]!;
+      expect(
+        (association(li, "discountApplications").target as Base[])[0]!.discount,
+      ).not.toBeNull();
+      expect(
+        (association(sl, "discountApplications").target as Base[])[0]!.discount,
+      ).not.toBeNull();
+    };
+
+    // First preload: nothing loaded, so all five levels query —
+    // line_items, shipping_lines, both discount_applications, and discounts.
+    const fresh = (await Invoice.where({ id: invoice.id }).toArray())[0]!;
+    const firstSqls = await captureSql(async () => {
+      await new Preloader({ records: [fresh], associations: nested }).call();
+    });
+    expect(firstSqls).toHaveLength(5);
+    const firstReads = await captureSql(async () => readDiscounts(fresh));
+    expect(firstReads).toHaveLength(0);
+
+    // Reload, then force-load the line_items branch (line_items +
+    // line_item_discount_applications). The second preload must skip that branch
+    // and issue only the three shipping/discount queries.
+    const reloaded = (await Invoice.where({ id: invoice.id }).toArray())[0]!;
+    const lineItems = (await loadHasMany(reloaded, "lineItems", {})) as Base[];
+    for (const li of lineItems) await loadHasMany(li, "discountApplications", {});
+    const secondSqls = await captureSql(async () => {
+      await new Preloader({ records: [reloaded], associations: nested }).call();
+    });
+    expect(secondSqls).toHaveLength(3);
+    const secondReads = await captureSql(async () => readDiscounts(reloaded));
+    expect(secondReads).toHaveLength(0);
   });
 
   it("preload through", async () => {
@@ -1598,6 +1665,10 @@ describe("PreloaderTest", () => {
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     // Scope present → availableRecords ignored, runs the query
     expect(queryCalls).toHaveLength(1);
+    // The author is loaded from the query, NOT the supplied instance (Rails'
+    // assert_not_equal david.__id__, post.author.__id__).
+    expect(post.association("author").isLoaded()).toBe(true);
+    expect(post.association("author").target).not.toBe(david);
   });
 
   it("preload with available records queries when collection", async () => {
@@ -1614,6 +1685,12 @@ describe("PreloaderTest", () => {
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     // Collection association → availableRecords skipped, runs the query
     expect(queryCalls).toHaveLength(1);
+    // The loaded comments come from the query, sharing no object identity with
+    // the supplied availableRecords (Rails' assert_empty intersection).
+    expect(post.association("comments").isLoaded()).toBe(true);
+    const loaded = post.association("comments").target as any[];
+    expect(loaded.some((lc) => comments.includes(lc))).toBe(false);
+    expect(loaded.map((lc) => lc.id)).toEqual([(c1 as any).id]);
   });
 
   it("preload with available records queries when incomplete", async () => {
