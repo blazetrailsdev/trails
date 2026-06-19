@@ -175,7 +175,10 @@ describe("commentFixtureData", () => {
       .filter((s) => s.includes("INSERT INTO") && s.includes("comments"));
     const greetingsInsert = findInsertWithPk(insertSqls, commentFixtureData.greetings.id);
     expect(greetingsInsert).toBeTruthy();
-    expect(greetingsInsert).toContain(String(fixtureId("welcome")));
+    // posts.welcome pins an explicit `id: 1`, so the ref resolves to that pinned id
+    // (not the CRC32 label hash) even though the posts set isn't loaded here.
+    expectValueInRow(greetingsInsert, postFixtureData.welcome.id as number);
+    expect(greetingsInsert).not.toContain(String(fixtureId("welcome")));
   });
 });
 
@@ -212,7 +215,11 @@ describe("authorFixtureData", () => {
       .filter((s) => s.includes("INSERT INTO") && s.includes("authors"));
     const davidInsert = findInsertWithPk(insertSqls, authorFixtureData.david.id);
     expect(davidInsert).toBeTruthy();
-    expect(davidInsert).toContain(String(fixtureId("david_address")));
+    // author_addresses.david_address pins an explicit `id: 1`, so the ref resolves to
+    // that pinned id (not the CRC32 label hash) even though the author_addresses set
+    // isn't loaded here.
+    expectValueInRow(davidInsert, authorAddressFixtureData.david_address.id);
+    expect(davidInsert).not.toContain(String(fixtureId("david_address")));
   });
 });
 
@@ -247,7 +254,10 @@ describe("bookFixtureData", () => {
       .filter((s) => s.includes("INSERT INTO") && s.includes("books"));
     const awdrInsert = findInsertWithPk(insertSqls, bookFixtureData.awdr.id);
     expect(awdrInsert).toBeTruthy();
-    expect(awdrInsert).toContain(String(fixtureId("david")));
+    // authors.david pins an explicit `id: 1`, so the ref resolves to that pinned id
+    // (not the CRC32 label hash) even though the authors set isn't loaded here.
+    expectValueInRow(awdrInsert, authorFixtureData.david.id);
+    expect(awdrInsert).not.toContain(String(fixtureId("david")));
   });
 
   it("ref() resolves cross-table to declared id once target fixture set is loaded", async () => {
@@ -376,7 +386,7 @@ describe("accountFixtureData", () => {
     expect(firmRef.fixtureName).toBe("odegy");
   });
 
-  it("defineFixtures: signals37.firm_id falls back to fixtureId('first_firm') when companies set isn't loaded", async () => {
+  it("defineFixtures: signals37.firm_id resolves to first_firm's pinned id when companies set isn't loaded", async () => {
     const adapter = makeAdapter();
     const Account = makeModel("accounts");
     for (const k of Object.keys(accountFixtureData) as Array<keyof typeof accountFixtureData>) {
@@ -392,9 +402,11 @@ describe("accountFixtureData", () => {
       .filter((s) => s.includes("INSERT INTO") && s.includes("accounts"));
     const signals37Insert = findInsertWithPk(insertSqls, accountFixtureData.signals37.id);
     expect(signals37Insert).toBeTruthy();
-    // companies fixture set isn't loaded in this test, so ref("companies", "first_firm")
-    // falls back to fixtureId("first_firm") (no entry in declared-id registry).
-    expect(signals37Insert).toContain(String(fixtureId("first_firm")));
+    // companies.first_firm pins an explicit `id: 1`, so ref("companies", "first_firm")
+    // resolves to that pinned id from the canonical fixture-data registry even though
+    // the companies set isn't loaded into the adapter-scoped declared-id registry.
+    expectValueInRow(signals37Insert, companyFixtureData.first_firm.id);
+    expect(signals37Insert).not.toContain(String(fixtureId("first_firm")));
   });
 });
 
