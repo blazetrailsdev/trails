@@ -30,9 +30,7 @@ describe("DateTimeTest", () => {
     const starting = Temporal.Instant.from("2001-02-03T04:05:06.789012Z");
     const p = await (Task as any).create({ starting });
     const reloaded = await (Task as any).find(p.id);
-    expect((reloaded as any).starting.epochMicroseconds).toBe(
-      (p as any).starting.epochMicroseconds,
-    );
+    expect(reloaded.starting.epochMicroseconds).toBe(p.starting.epochMicroseconds);
   });
 
   it("serialize_cast_value is equivalent to serialize after cast", () => {

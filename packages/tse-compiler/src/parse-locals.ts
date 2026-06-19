@@ -46,11 +46,11 @@ export function parseLocalsSignature(sig: string): LocalEntry[] {
   let quote: '"' | "'" | "`" | null = null;
   let buf = "";
   for (let i = 0; i < sig.length; i++) {
-    const ch = sig[i]!;
+    const ch = sig[i];
     if (quote !== null) {
       buf += ch;
       if (ch === "\\" && i + 1 < sig.length) {
-        buf += sig[i + 1]!;
+        buf += sig[i + 1];
         i++;
         continue;
       }
@@ -67,7 +67,7 @@ export function parseLocalsSignature(sig: string): LocalEntry[] {
       buf = "";
       continue;
     }
-    if (ch === "(" || ch === "[" || ch === "{") stack.push(CLOSERS[ch]!);
+    if (ch === "(" || ch === "[" || ch === "{") stack.push(CLOSERS[ch]);
     else if (ch === ")" || ch === "]" || ch === "}") {
       const expected = stack.pop();
       if (expected !== ch) {

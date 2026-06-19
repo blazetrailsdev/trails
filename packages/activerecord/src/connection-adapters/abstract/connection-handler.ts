@@ -136,7 +136,7 @@ export class ConnectionHandler {
 
     if (!clobber && existingPoolConfig && existingPoolConfig.dbConfig === poolConfig.dbConfig) {
       if (!(ownerName instanceof ConnectionDescriptor)) {
-        const owner = ownerName as ConnectionOwner;
+        const owner = ownerName;
         if (
           owner.primaryClassQ?.() &&
           existingPoolConfig.connectionDescriptor.name !== owner.name

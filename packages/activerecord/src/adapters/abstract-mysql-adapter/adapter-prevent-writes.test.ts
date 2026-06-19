@@ -113,7 +113,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("doesnt error when a use query is called while preventing writes", async () => {
       const dbRows = await adapter.execute("SELECT DATABASE() AS db");
-      const dbName = dbRows[0]!.db as string;
+      const dbName = dbRows[0].db as string;
       preventWrites(adapter);
       await expect(adapter.execute(`USE \`${dbName}\``)).resolves.toBeDefined();
     });
@@ -121,7 +121,7 @@ describeIfMysql("Mysql2Adapter", () => {
     it("doesnt error when a kill query is called while preventing writes", async () => {
       preventWrites(adapter);
       const rows = await adapter.execute("SELECT CONNECTION_ID() as connection_id");
-      const connId = rows[0]!.connection_id;
+      const connId = rows[0].connection_id;
       await expect(adapter.execute(`KILL QUERY ${connId}`)).rejects.toBeInstanceOf(QueryCanceled);
     });
   });

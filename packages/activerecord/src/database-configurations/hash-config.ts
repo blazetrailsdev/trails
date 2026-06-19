@@ -63,7 +63,7 @@ export class HashConfig extends DatabaseConfig {
       // `false` short-circuit to a nil return. JS `undefined` is treated as
       // "key absent" (fall through to the default).
       if (val === false || val === null) return null;
-      return val as string;
+      return val;
     }
     const typeFile = this._schemaFileType(format);
     if (!typeFile) return null;

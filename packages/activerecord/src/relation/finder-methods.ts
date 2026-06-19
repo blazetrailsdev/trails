@@ -102,7 +102,7 @@ export function normalizeFindArgs(
     } else {
       // Simple PK: flatten so mixed inputs like `find([1, 2], 3)`
       // canonicalize to `[1, 2, 3]`.
-      ids = (args as unknown[]).flat(Infinity);
+      ids = args.flat(Infinity);
       wantArray = true;
     }
   } else if (Array.isArray(first)) {
@@ -138,7 +138,7 @@ export function normalizeFindArgs(
   }
 
   if (composite) {
-    const pkArity = (pk as string[]).length;
+    const pkArity = pk.length;
     for (const id of ids) {
       if (!Array.isArray(id) || id.length !== pkArity) {
         throw new RecordNotFound(
@@ -167,7 +167,7 @@ export function raiseNotFoundAll(
   normalized: NormalizedFindIds,
 ): never {
   const { ids, tuples } = normalized;
-  const messageIds = tuples ? String(tuples) : (ids as unknown[]).join(", ");
+  const messageIds = tuples ? String(tuples) : ids.join(", ");
   const payload = tuples ?? ids;
   throw new RecordNotFound(
     `Couldn't find all ${modelName} with '${String(pk)}': (${messageIds})`,
@@ -443,11 +443,7 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
   // Rails: `if relation.order_values.empty? || relation.has_limit_or_offset?`
   // Use hasOrder() on the result so _rawOrderClauses (e.g. inOrderOf) are also
   // treated as "has an order" — avoids loading all records for those relations.
-  if (
-    !hasOrder(relation) ||
-    (relation as any)._limitValue != null ||
-    (relation as any)._offsetValue != null
-  ) {
+  if (!hasOrder(relation) || relation._limitValue != null || relation._offsetValue != null) {
     const records = await relation.toArray();
     return records[records.length - 1 - index] ?? null;
   }
@@ -627,7 +623,7 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
     relation = relation.where(conditions);
   } else if (typeof conditions === "object") {
     // Hash-like: Rails' `when Hash` branch — skip if empty.
-    if (Object.keys(conditions as object).length > 0) relation = relation.where(conditions);
+    if (Object.keys(conditions).length > 0) relation = relation.where(conditions);
   } else {
     // Scalar → PK lookup (Rails' else branch: `where!(primary_key => conditions)`).
     const pk = (rel as any)._modelClass.primaryKey;

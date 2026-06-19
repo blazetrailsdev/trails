@@ -203,7 +203,7 @@ describe("generateMethodForMime", () => {
   });
 
   it("accepts a MimeType instance without throwing", () => {
-    const mime = MimeType.lookup("json")!;
+    const mime = MimeType.lookup("json");
     expect(() => generateMethodForMime(mime)).not.toThrow();
   });
 

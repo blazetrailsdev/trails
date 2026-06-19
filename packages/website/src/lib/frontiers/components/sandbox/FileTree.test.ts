@@ -157,7 +157,7 @@ describe("FileTree", () => {
       await waitFor(() => expect(screen.getByTestId("new-file-button")).toBeTruthy());
 
       await fireEvent.click(screen.getByTestId("new-file-button"));
-      const input = screen.getByTestId("create-input") as HTMLInputElement;
+      const input = screen.getByTestId("create-input");
       input.value = "hello.ts";
       await fireEvent.input(input, { target: { value: "hello.ts" } });
       await fireEvent.keyDown(input, { key: "Enter" });
@@ -171,7 +171,7 @@ describe("FileTree", () => {
       await waitFor(() => expect(screen.getByTestId("new-file-button")).toBeTruthy());
 
       await fireEvent.click(screen.getByTestId("new-file-button"));
-      const input = screen.getByTestId("create-input") as HTMLInputElement;
+      const input = screen.getByTestId("create-input");
       input.value = "existing.ts";
       await fireEvent.input(input, { target: { value: "existing.ts" } });
       await fireEvent.keyDown(input, { key: "Enter" });
@@ -212,7 +212,7 @@ describe("FileTree", () => {
       await fireEvent.contextMenu(button);
       await fireEvent.click(screen.getByText("Rename"));
 
-      const input = screen.getByTestId("rename-input") as HTMLInputElement;
+      const input = screen.getByTestId("rename-input");
       input.value = "new.ts";
       await fireEvent.input(input, { target: { value: "new.ts" } });
       await fireEvent.keyDown(input, { key: "Enter" });
@@ -234,7 +234,7 @@ describe("FileTree", () => {
       await fireEvent.contextMenu(button);
       await fireEvent.click(screen.getByText("Rename"));
 
-      const input = screen.getByTestId("rename-input") as HTMLInputElement;
+      const input = screen.getByTestId("rename-input");
       input.value = "lib";
       await fireEvent.input(input, { target: { value: "lib" } });
       await fireEvent.keyDown(input, { key: "Enter" });
@@ -397,7 +397,7 @@ describe("FileTree", () => {
       await waitFor(() => expect(screen.getByTestId("new-folder-button")).toBeTruthy());
 
       await fireEvent.click(screen.getByTestId("new-folder-button"));
-      const input = screen.getByTestId("create-input") as HTMLInputElement;
+      const input = screen.getByTestId("create-input");
       input.value = "newfolder";
       await fireEvent.input(input, { target: { value: "newfolder" } });
       await fireEvent.keyDown(input, { key: "Enter" });
@@ -410,7 +410,7 @@ describe("FileTree", () => {
       await waitFor(() => expect(screen.getByTestId("new-folder-button")).toBeTruthy());
 
       await fireEvent.click(screen.getByTestId("new-folder-button"));
-      const input = screen.getByTestId("create-input") as HTMLInputElement;
+      const input = screen.getByTestId("create-input");
       input.value = "myfolder";
       await fireEvent.input(input, { target: { value: "myfolder" } });
       await fireEvent.keyDown(input, { key: "Enter" });

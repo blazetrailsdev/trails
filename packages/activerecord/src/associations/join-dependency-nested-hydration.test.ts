@@ -59,8 +59,8 @@ describe("JoinDependency nested hydration", () => {
     expect(authorProxy2?.target).toBeDefined();
     expect(authorProxy1?.target).toBe(authorProxy2?.target);
 
-    expect((comment1 as any)._preloadedAssociations?.get("author")).toBeDefined();
-    expect((post as any)._preloadedAssociations?.has("author")).toBeFalsy();
+    expect(comment1._preloadedAssociations?.get("author")).toBeDefined();
+    expect(post._preloadedAssociations?.has("author")).toBeFalsy();
   });
 
   it("eager association loading with cascaded two levels and one level", () => {
@@ -87,6 +87,6 @@ describe("JoinDependency nested hydration", () => {
     const rows = [{ t0_r0: 1, t0_r1: "Post A", t1_r0: 10, t1_r1: "C1", t1_r2: 1, t1_r3: null }];
     const { parents } = jd.instantiateFromRows(rows);
     const comment = parents[0].association("comments").target[0];
-    expect((comment as any)._readonly).toBeFalsy();
+    expect(comment._readonly).toBeFalsy();
   });
 });

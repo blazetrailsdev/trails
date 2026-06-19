@@ -15,14 +15,14 @@ describe("Predications.groupingAny / groupingAll", () => {
     const out = Predications.groupingAny.call(users.attr("id"), "eq", [1, 2, 3]);
     expect(out).toBeInstanceOf(Nodes.Grouping);
     // The grouped expression is an Or chain over three Equality nodes.
-    const inner = (out as Nodes.Grouping).expr as Nodes.Or;
+    const inner = out.expr as Nodes.Or;
     expect(inner).toBeInstanceOf(Nodes.Or);
   });
 
   it("groupingAll dispatches by method-id and folds with AND", () => {
     const out = Predications.groupingAll.call(users.attr("id"), "gt", [1, 2]);
     expect(out).toBeInstanceOf(Nodes.Grouping);
-    expect((out as Nodes.Grouping).expr).toBeInstanceOf(Nodes.And);
+    expect(out.expr).toBeInstanceOf(Nodes.And);
   });
 
   it("groupingAny accepts a closure variant (no stringly-typed dispatch)", () => {

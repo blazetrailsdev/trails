@@ -76,7 +76,7 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
     // how `format.html(...)` and `format.custom(...)` should resolve
     // the same `this` for subclasses.
     return (...args: unknown[]): unknown => {
-      const fn = Reflect.get(target, "custom", receiver) as Collector["custom"];
+      const fn = Reflect.get(target, "custom", receiver);
       return fn.call(receiver, mime, ...args);
     };
   },

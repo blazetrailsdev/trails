@@ -410,7 +410,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
     };
     const richKlass = ownerCtor._reflectOnAssociation?.(assocName)?.klass;
-    const targetModel = richKlass ?? (resolveModel(className) as typeof Base);
+    const targetModel = richKlass ?? resolveModel(className);
     super(targetModel, targetModel.arelTable);
     this._record = record;
     this._assocName = assocName;
@@ -611,7 +611,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // `_association` returns `this` so AR#toArray can read owner/reflection off the CP.
           (
             _AssociationRelationCtor!.prototype as unknown as { toArray(): Promise<Base[]> }
-          ).toArray.call(this) as Promise<Base[]>
+          ).toArray.call(this)
       : undefined;
     const results = (await loadHasMany(
       this._record,
@@ -732,7 +732,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (vals.some((v) => v == null)) return null;
       return JSON.stringify(vals);
     }
-    const val = r._readAttribute(pk as string);
+    const val = r._readAttribute(pk);
     return val == null ? null : String(val);
   }
 
@@ -898,7 +898,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       buildAttrs[`${underscore(asName)}_type`] = polymorphicName(ctor);
     }
 
-    let targetModel = this.model as typeof Base;
+    let targetModel = this.model;
 
     // STI: resolve subclass from the caller-supplied inheritance column,
     // falling back to a value from scope_for_create (e.g.
@@ -915,7 +915,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     const record = new targetModel(buildAttrs);
-    this._applyScopeForCreate(record, attrs, foreignKey as string | string[]);
+    this._applyScopeForCreate(record, attrs, foreignKey);
     // Rails wires the inverse inside `initialize_attributes`, before any
     // build/create block runs — so a block can already see `child.owner`.
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
@@ -923,7 +923,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _buildThrough(attrs: Record<string, unknown> = {}): Base {
-    let targetModel = this.model as typeof Base;
+    let targetModel = this.model;
 
     const sfcForSti = this._scopeForCreateRaw();
     const inheritanceCol = getInheritanceColumn(targetModel);
@@ -1078,7 +1078,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (Array.isArray(attrs)) {
       const records: T[] = [];
       for (const a of attrs) {
-        records.push((await this.create(a, block)) as T);
+        records.push(await this.create(a, block));
       }
       return records;
     }
@@ -1682,10 +1682,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           );
         }
         for (let i = 0; i < foreignKey.length; i++) {
-          record._writeAttribute(
-            foreignKey[i],
-            this._record._readAttribute(primaryKey[i] as string),
-          );
+          record._writeAttribute(foreignKey[i], this._record._readAttribute(primaryKey[i]));
         }
       } else {
         if (Array.isArray(primaryKey)) {
@@ -1693,8 +1690,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             `Association "${this._assocName}" with composite primaryKey requires a composite foreignKey array`,
           );
         }
-        const pkValue = this._record._readAttribute(primaryKey as string);
-        record._writeAttribute(foreignKey as string, pkValue);
+        const pkValue = this._record._readAttribute(primaryKey);
+        record._writeAttribute(foreignKey, pkValue);
       }
       if (typeCol) record._writeAttribute(typeCol, polymorphicName(ctor));
 
@@ -1799,7 +1796,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         }
       }
     }
-    const fkCols = Array.isArray(ownerFk) ? ownerFk : [ownerFk as string];
+    const fkCols = Array.isArray(ownerFk) ? ownerFk : [ownerFk];
 
     // Mirror Reflection#active_record_primary_key (reflection.rb:587-603).
     // `options[:query_constraints]` describes the *foreign-key* shape on the
@@ -1814,8 +1811,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ownerHasQueryConstraints.call(ctor as any) ||
       throughAssoc.options.queryConstraints
     ) {
-      ownerPk =
-        ownerQueryConstraintsList.call(ctor as any) ?? (ctor.primaryKey as string | string[]);
+      ownerPk = ownerQueryConstraintsList.call(ctor as any) ?? ctor.primaryKey;
     } else if (
       // Rails' id-collapse: a scalar FK against a composite PK that includes
       // "id" pairs with the scalar "id" column (reflection.ts:791-793).
@@ -1825,9 +1821,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ) {
       ownerPk = "id";
     } else {
-      ownerPk = ctor.primaryKey as string | string[];
+      ownerPk = ctor.primaryKey;
     }
-    const pkCols = Array.isArray(ownerPk) ? ownerPk : [ownerPk as string];
+    const pkCols = Array.isArray(ownerPk) ? ownerPk : [ownerPk];
     if (fkCols.length !== pkCols.length) {
       throw new Error(
         `Composite primaryKey/foreignKey mismatch on through "${this._assocName}": ${pkCols.length} pk vs ${fkCols.length} fk`,
@@ -1866,7 +1862,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // We match that: if the CPK includes "id", use "id"; otherwise the CPK
     // cannot collapse to a scalar and we raise CompositePrimaryKeyMismatchError.
     const ownerPkOption = throughAssoc.options.primaryKey;
-    if (Array.isArray(ownerPkOption) && !(ownerPkOption as string[]).includes("id")) {
+    if (Array.isArray(ownerPkOption) && !ownerPkOption.includes("id")) {
       throw new CompositePrimaryKeyMismatchError(
         ctor.name,
         `${this._assocName} (primaryKey: option)`,
@@ -1874,11 +1870,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const resolvedPkOption = Array.isArray(ownerPkOption) ? "id" : ownerPkOption;
     const ctorPk = ctor.primaryKey;
-    if (Array.isArray(ctorPk) && !(ctorPk as string[]).includes("id")) {
+    if (Array.isArray(ctorPk) && !ctorPk.includes("id")) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, this._assocName);
     }
-    const resolvedCtorPk = Array.isArray(ctorPk) ? "id" : (ctorPk as string);
-    const polyPk = (resolvedPkOption ?? resolvedCtorPk) as string;
+    const resolvedCtorPk = Array.isArray(ctorPk) ? "id" : ctorPk;
+    const polyPk = resolvedPkOption ?? resolvedCtorPk;
     return {
       idCol,
       idValue: this._record._readAttribute(polyPk),
@@ -1918,7 +1914,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // _throughOwnerPolymorphic so they target the same column.
     const ownerJoinAttrs: Record<string, unknown> = throughAssoc.options.as
       ? (() => {
-          const poly = this._throughOwnerPolymorphic(throughAssoc, ctor, throughAssoc.options.as!);
+          const poly = this._throughOwnerPolymorphic(throughAssoc, ctor, throughAssoc.options.as);
           return { [poly.idCol]: poly.idValue };
         })()
       : this._throughOwnerAttrs(throughAssoc, ctor);
@@ -1988,7 +1984,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           }
           sourceJoinAttrs = {};
           for (let i = 0; i < sourceFk.length; i++) {
-            sourceJoinAttrs[sourceFk[i]] = record._readAttribute(sourcePkCols[i] as string);
+            sourceJoinAttrs[sourceFk[i]] = record._readAttribute(sourcePkCols[i]);
           }
         } else {
           const targetPk = (record.constructor as typeof Base).primaryKey;
@@ -2041,13 +2037,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _invalidateAssociationIds(): void {
     const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
     if (assocInstance) {
-      (assocInstance as any)._associationIds = null;
+      assocInstance._associationIds = null;
       // Mirrors Rails' `reset_scope` after insert_record — without it an
       // instance that was previously loaded via the `record.collectionIds`
       // reader keeps `loaded`/`target` from the pre-push fetch and returns
       // stale data on the next read.
-      if (typeof (assocInstance as any).reset === "function") {
-        (assocInstance as any).reset();
+      if (typeof assocInstance.reset === "function") {
+        assocInstance.reset();
       }
     }
   }
@@ -2083,8 +2079,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const opts = this._assocDef.options;
     // Polymorphic associations have no fixed klass — Rails no-ops type checking there.
     if (opts.polymorphic) return;
-    const className =
-      (opts.className as string | undefined) ?? camelize(singularize(this._assocName));
+    const className = opts.className ?? camelize(singularize(this._assocName));
     const klass = resolveAssocClass(this._record, this._assocName, className);
     for (const record of records) {
       if (record == null || !(record instanceof klass)) {
@@ -2127,7 +2122,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     // Coerce id args via the scoped `find` (Rails delete_or_destroy).
     const modelRecords = records.every((r) => typeof r === "object")
-      ? (records as T[])
+      ? records
       : ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[]);
 
     // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
@@ -2299,7 +2294,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (Array.isArray(foreignKey)) {
       for (const fk of foreignKey) updates[fk] = null;
     } else {
-      updates[foreignKey as string] = null;
+      updates[foreignKey] = null;
     }
     if (asName) updates[`${underscore(asName)}_type`] = null;
     return updates;
@@ -2427,9 +2422,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Mirrors `ActiveRecord::Associations::CollectionAssociation#include?`
     // (`return false unless record.is_a?(reflection.klass)`).
     if (!this._assocDef.options.polymorphic) {
-      const className =
-        (this._assocDef.options.className as string | undefined) ??
-        camelize(singularize(this._assocName));
+      const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
       const klass = resolveAssocClass(this._record, this._assocName, className);
       if (!(record instanceof klass)) return false;
     }
@@ -2581,7 +2574,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const entries = Object.entries(conditions as Record<string, unknown>);
         return records.some((r) => entries.every(([k, v]) => r.readAttribute(k) === v));
       }
-      const targetModel = this.model as typeof Base;
+      const targetModel = this.model;
       const pk = targetModel.primaryKey;
       if (Array.isArray(pk)) {
         throw new Error(
@@ -2690,7 +2683,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return (await this.scope().find(...args)) as T | T[];
     }
 
-    const targetModel = this.model as typeof Base;
+    const targetModel = this.model;
     const pk = targetModel.primaryKey ?? "id";
     const composite = Array.isArray(pk);
 
@@ -2713,11 +2706,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     )._castAttributeValue;
     const castId = (id: unknown): unknown => {
       if (composite) {
-        const cols = pk as string[];
+        const cols = pk;
         const values = id as unknown[];
         return castFn ? cols.map((c, i) => castFn.call(targetModel, c, values[i])) : values;
       }
-      return castFn ? castFn.call(targetModel, pk as string, id) : id;
+      return castFn ? castFn.call(targetModel, pk, id) : id;
     };
 
     // Index records by PK once — O(records + ids) instead of
@@ -2728,10 +2721,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const keyForTuple = (tuple: unknown[]): string => tuple.map((x) => String(x)).join(TUPLE_SEP);
     const keyForRecord = (r: Base): string => {
       if (composite) {
-        const cols = pk as string[];
+        const cols = pk;
         return keyForTuple(cols.map((c) => r._readAttribute(c)));
       }
-      return String(r._readAttribute(pk as string));
+      return String(r._readAttribute(pk));
     };
     const keyForCastedId = (castedId: unknown): string => {
       if (composite) return keyForTuple(castedId as unknown[]);
@@ -2788,7 +2781,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // fall through to scope().pluck(...) so Relation's SQL path runs.
     const allStrings = columns.every((c) => typeof c === "string");
     if (allStrings && (this._isThrough || this._targetLoaded)) {
-      const stringCols = columns as string[];
+      const stringCols = columns;
       const records = (this._isThrough ? await this.toArray() : this._target).filter(
         (r) => !r.isNewRecord(),
       );
@@ -2812,7 +2805,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): Promise<unknown> {
     const allStrings = columns.every((c) => typeof c === "string");
     if (allStrings && (this._isThrough || this._targetLoaded)) {
-      const stringCols = columns as string[];
+      const stringCols = columns;
       const records = (this._isThrough ? await this.toArray() : this._target).filter(
         (r) => !r.isNewRecord(),
       );
@@ -2856,7 +2849,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
     if (rel === null) {
-      const targetModel = this.model as typeof Base;
+      const targetModel = this.model;
       let emptyRel = (targetModel as any).all();
       if (this._assocDef.options.scope) {
         emptyRel = this._assocDef.options.scope(emptyRel);
@@ -2930,7 +2923,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       );
     }
 
-    const targetModel = this.model as typeof Base;
+    const targetModel = this.model;
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
 
     const throughClassName =
@@ -2945,7 +2938,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ctor as unknown as {
         _reflectOnAssociation?: (n: string) => { sourceReflection?: any } | null;
       }
-    )._reflectOnAssociation?.(this._assocName)?.sourceReflection as any;
+    )._reflectOnAssociation?.(this._assocName)?.sourceReflection;
 
     const throughAs = throughAssoc.options.as;
     const throughTable = new ArelTable(throughModel.tableName);
@@ -3097,7 +3090,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // (relation.rb:1291); carry the annotation onto the bounded query.
     const subject = this._targetLoaded
       ? this._target
-      : ((await this.annotate("loading for inspect").limit(take).toArray()) as T[]);
+      : await this.annotate("loading for inspect").limit(take).toArray();
     const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
     if (entries.length === 11) entries[10] = "...";
     return `#<${this.constructor.name} [${entries.join(", ")}]>`;
@@ -3119,7 +3112,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const take = limitValue != null ? Math.min(limitValue, 11) : 11;
     const subject = this._targetLoaded
       ? this._target
-      : ((await this.annotate("loading for pp").limit(take).toArray()) as T[]);
+      : await this.annotate("loading for pp").limit(take).toArray();
     const entries = subject.slice(0, take) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
     await pp.pp(entries);
@@ -3138,7 +3131,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): Promise<T | T[]> {
     if (Array.isArray(attrs)) {
       const records: T[] = [];
-      for (const a of attrs) records.push((await this.createBang(a, block)) as T);
+      for (const a of attrs) records.push(await this.createBang(a, block));
       return records;
     }
     this._ensureThroughWritable();
@@ -3479,7 +3472,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           "association-relation.ts must be loaded first",
       );
     }
-    return new _AssociationRelationCtor(this.model as typeof Base, this) as Relation<T>;
+    return new _AssociationRelationCtor(this.model, this) as Relation<T>;
   }
 }
 
@@ -3560,5 +3553,5 @@ function isFindFromTarget(proxy: CollectionProxy<any>): boolean {
 
 /** @internal */
 function execQueries(proxy: CollectionProxy<any>): Promise<any[]> {
-  return proxy.loadTarget() as Promise<any[]>;
+  return proxy.loadTarget();
 }

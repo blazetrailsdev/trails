@@ -11,7 +11,7 @@ function dig(obj: TranslationHash, keys: string[]): TranslationValue | undefined
     if (current === null || typeof current !== "object" || Array.isArray(current)) {
       return undefined;
     }
-    current = (current as TranslationHash)[k];
+    current = current[k];
     if (current === undefined) return undefined;
   }
   return current;
@@ -347,7 +347,7 @@ class I18nModule {
       !Array.isArray(value)
     ) {
       const pluralKey = count === 1 ? "one" : "other";
-      const pluralized = (value as TranslationHash)[pluralKey];
+      const pluralized = value[pluralKey];
       if (pluralized !== undefined) return pluralized;
     }
     return value;

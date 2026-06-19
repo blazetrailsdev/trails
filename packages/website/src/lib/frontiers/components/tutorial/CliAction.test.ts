@@ -66,7 +66,7 @@ describe("CliAction", () => {
     render(CliAction, { props: { command: "slow", exec } });
     await fireEvent.click(screen.getByTestId("run-button"));
     expect(screen.getByTestId("run-button").textContent).toContain("Running");
-    expect((screen.getByTestId("run-button") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("run-button").disabled).toBe(true);
 
     resolve!({ success: true, output: [], exitCode: 0 });
     await waitFor(() => expect(screen.getByTestId("run-button").textContent).toContain("Re-run"));

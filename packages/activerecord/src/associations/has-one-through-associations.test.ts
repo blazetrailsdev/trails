@@ -738,13 +738,13 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(clubs).toHaveLength(2);
 
     const byId = new Map(clubs.map((c: any) => [c.id, c]));
-    const memberClubLoaded = byId.get(memberClub.id) as any;
-    const orgClubLoaded = byId.get(orgClub.id) as any;
+    const memberClubLoaded = byId.get(memberClub.id);
+    const orgClubLoaded = byId.get(orgClub.id);
 
     const preloaded = memberClubLoaded._preloadedAssociations?.get("sponsoredMember");
     expect(preloaded).toBeDefined();
     expect(preloaded).not.toBeNull();
-    expect((preloaded as any).name).toBe("Groucho");
+    expect(preloaded.name).toBe("Groucho");
 
     // org-sponsored club must have a nil preloaded entry (key present, value null)
     expect(orgClubLoaded._preloadedAssociations?.has("sponsoredMember")).toBe(true);

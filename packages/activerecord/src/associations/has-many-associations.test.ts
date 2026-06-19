@@ -515,7 +515,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     });
 
     const expected = await HmSubscription.where({ subscriber_id: "webster132" }).toArray();
-    const actual = (await subscriptions.toArray()) as Base[];
+    const actual = await subscriptions.toArray();
     expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
@@ -529,19 +529,19 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     });
 
     const expected = await HmEssay.where({ writer_id: "David" }).toArray();
-    const actual = (await essays.toArray()) as Base[];
+    const actual = await essays.toArray();
     expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
   it("ids on unloaded association with custom primary key", async () => {
-    const david = people("david") as HmPerson;
+    const david = people("david");
     const expected = (await HmEssay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
     const ids = await (david.association("essays") as any).idsReader();
     expect(ids).toEqual(expected);
   });
 
   it("ids on loaded association with custom primary key", async () => {
-    const david = people("david") as HmPerson;
+    const david = people("david");
     const assoc = david.association("essays") as any;
     await assoc.loadTarget();
     const expected = (await HmEssay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
@@ -646,7 +646,7 @@ describe("HasManyAssociationsTest", () => {
     expect(comment.author_type).toBe(author.constructor.name);
 
     await author.destroy();
-    const reloaded = (await Comment.find(comment.id as number))!;
+    const reloaded = await Comment.find(comment.id as number);
 
     expect(reloaded.author_id).toBeNull();
     expect(reloaded.author_type).toBeNull();
@@ -693,7 +693,7 @@ describe("HasManyAssociationsTest", () => {
   const { companies } = useHandlerFixtures(["companies", "accounts"]);
   beforeAll(async () => {
     await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
+      Base.connection,
       {
         companies: TEST_SCHEMA.companies,
         accounts: TEST_SCHEMA.accounts,
@@ -722,7 +722,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("delete all with option nullify", async () => {
     const firm = companies("first_firm") as any;
-    const clientId = ((await firm.dependentClientsOfFirm.first()) as any).id;
+    const clientId = (await firm.dependentClientsOfFirm.first()).id;
     const count = await firm.dependentClientsOfFirm.count();
     expect((await ((await Client.find(clientId)) as any).firm).id).toBe(firm.id);
     expect(await firm.dependentClientsOfFirm.deleteAll("nullify")).toBe(count);
@@ -766,7 +766,7 @@ describe("HasManyAssociationsTest", () => {
   ]);
   beforeAll(async () => {
     await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
+      Base.connection,
       {
         companies: TEST_SCHEMA.companies,
         developers: TEST_SCHEMA.developers,
@@ -823,22 +823,22 @@ describe("HasManyAssociationsTest", () => {
   it("find first", async () => {
     const firm = (await HmFirm.first()) as any;
     const client2 = (await Client.find(2)) as any;
-    const first = (await firm.clients.first()) as any;
-    const ordered = (await firm.clients.order("id").first()) as any;
+    const first = await firm.clients.first();
+    const ordered = await firm.clients.order("id").first();
     expect(first.id).toBe(ordered.id);
-    const byType = (await firm.clients.where("type = 'Client'").order("id").first()) as any;
+    const byType = await firm.clients.where("type = 'Client'").order("id").first();
     expect(byType.id).toBe(client2.id);
   });
 
   it("find in collection", async () => {
     const firm = companies("first_firm") as any;
-    expect(((await firm.clients.find(2)) as any).name).toBe(((await Client.find(2)) as any).name);
+    expect((await firm.clients.find(2)).name).toBe(((await Client.find(2)) as any).name);
     await expect(firm.clients.find(6)).rejects.toThrow(RecordNotFound);
   });
 
   it("finding with condition", async () => {
     const firm = (await HmFirm.first()) as any;
-    const client = (await firm.clientsLikeMs.first()) as any;
+    const client = await firm.clientsLikeMs.first();
     expect(client.name).toBe("Microsoft");
   });
 
@@ -847,7 +847,7 @@ describe("HasManyAssociationsTest", () => {
 
     await expect(firm.clients.find()).rejects.toThrow(RecordNotFound);
 
-    const client = (await firm.clients.find(2)) as any;
+    const client = await firm.clients.find(2);
     expect(client).toBeInstanceOf(Client);
 
     const clientAry = (await firm.clients.find([2])) as any[];
@@ -866,8 +866,8 @@ describe("HasManyAssociationsTest", () => {
     const firm = companies("first_firm") as any;
     const seen: number[] = [];
     for await (const client of firm.clients.findEach({ batchSize: 1 })) {
-      expect((client as any).firm_id).toBe(firm.id);
-      seen.push((client as any).id);
+      expect(client.firm_id).toBe(firm.id);
+      seen.push(client.id);
     }
     expect(seen.length).toBe(3);
   });
@@ -878,7 +878,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = companies("first_firm") as any;
     await firm.clientsOfFirm.toArray();
 
-    const first = (await firm.clientsOfFirm.first()) as any;
+    const first = await firm.clientsOfFirm.first();
     await firm.clientsOfFirm.delete(first);
     expect(await firm.clientsOfFirm.size()).toBe(1);
     await firm.clientsOfFirm.reload();
@@ -1393,7 +1393,7 @@ describe("HasManyAssociationsTest", () => {
   const { companies } = useHandlerFixtures(["companies"]);
   beforeAll(async () => {
     await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
+      Base.connection,
       {
         cars: TEST_SCHEMA.cars,
         bulbs: TEST_SCHEMA.bulbs,
@@ -1513,7 +1513,7 @@ describe("HasManyAssociationsTest", () => {
   const { companies } = useHandlerFixtures(["companies"]);
   beforeAll(async () => {
     await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
+      Base.connection,
       {
         companies: TEST_SCHEMA.companies,
         posts: TEST_SCHEMA.posts,
@@ -7050,7 +7050,7 @@ describe("HasManyAssociationsTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(
-      Base.connection as Parameters<typeof defineSchema>[0],
+      Base.connection,
       { cars: TEST_SCHEMA.cars, bulbs: TEST_SCHEMA.bulbs },
       { dropExisting: true },
     );
@@ -7131,7 +7131,7 @@ describe("HasManyAssociationsTest", () => {
     // `Author#first_posts` resolves to the `FirstPost` model, whose
     // `default_scope { where(id: 1) }` restricts the collection to post id 1.
     // Mary (author 2) owns no post with id 1, so the proxy is empty.
-    const author = (await HmAuthor.find(authors("mary").id)) as HmAuthor;
+    const author = await HmAuthor.find(authors("mary").id);
     const exists = await author.firstPosts.exists();
     expect(exists).toBe(false);
   });
@@ -7161,13 +7161,11 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     //   assert_equal Essay.where(writer_id: "David"), david.essays
     // `Author#essays` uses primary_key :name (as: :writer), so David's
     // essays are exactly those with writer_id == "David".
-    const david = authors("david") as HmAuthor;
+    const david = authors("david");
     const expected = (await HmEssay.where({ writer_id: "David" }).toArray())
       .map((e) => e.id)
       .sort();
-    const actual = ((await association(david, "essays").toArray()) as Base[])
-      .map((e) => e.id)
-      .sort();
+    const actual = (await association(david, "essays").toArray()).map((e) => e.id).sort();
     expect(actual).toEqual(expected);
   });
 
@@ -7178,7 +7176,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     //   david.essays = [Essay.create!(name: "Remote Work")]
     //   assert_equal ["Remote Work"], david.essays.map(&:name)
     // `Person#essays` uses primary_key :first_name, foreign_key :writer_id.
-    const david = people("david") as HmPerson;
+    const david = people("david");
     const names = ((await association(david, "essays").toArray()) as HmEssay[]).map((e) => e.name);
     expect(names).toEqual(["A Modest Proposal"]);
 

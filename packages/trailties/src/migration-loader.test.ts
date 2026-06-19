@@ -31,7 +31,7 @@ describe("discoverMigrations", () => {
     write("20260101000000-create-posts.ts");
     const found = await discoverMigrations(tmpDir);
     expect(found).toHaveLength(1);
-    expect(found[0]!.version).toBe("20260101000000");
+    expect(found[0].version).toBe("20260101000000");
   });
 
   it("collapses hyphen and underscore variants of the same migration, preferring underscore", async () => {
@@ -39,7 +39,7 @@ describe("discoverMigrations", () => {
     write("20260101000000_create_posts.ts");
     const found = await discoverMigrations(tmpDir);
     expect(found).toHaveLength(1);
-    expect(path.basename(found[0]!.filename!)).toBe("20260101000000_create_posts.ts");
+    expect(path.basename(found[0].filename!)).toBe("20260101000000_create_posts.ts");
   });
 
   it("prefers .ts over .js when both exist for the same migration", async () => {
@@ -47,6 +47,6 @@ describe("discoverMigrations", () => {
     write("20260101000000_create_posts.js");
     const found = await discoverMigrations(tmpDir);
     expect(found).toHaveLength(1);
-    expect(path.basename(found[0]!.filename!)).toBe("20260101000000_create_posts.ts");
+    expect(path.basename(found[0].filename!)).toBe("20260101000000_create_posts.ts");
   });
 });

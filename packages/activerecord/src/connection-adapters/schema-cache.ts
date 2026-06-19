@@ -94,7 +94,7 @@ export class SchemaCache {
   static read<T>(filename: string, callback: (data: string) => T): T {
     const fs = getFs();
     if (filename.endsWith(".gz")) {
-      const raw = fs.readFileSync(filename, "latin1") as string;
+      const raw = fs.readFileSync(filename, "latin1");
       return callback(Gzip.decompress(raw));
     }
     return callback(fs.readFileSync(filename, "utf-8"));

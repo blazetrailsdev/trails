@@ -62,7 +62,7 @@ export async function parse(data: string | null | undefined): Promise<XmlHash> {
     private _hashStack: XmlHash[] = [];
 
     get currentHash(): XmlHash {
-      return this._hashStack[this._hashStack.length - 1]!;
+      return this._hashStack[this._hashStack.length - 1];
     }
 
     override startDocument(): void {

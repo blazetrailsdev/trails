@@ -60,7 +60,7 @@ export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
     EXTENDS_IDENT.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = EXTENDS_IDENT.exec(text))) {
-      if (baseNameSet.has(match[1]!)) return true;
+      if (baseNameSet.has(match[1])) return true;
     }
     return false;
   }

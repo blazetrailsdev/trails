@@ -392,7 +392,7 @@ export function extractSchemaQualifiedName(
 ): [string | null, string | null] {
   const parts = (str ?? "").match(/[^`.\s]+|`[^`]*`/g) ?? [];
   if (parts.length >= 2) {
-    return [parts[0]!.replace(/^`|`$/g, ""), parts[1]!.replace(/^`|`$/g, "")];
+    return [parts[0]!.replace(/^`|`$/g, ""), parts[1].replace(/^`|`$/g, "")];
   }
   if (parts.length === 1) {
     return [null, parts[0].replace(/^`|`$/g, "")];
@@ -469,7 +469,7 @@ interface IntrospectionHost {
  */
 export async function columns(this: IntrospectionHost, tableName: string): Promise<Column[]> {
   const { schema, table } = this.parseMysqlName(tableName);
-  const rows = (await this.schemaQuery(
+  const rows = await this.schemaQuery(
     `SELECT column_name AS name,
             column_default AS default_value,
             is_nullable AS nullable,
@@ -487,7 +487,7 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
        AND table_name = ?
        ORDER BY ordinal_position`,
     [schema ?? null, table],
-  )) as Array<Record<string, unknown>>;
+  );
 
   // The bare-string "NULL" default below is a MariaDB-only reflection quirk and the
   // disambiguation is engine-specific (see the coercion comment). Ensure the cached
@@ -747,7 +747,7 @@ export async function foreignKeys(
   tableName: string,
 ): Promise<ForeignKeyDefinition[]> {
   const scope = quotedScope.call(this, tableName);
-  const rows = (await this.schemaQuery(
+  const rows = await this.schemaQuery(
     `SELECT fk.referenced_table_name AS to_table,
             fk.referenced_column_name AS primary_key,
             fk.column_name AS \`column\`,
@@ -764,7 +764,7 @@ export async function foreignKeys(
        AND rc.constraint_schema = ${scope.schema}
        AND rc.table_name = ${scope.name}
      ORDER BY fk.constraint_name, fk.ordinal_position`,
-  )) as Array<Record<string, unknown>>;
+  );
 
   const grouped = new Map<string, Array<Record<string, unknown>>>();
   for (const row of rows) {
@@ -829,9 +829,7 @@ export async function indexes(
 > {
   let rows: Array<Record<string, unknown>>;
   try {
-    rows = (await this.schemaQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`)) as Array<
-      Record<string, unknown>
-    >;
+    rows = await this.schemaQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`);
   } catch (e) {
     // Mirrors Rails' `rescue StatementInvalid` — a missing table yields []
     // rather than propagating ER_NO_SUCH_TABLE.
@@ -885,7 +883,7 @@ export async function indexes(
       });
     }
 
-    const entry = byIndex.get(currentIndex!)!;
+    const entry = byIndex.get(currentIndex)!;
     // Mirrors Rails' `row[:Collation] == "D"` — descending column/expression.
     const desc = String((r.Collation ?? r.COLLATION) as string) === "D";
     const rawExpr = r.Expression ?? r.EXPRESSION;

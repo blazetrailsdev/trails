@@ -39,10 +39,7 @@ export async function touch(
     names = [optionsOrName, ...rest];
   } else if (optionsOrName?.time != null) {
     const t = optionsOrName.time;
-    time =
-      t instanceof Temporal.Instant
-        ? t
-        : Temporal.Instant.fromEpochMilliseconds((t as Date).getTime()); // boundary: accepts JS Date from touch(time:) callers
+    time = t instanceof Temporal.Instant ? t : Temporal.Instant.fromEpochMilliseconds(t.getTime()); // boundary: accepts JS Date from touch(time:) callers
     names = rest;
   } else {
     time = Temporal.Now.instant();

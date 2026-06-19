@@ -140,7 +140,7 @@ export class Dispatcher extends Endpoint {
   }
 
   serve(req: RouterRequest): RackishResponse {
-    const params = req.pathParameters as Record<string, unknown>;
+    const params = req.pathParameters;
     const action = typeof params["action"] === "string" ? params["action"] : "";
     const handler = this._controller(req);
     if (!handler) {
@@ -156,7 +156,7 @@ export class Dispatcher extends Endpoint {
   /** @internal */
   protected _controller(req: RouterRequest): DispatchHandler | undefined {
     if (!this._registry) return undefined;
-    const params = req.pathParameters as Record<string, unknown>;
+    const params = req.pathParameters;
     const controller = typeof params["controller"] === "string" ? params["controller"] : "";
     return this._registry.resolve(controller);
   }

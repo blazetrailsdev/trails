@@ -21,7 +21,7 @@ export function makeRange<T>(begin: T | null, end: T | null, excludeEnd = false)
  * Mirrors ActiveSupport Range#overlap?
  */
 export function overlap<T extends number | Date>(a: Range<T>, b: Range<T>): boolean {
-  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : (v as number));
+  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : v);
 
   // a starts after b ends
   if (a.begin !== null && b.end !== null) {
@@ -47,7 +47,7 @@ export const overlaps = overlap; // alias
  * (endpoint comparison via `<=>`).
  */
 export function rangeIncludesValue<T extends number | Date>(range: Range<T>, value: T): boolean {
-  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : (v as number));
+  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : v);
   const n = toNum(value);
 
   if (range.begin !== null && n < toNum(range.begin)) return false;
@@ -93,7 +93,7 @@ export function rangeIncludesRange<T extends number | Date>(
   outer: Range<T>,
   inner: Range<T>,
 ): boolean {
-  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : (v as number));
+  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : v);
 
   // inner begin must be within outer
   if (inner.begin !== null) {

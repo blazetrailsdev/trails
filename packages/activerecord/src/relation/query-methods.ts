@@ -198,7 +198,7 @@ function resolveOrderMatcher(host: QueryMethodsHost): RegExp {
   try {
     // Mirrors Rails' `model.adapter_class.column_name_with_order_matcher`.
     const adapter: any = host._modelClass.connection;
-    return (adapter?.constructor as any)?.columnNameWithOrderMatcher?.() ?? abstractOrderMatcher();
+    return adapter?.constructor?.columnNameWithOrderMatcher?.() ?? abstractOrderMatcher();
   } catch {
     // No adapter configured — fall back to abstract pattern.
     return abstractOrderMatcher();
@@ -287,7 +287,7 @@ function resolveCteEntry(name: string, query: unknown): Nodes.Node {
   if (Array.isArray(query)) {
     if (query.length === 0) throw argumentError(`Empty array passed for CTE "${name}".`);
     for (const q of query) {
-      if (typeof q !== "string" && typeof (q as any)?.toSql !== "function") {
+      if (typeof q !== "string" && typeof q?.toSql !== "function") {
         const typeName =
           q !== null && typeof q === "object"
             ? `type object (${(q as object).constructor?.name ?? "unknown"})`
@@ -549,8 +549,7 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       if (first instanceof Nodes.Node) {
         // Bind array: [Arel.sql("col = ?"), bind1, ...] — Arel bypasses check.
         // Store as { raw } so _applyOrderToManager emits it verbatim.
-        const rawSql =
-          (first as any).value ?? this._modelClass.connection.toSql(first as Nodes.Node);
+        const rawSql = (first as any).value ?? this._modelClass.connection.toSql(first);
         const interpolated =
           rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
         if (interpolated.trim() !== "") this._orderClauses.push({ raw: String(interpolated) });
@@ -622,8 +621,7 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
     if (Array.isArray(arg)) {
       const [first, ...rest] = arg as unknown[];
       if (first instanceof Nodes.Node) {
-        const rawSql =
-          (first as any).value ?? this._modelClass.connection.toSql(first as Nodes.Node);
+        const rawSql = (first as any).value ?? this._modelClass.connection.toSql(first);
         const interpolated =
           rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
         if (interpolated.trim() !== "") this._orderClauses.push({ raw: String(interpolated) });
@@ -887,7 +885,7 @@ export function buildWhereClause(
     let sql: string;
     if (isNamedBinds) {
       sql = opts;
-      const namedBinds = firstBind as Record<string, unknown>;
+      const namedBinds = firstBind;
       const adapter = connectionFor((this as any)._modelClass);
       for (const [name, value] of Object.entries(namedBinds)) {
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -923,7 +921,7 @@ export function buildWhereClause(
     const mc = (this as any)._modelClass;
     const aliases: Record<string, string> = mc?._attributeAliases ?? {};
     const normalized: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(opts as Record<string, unknown>)) {
+    for (const [key, value] of Object.entries(opts)) {
       const resolved = aliases[key] ?? key;
       normalized[resolved] = isRelationLike(value)
         ? value
@@ -959,7 +957,7 @@ function isRelationLike(value: unknown): boolean {
   return (
     typeof value === "object" &&
     value !== null &&
-    "_modelClass" in (value as object) &&
+    "_modelClass" in value &&
     typeof (value as { toArel?: unknown }).toArel === "function"
   );
 }
@@ -1106,7 +1104,7 @@ function rubyClassNameOf(value: unknown): string {
     case "object": {
       // Rails uses `other.class.name`; a plain object maps to Ruby's Hash,
       // but a class instance should report its own constructor name.
-      const ctor = (value as object).constructor;
+      const ctor = value.constructor;
       return ctor && ctor !== Object ? ctor.name : "Hash";
     }
     case "string":
@@ -1422,7 +1420,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   if (Array.isArray(primaryKey)) {
     throw new Error("excluding does not support models with composite primary keys");
   }
-  const pk = primaryKey as string;
+  const pk = primaryKey;
   const ids = records.map((r: any) => (typeof r === "object" && r !== null ? (r.id ?? r) : r));
   this._whereClause.predicates.push(...this.predicateBuilder.buildNegatedFromHash({ [pk]: ids }));
   return this;
@@ -1461,7 +1459,7 @@ function walkAssociationTree(
   } else if (isPlainObject(associations)) {
     for (const [k, v] of Object.entries(associations)) {
       const sub = (tree[k] ??= makeAssocTree());
-      if (v != null) walkAssociationTree(v as AssociationSpec | AssociationSpec[], sub);
+      if (v != null) walkAssociationTree(v, sub);
     }
   } else {
     let desc: string;
@@ -1712,12 +1710,12 @@ export function buildSubquery(
   // Rails: except(:optimizer_hints).arel.as(alias) — use unscope (our except is SQL EXCEPT, not query-part removal)
   const relation =
     typeof (this as any).unscope === "function" ? (this as any).unscope("optimizerHints") : this;
-  if (typeof (relation as any).toArel !== "function") {
+  if (typeof relation.toArel !== "function") {
     throw new ActiveRecordError("Cannot build subquery: relation does not support toArel()");
   }
   // No identifier gate — the alias is caller-trusted and wrapped verbatim in a
   // `SqlLiteral` by `SelectManager#as`, matching Rails' `build_from`.
-  const aliasedSubquery = (relation as any).toArel().as(subqueryAlias);
+  const aliasedSubquery = relation.toArel().as(subqueryAlias);
   const sm = new SelectManager();
   sm.from(aliasedSubquery);
   sm.project(selectValue as any);
@@ -2101,8 +2099,7 @@ export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown
     if (typeof field === "string" || typeof field === "symbol")
       return [arelColumn.call(this, field as any)];
     if (typeof field === "function") return [field()];
-    if (isPlainObject(field))
-      return arelColumnsFromHash.call(this, field as Record<string, unknown>);
+    if (isPlainObject(field)) return arelColumnsFromHash.call(this, field);
     return [field];
   });
 }
@@ -2173,8 +2170,7 @@ export function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): un
     // (null/undefined) select arg is dropped, so `select(null)` clears nothing
     // instead of projecting a literal "null" column.
     if (field === null || field === undefined) return [];
-    if (isPlainObject(field))
-      return arelColumnAliasesFromHash.call(this, field as Record<string, unknown>);
+    if (isPlainObject(field)) return arelColumnAliasesFromHash.call(this, field);
     return [field];
   });
 }
@@ -2220,7 +2216,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   const fromClause = (this as any)._fromClause;
   const opts = fromClause?.value;
   let name = fromClause?.name;
-  if (opts && typeof (opts as any).toArel === "function") {
+  if (opts && typeof opts.toArel === "function") {
     name ??= "subquery";
     const alias = String(name);
     // A set-operation relation (union/intersect/except) has no projection-only
@@ -2232,8 +2228,8 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // string inlining / `$N`→`?` rewrite). Operands handle their own eager loading
     // inside `_buildSetOperationNode`, so the applyJoinDependency clone below is
     // skipped for this branch.
-    if ((opts as any)._setOperation) {
-      return new Nodes.TableAlias((opts as any)._buildSetOperationNode(), arelSql(alias));
+    if (opts._setOperation) {
+      return new Nodes.TableAlias(opts._buildSetOperationNode(), arelSql(alias));
     }
     // No identifier gate: Rails' `build_from` stores the caller-provided
     // `subquery_name` verbatim and wraps it in a `SqlLiteral` via
@@ -2245,13 +2241,10 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // build_from). Clone avoids mutating the caller's relation in-place since
     // applyJoinDependency modifies _joinClauses.
     let resolved: any = opts;
-    if (
-      typeof (opts as any)._eagerLoadingForSql === "function" &&
-      (opts as any)._eagerLoadingForSql()
-    ) {
-      resolved = (opts as any)._clone
-        ? (opts as any)._clone().applyJoinDependency(true)
-        : (opts as any).applyJoinDependency(true);
+    if (typeof opts._eagerLoadingForSql === "function" && opts._eagerLoadingForSql()) {
+      resolved = opts._clone
+        ? opts._clone().applyJoinDependency(true)
+        : opts.applyJoinDependency(true);
     }
     // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
     // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the
@@ -2259,9 +2252,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // subquery stays a live AST: its binds parameterize and its retryability is
     // determined by the actual child nodes (not unconditionally disabled).
     const subArel =
-      typeof (resolved as any).buildArel === "function"
-        ? (resolved as any).buildArel()
-        : resolved.toArel();
+      typeof resolved.buildArel === "function" ? resolved.buildArel() : resolved.toArel();
     return subArel.as(alias);
   }
   return opts;
@@ -2639,8 +2630,8 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;
 
   const buckets = buildJoinBuckets.call(this);
-  const leadingJoins = buckets.leading_join as unknown[];
-  const joinNodes = buckets.join_node as unknown[];
+  const leadingJoins = buckets.leading_join;
+  const joinNodes = buckets.join_node;
   const stashedJoins = buckets.stashed_join as JoinDependency[];
   const namedJoins = buckets.named_join as AssociationSpec[];
 

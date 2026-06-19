@@ -819,7 +819,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("schemaStatements().dropTable supports temporary:true via MigrationContext.schema path", async () => {
       await adapter.exec("CREATE TEMPORARY TABLE `tmp_sweep_e` (`id` INT)");
-      const schema = adapter.schemaStatements!();
+      const schema = adapter.schemaStatements();
       await (schema as any).dropTable("tmp_sweep_e", { temporary: true });
       // If temporary: true wasn't forwarded the SQL would be DROP TABLE (not TEMPORARY),
       // which would fail on MariaDB / MySQL when only a temp table with that name exists.

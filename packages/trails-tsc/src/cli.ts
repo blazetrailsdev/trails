@@ -30,7 +30,7 @@ export function runCli(argv: readonly string[]): number {
   }
   const opts: BuildViewsOptions = {};
   for (let i = 1; i < argv.length; i++) {
-    const a = argv[i]!;
+    const a = argv[i];
     if (VALUE_FLAGS.has(a)) {
       const v = argv[i + 1];
       if (v === undefined) {

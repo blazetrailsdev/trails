@@ -31,8 +31,8 @@ export class AssertionResponse {
       this.name = n;
       this.code = String(codeOrName);
     } else {
-      this.name = codeOrName as string;
-      const c = codeFromName(codeOrName as string);
+      this.name = codeOrName;
+      const c = codeFromName(codeOrName);
       if (c === undefined) {
         throw new Error(`Invalid response name: ${codeOrName}`);
       }

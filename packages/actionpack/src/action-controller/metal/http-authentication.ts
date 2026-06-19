@@ -116,7 +116,7 @@ export function httpBasicAuthenticateOrRequestWith(
 ): boolean {
   const { name, password, realm = null, message = null } = options;
   return authenticateOrRequestWithHttpBasic.call(
-    this as BasicControllerHost,
+    this,
     realm,
     message,
     (givenName: string, givenPassword: string): boolean => {
@@ -342,7 +342,7 @@ export function validateNonce(
   secondsToTimeout = 5 * 60,
 ): boolean {
   if (value == null) return false;
-  const t = parseInt(Buffer.from(value, "base64").toString("utf-8").split(":")[0]!, 10);
+  const t = parseInt(Buffer.from(value, "base64").toString("utf-8").split(":")[0], 10);
   return (
     !isNaN(t) &&
     nonce(secretKey, t) === value &&

@@ -330,7 +330,7 @@ function findDirectiveEnd(text: string): number {
   while ((match = lineRe.exec(text)) !== null) {
     const [full, line, terminator] = match;
     if (terminator === "" && line === "") break;
-    const trimmed = line!.trimStart();
+    const trimmed = line.trimStart();
     // File-leading directives we preserve above the auto-import block:
     //   - shebangs (`#!...`)
     //   - triple-slash reference directives (`/// <reference ...>`)
@@ -353,7 +353,7 @@ function findDirectiveEnd(text: string): number {
       isSingleLineBlockPragma ||
       trimmed === ""
     ) {
-      pos += full!.length;
+      pos += full.length;
       if (terminator === "") break;
     } else {
       break;

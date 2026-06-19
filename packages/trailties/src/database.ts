@@ -242,7 +242,7 @@ function isMultiDatabaseEnv(value: unknown): value is Record<string, object> {
   // true for an empty hash. An empty env still counts as multi-DB (with
   // zero named sub-configs) — the caller catches that case and throws
   // a clearer error than "single-DB with no fields".
-  return Object.values(value as object).every(
+  return Object.values(value).every(
     (v) => v !== null && typeof v === "object" && !Array.isArray(v),
   );
 }

@@ -1013,7 +1013,7 @@ describe("TestNestedAttributesInGeneral", () => {
     (human as any).interestsAttributes = [{ id: interest.id, topic: "gardening" }];
     const first = await (human as any).interests.first();
     const zero = (human as any).interests[0];
-    expect((first as any).topic).toBe((zero as any).topic);
+    expect(first.topic).toBe(zero.topic);
   });
   it("allows class to override setter and call super", async () => {
     registerModel(CanonicalPirate);
@@ -1093,7 +1093,7 @@ describe("TestNestedAttributesInGeneral", () => {
 
     const reloaded = (await CpkBook.find([1, 2])) as any;
     expect(Number(await reloaded.chapters.count())).toBe(1);
-    expect(((await reloaded.chapters.first()) as any).title).toBe("New title");
+    expect((await reloaded.chapters.first()).title).toBe("New title");
   });
 
   it("should build a new record if reject all blank does not return false", async () => {
@@ -1754,10 +1754,7 @@ describe("should take a hash with composite id keys and assign the attributes to
       { id: child1.id, name: "Grace OMalley" },
       { id: child2.id, name: "Privateers Greed" },
     ];
-    expect([(child1 as any).name, (child2 as any).name]).toEqual([
-      "Grace OMalley",
-      "Privateers Greed",
-    ]);
+    expect([child1.name, child2.name]).toEqual(["Grace OMalley", "Privateers Greed"]);
   });
 });
 
@@ -2076,7 +2073,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     });
     cacheAssoc(pirate, "ship", ship);
     const part = await (ship.parts as any).create({ name: "Mast" });
-    const trinket = await (part.trinkets as any).create({ name: "Necklace" });
+    const trinket = await part.trinkets.create({ name: "Necklace" });
     return { pirate, ship, part, trinket };
   }
 
@@ -2084,7 +2081,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     const { pirate, trinket } = await setup();
     trinket.name = "changed";
     expect(await pirate.save()).toBe(true);
-    const reloaded = await Treasure.find(trinket.id!);
+    const reloaded = await Treasure.find(trinket.id);
     expect(reloaded.name).toBe("changed");
   });
 
@@ -2095,7 +2092,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
       partsAttributes: [{ id: part.id, trinketsAttributes: [{ id: trinket.id, name: "changed" }] }],
     };
     await pirate.save();
-    const reloaded = await Treasure.find(trinket.id!);
+    const reloaded = await Treasure.find(trinket.id);
     expect(reloaded.name).toBe("changed");
   });
 
@@ -2160,7 +2157,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 
     const ship = await CanonicalShip.create({ name: "The good ship Dollypop" });
     const part = await (ship.parts as any).create({ name: "Mast" });
-    const trinket = await (part.trinkets as any).create({ name: "Necklace" });
+    const trinket = await part.trinkets.create({ name: "Necklace" });
     return { ship, part, trinket };
   }
 
@@ -2183,18 +2180,18 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     await assertNoQueries(false, () => {
       const inMemoryPart = (ship.parts as any).target[0];
       expect(inMemoryPart.name).toBe("Mast");
-      const grandchild = (inMemoryPart.trinkets as any).target[0];
+      const grandchild = inMemoryPart.trinkets.target[0];
       expect(grandchild.name).toBe("Ruby");
     });
     await ship.save();
-    expect(((ship.parts as any).target[0].trinkets as any).target[0].name).toBe("Ruby");
+    expect((ship.parts as any).target[0].trinkets.target[0].name).toBe("Ruby");
   });
 
   it("when grandchild changed in memory, saving parent should save grandchild", async () => {
     const { ship, trinket } = await setup();
     trinket.name = "changed";
     expect(await ship.save()).toBe(true);
-    const reloaded = await Treasure.find(trinket.id!);
+    const reloaded = await Treasure.find(trinket.id);
     expect(reloaded.name).toBe("changed");
   });
 
@@ -2204,7 +2201,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
       { id: part.id, trinketsAttributes: [{ id: trinket.id, name: "changed" }] },
     ];
     await ship.save();
-    const reloaded = await Treasure.find(trinket.id!);
+    const reloaded = await Treasure.find(trinket.id);
     expect(reloaded.name).toBe("changed");
   });
 

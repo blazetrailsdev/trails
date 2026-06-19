@@ -488,7 +488,7 @@ export function store(modelClass: typeof Base, attribute: string, options: Store
   // handle their own cast/serialize. Only patch readAttribute for plain text/string
   // columns that have no type-level accessor.
   const colType = (modelClass as any).typeForAttribute?.(attribute);
-  if (!colType || typeof (colType as any).accessor !== "function") {
+  if (!colType || typeof colType.accessor !== "function") {
     if (!_serializeAttr) {
       throw new ConfigurationError(
         `store() requires serialize() to be registered before use. ` +
@@ -525,8 +525,8 @@ export function storeAccessorFor(
 ): typeof HashAccessor {
   // Rails dispatches via type_for_attribute(attr).accessor — check the type first.
   const type = (modelClass as any).typeForAttribute?.(storeAttribute);
-  if (type && typeof (type as any).accessor === "function") {
-    const accessor = (type as any).accessor();
+  if (type && typeof type.accessor === "function") {
+    const accessor = type.accessor();
     if (accessor && typeof accessor.read === "function" && typeof accessor.write === "function") {
       return accessor as typeof HashAccessor;
     }

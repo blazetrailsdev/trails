@@ -608,7 +608,7 @@ describe("Response Cache::Response wiring", () => {
     const res = new Response();
     res._cacheControl = "no-cache";
     res.mergeAndNormalizeCacheControlBang({ public: true, max_age: 30 });
-    const cc = res._cacheControl!;
+    const cc = res._cacheControl;
     expect(cc).toContain("max-age=30");
     expect(cc).toContain("public");
   });

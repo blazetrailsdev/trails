@@ -72,16 +72,13 @@ export function javascriptTag(
     opts = isHash
       ? { ...(contentOrOptions as Record<string, unknown>) }
       : typeof htmlOptions === "object" && htmlOptions !== null
-        ? { ...(htmlOptions as Record<string, unknown>) }
+        ? { ...htmlOptions }
         : {};
     content = capture.call(this as CaptureHelperHost, resolvedBlock);
   } else {
     content = contentOrOptions;
-    opts =
-      typeof htmlOptions === "object" && htmlOptions !== null
-        ? { ...(htmlOptions as Record<string, unknown>) }
-        : {};
+    opts = typeof htmlOptions === "object" && htmlOptions !== null ? { ...htmlOptions } : {};
   }
 
-  return contentTag("script", javascriptCdataSection(content), opts, true) as SafeBuffer;
+  return contentTag("script", javascriptCdataSection(content), opts, true);
 }

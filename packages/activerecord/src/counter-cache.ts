@@ -172,7 +172,7 @@ export async function resetCounters(
     // Mirrors Rails: for a `has_many :through`, the counter column comes from the
     // through (join) reflection, while the count still runs against the through.
     if (assoc.options.through) {
-      const through = hasManyAssocs.find((a) => a.name === assoc!.options.through);
+      const through = hasManyAssocs.find((a) => a.name === assoc.options.through);
       if (through) counterColumn = resolveCounterColumn(this, through, through.name);
     }
 

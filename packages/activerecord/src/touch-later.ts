@@ -45,7 +45,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   const self = this as any;
 
   if (!self._deferTouchAttrs) {
-    self._deferTouchAttrs = [...(timestampAttributesForUpdateInModel.call(ctor) as string[])];
+    self._deferTouchAttrs = [...timestampAttributesForUpdateInModel.call(ctor)];
   }
 
   if (names.length > 0) {

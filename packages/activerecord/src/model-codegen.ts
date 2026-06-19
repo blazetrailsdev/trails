@@ -108,13 +108,13 @@ export function unqualify(tableName: string): string {
   let current = "";
   let inQuotes = false;
   for (let i = 0; i < tableName.length; i++) {
-    const ch = tableName[i]!;
+    const ch = tableName[i];
     if (ch === '"') {
       current += ch;
       // "" inside a quoted identifier is an escaped double-quote —
       // stays inside the identifier, doesn't toggle state.
       if (inQuotes && tableName[i + 1] === '"') {
-        current += tableName[i + 1]!;
+        current += tableName[i + 1];
         i++;
         continue;
       }
@@ -129,7 +129,7 @@ export function unqualify(tableName: string): string {
     current += ch;
   }
   parts.push(current);
-  return unquoteIdentifier(parts[parts.length - 1]!);
+  return unquoteIdentifier(parts[parts.length - 1]);
 }
 
 function unquoteIdentifier(id: string): string {
@@ -390,7 +390,7 @@ export function generateModels(
 
   const emittedClasses = [...classes.values()].sort((a, b) => a.name.localeCompare(b.name));
   for (let i = 0; i < emittedClasses.length; i++) {
-    const cls = emittedClasses[i]!;
+    const cls = emittedClasses[i];
     out.push(`export class ${cls.name} extends Base {`);
     const staticLines: string[] = [];
 

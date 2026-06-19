@@ -158,9 +158,9 @@ export class SQLiteDatabaseTasks {
       let binds: unknown[] = [];
 
       if (ignoreTables.length > 0) {
-        const tablesRows = (await adapter.execute(
+        const tablesRows = await adapter.execute(
           "SELECT tbl_name FROM sqlite_master WHERE type IN ('table','view','index','trigger')",
-        )) as Array<Record<string, unknown>>;
+        );
         const allTables = Array.from(
           new Set(tablesRows.map((r) => String(r.tbl_name ?? "")).filter(Boolean)),
         );
@@ -183,7 +183,7 @@ export class SQLiteDatabaseTasks {
       }
 
       const query = `SELECT sql || ';' AS sql FROM sqlite_master ${where} ORDER BY ${typeOrder}, tbl_name, name`;
-      const rows = (await adapter.execute(query, binds)) as Array<Record<string, unknown>>;
+      const rows = await adapter.execute(query, binds);
       const output = rows.map((r) => String(r.sql ?? "")).join("\n");
       getFs().writeFileSync(filename, output);
     } finally {

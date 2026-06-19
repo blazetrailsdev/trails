@@ -36,7 +36,7 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     const details = this.extractDetails(options as Record<string, unknown>);
     const found = this.lookupContext.findAll(
       options.template as string,
-      (options.prefixes ?? []) as string[],
+      options.prefixes ?? [],
       false,
       keys,
       details,
@@ -44,7 +44,7 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
 
     const template =
       found.length > 0
-        ? found[0]!
+        ? found[0]
         : (this.lookupContext.findTemplate(
             options.template as string,
             (options.prefixes ?? [])[0] ?? "",
@@ -138,7 +138,7 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
         keys,
         detailsWithFormats,
       ) as RenderableTemplate[];
-      if (found.length > 0) return found[0]!;
+      if (found.length > 0) return found[0];
       const format = formats[0] ?? "html";
       return this.lookupContext.findLayout(layout, format) as unknown as RenderableTemplate | null;
     }

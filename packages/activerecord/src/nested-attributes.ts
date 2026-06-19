@@ -164,7 +164,7 @@ export function assignNestedAttributes(
   } else {
     // Sort by keys before converting to array (Rails sorts hash keys)
     const sortedKeys = Object.keys(attributesArray).sort();
-    attrs = sortedKeys.map((k) => (attributesArray as Record<string, Record<string, unknown>>)[k]);
+    attrs = sortedKeys.map((k) => attributesArray[k]);
   }
 
   // Rails raises TooManyRecords synchronously from
@@ -636,7 +636,7 @@ export function assignNestedAttributesForCollectionAssociation(
       const targetModel = resolveCollectionTargetModel(record, associationName);
       if (targetModel) {
         for (const a of attrs) {
-          const id = (a as Record<string, unknown>).id;
+          const id = a.id;
           if (id != null && id !== "" && hasDestroyFlag(a)) {
             const existing = findRecordById(targetModel, loaded, id);
             if (existing) markForDestruction(existing);
@@ -729,7 +729,7 @@ function populateInMemoryExistingRecord(
   // attributes would otherwise satisfy `reject_if`.
   const proxy = collectionProxyFor(record, associationName);
   const id = (attrs as any).id;
-  let existing = findRecordById(targetModel, proxy.target as Base[], id);
+  let existing = findRecordById(targetModel, proxy.target, id);
   let isNewStub = false;
   if (!existing) {
     if (proxy.loaded) {
@@ -795,7 +795,7 @@ function loadedCollectionTarget(record: Base, associationName: string): Base[] {
   const proxy = (record as any)._collectionProxies?.get?.(associationName) as
     | { target?: unknown[] }
     | undefined;
-  return Array.isArray(proxy?.target) ? (proxy!.target as Base[]) : [];
+  return Array.isArray(proxy?.target) ? (proxy.target as Base[]) : [];
 }
 
 /**
@@ -826,9 +826,7 @@ function resolveCollectionTargetModel(
   const associations: any[] = (ctor as any)._associations ?? [];
   const assocDef = associations.find((a: any) => a.name === associationName);
   if (!assocDef) return undefined;
-  return modelRegistry.get(collectionAssociationClassName(assocDef, associationName)) as
-    | typeof Base
-    | undefined;
+  return modelRegistry.get(collectionAssociationClassName(assocDef, associationName));
 }
 
 export const InstanceMethods = {

@@ -100,7 +100,7 @@ export function serializableHash(
             `includes / preload) — synchronous serialization cannot query the database.`,
         );
       }
-      const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
+      const items = Array.isArray(records) ? records : Array.from(records);
       // This callback only runs in the sync build, so nested includes build
       // sync too (pass `sync: true`) rather than returning their own thenables.
       safeSet(
@@ -319,7 +319,7 @@ async function preloadIncludes(
     const children = isSerializableCollection(records)
       ? Array.isArray(records)
         ? records
-        : Array.from(records as Iterable<unknown>)
+        : Array.from(records)
       : // Any resolved singular object (AR record or `_attributes`-less PORO)
         // may itself carry nested includes to preload.
         records != null && typeof records === "object"
@@ -381,7 +381,7 @@ export function asJsonThenable(
   const finalize = (raw: unknown): Record<string, unknown> => {
     const hash = coerceForJson(raw) as Record<string, unknown>;
     if (root === false || root == null) return hash;
-    return { [root === true ? element() : (root as string)]: hash };
+    return { [root === true ? element() : root]: hash };
   };
   if (!hasIncludes(options)) return finalize(serialize());
   return thenableHash(

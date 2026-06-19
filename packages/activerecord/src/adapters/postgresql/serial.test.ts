@@ -19,7 +19,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   // Mirrors Rails' `PostgresqlSerial.columns_hash[name]` — fetch a column by
   // name from the live adapter introspection.
   const columnNamed = async (table: string, name: string): Promise<Column> => {
-    const cols = (await adapter.columns(table)) as Column[];
+    const cols = await adapter.columns(table);
     const col = cols.find((c) => c.name === name);
     if (!col) throw new Error(`column ${name} not found on ${table}`);
     return col;
@@ -134,7 +134,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("serial columns", async () => {
-      const columns = (await adapter.columns("foo")) as Column[];
+      const columns = await adapter.columns("foo");
       for (const column of columns) {
         expect(column.type).toBe("integer");
         expect(column.isSerial).toBe(true);
@@ -169,7 +169,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("serial columns", async () => {
-      const columns = (await adapter.columns(tableName)) as Column[];
+      const columns = await adapter.columns(tableName);
       for (const column of columns) {
         expect(column.type).toBe("integer");
         expect(column.isSerial).toBe(true);

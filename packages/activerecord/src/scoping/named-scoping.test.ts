@@ -52,9 +52,7 @@ describe("NamedScopingTest", () => {
   it("implements enumerable", async () => {
     expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
     expect(ids(await (Topic as any).base().toArray())).toEqual(ids(await Topic.all().toArray()));
-    expect(((await (Topic as any).base().first()) as any).id).toBe(
-      ((await Topic.first()) as any).id,
-    );
+    expect((await (Topic as any).base().first()).id).toBe(((await Topic.first()) as any).id);
   });
 
   it("found items are cached", async () => {
@@ -355,12 +353,12 @@ describe("NamedScopingTest", () => {
   });
 
   it("should create on top of scope", async () => {
-    const topic = (await (Topic as any).approved().create({})) as any;
+    const topic = await (Topic as any).approved().create({});
     expect(topic.approved).toBe(true);
   });
 
   it("should create with bang on top of scope", async () => {
-    const topic = (await (Topic as any).approved().create({})) as any;
+    const topic = await (Topic as any).approved().create({});
     expect(topic.approved).toBe(true);
   });
 
@@ -402,7 +400,7 @@ describe("NamedScopingTest", () => {
 
   it("rand should select a random object from proxy", async () => {
     const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";
-    const sample = (await (Topic as any).approved().order(randomFn).first()) as any;
+    const sample = await (Topic as any).approved().order(randomFn).first();
     expect(sample).toBeInstanceOf(Topic);
   });
 
@@ -449,10 +447,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("chaining applies last conditions when creating", () => {
-    expect(((Topic as any).rejected().new({}) as any).approved).toBe(false);
-    expect(((Topic as any).rejected().approved().new({}) as any).approved).toBe(true);
-    expect(((Topic as any).approved().rejected().new({}) as any).approved).toBe(false);
-    expect(((Topic as any).approved().rejected().approved().new({}) as any).approved).toBe(true);
+    expect((Topic as any).rejected().new({}).approved).toBe(false);
+    expect((Topic as any).rejected().approved().new({}).approved).toBe(true);
+    expect((Topic as any).approved().rejected().new({}).approved).toBe(false);
+    expect((Topic as any).approved().rejected().approved().new({}).approved).toBe(true);
   });
 
   it("chaining combines conditions when searching", async () => {
@@ -525,9 +523,9 @@ describe("NamedScopingTest", () => {
 
   it("scopes on relations", async () => {
     const approvedTopics = (Topic as any).all().approved().order("id DESC");
-    expect(((await approvedTopics.first()) as any).id).toBe(topics("fifth").id);
+    expect((await approvedTopics.first()).id).toBe(topics("fifth").id);
     const repliedApproved = approvedTopics.replied();
-    expect(((await repliedApproved.first()) as any).id).toBe(topics("third").id);
+    expect((await repliedApproved.first()).id).toBe(topics("third").id);
   });
 
   it("index on scope", async () => {

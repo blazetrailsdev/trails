@@ -123,7 +123,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
     env["action_dispatch.content_security_policy"] = policy;
     const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
     const [, headers] = await new ContentSecurityPolicyMiddleware(app).call(env);
-    const header = headers[CONTENT_SECURITY_POLICY] as string;
+    const header = headers[CONTENT_SECURITY_POLICY];
     expect(header).toMatch(/script-src 'self' 'nonce-/);
     expect(header).not.toMatch(/style-src 'self' 'nonce-/);
   });

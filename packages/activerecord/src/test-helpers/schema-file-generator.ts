@@ -46,9 +46,7 @@ function isWrapped(t: TableSchema): t is {
 }
 
 function columnsOf(t: TableSchema): Record<string, ColumnSpec> {
-  return isWrapped(t)
-    ? (t as { columns: Record<string, ColumnSpec> }).columns
-    : (t as Record<string, ColumnSpec>);
+  return isWrapped(t) ? (t as { columns: Record<string, ColumnSpec> }).columns : t;
 }
 
 function primaryKeyOf(t: TableSchema): string[] | false | undefined {

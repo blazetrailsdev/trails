@@ -40,7 +40,7 @@ describe("virtualize — deltas", () => {
       "}\n";
     const { deltas } = virtualize(src, "post.ts");
     expect(deltas).toHaveLength(1);
-    expect(deltas[0]!.lineCount).toBe(3); // leading \n + 2 declare lines
+    expect(deltas[0].lineCount).toBe(3); // leading \n + 2 declare lines
   });
 
   test("no deltas when no class matches Base", () => {
@@ -410,8 +410,8 @@ describe("virtualize — multiple classes", () => {
     expect(remapLine(commentBodyVLine, deltas)).toBe(5);
 
     // Injected lines (inside either block) return null.
-    expect(remapLine(deltas[0]!.insertedAtLine + 1, deltas)).toBeNull();
-    expect(remapLine(deltas[1]!.insertedAtLine + 1, deltas)).toBeNull();
+    expect(remapLine(deltas[0].insertedAtLine + 1, deltas)).toBeNull();
+    expect(remapLine(deltas[1].insertedAtLine + 1, deltas)).toBeNull();
   });
 });
 
@@ -531,7 +531,7 @@ describe("virtualize — include() interface bridge", () => {
     expect(text).toMatch(/__TrailsIncluded<typeof Persistence[\s\S]*\.InstanceMethods>/);
     // Delta line count must reflect ACTUAL physical lines in the
     // prepended block, not the entry count.
-    const headDelta = deltas[0]!;
+    const headDelta = deltas[0];
     const headLines = text
       .slice(0, indexOfNthNewline(text, headDelta.insertedAtLine + headDelta.lineCount + 1))
       .split(/\r?\n/);

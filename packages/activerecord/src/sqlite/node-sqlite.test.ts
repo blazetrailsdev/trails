@@ -64,8 +64,8 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
     const stmt = await conn.prepare("SELECT id, name, qty FROM widgets");
     const cols = stmt.columns();
     expect(cols.length).toBe(3);
-    expect(cols[0]!.name).toBe("id");
-    expect(cols[0]!.column === null || typeof cols[0]!.column === "string").toBe(true);
+    expect(cols[0].name).toBe("id");
+    expect(cols[0].column === null || typeof cols[0].column === "string").toBe(true);
   });
 
   it("setReadBigInts enables bigint returns", async () => {

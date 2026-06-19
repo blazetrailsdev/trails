@@ -1,4 +1,4 @@
-import type { ClassDecl, ClassOpts, Field, Ref } from "./types.js";
+import type { ClassDecl, ClassOpts, Ref } from "./types.js";
 import { type EmitResult, emitField, emitMethod, isMethod } from "./emit-method.js";
 import { refMeta } from "./refs.js";
 
@@ -26,7 +26,7 @@ export function emitClass(c: ClassDecl): EmitResult {
   }
   const members: string[] = [];
   for (const m of c.body) {
-    const e = isMethod(m) ? emitMethod(m) : emitField(m as Field);
+    const e = isMethod(m) ? emitMethod(m) : emitField(m);
     valueRefs.push(...e.valueRefs);
     typeRefs.push(...e.typeRefs);
     members.push(isMethod(m) ? e.text : `  ${e.text}`);

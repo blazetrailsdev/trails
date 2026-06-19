@@ -102,7 +102,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
         const errors = [result1, result2]
           .filter((r) => r.status === "rejected")
-          .map((r) => (r as PromiseRejectedResult).reason);
+          .map((r) => r.reason);
 
         expect(errors).toHaveLength(1);
         expect(errors[0]).toBeInstanceOf(Deadlocked);

@@ -233,7 +233,7 @@ export function createOrUpdate(this: any): Promise<boolean> {
 /** @internal */
 export async function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
-  const ctor = this.constructor as any;
+  const ctor = this.constructor;
   return runAllCallbacks(ctor.prototype, "create", this, async () => {
     if ((this.recordTimestamps ?? ctor.recordTimestamps) !== false) {
       const time = currentTimeFromProperTimezone();
@@ -275,7 +275,7 @@ export async function _updateRecord(this: any): Promise<boolean> {
   // Rails: _run_update_callbacks { record_update_timestamps { super } } — returns boolean.
   // record_update_timestamps writes updated_at/updated_on when @_touch_record
   // and should_record_timestamps? are true, then yields to the actual update.
-  const ctor = this.constructor as any;
+  const ctor = this.constructor;
   return runAllCallbacks(ctor.prototype, "update", this, async () => {
     // Mirror record_update_timestamps: write timestamp columns before the update
     // when the model has record_timestamps enabled and has changes to save.

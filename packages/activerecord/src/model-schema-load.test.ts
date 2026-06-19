@@ -299,7 +299,7 @@ describe("loadSchemaFromAdapter integration details", () => {
 
     const inflight = (loadSchemaFromAdapter as any).call(host);
 
-    host.adapter = secondAdapter as unknown as typeof host.adapter;
+    host.adapter = secondAdapter as typeof host.adapter;
     resolveColumns({ guid: { sqlType: "uuid" } });
     await inflight;
 

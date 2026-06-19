@@ -38,7 +38,7 @@ describe("TestSelectCore", () => {
   it("set quantifier", () => {
     const mgr = new SelectManager(users);
     mgr.project(star).distinct();
-    expect((mgr.ast.cores[0] as Nodes.SelectCore).setQuantifier).toBeInstanceOf(Nodes.Distinct);
+    expect(mgr.ast.cores[0].setQuantifier).toBeInstanceOf(Nodes.Distinct);
     expect(mgr.toSql()).toContain("SELECT DISTINCT");
   });
 });

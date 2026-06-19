@@ -86,7 +86,7 @@ export default config;
     expect(migrationEntry, "generated migration file should exist").toBeTruthy();
 
     const migrationPath = join(migrateDir, migrationEntry!);
-    const version = migrationEntry!.split("_")[0]!;
+    const version = migrationEntry!.split("_")[0];
 
     // 5. Patch the generated migration
     await writeFile(migrationPath, MIGRATION_BODY, "utf8");

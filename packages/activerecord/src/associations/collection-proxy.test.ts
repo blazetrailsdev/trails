@@ -261,7 +261,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     // Use `_loaded` as a sentinel to grab the first record then concatenate.
     const concat = proxy.reduce((acc, p) => {
       // ts-ignore the lie: we're concatenating titles for a string demo
-      return { ...acc, title: (acc as ApPost).title + p.title } as ApPost;
+      return { ...acc, title: acc.title + p.title } as ApPost;
     });
     expect(concat.title).toBe("abc");
   });

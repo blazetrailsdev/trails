@@ -15,7 +15,6 @@ import {
   HelperMethodBuilder,
   isModelClass,
   symbolToString,
-  type ModelClass,
   type PolymorphicHost,
   type PolymorphicMappingEntry,
   type ToModel,
@@ -141,7 +140,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     return builder.handleStringCall(target, symbolToString(options));
   }
   if (isModelClass(options)) {
-    return builder.handleClassCall(target, options as ModelClass);
+    return builder.handleClassCall(target, options);
   }
   return builder.handleModelCall(target, options as ToModel);
 }

@@ -123,7 +123,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     expect(typeof ciphertext).toBe("string");
     expect(ciphertext).not.toBe("Dune");
     // Verify the ciphertext decrypts to the correct value.
-    const type = (Book as any)._attributeDefinitions?.get("name")?.type;
+    const type = Book._attributeDefinitions?.get("name")?.type;
     expect(type.deserialize(ciphertext)).toBe("Dune");
   });
 
@@ -137,7 +137,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const reloaded = await Post.find(post.id);
     const ciphertext = reloaded.ciphertextFor("title");
     expect(ciphertext).toBe(reloaded.readAttributeBeforeTypeCast("title"));
-    const type = (Post as any)._attributeDefinitions?.get("title")?.type;
+    const type = Post._attributeDefinitions?.get("title")?.type;
     expect(type.deserialize(ciphertext)).toBe("Fear is the mind-killer");
   });
 
@@ -146,7 +146,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const book = await Book.create({ name: "Dune" });
     book.name = "Arrakis";
     const ciphertext = book.ciphertextFor("name");
-    const type = (Book as any)._attributeDefinitions?.get("name")?.type;
+    const type = Book._attributeDefinitions?.get("name")?.type;
     expect(type.deserialize(ciphertext)).toBe("Arrakis");
   });
 
@@ -155,16 +155,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const book = await Book.create({ name: "Dune" });
     await book.decrypt();
     const ciphertext = book.ciphertextFor("name");
-    const type = (Book as any)._attributeDefinitions?.get("name")?.type;
+    const type = Book._attributeDefinitions?.get("name")?.type;
     expect(type.deserialize(ciphertext)).toBe("Dune");
   });
 
   it("ciphertext_for returns the ciphertext of a value when the record is new", async () => {
     const Book = makeEncryptedBook(await freshAdapter());
-    const book = new Book() as any;
+    const book = new Book();
     book.name = "Dune";
     const ciphertext = book.ciphertextFor("name");
-    const type = (Book as any)._attributeDefinitions?.get("name")?.type;
+    const type = Book._attributeDefinitions?.get("name")?.type;
     expect(type.deserialize(ciphertext)).toBe("Dune");
   });
 
@@ -181,7 +181,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const author = await Author.create({ name: "david" });
 
     // Encrypt "dhh" using the previous scheme to simulate an old row.
-    const type = (Author as any)._attributeDefinitions?.get("name")?.type;
+    const type = Author._attributeDefinitions?.get("name")?.type;
     expect(type.previousTypes.length).toBeGreaterThan(0);
     const prevType = type.previousTypes[0];
     const oldCiphertext = prevType.serialize("dhh") as string;

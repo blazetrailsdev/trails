@@ -72,11 +72,11 @@ export class Trailtie extends Initializable {
   }
 
   static get config(): Configuration {
-    return (this as typeof Trailtie).instance().config;
+    return this.instance().config;
   }
 
   static configure(block: (this: Trailtie) => void): void {
-    (this as typeof Trailtie).instance().configure(block);
+    this.instance().configure(block);
   }
 
   static rakeTasks(block: TrailtieBlock): void {

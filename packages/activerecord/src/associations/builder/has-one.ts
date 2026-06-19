@@ -31,7 +31,7 @@ export class HasOne extends SingularAssociation {
       !Array.isArray(scope) &&
       !(scope instanceof Function)
     ) {
-      options = scope as Record<string, unknown>;
+      options = scope;
       scope = null;
     }
     if (options.counterCache) {
@@ -119,12 +119,12 @@ export class HasOne extends SingularAssociation {
     });
     if (typeof model.afterTouch === "function") {
       model.afterTouch(async (record: any) => {
-        if ((record as any)._touchingAssociations) return;
-        (record as any)._touchingAssociations = true;
+        if (record._touchingAssociations) return;
+        record._touchingAssociations = true;
         try {
           await HasOne.touchRecord(record, name, touch);
         } finally {
-          (record as any)._touchingAssociations = false;
+          record._touchingAssociations = false;
         }
       });
     }

@@ -251,7 +251,7 @@ export class CommandRecorder {
       options = { ...(a.pop() as Record<string, unknown>) };
     }
     const table = a[0];
-    let columns = a[1] as unknown;
+    let columns = a[1];
     if (columns === undefined) {
       columns = options["column"];
       delete options["column"];
@@ -304,7 +304,7 @@ export class CommandRecorder {
       options = { ...(a.pop() as Record<string, unknown>) };
     }
     const fromTable = a[0];
-    let toTable = a[1] as unknown;
+    let toTable = a[1];
     if (toTable === undefined) {
       toTable = options["toTable"];
       delete options["toTable"];
@@ -491,8 +491,8 @@ export class CommandRecorder {
 
   /** @internal */
   invertChangeColumnNull(args: unknown[]): [string, unknown[]] {
-    const a = args.slice() as unknown[];
-    (a as unknown[])[2] = !(a[2] as boolean);
+    const a = args.slice();
+    a[2] = !(a[2] as boolean);
     return ["changeColumnNull", a];
   }
 

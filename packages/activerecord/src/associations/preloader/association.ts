@@ -465,7 +465,7 @@ export class LoaderQuery {
       return this.scope.where(whereObj).toArray();
     }
 
-    return this.scope.where({ [this.associationKeyName as string]: keys }).toArray();
+    return this.scope.where({ [this.associationKeyName]: keys }).toArray();
   }
 
   recordsFor(loaders: Association[]): Promise<Base[]> {

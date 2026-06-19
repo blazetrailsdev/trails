@@ -153,7 +153,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
   it("includes() preloads nested-through and binds results into _preloadedAssociations", async () => {
     const { a, r1, r2, r3 } = await seed();
     const loaded = (await NtdAuthor.all().includes("ntdAllRatings").toArray()) as any[];
-    const author = loaded.find((row) => row.id === a.id) as any;
+    const author = loaded.find((row) => row.id === a.id);
     expect(author).toBeDefined();
     const preloaded = author._preloadedAssociations?.get("ntdAllRatings") as any[];
     expect(preloaded).toBeDefined();
@@ -163,7 +163,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
   it("includes() preloads the direct-through intermediate independently from the nested-through", async () => {
     const { a, c1, c2, c3 } = await seed();
     const loaded = (await NtdAuthor.all().includes("ntdAllComments").toArray()) as any[];
-    const author = loaded.find((row) => row.id === a.id) as any;
+    const author = loaded.find((row) => row.id === a.id);
     const preloaded = author._preloadedAssociations?.get("ntdAllComments") as any[];
     expect(preloaded.map((c: any) => c.id).sort()).toEqual([c1.id, c2.id, c3.id].sort());
   });
@@ -174,7 +174,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
       .includes("ntdAllRatings")
       .where({ id: a.id })
       .toArray()) as any[];
-    const author = loaded.find((row) => row.id === a.id) as any;
+    const author = loaded.find((row) => row.id === a.id);
     expect(author).toBeDefined();
     const preloaded = author._preloadedAssociations?.get("ntdAllRatings") as any[];
     // Filtering the outer relation must not silently drop preloaded

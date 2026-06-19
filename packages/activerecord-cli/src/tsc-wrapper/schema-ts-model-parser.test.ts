@@ -83,7 +83,7 @@ describe("parseSchemaForModels", () => {
     `;
     const books = tableNamed(source, "books");
     expect(books.foreignKeys).toHaveLength(1);
-    const fk = books.foreignKeys[0]!;
+    const fk = books.foreignKeys[0];
     expect(fk.fromTable).toBe("books");
     expect(fk.toTable).toBe("authors");
     expect(fk.column).toBe("author_id");
@@ -100,7 +100,7 @@ describe("parseSchemaForModels", () => {
         await ctx.addForeignKey("reviews", "books");
       }
     `;
-    const fk = tableNamed(source, "reviews").foreignKeys[0]!;
+    const fk = tableNamed(source, "reviews").foreignKeys[0];
     expect(fk.column).toBe("book_id");
     // Synthesized name mirrors Rails' fk_rails_<10hex> so it round-trips through SchemaDumper.
     expect(fk.name).toBe("fk_rails_924a0b30ca");
@@ -116,7 +116,7 @@ describe("parseSchemaForModels", () => {
         await ctx.addForeignKey("memberships", "accounts", { column: "tenant_id,account_id" });
       }
     `;
-    const fk = tableNamed(source, "memberships").foreignKeys[0]!;
+    const fk = tableNamed(source, "memberships").foreignKeys[0];
     expect(fk.column).toBe("tenant_id,account_id");
     // sha256("memberships_tenant_id_and_account_id_fk").slice(0,10)
     expect(fk.name).toBe("fk_rails_4bc705af9c");
@@ -131,7 +131,7 @@ describe("parseSchemaForModels", () => {
         await ctx.addForeignKey("comments", "posts", { column: "post_id", primaryKey: "uuid", onDelete: "cascade", validate: false });
       }
     `;
-    const fk = tableNamed(source, "comments").foreignKeys[0]!;
+    const fk = tableNamed(source, "comments").foreignKeys[0];
     expect(fk.column).toBe("post_id");
     expect(fk.primaryKey).toBe("uuid");
     expect(fk.onDelete).toBe("cascade");
@@ -158,8 +158,8 @@ describe("parseSchemaForModels", () => {
     expect(tables.map((t) => t.name)).toEqual(["authors", "books", "reviews"]);
     expect(tables.find((t) => t.name === "authors")!.foreignKeys).toEqual([]);
     expect(tables.find((t) => t.name === "books")!.foreignKeys).toHaveLength(1);
-    expect(tables.find((t) => t.name === "books")!.foreignKeys[0]!.toTable).toBe("authors");
-    expect(tables.find((t) => t.name === "reviews")!.foreignKeys[0]!.column).toBe("book_id");
+    expect(tables.find((t) => t.name === "books")!.foreignKeys[0].toTable).toBe("authors");
+    expect(tables.find((t) => t.name === "reviews")!.foreignKeys[0].column).toBe("book_id");
   });
 
   it("produces a shape generateModels consumes into correct classes and associations", () => {

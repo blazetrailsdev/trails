@@ -275,7 +275,7 @@ export class HasOneAssociation extends SingularAssociation {
 
 /** @internal */
 async function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<void> {
-  const target = assoc.target as Base | null;
+  const target = assoc.target;
   if (!target) return;
   if (method === "delete") {
     await ((target as any).delete?.() ?? Promise.resolve());

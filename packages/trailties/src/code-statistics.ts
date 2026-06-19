@@ -101,7 +101,7 @@ export class CodeStatistics {
       if (st.isDirectory()) {
         if (!name.startsWith(".")) stats.add(await this.walk(full));
       } else if (FILE_PATTERN.test(name)) {
-        await stats.addByFilePath(full, (p) => fs.readFile!(p, "utf-8") as Promise<string>);
+        await stats.addByFilePath(full, (p) => fs.readFile!(p, "utf-8"));
       }
     }
     return stats;

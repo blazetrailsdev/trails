@@ -304,9 +304,7 @@ export function mergeAndNormalizeCacheControlBang(
     delete control.no_cache;
     delete control.no_store;
     if (control.extras) {
-      cacheControl.extras = [
-        ...new Set([...(cacheControl.extras ?? []), ...(control.extras as string[])]),
-      ];
+      cacheControl.extras = [...new Set([...(cacheControl.extras ?? []), ...control.extras])];
       delete control.extras;
     }
     Object.assign(control, cacheControl);
@@ -319,7 +317,7 @@ export function mergeAndNormalizeCacheControlBang(
   } else if (control.no_cache) {
     if (control.public) options.push(PUBLIC);
     options.push(NO_CACHE);
-    if (control.extras) options.push(...(control.extras as string[]));
+    if (control.extras) options.push(...control.extras);
   } else {
     const max = control.max_age;
     const swr = control.stale_while_revalidate;
@@ -330,7 +328,7 @@ export function mergeAndNormalizeCacheControlBang(
     if (swr !== undefined) options.push(`stale-while-revalidate=${parseInt(String(swr), 10) || 0}`);
     if (sie !== undefined) options.push(`stale-if-error=${parseInt(String(sie), 10) || 0}`);
     if (control.immutable) options.push(IMMUTABLE);
-    if (control.extras) options.push(...(control.extras as string[]));
+    if (control.extras) options.push(...control.extras);
   }
   this.setHeader(CACHE_CONTROL, options.join(", "));
 }

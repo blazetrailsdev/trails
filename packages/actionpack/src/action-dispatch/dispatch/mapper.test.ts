@@ -43,7 +43,7 @@ describe("MapperTest", () => {
     // pending: route.path does not include .:format suffix; format suffix lives in route.formatted
     const m = new Mapper();
     m.get("/foo", { to: "posts#index", as: "main", format: true });
-    const route = m.routes[0]!;
+    const route = m.routes[0];
     expect(route.defaults).toEqual({ controller: "posts", action: "index" });
     expect(route.path).toBe("/foo.:format");
   });
@@ -55,7 +55,7 @@ describe("MapperTest", () => {
     m.scope({ format: true } as Parameters<Mapper["scope"]>[0], () => {
       m.get("/foo", { to: "posts#index", as: "main" });
     });
-    const route = m.routes[0]!;
+    const route = m.routes[0];
     expect(route.defaults).toEqual({ controller: "posts", action: "index" });
     expect(route.path).toBe("/foo.:format");
   });
@@ -67,7 +67,7 @@ describe("MapperTest", () => {
     m.scope({ omg: "awesome" } as Parameters<Mapper["scope"]>[0], () => {
       m.get("/", { to: "posts#index", as: "main" });
     });
-    const route = m.routes[0]!;
+    const route = m.routes[0];
     expect(route.defaults).toMatchObject({ omg: "awesome", controller: "posts", action: "index" });
     expect(route.verb).toBe("GET");
   });
@@ -84,7 +84,7 @@ describe("MapperTest", () => {
     m.scope({ via: "put" } as Parameters<Mapper["scope"]>[0], () => {
       m.match("/", { to: "posts#index", as: "main" });
     });
-    expect(m.routes[0]!.verb).toBe("PUT");
+    expect(m.routes[0].verb).toBe("PUT");
   });
 
   // Rails: test_to_scope
@@ -95,15 +95,15 @@ describe("MapperTest", () => {
       m.get("all");
       m.post("most");
     });
-    expect((m.routes[0]!.defaults as Record<string, unknown>)["to"]).toBe("posts#index");
-    expect((m.routes[1]!.defaults as Record<string, unknown>)["to"]).toBe("posts#index");
+    expect((m.routes[0].defaults as Record<string, unknown>)["to"]).toBe("posts#index");
+    expect((m.routes[1].defaults as Record<string, unknown>)["to"]).toBe("posts#index");
   });
 
   // Rails: test_map_slash
   it("map slash", () => {
     const m = new Mapper();
     m.get("/", { to: "posts#index", as: "main" });
-    expect(m.routes[0]!.path).toBe("/");
+    expect(m.routes[0].path).toBe("/");
   });
 
   // Rails: test_map_more_slashes
@@ -111,7 +111,7 @@ describe("MapperTest", () => {
     // pending: route.path does not include the (.:format) suffix automatically
     const m = new Mapper();
     m.get("/one/two/", { to: "posts#index", as: "main" });
-    expect(m.routes[0]!.path).toBe("/one/two(.:format)");
+    expect(m.routes[0].path).toBe("/one/two(.:format)");
   });
 
   // Rails: test_map_wildcard
@@ -119,7 +119,7 @@ describe("MapperTest", () => {
     // pending: glob wildcard requirements (/.+?/ms) not auto-set; path lacks (.:format)
     const m = new Mapper();
     m.get("/*path", { to: "pages#show" });
-    const route = m.routes[0]!;
+    const route = m.routes[0];
     expect(route.path).toBe("/*path(.:format)");
     expect((route.requirements as Record<string, RegExp>)["path"]).toEqual(/.+?/ms);
   });
@@ -129,7 +129,7 @@ describe("MapperTest", () => {
     // pending: glob wildcard requirements not auto-set; path lacks format suffix
     const m = new Mapper();
     m.get("/*path/foo/:bar", { to: "pages#show" });
-    const route = m.routes[0]!;
+    const route = m.routes[0];
     expect(route.path).toBe("/*path/foo/:bar(.:format)");
     expect((route.requirements as Record<string, RegExp>)["path"]).toEqual(/.+?/ms);
   });
@@ -139,7 +139,7 @@ describe("MapperTest", () => {
     // pending: glob wildcard requirements not auto-set; path lacks format suffix
     const m = new Mapper();
     m.get("/*foo/*bar", { to: "pages#show" });
-    const route = m.routes[0]!;
+    const route = m.routes[0];
     expect(route.path).toBe("/*foo/*bar(.:format)");
     expect((route.requirements as Record<string, RegExp>)["foo"]).toEqual(/.+?/ms);
     expect((route.requirements as Record<string, RegExp>)["bar"]).toEqual(/.+?/ms);
@@ -150,7 +150,7 @@ describe("MapperTest", () => {
     // pending: route.path does not reflect format: false; glob requirements not auto-set
     const m = new Mapper();
     m.get("/*path", { to: "pages#show", format: false });
-    const route = m.routes[0]!;
+    const route = m.routes[0];
     expect(route.path).toBe("/*path");
     expect((route.requirements as Record<string, unknown>)["path"]).toBeUndefined();
   });
@@ -160,7 +160,7 @@ describe("MapperTest", () => {
     // pending: route.path does not include .:format suffix
     const m = new Mapper();
     m.get("/*path", { to: "pages#show", format: true });
-    expect(m.routes[0]!.path).toBe("/*path.:format");
+    expect(m.routes[0].path).toBe("/*path.:format");
   });
 
   const app = (_env: Record<string, unknown>) => [200, {}, bodyFromString("")] as const;

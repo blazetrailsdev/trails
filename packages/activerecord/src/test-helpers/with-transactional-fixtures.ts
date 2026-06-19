@@ -54,7 +54,7 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
  * @internal
  */
 function clearSchemaCache(adapter: TransactionalFixturesAdapter): void {
-  (adapter as DatabaseAdapter).schemaCache?.clear();
+  adapter.schemaCache?.clear();
 }
 
 /**

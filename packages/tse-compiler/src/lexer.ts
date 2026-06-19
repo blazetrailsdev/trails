@@ -39,7 +39,7 @@ function lineAt(lineStarts: readonly number[], offset: number): number {
   let hi = lineStarts.length;
   while (lo < hi) {
     const mid = (lo + hi) >>> 1;
-    if (lineStarts[mid]! <= offset) lo = mid + 1;
+    if (lineStarts[mid] <= offset) lo = mid + 1;
     else hi = mid;
   }
   return lo - 1;

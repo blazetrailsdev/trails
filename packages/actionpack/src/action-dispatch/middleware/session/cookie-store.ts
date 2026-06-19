@@ -65,7 +65,7 @@ export class CookieStore extends AbstractSecureStore {
     _sessionId: unknown,
     options: { drop?: boolean } = {},
   ): RackSessionId | null {
-    const newSid = options.drop ? null : (this.generateSid() as RackSessionId);
+    const newSid = options.drop ? null : this.generateSid();
     req.setHeader(
       "action_dispatch.request.unsigned_session_cookie",
       newSid ? { session_id: newSid.publicId } : {},
@@ -109,7 +109,7 @@ export class CookieStore extends AbstractSecureStore {
   ): Record<string, unknown> {
     const out = data ?? {};
     if (out["session_id"] == null) {
-      out["session_id"] = sid ? sid.publicId : (this.generateSid() as RackSessionId).publicId;
+      out["session_id"] = sid ? sid.publicId : this.generateSid().publicId;
     }
     return out;
   }

@@ -23,7 +23,7 @@ describe("ModelGeneratorTest", () => {
       attributes: ["title:string", "views:integer"],
     }).run();
     expect(files).toContain("app/models/post.ts");
-    const content = fs.readFileSync(path.join(tmpDir, files[0]!), "utf-8");
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
     expect(content).toContain("export class Post extends Base");
     expect(content).toContain("title!: string;");
     expect(content).toContain("views!: number;");
@@ -38,7 +38,7 @@ describe("ModelGeneratorTest", () => {
     const gen = new ModelGenerator({ cwd: tmpDir, output: () => {}, name: "admin/user" });
     const files = gen.run();
     expect(files).toContain("app/models/admin/user.ts");
-    expect(fs.readFileSync(path.join(tmpDir, files[0]!), "utf-8")).toContain(
+    expect(fs.readFileSync(path.join(tmpDir, files[0]), "utf-8")).toContain(
       "export class AdminUser extends Base",
     );
   });

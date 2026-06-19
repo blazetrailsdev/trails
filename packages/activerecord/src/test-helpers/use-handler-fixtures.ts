@@ -2,7 +2,6 @@ import { Base } from "../base.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import {
   withTransactionalFixtures,
-  type TransactionalFixturesAdapter,
   type WithTransactionalFixturesOptions,
 } from "./with-transactional-fixtures.js";
 import {
@@ -61,7 +60,7 @@ export function useHandlerFixtures(
   const { usesTransaction, invalidateSchemaCache, ...fixtureOpts } = options ?? {};
 
   setupHandlerSuite();
-  withTransactionalFixtures(() => Base.connection as TransactionalFixturesAdapter, {
+  withTransactionalFixtures(() => Base.connection, {
     usesTransaction,
     invalidateSchemaCache,
   });

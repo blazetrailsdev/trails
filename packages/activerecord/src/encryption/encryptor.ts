@@ -175,7 +175,7 @@ export class Encryptor {
     if (typeof clearText !== "string") {
       const typeName =
         clearText != null && typeof clearText === "object"
-          ? ((clearText as object).constructor?.name ?? "object")
+          ? (clearText.constructor?.name ?? "object")
           : typeof clearText;
       throw new ForbiddenClass(`The encryptor can only encrypt string values (${typeName})`);
     }

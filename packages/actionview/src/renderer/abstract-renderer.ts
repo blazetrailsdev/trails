@@ -104,7 +104,7 @@ export class RenderedCollection {
   }
 
   get format(): string | null {
-    return this.renderedTemplates[0]!.format;
+    return this.renderedTemplates[0].format;
   }
 }
 
@@ -162,7 +162,7 @@ export function localVariable(path: string, options: Record<string, unknown>): s
   const base = path.endsWith("/") ? "" : path.split("/").pop()!;
   const match = /^_?(.*?)(?:\.\w+)*$/.exec(base);
   if (!match) raiseInvalidIdentifier(path);
-  return match![1];
+  return match[1];
 }
 
 /** @internal */

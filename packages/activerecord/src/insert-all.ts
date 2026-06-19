@@ -494,7 +494,7 @@ export class InsertAll {
       if (!cache || typeof cache.indexes !== "function") return [];
       indexes = await cache.indexes(conn.pool ?? conn, tableName);
     }
-    return (indexes as unknown[]).filter((i: any) => i.unique);
+    return indexes.filter((i: any) => i.unique);
   }
 
   /**

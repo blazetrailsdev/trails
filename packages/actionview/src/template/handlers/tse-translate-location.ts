@@ -90,8 +90,8 @@ export function tokenizeLine(line: string): SourceToken[] {
     textBuf = "";
   };
   for (const m of line.matchAll(LINE_TAG_RE)) {
-    textBuf += line.slice(last, m.index!);
-    last = m.index! + m[0].length;
+    textBuf += line.slice(last, m.index);
+    last = m.index + m[0].length;
     if (m[0] === "<%%") {
       textBuf += "<%";
       continue;

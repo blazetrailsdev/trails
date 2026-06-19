@@ -98,12 +98,12 @@ describe("MigratorTest", () => {
       ][];
 
       expect(parsed).toHaveLength(3);
-      expect(parsed[0]![0]).toBe("1");
-      expect(parsed[0]![1]).toBe("valid_people_have_last_names");
-      expect(parsed[1]![0]).toBe("2");
-      expect(parsed[1]![1]).toBe("we_need_reminders");
-      expect(parsed[2]![0]).toBe("3");
-      expect(parsed[2]![1]).toBe("innocent_jointable");
+      expect(parsed[0][0]).toBe("1");
+      expect(parsed[0][1]).toBe("valid_people_have_last_names");
+      expect(parsed[1][0]).toBe("2");
+      expect(parsed[1][1]).toBe("we_need_reminders");
+      expect(parsed[2][0]).toBe("3");
+      expect(parsed[2][1]).toBe("innocent_jointable");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -132,8 +132,8 @@ describe("MigratorTest", () => {
       ][];
 
       expect(parsed).toHaveLength(1);
-      expect(parsed[0]![0]).toBe("9");
-      expect(parsed[0]![1]).toBe("add_expressions");
+      expect(parsed[0][0]).toBe("9");
+      expect(parsed[0][1]).toBe("add_expressions");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -230,7 +230,7 @@ describe("MigratorTest", () => {
           const parsed = migrator.parseMigrationFilename(f);
           if (!parsed) return null;
           const [version, name] = parsed;
-          return makeMigration(version!, name!);
+          return makeMigration(version, name);
         })
         .filter(Boolean) as ReturnType<typeof makeMigration>[];
 
@@ -265,7 +265,7 @@ describe("MigratorTest", () => {
           const parsed = migrator.parseMigrationFilename(f);
           if (!parsed) return null;
           const [version, name] = parsed;
-          return makeMigration(version!, name!);
+          return makeMigration(version, name);
         })
         .filter(Boolean) as ReturnType<typeof makeMigration>[];
 
@@ -324,9 +324,9 @@ describe("MigratorTest", () => {
       const proxies = Migrator.fromPath(root, adapter);
       expect(proxies).toHaveLength(3);
       expect(proxies.map((p) => p.version)).toEqual(["1", "2", "10"]);
-      expect(proxies[0]!.name).toBe("ValidPeopleHaveLastNames");
-      expect(proxies[1]!.name).toBe("WeNeedReminders");
-      expect(proxies[2]!.name).toBe("LateMigration");
+      expect(proxies[0].name).toBe("ValidPeopleHaveLastNames");
+      expect(proxies[1].name).toBe("WeNeedReminders");
+      expect(proxies[2].name).toBe("LateMigration");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

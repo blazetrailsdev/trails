@@ -62,7 +62,7 @@ export function setupBang(this: AcceptanceHost, klass: unknown): void {
       get:
         inherited.getter ??
         function (this: Record<string, unknown>) {
-          return this[slot] as unknown;
+          return this[slot];
         },
       set:
         inherited.setter ??

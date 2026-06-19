@@ -856,7 +856,7 @@ it("pin connection isolation across execution contexts", async () => {
       expect(ctx2Conn).not.toBe(ctx1Conn);
 
       // Checkin of ctx2's pinned connection is a no-op (still pinned)
-      pool.checkin(ctx2Conn!);
+      pool.checkin(ctx2Conn);
       expect(pool.checkout()).toBe(ctx2Conn);
 
       await pool.unpinConnectionBang();

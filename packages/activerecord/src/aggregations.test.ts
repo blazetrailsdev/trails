@@ -221,7 +221,7 @@ describe("AggregationsTest", () => {
 
   // Rails: test_nil_raises_error_when_allow_nil_is_false
   it("nil raises error when allow nil is false", () => {
-    const david = customers("david") as CustomerModel;
+    const david = customers("david");
     expect(() => {
       (david as any).balance = null;
     }).toThrow();
@@ -261,7 +261,7 @@ describe("AggregationsTest", () => {
 
   // Rails: test_assigning_hash_without_custom_converter
   it("assigning hash without custom converter", () => {
-    const barney = customers("barney") as CustomerModel;
+    const barney = customers("barney");
     const hash = { first: "Barney", last: "Stinson" };
     (barney as any).fullnameNoConverter = hash;
     expect(barney.readAttribute("name")).toBe(String(hash));

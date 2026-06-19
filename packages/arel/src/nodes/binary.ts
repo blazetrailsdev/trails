@@ -79,8 +79,7 @@ export function _registerCteFactory(fn: (name: string, relation: Node) => Cte): 
 
 export class As extends Binary {
   toCte(): Cte {
-    const name =
-      this.right instanceof SqlLiteral ? (this.right as SqlLiteral).value : String(this.right);
+    const name = this.right instanceof SqlLiteral ? this.right.value : String(this.right);
     if (!cteFactory) {
       throw new Error(
         'As.toCte() requires the Cte factory registry. Import from "@blazetrails/arel" instead of deep-importing node classes.',

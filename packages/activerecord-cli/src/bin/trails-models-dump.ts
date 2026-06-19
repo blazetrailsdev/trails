@@ -62,7 +62,7 @@ function parseArgs(argv: readonly string[]): Args | number {
     format: boolean;
   } = { ignore: [], only: [], noHeader: false, format: false };
   for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]!;
+    const a = argv[i];
     const readValue = (flag: string): string | number => {
       const next = argv[i + 1];
       if (!next || next.startsWith("-")) {

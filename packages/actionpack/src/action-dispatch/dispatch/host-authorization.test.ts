@@ -33,7 +33,7 @@ describe("HostAuthorizationTest", () => {
       PATH_INFO: "/",
     });
     expect(status).toBe(403);
-    expect((headers as Record<string, string>)["content-type"]).toContain("text/html");
+    expect(headers["content-type"]).toContain("text/html");
     expect(await bodyToString(body)).toBe("");
   });
 
@@ -46,7 +46,7 @@ describe("HostAuthorizationTest", () => {
       "action_dispatch.show_detailed_exceptions": true,
     });
     expect(status).toBe(403);
-    expect((headers as Record<string, string>)["content-type"]).toContain("text/html");
+    expect(headers["content-type"]).toContain("text/html");
     const rendered = await bodyToString(body);
     expect(rendered).toContain("Blocked host");
     expect(rendered).toContain("evil.com");
@@ -61,7 +61,7 @@ describe("HostAuthorizationTest", () => {
       PATH_INFO: "/",
     });
     expect(status).toBe(403);
-    expect((headers as Record<string, string>)["content-type"]).toContain("text/plain");
+    expect(headers["content-type"]).toContain("text/plain");
   });
 
   it("default response logs blocked hosts via request logger", async () => {

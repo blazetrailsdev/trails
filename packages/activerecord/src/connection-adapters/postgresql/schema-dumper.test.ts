@@ -133,7 +133,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         indexes: () => [],
         supportsVirtualColumns: () => true,
       };
-      const dumper = new (SchemaDumper as any)(mockAdapter) as any;
+      const dumper = new (SchemaDumper as any)(mockAdapter);
       const col = new Column("computed", null, { sqlType: "integer", type: "integer" }, true, {
         defaultFunction: "(a + b)",
         generated: "s",
@@ -151,7 +151,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         indexes: () => [],
         supportsVirtualColumns: () => true,
       };
-      const dumper = new (SchemaDumper as any)(mockAdapter) as any;
+      const dumper = new (SchemaDumper as any)(mockAdapter);
       const col = new Column("status", null, { sqlType: "mood", type: "enum" }, true, {
         defaultFunction: "('happy'::mood)",
         generated: "s",
@@ -168,7 +168,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         indexes: () => [],
         supportsVirtualColumns: () => false,
       };
-      const dumper = new (SchemaDumper as any)(mockAdapter) as any;
+      const dumper = new (SchemaDumper as any)(mockAdapter);
       const col = new Column("computed", null, { sqlType: "integer", type: "integer" }, true, {
         defaultFunction: "(a + b)",
         generated: "s",
@@ -221,7 +221,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         ...emptySource,
         extensions: async () => ["plpgsql", "hstore"],
       };
-      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const dumper = new (SchemaDumper as any)(adapter);
       const lines: string[] = [];
       await dumper.extensions(lines);
       expect(lines[0]).toContain("extensions that must be enabled");
@@ -232,7 +232,7 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("emits nothing when extensions list is empty", async () => {
       const adapter = { ...emptySource, extensions: async () => [] };
-      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const dumper = new (SchemaDumper as any)(adapter);
       const lines: string[] = [];
       await dumper.extensions(lines);
       expect(lines).toHaveLength(0);
@@ -249,7 +249,7 @@ describe("PostgreSQL::SchemaDumper", () => {
             ["mood", ["happy", "sad"]],
           ] as [string, string[]][],
       };
-      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const dumper = new (SchemaDumper as any)(adapter);
       const lines: string[] = [];
       await dumper.types(lines);
       expect(lines[0]).toBe("  // Custom types defined in this database.");
@@ -260,7 +260,7 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("emits nothing when enum types list is empty", async () => {
       const adapter = { ...emptySource, enumTypes: async () => [] };
-      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const dumper = new (SchemaDumper as any)(adapter);
       const lines: string[] = [];
       await dumper.types(lines);
       expect(lines).toHaveLength(0);
@@ -273,7 +273,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         ...emptySource,
         schemaNames: async () => ["public", "myschema", "analytics"],
       };
-      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const dumper = new (SchemaDumper as any)(adapter);
       const lines: string[] = [];
       await dumper.schemas(lines);
       expect(lines).toEqual([
@@ -297,7 +297,7 @@ describe("PostgreSQL::SchemaDumper", () => {
           }),
         ],
       };
-      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const dumper = new (SchemaDumper as any)(adapter);
       const lines: string[] = [];
       await dumper.exclusionConstraintsInCreate("rooms", lines);
       expect(lines[0]).toContain(`await ctx.addExclusionConstraint("rooms", "price WITH ="`);
@@ -319,7 +319,7 @@ describe("PostgreSQL::SchemaDumper", () => {
           }),
         ],
       };
-      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const dumper = new (SchemaDumper as any)(adapter);
       const lines: string[] = [];
       await dumper.uniqueConstraintsInCreate("users", lines);
       expect(lines[0]).toContain(`await ctx.addUniqueConstraint("users", ["email"]`);
@@ -329,7 +329,7 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("emits nothing when no unique constraints", async () => {
       const adapter = { ...emptySource, uniqueConstraints: async () => [] };
-      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const dumper = new (SchemaDumper as any)(adapter);
       const lines: string[] = [];
       await dumper.uniqueConstraintsInCreate("users", lines);
       expect(lines).toHaveLength(0);

@@ -50,7 +50,7 @@ export class GeneratedAttribute {
     }
     const [parsedType, opts] = parseTypeAndOptions(type);
     const finalType = parsedType ?? "string";
-    if (DANGEROUS.has(name!)) {
+    if (DANGEROUS.has(name)) {
       throw new GeneratorError(
         `Could not generate field '${name}', as it is already defined by Active Record.`,
       );
@@ -68,7 +68,7 @@ export class GeneratedAttribute {
     if (parsedType && GeneratedAttribute.reference(finalType) && indexType === "uniq") {
       opts.index = { unique: true };
     }
-    return new GeneratedAttribute(name!, finalType, indexType as IndexType, opts);
+    return new GeneratedAttribute(name, finalType, indexType as IndexType, opts);
   }
 
   static validType = (t: string): boolean => DEFAULT_TYPES.has(t);
@@ -152,14 +152,14 @@ function parseTypeAndOptions(type: string | undefined): [string | undefined, Att
   let m: RegExpMatchArray | null;
   if ((m = type.match(/^(text|binary)\{([a-z]+)\}$/))) [parsedType, opts.size] = [m[1], m[2]];
   else if ((m = type.match(/^(string|text|binary|integer)\{(\d+)\}$/))) {
-    [parsedType, opts.limit] = [m[1], parseInt(m[2]!, 10)];
+    [parsedType, opts.limit] = [m[1], parseInt(m[2], 10)];
   } else if ((m = type.match(/^decimal\{(\d+)[,.-](\d+)\}$/))) {
     parsedType = "decimal";
-    opts.precision = parseInt(m[1]!, 10);
-    opts.scale = parseInt(m[2]!, 10);
+    opts.precision = parseInt(m[1], 10);
+    opts.scale = parseInt(m[2], 10);
   } else if ((m = type.match(/^(references|belongs_to)\{(.+)\}$/))) {
     parsedType = m[1];
-    for (const o of m[2]!.split(/[,.-]/)) opts[o] = true;
+    for (const o of m[2].split(/[,.-]/)) opts[o] = true;
   } else parsedType = type.replace(/!/g, "");
   if (type.endsWith("!")) opts.null = false;
   return [parsedType, opts];

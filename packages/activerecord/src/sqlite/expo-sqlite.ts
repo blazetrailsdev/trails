@@ -192,7 +192,7 @@ export const expoSqliteDriver: SqliteDriver = {
     // openDatabaseAsync; pass driverOptions through for any driver-specific
     // overrides.
     const db = await expoSqlite.openDatabaseAsync(config.database, {
-      ...(config.driverOptions as Parameters<ExpoSqliteModule["openDatabaseAsync"]>[1] | undefined),
+      ...config.driverOptions,
     });
     return new ExpoSqliteConnection(db);
   },

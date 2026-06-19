@@ -700,7 +700,7 @@ export class SchemaDumper {
         version = versions[versions.length - 1];
       }
     }
-    const schema = await (this.dump(adapter, { ...options, version }) as Promise<string>);
+    const schema = await this.dump(adapter, { ...options, version });
     return `// Schema version: ${version}\n${schema}`;
   }
 
@@ -825,7 +825,7 @@ export class SchemaDumper {
         }
       });
     }
-    const sorted = [...(tableNames as string[])].sort();
+    const sorted = [...tableNames].sort();
     for (const tableName of sorted) {
       if (this.isIgnored(tableName)) continue;
       const columns = this._source.columns(tableName);
@@ -846,13 +846,7 @@ export class SchemaDumper {
       }
       this.tableName = tableName;
       try {
-        this.emitTable(
-          lines,
-          tableName,
-          columns as ColumnInfo[],
-          indexes as IndexInfo[],
-          adapterTableOpts,
-        );
+        this.emitTable(lines, tableName, columns, indexes, adapterTableOpts);
         lines.push("");
       } finally {
         this.tableName = undefined;

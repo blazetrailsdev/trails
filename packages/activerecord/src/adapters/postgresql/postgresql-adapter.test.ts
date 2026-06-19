@@ -323,7 +323,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           ]);
           const errors = [result1, result2]
             .filter((r) => r.status === "rejected")
-            .map((r) => (r as PromiseRejectedResult).reason);
+            .map((r) => r.reason);
           expect(errors.some((e) => e instanceof Deadlocked)).toBe(true);
         } finally {
           await adapter.rollback().catch(() => {});
@@ -1206,7 +1206,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("warnings behaviour can be customized with a proc", async () => {
       let captured: SQLWarning | null = null;
       PostgreSQLAdapter.dbWarningsAction = (w) => {
-        captured = w as SQLWarning;
+        captured = w;
       };
       await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
       expect(captured).toBeInstanceOf(SQLWarning);

@@ -283,14 +283,14 @@ describe("StoreTest", () => {
         (this as any).settings = JSON.stringify({ theme: `custom:${v}` });
       }
       get theme() {
-        const settings = this.settings as any;
+        const settings = this.settings;
         if (!settings) return null;
         return settings.get("theme") ?? null;
       }
     }
     const u = new (SpecialUser as any)({ name: "Ivy" });
-    (u as any).theme = "blue";
-    expect((u as any).theme).toBe("custom:blue");
+    u.theme = "blue";
+    expect(u.theme).toBe("custom:blue");
   });
 
   it("overriding a write accessor using super", () => {

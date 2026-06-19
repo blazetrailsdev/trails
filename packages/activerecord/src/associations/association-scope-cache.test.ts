@@ -163,8 +163,8 @@ describe("Association scope cache", () => {
     await assoc1.loadTarget();
     await assoc2.loadTarget();
     // Cache fields are per-instance; loading one doesn't pollute the other.
-    expect((assoc1 as any)._cachedScope).toBeDefined();
-    expect((assoc2 as any)._cachedScope).toBeDefined();
-    expect((assoc1 as any)._cachedScope).not.toBe((assoc2 as any)._cachedScope);
+    expect(assoc1._cachedScope).toBeDefined();
+    expect(assoc2._cachedScope).toBeDefined();
+    expect(assoc1._cachedScope).not.toBe(assoc2._cachedScope);
   });
 });

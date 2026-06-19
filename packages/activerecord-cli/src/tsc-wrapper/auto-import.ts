@@ -1,10 +1,6 @@
 import ts from "typescript";
 import * as path from "node:path";
-import {
-  walk,
-  type ClassInfo,
-  type AssociationCall,
-} from "@blazetrails/activerecord/type-virtualization/walker.js";
+import { walk, type ClassInfo } from "@blazetrails/activerecord/type-virtualization/walker.js";
 import { resolveAssociationTarget } from "@blazetrails/activerecord/type-virtualization/resolve-target.js";
 
 /**
@@ -56,7 +52,7 @@ function collectTargetNames(info: ClassInfo, out: Set<string>): void {
       call.kind === "belongsTo" ||
       call.kind === "hasOne"
     ) {
-      const assocCall = call as AssociationCall;
+      const assocCall = call;
       // Polymorphic belongsTo emits `Base` (not a user class) in
       // `synthesize.ts`, so auto-injecting `import type { <Target> }`
       // would be unused and can trigger noUnusedLocals/lint errors

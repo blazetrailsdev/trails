@@ -6866,7 +6866,7 @@ describe("CalculationsTest", () => {
         captured = await Topic.firstOrCreate({ title: "via-class-firstOrCreate" });
       });
     expect(captured).not.toBeNull();
-    const topic = captured! as InstanceType<typeof Topic>;
+    const topic = captured!;
     expect(topic.status).toBe("scoped-default");
     expect(topic.title).toBe("via-class-firstOrCreate");
   });
@@ -6882,7 +6882,7 @@ describe("CalculationsTest", () => {
         captured = await Topic.firstOrInitialize();
       });
     expect(captured).not.toBeNull();
-    const topic = captured! as InstanceType<typeof Topic>;
+    const topic = captured!;
     expect(topic.isNewRecord()).toBe(true);
     expect(topic.title).toBe("to-be-initialized");
     expect(topic.status).toBe("draft");

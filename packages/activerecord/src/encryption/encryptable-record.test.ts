@@ -385,7 +385,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("encrypts store attributes with accessors", async () => {
     const TrafficLight = makeEncryptedTrafficLightWithStoreState(await freshAdapter());
-    const light = new (TrafficLight as any)();
+    const light = new TrafficLight();
     // Set via JS property assignment so the storeAccessor setter fires.
     light.color = "red";
     await light.save();
@@ -502,7 +502,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
     // Reconstruct via _instantiate (the DB-load path) so writeFromDatabase → deserialize
     // is invoked, matching how Rails Marshal.load reconstructs AR objects.
-    const loadedBook = (Book as any)._instantiate(rawValues);
+    const loadedBook = Book._instantiate(rawValues);
 
     expect(loadedBook.name).toBe("Dune");
   });
@@ -535,7 +535,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
       title: "string",
       body: "string",
     });
-    PostSha256._tableName = (PostSha1 as any)._tableName;
+    PostSha256._tableName = PostSha1._tableName;
     PostSha256.encrypts("title", { keyProvider: keyProviderSha256 });
     new PostSha256();
 
@@ -640,8 +640,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     new Book();
     const Post = makeEncryptedPost(await freshAdapter());
     new Post();
-    expect((Book as any).typeForAttribute("name").type()).toBe("string");
-    expect((Post as any).typeForAttribute("body").type()).toBe("string");
+    expect(Book.typeForAttribute("name").type()).toBe("string");
+    expect(Post.typeForAttribute("body").type()).toBe("string");
   });
 
   it("encrypts normalized data", async () => {

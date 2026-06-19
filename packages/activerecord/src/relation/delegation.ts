@@ -270,24 +270,24 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 
       // Check generated relation methods scoped to this model (mirrors Rails' GeneratedRelationMethods)
       const genMethods = _generatedMethodsByModel.get(modelClass as any);
-      if (genMethods?.has(prop as string)) {
-        const fn = genMethods.get(prop as string)!;
+      if (genMethods?.has(prop)) {
+        const fn = genMethods.get(prop)!;
         return (...args: any[]) => fn.apply(target, args);
       }
-      if (modelClass._scopes.has(prop as string)) {
+      if (modelClass._scopes.has(prop)) {
         return (...args: any[]) => {
-          const scopeFn = modelClass._scopes.get(prop as string)!;
+          const scopeFn = modelClass._scopes.get(prop)!;
           const result = scopeFn(target, ...args);
-          const extensions = modelClass._scopeExtensions?.get(prop as string);
+          const extensions = modelClass._scopeExtensions?.get(prop);
           if (extensions && result && typeof result === "object") {
             // Register the extension as a module on the relation (mirrors Ruby's
             // anonymous-module `extend`) so its methods survive spawning — e.g.
             // `Topic.anonymous_extension.none.one`.
-            if (typeof (result as any).extendingBang === "function") {
-              (result as any).extendingBang(extensions);
+            if (typeof result.extendingBang === "function") {
+              result.extendingBang(extensions);
             } else {
               for (const [name, fn] of Object.entries(extensions)) {
-                (result as any)[name] = fn.bind(result);
+                result[name] = fn.bind(result);
               }
             }
           }
@@ -299,18 +299,16 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       // and self-loading, so it's offered whether or not the relation is
       // loaded (mirrors Rails: `partition` enumerates through `records`, which
       // forces a load). `toArray()` loads then returns the rows.
-      const enumerableDelegate = delegateEnumerableMethod(prop as string, () =>
-        (target as any).toArray(),
-      );
+      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.toArray());
       if (enumerableDelegate) return enumerableDelegate;
 
       // Array-method delegation (delegation.rb `delegate ... to: :records`).
       // Only when the relation is already loaded — these are synchronous, and
       // JS can't block on the DB, so an unloaded relation keeps its `undefined`
       // default rather than delegating against records that aren't here yet.
-      if ((target as any)._loaded) {
-        const records = () => (target as any)._records ?? [];
-        const arrayDelegate = delegateArrayMethod(prop as string, records);
+      if (target._loaded) {
+        const records = () => target._records ?? [];
+        const arrayDelegate = delegateArrayMethod(prop, records);
         if (arrayDelegate) return arrayDelegate;
       }
       return value;

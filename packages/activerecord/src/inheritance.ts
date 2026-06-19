@@ -261,7 +261,7 @@ export function classHasAttribute(modelClass: typeof Base, name: string): boolea
   if ((modelClass as any)._attributeDefinitions?.has(name)) return true;
   if (modelClass.abstractClass) return false;
   try {
-    return (modelClass.columnNames() as string[]).includes(name);
+    return modelClass.columnNames().includes(name);
   } catch {
     return false;
   }
@@ -309,7 +309,7 @@ export function isStiSubclass(modelClass: object): boolean {
   // Walk up the prototype chain to find if any parent has _inheritanceColumn
   let current = Object.getPrototypeOf(modelClass);
   while (current && current !== Function.prototype) {
-    if ((current as any)._inheritanceColumn) return true;
+    if (current._inheritanceColumn) return true;
     current = Object.getPrototypeOf(current);
   }
   return false;
@@ -425,9 +425,7 @@ export function narrowToProjectedColumns(
   const pk = (klass as any).primaryKey as string | string[] | undefined;
   const pkSet = new Set(Array.isArray(pk) ? pk : pk != null ? [pk] : []);
   const rowKeys = new Set(Object.keys(row));
-  const narrowable = (klass.columnNames() as string[]).filter(
-    (c) => !pkSet.has(c) && !rowKeys.has(c),
-  );
+  const narrowable = klass.columnNames().filter((c) => !pkSet.has(c) && !rowKeys.has(c));
   // Hot path: a full SELECT projects every column, so there is nothing to
   // narrow — skip the attribute-set scan entirely.
   if (narrowable.length === 0) return;
@@ -767,7 +765,7 @@ export function subclassFromAttributes(
   if (!attrs) return null;
 
   // Convert to plain object via toH (Ruby Hash) or toObject (TS hash-like)
-  let attrsHash = attrs as Record<string, unknown>;
+  let attrsHash = attrs;
   if (typeof (attrs as any).toH === "function") {
     attrsHash = (attrs as any).toH();
   } else if (typeof (attrs as any).toObject === "function") {

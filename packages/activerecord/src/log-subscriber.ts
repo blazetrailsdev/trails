@@ -97,8 +97,8 @@ export class LogSubscriber extends BaseLogSubscriber {
       );
       const bindPairs: [string | null, unknown][] = [];
 
-      for (let i = 0; i < (payload.binds as any[]).length; i++) {
-        const attr = (payload.binds as any[])[i];
+      for (let i = 0; i < payload.binds.length; i++) {
+        const attr = payload.binds[i];
         const filteredParams = this.filter(this.extractAttributeName(attr, i), castedParams?.[i]);
         bindPairs.push(this.renderBind(attr, filteredParams));
       }
@@ -187,12 +187,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     valueForDatabase?: unknown;
   } | null {
     if (attr instanceof Attribute) return attr as never;
-    if (
-      attr &&
-      typeof attr === "object" &&
-      "type" in (attr as object) &&
-      "value" in (attr as object)
-    ) {
+    if (attr && typeof attr === "object" && "type" in attr && "value" in attr) {
       return attr as never;
     }
     return null;

@@ -558,4 +558,26 @@ export default defineConfig(
       "no-undef": "off",
     },
   },
+
+  // ── no-unnecessary-type-assertion: scoped typed-lint block (projectService only, not recommendedTypeChecked) ──
+  {
+    files: ["**/*.ts"],
+    ignores: [
+      // Files not included in any tsconfig.json — projectService rejects them.
+      "packages/actionview/types/**",
+      "packages/activerecord/scripts/**",
+      "packages/website/docs/.vitepress/**",
+      "vitest.config.ts",
+      "vitest.dx-tests.config.ts",
+    ],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+    },
+  },
 );

@@ -67,7 +67,7 @@ const CRC32_TABLE = (() => {
 function crc32(str: string): number {
   let crc = 0xffffffff;
   for (let i = 0; i < str.length; i++) {
-    crc = CRC32_TABLE[(crc ^ str.charCodeAt(i)) & 0xff]! ^ (crc >>> 8);
+    crc = CRC32_TABLE[(crc ^ str.charCodeAt(i)) & 0xff] ^ (crc >>> 8);
   }
   return ((crc ^ 0xffffffff) >>> 0) % FIXTURE_MAX_ID;
 }
@@ -819,8 +819,8 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // inserted row instead.
   const result = {} as { [P in K]: InstanceType<T> };
   for (let i = 0; i < labels.length; i++) {
-    const label = labels[i]!;
-    const row = rows[i] as FixtureAttrs;
+    const label = labels[i];
+    const row = rows[i];
     // Single PK → match by the one column; composite PK → match by every key
     // column; id-less (pkCol === null) → match the full inserted row.
     let criteria: FixtureAttrs;

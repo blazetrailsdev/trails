@@ -234,7 +234,7 @@ export class Mapper {
           nestedParam: `${singular}_id`,
           param: "id",
           resourceScope: controller,
-          actions: Array.from(allowed) as ResourceAction[],
+          actions: Array.from(allowed),
         },
         resourceController: controller,
         resourcePathNames: pathNames,
@@ -358,7 +358,7 @@ export class Mapper {
           collectionName: pluralize(name),
           param: "id",
           resourceScope: controller,
-          actions: Array.from(allowed) as ResourceAction[],
+          actions: Array.from(allowed),
         },
         resourceController: controller,
         resourcePathNames: pathNames,
@@ -916,7 +916,7 @@ export class Mapper {
     if (tail && typeof tail === "object" && !Array.isArray(tail)) {
       options = args.pop() as Record<string, unknown>;
     }
-    for (const klass of (args as unknown[]).flat()) {
+    for (const klass of args.flat()) {
       const typed = klass as { modelName?: { name?: string }; name?: string };
       const key =
         klass != null && (typeof klass === "object" || typeof klass === "function")
@@ -1477,7 +1477,7 @@ export class Mapper {
       return true;
     }
 
-    const constraints = (options.constraints ?? {}) as RouteConstraints;
+    const constraints = options.constraints ?? {};
     let pulledAny = false;
     for (const k of Object.keys(options) as Array<keyof RouteOptions>) {
       const v = options[k];

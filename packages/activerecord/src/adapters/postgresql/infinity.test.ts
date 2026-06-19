@@ -54,8 +54,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("type casting infinity on a float column", async () => {
       const M = await modelClass();
       const record = await (M as any).create({ float: Number.POSITIVE_INFINITY });
-      await (record as any).reload();
-      expect((record as any).float).toBe(Number.POSITIVE_INFINITY);
+      await record.reload();
+      expect(record.float).toBe(Number.POSITIVE_INFINITY);
     });
 
     it("type casting string on a float column", async () => {
@@ -71,47 +71,47 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("updateColumns with infinity on a float column", async () => {
       const M = await modelClass();
       const record = await (M as any).create({});
-      await (record as any).updateColumns({ float: Number.POSITIVE_INFINITY });
-      await (record as any).reload();
-      expect((record as any).float).toBe(Number.POSITIVE_INFINITY);
+      await record.updateColumns({ float: Number.POSITIVE_INFINITY });
+      await record.reload();
+      expect(record.float).toBe(Number.POSITIVE_INFINITY);
     });
 
     it("update_all with infinity on a float column", async () => {
       const M = await modelClass();
       const record = await (M as any).create({});
       await (M as any).updateAll({ float: Number.POSITIVE_INFINITY });
-      await (record as any).reload();
-      expect((record as any).float).toBe(Number.POSITIVE_INFINITY);
+      await record.reload();
+      expect(record.float).toBe(Number.POSITIVE_INFINITY);
     });
 
     it("type casting infinity on a datetime column", async () => {
       const M = await modelClass();
       let record = await (M as any).create({ datetime: "infinity" });
-      await (record as any).reload();
-      expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+      await record.reload();
+      expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
 
       record = await (M as any).create({ datetime: Number.POSITIVE_INFINITY });
-      await (record as any).reload();
-      expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+      await record.reload();
+      expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
     });
 
     it("type casting infinity on a date column", async () => {
       const M = await modelClass();
       let record = await (M as any).create({ date: "infinity" });
-      await (record as any).reload();
-      expect((record as any).date).toBe(Number.POSITIVE_INFINITY);
+      await record.reload();
+      expect(record.date).toBe(Number.POSITIVE_INFINITY);
 
       record = await (M as any).create({ date: Number.POSITIVE_INFINITY });
-      await (record as any).reload();
-      expect((record as any).date).toBe(Number.POSITIVE_INFINITY);
+      await record.reload();
+      expect(record.date).toBe(Number.POSITIVE_INFINITY);
     });
 
     it("update_all with infinity on a datetime column", async () => {
       const M = await modelClass();
       const record = await (M as any).create({});
       await (M as any).updateAll({ datetime: Number.POSITIVE_INFINITY });
-      await (record as any).reload();
-      expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+      await record.reload();
+      expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
     });
 
     it("assigning 'infinity' on a datetime column with TZ aware attributes", async () => {
@@ -136,14 +136,14 @@ describeIfPg("PostgreSQLAdapter", () => {
         await PostgresqlInfinity.loadSchema();
 
         let record = await (PostgresqlInfinity as any).create({ datetime: "infinity" });
-        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
-        await (record as any).reload();
-        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+        expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
+        await record.reload();
+        expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
 
         record = await (PostgresqlInfinity as any).create({ datetime: Number.POSITIVE_INFINITY });
-        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
-        await (record as any).reload();
-        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+        expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
+        await record.reload();
+        expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
 
         // Rails also exercises `create!(datetime: BigDecimal::INFINITY)`. JavaScript
         // has no BigDecimal type; `Number.POSITIVE_INFINITY` (covered above) is the

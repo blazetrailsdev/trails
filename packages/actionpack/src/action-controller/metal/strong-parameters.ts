@@ -529,7 +529,7 @@ export class Parameters {
         const obj = current as Record<string, unknown>;
         current = obj[key];
         if (isPlainObject(current)) {
-          current = this._newWithInheritedPermitted(current as Record<string, unknown>);
+          current = this._newWithInheritedPermitted(current);
           obj[key] = current;
         }
       } else {
@@ -662,7 +662,7 @@ export class Parameters {
     options: { suppressUnpermitted?: boolean } = {},
   ): Parameters {
     const params = new Parameters();
-    const flatFilters = filters.flat() as (string | Record<string, unknown>)[];
+    const flatFilters = filters.flat();
 
     for (const filter of flatFilters) {
       if (typeof filter === "string") {
@@ -728,7 +728,7 @@ export class Parameters {
               return item._permitFilters(v as (string | Record<string, unknown>)[], options);
             }
             if (isPlainObject(item)) {
-              const nestedParams = new Parameters(item as Record<string, unknown>);
+              const nestedParams = new Parameters(item);
               return nestedParams._permitFilters(
                 v as (string | Record<string, unknown>)[],
                 options,
@@ -744,7 +744,7 @@ export class Parameters {
           // empty array filter for a hash — permit arbitrary hash
           params._data[k] = val;
         } else if (Array.isArray(v)) {
-          const nestedParams = new Parameters(val as Record<string, unknown>);
+          const nestedParams = new Parameters(val);
           nestedParams._permitted = this._permitted;
           params._data[k] = nestedParams._permitFilters(
             v as (string | Record<string, unknown>)[],
@@ -792,7 +792,7 @@ export class Parameters {
     }
     if (isPlainObject(value)) {
       const result: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      for (const [k, v] of Object.entries(value)) {
         result[k] = this._convertParametersToHashes(v, using);
       }
       return result;
@@ -824,7 +824,7 @@ export class Parameters {
       return mutated ? result : value;
     }
     if (isPlainObject(value)) {
-      return this._newWithInheritedPermitted(value as Record<string, unknown>);
+      return this._newWithInheritedPermitted(value);
     }
     return value;
   }
@@ -890,7 +890,7 @@ export class Parameters {
       return object;
     }
     if (isPlainObject(object)) {
-      const target = object as Record<string, unknown>;
+      const target = object;
       const keys = Object.keys(target);
       for (const k of keys) {
         const value = target[k];
@@ -1071,7 +1071,7 @@ export class Parameters {
     }
     if (isPlainObject(object)) {
       const result: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(object as Record<string, unknown>)) {
+      for (const [k, v] of Object.entries(object)) {
         result[fn(k)] = this._deepTransformKeysInObject(v, fn);
       }
       return result;
@@ -1107,21 +1107,14 @@ function deepMergeObjects(
   const result = { ...left };
   for (const [k, v] of Object.entries(right)) {
     if (k in result && isPlainObject(result[k]) && isPlainObject(v)) {
-      result[k] = deepMergeObjects(
-        result[k] as Record<string, unknown>,
-        v as Record<string, unknown>,
-      );
+      result[k] = deepMergeObjects(result[k], v);
     } else if (
       k in result &&
       (result[k] instanceof Parameters || isPlainObject(result[k])) &&
       (v instanceof Parameters || isPlainObject(v))
     ) {
-      const leftRaw =
-        result[k] instanceof Parameters
-          ? (result[k] as Parameters)._toRawHash()
-          : (result[k] as Record<string, unknown>);
-      const rightRaw =
-        v instanceof Parameters ? (v as Parameters)._toRawHash() : (v as Record<string, unknown>);
+      const leftRaw = result[k] instanceof Parameters ? result[k]._toRawHash() : result[k];
+      const rightRaw = v instanceof Parameters ? v._toRawHash() : v;
       const merged = deepMergeObjects(leftRaw, rightRaw);
       result[k] = merged;
     } else {

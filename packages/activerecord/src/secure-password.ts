@@ -71,7 +71,7 @@ export function hasSecurePassword(
   // Mirrors: attr_reader + define_method("#{attribute}=") in InstanceMethodsOnActivation
   Object.defineProperty(modelClass.prototype, attribute, {
     get: function () {
-      return (this as any)[passwordKey] ?? null;
+      return this[passwordKey] ?? null;
     },
     set: function (value: string | null) {
       // Normalize non-string non-nil values to string to match Ruby's implicit to_s.
@@ -81,7 +81,7 @@ export function hasSecurePassword(
           : typeof value === "string"
             ? value
             : String(value);
-      (this as any)[passwordKey] = normalized;
+      this[passwordKey] = normalized;
       // Rails: nil assignment clears the digest immediately
       // (active_model/secure_password.rb InstanceMethodsOnActivation)
       if (normalized === null || normalized === undefined) {
@@ -95,10 +95,10 @@ export function hasSecurePassword(
   const confirmationProp = `${camelBase}Confirmation`;
   Object.defineProperty(modelClass.prototype, confirmationProp, {
     get: function () {
-      return (this as any)[confirmationKey] ?? null;
+      return this[confirmationKey] ?? null;
     },
     set: function (value: string | null) {
-      (this as any)[confirmationKey] = value;
+      this[confirmationKey] = value;
     },
     configurable: true,
   });
@@ -108,18 +108,18 @@ export function hasSecurePassword(
   const challengeProp = `${camelBase}Challenge`;
   Object.defineProperty(modelClass.prototype, challengeProp, {
     get: function () {
-      return (this as any)[challengeKey] ?? null;
+      return this[challengeKey] ?? null;
     },
     set: function (value: string | null) {
       // Rails uses present? to gate challenge validation — normalize blank to null.
       // Check isBlank BEFORE coercion so non-string blanks (false, [], {}) are
       // caught as blank rather than stringified to non-blank ("false", "[object Object]").
       if (value === null || value === undefined || isBlank(value as unknown as string)) {
-        (this as any)[challengeKey] = null;
+        this[challengeKey] = null;
         return;
       }
       const coerced = typeof value === "string" ? value : String(value);
-      (this as any)[challengeKey] = coerced;
+      this[challengeKey] = coerced;
     },
     configurable: true,
   });
@@ -205,8 +205,8 @@ export function hasSecurePassword(
     modelClass.validate(function (record: any) {
       // Compute inside the callback so it reflects the runtime I18n locale.
       const attrLabel =
-        typeof (record.constructor as any).humanAttributeName === "function"
-          ? (record.constructor as any).humanAttributeName(attribute)
+        typeof record.constructor.humanAttributeName === "function"
+          ? record.constructor.humanAttributeName(attribute)
           : humanize(attribute);
       const rawPassword = record[passwordKey];
       // Mirrors Rails: `!empty?` for hashing/presence; `allow_blank: true` for confirmation.
@@ -429,10 +429,10 @@ export async function authenticateBy(
     for (const [name] of passwordEntries) {
       const value = passwords[name] as string;
       const methodName = `authenticate${camelize(name)}`;
-      const authenticateMethod = (record as any)[methodName];
+      const authenticateMethod = record[methodName];
       if (typeof authenticateMethod !== "function") {
         throw new TypeError(
-          `${(this as typeof Base).name}#${methodName} is not defined — ` +
+          `${this.name}#${methodName} is not defined — ` +
             `did you call hasSecurePassword(model, "${name}")?`,
         );
       }

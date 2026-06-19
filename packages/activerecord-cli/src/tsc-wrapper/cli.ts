@@ -28,7 +28,7 @@ export function loadSchemaColumns(
   let schemaPath: string | undefined;
   let schemaProvided = false;
   for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
+    const a = args[i];
     if (a === "--schema") {
       schemaProvided = true;
       const nextArg = args[i + 1];
@@ -165,14 +165,14 @@ function validateColumnValue(
     if (r.type !== "array") {
       fail(
         `column "${fqColumn}" rich shape: \`arrayElementType\` is only valid when ` +
-          `\`type\` is "array" (got type: "${r.type as string}")`,
+          `\`type\` is "array" (got type: "${r.type}")`,
       );
     }
   }
-  const out: RichColumnValue = { type: r.type as string };
-  if (r.null !== undefined) out.null = r.null as boolean;
+  const out: RichColumnValue = { type: r.type };
+  if (r.null !== undefined) out.null = r.null;
   if (r.arrayElementType !== undefined) {
-    out.arrayElementType = r.arrayElementType as string;
+    out.arrayElementType = r.arrayElementType;
   }
   return out;
 }
@@ -219,7 +219,7 @@ function parsePretty(args: string[], options: ts.CompilerOptions): boolean {
   };
   let prettyFromArgs: boolean | undefined;
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i]!;
+    const arg = args[i];
     if (arg === "--pretty") {
       prettyFromArgs = parseValue(args[i + 1]) ?? true;
       break;
@@ -260,11 +260,11 @@ function handleBuildMode(args: string[]): void {
   const flagsWithValues = new Set(["--pretty", "--schema"]);
   const rest: string[] = [];
   for (let i = 0; i < buildArgs.length; i++) {
-    const arg = buildArgs[i]!;
+    const arg = buildArgs[i];
     if (arg === "--verbose" || arg === "--clean") continue;
     if (arg.startsWith("--pretty=") || arg.startsWith("--schema=")) continue;
     if (flagsWithValues.has(arg)) {
-      if (i + 1 < buildArgs.length && !buildArgs[i + 1]!.startsWith("-")) i++;
+      if (i + 1 < buildArgs.length && !buildArgs[i + 1].startsWith("-")) i++;
       continue;
     }
     if (arg.startsWith("-")) continue;
@@ -313,7 +313,7 @@ function main(): void {
   let configPath: string | undefined;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "-p" || args[i] === "--project") {
-      if (!args[i + 1] || args[i + 1]!.startsWith("-")) {
+      if (!args[i + 1] || args[i + 1].startsWith("-")) {
         process.stderr.write("trails-tsc: Compiler option '--project' expects an argument.\n");
         process.exit(1);
       }

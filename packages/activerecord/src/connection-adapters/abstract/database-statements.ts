@@ -2072,7 +2072,7 @@ export function sqlForInsert(
  * @internal
  */
 function lastInsertedId(result: Result): unknown {
-  return singleValueFromRows(result.rows as unknown[][]);
+  return singleValueFromRows(result.rows);
 }
 
 /**
@@ -2082,7 +2082,7 @@ function lastInsertedId(result: Result): unknown {
  * @internal
  */
 export function returningColumnValues(this: DatabaseStatementsHost, result: Result): unknown[] {
-  return [singleValueFromRows(result.rows as unknown[][])];
+  return [singleValueFromRows(result.rows)];
 }
 
 /**

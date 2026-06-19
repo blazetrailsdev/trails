@@ -109,9 +109,7 @@ export async function resolveFixtureNames(
   const map: ResolvedFixtureMap = {};
   const tableToName = new Map<string, string>();
   for (const name of names) {
-    const entry = fixtureRegistry[name as FixtureName] as
-      | (typeof fixtureRegistry)[FixtureName]
-      | undefined;
+    const entry = fixtureRegistry[name] as (typeof fixtureRegistry)[FixtureName] | undefined;
     if (!entry) {
       throw new Error(
         `useFixtures: no fixture set named "${name}" in the registry — add it to fixtures-registry.ts`,
@@ -358,7 +356,7 @@ export function useFixtures(
     // defineJoinTableFixtures.
     for (let i = 1; i < (fixturesOrNames as readonly unknown[]).length; i++) {
       const el = (fixturesOrNames as readonly unknown[])[i];
-      if (typeof el !== "object" || el === null || !("table" in (el as object))) {
+      if (typeof el !== "object" || el === null || !("table" in el)) {
         throw new Error(
           `useFixtures: mixed tableless and by-name entries are not supported. ` +
             `Element at index ${i} (${JSON.stringify(el)}) is not a tableless { table, data } entry.`,
@@ -381,7 +379,7 @@ export function useFixtures(
   ) {
     for (let i = 1; i < (fixturesOrNames as readonly unknown[]).length; i++) {
       const el = (fixturesOrNames as readonly unknown[])[i];
-      if (typeof el === "object" && el !== null && "table" in (el as object)) {
+      if (typeof el === "object" && el !== null && "table" in el) {
         throw new Error(
           `useFixtures: mixed tableless and by-name entries are not supported. ` +
             `Element at index ${i} is a tableless { table, data } entry but the array started with a by-name string.`,

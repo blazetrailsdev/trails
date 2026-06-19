@@ -477,7 +477,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.zone).toBe("EDT");
 
     // Subtracting 1 second goes back to 1:59:59 AM EST
-    twz = twz.minus(1) as TimeWithZone;
+    twz = twz.minus(1);
     expect(twz.hour).toBe(1);
     expect(twz.min).toBe(59);
     expect(twz.sec).toBe(59);
@@ -504,7 +504,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.zone).toBe("EST");
 
     // Subtracting 1 second goes back to 1:59:59 EDT
-    twz = twz.minus(1) as TimeWithZone;
+    twz = twz.minus(1);
     expect(twz.hour).toBe(1);
     expect(twz.min).toBe(59);
     expect(twz.sec).toBe(59);

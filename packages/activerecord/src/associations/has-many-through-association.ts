@@ -48,7 +48,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     ensureNotNested(this);
     const added = await super.concatRecords(records, true);
     if (this.owner.isNewRecord() && added) {
-      for (const record of added.flat() as Base[]) {
+      for (const record of added.flat()) {
         buildThroughRecord(this, record);
       }
     }
@@ -84,10 +84,10 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     if (this.isLoaded()) {
       return this.target.map((r) => this.primaryKeyValue(r));
     }
-    if (this._associationIds) return this._associationIds as unknown[];
+    if (this._associationIds) return this._associationIds;
     const records = await this.doAsyncFindTarget();
     this._associationIds = records.map((r) => this.primaryKeyValue(r));
-    return this._associationIds as unknown[];
+    return this._associationIds;
   }
 
   /**
@@ -210,7 +210,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    */
   protected override async deleteRecords(records: Base[], method: string): Promise<number> {
     ensureNotNested(this);
-    const throughName = this.reflection.options.through as string | undefined;
+    const throughName = this.reflection.options.through;
     const owner = this.owner as unknown as { association?: (n: string) => any };
     const throughAssoc = throughName ? (owner.association?.(throughName) ?? null) : null;
     if (!throughAssoc) return 0;
@@ -425,7 +425,7 @@ function throughScope(assoc: HasManyThroughAssociation): unknown {
 /** @internal */
 function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string, unknown> {
   // Extract WHERE conditions from the through scope for the through model's table.
-  const throughName = assoc.reflection.options.through as string | undefined;
+  const throughName = assoc.reflection.options.through;
   if (!throughName) return {};
   const throughAssoc = (assoc.owner as any).association?.(throughName);
   if (!throughAssoc) return {};
@@ -443,11 +443,11 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
   // rather than leaking into the join row / delete query.
   const scope: any = throughScope(assoc) ?? (assoc as any).scope?.() ?? throughAssoc.scope?.();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
-  const throughTable = (throughAssoc.klass as any)?.tableName ?? "";
+  const throughTable = throughAssoc.klass?.tableName ?? "";
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
   // Exclude the FK columns and the STI inheritance column.
   const throughFk = throughAssoc.reflection?.options?.foreignKey ?? "";
-  const inheritanceCol = (throughAssoc.klass as any)?.inheritanceColumn ?? "type";
+  const inheritanceCol = throughAssoc.klass?.inheritanceColumn ?? "type";
   for (const key of [String(throughFk), inheritanceCol]) {
     if (key in attrs) delete attrs[key];
   }
@@ -560,7 +560,7 @@ function distribution(_assoc: HasManyThroughAssociation, array: Base[]): Map<Bas
 
 /** @internal */
 function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base[] {
-  const throughName = assoc.reflection.options.through as string | undefined;
+  const throughName = assoc.reflection.options.through;
   if (!throughName) return [];
   const throughAssoc = (assoc.owner as any).association?.(throughName);
   if (!throughAssoc) return [];
@@ -587,7 +587,7 @@ function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base
 /** @internal */
 function deleteThroughRecords(assoc: HasManyThroughAssociation, records: Base[]): Promise<void> {
   // Mirrors Rails delete_through_records: remove through join-model records.
-  const throughName = assoc.reflection.options.through as string | undefined;
+  const throughName = assoc.reflection.options.through;
   if (!throughName) return Promise.resolve();
   const throughAssoc = (assoc.owner as any).association?.(throughName);
   if (!throughAssoc) return Promise.resolve();
@@ -644,7 +644,7 @@ function throughReflection(assoc: HasManyThroughAssociation): unknown {
   let refl: Refl | null =
     (ctor._reflectOnAssociation?.(assoc.reflection.name) as Refl | null)?.throughReflection ?? null;
   if (!refl) {
-    const throughName = assoc.reflection.options.through as string | undefined;
+    const throughName = assoc.reflection.options.through;
     if (!throughName) return null;
     refl = ctor._reflectOnAssociation?.(throughName) ?? null;
   }
@@ -687,7 +687,7 @@ function constructJoinAttributes(
   ensureMutable(assoc);
   const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
-  const sourceRefl = refl?.sourceReflection as any;
+  const sourceRefl = refl?.sourceReflection;
   if (!sourceRefl) return {};
   const reflKlass = safeKlass(refl);
   const assocPk =

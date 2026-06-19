@@ -599,7 +599,7 @@ export class Callback {
     } else {
       this._compiled = new Around(callTemplate, userConditions);
     }
-    return this._compiled!;
+    return this._compiled;
   }
 
   currentScopes(): string[] {
@@ -1000,7 +1000,7 @@ export class CallbackChain {
         const next = (): void | Promise<void> => {
           const r = prev();
           if (!isThenable(r)) return r;
-          pendingProceed = Promise.resolve(r) as Promise<void>;
+          pendingProceed = Promise.resolve(r);
           // Return a thenable wrapper so we can detect whether the around
           // actually awaited/chained on next() (real observation) versus
           // calling it fire-and-forget. `await` and `.then(...)` both invoke
@@ -1046,7 +1046,7 @@ export class CallbackChain {
         } catch (err) {
           if (pendingProceed) {
             return (async () => {
-              await pendingProceed!.catch(() => {});
+              await pendingProceed.catch(() => {});
               throw err;
             })();
           }
@@ -1288,16 +1288,14 @@ export namespace Callbacks {
       throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
     }
     const isObj = typeof callback === "object" && callback !== null;
-    const resolved = isObj
-      ? resolveCallbackObject<T>(callback as CallbackObject, kind, name)
-      : (callback as AnyCallback<T>);
+    const resolved = isObj ? resolveCallbackObject<T>(callback, kind, name) : callback;
     const entry = new Callback(
       name,
       resolved as AnyCallback,
       kind,
       options as CallbackOptions,
       chain.config,
-      isObj ? (callback as CallbackObject) : undefined,
+      isObj ? callback : undefined,
     );
     if (options.prepend) {
       chain.prepend(entry);

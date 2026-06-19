@@ -253,7 +253,7 @@ export function runCheck(vfs: VirtualFS, adapter: SqlJsAdapter, check: CheckSpec
       return {
         check,
         passed: false,
-        error: `Unknown check type: ${String((check as CheckSpec).type)}`,
+        error: `Unknown check type: ${String(check.type)}`,
       };
     }
   }

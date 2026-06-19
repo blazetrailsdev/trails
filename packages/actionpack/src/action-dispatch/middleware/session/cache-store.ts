@@ -112,6 +112,6 @@ export class CacheStore extends AbstractSecureStore {
 
   /** Narrowed return type. Rails: `AbstractSecureStore#generate_sid`. */
   override generateSid(): SessionId {
-    return super.generateSid() as SessionId;
+    return super.generateSid();
   }
 }

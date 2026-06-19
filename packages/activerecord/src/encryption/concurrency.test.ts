@@ -42,7 +42,7 @@ describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
     const reloaded = await Promise.all(created.map((b: any) => Book.find(b.id)));
 
     for (let i = 0; i < names.length; i++) {
-      expect((reloaded[i] as any).name).toBe(names[i]);
+      expect(reloaded[i].name).toBe(names[i]);
     }
   });
 });

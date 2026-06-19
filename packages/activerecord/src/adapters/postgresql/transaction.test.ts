@@ -97,7 +97,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         ]);
         const errs = [r1, r2].filter((r) => r.status === "rejected");
         expect(errs).toHaveLength(1);
-        expect((errs[0] as PromiseRejectedResult).reason).toBeInstanceOf(Deadlocked);
+        expect(errs[0].reason).toBeInstanceOf(Deadlocked);
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
         await other.rollbackDbTransaction().catch(() => {});

@@ -154,9 +154,9 @@ describe("DateTimePrecisionTest", () => {
     const Foo = makeFoo();
     await Foo.loadSchema();
     const r1 = await (Foo as any).create({ happened_at: null });
-    expect((r1 as any).happened_at).toBeNull();
+    expect(r1.happened_at).toBeNull();
     const r2 = await (Foo as any).create({ happened_at: "" });
-    expect((r2 as any).happened_at).toBeNull();
+    expect(r2.happened_at).toBeNull();
   });
 
   it("writing a date attribute", async () => {
@@ -168,7 +168,7 @@ describe("DateTimePrecisionTest", () => {
     const date = Temporal.PlainDate.from("2001-02-03");
     const record = await (Foo as any).create({ happened_at: date });
     const reloaded = await (Foo as any).find(record.id);
-    const pdt = (reloaded as any).happened_at.toZonedDateTimeISO("UTC").toPlainDate();
+    const pdt = reloaded.happened_at.toZonedDateTimeISO("UTC").toPlainDate();
     expect(pdt.equals(date)).toBe(true);
   });
 

@@ -396,7 +396,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       this._advisoryLocksEnabled = Mysql2Adapter.typeCastConfigToBoolean(advisoryLocks) !== false;
     }
     this._database =
-      (mysqlConfig.database as string | undefined) ??
+      mysqlConfig.database ??
       (() => {
         try {
           const uri = (mysqlConfig as { uri?: string }).uri;
@@ -430,9 +430,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // connection-open time (no constructor validation in AbstractMysqlAdapter);
     // we validate early as a fail-fast safety measure. _buildInitSql() re-applies
     // the same regex before each new connection as the authoritative guard.
-    const _charset =
-      (mysqlConfig.charset as string | undefined) ??
-      (mysqlConfig as { encoding?: string }).encoding;
+    const _charset = mysqlConfig.charset ?? (mysqlConfig as { encoding?: string }).encoding;
     const _collation = (mysqlConfig as { collation?: string }).collation;
     const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
     if (_charset && !SAFE_CHARSET_RE.test(_charset)) {
@@ -510,7 +508,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           // in an array of positional row arrays. Return empty Result for DML
           // to avoid throwing on INSERT/UPDATE/DELETE passed to execQuery.
           if (!Array.isArray(result)) {
-            payload.row_count = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+            payload.row_count = result.affectedRows ?? 0;
             await this._handleWarningsOn(mysqlConn, driverSql);
             return new Result([], []);
           }
@@ -1040,7 +1038,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   override schemaStatements(host?: DatabaseAdapter): MysqlSchemaStatements {
-    return new MysqlSchemaStatements((host ?? this) as DatabaseAdapter);
+    return new MysqlSchemaStatements(host ?? this);
   }
 
   // ── Schema DDL ──
@@ -1632,7 +1630,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // mysql2's `charset` pool option corresponds to Rails' database.yml `encoding:`.
     const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
     const charset =
-      (this._poolConfig.charset as string | undefined) ??
+      this._poolConfig.charset ??
       (this._poolConfig as { encoding?: string }).encoding ??
       (typeof varEncoding === "string" ? varEncoding : undefined);
     const charsetCollation =
@@ -1681,8 +1679,7 @@ function translateConnectError(
     case 1044: // ER_DBACCESS_DENIED_ERROR
     case 1045: {
       // ER_ACCESS_DENIED_ERROR
-      const user =
-        (config.user as string | undefined) ?? parseUriField(config, "username") ?? "unknown";
+      const user = config.user ?? parseUriField(config, "username") ?? "unknown";
       return new DatabaseConnectionError(
         `There is an issue connecting to your database with your username/password, username: ${user}.\n\nPlease check your database configuration to ensure the username/password are valid.`,
         { cause: err },
@@ -1691,8 +1688,7 @@ function translateConnectError(
     case 2003: // ER_CONN_HOST_ERROR
     case 2005: {
       // ER_UNKNOWN_HOST_ERROR
-      const host =
-        (config.host as string | undefined) ?? parseUriField(config, "hostname") ?? "unknown";
+      const host = config.host ?? parseUriField(config, "hostname") ?? "unknown";
       return new DatabaseConnectionError(
         `There is an issue connecting with your hostname: ${host}.\n\nPlease check your database configuration and ensure there is a valid connection to your database.`,
         { cause: err },

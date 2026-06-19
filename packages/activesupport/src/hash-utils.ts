@@ -14,7 +14,7 @@ export function deepMerge<T extends AnyObject>(target: T, source: AnyObject): T 
     const targetVal = result[key];
     const sourceVal = source[key];
     if (isPlainObject(targetVal) && isPlainObject(sourceVal)) {
-      result[key] = deepMerge(targetVal as AnyObject, sourceVal as AnyObject);
+      result[key] = deepMerge(targetVal, sourceVal);
     } else {
       result[key] = sourceVal;
     }
@@ -31,7 +31,7 @@ export function deepMergeInPlace<T extends AnyObject>(target: T, source: AnyObje
     const targetVal = target[key as keyof T];
     const sourceVal = source[key];
     if (isPlainObject(targetVal) && isPlainObject(sourceVal)) {
-      deepMergeInPlace(targetVal as AnyObject, sourceVal as AnyObject);
+      deepMergeInPlace(targetVal as AnyObject, sourceVal);
     } else {
       (target as AnyObject)[key] = sourceVal;
     }
@@ -88,8 +88,8 @@ export function deepTransformKeys(obj: unknown, fn: (key: string) => string): un
   }
   if (obj !== null && typeof obj === "object" && isPlainObject(obj)) {
     const result: AnyObject = {};
-    for (const key of Object.keys(obj as AnyObject)) {
-      result[fn(key)] = deepTransformKeys((obj as AnyObject)[key], fn);
+    for (const key of Object.keys(obj)) {
+      result[fn(key)] = deepTransformKeys(obj[key], fn);
     }
     return result;
   }
@@ -196,8 +196,8 @@ export function deepTransformValues(obj: unknown, fn: (value: unknown) => unknow
   }
   if (obj !== null && typeof obj === "object" && isPlainObject(obj)) {
     const result: AnyObject = {};
-    for (const key of Object.keys(obj as AnyObject)) {
-      result[key] = deepTransformValues((obj as AnyObject)[key], fn);
+    for (const key of Object.keys(obj)) {
+      result[key] = deepTransformValues(obj[key], fn);
     }
     return result;
   }

@@ -116,7 +116,7 @@ function rewriteSubdomain(
 
   if (subdomain === false || subdomain === "") return domain;
 
-  const sub = typeof subdomain === "object" ? subdomain.toString() : (subdomain as string);
+  const sub = typeof subdomain === "object" ? subdomain.toString() : subdomain;
   return sub ? `${sub}.${domain}` : domain;
 }
 

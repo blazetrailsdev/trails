@@ -1,8 +1,5 @@
 import { Base } from "../base.js";
-import {
-  withTransactionalFixtures,
-  type TransactionalFixturesAdapter,
-} from "./with-transactional-fixtures.js";
+import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 
 /**
  * Handler-resolved variant of {@link withTransactionalFixtures} for Phase D-1
@@ -35,5 +32,5 @@ import {
  * @internal
  */
 export function useHandlerTransactionalFixtures(): void {
-  withTransactionalFixtures(() => Base.connection as TransactionalFixturesAdapter);
+  withTransactionalFixtures(() => Base.connection);
 }

@@ -1111,7 +1111,7 @@ describe("NestedThroughAssociationsTest", () => {
     await Tagging.create({ tag_id: tag2.id, taggable_id: post2.id, taggable_type: "Post" });
 
     const posts = await Post.all().preload("tags").toArray();
-    const allTags = posts.flatMap((p: any) => (p as any)._preloadedAssociations?.get("tags") ?? []);
+    const allTags = posts.flatMap((p: any) => p._preloadedAssociations?.get("tags") ?? []);
     expect(allTags).toHaveLength(2);
   });
 
@@ -1138,7 +1138,7 @@ describe("NestedThroughAssociationsTest", () => {
     await Tagging.create({ tag_id: t2.id, taggable_id: post2.id, taggable_type: "Post" });
 
     const posts = await Post.all().eagerLoad("tags").toArray();
-    const allTags = posts.flatMap((p: any) => (p as any)._preloadedAssociations?.get("tags") ?? []);
+    const allTags = posts.flatMap((p: any) => p._preloadedAssociations?.get("tags") ?? []);
     expect(allTags).toHaveLength(2);
   });
 
@@ -2272,7 +2272,7 @@ describe("NestedThroughAssociationsTest", () => {
     // The Post already had `tags` preloaded by `{ posts: "tags" }`; the later
     // `postTags` through-preload (which reuses that Post as a middle record)
     // must leave it loaded and intact, not reset it.
-    const post0 = ((authors[0] as any).association("posts").target ?? [])[0] as any;
+    const post0 = ((authors[0] as any).association("posts").target ?? [])[0];
     expect(post0.association("tags").loaded).toBe(true);
     const tagNames = (post0.association("tags").target ?? []).map((t: any) => t.name).sort();
     expect(tagNames).toEqual(["blue", "red"]);

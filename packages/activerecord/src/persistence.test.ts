@@ -1321,7 +1321,7 @@ describe("PersistenceTest", () => {
     }
     const t = new Topic({});
     await t.save(); // fails validation, populates errors
-    expect(t.errors.get("title")!.length).toBeGreaterThan(0);
+    expect(t.errors.get("title").length).toBeGreaterThan(0);
     // becomes should carry the errors
     const o = t.becomes(OtherTopic);
     expect(o.errors).toBeDefined();

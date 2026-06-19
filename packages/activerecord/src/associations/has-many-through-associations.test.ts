@@ -694,7 +694,7 @@ describe("HasManyThroughAssociationsTest", () => {
       .whereNot({ "ta_developers.id": bob.id })
       .toArray();
     expect(results).toHaveLength(1);
-    expect((results[0] as any).name).toBe("Alice");
+    expect(results[0].name).toBe("Alice");
     // Verify aliceContract was created (exercises the through table)
     expect(aliceContract.id).toBeDefined();
   });
@@ -1600,7 +1600,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const proxy = association(post, "btsPeople");
     const person = proxy.build({ first_name: "Bob" });
     // build_record wires the join row onto the source's collection inverse.
-    const readers = association(person, "btsReaders").target as Base[];
+    const readers = association(person, "btsReaders").target;
     expect(readers.length).toBe(1);
     await person.save();
     // After save, person should be persisted
@@ -1936,7 +1936,7 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     it("destroy all on composite primary key model", async () => {
-      const tag = cpkTags("cpk_tag_loyal_customer") as CpkTag;
+      const tag = cpkTags("cpk_tag_loyal_customer");
       const orders = await (tag as any).orders.toArray();
       expect(orders.length).toBeGreaterThan(0);
       await (tag as any).orders.destroyAll();
@@ -1947,7 +1947,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     it("composite primary key join table", async () => {
       const order = await CpkOrder.create({ shop_id: 1, status: "open" });
-      const tag = cpkTags("cpk_tag_loyal_customer") as CpkTag;
+      const tag = cpkTags("cpk_tag_loyal_customer");
       const orderTag = await CpkOrderTag.create({
         order_id: (order as any).idValue,
         tag_id: (tag as any).id,
@@ -1956,14 +1956,14 @@ describe("HasManyThroughAssociationsTest", () => {
       // Rails: assert_equal order, order_tag.order
       // `reader` is sync (returns null if not preloaded); use loadTarget() for the async DB load.
       // AR == compares by class + id; compare idValue (the scalar "id" column) instead of toEqual.
-      const loadedOrder = (await (orderTag as any).association("order").loadTarget()) as any;
+      const loadedOrder = await (orderTag as any).association("order").loadTarget();
       expect(loadedOrder?.idValue).toBe((order as any).idValue);
-      const loadedTag = (await (orderTag as any).association("tag").loadTarget()) as any;
+      const loadedTag = await (orderTag as any).association("tag").loadTarget();
       expect(loadedTag?.id).toBe((tag as any).id);
       await (orderTag as any).update({ attached_reason: "This is our loyal customer" });
       const orderTags = await (order as any).orderTags.toArray();
-      const found = orderTags.find((ot: any) => (ot as any).tag_id === (tag as any).id);
-      expect((found as any).attached_reason).toBe("This is our loyal customer");
+      const found = orderTags.find((ot: any) => ot.tag_id === (tag as any).id);
+      expect(found.attached_reason).toBe("This is our loyal customer");
     });
   });
   it("destroy all on association clears scope", async () => {
@@ -3510,7 +3510,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const found = await (person as any).df_posts.findBy({ title: "Welcome to the weblog" });
     expect(found).not.toBeNull();
-    expect((found as any).title).toBe("Welcome to the weblog");
+    expect(found.title).toBe("Welcome to the weblog");
   });
 
   it("count with include should alias join table", async () => {
@@ -4849,7 +4849,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const nonSkimmers = await (author as any).ss_non_skimmer_readers.toArray();
     expect(nonSkimmers).toHaveLength(1);
-    expect((nonSkimmers[0] as any).id).toBe(r1.id);
+    expect(nonSkimmers[0].id).toBe(r1.id);
   });
 
   it("has many through with through scope with includes", async () => {
@@ -4900,7 +4900,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const posts = await (author as any).ssi_posts.toArray();
     expect(posts).toHaveLength(1);
-    expect((posts[0] as any).title).toBe("Welcome");
+    expect(posts[0].title).toBe("Welcome");
   });
 
   it("has many through with through scope with joins", async () => {
@@ -4949,7 +4949,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const posts = await (author as any).ssj_published_posts.toArray();
     expect(posts).toHaveLength(1);
-    expect((posts[0] as any).title).toBe("Published");
+    expect(posts[0].title).toBe("Published");
   });
 
   it("duplicated has many through with through scope with joins", async () => {
@@ -5006,7 +5006,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const posts = await (author as any).dup_general_posts.toArray();
     expect(posts).toHaveLength(1);
-    expect((posts[0] as any).title).toBe("Welcome");
+    expect(posts[0].title).toBe("Welcome");
   });
   it("has many through polymorphic with rewhere", async () => {
     class RwPost extends Base {
@@ -6315,7 +6315,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const results = await (owner as any).ds_tgts.toArray();
     expect(results).toHaveLength(1);
-    expect((results[0] as any).title).toBe("First");
+    expect(results[0].title).toBe("First");
   });
 
   it("has many through with includes in through association scope", async () => {
@@ -6415,7 +6415,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const favorites = await (club as any).ir_favorites.toArray();
     expect(favorites).toHaveLength(1);
-    expect((favorites[0] as any).id).toBe(member.id);
+    expect(favorites[0].id).toBe(member.id);
   });
 
   it("insert records via has many through association with scope and association name different from the joining table name", async () => {
@@ -6520,7 +6520,7 @@ describe("HasManyThroughAssociationsTest", () => {
     // Scoped: only non-skimmer readers
     const nonSkimmers = await (post as any).htu_non_skimmer_people.toArray();
     expect(nonSkimmers).toHaveLength(1);
-    expect((nonSkimmers[0] as any).name).toBe("David");
+    expect(nonSkimmers[0].name).toBe("David");
   });
   it("has many through add with sti middle relation", async () => {
     class StiAddClub extends Base {
@@ -6728,13 +6728,13 @@ describe("HasManyThroughAssociationsTest", () => {
     currentOwnerId = Number(owner1.id);
     const r1 = await (owner1 as any).dc_tgts.toArray();
     expect(r1).toHaveLength(1);
-    expect((r1[0] as any).name).toBe("T1");
+    expect(r1[0].name).toBe("T1");
 
     // Change scope to owner2 — second load on owner2 should NOT return a stale owner1 cache
     currentOwnerId = Number(owner2.id);
     const r2 = await (owner2 as any).dc_tgts.toArray();
     expect(r2).toHaveLength(1);
-    expect((r2[0] as any).name).toBe("T2");
+    expect(r2[0].name).toBe("T2");
   });
 
   it("has many through with scope that has joined same table with parent relation", async () => {
@@ -6784,7 +6784,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const comments = await (author as any).js_comments.toArray();
     expect(comments).toHaveLength(1);
-    expect((comments[0] as any).body).toBe("Great!");
+    expect(comments[0].body).toBe("Great!");
   });
 
   it("has many through with left joined same table with through table", async () => {
@@ -6834,7 +6834,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const comments = await (author as any).lj_comments.toArray();
     expect(comments).toHaveLength(1);
-    expect((comments[0] as any).body).toBe("Hey!");
+    expect(comments[0].body).toBe("Hey!");
   });
 
   it("has many through with unscope should affect to through scope", async () => {
@@ -6950,7 +6950,7 @@ describe("HasManyThroughAssociationsTest", () => {
     // Basic through loading works
     const comments = await (author as any).sj_comments.toArray();
     expect(comments).toHaveLength(1);
-    expect((comments[0] as any).body).toBe("C1");
+    expect(comments[0].body).toBe("C1");
 
     // Through association with a string join in scope also works
     const recentComments = await (author as any).sj_recent_comments.toArray();
@@ -7019,7 +7019,7 @@ describe("HasManyThroughAssociationsTest", () => {
       // full comment set, because unscoping the through model (FirstPost, whose
       // default_scope is where(id: 1)) widens first_posts to all the author's
       // posts — so comments_on_first_posts equals author.comments.
-      const author = authors("david") as Author;
+      const author = authors("david");
       const expected = ids(await association(author, "comments").toArray());
 
       const inside = await FirstPost.unscoped(async () => {
@@ -7035,7 +7035,7 @@ describe("HasManyThroughAssociationsTest", () => {
       // Rails: FirstPost.where(id: 2).scoping { author.comments_on_first_posts.reset }
       // — the through association applies its own scope, so the surrounding
       // scoping block on FirstPost leaves comments_on_first_posts unchanged.
-      const author = authors("david") as Author;
+      const author = authors("david");
       const expected = ids(await association(author, "commentsOnFirstPosts").toArray());
 
       await FirstPost.where({ id: 2 }).scoping(async () => {
@@ -7118,7 +7118,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const cats = await (author as any).uid_cats.toArray();
     expect(cats).toHaveLength(1);
-    expect((cats[0] as any).id).toBe(cat.id);
+    expect(cats[0].id).toBe(cat.id);
   });
   it("single has many through association with unpersisted parent instance", async () => {
     class HmtUnpOwner extends Base {
@@ -7365,7 +7365,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const tags = await (post as any).cq_tags.toArray();
     expect(tags).toHaveLength(1);
-    expect((tags[0] as any).name).toBe("Ruby");
+    expect(tags[0].name).toBe("Ruby");
   });
 
   it("tags has manu posts through association with composite query constraints", async () => {
@@ -7413,8 +7413,8 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const posts = await (tag as any).cq_blog_posts2.toArray();
     expect(posts).toHaveLength(1);
-    expect((posts[0] as any).title).toBe("Great Post");
-    expect((posts[0] as any).blog_id).toBe(1);
+    expect(posts[0].title).toBe("Great Post");
+    expect(posts[0].blog_id).toBe(1);
   });
   it("loading cpk association with unpersisted owner", async () => {
     class CpkHmtOwner extends Base {

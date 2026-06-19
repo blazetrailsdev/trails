@@ -17,7 +17,7 @@ export class TagStack {
 
   pushTags(tags: unknown[]): string[] {
     this._tagsString = null;
-    const flat = (tags as unknown[])
+    const flat = tags
       .flat(Infinity)
       .map((t) => (t == null ? "" : globalThis.String(t)))
       .filter((t) => t.length > 0 && !/^\s*$/.test(t));

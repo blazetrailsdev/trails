@@ -94,7 +94,7 @@ describe("LazyAttributeSet", () => {
     const lazy = new LazyAttributeSet(new Map(), extra);
     const mapped = lazy.map((a) => a);
     expect(mapped).toBeInstanceOf(LazyAttributeSet);
-    expect((mapped as LazyAttributeSet).additionalTypes()).toEqual(extra);
+    expect(mapped.additionalTypes()).toEqual(extra);
   });
 });
 

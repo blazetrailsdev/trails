@@ -1,6 +1,5 @@
 import { getFs, getPath, Logger, getEnv, camelize, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import type { FsDirent } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { DatabaseAdapter } from "./adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -63,7 +62,7 @@ function _extractNewCommentValue(
     }
     return to;
   }
-  return v as string | null;
+  return v;
 }
 
 // Registry for AR config injected by Base — breaks the migration ↔ base import cycle.
@@ -945,8 +944,8 @@ export abstract class Migration {
       valuesOrOptions !== null &&
       typeof valuesOrOptions === "object" &&
       !Array.isArray(valuesOrOptions);
-    const values = isOptsObj ? undefined : (valuesOrOptions as string[] | undefined);
-    const opts = isOptsObj ? (valuesOrOptions as Record<string, unknown>) : (options ?? undefined);
+    const values = isOptsObj ? undefined : valuesOrOptions;
+    const opts = isOptsObj ? valuesOrOptions : (options ?? undefined);
     if (this._recording) {
       this._recorder.record("dropEnum", [name, values, opts]);
       return;
@@ -988,12 +987,8 @@ export abstract class Migration {
       columnNameOrOptions !== null &&
       typeof columnNameOrOptions === "object" &&
       !Array.isArray(columnNameOrOptions);
-    const columnName = isOptsObj
-      ? undefined
-      : (columnNameOrOptions as string | string[] | undefined);
-    const opts = isOptsObj
-      ? (columnNameOrOptions as Record<string, unknown>)
-      : (options ?? undefined);
+    const columnName = isOptsObj ? undefined : columnNameOrOptions;
+    const opts = isOptsObj ? columnNameOrOptions : (options ?? undefined);
     if (this._recording) {
       this._recorder.record("removeUniqueConstraint", [tableName, columnName, opts]);
       return;
@@ -1552,7 +1547,7 @@ export abstract class Migration {
         // before the provenance line, mirroring Rails' frozen_string_literal /
         // encoding handling (migration.rb:1082).
         const magicMatch = /^((?:\/\/ @ts-(?:no)?check[^\n]*\n)+\n?)/.exec(body);
-        const magic = magicMatch ? magicMatch[1]! : "";
+        const magic = magicMatch ? magicMatch[1] : "";
         const rest = magic.length > 0 ? body.slice(magic.length) : body;
         fs.writeFileSync(newPath, `${magic}${inserted}${rest}`);
         copied.push(copy);
@@ -1759,7 +1754,7 @@ export class MigrationContext {
     }
     const rows = await this.connection.execute(sql);
     return rows.map((r) => {
-      const x = r as Record<string, unknown>;
+      const x = r;
       const colName = (x.name ?? x.column_name ?? x.Field) as string;
       // SQLite: type; PG: data_type (with udt_name for USER-DEFINED); MySQL: Type
       let rawType = ((x.type ?? x.data_type ?? x.Type) as string | undefined) ?? "";
@@ -1769,7 +1764,7 @@ export class MigrationContext {
         // etc. — strip the leading underscore and surface as the base type
         // plus array:true (schema-dumper/array.test.ts pattern).
         if (rawType.toUpperCase() === "ARRAY" && typeof x.udt_name === "string") {
-          rawType = (x.udt_name as string).replace(/^_/, "");
+          rawType = x.udt_name.replace(/^_/, "");
           isArray = true;
         } else if (rawType.toUpperCase() === "USER-DEFINED" && x.udt_name) {
           rawType = String(x.udt_name);
@@ -2637,7 +2632,7 @@ export class Migrator {
     // Rails: `release_advisory_lock(...) or raise` (migration.rb:1608-1612).
     let released: boolean | undefined;
     try {
-      released = await adapter.releaseAdvisoryLock!(lockId);
+      released = await adapter.releaseAdvisoryLock(lockId);
     } catch (releaseErr) {
       if (fnError !== _sentinel) throw fnError;
       throw releaseErr;
@@ -2976,7 +2971,7 @@ export class Migrator {
       const normV = SchemaMigration.normalizeMigrationNumber(m.version);
       const isUp = applied.delete(normV);
       return {
-        status: (isUp ? "up" : "down") as "up" | "down",
+        status: (isUp ? "up" : "down") as "up" | "down", // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion
         version: normV,
         name: m.name,
       };
@@ -2999,7 +2994,7 @@ export class Migrator {
       const m = v.match(/^\s*(-?\d+)/);
       if (!m) return 0n;
       try {
-        return BigInt(m[1]!);
+        return BigInt(m[1]);
       } catch {
         return 0n;
       }
@@ -3489,7 +3484,7 @@ export class Migrator {
     const files: string[] = [];
     const collect = (dir: string) => {
       if (!existsSync(dir)) return;
-      for (const entry of readdirSync(dir, { withFileTypes: true }) as FsDirent[]) {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = join(dir, entry.name);
         if (entry.isDirectory()) {
           collect(full);
@@ -3508,7 +3503,7 @@ export class Migrator {
     const base = filename.replace(/.*[/\\]/, "").replace(/\.(ts|js)$/, "");
     const m = base.match(/^(\d+)_([a-z0-9_]*)(?:\.([a-z0-9_]*))?$/);
     if (!m) return null;
-    return [m[1]!, m[2]!, m[3] ?? ""];
+    return [m[1], m[2], m[3] ?? ""];
   }
 
   // Rails: MigrationContext#validate_timestamp?

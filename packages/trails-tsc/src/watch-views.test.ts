@@ -44,7 +44,7 @@ describe("watchViews", () => {
     const handle = watchViews({ cwd, debounceMs: 5, onError: (e) => errors.push(e) });
     try {
       await waitFor(() => errors.length > 0);
-      expect(errors[0]!.message).toMatch(/symlink escape/);
+      expect(errors[0].message).toMatch(/symlink escape/);
       expect(fs.existsSync(path.join(cwd, "app/views"))).toBe(true);
     } finally {
       handle.close();

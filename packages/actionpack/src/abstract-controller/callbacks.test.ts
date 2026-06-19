@@ -46,7 +46,7 @@ class Callback2 extends AbstractController {
     this.second = "Goodbye";
   }
   async index() {
-    this.responseBody = (this.text ?? "") as string;
+    this.responseBody = this.text ?? "";
   }
 }
 Callback2.beforeAction((c) => (c as Callback2).first(), { name: "first" });
@@ -264,7 +264,7 @@ describe("TestCallbacksWithArrayConditions", () => {
 
 class ChangedConditions extends Callback2 {
   async not_index() {
-    this.responseBody = (this.text ?? "") as string;
+    this.responseBody = this.text ?? "";
   }
 }
 ChangedConditions.beforeAction((c) => (c as Callback2).first(), {

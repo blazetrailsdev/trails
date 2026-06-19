@@ -162,9 +162,7 @@ export class BelongsTo extends SingularAssociation {
     const oldFkValues = fkColumns.map((col) => {
       const change = changes[col] as [unknown, unknown] | undefined;
       if (change) return change[0];
-      return typeof (record as any)._readAttribute === "function"
-        ? (record as any)._readAttribute(col)
-        : record[col];
+      return typeof record._readAttribute === "function" ? record._readAttribute(col) : record[col];
     });
     const foreignTypeCol = `${underscore(name)}_type`;
     const hasOldFk =
@@ -186,8 +184,8 @@ export class BelongsTo extends SingularAssociation {
             `${underscore(name)}_type`;
           const typeName =
             (changes[foreignType] as [unknown, unknown] | undefined)?.[0] ??
-            (typeof (record as any)._readAttribute === "function"
-              ? (record as any)._readAttribute(foreignType)
+            (typeof record._readAttribute === "function"
+              ? record._readAttribute(foreignType)
               : record[foreignType]);
           try {
             klass = typeName ? resolveModel(typeName) : null;
@@ -275,12 +273,12 @@ export class BelongsTo extends SingularAssociation {
 
     if (typeof model.afterTouch === "function") {
       model.afterTouch(async (record: any) => {
-        if ((record as any)._touchingAssociations) return;
-        (record as any)._touchingAssociations = true;
+        if (record._touchingAssociations) return;
+        record._touchingAssociations = true;
         try {
           await makeCallback("changesToSave")(record);
         } finally {
-          (record as any)._touchingAssociations = false;
+          record._touchingAssociations = false;
         }
       });
     }
@@ -350,7 +348,7 @@ export class BelongsTo extends SingularAssociation {
         const needsValidation = (record: any, attrs: string[]) =>
           attrs.some(
             (attr) =>
-              (record as any)._readAttribute(attr) == null ||
+              record._readAttribute(attr) == null ||
               (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
           );
 

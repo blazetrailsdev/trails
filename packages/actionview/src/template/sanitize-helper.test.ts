@@ -14,7 +14,7 @@ import {
   getSafeListSanitizer,
   setSafeListSanitizer,
 } from "../helpers/sanitize-helper.js";
-import type { Sanitizer, SanitizerVendor, SanitizerClass } from "../helpers/sanitize-helper.js";
+import type { SanitizerVendor, SanitizerClass } from "../helpers/sanitize-helper.js";
 
 function newMockVendor(): SanitizerVendor & { newMockSanitizer: (name: string) => SanitizerClass } {
   function newMockSanitizer(injectedName: string): SanitizerClass {
@@ -32,7 +32,7 @@ function newMockVendor(): SanitizerVendor & { newMockSanitizer: (name: string) =
   const safeListClass = newMockSanitizer("safe_list_sanitizer");
   (safeListClass as any).allowedTags = ["b", "i", "a"];
   (safeListClass as any).allowedAttributes = ["href", "title"];
-  (safeListClass.prototype as any).sanitizeCss = function (style: string) {
+  safeListClass.prototype.sanitizeCss = function (style: string) {
     return `safe_list_sanitizer#sanitize_css / ${style}`;
   };
 
@@ -90,7 +90,7 @@ describe("SanitizeHelperTest", () => {
   it("full_sanitizer is settable", () => {
     const saved = getFullSanitizer();
     const mock = new (mockVendor.newMockSanitizer("walrus"))();
-    setFullSanitizer(mock as Sanitizer);
+    setFullSanitizer(mock);
     expect(getFullSanitizer()).toBe(mock);
     setFullSanitizer(saved);
   });
@@ -98,7 +98,7 @@ describe("SanitizeHelperTest", () => {
   it("link_sanitizer is settable", () => {
     const saved = getLinkSanitizer();
     const mock = new (mockVendor.newMockSanitizer("walrus"))();
-    setLinkSanitizer(mock as Sanitizer);
+    setLinkSanitizer(mock);
     expect(getLinkSanitizer()).toBe(mock);
     setLinkSanitizer(saved);
   });
@@ -106,7 +106,7 @@ describe("SanitizeHelperTest", () => {
   it("safe_list_sanitizer is settable", () => {
     const saved = getSafeListSanitizer();
     const mock = new (mockVendor.newMockSanitizer("walrus"))();
-    setSafeListSanitizer(mock as Sanitizer);
+    setSafeListSanitizer(mock);
     expect(getSafeListSanitizer()).toBe(mock);
     setSafeListSanitizer(saved);
   });

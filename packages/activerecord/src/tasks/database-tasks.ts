@@ -734,7 +734,7 @@ export class DatabaseTasks {
     if (!source) return null;
     if (Array.isArray(source) || typeof source === "string") return source;
     if (adapter && typeof source === "object" && adapter in source) {
-      const value = (source as Record<string, string | string[]>)[adapter];
+      const value = source[adapter];
       return value;
     }
     return null;
@@ -1429,7 +1429,7 @@ export function structureDumpFlagsFor(adapter: string): string | string[] | null
   const flags = DatabaseTasks.structureDumpFlags;
   if (!flags) return null;
   if (typeof flags === "string" || Array.isArray(flags)) return flags;
-  return (flags as Record<string, string | string[]>)[adapter] ?? null;
+  return flags[adapter] ?? null;
 }
 
 /** @internal */
@@ -1437,7 +1437,7 @@ export function structureLoadFlagsFor(adapter: string): string | string[] | null
   const flags = DatabaseTasks.structureLoadFlags;
   if (!flags) return null;
   if (typeof flags === "string" || Array.isArray(flags)) return flags;
-  return (flags as Record<string, string | string[]>)[adapter] ?? null;
+  return flags[adapter] ?? null;
 }
 
 /** @internal */

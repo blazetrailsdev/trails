@@ -62,7 +62,7 @@ export function pickTemplateForEtag(
   controller: { actionName?: string },
 ): string | undefined {
   if (options?.template === false) return undefined;
-  return (options?.template as string | undefined) ?? controller.actionName;
+  return options?.template ?? controller.actionName;
 }
 
 /** @internal */

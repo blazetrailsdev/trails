@@ -244,7 +244,7 @@ describe("TransactionCallbacksTest", () => {
 
     const topic = (await TopicForAssoc.create({ title: "Parent" })) as any;
     // Create with no title → validation fails → afterCreateCommit does NOT fire
-    await (topic.assocReplies as any).create({});
+    await topic.assocReplies.create({});
     expect(commitHistory).toEqual([]);
   });
   it("no after commit on destroy after transaction commits for destroyed new record", async () => {

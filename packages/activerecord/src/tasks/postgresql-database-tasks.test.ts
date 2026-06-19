@@ -79,8 +79,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     }));
 
     try {
-      const mod =
-        (await import("./postgresql-database-tasks.js")) as typeof import("./postgresql-database-tasks.js");
+      const mod = await import("./postgresql-database-tasks.js");
       await new mod.PostgreSQLDatabaseTasks(
         new HashConfig("development", "primary", {
           adapter: "postgresql",

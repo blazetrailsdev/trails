@@ -130,7 +130,7 @@ describe("SQLite adapter driver binding", () => {
       resolveClose = resolve;
     });
     const driver = asyncDriver(async (config) => {
-      const conn = (await openVia(config)) as SqliteConnection;
+      const conn = await openVia(config);
       return new Proxy(conn, {
         get(target, prop, receiver) {
           if (prop === "close") {
@@ -156,7 +156,7 @@ describe("SQLite adapter driver binding", () => {
     // The async close() fired by disconnectBang rejects; close() must drain the
     // swallowed rejection without surfacing it.
     const driver = asyncDriver(async (config) => {
-      const conn = (await openVia(config)) as SqliteConnection;
+      const conn = await openVia(config);
       return new Proxy(conn, {
         get(target, prop, receiver) {
           if (prop === "close") {
@@ -260,7 +260,7 @@ describe("SQLite adapter driver binding", () => {
       resolveClose = resolve;
     });
     const driver = asyncDriver(async (config) => {
-      const conn = (await openVia(config)) as SqliteConnection;
+      const conn = await openVia(config);
       return new Proxy(conn, {
         get(target, prop, receiver) {
           if (prop === "close") {

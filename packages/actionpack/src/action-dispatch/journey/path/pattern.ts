@@ -73,7 +73,7 @@ function combinedFlagsUsed(
   names: readonly string[],
 ): string {
   const values: Array<RegExp | RegExp[]> = [];
-  for (const n of names) if (Object.hasOwn(matchers, n)) values.push(matchers[n]!);
+  for (const n of names) if (Object.hasOwn(matchers, n)) values.push(matchers[n]);
   return combinedFlagsFor(values);
 }
 
@@ -107,7 +107,7 @@ export class AnchoredRegexp extends Visitor {
   protected override visitSYMBOL(node: Node): string {
     const name = node.toSym();
     if (!Object.hasOwn(this._matchers, name)) return this._separatorRe;
-    return `(${regexUnion(this._matchers[name]!)})`;
+    return `(${regexUnion(this._matchers[name])})`;
   }
 
   protected override visitGROUP(node: Node): string {
@@ -127,10 +127,10 @@ export class AnchoredRegexp extends Visitor {
   }
 
   protected override visitSTAR(node: Node): string {
-    const inner = (node as Star).left as Node;
+    const inner = (node as Star).left;
     const name = inner.toSym();
     if (!Object.hasOwn(this._matchers, name)) return "(.+)";
-    return `(${regexUnion(this._matchers[name]!)})`;
+    return `(${regexUnion(this._matchers[name])})`;
   }
 
   protected override visitOR(node: Node): string {
@@ -200,7 +200,7 @@ export class MatchData {
   at(x: number): string | undefined {
     if (x === 0) return this._match[0];
     if (x < 0 || x >= this.length) return undefined;
-    const idx = this._offsets[x - 1]! + x;
+    const idx = this._offsets[x - 1] + x;
     return this._match[idx];
   }
 
@@ -278,9 +278,9 @@ export class Pattern {
     if (!this.ast) return true;
     const terminals = this.ast.terminals;
     for (let i = 1; i < terminals.length; i++) {
-      const s = terminals[i]!;
+      const s = terminals[i];
       if (s.type === "DOT" || s.type === "SLASH") continue;
-      const back = terminals[i - 1]!;
+      const back = terminals[i - 1];
       const fwd = terminals[i + 1];
       // Rails consults the SymbolNode's regexp after `ast.requirements=`
       // wires it in; trails-side Pattern stores requirements separately,
@@ -368,14 +368,14 @@ export class Pattern {
       if (!n.isSymbol()) continue;
       const name = n.toSym();
       if (Object.hasOwn(this.requirements, name)) {
-        const reqs = this.requirements[name]!;
+        const reqs = this.requirements[name];
         const src = regexUnion(reqs);
         const re = new RegExp(`(?:${src})|`, combinedFlagsFor([reqs], { outer: false }));
         const m = re.exec("");
         const groupCount = m ? m.length - 1 : 0;
-        offsets.push(groupCount + offsets[offsets.length - 1]!);
+        offsets.push(groupCount + offsets[offsets.length - 1]);
       } else {
-        offsets.push(offsets[offsets.length - 1]!);
+        offsets.push(offsets[offsets.length - 1]);
       }
     }
     this._offsets = offsets;
@@ -409,16 +409,16 @@ export class Pattern {
  */
 function normalizeLeadingOptionalSpec(spec: Node): Node {
   const parts = flattenCat(spec);
-  if (parts.length < 2 || parts[0]!.type !== "SLASH") return spec;
-  const second = parts[1]!;
+  if (parts.length < 2 || parts[0].type !== "SLASH") return spec;
+  const second = parts[1];
   if (!second.isGroup()) return spec;
   // The second top-level node must be a Group whose body starts with a
   // SLASH terminal — otherwise there's no slash-doubling to undo.
   const innerParts = flattenCat((second as Group).left as Node);
-  if (innerParts.length < 2 || innerParts[0]!.type !== "SLASH") return spec;
+  if (innerParts.length < 2 || innerParts[0].type !== "SLASH") return spec;
   const allOptional = parts.slice(1).every((p) => p.isGroup());
   const newParts = allOptional
-    ? [parts[0]!, new Group(buildCat(innerParts.slice(1))), ...parts.slice(2)]
+    ? [parts[0], new Group(buildCat(innerParts.slice(1))), ...parts.slice(2)]
     : parts.slice(1);
   return buildCat(newParts);
 }
@@ -440,5 +440,5 @@ function flattenCat(node: Node): Node[] {
 
 /** @internal Rebuild a right-leaning Cat chain from a non-empty node list. */
 function buildCat(parts: readonly Node[]): Node {
-  return parts.slice(1).reduce((acc, n) => new Cat(acc, n), parts[0]!);
+  return parts.slice(1).reduce((acc, n) => new Cat(acc, n), parts[0]);
 }

@@ -145,7 +145,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       typeof chainWalkerOrTrusted === "object" &&
       TRUSTED_CLONE in chainWalkerOrTrusted
     ) {
-      const t = (chainWalkerOrTrusted as TrustedClonePayload<T>)[TRUSTED_CLONE];
+      const t = chainWalkerOrTrusted[TRUSTED_CLONE];
       this.key = key;
       this._composite = t.composite;
       this._storedIds = t.storedIds;

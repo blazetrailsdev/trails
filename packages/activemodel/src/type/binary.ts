@@ -30,9 +30,9 @@ export class BinaryType extends ValueType<Uint8Array> {
     const cur = this.serialize(newValue);
     if (old === null && cur === null) return false;
     if (old === null || cur === null) return true;
-    if (old.length !== (cur as Uint8Array).length) return true;
+    if (old.length !== cur.length) return true;
     for (let i = 0; i < old.length; i++) {
-      if (old[i] !== (cur as Uint8Array)[i]) return true;
+      if (old[i] !== cur[i]) return true;
     }
     return false;
   }

@@ -36,7 +36,7 @@ export class Engine extends Trailtie {
     const fs = await getFsAsync();
     const expanded = await realpathOr(fs, p.resolve(path));
     for (const klass of this.engineSubclasses()) {
-      const engine = klass.instance() as Engine;
+      const engine = klass.instance();
       const root = await engine.root().catch(() => undefined);
       if (root && (await realpathOr(fs, p.resolve(root))) === expanded) return engine;
     }

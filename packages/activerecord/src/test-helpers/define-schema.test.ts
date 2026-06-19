@@ -56,9 +56,7 @@ describe("defineSchema", () => {
       },
     });
 
-    const createCalls = spy.mock.calls
-      .map((c) => c[0] as string)
-      .filter((sql) => /CREATE TABLE/i.test(sql));
+    const createCalls = spy.mock.calls.map((c) => c[0]).filter((sql) => /CREATE TABLE/i.test(sql));
     expect(createCalls[0]).toMatch(/\bposts\b/);
     expect(createCalls[1]).toMatch(/\bcomments\b/);
   });
@@ -73,7 +71,7 @@ describe("defineSchema", () => {
     });
 
     const order = spy.mock.calls
-      .map((c) => c[0] as string)
+      .map((c) => c[0])
       .filter((sql) => /CREATE TABLE/i.test(sql))
       .map((sql) => sql.match(/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?[`"']?(\w+)[`"']?/i)?.[1]);
     expect(order).toEqual(["a", "b", "c"]);
@@ -130,9 +128,7 @@ describe("defineSchema", () => {
       await expect(
         adapter.executeMutation(`INSERT INTO "single_pk" ("code","label") VALUES (NULL,'z')`),
       ).rejects.toThrow();
-      const rows = (await adapter.execute(`SELECT * FROM "single_pk"`)) as Array<
-        Record<string, unknown>
-      >;
+      const rows = await adapter.execute(`SELECT * FROM "single_pk"`);
       expect(rows).toHaveLength(1);
       // No auto `id` column when wrapper.primaryKey is set.
       expect("id" in rows[0]).toBe(false);
@@ -148,9 +144,7 @@ describe("defineSchema", () => {
       });
       await adapter.executeMutation(`INSERT INTO "serial_pk" ("label") VALUES ('a')`);
       await adapter.executeMutation(`INSERT INTO "serial_pk" ("label") VALUES ('b')`);
-      const rows = (await adapter.execute(
-        `SELECT * FROM "serial_pk" ORDER BY "thing_id"`,
-      )) as Array<Record<string, unknown>>;
+      const rows = await adapter.execute(`SELECT * FROM "serial_pk" ORDER BY "thing_id"`);
       expect(rows).toHaveLength(2);
       // The PK was auto-populated (not null) and the column was not duplicated
       // (no auto `id`).
@@ -173,9 +167,7 @@ describe("defineSchema", () => {
       });
       await adapter.executeMutation(`INSERT INTO "big_serial_pk" ("label") VALUES ('a')`);
       await adapter.executeMutation(`INSERT INTO "big_serial_pk" ("label") VALUES ('b')`);
-      const rows = (await adapter.execute(
-        `SELECT * FROM "big_serial_pk" ORDER BY "thing_id"`,
-      )) as Array<Record<string, unknown>>;
+      const rows = await adapter.execute(`SELECT * FROM "big_serial_pk" ORDER BY "thing_id"`);
       expect(rows).toHaveLength(2);
       expect(rows[0].thing_id).not.toBeNull();
       expect(rows[1].thing_id).not.toBeNull();
@@ -205,9 +197,7 @@ describe("defineSchema", () => {
       });
       // No "id" column present.
       await adapter.executeMutation(`INSERT INTO "no_pk" ("tag") VALUES ('x')`);
-      const rows = (await adapter.execute(`SELECT * FROM "no_pk"`)) as Array<
-        Record<string, unknown>
-      >;
+      const rows = await adapter.execute(`SELECT * FROM "no_pk"`);
       expect(rows).toHaveLength(1);
       expect("id" in rows[0]).toBe(false);
     });
@@ -224,7 +214,7 @@ describe("defineSchema", () => {
         },
       });
       await adapter.executeMutation(`INSERT INTO "sti" ("type","name") VALUES ('Dog','Rex')`);
-      const rows = (await adapter.execute(`SELECT * FROM "sti"`)) as Array<Record<string, unknown>>;
+      const rows = await adapter.execute(`SELECT * FROM "sti"`);
       expect(rows[0]["type"]).toBe("Dog");
       expect("id" in rows[0]).toBe(false);
     });
@@ -242,9 +232,7 @@ describe("defineSchema", () => {
       await adapter.executeMutation(
         `INSERT INTO "legacy_pk_col" ("columns","primaryKey") VALUES ('a','b')`,
       );
-      const rows = (await adapter.execute(`SELECT * FROM "legacy_pk_col"`)) as Array<
-        Record<string, unknown>
-      >;
+      const rows = await adapter.execute(`SELECT * FROM "legacy_pk_col"`);
       expect(rows[0]["columns"]).toBe("a");
       expect(rows[0]["primaryKey"]).toBe("b");
     });
@@ -259,9 +247,7 @@ describe("defineSchema", () => {
         reports2: { columns: { type: "string" } },
       });
       await adapter.executeMutation(`INSERT INTO "reports2" ("columns") VALUES ('hi')`);
-      const rows = (await adapter.execute(`SELECT * FROM "reports2"`)) as Array<
-        Record<string, unknown>
-      >;
+      const rows = await adapter.execute(`SELECT * FROM "reports2"`);
       expect(rows[0]["columns"]).toBe("hi");
     });
 
@@ -273,9 +259,7 @@ describe("defineSchema", () => {
         reports: { columns: "string", count: "integer" },
       });
       await adapter.executeMutation(`INSERT INTO "reports" ("columns","count") VALUES ('hello',1)`);
-      const rows = (await adapter.execute(`SELECT * FROM "reports"`)) as Array<
-        Record<string, unknown>
-      >;
+      const rows = await adapter.execute(`SELECT * FROM "reports"`);
       expect(rows[0]["columns"]).toBe("hello");
     });
   });
@@ -319,7 +303,7 @@ describe("defineSchema", () => {
         widgets: { name: "string", count: "integer" },
       });
 
-      const { creates, drops } = ddlCounts(spy.mock.calls.map((c) => c[0] as string));
+      const { creates, drops } = ddlCounts(spy.mock.calls.map((c) => c[0]));
       expect(creates).toBe(0);
       expect(drops).toBe(0);
     });
@@ -338,7 +322,7 @@ describe("defineSchema", () => {
         c: { ratio: "float" },
       });
 
-      const sqls = spy.mock.calls.map((c) => c[0] as string);
+      const sqls = spy.mock.calls.map((c) => c[0]);
       const creates = sqls.filter((s) => /CREATE TABLE/i.test(s));
       const drops = sqls.filter((s) => /DROP TABLE/i.test(s));
       expect(drops).toHaveLength(1);
@@ -359,7 +343,7 @@ describe("defineSchema", () => {
         q: { label: "string" },
       });
 
-      const sqls = spy.mock.calls.map((c) => c[0] as string);
+      const sqls = spy.mock.calls.map((c) => c[0]);
       const touchedQ = sqls.some((s) => /\bq\b/.test(s) && /(CREATE|DROP) TABLE/i.test(s));
       expect(touchedQ).toBe(false);
       const createsP = sqls.filter((s) => /CREATE TABLE/i.test(s) && /\bp\b/.test(s));
@@ -372,7 +356,7 @@ describe("defineSchema", () => {
       const spy = vi.spyOn(adapter, "executeMutation");
       await defineSchema(adapter, { items: { name: "string" } }, { dropExisting: true });
 
-      const { creates, drops } = ddlCounts(spy.mock.calls.map((c) => c[0] as string));
+      const { creates, drops } = ddlCounts(spy.mock.calls.map((c) => c[0]));
       expect(creates).toBeGreaterThanOrEqual(1);
       expect(drops).toBeGreaterThanOrEqual(1);
     });
@@ -460,7 +444,7 @@ describe("defineSchema", () => {
       const spy = vi.spyOn(raw, "executeMutation");
       await defineSchema(raw, spec);
       const ddl = spy.mock.calls
-        .map((c) => c[0] as string)
+        .map((c) => c[0])
         .filter((sql) => /CREATE TABLE|DROP TABLE/i.test(sql));
       expect(ddl).toEqual([]);
     });

@@ -84,8 +84,7 @@ export class Association {
     if (opts.polymorphic || opts.through || opts.anonymousClass) return;
     const name = this.reflection.name;
     const className =
-      (opts.className as string | undefined) ??
-      camelize(this.reflection.type === "hasMany" ? singularize(name) : name);
+      opts.className ?? camelize(this.reflection.type === "hasMany" ? singularize(name) : name);
     resolveModel(className);
   }
 
@@ -180,21 +179,17 @@ export class Association {
     // Fires when CollectionProxy.scoping sets an AssociationRelation as
     // klass.currentScope; not yet implemented, so this is unreachable.
     const currentScope = (klass as any).currentScope;
-    if (currentScope && (currentScope as any).proxyAssociation === this) {
-      return typeof (currentScope as any).spawn === "function"
-        ? (currentScope as any).spawn()
-        : currentScope;
+    if (currentScope && currentScope.proxyAssociation === this) {
+      return typeof currentScope.spawn === "function" ? currentScope.spawn() : currentScope;
     }
     // Branches 3 + 4.
     const target = this.targetScope();
     const base =
-      target != null && typeof (target as any).merge === "function"
-        ? (target as any).merge(this._cachedScope)
+      target != null && typeof target.merge === "function"
+        ? target.merge(this._cachedScope)
         : this._cachedScope;
     const globalScope = ScopeRegistry.globalCurrentScope(klass as unknown as object);
-    return globalScope && typeof (base as any)?.merge === "function"
-      ? (base as any).merge(globalScope)
-      : base;
+    return globalScope && typeof base?.merge === "function" ? base.merge(globalScope) : base;
   }
 
   resetScope(): void {
@@ -567,7 +562,7 @@ export class Association {
 
   /** @internal */
   scopeForCreate(): Record<string, unknown> {
-    return (this.scope() as any)?.scopeForCreate?.() ?? {};
+    return this.scope()?.scopeForCreate?.() ?? {};
   }
 
   private isFindTarget(): boolean {

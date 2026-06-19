@@ -811,7 +811,7 @@ describe("AdapterTestWithoutTransaction", () => {
     sub.id = "bob drake";
     // Rails: assert_nothing_raised { sub.save! }
     await sub.saveBang();
-    const found = (await Subscriber.find("bob drake")) as Subscriber;
+    const found = await Subscriber.find("bob drake");
     expect(found.id).toBe("bob drake");
   });
 });

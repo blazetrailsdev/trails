@@ -227,7 +227,7 @@ export class IntegrationTest {
    * @internal
    */
   get _routes(): UrlForRoutes {
-    return this._routesOverride ?? (this.routes._routes as UrlForRoutes);
+    return this._routesOverride ?? this.routes._routes;
   }
 
   set _routes(value: UrlForRoutes | null) {
@@ -374,7 +374,7 @@ export class IntegrationTest {
    */
   get flash(): FlashHash {
     if (!this.request) return new FlashHash();
-    return testProcessFlash.call(this as unknown as TestProcessHost) as FlashHash;
+    return testProcessFlash.call(this as unknown as TestProcessHost);
   }
 
   /**
@@ -658,7 +658,7 @@ export class IntegrationTest {
    * trails mirrors the deprecation by raising via TestProcess#assigns.
    */
   assigns(key?: string | symbol): never {
-    return assignsFn.call(this as unknown as TestProcessHost, key) as never;
+    return assignsFn.call(this as unknown as TestProcessHost, key);
   }
 
   /**
@@ -671,7 +671,7 @@ export class IntegrationTest {
       path,
       mimeType,
       binary,
-    ) as UploadedFile;
+    );
   }
 
   /** Alias of {@link fileFixtureUpload}. */
@@ -681,7 +681,7 @@ export class IntegrationTest {
       path,
       mimeType,
       binary,
-    ) as UploadedFile;
+    );
   }
 
   /** Human-friendly description used by debuggers. Mirrors `Session#inspect`. */
@@ -875,7 +875,7 @@ export class IntegrationTest {
     let queryString = qIdx >= 0 ? path.slice(qIdx + 1) : "";
     // Rails serializes GET/HEAD params into the query string (via _process_path).
     if (options.params && (method === "GET" || method === "HEAD")) {
-      const extra = buildNestedQuery(options.params as Record<string, unknown>);
+      const extra = buildNestedQuery(options.params);
       if (extra) queryString = queryString ? `${queryString}&${extra}` : extra;
     }
     // Match route on pathname only.

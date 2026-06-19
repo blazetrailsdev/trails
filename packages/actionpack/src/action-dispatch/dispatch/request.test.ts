@@ -287,8 +287,8 @@ describe("RequestMimeType", () => {
       HTTP_ACCEPT: "text/html",
       HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
     });
-    const xml = MimeType.lookup("xml")!;
-    const json = MimeType.lookup("json")!;
+    const xml = MimeType.lookup("xml");
+    const json = MimeType.lookup("json");
     expect(req.negotiateMime([xml, json])).toBeNull();
     expect(req.negotiateMime([xml, MimeType.HTML])).toBe(MimeType.HTML);
     // Mime::ALL: any "*/*" entry — fall back to the request's first format.
@@ -301,8 +301,8 @@ describe("RequestMimeType", () => {
       CONTENT_TYPE: "application/xml; charset=UTF-8",
       HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
     });
-    const xml = MimeType.lookup("xml")!;
-    const csv = MimeType.lookup("csv")!;
+    const xml = MimeType.lookup("xml");
+    const csv = MimeType.lookup("csv");
     expect(req.negotiateMime([xml, csv])).toBe(xml);
     expect(req.contentMimeType?.symbol).toBe("xml");
   });

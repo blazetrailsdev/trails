@@ -105,7 +105,7 @@ export class ParamBuilder {
         (e instanceof Error &&
           (e.name === "ArgumentError" || e.message.startsWith("ArgumentError:")))
       ) {
-        throw new InvalidParameterError((e as Error).message);
+        throw new InvalidParameterError(e.message);
       }
       throw e;
     }
@@ -181,7 +181,7 @@ function classNameOf(v: unknown): string {
   if (typeof v === "object") {
     const proto = Object.getPrototypeOf(v);
     if (proto === null || proto === Object.prototype) return "Hash";
-    return (v as object).constructor?.name ?? "Object";
+    return v.constructor?.name ?? "Object";
   }
   return typeof v;
 }
@@ -296,7 +296,7 @@ function storeNestedParamImpl(
     if (!self.paramsHashType(child)) {
       throw new ParameterTypeError(`expected Hash (got ${classNameOf(child)}) for param \`${k}'`);
     }
-    params[k] = self.storeNestedParam(child, after, v, depth + 1) as ParamValue;
+    params[k] = self.storeNestedParam(child, after, v, depth + 1);
   }
 
   return params;

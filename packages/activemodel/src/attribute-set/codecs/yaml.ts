@@ -17,8 +17,8 @@ export const yamlCodec: AttributeSetCodec = {
     if (
       !isPlainObject(parsed) ||
       !("v" in parsed) ||
-      !isPlainObject((parsed as Record<string, unknown>).types) ||
-      !isPlainObject((parsed as Record<string, unknown>).values)
+      !isPlainObject(parsed.types) ||
+      !isPlainObject(parsed.values)
     ) {
       throw new AttributeSetCoderError(
         "yamlCodec.decode: input is not a valid AttributeSetEnvelope",

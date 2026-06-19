@@ -61,7 +61,7 @@ describe("CookieStoreTest", () => {
   it("setting session value", () => {
     const store = makeStore();
     const req = makeReq();
-    const sid = store.generateSid() as RackSessionId;
+    const sid = store.generateSid();
     const result = store.writeSession(req, sid, { foo: "bar" });
     expect(result.cookieValue["foo"]).toBe("bar");
     expect(result.cookieValue["session_id"]).toBe(sid.publicId);
@@ -144,7 +144,7 @@ describe("CookieStoreTest", () => {
     // value exceeds 4096 bytes; CookieStore itself does not gate.
     const store = makeStore();
     const req = makeReq();
-    const sid = store.generateSid() as RackSessionId;
+    const sid = store.generateSid();
     const big = { foo: "x".repeat(5000) };
     const result = store.writeSession(req, sid, big);
     expect(result.cookieValue["foo"]).toHaveLength(5000);

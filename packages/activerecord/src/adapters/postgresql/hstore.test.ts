@@ -124,7 +124,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("column", async () => {
       expect(column.type).toBe("hstore");
       expect(column.sqlType).toBe("hstore");
-      expect((column as any).array).toBeFalsy();
+      expect(column.array).toBeFalsy();
       // Rails: assert_not_predicate @type, :binary? — hstore is not a binary type
       expect(type.type()).not.toBe("binary");
     });
@@ -219,8 +219,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((x as any).timezone).toBe("GMT");
 
       const y = (x as any).dup();
-      expect((y as any).language).toBe("fr");
-      expect((y as any).timezone).toBe("GMT");
+      expect(y.language).toBe("fr");
+      expect(y.timezone).toBe("GMT");
     });
 
     it("yaml round trip with store accessors", () => {

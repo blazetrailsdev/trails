@@ -98,7 +98,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
     const sizeMatch = /^(?<size>tiny|medium|long)(?:text|blob)/i.exec(column.sqlType ?? "");
     if (sizeMatch?.groups) {
-      const size = (sizeMatch.groups["size"] as string).toLowerCase();
+      const size = sizeMatch.groups["size"].toLowerCase();
       const rest = { ...spec };
       Object.keys(spec).forEach((k) => delete spec[k]);
       // Rails dumps the symbol `size: :medium`; the TS DSL takes a string size

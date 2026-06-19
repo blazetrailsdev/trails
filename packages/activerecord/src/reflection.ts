@@ -556,7 +556,7 @@ export class MacroReflection extends AbstractReflection {
   equals(other: unknown): boolean {
     if (this === other) return true;
     if (!(other instanceof (this.constructor as typeof MacroReflection))) return false;
-    const o = other as MacroReflection;
+    const o = other;
     return this.name === o.name && o.options != null && this.activeRecord === o.activeRecord;
   }
 
@@ -770,7 +770,7 @@ export class AssociationReflection extends MacroReflection {
       let derivedFk: string | string[] = this.deriveForeignKey(inferFromInverseOf);
 
       if (hasQueryConstraints.call(this.activeRecord as any)) {
-        derivedFk = this.deriveFkQueryConstraints(derivedFk as string);
+        derivedFk = this.deriveFkQueryConstraints(derivedFk);
       }
 
       this._foreignKeyCache = derivedFk;
@@ -1093,8 +1093,7 @@ export class AssociationReflection extends MacroReflection {
   joinIdFor(owner: any): any[] {
     const keys = Array.isArray(this.joinForeignKey) ? this.joinForeignKey : [this.joinForeignKey];
     return keys.map((key) => {
-      if (typeof (owner as any)._readAttribute === "function")
-        return (owner as any)._readAttribute(key);
+      if (typeof owner._readAttribute === "function") return owner._readAttribute(key);
       if (typeof owner.readAttribute === "function") return owner.readAttribute(key);
       return owner[key];
     });
@@ -1166,7 +1165,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   extensions(): any[] {
-    if (Array.isArray(this.options.extend)) return this.options.extend as any[];
+    if (Array.isArray(this.options.extend)) return this.options.extend;
     if (this.options.extend) return [this.options.extend];
     return [];
   }
@@ -2187,8 +2186,7 @@ export function reflectOnAllAssociations(
   if (!macro) return allReflections;
 
   return allReflections.filter((ref) => {
-    const refMacro =
-      ref instanceof ThroughReflection ? ref.macro : (ref as AssociationReflection).macro;
+    const refMacro = ref instanceof ThroughReflection ? ref.macro : ref.macro;
     if (macro === "hasAndBelongsToMany") {
       return refMacro === "hasAndBelongsToMany";
     }
@@ -2217,8 +2215,7 @@ export function reflectOnAllAutosaveAssociations(
   modelClass: typeof Base,
 ): AssociationLikeReflection[] {
   return reflectOnAllAssociations(modelClass).filter((ref) => {
-    const opts =
-      ref instanceof ThroughReflection ? ref.options : (ref as AssociationReflection).options;
+    const opts = ref instanceof ThroughReflection ? ref.options : ref.options;
     return !!opts.autosave;
   });
 }

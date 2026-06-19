@@ -42,7 +42,7 @@ export class CollectionAssociation extends Association {
     if (block) {
       const extensionModuleName = `${name.charAt(0).toUpperCase()}${name.slice(1)}AssociationExtension`;
       const extension = { name: extensionModuleName, block };
-      (model as any)[extensionModuleName] = extension;
+      model[extensionModuleName] = extension;
       return extension;
     }
     return undefined;
@@ -55,7 +55,7 @@ export class CollectionAssociation extends Association {
     options: Record<string, unknown>,
   ): void {
     const callbackValues = Array.isArray(options[callbackName])
-      ? (options[callbackName] as any[])
+      ? options[callbackName]
       : options[callbackName] != null
         ? [options[callbackName]]
         : [];

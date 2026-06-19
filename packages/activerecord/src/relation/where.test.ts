@@ -657,7 +657,7 @@ describe("WhereTest", () => {
     await CpkBook.create({ author_id: 2, number: 100, title: "Other" });
     const result = await CpkBook.where(["author_id", "number"], [[1, 100]]).toArray();
     expect(result).toHaveLength(1);
-    const book = result[0] as InstanceType<typeof CpkBook>;
+    const book = result[0];
     expect(book.title).toBe("First");
   });
 
@@ -718,7 +718,7 @@ describe("WhereTest", () => {
       .where({ status: "active" })
       .toArray();
     expect(result).toHaveLength(1);
-    const item = result[0] as InstanceType<typeof CpkItem>;
+    const item = result[0];
     expect(item.shop_id).toBe(1);
     expect(item.number).toBe(1);
   });
@@ -765,17 +765,17 @@ describe("WhereTest", () => {
       foreignKey: ["shop_id", "order_id"],
     });
 
-    const order = (await WnilOrder.create({ shop_id: 1 })) as InstanceType<typeof WnilOrder>;
-    const otherOrder = (await WnilOrder.create({ shop_id: 2 })) as InstanceType<typeof WnilOrder>;
+    const order = await WnilOrder.create({ shop_id: 1 });
+    const otherOrder = await WnilOrder.create({ shop_id: 2 });
     // Use readAttribute to get the scalar auto-increment id, not the composite .id accessor
-    const book = (await WnilBook.create({
+    const book = await WnilBook.create({
       shop_id: order.readAttribute("shop_id"),
       order_id: order.readAttribute("id"),
-    })) as InstanceType<typeof WnilBook>;
-    const decoy = (await WnilBook.create({
+    });
+    const decoy = await WnilBook.create({
       shop_id: otherOrder.readAttribute("shop_id"),
       order_id: otherOrder.readAttribute("id"),
-    })) as InstanceType<typeof WnilBook>;
+    });
 
     const found = (await WnilBook.where({ order }).toArray()).map((r: any) => r.id);
     expect(found).toContain((book as any).id);
@@ -1208,34 +1208,30 @@ describe("WhereTest", () => {
     registerModel("PolyMCar", PolyMCar);
     Associations.belongsTo.call(PolyMPriceEstimate, "estimateOf", { polymorphic: true });
 
-    const treasure1 = (await PolyMTreasure.create({ name: "diamond" })) as InstanceType<
-      typeof PolyMTreasure
-    >;
-    const treasure2 = (await PolyMTreasure.create({ name: "sapphire" })) as InstanceType<
-      typeof PolyMTreasure
-    >;
-    const car = (await PolyMCar.create({ name: "honda" })) as InstanceType<typeof PolyMCar>;
-    const pe1 = (await PolyMPriceEstimate.create({
+    const treasure1 = await PolyMTreasure.create({ name: "diamond" });
+    const treasure2 = await PolyMTreasure.create({ name: "sapphire" });
+    const car = await PolyMCar.create({ name: "honda" });
+    const pe1 = await PolyMPriceEstimate.create({
       estimate_of_type: "PolyMTreasure",
       estimate_of_id: (treasure1 as any).id,
       price: 100,
-    })) as InstanceType<typeof PolyMPriceEstimate>;
-    const pe2 = (await PolyMPriceEstimate.create({
+    });
+    const pe2 = await PolyMPriceEstimate.create({
       estimate_of_type: "PolyMTreasure",
       estimate_of_id: (treasure2 as any).id,
       price: 200,
-    })) as InstanceType<typeof PolyMPriceEstimate>;
-    const pe3 = (await PolyMPriceEstimate.create({
+    });
+    const pe3 = await PolyMPriceEstimate.create({
       estimate_of_type: "PolyMCar",
       estimate_of_id: (car as any).id,
       price: 300,
-    })) as InstanceType<typeof PolyMPriceEstimate>;
+    });
     // decoy: same type as treasure1 but a different id — must not appear in results
-    const decoy = (await PolyMPriceEstimate.create({
+    const decoy = await PolyMPriceEstimate.create({
       estimate_of_type: "PolyMTreasure",
       estimate_of_id: 99999,
       price: 0,
-    })) as InstanceType<typeof PolyMPriceEstimate>;
+    });
 
     const expected = [(pe1 as any).id, (pe2 as any).id, (pe3 as any).id].sort();
     const actual = (

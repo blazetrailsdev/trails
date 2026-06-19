@@ -93,19 +93,19 @@ describe("Delegation.generateMethodMissing", () => {
       name: "world",
     };
     const obj = Delegation.generateMethodMissing({ delegate } as any, "delegate");
-    expect((obj as any).greet()).toBe("hello");
-    expect((obj as any).name).toBe("world");
+    expect(obj.greet()).toBe("hello");
+    expect(obj.name).toBe("world");
   });
 
   it("throws DelegationError for nil delegate without allowNil", () => {
     const obj = Delegation.generateMethodMissing({ delegate: null } as any, "delegate");
-    expect(() => (obj as any).greet).toThrow(DelegationError);
+    expect(() => obj.greet).toThrow(DelegationError);
   });
 
   it("returns undefined for nil delegate with allowNil", () => {
     const obj = Delegation.generateMethodMissing({ delegate: null } as any, "delegate", {
       allowNil: true,
     });
-    expect((obj as any).greet).toBeUndefined();
+    expect(obj.greet).toBeUndefined();
   });
 });

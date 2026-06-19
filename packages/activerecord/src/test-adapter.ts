@@ -181,7 +181,7 @@ export type TestDatabaseAdapter = DatabaseAdapter;
  * raw pool-leased DatabaseAdapter is returned directly.
  */
 export function createTestAdapter(): TestDatabaseAdapter {
-  return _pool.leaseConnection() as TestDatabaseAdapter;
+  return _pool.leaseConnection();
 }
 
 /**

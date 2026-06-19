@@ -21,7 +21,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
     const calls: Array<{ action: string; id: string }> = [];
     routes.registerController("posts", (action, req) => {
       const params = req.pathParameters as Record<string, string>;
-      calls.push({ action, id: params["id"]! });
+      calls.push({ action, id: params["id"] });
       return [200, { "content-type": "text/plain" }, ["ok"]] as unknown as RackishResponse;
     });
 
@@ -36,7 +36,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
 
     const res = routes.serve(makeReq("/posts"));
     expect(res[0]).toBe(404);
-    expect((res[1] as Record<string, string>)["x-cascade"]).toBe("pass");
+    expect(res[1]["x-cascade"]).toBe("pass");
   });
 
   it("returns 404 X-Cascade when no route matches", () => {
@@ -46,7 +46,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
 
     const res = routes.serve(makeReq("/nope"));
     expect(res[0]).toBe(404);
-    expect((res[1] as Record<string, string>)["x-cascade"]).toBe("pass");
+    expect(res[1]["x-cascade"]).toBe("pass");
   });
 
   it("X-Cascade: pass from a handler falls through to the next route", () => {

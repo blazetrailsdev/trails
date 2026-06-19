@@ -184,7 +184,7 @@ export class CollectionRenderer extends AbstractRenderer {
     }
     const contextPrefix = this.lookupContext.prefixes[0] ?? "";
     const paths = collection.map((item) => partialPath(item, context, contextPrefix));
-    const firstPath = paths[0]!;
+    const firstPath = paths[0];
     if (paths.every((p) => p === firstPath)) {
       return this.renderCollectionWithPartial(collection, firstPath, context, block);
     }
@@ -194,9 +194,9 @@ export class CollectionRenderer extends AbstractRenderer {
     const parts: string[] = [];
     let lastTemplate: RenderableTemplate | null = null;
     for (let i = 0; i < collection.length; i++) {
-      const template = findPartialTemplate(this.lookupContext, paths[i]!);
+      const template = findPartialTemplate(this.lookupContext, paths[i]);
       lastTemplate = template;
-      const itemAs = localVariable(paths[i]!, this.options as Record<string, unknown>);
+      const itemAs = localVariable(paths[i], this.options as Record<string, unknown>);
       const locals = {
         ...baseLocals,
         [itemAs]: collection[i],

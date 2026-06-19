@@ -158,7 +158,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("create and update money", async () => {
       // Rails: money = PostgresqlMoney.create(wealth: +"987.65")
-      const money = (await (PostgresqlMoney as any).create({ wealth: "987.65" })) as any;
+      const money = await (PostgresqlMoney as any).create({ wealth: "987.65" });
       // Rails: assert_equal 987.65, money.wealth
       expect(Number(money.wealth)).toBeCloseTo(987.65, 2);
       // Rails: new_value = BigDecimal("123.45"); money.wealth = new_value; money.save!; money.reload
@@ -171,7 +171,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("update all with money string", async () => {
       // Rails: money = PostgresqlMoney.create!; PostgresqlMoney.update_all(wealth: "987.65"); money.reload
-      const money = (await (PostgresqlMoney as any).createBang({})) as any;
+      const money = await (PostgresqlMoney as any).createBang({});
       await (PostgresqlMoney as any).updateAll({ wealth: "987.65" });
       await money.reload();
       // Rails: assert_equal 987.65, money.wealth
@@ -181,7 +181,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("update all with money big decimal", async () => {
       // Rails: money = PostgresqlMoney.create!; PostgresqlMoney.update_all(wealth: "123.45".to_d); money.reload
       // Trails has no BigDecimal; decimal string "123.45" is the JS equivalent.
-      const money = (await (PostgresqlMoney as any).createBang({})) as any;
+      const money = await (PostgresqlMoney as any).createBang({});
       await (PostgresqlMoney as any).updateAll({ wealth: "123.45" });
       await money.reload();
       // Rails: assert_equal 123.45, money.wealth
@@ -190,7 +190,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("update all with money numeric", async () => {
       // Rails: money = PostgresqlMoney.create!; PostgresqlMoney.update_all(wealth: 123.45); money.reload
-      const money = (await (PostgresqlMoney as any).createBang({})) as any;
+      const money = await (PostgresqlMoney as any).createBang({});
       await (PostgresqlMoney as any).updateAll({ wealth: 123.45 });
       await money.reload();
       // Rails: assert_equal 123.45, money.wealth

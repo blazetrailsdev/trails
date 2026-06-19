@@ -77,7 +77,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         other.execute("UPDATE samples SET value = 4 WHERE id = 1"),
       ]);
       const errs = [r1, r2].filter((r) => r.status === "rejected");
-      return errs.length === 1 && (errs[0] as PromiseRejectedResult).reason instanceof Deadlocked;
+      return errs.length === 1 && errs[0].reason instanceof Deadlocked;
     }
 
     // After the doomed txn is rolled back, the connection is reusable: a fresh

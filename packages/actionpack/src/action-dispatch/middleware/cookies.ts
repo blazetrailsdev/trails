@@ -111,7 +111,7 @@ export class CookieJar implements Iterable<[string, string]> {
     // `request.cookiesAppOptions` if the host exposes it so signed/encrypted
     // accessors can find their secrets in test setups.
     const jar = new CookieJar(request?.cookiesAppOptions ?? {});
-    if (request && "env" in request) jar._request = request as RequestCookieMethodsHost;
+    if (request && "env" in request) jar._request = request;
     for (const [k, v] of Object.entries(cookies ?? {})) {
       jar._cookies.set(k, v);
     }
@@ -306,7 +306,7 @@ function makeSerializedHost(
 
 /** @internal */
 function normalizeSerializedInput(input: unknown): SerializedSetOptions {
-  if (input !== null && typeof input === "object" && Object.hasOwn(input as object, "value")) {
+  if (input !== null && typeof input === "object" && Object.hasOwn(input, "value")) {
     return { ...(input as SerializedSetOptions) };
   }
   return { value: input };

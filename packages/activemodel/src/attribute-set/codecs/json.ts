@@ -30,8 +30,8 @@ export const jsonCodec: AttributeSetCodec = {
     if (
       !isPlainObject(parsed) ||
       !("v" in parsed) ||
-      !isPlainObject((parsed as Record<string, unknown>).types) ||
-      !isPlainObject((parsed as Record<string, unknown>).values)
+      !isPlainObject(parsed.types) ||
+      !isPlainObject(parsed.values)
     ) {
       throw new AttributeSetCoderError(
         "jsonCodec.decode: input is not a valid AttributeSetEnvelope",

@@ -20,7 +20,7 @@ describe("MigrationGeneratorTest", () => {
       name: "add_title_to_posts",
     }).run();
     expect(files[0]).toMatch(/^db\/migrations\/\d+-add-title-to-posts\.ts$/);
-    const content = fs.readFileSync(path.join(tmpDir, files[0]!), "utf-8");
+    const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
     expect(content).toContain("class AddTitleToPosts extends Migration");
     expect(content).toContain("async change(): Promise<void>");
   });

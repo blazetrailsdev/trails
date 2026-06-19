@@ -33,7 +33,7 @@ export class ScaffoldControllerGenerator extends GeneratorBase {
     const { api = false, skipRoutes = false, test = true, helper = true } = options;
     const stripped = name.replace(/[_-]?controller$/i, "");
     const parts = stripped.split("/");
-    const leaf = parts[parts.length - 1]!;
+    const leaf = parts[parts.length - 1];
     const nsClass = parts.slice(0, -1).map((p) => classify(p));
     const nsDashed = parts.slice(0, -1).map((p) => dasherize(underscore(p)));
     const nsUnderscored = parts.slice(0, -1).map((p) => underscore(p));

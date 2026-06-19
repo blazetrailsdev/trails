@@ -242,8 +242,8 @@ function _rebindTableInNode(node: Nodes.Node, fromName: string, alias: string): 
   }
   if (node instanceof Nodes.Binary) {
     return Object.assign(clone, node, {
-      left: _rebindOperand((node as Nodes.Binary).left, fromName, alias),
-      right: _rebindOperand((node as Nodes.Binary).right, fromName, alias),
+      left: _rebindOperand(node.left, fromName, alias),
+      right: _rebindOperand(node.right, fromName, alias),
     });
   }
   if (node instanceof Nodes.Grouping || node instanceof Nodes.Unary) {
@@ -414,7 +414,7 @@ function hasTopLevelComma(s: string): boolean {
 function resolveColumnNameMatcher(adapter: any): RegExp {
   // Mirrors Rails' `model.adapter_class.column_name_matcher` — a direct static
   // lookup on the concrete adapter class.
-  return (adapter?.constructor as any)?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
+  return adapter?.constructor?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
 }
 
 function resolveColumnNameWithOrderMatcher(adapter: any): RegExp {
@@ -422,8 +422,7 @@ function resolveColumnNameWithOrderMatcher(adapter: any): RegExp {
   // FIRST|LAST` suffix after the column name. Mirrors Rails'
   // `model.adapter_class.column_name_with_order_matcher`.
   return (
-    (adapter?.constructor as any)?.columnNameWithOrderMatcher?.() ??
-    abstractColumnNameWithOrderMatcher()
+    adapter?.constructor?.columnNameWithOrderMatcher?.() ?? abstractColumnNameWithOrderMatcher()
   );
 }
 
@@ -608,7 +607,7 @@ export class Relation<T extends Base> {
           "Relation#where(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      const cols = conditionsOrSql as string[];
+      const cols = conditionsOrSql;
       const tuples = rest[0] as unknown[][];
       const node = this.predicateBuilder.buildComposite(cols, tuples);
       if (node === null) return this._clone().noneBang();
@@ -817,9 +816,7 @@ export class Relation<T extends Base> {
 
     const deps: JoinDependency[] = [];
     if (emitted.length > 0) {
-      deps.push(
-        QueryMethodBangs.constructJoinDependency.call(this as any, emitted, null) as JoinDependency,
-      );
+      deps.push(QueryMethodBangs.constructJoinDependency.call(this as any, emitted, null));
     }
     // Cross-klass merged dependencies (Rails merge_joins / merge_outer_joins)
     // are emitted directly, so include their joined tables too.
@@ -1045,7 +1042,7 @@ export class Relation<T extends Base> {
           "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      const node = this.predicateBuilder.buildComposite(conditions as string[], tuples);
+      const node = this.predicateBuilder.buildComposite(conditions, tuples);
       // null = empty/all-filtered → NOT (no rows) = ALL rows = no
       // predicate added (matches Rails' `where.not(...)` no-op for
       // empty hashes).
@@ -1448,7 +1445,7 @@ export class Relation<T extends Base> {
     const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
     const subject = this._loaded
       ? this._records
-      : ((await this.annotate("loading for pp").limit(max).toArray()) as T[]);
+      : await this.annotate("loading for pp").limit(max).toArray();
     const entries = subject.slice(0, max) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
     await pp.pp(entries);
@@ -1739,7 +1736,7 @@ export class Relation<T extends Base> {
         if (!rel._namedInnerJoins.includes(arg)) rel._namedInnerJoins.push(arg);
         continue;
       }
-      if (!rel._joinValues.includes(arg as string)) rel._joinValues.push(arg as string);
+      if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
     }
     return rel;
   }
@@ -1774,7 +1771,7 @@ export class Relation<T extends Base> {
           "only associations and hashes are supported as arguments to leftOuterJoins",
         );
       }
-      const specs = Array.isArray(table) ? table : [table as AssociationSpec];
+      const specs = Array.isArray(table) ? table : [table];
       for (const spec of specs) {
         if (!rel._leftOuterJoinsValues.includes(spec)) rel._leftOuterJoinsValues.push(spec);
       }
@@ -1830,7 +1827,7 @@ export class Relation<T extends Base> {
   private _appendAssociationScope(predicates: Nodes.Node[], assocDef: any, targetModel: any): void {
     const scope = assocDef.options.scope;
     if (typeof scope !== "function") return;
-    const baseRel = (targetModel as any)._allForPreload();
+    const baseRel = targetModel._allForPreload();
     const scopeRel = invokeScopeLambda(scope, baseRel, undefined as unknown as Base) || baseRel;
     if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
       predicates.push(scopeRel._whereClause.ast);
@@ -2175,7 +2172,7 @@ export class Relation<T extends Base> {
       },
       {
         table: targetTable,
-        on: tgtT.get(targetPk as string).eq(joinT.get(targetFk)),
+        on: tgtT.get(targetPk).eq(joinT.get(targetFk)),
         klass: targetModel,
       },
     ];
@@ -2341,7 +2338,7 @@ export class Relation<T extends Base> {
     if (Array.isArray(attrs)) {
       const records: T[] = [];
       for (const a of attrs) {
-        records.push((await this.create(a, block)) as T);
+        records.push(await this.create(a, block));
       }
       return records;
     }
@@ -2364,7 +2361,7 @@ export class Relation<T extends Base> {
     if (Array.isArray(attrs)) {
       const records: T[] = [];
       for (const a of attrs) {
-        records.push((await this.createBang(a, block)) as T);
+        records.push(await this.createBang(a, block));
       }
       return records;
     }
@@ -2863,7 +2860,7 @@ export class Relation<T extends Base> {
         if (inverseName) {
           const targets = isSingular ? (children[0] ? [children[0]] : []) : children;
           for (const child of targets) {
-            _cacheSingularTarget(child as any, inverseName, parent as any);
+            _cacheSingularTarget(child, inverseName, parent);
           }
         }
       }
@@ -3073,9 +3070,9 @@ export class Relation<T extends Base> {
       // Bind-wrapper objects like PG's BinaryBind (`{ value, format }`)
       // — recurse on `.value` so the inspected form shows the payload
       // rather than the wrapper envelope.
-      const keys = Object.keys(value as object);
+      const keys = Object.keys(value);
       if (
-        "value" in (value as object) &&
+        "value" in value &&
         keys.length > 0 &&
         keys.every((k) => k === "value" || k === "format")
       ) {
@@ -3094,7 +3091,7 @@ export class Relation<T extends Base> {
     if (typeof Buffer !== "undefined" && value instanceof Buffer) return value.byteLength;
     if (typeof ArrayBuffer !== "undefined") {
       if (value instanceof ArrayBuffer) return value.byteLength;
-      if (ArrayBuffer.isView(value)) return (value as ArrayBufferView).byteLength;
+      if (ArrayBuffer.isView(value)) return value.byteLength;
     }
     return null;
   }
@@ -3432,7 +3429,7 @@ export class Relation<T extends Base> {
       case "count":
         return this.count(column);
       case "sum":
-        return this.sum(column!);
+        return this.sum(column);
       case "average":
         return this.average(column!);
       case "minimum":
@@ -3469,11 +3466,7 @@ export class Relation<T extends Base> {
     // reflection we also materialize the limited DISTINCT primary keys
     // (distinct_relation_for_primary_key) before recursing.
     const firstColumnName =
-      columns.length === 0
-        ? null
-        : typeof columns[0] === "string"
-          ? (columns[0] as string)
-          : " arel";
+      columns.length === 0 ? null : typeof columns[0] === "string" ? columns[0] : " arel";
     if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], firstColumnName)) {
       // _hasInclude is true only when _eagerLoadAssociations or
       // _includesAssociations is non-empty, so the union is always non-empty here.
@@ -3497,15 +3490,15 @@ export class Relation<T extends Base> {
         this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
         if (jd.nodes.length > 0) {
           const limitedIds = await this._materializeLimitedIds(jd, basePk);
-          const limited = (rel.leftOuterJoins(eagerSpecs) as Relation<T>).where({
+          const limited = rel.leftOuterJoins(eagerSpecs).where({
             [basePk]: limitedIds,
-          }) as Relation<T>;
+          });
           limited._limitValue = null;
           limited._offsetValue = null;
           return limited.pluck(...columns);
         }
       }
-      return (rel.leftOuterJoins(eagerSpecs) as Relation<T>).pluck(...columns);
+      return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
     }
 
     // Reflect the schema before casting results so the model's attribute
@@ -3620,13 +3613,13 @@ export class Relation<T extends Base> {
       ([key, val]) => {
         const def = this._modelClass._attributeDefinitions.get(key);
         const isArray = def?.type?.name === "array";
-        if (isArray) return [table.get(key), def!.type!.serialize(val)];
+        if (isArray) return [table.get(key), def.type.serialize(val)];
         const isRangeCol =
           val instanceof Range &&
           (def?.type as { isForceEquality?(v: unknown): boolean } | undefined)?.isForceEquality?.(
             val,
           );
-        if (isRangeCol) return [table.get(key), def!.type!.serialize(val)];
+        if (isRangeCol) return [table.get(key), def!.type.serialize(val)];
         return [table.get(key), val];
       },
     );
@@ -3882,7 +3875,7 @@ export class Relation<T extends Base> {
       return result;
     } catch (e) {
       if (!(e instanceof RecordNotUnique)) throw e;
-      return this.where(conditions).lock().findByBang(conditions) as Promise<T>;
+      return this.where(conditions).lock().findByBang(conditions);
     }
   }
 
@@ -4267,9 +4260,7 @@ export class Relation<T extends Base> {
           batchRel._orderClauses = batchOrders.map(
             ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
           );
-          const tuples = (batchRows as any[]).map((r) =>
-            cursorArr.map((c) => (r as any).readAttribute(c)),
-          );
+          const tuples = batchRows.map((r) => cursorArr.map((c) => r.readAttribute(c)));
           if (useRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
             // Range-mode: emit `col >= first AND col <= last` (reversed for desc)
             // instead of `col IN (...)`. Mirrors Rails apply_finish_limit path.
@@ -4386,7 +4377,7 @@ export class Relation<T extends Base> {
     const rel = this._clone();
     rel._eagerLoadAssociations = [];
     rel._includesAssociations = [];
-    return rel.leftOuterJoins(eagerSpecs) as Relation<T>;
+    return rel.leftOuterJoins(eagerSpecs);
   }
 
   /**
@@ -4726,9 +4717,7 @@ export class Relation<T extends Base> {
       this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
     );
     const idRows = await this._modelClass.connection.execute(idSql, idBinds);
-    return (idRows as Record<string, unknown>[]).map(
-      (row) => row[basePk] ?? Object.values(row).pop(),
-    );
+    return idRows.map((row) => row[basePk] ?? Object.values(row).pop());
   }
 
   /**
@@ -5062,7 +5051,7 @@ export class Relation<T extends Base> {
    */
   arelColumn(field: string | symbol | Nodes.Node, fallback?: (attr: string) => unknown): unknown {
     if (field instanceof Nodes.Node) return field;
-    return _arelColumn.call(this as any, field as string | symbol, fallback);
+    return _arelColumn.call(this as any, field, fallback);
   }
 
   /**
@@ -5338,7 +5327,7 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    const record = (await this.find(id)) as T;
+    const record = await this.find(id);
     await record.update(attrs ?? {});
     return record;
   }
@@ -5357,7 +5346,7 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    const record = (await this.find(id)) as T;
+    const record = await this.find(id);
     await record.updateBang(attrs ?? {});
     return record;
   }
@@ -5498,7 +5487,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#destroy
    */
   async destroy(id: unknown): Promise<T> {
-    const record = (await this.find(id)) as T;
+    const record = await this.find(id);
     await record.destroy();
     return record;
   }
@@ -5965,7 +5954,7 @@ export class Relation<T extends Base> {
         const inner = collection._clone();
         inner._selectColumns = [tsColumn.as("collection_cache_key_timestamp")];
         if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
-          inner._selectColumns = [this.table.star, ...inner._selectColumns!];
+          inner._selectColumns = [this.table.star, ...inner._selectColumns];
         }
         // Build a proper Arel SelectManager for the outer COUNT/MAX query so
         // quoting and adapter differences are handled by the AST visitor.

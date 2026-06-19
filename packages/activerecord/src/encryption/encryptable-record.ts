@@ -167,7 +167,7 @@ export class EncryptableRecord {
           // adapter-resolved type (applyPendingEncryptions re-runs after).
           userProvided: existingDef?.userProvided ?? false,
           source: existingDef?.source ?? "schema",
-          ...((existingDef as any)?.limit != null ? { limit: (existingDef as any).limit } : {}),
+          ...(existingDef?.limit != null ? { limit: existingDef.limit } : {}),
         });
       }
 
@@ -182,7 +182,7 @@ export class EncryptableRecord {
   /** @internal */
   static validateColumnSize(modelClass: any, attribute: string): void {
     if (typeof modelClass.validatesLengthOf !== "function") return;
-    const limit = (modelClass._attributeDefinitions?.get(attribute) as any)?.limit;
+    const limit = modelClass._attributeDefinitions?.get(attribute)?.limit;
     if (limit == null) return;
     // Guard against double registration (called at encrypts() time and again
     // after schema reflection). Check whether a LengthValidator with this
@@ -306,7 +306,7 @@ export class EncryptableRecord {
    * @internal
    */
   static isEncryptedAttribute(record: any, attributeName: string): boolean {
-    const klass = record.constructor as any;
+    const klass = record.constructor;
     // Resolve attribute aliases before checking encrypted set.
     const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
     if (!klass._encryptedAttributes?.has(resolvedName)) return false;
@@ -318,7 +318,7 @@ export class EncryptableRecord {
 
   /** @internal */
   static ciphertextFor(record: any, attributeName: string): unknown {
-    const klass = record.constructor as any;
+    const klass = record.constructor;
     const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
     if (this.isEncryptedAttribute(record, attributeName)) {
       return record.readAttributeBeforeTypeCast?.(resolvedName);
@@ -382,7 +382,7 @@ export class EncryptableRecord {
 
   /** @internal */
   static buildEncryptAttributeAssignments(record: any): Record<string, unknown> {
-    const klass = record.constructor as any;
+    const klass = record.constructor;
     const result: Record<string, unknown> = {};
     for (const name of klass._encryptedAttributes ?? new Set<string>()) {
       result[name] =
@@ -393,7 +393,7 @@ export class EncryptableRecord {
 
   /** @internal */
   static buildDecryptAttributeAssignments(record: any): Record<string, unknown> {
-    const klass = record.constructor as any;
+    const klass = record.constructor;
     const result: Record<string, unknown> = {};
     for (const name of klass._encryptedAttributes ?? new Set<string>()) {
       const type = getAttributeType(klass, name);
@@ -413,7 +413,7 @@ export class EncryptableRecord {
 
   /** @internal */
   static cantModifyEncryptedAttributesWhenFrozen(record: any): void {
-    const klass = record.constructor as any;
+    const klass = record.constructor;
     const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
     // changedAttributes is a string[] in this codebase (from DirtyTracker).
     // Iterate changed once and check Set membership — O(n+m) vs O(n×m).

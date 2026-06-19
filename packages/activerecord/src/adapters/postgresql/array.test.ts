@@ -306,8 +306,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         ],
       ];
       const r = await (PgArrays as any).create({ tags: arr });
-      await (r as any).reload();
-      expect((r as any).tags).toEqual(arr);
+      await r.reload();
+      expect(r.tags).toEqual(arr);
     });
 
     it("with arbitrary whitespace", async () => {
@@ -323,8 +323,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         ],
       ];
       const r = await (PgArrays as any).create({ tags: arr });
-      await (r as any).reload();
-      expect((r as any).tags).toEqual(arr);
+      await r.reload();
+      expect(r.tags).toEqual(arr);
     });
 
     it("multi dimensional with integers", async () => {
@@ -373,7 +373,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await PgArrays.loadSchema();
       const last = await (PgArrays as any).last();
       // Rails: assert_equal(PgArray.last.tags, tag_values)
-      expect((last as any).tags).toEqual(tagValues);
+      expect(last.tags).toEqual(tagValues);
     });
     it("attribute for inspect for array field", async () => {
       class PgArrays extends Base {
@@ -458,9 +458,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         static tableName = "pg_arrays";
       }
       await PgArrays.loadSchema();
-      const x = (await (PgArrays as any).create({
+      const x = await (PgArrays as any).create({
         hstores: [{ a: "a" }, { b: "b" }],
-      })) as any;
+      });
       x.hstores[0]["a"] = "c";
       await x.save();
       await x.reload();
@@ -470,7 +470,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("datetime with timezone awareness", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
+      const zone = TimeZone.find(tz);
       setZone(tz);
       try {
         class PgArrays extends Base {
@@ -557,13 +557,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tags = ["black", "blue"];
       // Rails: e1 = klass.create("tags" => ["black", "blue"]); assert_predicate e1, :persisted?
       const e1 = await (PgArrays as any).create({ tags });
-      expect((e1 as any).isPersisted()).toBe(true);
+      expect(e1.isPersisted()).toBe(true);
 
       // Rails: e2 = klass.create("tags" => ["black", "blue"]); assert_not e2.persisted?
       const e2 = await (PgArrays as any).create({ tags });
-      expect((e2 as any).isPersisted()).toBe(false);
+      expect(e2.isPersisted()).toBe(false);
       // Rails: assert_equal ["has already been taken"], e2.errors[:tags]
-      expect((e2 as any).errors.where("tags").map((e: any) => e.message)).toEqual([
+      expect(e2.errors.where("tags").map((e: any) => e.message)).toEqual([
         "has already been taken",
       ]);
     });
@@ -585,7 +585,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         .toZonedDateTimeISO("UTC")
         .with({ microsecond: 123, nanosecond: 0 })
         .toInstant();
-      const record = (await (PgArrays as any).create({ timestamps: [time] })) as any;
+      const record = await (PgArrays as any).create({ timestamps: [time] });
       // Rails: assert_equal 1, record.timestamps.count
       expect(record.timestamps).toHaveLength(1);
       // Rails: assert_equal 123, record.timestamps.first.usec

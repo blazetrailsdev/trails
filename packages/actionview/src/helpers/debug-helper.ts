@@ -31,8 +31,8 @@ function inspect(value: unknown, seen: WeakSet<object> = new WeakSet()): string 
   }
   if (typeof value !== "object") return String(value);
 
-  if (seen.has(value as object)) return "[Circular]";
-  seen.add(value as object);
+  if (seen.has(value)) return "[Circular]";
+  seen.add(value);
   try {
     if (Array.isArray(value)) {
       return `[${value.map((v) => inspect(v, seen)).join(", ")}]`;
@@ -42,6 +42,6 @@ function inspect(value: unknown, seen: WeakSet<object> = new WeakSet()): string 
     );
     return `{ ${entries.join(", ")} }`;
   } finally {
-    seen.delete(value as object);
+    seen.delete(value);
   }
 }

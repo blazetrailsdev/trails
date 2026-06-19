@@ -24,7 +24,7 @@ export const WindowPredications: WindowPredicationsModule = {
     // (trusted raw SQL fragment) in the OVER clause — they are not
     // escaped as identifiers. Without this wrapping the visitor would
     // treat the string as a value and emit `OVER 'w'` instead of `OVER w`.
-    const right = typeof expr === "string" ? new SqlLiteral(expr) : (expr as Node | null);
+    const right = typeof expr === "string" ? new SqlLiteral(expr) : expr;
     return new Over(this, right);
   },
 };

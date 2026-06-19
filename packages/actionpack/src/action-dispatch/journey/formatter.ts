@@ -224,7 +224,7 @@ export class Formatter {
     const routes: [number, Route][] = [];
     const queue: CacheNode[] = [cache];
     for (let i = 0; i < queue.length; i++) {
-      const c = queue[i]!;
+      const c = queue[i];
       routes.push(...c.routes);
       for (const [k, v] of Object.entries(options)) {
         const key = pairKey(k, v);

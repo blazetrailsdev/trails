@@ -76,7 +76,7 @@ export function buildPkWhere(this: typeof Base, idValue: unknown): string {
     return conditions.join(" AND ");
   }
   if (idValue === undefined || idValue === null) return "1=0";
-  return `${a.quoteIdentifier(pk as string)} = ${a.quote(idValue)}`;
+  return `${a.quoteIdentifier(pk)} = ${a.quote(idValue)}`;
 }
 
 /**
@@ -102,7 +102,7 @@ export function buildPkWhereNode(
     }
     return new Nodes.And(conditions);
   }
-  const attr = table.get(pk as string);
+  const attr = table.get(pk);
   if (idValue === undefined || idValue === null) return arelSql("1=0");
   return attr.eq(idValue);
 }
@@ -456,7 +456,7 @@ export function resetTableName(this: SchemaHost): string {
     const parent = Object.getPrototypeOf(this) as SchemaHost | null;
     if (parent?.tableName != null) {
       this._tableName = parent.tableName;
-      return this._tableName!;
+      return this._tableName;
     }
   }
   const name = resolveTableName.call(this as any);
@@ -551,7 +551,7 @@ export function columns(this: SchemaHost): any[] {
   const hash = getColumnsHash(this);
   const cacheHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
   cacheHost._columns = Object.values(hash);
-  return cacheHost._columns!;
+  return cacheHost._columns;
 }
 
 export function attributeSetCoder(this: SchemaHost): AttributeSetCoder {
@@ -799,13 +799,13 @@ export function loadSchema(this: SchemaHost): void {
     const ignored = new Set(workHost._ignoredColumns ?? []);
     for (const [name, def] of workHost._attributeDefinitions) {
       if (ignored.has(name)) continue;
-      if ((def as any).virtual) continue;
-      const fn = (def as any).defaultFunction ?? null;
+      if (def.virtual) continue;
+      const fn = def.defaultFunction ?? null;
       hash[name] = {
         name,
         type: def.type?.name ?? null,
         default: def.defaultValue ?? null,
-        limit: (def as any).limit ?? null,
+        limit: def.limit ?? null,
         ...(fn != null ? { defaultFunction: fn } : {}),
       };
     }

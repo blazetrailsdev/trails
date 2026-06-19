@@ -36,7 +36,7 @@ export class AppGenerator extends AppBase {
 
   constructor(options: AppGeneratorOptions) {
     const database = options.database
-      ? ((DB_ALIAS[options.database] ?? options.database) as DatabaseName)
+      ? (DB_ALIAS[options.database] ?? options.database)
       : undefined;
     super({ ...options, appPath: options.appPath ?? options.cwd, database });
     this.packageManager = options.packageManager ?? "pnpm";

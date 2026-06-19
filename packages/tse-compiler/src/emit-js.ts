@@ -152,7 +152,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
       push(`  ${bufRef}.${exprAppend}(${callExpr}`, node.srcLine);
       push("  context.capture(() => {");
     } else if (node.kind === "code" && insideBlock) {
-      const innerDepth = innerDepths[innerDepths.length - 1]!;
+      const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
         const callExprParens = innerCallExprParens.pop()!;
@@ -162,7 +162,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
         const suffix = ")".repeat(Math.max(0, 2 + callExprParens - closingParensInT)) + ";";
         push(`  ${tClean}${suffix}`, node.srcLine);
       } else {
-        innerDepths[innerDepths.length - 1]! += netBraceDepth(node.value);
+        innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
         push("  " + emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);
       }
     } else {

@@ -105,7 +105,7 @@ function _loadedAssociation(record: any, name: string): any | null {
     // (collection_association.rb:457-490) and keeps `_hydrateFromPreload`
     // viable for later preload-after-build orderings.
     if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
-      inst.target = proxy!.target as any;
+      inst.target = proxy.target as any;
       return inst;
     }
     // Association-side build (e.g. `record.association(name).build(...)`)
@@ -494,7 +494,7 @@ async function _insertCollectionRecordFallback(
     }
     primaryKey.forEach((pk: string, i: number) => {
       const pkValue = record._readAttribute(pk);
-      if (pkValue != null) child._writeAttribute((foreignKey as string[])[i], pkValue);
+      if (pkValue != null) child._writeAttribute(foreignKey[i], pkValue);
     });
   } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
     const pkValue = record._readAttribute(primaryKey);
@@ -577,7 +577,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
       Array.isArray(primaryKey) &&
       !Array.isArray(foreignKey)
     ) {
-      if ((primaryKey as string[]).includes("id")) primaryKey = "id";
+      if (primaryKey.includes("id")) primaryKey = "id";
     }
     if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
       if (primaryKey.length !== foreignKey.length) {
@@ -588,7 +588,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
       }
       primaryKey.forEach((pk: string, i: number) => {
         const pkValue = record._readAttribute(pk);
-        if (pkValue != null) childRecord._writeAttribute((foreignKey as string[])[i], pkValue);
+        if (pkValue != null) childRecord._writeAttribute(foreignKey[i], pkValue);
       });
     } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
       const pkValue = record._readAttribute(primaryKey);
@@ -950,7 +950,7 @@ export function validateCollectionAssociation(
       ? null
       : Array.isArray(association.target)
         ? (association.target as any[])
-        : [association.target as any]
+        : [association.target]
     : associatedRecordsToValidateOrSave(
         association,
         typeof this.isNewRecord === "function" ? this.isNewRecord() : false,
@@ -1018,7 +1018,7 @@ export function aroundSaveCollectionAssociation(
     throw e;
   }
   if (result != null && typeof (result as any).then === "function") {
-    return (result as Promise<any>).then(
+    return result.then(
       (v) => {
         restore();
         return v;
@@ -1258,14 +1258,14 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     // see autosave_association.rb `save_collection_association`.
     const collectionName = reflection.name;
     afterCreate(model, async (record: any) => {
-      const assocDef = (record.constructor as any)._associations?.find(
+      const assocDef = record.constructor._associations?.find(
         (a: any) => a.name === collectionName,
       );
       if (assocDef?.options?.autosave === false) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
     afterUpdate(model, async (record: any) => {
-      const assocDef = (record.constructor as any)._associations?.find(
+      const assocDef = record.constructor._associations?.find(
         (a: any) => a.name === collectionName,
       );
       if (assocDef?.options?.autosave === false) return;
@@ -1277,16 +1277,12 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
       return saveHasOneAssociation.call(this, reflection);
     });
     afterCreate(model, async (record: any) => {
-      const assocDef = (record.constructor as any)._associations?.find(
-        (a: any) => a.name === hasOneName,
-      );
+      const assocDef = record.constructor._associations?.find((a: any) => a.name === hasOneName);
       if (!assocDef?.options?.autosave) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
     afterUpdate(model, async (record: any) => {
-      const assocDef = (record.constructor as any)._associations?.find(
-        (a: any) => a.name === hasOneName,
-      );
+      const assocDef = record.constructor._associations?.find((a: any) => a.name === hasOneName);
       if (!assocDef?.options?.autosave) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });

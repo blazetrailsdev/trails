@@ -265,7 +265,7 @@ export function quotedPrimaryKey(this: PrimaryKeyHost & { connection?: DatabaseA
   const fallback = (k: string) => `"${k.replace(/"/g, '""')}"`;
   if (Array.isArray(pk))
     return pk.map((k) => (quoter ? quoter.quoteColumnName(k) : fallback(k))).join(", ");
-  return quoter ? quoter.quoteColumnName(pk as string) : fallback(pk as string);
+  return quoter ? quoter.quoteColumnName(pk) : fallback(pk);
 }
 
 export function resetPrimaryKey(this: PrimaryKeyHost): void {

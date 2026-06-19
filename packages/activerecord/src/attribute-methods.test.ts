@@ -1476,7 +1476,7 @@ describe("AttributeMethodsTest", () => {
     }
     const t = (await Topic.create({ title: "original" })) as any;
     t.title = "updated";
-    await (t as any).save();
+    await t.save();
     expect(t.title).toBe("updated");
   });
 
@@ -1899,7 +1899,7 @@ describe("AttributeMethodsTest", () => {
         this.attribute("color", "string");
       }
       set color(v: string) {
-        (this as any).writeAttribute("color", (v as string).toUpperCase());
+        (this as any).writeAttribute("color", v.toUpperCase());
       }
     }
     (Widget as any).defineAttributeMethods();

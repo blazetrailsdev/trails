@@ -4,7 +4,7 @@ import { MockRequest } from "./mock-request.js";
 
 it("act as a noop logger", async () => {
   const app = async (env: Record<string, any>) => {
-    (env["rack.logger"] as any).warn("b00m");
+    env["rack.logger"].warn("b00m");
     return [200, { "content-type": "text/plain" }, ["Hello, World!"]] as [
       number,
       Record<string, string>,

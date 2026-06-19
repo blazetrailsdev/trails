@@ -354,7 +354,7 @@ export class Response {
         this._buffered = false;
       }
     }
-    return this._buffered!;
+    return this._buffered;
   }
 
   append(chunk: string): string {

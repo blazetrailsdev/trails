@@ -65,7 +65,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const host = makeHost({ defaultUrlOptions: { host: "example.com" } });
     const routes = host._routes as ReturnType<typeof makeRoutes>;
     fullUrlFor.call(host, { controller: "posts", use_route: "post" });
-    const [opts, routeName] = routes.calls[0]!;
+    const [opts, routeName] = routes.calls[0];
     expect(routeName).toBe("post");
     expect(opts).toEqual({ host: "example.com", controller: "posts" });
     expect(opts).not.toHaveProperty("use_route");
@@ -75,7 +75,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const host = makeHost();
     const routes = host._routes as ReturnType<typeof makeRoutes>;
     fullUrlFor.call(host, { use_route: Symbol("post") });
-    expect(routes.calls[0]![1]).toBe("post");
+    expect(routes.calls[0][1]).toBe("post");
   });
 
   it("use_route Symbol() without description throws ArgumentError", () => {
@@ -88,7 +88,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const host = makeHost({ defaultUrlOptions: { host: "default.test" } });
     const routes = host._routes as ReturnType<typeof makeRoutes>;
     fullUrlFor.call(host, { host: "override.test" });
-    expect(routes.calls[0]![0]).toEqual({ host: "override.test" });
+    expect(routes.calls[0][0]).toEqual({ host: "override.test" });
   });
 
   it("symbol options delegate to HelperMethodBuilder.url().handleStringCall", () => {
@@ -168,7 +168,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const host = makeHost();
     const routes = host._routes as ReturnType<typeof makeRoutes>;
     fullUrlFor.call(host, params);
-    expect(routes.calls[0]![0]).toEqual({ controller: "posts", action: "show", id: 7 });
+    expect(routes.calls[0][0]).toEqual({ controller: "posts", action: "show", id: 7 });
   });
 
   it("unpermitted Parameters throw UnfilteredParameters from toH()", () => {

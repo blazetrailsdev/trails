@@ -381,7 +381,7 @@ export class Route {
       // dropping the requirement before we can copy it.
       const safeReqs: Record<string, RegExp> = Object.create(null);
       for (const name of Object.keys(reqs)) {
-        const re = reqs[name]!;
+        const re = reqs[name];
         // Strip stateful flags that would break anchored single-shot use:
         // `g`/`y` advance `lastIndex` across calls (nondeterministic across
         // pathFor invocations); `m` rebinds `^`/`$` to line boundaries and
@@ -541,7 +541,7 @@ function emittedSlashInPathPreservingCapture(
   // scanner's STAR rule, including digit-leading names like `*123`).
   const splatNames = new Set<string>();
   for (const m of path.matchAll(/\*(\w+)/g)) {
-    splatNames.add(m[1]!);
+    splatNames.add(m[1]);
   }
   const declaresController = /(?<!\\):controller\b/.test(path);
   for (const [k, v] of Object.entries(params)) {
@@ -552,7 +552,7 @@ function emittedSlashInPathPreservingCapture(
     // so the value can land in `out` either verbatim or partially
     // escaped. Cheap proof-of-presence: the slash-containing prefix up
     // to the first non-path-safe character should appear unchanged.
-    const slashPrefix = v.split(/[^a-zA-Z0-9\-._~!$&'()*+,;=:@/]/, 1)[0]!;
+    const slashPrefix = v.split(/[^a-zA-Z0-9\-._~!$&'()*+,;=:@/]/, 1)[0];
     if (slashPrefix.includes("/") && out.includes(slashPrefix)) return true;
   }
   return false;

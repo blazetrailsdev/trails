@@ -94,11 +94,11 @@ export function batchCondition(
   // where STRICT_OP is the strict variant of OP (lteq→lt, gteq→gt).
   const positions = cursorArr.map((col, i) => [col, valArr[i], operators[i]] as const);
   const [firstCol, firstVal, firstOp] = positions[positions.length - 1];
-  let clause: any = (table.get(firstCol) as any)[firstOp](firstVal);
+  let clause: any = table.get(firstCol)[firstOp](firstVal);
 
   for (let i = positions.length - 2; i >= 0; i--) {
     const [col, val, op] = positions[i];
-    const attr = table.get(col) as any;
+    const attr = table.get(col);
     const strictOp = op === "lteq" ? "lt" : op === "gteq" ? "gt" : op;
     clause = attr[strictOp](val).or(attr.eq(val).and(clause));
   }
@@ -140,7 +140,7 @@ export function batchOnLoadedRelation(opts: {
 }): any[] {
   const { relation, cursor, batchLimit } = opts;
   // relation.records() is async in this codebase; loaded records live on _records.
-  let records: any[] = Array.isArray((relation as any)._records) ? (relation as any)._records : [];
+  let records: any[] = Array.isArray(relation._records) ? relation._records : [];
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
   const orderDirs = batchOrders.map(([, dir]) => dir);
 

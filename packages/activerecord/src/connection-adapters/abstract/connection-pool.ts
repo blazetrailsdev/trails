@@ -671,7 +671,7 @@ export class ConnectionPool implements ReapablePool {
     let c: DatabaseAdapter;
     try {
       const result = this._available.poll(t);
-      c = result instanceof Promise ? await result : result!;
+      c = result instanceof Promise ? await result : result;
     } catch (err) {
       if (err instanceof ConnectionTimeoutError) {
         err.setPool(this);
@@ -1408,7 +1408,7 @@ function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): Databa
  * @internal
  */
 function withNewConnectionsBlocked<R>(pool: Pool, block: () => R): R {
-  const p = pool as Pool & { _threadsBlockingNewConnections?: number };
+  const p = pool;
   p._threadsBlockingNewConnections = (p._threadsBlockingNewConnections ?? 0) + 1;
   try {
     return block();
@@ -1526,7 +1526,7 @@ function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: string | numbe
  * @internal
  */
 function tryToCheckoutNewConnection(pool: Pool): DatabaseAdapter | null {
-  const p = pool as Pool & { _threadsBlockingNewConnections?: number };
+  const p = pool;
   if ((p._threadsBlockingNewConnections ?? 0) > 0) return null;
   if (!pool._connections || pool._connections.length >= pool.size) return null;
   if (!pool.automaticReconnect) {

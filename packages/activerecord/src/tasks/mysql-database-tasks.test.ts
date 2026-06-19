@@ -65,8 +65,7 @@ describe("MySQLDatabaseTasks", () => {
     let createCallArg: unknown;
 
     try {
-      const mod =
-        (await import("./mysql-database-tasks.js")) as typeof import("./mysql-database-tasks.js");
+      const mod = await import("./mysql-database-tasks.js");
       const tasks = new mod.MySQLDatabaseTasks(
         new HashConfig("development", "primary", {
           adapter: "mysql2",
@@ -128,8 +127,7 @@ describe("MySQLDatabaseTasks", () => {
     }));
 
     try {
-      const mod =
-        (await import("./mysql-database-tasks.js")) as typeof import("./mysql-database-tasks.js");
+      const mod = await import("./mysql-database-tasks.js");
       await new mod.MySQLDatabaseTasks(
         new HashConfig("development", "primary", {
           adapter: "mysql2",

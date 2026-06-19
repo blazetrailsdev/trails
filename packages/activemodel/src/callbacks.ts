@@ -249,7 +249,7 @@ export function _registerCallbackOnProto(
         `Unknown key: :on. The :on option is only supported for :commit and :rollback callbacks (got :${event})`,
       );
     }
-    const onValue = (conditions as TransactionalCallbackConditions).on;
+    const onValue = conditions.on;
     if (onValue !== undefined) {
       const values = Array.isArray(onValue) ? onValue : [onValue];
       const invalid = values.filter((v) => !VALID_ON_VALUES.has(v));
@@ -273,7 +273,7 @@ export function _registerCallbackOnProto(
   const entry = new Callback(
     event,
     resolved,
-    timing as CallbackKind,
+    timing,
     {
       if: conditions?.if as ((t: object) => boolean) | undefined,
       unless: conditions?.unless as ((t: object) => boolean) | undefined,
@@ -303,7 +303,7 @@ export function hasCallbackOnProto(
   const chain = asPeekCallbackChain(proto, event);
   if (!chain) return false;
   const asFilter = filter as unknown as AnyCallback | ASCallbackObject;
-  return chain.entries.some((e) => e.matches(timing as CallbackKind, asFilter));
+  return chain.entries.some((e) => e.matches(timing, asFilter));
 }
 
 /**
@@ -318,8 +318,8 @@ export function skipCallbackOnProto(
   const chain = asPeekCallbackChain(proto, event);
   if (!chain) return false;
   const asFilter = filter as unknown as AnyCallback | ASCallbackObject;
-  if (!chain.entries.some((e) => e.matches(timing as CallbackKind, asFilter))) return false;
-  asSkipCallback(proto, event, timing as CallbackKind, asFilter);
+  if (!chain.entries.some((e) => e.matches(timing, asFilter))) return false;
+  asSkipCallback(proto, event, timing, asFilter);
   return true;
 }
 

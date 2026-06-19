@@ -356,7 +356,7 @@ export function _mergeAttributes(attrNames: unknown[]): Record<string, unknown> 
     last !== null && typeof last === "object" && !Array.isArray(last) && last.constructor === Object
       ? { ...(attrNames.pop() as Record<string, unknown>) }
       : {};
-  const flat = (attrNames as unknown[]).flat(Infinity).map((n) => String(n));
+  const flat = attrNames.flat(Infinity).map((n) => String(n));
   options.attributes = flat;
   return options;
 }

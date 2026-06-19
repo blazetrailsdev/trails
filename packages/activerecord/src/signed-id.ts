@@ -128,12 +128,12 @@ export async function findSigned<T extends typeof Base>(
   if (id === null) return null;
   if (Array.isArray(pk)) {
     const conditions: Record<string, unknown> = {};
-    (pk as string[]).forEach((col, i) => {
+    pk.forEach((col, i) => {
       conditions[col] = (id as unknown[])[i];
     });
     return modelClass.findBy(conditions);
   }
-  return modelClass.findBy({ [pk as string]: id });
+  return modelClass.findBy({ [pk]: id });
 }
 
 /**

@@ -140,10 +140,7 @@ export function matchedAttributeMethod(
   this: InstanceHost,
   methodName: string,
 ): { proxyTarget: string; attrName: string } | null {
-  const matches = attributeMethodPatternsMatching.call(
-    this.constructor as AttributeMethodHost,
-    methodName,
-  );
+  const matches = attributeMethodPatternsMatching.call(this.constructor, methodName);
   return matches.find((m) => isAttributeMethod.call(this, m.attrName)) ?? null;
 }
 

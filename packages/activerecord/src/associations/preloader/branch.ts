@@ -267,7 +267,7 @@ export class Branch {
               new Branch({
                 parent: this,
                 association: parent,
-                children: (assoc as any)[parent],
+                children: assoc[parent],
                 associateByDefault: this.associateByDefault,
                 scope: this.scope,
               }),

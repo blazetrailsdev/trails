@@ -364,10 +364,10 @@ describe("MySQL::SchemaStatements", () => {
       "astronauts",
     );
     expect(fks).toHaveLength(1);
-    expect(fks[0]!.column).toBe("rocket_id");
-    expect(fks[0]!.primaryKey).toBe("id");
-    expect(fks[0]!.toTable).toBe("rockets");
-    expect(fks[0]!.onDelete).toBe("cascade");
+    expect(fks[0].column).toBe("rocket_id");
+    expect(fks[0].primaryKey).toBe("id");
+    expect(fks[0].toTable).toBe("rockets");
+    expect(fks[0].onDelete).toBe("cascade");
   });
 
   it("test_add_composite_foreign_key_infers_column", async () => {
@@ -395,8 +395,8 @@ describe("MySQL::SchemaStatements", () => {
       "astronauts",
     );
     expect(fks).toHaveLength(1);
-    expect(fks[0]!.column).toEqual(["rocket_tenant_id", "rocket_id"]);
-    expect(fks[0]!.primaryKey).toEqual(["tenant_id", "id"]);
+    expect(fks[0].column).toEqual(["rocket_tenant_id", "rocket_id"]);
+    expect(fks[0].primaryKey).toEqual(["tenant_id", "id"]);
   });
 
   it("foreignKeys: unquotes backtick-quoted column and to_table identifiers", async () => {
@@ -414,8 +414,8 @@ describe("MySQL::SchemaStatements", () => {
       ]),
       "astronauts",
     );
-    expect(fks[0]!.column).toBe("rocket_id");
-    expect(fks[0]!.toTable).toBe("roc`kets");
+    expect(fks[0].column).toBe("rocket_id");
+    expect(fks[0].toTable).toBe("roc`kets");
   });
 
   // Minimal IndexesHost: indexes() reads via schemaQuery and quotes the table
@@ -440,8 +440,8 @@ describe("MySQL::SchemaStatements", () => {
       "pages",
     );
     expect(idx).toHaveLength(1);
-    expect(idx[0]!.lengths).toEqual({ title: 10 });
-    expect(idx[0]!.orders).toBeUndefined();
+    expect(idx[0].lengths).toEqual({ title: 10 });
+    expect(idx[0].orders).toBeUndefined();
   });
 
   it("indexes: surfaces desc orders when Collation is D", async () => {
@@ -458,8 +458,8 @@ describe("MySQL::SchemaStatements", () => {
       ]),
       "pages",
     );
-    expect(idx[0]!.orders).toEqual({ title: "desc" });
-    expect(idx[0]!.lengths).toBeUndefined();
+    expect(idx[0].orders).toEqual({ title: "desc" });
+    expect(idx[0].lengths).toBeUndefined();
   });
 
   it("indexes: surfaces desc orders for descending functional indexes", async () => {
@@ -477,7 +477,7 @@ describe("MySQL::SchemaStatements", () => {
       ]),
       "pages",
     );
-    expect(idx[0]!.columns).toEqual(["(lower(`title`))"]);
-    expect(idx[0]!.orders).toEqual({ "(lower(`title`))": "desc" });
+    expect(idx[0].columns).toEqual(["(lower(`title`))"]);
+    expect(idx[0].orders).toEqual({ "(lower(`title`))": "desc" });
   });
 });

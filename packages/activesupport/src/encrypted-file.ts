@@ -111,7 +111,7 @@ export class EncryptedFile {
     const key = await this.key();
     const fs = await getFsAsync();
     const path = await this.resolveContentPath();
-    if (key !== null && (await fs.exists!(path))) {
+    if (key !== null && (await fs.exists(path))) {
       const raw = (await fs.readFile!(path, "utf8")).trim();
       return this.decrypt(key, raw);
     }
@@ -198,7 +198,7 @@ export class EncryptedFile {
     if (this.keyFileChecked) return this.keyFileContents;
     this.keyFileChecked = true;
     const fs = await getFsAsync();
-    if (!(await fs.exists!(this.keyPath))) return null;
+    if (!(await fs.exists(this.keyPath))) return null;
     this.keyFileContents = (await fs.readFile!(this.keyPath, "utf8")).trim();
     return this.keyFileContents;
   }

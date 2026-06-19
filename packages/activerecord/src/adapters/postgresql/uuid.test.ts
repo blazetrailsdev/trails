@@ -916,8 +916,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("collection association with uuid", async () => {
       const post = await UuidPost.createBang({});
-      const comment = await (post as any).uuidComments.createBang({});
-      const found = await (post as any).uuidComments.find(comment.id);
+      const comment = await post.uuidComments.createBang({});
+      const found = await post.uuidComments.find(comment.id);
       expect(found).toBeTruthy();
       expect(found.id).toBe(comment.id);
     });
@@ -1033,16 +1033,16 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("uuid primary key and disable joins with delegate cache", async () => {
       const forum = await UuidForum.createBang({});
-      const post1 = await (forum as any).uuidPosts.createBang({});
-      const comment11 = await (post1 as any).uuidComments.createBang({});
-      const comment12 = await (post1 as any).uuidComments.createBang({});
-      const post2 = await (forum as any).uuidPosts.createBang({});
-      const comment21 = await (post2 as any).uuidComments.createBang({});
-      const comment22 = await (post2 as any).uuidComments.createBang({});
-      const comment23 = await (post2 as any).uuidComments.createBang({});
+      const post1 = await forum.uuidPosts.createBang({});
+      const comment11 = await post1.uuidComments.createBang({});
+      const comment12 = await post1.uuidComments.createBang({});
+      const post2 = await forum.uuidPosts.createBang({});
+      const comment21 = await post2.uuidComments.createBang({});
+      const comment22 = await post2.uuidComments.createBang({});
+      const comment23 = await post2.uuidComments.createBang({});
 
       // Rails: uuid_forum.uuid_comments_without_joins.order(:id).to_a.map(&:id).sort
-      const noJoins = await (forum as any).uuidCommentsWithoutJoins.order("id").toArray();
+      const noJoins = await forum.uuidCommentsWithoutJoins.order("id").toArray();
       const actual = noJoins.map((c: any) => c.id).sort();
       const expected = [
         comment11.id,

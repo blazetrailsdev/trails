@@ -207,7 +207,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
   it("includes() preloads polymorphic-through with source_type into _preloadedAssociations", async () => {
     const { hotel, cake1, cake2 } = await seed();
     const loaded = (await PsHotel.all().includes("cakeDesigners").toArray()) as any[];
-    const h = loaded.find((row) => row.id === hotel.id) as any;
+    const h = loaded.find((row) => row.id === hotel.id);
     const preloaded = h._preloadedAssociations?.get("cakeDesigners") as any[];
     expect(preloaded).toBeDefined();
     expect(preloaded.map((d: any) => d.id).sort()).toEqual([cake1.id, cake2.id].sort());
@@ -234,7 +234,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .includes("cakeDesigners")
       .includes("drinkDesigners")
       .toArray()) as any[];
-    const h = loaded.find((row) => row.id === hotel.id) as any;
+    const h = loaded.find((row) => row.id === hotel.id);
     const cakes = h._preloadedAssociations?.get("cakeDesigners") as any[];
     const drinks = h._preloadedAssociations?.get("drinkDesigners") as any[];
     expect(cakes.map((d: any) => d.id).sort()).toEqual([cake1.id, cake2.id].sort());
@@ -286,7 +286,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .includes("cakeDesigners")
       .where({ id: hotel.id })
       .toArray()) as any[];
-    const h = loaded[0] as any;
+    const h = loaded[0];
     const preloaded = h._preloadedAssociations?.get("cakeDesigners") as any[];
     // Filtering the outer relation must not silently drop preloaded
     // targets — a JOIN-collapsed cardinality bug here would surface

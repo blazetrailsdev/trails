@@ -533,7 +533,7 @@ function _downcaseLikeRails(v: unknown): unknown {
   if (v instanceof Uint8Array) {
     const out = new Uint8Array(v.length);
     for (let i = 0; i < v.length; i++) {
-      const b = v[i]!;
+      const b = v[i];
       out[i] = b >= 0x41 && b <= 0x5a ? b + 0x20 : b;
     }
     return out;
@@ -629,7 +629,7 @@ function _valuesEqual(readValue: unknown, expectedValue: unknown): boolean {
     readValue instanceof Uint8Array &&
     expectedValue instanceof Uint8Array &&
     readValue.length === expectedValue.length &&
-    readValue.every((b, i) => b === (expectedValue as Uint8Array)[i])
+    readValue.every((b, i) => b === expectedValue[i])
   )
     return true;
   if (
@@ -670,8 +670,8 @@ function _assertEncryptedAttributeOnModel(
     const dbValue = dbValues[attrName];
     const type = model._attributes?.getAttribute?.(attrName)?.type;
     const rawSerialized =
-      type && typeof (type as any).castType?.serialize === "function"
-        ? (type as any).castType.serialize(expectedValue)
+      type && typeof type.castType?.serialize === "function"
+        ? type.castType.serialize(expectedValue)
         : null;
     const serializedPlaintext = rawSerialized != null ? String(rawSerialized) : null;
 
@@ -693,7 +693,7 @@ function _assertEncryptedAttributeOnModel(
       dbBytes !== null &&
       plaintextBytes !== null &&
       dbBytes.length === plaintextBytes.length &&
-      dbBytes.every((b, i) => b === (plaintextBytes as Uint8Array)[i]);
+      dbBytes.every((b, i) => b === plaintextBytes[i]);
 
     if (
       binaryPlaintextMatch ||
@@ -750,7 +750,7 @@ export function assertNotEncryptedAttribute(
  * Rails reads the stored value whereas this re-serializes the current attribute.
  */
 export function ciphertextFor(model: any, attrName: string): unknown {
-  const klass = model.constructor as any;
+  const klass = model.constructor;
   const type = klass._attributeDefinitions?.get(attrName)?.type;
   if (type && typeof type.serialize === "function" && typeof type.isEncrypted === "function") {
     const value = model[attrName];

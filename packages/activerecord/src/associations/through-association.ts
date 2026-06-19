@@ -49,8 +49,8 @@ function constructJoinAttributes(
   ...records: Base[]
 ): Record<string, unknown> {
   ensureMutable(assoc);
-  const refl = assoc.reflection as any;
-  const sourceRefl = refl.sourceReflection?.() as any;
+  const refl = assoc.reflection;
+  const sourceRefl = refl.sourceReflection?.();
   if (!sourceRefl) return {};
 
   // Rails: source_reflection.association_primary_key(reflection.klass)
@@ -87,7 +87,7 @@ function constructJoinAttributes(
 
 /** @internal */
 function ensureMutable(assoc: { owner: Base; reflection: any }): void {
-  const sourceRefl = assoc.reflection.sourceReflection?.() as any;
+  const sourceRefl = assoc.reflection.sourceReflection?.();
   if (sourceRefl && sourceRefl.macro !== "belongsTo") {
     throw new Error(
       `Cannot modify association '${assoc.reflection.name}': ` +

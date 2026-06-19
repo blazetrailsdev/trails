@@ -88,7 +88,7 @@ export class HashLookupTypeMap {
     if (typeof value === "function") {
       this._mapping.set(key, value as (...args: unknown[]) => Type);
     } else {
-      this._mapping.set(key, () => value as Type);
+      this._mapping.set(key, () => value);
     }
     this._cache.clear();
   }

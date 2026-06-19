@@ -330,7 +330,7 @@ function collectPendingModifications(cls: AttributeHostInternals): PendingModifi
     return [];
   const superMods = collectPendingModifications(Object.getPrototypeOf(cls));
   const own = Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")
-    ? (cls._pendingAttributeModifications as PendingModification[])
+    ? cls._pendingAttributeModifications
     : [];
   return [...superMods, ...own];
 }

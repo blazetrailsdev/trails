@@ -56,8 +56,8 @@ function optionsEqual(a: unknown, b: unknown): boolean {
   }
   if (a instanceof RegExp || b instanceof RegExp) return false;
   if (typeof a === "object" && typeof b === "object") {
-    const ak = Object.keys(a as object);
-    const bk = Object.keys(b as object);
+    const ak = Object.keys(a);
+    const bk = Object.keys(b);
     if (ak.length !== bk.length) return false;
     for (const k of ak) {
       if (!Object.prototype.hasOwnProperty.call(b, k)) return false;

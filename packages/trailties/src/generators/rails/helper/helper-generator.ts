@@ -54,7 +54,7 @@ export interface HelperPaths {
 export function helperPaths(name: string): HelperPaths {
   const stripped = name.replace(/[_-]?helper$/i, "");
   const parts = stripped.split("/");
-  const leaf = parts[parts.length - 1]!;
+  const leaf = parts[parts.length - 1];
   const helperName =
     parts.length > 1
       ? parts.map((p) => classify(p)).join("") + "Helper"

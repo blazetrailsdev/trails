@@ -25,7 +25,7 @@ export class AbstractRequest {
 
   valid(): boolean {
     const key = this.authorizationKey();
-    return key !== null && this.env[key!] != null;
+    return key !== null && this.env[key] != null;
   }
 
   parts(): [string, string] {

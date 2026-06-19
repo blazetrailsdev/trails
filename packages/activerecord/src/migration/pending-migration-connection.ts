@@ -44,7 +44,7 @@ export class PendingMigrationConnection {
     if (this._connectionHandler) {
       const pool = this._connectionHandler.retrieveConnectionPool(this._connectionName);
       if (pool) {
-        return pool.withConnection((adapter) => callback(adapter as DatabaseAdapter));
+        return pool.withConnection((adapter) => callback(adapter));
       }
     }
 

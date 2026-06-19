@@ -57,7 +57,7 @@ export class TemplateRenderer extends AbstractRenderer {
       if (typeof tmpl === "object" && typeof (tmpl as RenderableTemplate).render === "function") {
         return tmpl as RenderableTemplate;
       }
-      return this.findTemplateForName(tmpl as string, options.prefixes ?? [], keys);
+      return this.findTemplateForName(tmpl, options.prefixes ?? [], keys);
     }
     throw new Error(
       "You invoked render but did not give any of :body, :file, :html, :inline, :partial, :plain, :renderable, or :template option.",
@@ -127,7 +127,7 @@ export class TemplateRenderer extends AbstractRenderer {
         keys,
         detailsWithFormats,
       ) as RenderableTemplate[];
-      if (found.length > 0) return found[0]!;
+      if (found.length > 0) return found[0];
       // Fall back to 3-arg findLayout (TemplateResolver chain).
       const format = formats[0] ?? "html";
       const fromResolver = this.lookupContext.findLayout(layout, format);
@@ -155,7 +155,7 @@ export class TemplateRenderer extends AbstractRenderer {
       keys,
       this.details,
     ) as RenderableTemplate[];
-    if (found.length > 0) return found[0]!;
+    if (found.length > 0) return found[0];
 
     // Fall back to the 3-arg TemplateResolver chain.
     const lastSlash = name.lastIndexOf("/");

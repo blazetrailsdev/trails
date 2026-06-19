@@ -72,7 +72,7 @@ export class ActionableError extends Error {
   static action(name: string, block: () => void): void {
     // Copy-on-write: ensure each subclass gets its own actions hash
     if (!Object.prototype.hasOwnProperty.call(this, "_actions")) {
-      const parentActions = (this as typeof ActionableError)._actions || {};
+      const parentActions = this._actions || {};
       Object.defineProperty(this, "_actions", {
         value: { ...parentActions },
         writable: true,

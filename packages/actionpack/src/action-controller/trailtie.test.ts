@@ -15,8 +15,8 @@ describe("ActionController::Trailtie", () => {
   });
 
   afterEach(() => {
-    (BaseRailtie.subclasses as (typeof BaseRailtie)[]).length = 0;
-    (BaseRailtie.subclasses as (typeof BaseRailtie)[]).push(...savedSubclasses);
+    BaseRailtie.subclasses.length = 0;
+    BaseRailtie.subclasses.push(...savedSubclasses);
     Trailtie.config["actionController"] = savedConfig;
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];

@@ -451,7 +451,7 @@ export function _loadedSingularTarget(
   // holder must re-query (matches the old `_cachedAssociations` write-shadow,
   // which never recorded query loads).
   if (instance?.isLoaded() && instance._explicitTarget) {
-    return { value: (instance.target ?? null) as Base | null };
+    return { value: instance.target ?? null };
   }
   if (record._preloadedAssociations?.has(assocName)) {
     return { value: record._preloadedAssociations.get(assocName) as Base | null };
@@ -1145,7 +1145,7 @@ export async function loadBelongsTo(
       : [reflection.joinForeignKey]
     : Array.isArray(foreignKey)
       ? foreignKey
-      : [foreignKey as string];
+      : [foreignKey];
   for (const fk of fkColsForCheck) {
     const v = record._readAttribute(fk);
     if (v === null || v === undefined) return null;
@@ -1172,7 +1172,7 @@ export async function loadBelongsTo(
       result = await targetModel.findBy(conditions);
     } else {
       result = await targetModel.findBy({
-        [primaryKey as string]: record._readAttribute(foreignKey as string),
+        [primaryKey as string]: record._readAttribute(foreignKey),
       });
     }
   }
@@ -1260,7 +1260,7 @@ export async function loadHasOne(
     if (Array.isArray(foreignKey)) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
     }
-    if (Array.isArray(primaryKey) && !(primaryKey as string[]).includes("id")) {
+    if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
     }
   }
@@ -1281,7 +1281,7 @@ export async function loadHasOne(
       : [reflForOwnerFk.joinForeignKey]
     : Array.isArray(primaryKey)
       ? primaryKey
-      : [primaryKey as string];
+      : [primaryKey];
   for (const pk of pkCheckCols) {
     const v = record._readAttribute(pk);
     if (v === null || v === undefined) return null;
@@ -1309,20 +1309,20 @@ export async function loadHasOne(
       result = await targetModel.findBy(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
-      const inlinePk = Array.isArray(primaryKey) ? "id" : (primaryKey as string);
+      const inlinePk = Array.isArray(primaryKey) ? "id" : primaryKey;
       result = await targetModel.findBy({
-        [foreignKey as string]: record._readAttribute(inlinePk),
+        [foreignKey]: record._readAttribute(inlinePk),
         [typeCol]: polymorphicName(ctor),
       });
     } else if (options.scope) {
       let rel = targetModel
         .all()
-        .where({ [foreignKey as string]: record._readAttribute(primaryKey as string) });
+        .where({ [foreignKey]: record._readAttribute(primaryKey as string) });
       rel = applyAssociationScope(rel, options.scope, record);
       result = await rel.first();
     } else {
       result = await targetModel.findBy({
-        [foreignKey as string]: record._readAttribute(primaryKey as string),
+        [foreignKey]: record._readAttribute(primaryKey as string),
       });
     }
   }
@@ -1357,7 +1357,7 @@ export function buildHasOne(
     : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
 
   if (options.as) {
-    if (Array.isArray(primaryKey) && !(primaryKey as string[]).includes("id")) {
+    if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, _assocName);
     }
   }
@@ -1430,7 +1430,7 @@ export async function loadHasMany(
       cache !== record._collectionProxies.get(assocName) &&
       Array.isArray(cache.target)
     ) {
-      return cache.target as Base[];
+      return cache.target;
     }
     if (record._preloadedAssociations?.has(assocName)) {
       return record._preloadedAssociations.get(assocName) as Base[];
@@ -1497,7 +1497,7 @@ export async function loadHasMany(
     if (Array.isArray(foreignKey)) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
     }
-    if (Array.isArray(primaryKey) && !(primaryKey as string[]).includes("id")) {
+    if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
     }
   }
@@ -1522,7 +1522,7 @@ export async function loadHasMany(
       : [reflForOwnerFk.joinForeignKey]
     : Array.isArray(primaryKey)
       ? primaryKey
-      : [primaryKey as string];
+      : [primaryKey];
   for (const pk of fkCheckPks) {
     const v = record._readAttribute(pk);
     if (v === null || v === undefined) return [];
@@ -1559,15 +1559,13 @@ export async function loadHasMany(
       rel = targetModel.all().where(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
-      const inlinePk = Array.isArray(primaryKey) ? "id" : (primaryKey as string);
+      const inlinePk = Array.isArray(primaryKey) ? "id" : primaryKey;
       rel = targetModel.all().where({
-        [foreignKey as string]: record._readAttribute(inlinePk),
+        [foreignKey]: record._readAttribute(inlinePk),
         [typeCol]: polymorphicName(ctor),
       });
     } else {
-      rel = targetModel
-        .all()
-        .where({ [foreignKey as string]: record._readAttribute(primaryKey as string) });
+      rel = targetModel.all().where({ [foreignKey]: record._readAttribute(primaryKey as string) });
     }
     rel = applyAssociationScope(rel, options.scope, record);
   }
@@ -1635,14 +1633,14 @@ export function computeHasManyWhere(
     }
     // Collapse CPK to "id" when present (matching Rails' join_id_for).
     // CPK without "id" cannot map to a scalar <as>_id column.
-    if (Array.isArray(primaryKey) && !(primaryKey as string[]).includes("id")) {
+    if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
     }
-    const scalarPk = Array.isArray(primaryKey) ? "id" : (primaryKey as string);
+    const scalarPk = Array.isArray(primaryKey) ? "id" : primaryKey;
     const pkValue = record._readAttribute(scalarPk);
     if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
-    return { [foreignKey as string]: pkValue, [typeCol]: polymorphicName(ctor) };
+    return { [foreignKey]: pkValue, [typeCol]: polymorphicName(ctor) };
   }
 
   // Prefer the reflection's foreign key, which is derived from the class that
@@ -1690,7 +1688,7 @@ export function computeHasManyWhere(
   if (Array.isArray(primaryKey)) {
     throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
   }
-  const pkValue = record._readAttribute(primaryKey as string);
+  const pkValue = record._readAttribute(primaryKey);
   if (pkValue === null || pkValue === undefined) return null;
   return { [foreignKey]: pkValue };
 }
@@ -1784,7 +1782,7 @@ export async function countHasMany(
       const ctor = record.constructor as typeof Base;
       const throughRegistered = (ctor._associations ?? []).some((a) => a.name === options.through);
       if (!throughRegistered) {
-        throw _hmtNotFound(ctor, assocName, options.through!);
+        throw _hmtNotFound(ctor, assocName, options.through);
       }
       const rel = buildThroughJoinScope(record, assocName, options);
       if (!rel) return 0;
@@ -2099,7 +2097,7 @@ function habtmOwnerPk(_options: AssociationOptions, ctor: typeof Base): string {
   if (Array.isArray(pk)) {
     throw new ConfigurationError("HABTM associations do not support composite primary keys");
   }
-  return pk as string;
+  return pk;
 }
 
 /**
@@ -2196,7 +2194,7 @@ export async function loadHabtm(
     .where(joinArelTable.get(ownerFk).eq(pkValue));
 
   const targetArelTable = new ArelTable(targetModel.tableName);
-  const inNode = targetArelTable.get(targetPkCol as string).in(subquery);
+  const inNode = targetArelTable.get(targetPkCol).in(subquery);
 
   // Start from `klass.scope_for_association` so target-model default_scope
   // / current_scope are honored — matches Rails' `Association#scope` which
@@ -2314,12 +2312,12 @@ export function buildThroughAssociation(
     }
     const polyFk = rawPolyFk ?? `${underscore(throughAssoc.options.as)}_id`;
     const rawOwnerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-    if (Array.isArray(rawOwnerPk) && !(rawOwnerPk as string[]).includes("id")) {
+    if (Array.isArray(rawOwnerPk) && !rawOwnerPk.includes("id")) {
       throw new ConfigurationError(
         "Composite foreignKey/primaryKey is not supported for through associations",
       );
     }
-    const ownerPk = Array.isArray(rawOwnerPk) ? "id" : (rawOwnerPk as string);
+    const ownerPk = Array.isArray(rawOwnerPk) ? "id" : rawOwnerPk;
     throughAttrs[polyFk] = record._readAttribute(ownerPk);
     throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
   } else {
@@ -2330,7 +2328,7 @@ export function buildThroughAssociation(
         "Composite foreignKey/primaryKey is not supported for through associations",
       );
     }
-    throughAttrs[ownerFkOption as string] = record._readAttribute(ownerPkOption as string);
+    throughAttrs[ownerFkOption] = record._readAttribute(ownerPkOption);
   }
   const through = new throughModel(throughAttrs);
 
@@ -2389,7 +2387,7 @@ export async function createThroughAssociation(
           "createThroughAssociation does not support composite primary keys",
         );
       }
-      through._writeAttribute(sourceFk as string, target._readAttribute(targetPk as string));
+      through._writeAttribute(sourceFk, target._readAttribute(targetPk));
       if (sourceAssocDef?.options?.polymorphic) {
         const typeCol = `${underscore(sourceName)}_type`;
         const typeValue = assocDef.options.sourceType ?? (target.constructor as typeof Base).name;
@@ -2418,7 +2416,7 @@ export async function createThroughAssociation(
           "createThroughAssociation does not support composite primary keys",
         );
       }
-      target._writeAttribute(targetFk as string, through._readAttribute(throughPk as string));
+      target._writeAttribute(targetFk, through._readAttribute(throughPk));
       if (sourceAsName) {
         target._writeAttribute(`${underscore(sourceAsName)}_type`, polymorphicName(throughCtor));
       }
@@ -2442,7 +2440,7 @@ export async function createThroughAssociation(
       rec._newRecord = true;
       const pk = (rec.constructor as typeof Base).primaryKey;
       if (!Array.isArray(pk)) {
-        rec._writeAttribute(pk as string, null);
+        rec._writeAttribute(pk, null);
       }
     }
   }
@@ -2586,22 +2584,22 @@ function wrapCollectionProxy<T extends Base = Base>(
       // Promise) defer restoration until the promise settles — mirrors Rails'
       // synchronous block-scoping across the full method body.
       const modelClass = target.model;
-      const classMethod = (modelClass as any)[prop];
+      const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
         return (...args: any[]) => {
-          const prev = ScopeRegistry.currentScope(modelClass as any);
-          ScopeRegistry.setCurrentScope(modelClass as any, scope as any);
+          const prev = ScopeRegistry.currentScope(modelClass);
+          ScopeRegistry.setCurrentScope(modelClass, scope);
           let result: unknown;
           try {
             result = classMethod.apply(modelClass, args);
           } catch (e) {
-            ScopeRegistry.setCurrentScope(modelClass as any, prev);
+            ScopeRegistry.setCurrentScope(modelClass, prev);
             throw e;
           }
           if (result instanceof Promise) {
-            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass as any, prev));
+            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
           }
-          ScopeRegistry.setCurrentScope(modelClass as any, prev);
+          ScopeRegistry.setCurrentScope(modelClass, prev);
           return result;
         };
       }
@@ -2730,9 +2728,7 @@ export async function updateCounterCaches(
         const v = (loadedOwner as any)._readAttribute?.(pk);
         return v != null && String(v) === String(fkValues[i]);
       });
-    const parent: Base | null = cachedMatches
-      ? (loadedOwner as Base)
-      : await targetModel.findBy(conditions);
+    const parent: Base | null = cachedMatches ? loadedOwner : await targetModel.findBy(conditions);
     if (!parent) continue;
 
     // Forward the belongs_to(touch:) option so updated_at (and any named
@@ -2740,15 +2736,15 @@ export async function updateCounterCaches(
     const touch = assoc.options.touch;
     const opts = touch != null ? { touch } : undefined;
     if (direction === "increment") {
-      await (parent as Base).incrementBang(counterCol, 1, opts);
+      await parent.incrementBang(counterCol, 1, opts);
     } else {
-      await (parent as Base).decrementBang(counterCol, 1, opts);
+      await parent.decrementBang(counterCol, 1, opts);
     }
     // The counter UPDATE bumps the parent's lock_version in the DB (via the
     // Locking::Optimistic#update_counters override). When the parent is the
     // caller's in-memory record, sync that bump cleanly so a read without a
     // reload sees it and the record isn't left diffing against a stale baseline.
-    if (cachedMatches) reflectLockVersionBump(parent as Base);
+    if (cachedMatches) reflectLockVersionBump(parent);
   }
 }
 
@@ -2854,7 +2850,7 @@ export function setBelongsTo(
       // composite-PK target + scalar FK → collapse to "id" if present, else keep the array
       // (which would be misconfigured; explicit foreignKey/primaryKey required in that case).
       const scalarPk = Array.isArray(primaryKey)
-        ? (primaryKey as string[]).includes("id")
+        ? primaryKey.includes("id")
           ? "id"
           : primaryKey
         : primaryKey;
@@ -2863,7 +2859,7 @@ export function setBelongsTo(
           `belongs_to "${assocName}" has a scalar foreignKey but the target model has a composite primaryKey with no "id" component. Provide an explicit foreignKey array or primaryKey option.`,
         );
       }
-      record._writeAttribute(foreignKey as string, target._readAttribute(scalarPk));
+      record._writeAttribute(foreignKey, target._readAttribute(scalarPk));
     }
     if (options.polymorphic) {
       const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
@@ -2875,7 +2871,7 @@ export function setBelongsTo(
         record._writeAttribute(fk, null);
       }
     } else {
-      record._writeAttribute(foreignKey as string, null);
+      record._writeAttribute(foreignKey, null);
     }
     if (options.polymorphic) {
       const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
@@ -3015,7 +3011,7 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     } else if (typeof touchOpt === "string") {
       await parent.touch(touchOpt);
     } else if (Array.isArray(touchOpt) && touchOpt.length > 0) {
-      await parent.touch(...(touchOpt as string[]));
+      await parent.touch(...touchOpt);
     }
   }
 }

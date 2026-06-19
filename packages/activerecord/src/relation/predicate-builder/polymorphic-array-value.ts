@@ -91,7 +91,7 @@ export class PolymorphicArrayValue {
         return (value as any).select(arelTable && !Array.isArray(pk) ? arelTable.get(pk) : pk);
       }
       const pk = this.primaryKey(value);
-      if (pk in (value as object)) return (value as any)[pk];
+      if (pk in value) return (value as any)[pk];
     }
     return value;
   }

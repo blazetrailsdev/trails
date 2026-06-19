@@ -109,8 +109,8 @@ export class QueryLogs implements QueryTransformer {
     } else if (
       format !== null &&
       (typeof format === "object" || typeof format === "function") &&
-      typeof (format as QueryLogsFormatter).format === "function" &&
-      typeof (format as QueryLogsFormatter).join === "function"
+      typeof format.format === "function" &&
+      typeof format.join === "function"
     ) {
       // Accept anything with the right call shape — an instance, a
       // const object, or a class / function with static `format` /
@@ -125,7 +125,7 @@ export class QueryLogs implements QueryTransformer {
       } else {
         this._tagsFormatter = "legacy"; // unknown custom formatter
       }
-      this._formatter = format as QueryLogsFormatter;
+      this._formatter = format;
     } else {
       // Describe the bad value without dumping a full function body
       // (classes stringify to their whole source) — prefer the
@@ -332,11 +332,11 @@ export function rebuildHandlers(
   for (const tag of tags) {
     if (typeof tag === "function") {
       // Function tags are invoked directly — mirror tagContent()'s "custom" branch.
-      const fn = tag as TagHandler;
-      handlers.push(["custom", (ctx) => fn(ctx) as TagValue]);
+      const fn = tag;
+      handlers.push(["custom", (ctx) => fn(ctx)]);
     } else if (typeof tag === "object" && tag !== null) {
       for (const [k, v] of Object.entries(tag)) {
-        handlers.push([k, buildHandler(k, v as TagValue | TagHandler)]);
+        handlers.push([k, buildHandler(k, v)]);
       }
     } else {
       const name = String(tag);

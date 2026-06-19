@@ -113,7 +113,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
         (throughRecord as any).assignAttributes?.(attrs);
       }
     } else {
-      (throughProxy as any).build?.(attrs);
+      throughProxy.build?.(attrs);
     }
   }
 
@@ -146,13 +146,13 @@ async function createThroughRecord(
 
   let throughRecord = await throughProxy.loadTarget?.();
 
-  if (throughRecord && (throughRecord as any).isDestroyed?.()) {
+  if (throughRecord && throughRecord.isDestroyed?.()) {
     await throughProxy.reload?.();
-    throughRecord = (throughProxy as any).target ?? null;
+    throughRecord = throughProxy.target ?? null;
   }
 
   if (throughRecord && !record) {
-    await (throughRecord as any).destroy?.();
+    await throughRecord.destroy?.();
     return null;
   }
 
@@ -162,10 +162,10 @@ async function createThroughRecord(
     const attrs = constructJoinAttributes(assoc, record);
 
     if (throughRecord) {
-      if ((throughRecord as any).isNewRecord?.()) {
-        await (throughRecord as any).assignAttributes?.(attrs);
+      if (throughRecord.isNewRecord?.()) {
+        await throughRecord.assignAttributes?.(attrs);
       } else {
-        await (throughRecord as any).update?.(attrs);
+        await throughRecord.update?.(attrs);
       }
     } else if ((assoc.owner as any).isNewRecord?.() || !save) {
       throughProxy.build?.(attrs);
@@ -215,7 +215,7 @@ function throughReflection(assoc: HasOneThroughAssociation): unknown {
   let refl: Refl | null =
     (ctor._reflectOnAssociation?.(assoc.reflection.name) as Refl | null)?.throughReflection ?? null;
   if (!refl) {
-    const throughName = assoc.reflection.options.through as string | undefined;
+    const throughName = assoc.reflection.options.through;
     if (!throughName) return null;
     refl = ctor._reflectOnAssociation?.(throughName) ?? null;
   }
@@ -255,7 +255,7 @@ function constructJoinAttributes(
   ensureMutable(assoc);
   const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
-  const sourceRefl = refl?.sourceReflection as any;
+  const sourceRefl = refl?.sourceReflection;
   if (!sourceRefl) return {};
   const reflKlass = safeKlass(refl);
   const assocPk =

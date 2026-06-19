@@ -449,7 +449,7 @@ async function performClassUpdate(
         "update: attributes must be a plain object (missing or invalid attrs for the :all / nil form)",
       );
     }
-    const records = (await this.all().toArray()) as InstanceType<typeof Base>[];
+    const records = await this.all().toArray();
     for (const r of records) await run(r, candidate);
     return records;
   }
@@ -477,7 +477,7 @@ async function performClassUpdate(
       if (!isPlainObject(attrs)) {
         throw argumentError(`${this.name}.update: attributes must be a plain object`);
       }
-      const record = (await this.find(idOrAttrs)) as InstanceType<typeof Base>;
+      const record = await this.find(idOrAttrs);
       await run(record, attrs);
       return record;
     }
@@ -531,7 +531,7 @@ async function performClassUpdate(
   if (!isPlainObject(attrs)) {
     throw argumentError(`${this.name}.update: attributes must be a plain object`);
   }
-  const record = (await this.find(idOrAttrs)) as InstanceType<typeof Base>;
+  const record = await this.find(idOrAttrs);
   await run(record, attrs);
   return record;
 }
@@ -1016,7 +1016,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#hook_attribute_type (composed via module includes)
    */
   static override hookAttributeType(name: string, type: Type): Type {
-    const tzType = tzHookAttributeType.call(this as any, name, type) as Type;
+    const tzType = tzHookAttributeType.call(this as any, name, type);
     return LockingOptimistic.hookAttributeType.call(this as any, name, tzType);
   }
 
@@ -1082,7 +1082,7 @@ export class Base extends Model {
       return;
     }
     this._adapter = adapter;
-    if (this !== Base && this.name) Base._modelsByName.set(this.name, this as typeof Base);
+    if (this !== Base && this.name) Base._modelsByName.set(this.name, this);
 
     // Full schema reset on adapter swap: drops schema-sourced defs and
     // their prototype accessors (preserves user-declared defs), and
@@ -1488,7 +1488,7 @@ export class Base extends Model {
     // `applyPendingEncryptions` would fork `_attributeDefinitions` on
     // the subclass and reintroduce the shadowing the STI-routing fix
     // is trying to eliminate.
-    const target = isStiSubclass(this) ? (getStiBase(this) as typeof Base) : this;
+    const target = isStiSubclass(this) ? getStiBase(this) : this;
     encryptionHooks.encrypts(target, ...args);
   }
 
@@ -1973,7 +1973,7 @@ export class Base extends Model {
       // class's own relation — which carries the STI `type_condition` — and
       // merge the inherited scope into it, rather than cloning the parent's
       // type-unconstrained relation.
-      if ((scope as any)._modelClass === this) {
+      if (scope._modelClass === this) {
         return scope._clone();
       }
       return this._buildUnscopedRelation().merge(scope);
@@ -2192,7 +2192,7 @@ export class Base extends Model {
     // picks up the current scope + uses the narrow RecordNotUnique retry
     // Relation#createOrFindBy implements, so validation failures and
     // other adapter errors propagate unchanged.
-    return this.all().createOrFindBy(conditions, extra) as Promise<InstanceType<T>>;
+    return this.all().createOrFindBy(conditions, extra);
   }
 
   /**
@@ -2206,7 +2206,7 @@ export class Base extends Model {
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<InstanceType<T>> {
-    return this.all().createOrFindByBang(conditions, extra) as Promise<InstanceType<T>>;
+    return this.all().createOrFindByBang(conditions, extra);
   }
 
   /**
@@ -2231,7 +2231,7 @@ export class Base extends Model {
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> | InstanceType<T>[] {
     if (Array.isArray(attrs)) {
-      return attrs.map((a) => (this as T).new(a, block));
+      return attrs.map((a) => this.new(a, block));
     }
     const record = new this(this._mergeCurrentScopeAttrs(attrs)) as InstanceType<T>;
     if (block) block(record);
@@ -2259,7 +2259,7 @@ export class Base extends Model {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> | InstanceType<T>[] {
-    return Array.isArray(attrs) ? (this as T).new(attrs, block) : (this as T).new(attrs, block);
+    return Array.isArray(attrs) ? this.new(attrs, block) : this.new(attrs, block);
   }
 
   /**
@@ -2638,14 +2638,14 @@ export class Base extends Model {
     // Inheritance::ClassMethods#new). Resolution is registry-safe — scoped to
     // this class's descendants, never the ambiguous global name map — so it
     // runs after sanitize (the un-permitted params case raises above first).
-    const stiTarget = subclassFromAttributesForNew(new.target as typeof Base, attrs);
-    if (stiTarget && stiTarget !== (new.target as typeof Base)) {
-      return new stiTarget(attrs) as Base;
+    const stiTarget = subclassFromAttributesForNew(new.target, attrs);
+    if (stiTarget && stiTarget !== new.target) {
+      return new stiTarget(attrs);
     }
     // Split out constructor-form association values (e.g. `new Owner({items:
     // [...]})`) so super() never sees them as plain attributes. Dispatched
     // after super() so the association proxy exists on `this`.
-    let assocPending = _extractAssociationAttrs(new.target as typeof Base, attrs);
+    let assocPending = _extractAssociationAttrs(new.target, attrs);
     if (assocPending) attrs = assocPending.rest;
     if (hasMultiparameterKeys(attrs)) {
       // Mirrors Rails: Base#initialize calls assign_attributes which handles
@@ -2655,7 +2655,7 @@ export class Base extends Model {
       // Suppress after_initialize so it fires after ALL attrs are present
       // (not just the regular subset), and re-snapshot dirty state so mp
       // attrs appear clean (part of initial construction, not changes).
-      const ctor = new.target as typeof Base;
+      const ctor = new.target;
       const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
       const hadOwnSuppressor = Object.prototype.hasOwnProperty.call(
         suppressor,
@@ -2713,7 +2713,7 @@ export class Base extends Model {
       // initialize_internals_callback first, then fire after_initialize.
       // This matches Rails' Core#initialize order:
       //   init_internals → initialize_internals_callback → super → after_initialize
-      const ctor2 = new.target as typeof Base;
+      const ctor2 = new.target;
       // Separate store accessor keys (virtual, backed by a store column rather
       // than a direct DB column) from regular column attrs. Store accessor attrs
       // are assigned AFTER the clean re-snapshot so they appear as dirty for new
@@ -2821,11 +2821,7 @@ export class Base extends Model {
     // generated setter, so `new Model({commentsAttributes: [...]})` builds the
     // associated records in memory — mirroring Rails' `assign_attributes` →
     // `public_send(setter)` path. No-op for models without nested attributes.
-    _Persistence._reapplyNestedAttrSetters(
-      this.constructor as typeof Base,
-      this,
-      attrs as Record<string, unknown>,
-    );
+    _Persistence._reapplyNestedAttrSetters(this.constructor as typeof Base, this, attrs);
   }
 
   // --- Persistence instance predicates (wired via include() after class body) ---
@@ -3072,7 +3068,7 @@ export class Base extends Model {
           // no such free safety here, so guard explicitly: `_writeAttribute(nil,
           // …)` would otherwise raise MissingAttributeError via the Null
           // attribute.
-          this._writeAttribute(ctor.primaryKey as string, insertedId);
+          this._writeAttribute(ctor.primaryKey, insertedId);
         } else if (
           Array.isArray(ctor.primaryKey) &&
           insertedId != null &&
@@ -3765,7 +3761,7 @@ export class Base extends Model {
    */
   static inspect(): string {
     const name = this.name;
-    if ((this as typeof Base) === Base) {
+    if (this === Base) {
       return name;
     } else if (this.abstractClass) {
       return `${name}(abstract)`;
@@ -4302,7 +4298,7 @@ _setGlobalIdModelFinder((name: string) => {
   for (const root of Base._modelsByName.values()) {
     for (const klass of root.descendants) {
       if (klass.name === name) {
-        Base._modelsByName.set(name, klass as typeof Base);
+        Base._modelsByName.set(name, klass);
         return klass as unknown as _LocatorModel;
       }
     }
