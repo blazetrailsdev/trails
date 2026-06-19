@@ -1,4 +1,5 @@
 import type { CacheOptions, CacheStore } from "./index.js";
+import { coder } from "./coder.js";
 import { type CacheEntry, namespaceKey, isExpired } from "./entry-record.js";
 
 export class MemoryStore implements CacheStore {
@@ -31,8 +32,7 @@ export class MemoryStore implements CacheStore {
     const entry = this.getEntry(rk);
     if (!entry) return null;
     entry.accessedAt = Date.now();
-    // Deep clone to prevent mutation
-    return JSON.parse(JSON.stringify(entry.value));
+    return coder.load(entry.encodedValue);
   }
 
   write(key: string, value: unknown, options?: CacheOptions): boolean {
@@ -44,7 +44,11 @@ export class MemoryStore implements CacheStore {
     }
 
     const expiresAt = options?.expiresIn != null ? Date.now() + options.expiresIn : null;
-    const entry: CacheEntry = { value, expiresAt, accessedAt: Date.now() };
+    const entry: CacheEntry = {
+      encodedValue: coder.dump(value),
+      expiresAt,
+      accessedAt: Date.now(),
+    };
     this.store.set(rk, entry);
 
     if (this.store.size > this.sizeLimit) {
@@ -136,10 +140,10 @@ export class MemoryStore implements CacheStore {
     const rk = this.resolveKey(key, options);
     const entry = this.getEntry(rk);
     if (!entry) return null;
-    const current = Number(entry.value);
+    const current = Number(coder.load(entry.encodedValue));
     if (isNaN(current)) return null;
     const next = current + amount;
-    entry.value = next;
+    entry.encodedValue = coder.dump(next);
     entry.accessedAt = Date.now();
     return next;
   }
