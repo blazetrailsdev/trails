@@ -2594,9 +2594,10 @@ describe("AssociationsTest", () => {
     const ship = await Ship.create({ name: "The good ship Dollypop" });
     const part = await (ship as any).parts.create({ name: "Mast" });
     markForDestruction(part);
-    // Rails `ship.parts[0]` loads the target preserving in-memory records
-    // (marked-for-destruction kept); `load()` merges in-memory over DB rows.
-    const parts = await (ship as any).parts.load();
+    // Rails `ship.parts[0]` routes through load_target → merge_target_lists,
+    // preserving in-memory records (marked-for-destruction kept); trails'
+    // `toArray()` merges in-memory over DB rows the same way.
+    const parts = await (ship as any).parts.toArray();
     expect(isMarkedForDestruction(parts[0])).toBe(true);
   });
 
@@ -2606,7 +2607,7 @@ describe("AssociationsTest", () => {
     markForDestruction(part);
     const reloaded = await ShipPart.find((part as any).id as number);
     await reloaded.updateColumn("name", "Deck");
-    const parts = await (ship as any).parts.load();
+    const parts = await (ship as any).parts.toArray();
     expect(parts[0].name).toBe("Deck");
   });
 
