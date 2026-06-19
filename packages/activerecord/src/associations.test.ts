@@ -419,41 +419,13 @@ describe("PreloaderTest", () => {
       shipping_lines: canonicalSchema.shipping_lines,
       shipping_line_discount_applications: canonicalSchema.shipping_line_discount_applications,
       discounts: canonicalSchema.discounts,
-      cfk_bt_authors: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cfk_bt_posts: { author_id: "integer", author_region_id: "integer", title: "string" },
-      cfk_hm_authors: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cfk_hm_posts: { author_id: "integer", author_region_id: "integer", title: "string" },
-      cfk_lbt_authors: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cfk_lbt_posts: { author_id: "integer", author_region_id: "integer", title: "string" },
-      cfk_thru_appts: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
-      cfk_thru_doctors: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
-      cfk_thru_patients: { name: "string" },
-      cpk_pl_children: {
-        cpk_pl_owner_id: "integer",
-        cpk_pl_owner_shop_id: "integer",
-        label: "string",
-      },
-      cpk_pl_owners: {
-        columns: { id: "integer", name: "string", shop_id: "integer" },
-        primaryKey: ["shop_id", "id"],
-      },
-      cpk_pl_refs: { cpk_pl_target_id: "integer", cpk_pl_target_region_id: "integer" },
-      cpk_pl_targets: {
-        columns: { id: "integer", name: "string", region_id: "integer" },
-        primaryKey: ["region_id", "id"],
-      },
+      sharded_blogs: canonicalSchema.sharded_blogs,
+      sharded_blog_posts: canonicalSchema.sharded_blog_posts,
+      sharded_comments: canonicalSchema.sharded_comments,
+      sharded_tags: canonicalSchema.sharded_tags,
+      sharded_blog_posts_tags: canonicalSchema.sharded_blog_posts_tags,
+      cpk_orders: canonicalSchema.cpk_orders,
+      cpk_order_agreements: canonicalSchema.cpk_order_agreements,
     });
   });
 
@@ -477,6 +449,13 @@ describe("PreloaderTest", () => {
   let ShippingLine: typeof Base;
   let ShippingLineDiscountApplication: typeof Base;
   let Discount: typeof Base;
+  let ShardedBlogPL: typeof Base;
+  let ShardedBlogPostPL: typeof Base;
+  let ShardedCommentPL: typeof Base;
+  let ShardedTagPL: typeof Base;
+  let ShardedBlogPostTagPL: typeof Base;
+  let CpkOrderPL: typeof Base;
+  let CpkOrderAgreementPL: typeof Base;
 
   beforeAll(async () => {
     Author = (await import("./test-helpers/models/author.js")).Author as never;
@@ -500,6 +479,15 @@ describe("PreloaderTest", () => {
     ShippingLine = slMod.ShippingLine as never;
     ShippingLineDiscountApplication = slMod.ShippingLineDiscountApplication as never;
     Discount = (await import("./test-helpers/models/discount.js")).Discount as never;
+    const shardedMod = await import("./test-helpers/models/sharded.js");
+    ShardedBlogPL = shardedMod.ShardedBlog as never;
+    ShardedBlogPostPL = shardedMod.ShardedBlogPost as never;
+    ShardedCommentPL = shardedMod.ShardedComment as never;
+    ShardedTagPL = shardedMod.ShardedTag as never;
+    ShardedBlogPostTagPL = shardedMod.ShardedBlogPostTag as never;
+    const cpkMod = await import("./test-helpers/models/cpk.js");
+    CpkOrderPL = cpkMod.CpkOrder as never;
+    CpkOrderAgreementPL = cpkMod.CpkOrderAgreement as never;
   });
 
   beforeEach(() => {
@@ -520,6 +508,13 @@ describe("PreloaderTest", () => {
     registerModel("ShippingLine", ShippingLine);
     registerModel("ShippingLineDiscountApplication", ShippingLineDiscountApplication);
     registerModel("Discount", Discount);
+    registerModel("ShardedBlog", ShardedBlogPL);
+    registerModel("ShardedBlogPost", ShardedBlogPostPL);
+    registerModel("ShardedComment", ShardedCommentPL);
+    registerModel("ShardedTag", ShardedTagPL);
+    registerModel("ShardedBlogPostTag", ShardedBlogPostTagPL);
+    registerModel("CpkOrder", CpkOrderPL);
+    registerModel("CpkOrderAgreement", CpkOrderAgreementPL);
   });
 
   it("preload with scope", async () => {
@@ -1568,242 +1563,106 @@ describe("PreloaderTest", () => {
   });
 
   it("preload has many association with composite foreign key", async () => {
-    class CfkHmAuthor extends Base {
-      static {
-        this._tableName = "cfk_hm_authors";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CfkHmPost extends Base {
-      static {
-        this._tableName = "cfk_hm_posts";
-        this.attribute("author_region_id", "integer");
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(CfkHmAuthor, "cfkHmPosts", {
-      className: "CfkHmPost",
-      foreignKey: ["author_region_id", "author_id"],
-      primaryKey: ["region_id", "id"],
+    const blog = await ShardedBlogPL.create({ name: "Blog" });
+    const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
+    const bp2 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post2" });
+    const comment = await ShardedCommentPL.create({
+      blog_id: blog.id,
+      blog_post_id: bp1.id,
+      body: "Great!",
     });
-    registerModel("CfkHmAuthor", CfkHmAuthor);
-    registerModel("CfkHmPost", CfkHmPost);
 
-    const a1 = await CfkHmAuthor.create({ region_id: 1, id: 1, name: "A1" });
-    const a2 = await CfkHmAuthor.create({ region_id: 1, id: 2, name: "A2" });
-    await CfkHmPost.create({ author_region_id: 1, author_id: 1, title: "P1" });
-    await CfkHmPost.create({ author_region_id: 1, author_id: 1, title: "P2" });
-    await CfkHmPost.create({ author_region_id: 1, author_id: 2, title: "P3" });
-
-    const authors = await CfkHmAuthor.all().includes("cfkHmPosts").toArray();
-    expect(authors).toHaveLength(2);
-    const byName = new Map(authors.map((a) => [a.name, a]));
-    const a1Preloaded = (byName.get("A1") as any)._preloadedAssociations.get("cfkHmPosts");
-    const a2Preloaded = (byName.get("A2") as any)._preloadedAssociations.get("cfkHmPosts");
-    expect(a1Preloaded.map((p: any) => p.title).sort()).toEqual(["P1", "P2"]);
-    expect(a2Preloaded.map((p: any) => p.title)).toEqual(["P3"]);
+    const blogPosts = await ShardedBlogPostPL.all().includes("comments").toArray();
+    expect(blogPosts).toHaveLength(2);
+    const byTitle = new Map(blogPosts.map((bp) => [(bp as any).title, bp]));
+    expect(byTitle.get("Post1")!.association("comments").isLoaded()).toBe(true);
+    const preloaded = (byTitle.get("Post1") as any)._preloadedAssociations.get("comments");
+    expect(preloaded).toHaveLength(1);
+    expect(preloaded[0].id).toBe(comment.id);
   });
 
   it("preload belongs to association with composite foreign key", async () => {
-    class CfkBtAuthor extends Base {
-      static {
-        this._tableName = "cfk_bt_authors";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CfkBtPost extends Base {
-      static {
-        this._tableName = "cfk_bt_posts";
-        this.attribute("author_region_id", "integer");
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.belongsTo.call(CfkBtPost, "cfkBtAuthor", {
-      className: "CfkBtAuthor",
-      foreignKey: ["author_region_id", "author_id"],
-    });
-    registerModel("CfkBtAuthor", CfkBtAuthor);
-    registerModel("CfkBtPost", CfkBtPost);
+    const blog = await ShardedBlogPL.create({ name: "Blog" });
+    const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
+    const bp2 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post2" });
+    await ShardedCommentPL.create({ blog_id: blog.id, blog_post_id: bp1.id, body: "C1" });
+    await ShardedCommentPL.create({ blog_id: blog.id, blog_post_id: bp2.id, body: "C2" });
 
-    const a1 = await CfkBtAuthor.create({ region_id: 1, id: 1, name: "A1" });
-    const a2 = await CfkBtAuthor.create({ region_id: 1, id: 2, name: "A2" });
-    await CfkBtPost.create({ author_region_id: 1, author_id: 1, title: "P1" });
-    await CfkBtPost.create({ author_region_id: 1, author_id: 2, title: "P2" });
-
-    const posts = await CfkBtPost.all().includes("cfkBtAuthor").toArray();
-    expect(posts).toHaveLength(2);
-    const byTitle = new Map(posts.map((p) => [p.title, p]));
-    expect((byTitle.get("P1") as any)._preloadedAssociations.get("cfkBtAuthor").name).toBe("A1");
-    expect((byTitle.get("P2") as any)._preloadedAssociations.get("cfkBtAuthor").name).toBe("A2");
+    const comments = await ShardedCommentPL.all().includes("blogPost").toArray();
+    expect(comments).toHaveLength(2);
+    const byBody = new Map(comments.map((c) => [(c as any).body, c]));
+    expect(byBody.get("C1")!.association("blogPost").isLoaded()).toBe(true);
+    expect((byBody.get("C1") as any)._preloadedAssociations.get("blogPost").title).toBe("Post1");
+    expect((byBody.get("C2") as any)._preloadedAssociations.get("blogPost").title).toBe("Post2");
   });
 
   it("preload loaded belongs to association with composite foreign key", async () => {
-    class CfkLBtAuthor extends Base {
-      static {
-        this._tableName = "cfk_lbt_authors";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CfkLBtPost extends Base {
-      static {
-        this._tableName = "cfk_lbt_posts";
-        this.attribute("author_region_id", "integer");
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.belongsTo.call(CfkLBtPost, "cfkLBtAuthor", {
-      className: "CfkLBtAuthor",
-      foreignKey: ["author_region_id", "author_id"],
-    });
-    registerModel("CfkLBtAuthor", CfkLBtAuthor);
-    registerModel("CfkLBtPost", CfkLBtPost);
+    const blog = await ShardedBlogPL.create({ name: "Blog" });
+    const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
+    await ShardedCommentPL.create({ blog_id: blog.id, blog_post_id: bp1.id, body: "C1" });
 
-    const a1 = await CfkLBtAuthor.create({ region_id: 1, id: 1, name: "A1" });
-    await CfkLBtPost.create({ author_region_id: 1, author_id: 1, title: "P1" });
-
-    // Load post and force-load the belongs_to first.
-    const posts = await CfkLBtPost.all().toArray();
-    await loadBelongsTo(posts[0], "cfkLBtAuthor", {
-      className: "CfkLBtAuthor",
-      foreignKey: ["author_region_id", "author_id"],
+    const comments = await ShardedCommentPL.all().toArray();
+    await loadBelongsTo(comments[0], "blogPost", {
+      className: "ShardedBlogPost",
+      foreignKey: ["blog_id", "blog_post_id"],
     });
 
     // Now run preload — should reuse the already-loaded record, not crash.
-    const reloaded = await CfkLBtPost.all().includes("cfkLBtAuthor").toArray();
+    const reloaded = await ShardedCommentPL.all().includes("blogPost").toArray();
     expect(reloaded).toHaveLength(1);
-    const preloaded = (reloaded[0] as any)._preloadedAssociations.get("cfkLBtAuthor");
+    const preloaded = (reloaded[0] as any)._preloadedAssociations.get("blogPost");
     expect(preloaded).toBeDefined();
-    expect(preloaded.name).toBe("A1");
+    expect(preloaded.title).toBe("Post1");
   });
 
   it("preload has many through association with composite query constraints", async () => {
-    class CfkThruDoctor extends Base {
-      static {
-        this._tableName = "cfk_thru_doctors";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CfkThruAppt extends Base {
-      static {
-        this._tableName = "cfk_thru_appts";
-        this.attribute("doctor_region_id", "integer");
-        this.attribute("doctor_id", "integer");
-        this.attribute("patient_id", "integer");
-      }
-    }
-    class CfkThruPatient extends Base {
-      static {
-        this._tableName = "cfk_thru_patients";
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(CfkThruDoctor, "cfkThruAppts", {
-      className: "CfkThruAppt",
-      foreignKey: ["doctor_region_id", "doctor_id"],
-    });
-    Associations.belongsTo.call(CfkThruAppt, "cfkThruPatient", {
-      className: "CfkThruPatient",
-      foreignKey: "patient_id",
-    });
-    Associations.hasMany.call(CfkThruDoctor, "cfkThruPatients", {
-      through: "cfkThruAppts",
-      className: "CfkThruPatient",
-      source: "cfkThruPatient",
-    });
-    registerModel("CfkThruDoctor", CfkThruDoctor);
-    registerModel("CfkThruAppt", CfkThruAppt);
-    registerModel("CfkThruPatient", CfkThruPatient);
+    const blog = await ShardedBlogPL.create({ name: "Blog" });
+    const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
+    const tag = await ShardedTagPL.create({ blog_id: blog.id, name: "Tag1" });
+    await ShardedBlogPostTagPL.create({ blog_id: blog.id, blog_post_id: bp1.id, tag_id: tag.id });
 
-    const doc = await CfkThruDoctor.create({ region_id: 1, id: 1, name: "Dr A" });
-    const p1 = await CfkThruPatient.create({ name: "Alice" });
-    const p2 = await CfkThruPatient.create({ name: "Bob" });
-    await CfkThruAppt.create({ doctor_region_id: 1, doctor_id: 1, patient_id: p1.id });
-    await CfkThruAppt.create({ doctor_region_id: 1, doctor_id: 1, patient_id: p2.id });
-
-    const docs = await CfkThruDoctor.all().includes("cfkThruPatients").toArray();
-    expect(docs).toHaveLength(1);
-    const preloaded = (docs[0] as any)._preloadedAssociations.get("cfkThruPatients");
-    expect(preloaded.map((p: any) => p.name).sort()).toEqual(["Alice", "Bob"]);
+    const tags = await ShardedTagPL.all().includes("blogPosts").toArray();
+    expect(tags).toHaveLength(1);
+    expect(tags[0].association("blogPosts").isLoaded()).toBe(true);
+    const preloaded = (tags[0] as any)._preloadedAssociations.get("blogPosts");
+    expect(preloaded).toHaveLength(1);
+    expect(preloaded[0].title).toBe("Post1");
   });
+
   it("preloads has many on model with a composite primary key through id attribute", async () => {
-    class CpkPLOwner extends Base {
-      static {
-        this._tableName = "cpk_pl_owners";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    class CpkPLChild extends Base {
-      static {
-        this._tableName = "cpk_pl_children";
-        this.attribute("cpk_pl_owner_shop_id", "integer");
-        this.attribute("cpk_pl_owner_id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    Associations.hasMany.call(CpkPLOwner, "cpkPLChildren", {
-      foreignKey: ["cpk_pl_owner_shop_id", "cpk_pl_owner_id"],
-      className: "CpkPLChild",
+    const order = await CpkOrderPL.create({ shop_id: 1 });
+    const [, orderId] = order.id as [number, number];
+    const ag1 = await CpkOrderAgreementPL.create({ order_id: orderId, signature: "abc" });
+    const ag2 = await CpkOrderAgreementPL.create({ order_id: orderId, signature: "def" });
+
+    let orders: any[];
+    const sqls = await captureSql(async () => {
+      orders = await CpkOrderPL.where("id = ?", orderId).includes("orderAgreements").toArray();
     });
-    registerModel("CpkPLOwner", CpkPLOwner);
-    registerModel("CpkPLChild", CpkPLChild);
-    const owner = await CpkPLOwner.create({ shop_id: 1, id: 1, name: "O" });
-    await CpkPLChild.create({ cpk_pl_owner_shop_id: 1, cpk_pl_owner_id: 1, label: "A" });
-    await CpkPLChild.create({ cpk_pl_owner_shop_id: 1, cpk_pl_owner_id: 1, label: "B" });
-    const children = await loadHasMany(owner, "cpkPLChildren", {
-      foreignKey: ["cpk_pl_owner_shop_id", "cpk_pl_owner_id"],
-      className: "CpkPLChild",
-    });
-    expect(children.length).toBe(2);
+    expect(sqls).toHaveLength(2);
+    const preloadSql = sqls[1];
+    expectQuotedColumnInSql(preloadSql, "cpk_order_agreements.order_id", { inWhere: true });
+    expect(orders![0].association("orderAgreements").isLoaded()).toBe(true);
+    const loaded = (orders![0] as any)._preloadedAssociations.get("orderAgreements");
+    expect(loaded.map((a: any) => a.signature).sort()).toEqual(["abc", "def"]);
   });
+
   it("preloads belongs to a composite primary key model through id attribute", async () => {
-    class CpkPLTarget extends Base {
-      static {
-        this._tableName = "cpk_pl_targets";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-      }
-    }
-    class CpkPLRef extends Base {
-      static {
-        this._tableName = "cpk_pl_refs";
-        this.attribute("cpk_pl_target_region_id", "integer");
-        this.attribute("cpk_pl_target_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(CpkPLRef, "cpkPLTarget", {
-      foreignKey: ["cpk_pl_target_region_id", "cpk_pl_target_id"],
-      className: "CpkPLTarget",
+    const order = await CpkOrderPL.create({ shop_id: 1 });
+    const [, orderId] = order.id as [number, number];
+    const ag = await CpkOrderAgreementPL.create({ order_id: orderId, signature: "xyz" });
+
+    let agreements: any[];
+    const sqls = await captureSql(async () => {
+      agreements = await CpkOrderAgreementPL.where("id = ?", ag.id).includes("order").toArray();
     });
-    registerModel("CpkPLTarget", CpkPLTarget);
-    registerModel("CpkPLRef", CpkPLRef);
-    const target = await CpkPLTarget.create({ region_id: 1, id: 5, name: "T" });
-    const ref = await CpkPLRef.create({ cpk_pl_target_region_id: 1, cpk_pl_target_id: 5 });
-    const loaded = await loadBelongsTo(ref, "cpkPLTarget", {
-      foreignKey: ["cpk_pl_target_region_id", "cpk_pl_target_id"],
-      className: "CpkPLTarget",
-    });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.id).toEqual([1, 5]);
+    expect(sqls).toHaveLength(2);
+    const preloadSql = sqls[1];
+    expectQuotedColumnInSql(preloadSql, "cpk_orders.id", { inWhere: true });
+    expect(agreements![0].association("order").isLoaded()).toBe(true);
+    const loadedOrder = (agreements![0] as any)._preloadedAssociations.get("order");
+    expect(loadedOrder).not.toBeNull();
+    expect((loadedOrder.id as [number, number])[1]).toBe(orderId);
   });
 
   it("preload keeps built has many records no ops", async () => {
