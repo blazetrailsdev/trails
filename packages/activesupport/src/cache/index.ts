@@ -30,12 +30,8 @@ export interface CacheStore {
   decrement(key: string, amount?: number, options?: CacheOptions): number | null;
 }
 
-/** Mirrors Rails Cache::Store class-level logger interface. @internal */
-export interface CacheLogger {
-  warn(message: string): void;
-}
-
 export { Store } from "./store.js";
+export type { CacheLogger } from "./store.js";
 export { MemoryStore } from "./memory-store.js";
 export { NullStore } from "./null-store.js";
 export { FileStore } from "./file-store.js";

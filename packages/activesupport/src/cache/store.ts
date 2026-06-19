@@ -1,4 +1,7 @@
-import type { CacheLogger } from "./index.js";
+/** Mirrors Rails Cache::Store class-level logger interface. @internal */
+export interface CacheLogger {
+  warn(message: string): void;
+}
 
 /**
  * Mirrors Rails `ActiveSupport::Cache::Store` base class (cache.rb).
