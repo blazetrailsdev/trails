@@ -411,9 +411,15 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
     ) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
-        // Rails: `errors.add(reflection.name) unless association_saved` — only
-        // when the reflection validates (validate: false suppresses it).
-        if (assoc.options.validate !== false) propagateErrors(record, assoc.name);
+        // Rails save_collection_association (autosave_association.rb:447-453):
+        // `errors.add(reflection.name)` lives only in the non-autosave,
+        // non-nested branch, gated on `reflection.validate?`. Autosave
+        // collections insert with validate:false and add no owner error on
+        // failure; nested records never reach a failed insert here
+        // (_insertCollectionRecord short-circuits them to `true`).
+        if (!assoc.options.autosave && assoc.options.validate !== false) {
+          propagateErrors(record, assoc.name);
+        }
         return false;
       }
     }
@@ -828,8 +834,11 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
     ) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
-        // habtm routes through save_collection_association — same gating.
-        if (assoc.options.validate !== false) propagateErrors(record, assoc.name);
+        // habtm routes through save_collection_association — same gating as
+        // has_many above (non-autosave, validating only).
+        if (!assoc.options.autosave && assoc.options.validate !== false) {
+          propagateErrors(record, assoc.name);
+        }
         return false;
       }
     }
