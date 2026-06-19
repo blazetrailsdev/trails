@@ -95,6 +95,10 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
+        this.hasMany("cpkOrderItems", {
+          foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
+          className: "CpkOrderItem",
+        });
       }
     }
     class CpkOrderItem extends Base {
@@ -105,10 +109,6 @@ describe("AssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasMany.call(CpkOrder, "cpkOrderItems", {
-      foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
-      className: "CpkOrderItem",
-    });
     registerModel("CpkOrder", CpkOrder);
     registerModel("CpkOrderItem", CpkOrderItem);
     const order = await CpkOrder.create({ shop_id: 1, id: 1, status: "open" });
@@ -1477,6 +1477,7 @@ describe("PreloaderTest", () => {
     class PKAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("pkPosts", { className: "PKPost", foreignKey: "author_id" });
       }
     }
     class PKPost extends Base {
@@ -1484,10 +1485,6 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
-    Associations.hasMany.call(PKAuthor, "pkPosts", {
-      className: "PKPost",
-      foreignKey: "author_id",
-    });
     registerModel("PKAuthor", PKAuthor);
     registerModel("PKPost", PKPost);
 
@@ -1505,6 +1502,7 @@ describe("PreloaderTest", () => {
     class PKQAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("pkqPosts", { className: "PKQPost", foreignKey: "author_id" });
       }
     }
     class PKQPost extends Base {
@@ -1512,10 +1510,6 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
-    Associations.hasMany.call(PKQAuthor, "pkqPosts", {
-      className: "PKQPost",
-      foreignKey: "author_id",
-    });
     registerModel("PKQAuthor", PKQAuthor);
     registerModel("PKQPost", PKQPost);
 
@@ -1538,12 +1532,9 @@ describe("PreloaderTest", () => {
     class PKBPost extends Base {
       static {
         this._tableName = "posts";
+        this.belongsTo("pkbAuthor", { className: "PKBAuthor", foreignKey: "author_id" });
       }
     }
-    Associations.belongsTo.call(PKBPost, "pkbAuthor", {
-      className: "PKBAuthor",
-      foreignKey: "author_id",
-    });
     registerModel("PKBAuthor", PKBAuthor);
     registerModel("PKBPost", PKBPost);
 
@@ -1566,12 +1557,9 @@ describe("PreloaderTest", () => {
     class PKBAPost extends Base {
       static {
         this._tableName = "posts";
+        this.belongsTo("pkbaAuthor", { className: "PKBAAuthor", foreignKey: "author_id" });
       }
     }
-    Associations.belongsTo.call(PKBAPost, "pkbaAuthor", {
-      className: "PKBAAuthor",
-      foreignKey: "author_id",
-    });
     registerModel("PKBAAuthor", PKBAAuthor);
     registerModel("PKBAPost", PKBAPost);
 
@@ -1596,12 +1584,9 @@ describe("PreloaderTest", () => {
     class PTLBPost extends Base {
       static {
         this._tableName = "posts";
+        this.belongsTo("ptlbAuthor", { className: "PTLBAuthor", foreignKey: "author_id" });
       }
     }
-    Associations.belongsTo.call(PTLBPost, "ptlbAuthor", {
-      className: "PTLBAuthor",
-      foreignKey: "author_id",
-    });
     registerModel("PTLBAuthor", PTLBAuthor);
     registerModel("PTLBPost", PTLBPost);
 
@@ -1619,6 +1604,7 @@ describe("PreloaderTest", () => {
     class PTLCAuthor extends Base {
       static {
         this._tableName = "authors";
+        this.hasMany("ptlcPosts", { className: "PTLCPost", foreignKey: "author_id" });
       }
     }
     class PTLCPost extends Base {
@@ -1626,10 +1612,6 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
-    Associations.hasMany.call(PTLCAuthor, "ptlcPosts", {
-      className: "PTLCPost",
-      foreignKey: "author_id",
-    });
     registerModel("PTLCAuthor", PTLCAuthor);
     registerModel("PTLCPost", PTLCPost);
 
