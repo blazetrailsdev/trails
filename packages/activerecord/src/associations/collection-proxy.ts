@@ -306,6 +306,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return records.find(fn);
   }
 
+  // Mirrors Ruby's Enumerable#sort_by: a new array sorted ascending by the
+  // block's return key (stable, non-mutating). Like detect above, Rails reaches
+  // sort_by via Enumerable → Relation#records → CollectionProxy#load_target
+  // (collection_proxy.rb:1024), so override Relation#sortBy to load through
+  // loadTarget() — hydrating the target and its loaded-state side effects —
+  // rather than the inherited toArray() path.
+  async sortBy(key: (record: T) => any): Promise<T[]> {
+    const records = await this.loadTarget();
+    return records
+      .map((record, index) => ({ record, index, sortKey: key(record) }))
+      .sort((a, b) => {
+        if (a.sortKey < b.sortKey) return -1;
+        if (a.sortKey > b.sortKey) return 1;
+        return a.index - b.index;
+      })
+      .map((entry) => entry.record);
+  }
+
   // every has the standard type-predicate overload from Array<T>.
   every<S extends T>(
     predicate: (record: T, index: number, all: T[]) => record is S,
