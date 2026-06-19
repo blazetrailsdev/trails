@@ -219,11 +219,10 @@ export class Coder {
     if (this.legacySerializer) return this.serializer.dumpCompressed!(entry, threshold);
 
     const value = entry.value;
-    let type: number;
+    let type = this.typeForString(value);
     let payload: string;
-    if (typeof value === "string") {
-      type = STRING_TYPE;
-      payload = value;
+    if (type !== undefined) {
+      payload = value as string;
     } else {
       type = OBJECT_DUMP_TYPE;
       payload = this.serializer.dump(value);
@@ -235,18 +234,17 @@ export class Coder {
       type |= COMPRESSED_FLAG;
     }
 
-    const header = JSON.stringify([type, entry.expiresAt ?? -1, entry.version]);
+    const version = entry.version === null ? null : this.dumpVersion(entry.version);
+    const header = JSON.stringify([type, entry.expiresAt ?? -1, version]);
     return SIGNATURE + header + HEADER_SEP + payload;
   }
 
   load(dumped: unknown): unknown {
-    if (typeof dumped !== "string" || !dumped.startsWith(SIGNATURE)) {
-      return this.serializer.load(dumped as string);
-    }
+    if (!this.isSignature(dumped)) return this.serializer.load(dumped as string);
 
     const rest = dumped.slice(SIGNATURE.length);
     const sep = rest.indexOf(HEADER_SEP);
-    const [type, rawExpiresAt, version] = JSON.parse(rest.slice(0, sep)) as [
+    const [type, rawExpiresAt, rawVersion] = JSON.parse(rest.slice(0, sep)) as [
       number,
       number,
       string | null,
@@ -254,11 +252,36 @@ export class Coder {
     const payload = rest.slice(sep + 1);
 
     const expiresAt = rawExpiresAt < 0 ? null : rawExpiresAt;
+    const version = rawVersion === null ? null : this.loadVersion(rawVersion);
     const compressor = type & COMPRESSED_FLAG ? this.compressor : null;
     const serializer =
       (type & ~COMPRESSED_FLAG) === STRING_TYPE ? stringDeserializer : this.serializer;
 
     return new (lazyEntryClass())(serializer, compressor, payload, { version, expiresAt });
+  }
+
+  private isSignature(dumped: unknown): dumped is string {
+    return typeof dumped === "string" && dumped.startsWith(SIGNATURE);
+  }
+
+  // Rails keys a String's encoding (UTF-8/BINARY/US-ASCII) to a type byte so the
+  // value is stored as the payload verbatim. JS strings carry no encoding tag,
+  // so every string takes the single fast path; anything else returns undefined
+  // and falls through to the serializer.
+  private typeForString(value: unknown): number | undefined {
+    return typeof value === "string" ? STRING_TYPE : undefined;
+  }
+
+  // Rails packs the version, Marshal-encoding non-UTF-8 / Marshal-signature
+  // strings. trails carries the version as a plain string in the JSON header, so
+  // there is nothing to pack — the analog is the identity, and Rails'
+  // Marshal-version branch is N/A here (no Ruby wire).
+  private dumpVersion(version: string): string {
+    return version;
+  }
+
+  private loadVersion(dumpedVersion: string): string {
+    return dumpedVersion;
   }
 
   private tryCompress(payload: string, threshold: number): string | undefined {
