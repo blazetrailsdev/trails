@@ -104,6 +104,23 @@ describe("ComparisonValidationTest", () => {
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
+  it("validates comparison non-ArgumentError propagates", () => {
+    class Person extends Model {
+      static {
+        this.attribute("score", "integer");
+        this.validates("score", {
+          comparison: {
+            greaterThan: () => {
+              throw new TypeError("unexpected");
+            },
+          },
+        });
+      }
+    }
+    const p = new Person({ score: 5 });
+    expect(() => p.isValid()).toThrow(TypeError);
+  });
+
   it("validates comparison of no options", () => {
     expect(() => {
       class Person extends Model {
