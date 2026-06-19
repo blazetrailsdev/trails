@@ -295,7 +295,21 @@ export function validates(
     // Uniqueness needs a DB round-trip, so it routes to the deferred
     // _asyncValidations registry via validatesUniqueness rather than the
     // synchronous validatesWith chain (matching Rails' UniquenessValidator).
-    const { attributes: _attributes, ...uniqOpts } = buildOpts(opts);
+    //
+    // Drop the context-guard keys (`on`/`if`/`unless`/`strict`): the async path
+    // (`_runAsyncValidations`) invokes `validateEach` directly and never wires
+    // up the `validatesWith` context guard, so forwarding them would silently
+    // imply support that doesn't exist. Stripping them keeps the limitation
+    // explicit. Tracked for convergence:
+    // 0030/async-validations-honor-validation-context.
+    const {
+      attributes: _attributes,
+      on: _on,
+      if: _if,
+      unless: _unless,
+      strict: _strict,
+      ...uniqOpts
+    } = buildOpts(opts) as Record<string, unknown>;
     validatesUniqueness.call(
       this,
       attribute,

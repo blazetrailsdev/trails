@@ -3729,7 +3729,6 @@ describe.skip("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
-  setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
   // Dynamic import so esbuild doesn't rename the bespoke same-named classes
