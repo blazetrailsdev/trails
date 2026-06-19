@@ -197,7 +197,13 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
     await (targetModel as any).ensureSchemaLoaded();
 
-    const foreignKey = assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    // belongs_to keeps the FK on the owner, conventionally `${assoc_name}_id`;
+    // has_one/has_many keep it on the child, conventionally `${owner}_id`.
+    const foreignKey =
+      assocDef.options.foreignKey ??
+      (assocDef.type === "belongsTo"
+        ? `${underscore(assocName)}_id`
+        : `${underscore(ctor.name)}_id`);
 
     // limit-check already fired in assignNestedAttributes (Rails
     // raises synchronously at assign time).

@@ -881,22 +881,10 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
       updateOnly?: boolean;
     } = {},
   ) {
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    class Ship extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Ship, "pirate", { className: "Pirate", foreignKey: "pirate_id" });
-    registerModel("Pirate", Pirate);
-    registerModel("Ship", Ship);
-    acceptsNestedAttributesFor(Ship, "pirate", opts);
-    return { Ship, Pirate };
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+    acceptsNestedAttributesFor(CanonicalShip, "pirate", opts);
+    return { Ship: CanonicalShip, Pirate: CanonicalPirate };
   }
 
   it("should define an attribute writer method for the association", () => {
