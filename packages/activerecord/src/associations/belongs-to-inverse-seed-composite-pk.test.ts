@@ -3,8 +3,8 @@
  * through the holder (`record.association(name).setTarget(target)`) marks the
  * holder loaded, which captures `staleState()` → `foreignKeyNames()`. The
  * target need not be registered in the model registry, since we hold the
- * instance. Before the fix, `associationPrimaryKeys(null)` forced a registry
- * resolve and threw `Model '...' not found in registry`.
+ * instance. Before the fix, the target class was resolved from the registry
+ * (throwing `Model '...' not found`) instead of being read from the instance.
  */
 import { describe, it, expect } from "vitest";
 
