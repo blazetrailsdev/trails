@@ -13,6 +13,8 @@ interface Identifiable {
   isNewRecord(): boolean;
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
+  readAttributeBeforeTypeCast(name: string): unknown;
+  cameFromUser(name: string): boolean;
 }
 
 // ──────────────────────────────────────────────
@@ -149,9 +151,16 @@ export function cacheVersion(this: Identifiable): string | null {
   if (!klass.cacheVersioning) return null;
 
   if ((this as any).hasAttribute?.("updated_at")) {
-    // Mirrors Rails integration.rb:101-107 — reads `updated_at` via the
-    // alias-aware reader, so models aliasing updated_at to a real column
-    // (e.g. legacy_updated_at) still resolve their cache version.
+    // Mirrors Rails integration.rb:100-107. Fast path: when `updated_at` is
+    // still the raw DB string (not type-cast, not user-assigned),
+    // canUseFastCacheVersion reformats it WITHOUT invoking the `updated_at`
+    // type-casting reader. Only user-assigned values fall through to the
+    // alias-aware reader (so models aliasing updated_at to a real column
+    // still resolve their cache version).
+    const raw = this.readAttributeBeforeTypeCast("updated_at");
+    if (canUseFastCacheVersion(this, raw)) {
+      return rawTimestampToCacheVersion(raw as string);
+    }
     const val = this.readAttribute("updated_at");
     if (val instanceof Temporal.Instant) {
       const fmt: string = klass.cacheTimestampFormat ?? "usec";
@@ -230,16 +239,25 @@ export function collectionCacheKey(
 
 // Matches DB timestamp strings in the form "YYYY-MM-DD HH:MM:SS" or
 // "YYYY-MM-DD HH:MM:SS.ffffff" — the only shapes rawTimestampToCacheVersion
-// can reliably strip-and-pad to a 20-char usec key.
-const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/;
+// can reliably strip-and-pad to a 20-char usec key. Rails relies on the
+// connection returning microsecond (≤6 fractional digit) strings; some trails
+// adapters serialize timestamps with sub-microsecond precision (e.g. SQLite
+// stores nanoseconds), which rawTimestampToCacheVersion would NOT truncate
+// (Rails' helper only pads, never trims), yielding a >20-char key. Capping the
+// fractional part at 6 digits keeps the fast path only when it produces the
+// same value the type-casting reader would; longer strings fall through to it.
+const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
 
 /**
  * Returns true when the raw DB timestamp string can be converted directly
  * to a cache version without re-parsing (fast path). Checks: string type,
- * usec format, and expected DB timestamp shape. The UTC-timezone and
- * updatedAtCameFromUser? guards from Rails are omitted — they require an
- * async connection call that can't be made synchronously here; the shape
- * check acts as a partial proxy that prevents broken cache keys.
+ * usec format, not user-assigned, and expected DB timestamp shape. Rails'
+ * `with_connection(&:default_timezone) == :utc` guard is omitted — it requires
+ * an async connection call that can't be made synchronously here; the shape
+ * check acts as a partial proxy that prevents broken cache keys. The
+ * `!updated_at_came_from_user?` guard IS implemented (cameFromUser is sync), so
+ * a user-assigned DB-format string (e.g. `record.updated_at = "2020-01-01
+ * 00:00:00"`) correctly falls through to the type-casting reader.
  *
  * Mirrors: ActiveRecord::Integration#can_use_fast_cache_version? (private)
  *
@@ -249,6 +267,7 @@ export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown)
   if (typeof timestamp !== "string") return false;
   const klass = record.constructor as any;
   if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
+  if (record.cameFromUser("updated_at")) return false;
   return TIMESTAMP_RE.test(timestamp);
 }
 
