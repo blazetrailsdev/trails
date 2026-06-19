@@ -1267,11 +1267,16 @@ export async function loadHasOne(
           ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
           : `${underscore(ctor.name)}_id`));
 
-  // Polymorphic `:as` doesn't model composite owner-PK or composite
-  // FK in Rails. Reject explicitly so the caller gets a clear error
-  // rather than `readAttribute(undefined)` building a broken WHERE.
-  if (options.as && (Array.isArray(primaryKey) || Array.isArray(foreignKey))) {
-    throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+  // Polymorphic `:as` requires a scalar FK. A composite FK is always
+  // rejected. A composite owner PK collapses to "id" when present
+  // (matching Rails' join_id_for); otherwise reject.
+  if (options.as) {
+    if (Array.isArray(foreignKey)) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+    }
+    if (Array.isArray(primaryKey) && !(primaryKey as string[]).includes("id")) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+    }
   }
   // Route through AssociationScope (handles scalar, composite, :as, STI
   // in a single Rails-faithful path). reflection.isCollection() === false
@@ -1492,11 +1497,16 @@ export async function loadHasMany(
           ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
           : `${underscore(ctor.name)}_id`));
 
-  // Polymorphic `:as` doesn't model composite owner-PK or composite
-  // FK in Rails. Reject explicitly so the caller gets a clear error
-  // rather than `readAttribute(undefined)` building a broken WHERE.
-  if (options.as && (Array.isArray(primaryKey) || Array.isArray(foreignKey))) {
-    throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+  // Polymorphic `:as` requires a scalar FK. A composite FK is always
+  // rejected. A composite owner PK collapses to "id" when present
+  // (matching Rails' join_id_for); otherwise reject.
+  if (options.as) {
+    if (Array.isArray(foreignKey)) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+    }
+    if (Array.isArray(primaryKey) && !(primaryKey as string[]).includes("id")) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+    }
   }
   // Route through AssociationScope when we have a reflection registered.
   // AssociationScope handles scalar, composite, polymorphic `:as`, and
@@ -1626,10 +1636,16 @@ export function computeHasManyWhere(
 
   if (options.as) {
     const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
-    if (Array.isArray(foreignKey) || Array.isArray(primaryKey)) {
+    if (Array.isArray(foreignKey)) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
     }
-    const pkValue = record._readAttribute(primaryKey as string);
+    // Collapse CPK to "id" when present (matching Rails' join_id_for).
+    const scalarPk = Array.isArray(primaryKey)
+      ? primaryKey.includes("id")
+        ? "id"
+        : primaryKey[0]
+      : (primaryKey as string);
+    const pkValue = record._readAttribute(scalarPk);
     if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
     return { [foreignKey as string]: pkValue, [typeCol]: polymorphicName(ctor) };
@@ -2289,30 +2305,37 @@ export function buildThroughAssociation(
   }
   const target = new targetModel(attrs);
 
-  // Reject composite keys
-  const ownerFkOption = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-  const ownerPkOption = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-  if (Array.isArray(ownerFkOption) || Array.isArray(ownerPkOption)) {
-    throw new ConfigurationError(
-      "Composite foreignKey/primaryKey is not supported for through associations",
-    );
-  }
-
-  // Build intermediate record with owner FK
   const throughClassName =
     throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
   const throughModel = resolveAssocClass(record, throughAssoc.name, throughClassName);
-  const ownerFk = ownerFkOption as string;
-  const ownerPk = ownerPkOption as string;
   const throughAttrs: Record<string, unknown> = {};
   if (throughAssoc.options.as) {
-    const polyFk = throughAssoc.options.foreignKey
-      ? (throughAssoc.options.foreignKey as string)
-      : `${underscore(throughAssoc.options.as)}_id`;
+    // Polymorphic through: `<as>_id`/`<as>_type` are scalar columns.
+    // Collapse composite PK to "id" if present (matching Rails join_id_for).
+    const rawPolyFk = throughAssoc.options.foreignKey;
+    if (Array.isArray(rawPolyFk)) {
+      throw new ConfigurationError(
+        "Composite foreignKey/primaryKey is not supported for through associations",
+      );
+    }
+    const polyFk = rawPolyFk ?? `${underscore(throughAssoc.options.as)}_id`;
+    const rawOwnerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+    const ownerPk = Array.isArray(rawOwnerPk)
+      ? rawOwnerPk.includes("id")
+        ? "id"
+        : rawOwnerPk[0]
+      : (rawOwnerPk as string);
     throughAttrs[polyFk] = record._readAttribute(ownerPk);
     throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
   } else {
-    throughAttrs[ownerFk] = record._readAttribute(ownerPk);
+    const ownerFkOption = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    const ownerPkOption = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+    if (Array.isArray(ownerFkOption) || Array.isArray(ownerPkOption)) {
+      throw new ConfigurationError(
+        "Composite foreignKey/primaryKey is not supported for through associations",
+      );
+    }
+    throughAttrs[ownerFkOption as string] = record._readAttribute(ownerPkOption as string);
   }
   const through = new throughModel(throughAttrs);
 

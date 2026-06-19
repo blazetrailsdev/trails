@@ -1787,32 +1787,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const idCol = polyFk;
     // The polymorphic schema (`<as>_id`/`<as>_type`) only carries a scalar
-    // owner identifier. Rails' `Reflection#active_record_primary_key`
-    // (reflection.rb:587-604) freely returns a composite-PK array here, and
-    // `check_validity!` (reflection.rb:621) explicitly *skips* the
-    // composite-PK arity check for polymorphic associations — `join_id_for`
-    // (reflection.rb:642-644) then writes an array of values into the
-    // single `<as>_id` column, producing a silently-broken IN-shaped WHERE.
-    // Trails surfaces the misconfiguration as `ConfigurationError` instead:
-    // reject a composite `primaryKey:` outright, and require an explicit
-    // single-column `primaryKey:` when the owner has a composite PK so the
-    // chosen scalar identifier is deliberate, not silently collapsed.
+    // owner identifier. When the owner has a composite PK, Rails' `join_id_for`
+    // (reflection.rb:642-644) collapses to the `id` component when present.
+    // We match that: if the CPK includes "id", use "id"; otherwise the CPK
+    // cannot collapse to a scalar and we raise CompositePrimaryKeyMismatchError.
     const ownerPkOption = throughAssoc.options.primaryKey;
-    if (Array.isArray(ownerPkOption)) {
-      throw new ConfigurationError(
-        `Polymorphic-through "${this._assocName}" cannot use a composite primary key — ` +
-          `the schema only supports a single \`${underscore(asName)}_id\`/\`${underscore(asName)}_type\` pair. ` +
-          `Set \`primaryKey:\` to a single column on the association.`,
-      );
-    }
-    if (ownerPkOption === undefined && Array.isArray(ctor.primaryKey)) {
-      throw new ConfigurationError(
-        `Polymorphic-through "${this._assocName}" requires an explicit single-column ` +
-          `\`primaryKey:\` option because owner "${ctor.name}" has a composite primary key. ` +
-          `The polymorphic schema only stores a single \`${underscore(asName)}_id\` value.`,
-      );
-    }
-    const polyPk = (ownerPkOption ?? (ctor.primaryKey as string)) as string;
+    const resolvedPkOption = Array.isArray(ownerPkOption)
+      ? ownerPkOption.includes("id")
+        ? "id"
+        : ownerPkOption[0]
+      : ownerPkOption;
+    const ctorPk = ctor.primaryKey;
+    const resolvedCtorPk = Array.isArray(ctorPk)
+      ? ctorPk.includes("id")
+        ? "id"
+        : ctorPk[0]
+      : ctorPk;
+    const polyPk = (resolvedPkOption ?? resolvedCtorPk) as string;
     return {
       idCol,
       idValue: this._record._readAttribute(polyPk),

@@ -471,10 +471,10 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany rejects composite primary key with :as polymorphic", async () => {
-    // Rails doesn't support polymorphic :as combined with composite
-    // owner PK / composite FK — the polymorphic FK column is a single
-    // <as>_id by convention. Loaders must throw fast rather than
-    // silently building a broken WHERE via readAttribute(undefined).
+    // A composite owner PK without an "id" component cannot collapse to a
+    // scalar <as>_id value — reject with CompositePrimaryKeyMismatchError.
+    // (When the CPK includes "id", it collapses to "id" matching Rails'
+    // join_id_for; only the no-id case is unrepresentable.)
     const { loadHasMany, CompositePrimaryKeyMismatchError } = await import("../index.js");
     class CpkAsOwner extends Base {
       static {
