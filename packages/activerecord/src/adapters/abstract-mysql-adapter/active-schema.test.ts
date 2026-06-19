@@ -94,16 +94,22 @@ describeIfMysql("Mysql2Adapter", () => {
       }
 
       // Rails `with_real_execute` block: actually create the index against the
-      // canonical `people` table (no stub), confirm introspection sees it, then
-      // verify the `if_not_exists: true` pre-flight short-circuits without raising.
+      // `people` table (no stub), confirm introspection sees it, then verify the
+      // `if_not_exists: true` pre-flight short-circuits without raising. Rails
+      // runs against the seeded schema; this adapter's DB has no `people` table
+      // (the stub assertions above never execute), so create/drop it here.
+      const ss = adapter.schemaStatements();
       try {
+        await ss.createTable("people", { force: true }, (t) => {
+          t.string("first_name");
+        });
         await adapter.addIndex("people", "first_name");
         expect(await adapter.indexExists("people", "first_name")).toBe(true);
         await expect(
           adapter.addIndex("people", "first_name", { ifNotExists: true }),
         ).resolves.toBeUndefined();
       } finally {
-        await adapter.removeIndex("people", "first_name", { ifExists: true });
+        await ss.dropTable("people", { ifExists: true });
       }
 
       await expect(() =>
