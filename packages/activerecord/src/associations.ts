@@ -2777,11 +2777,7 @@ export function setBelongsTo(
   }
   const primaryKey = resolvedPk;
   const foreignKey =
-    options.foreignKey ??
-    options.queryConstraints ??
-    (Array.isArray(primaryKey)
-      ? primaryKey.map((col: string) => `${underscore(assocName)}_${col}`)
-      : `${underscore(assocName)}_id`);
+    options.foreignKey ?? options.queryConstraints ?? `${underscore(assocName)}_id`;
 
   // Rails BelongsToPolymorphicAssociation: `polymorphic_inverse_of` raises
   // when the configured inverse name doesn't resolve on the assigned
