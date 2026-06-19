@@ -30,6 +30,7 @@
 // entry.ts imports `coder` from here; `LazyEntry` extends `Entry` lazily (see
 // lazyEntryClass) so this cyclic import is never dereferenced at module-eval.
 import { Entry } from "./entry.js";
+import { DeserializationError } from "./index.js";
 
 const PREFIX = "~#";
 const UNDEF = "~#u";
@@ -189,6 +190,21 @@ function lazyEntryClass(): NonNullable<typeof lazyEntry> {
         this._resolved = true;
       }
       return this._value;
+    }
+
+    // Mirrors Rails' LazyEntry#mismatched? (coder.rb:114-117): when the version
+    // is not mismatched, force the value so a corrupt payload surfaces — a
+    // DeserializationError then counts as mismatched (a cache miss) rather than
+    // leaving the entry deceptively usable.
+    override isMismatched(version: string | null | undefined): boolean {
+      try {
+        const mismatched = super.isMismatched(version);
+        if (!mismatched) void this.value;
+        return mismatched;
+      } catch (error) {
+        if (error instanceof DeserializationError) return true;
+        throw error;
+      }
     }
   });
 }
