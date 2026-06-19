@@ -63,7 +63,7 @@ export class Association {
     validateThroughReflection(owner.constructor as typeof Base, reflection.name);
     // Rails' `check_validity! → klass → compute_class` raises NameError
     // synchronously in the constructor, so `record.association(:name)` itself
-    // throws rather than `load_target`. Mirrors association.rb:56-58.
+    // throws rather than `load_target`. Mirrors association.rb:41-42.
     this.checkKlass();
   }
 
