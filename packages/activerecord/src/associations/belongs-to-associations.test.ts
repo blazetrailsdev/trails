@@ -24,6 +24,13 @@ import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import {
+  CpkBrokenBook,
+  CpkBrokenBookWithNonCpkOrder,
+  CpkOrderWithSpecialPrimaryKey,
+  CpkNonCpkOrder,
+} from "../test-helpers/models/cpk.js";
+import { CompositePrimaryKeyMismatchError } from "./errors.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -3342,48 +3349,33 @@ describe("BelongsToAssociationsTest", () => {
     expect(account.isNewRecord()).toBe(false);
     expect(account.company_id).toBe(company.id);
   });
-  it("composite primary key malformed association class", async () => {
-    // Verify that defining a belongs_to with a non-existent class name throws at load time
-    class CpkmAccount extends Base {
-      static {
-        this.attribute("company_id", "integer");
-        this.belongsTo("company", {
-          className: "NonExistentModel",
-          foreignKey: "company_id",
-        });
-      }
+  it("composite primary key malformed association class", () => {
+    registerModel(CpkOrderWithSpecialPrimaryKey);
+    const book = new CpkBrokenBook();
+    let error: Error | undefined;
+    try {
+      book.association("order");
+    } catch (e) {
+      error = e as Error;
     }
-    registerModel(CpkmAccount);
-    const account = CpkmAccount.new({ company_id: 1 });
-    // Loading should throw because the model is not registered
-    await expect(
-      loadBelongsTo(account, "company", {
-        className: "NonExistentModel",
-        foreignKey: "company_id",
-      }),
-    ).rejects.toThrow(/not found in registry/);
+    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
+    expect(error?.message).toBe(
+      `Association CpkBrokenBook#order primary key ["shop_id", "status"] doesn't match with foreign key order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
   });
   it("composite primary key malformed association owner class", () => {
-    // Verify that belongs_to association can be defined even with unusual owner
-    class CpkoCompany extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+    registerModel(CpkNonCpkOrder);
+    const book = new CpkBrokenBookWithNonCpkOrder();
+    let error: Error | undefined;
+    try {
+      book.association("order");
+    } catch (e) {
+      error = e as Error;
     }
-    class CpkoAccount extends Base {
-      static {
-        this.attribute("company_id", "integer");
-      }
-    }
-    registerModel(CpkoCompany);
-    registerModel(CpkoAccount);
-    // Defining association should not throw
-    expect(() =>
-      Associations.belongsTo.call(CpkoAccount, "company", {
-        className: "CpkoCompany",
-        foreignKey: "company_id",
-      }),
-    ).not.toThrow();
+    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
+    expect(error?.message).toBe(
+      `Association CpkBrokenBookWithNonCpkOrder#order primary key ["id"] doesn't match with foreign key ["shop_id", "order_id"]. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
   });
   it("association with query constraints assigns id on replacement", async () => {
     class QcCompany extends Base {
