@@ -106,6 +106,15 @@ export interface DatabaseAdapter {
   sanitizeAsSqlComment(value: unknown): string;
 
   /**
+   * Cast a value to be used as a bound parameter of unknown type. Routed
+   * through the connection so the Arel visitor's BoundSqlLiteral path can
+   * cast each scalar before binding (MySQL stringifies numerics/booleans).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#cast_bound_value
+   */
+  castBoundValue(value: unknown): unknown;
+
+  /**
    * Assemble a dialect-specific INSERT statement from an InsertAll Builder.
    * The base adapter handles plain inserts; adapters supporting upsert /
    * skip-duplicates override this.

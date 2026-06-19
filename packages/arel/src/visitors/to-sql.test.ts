@@ -1850,6 +1850,7 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
       quotedTrue: () => "TRUE",
       quotedFalse: () => "FALSE",
       sanitizeAsSqlComment: (v) => v,
+      castBoundValue: (v) => v,
     };
     const sql = new Visitors.ToSql(stubQuoter).compile(users.get("id").eq(1));
     expect(sql).toContain("<<users>>");
@@ -1872,6 +1873,7 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
       quotedTrue: () => "TRUE",
       quotedFalse: () => "FALSE",
       sanitizeAsSqlComment: (v) => v,
+      castBoundValue: (v) => v,
     };
     const bytes = new Uint8Array([0x1f, 0x8b]);
     const node = users.get("payload").eq(bytes);
