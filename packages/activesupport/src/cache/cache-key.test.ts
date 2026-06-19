@@ -1,64 +1,78 @@
 import { describe, it, expect } from "vitest";
+import { expandCacheKey } from "./expand-cache-key.js";
+import { Entry } from "./entry.js";
+import { setEnv, env } from "../process-adapter.js";
+
+function withEnv(kv: Record<string, string>, fn: () => void) {
+  const saved: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(kv)) {
+    saved[k] = env[k];
+    setEnv(k, v);
+  }
+  try {
+    fn();
+  } finally {
+    for (const k of Object.keys(kv)) {
+      setEnv(k, saved[k]);
+    }
+  }
+}
 
 describe("CacheKeyTest", () => {
-  // Simple cache key expansion utility
-  function expandCacheKey(key: unknown, namespace?: string): string {
-    let base: string;
-    if (key === null || key === undefined) {
-      base = "";
-    } else if (typeof key === "boolean") {
-      base = String(key);
-    } else if (Array.isArray(key)) {
-      base = key.map((k) => expandCacheKey(k)).join("/");
-    } else if (typeof key === "object" && key !== null && "cacheKey" in key) {
-      base = (key as { cacheKey(): string }).cacheKey();
-    } else {
-      base = String(key);
-    }
-    return namespace ? `${namespace}/${base}` : base;
-  }
-
   it("entry legacy optional ivars", () => {
-    // A cache entry has a value and optionally expires_at
-    const entry = { value: "hello", expiresAt: null };
-    expect(entry.value).toBe("hello");
-    expect(entry.expiresAt).toBeNull();
+    class LegacyEntry extends Entry {
+      constructor(value: unknown) {
+        super(value);
+      }
+    }
+    const entry = new LegacyEntry("foo");
+    expect(entry.value).toBe("foo");
   });
 
   it("expand cache key", () => {
-    expect(expandCacheKey("foo")).toBe("foo");
-    expect(expandCacheKey("bar/baz")).toBe("bar/baz");
+    expect(expandCacheKey([1, "2", true])).toBe("1/2/true");
+    expect(expandCacheKey([1, "2", true], "name")).toBe("name/1/2/true");
   });
 
   it("expand cache key with rails cache id", () => {
-    expect(expandCacheKey("foo", "myapp")).toBe("myapp/foo");
+    withEnv({ RAILS_CACHE_ID: "c99" }, () => {
+      expect(expandCacheKey("foo")).toBe("c99/foo");
+      expect(expandCacheKey(["foo"])).toBe("c99/foo");
+      expect(expandCacheKey(["foo", "bar"])).toBe("c99/foo/bar");
+      expect(expandCacheKey("foo", "nm")).toBe("nm/c99/foo");
+      expect(expandCacheKey(["foo"], "nm")).toBe("nm/c99/foo");
+      expect(expandCacheKey(["foo", "bar"], "nm")).toBe("nm/c99/foo/bar");
+    });
   });
 
   it("expand cache key with rails app version", () => {
-    expect(expandCacheKey("key", "v1")).toBe("v1/key");
+    withEnv({ RAILS_APP_VERSION: "rails3" }, () => {
+      expect(expandCacheKey("foo")).toBe("rails3/foo");
+    });
   });
 
   it("expand cache key rails cache id should win over rails app version", () => {
-    // When both cache_id and app_version are present, cache_id takes precedence
-    expect(expandCacheKey("key", "app_id")).toBe("app_id/key");
+    withEnv({ RAILS_CACHE_ID: "c99", RAILS_APP_VERSION: "rails3" }, () => {
+      expect(expandCacheKey("foo")).toBe("c99/foo");
+    });
   });
 
   it("expand cache key respond to cache key", () => {
-    const obj = {
+    const key = Object.assign("foo", {
       cacheKey() {
-        return "custom/key";
+        return "foo_key";
       },
-    };
-    expect(expandCacheKey(obj)).toBe("custom/key");
+    });
+    expect(expandCacheKey(key)).toBe("foo_key");
   });
 
   it("expand cache key array with something that responds to cache key", () => {
-    const obj = {
+    const key = Object.assign("foo", {
       cacheKey() {
-        return "obj-1";
+        return "foo_key";
       },
-    };
-    expect(expandCacheKey([obj, "extra"])).toBe("obj-1/extra");
+    });
+    expect(expandCacheKey([key])).toBe("foo_key");
   });
 
   it("expand cache key of nil", () => {
@@ -74,7 +88,18 @@ describe("CacheKeyTest", () => {
   });
 
   it("expand cache key of array like object", () => {
-    const arrayLike = ["a", "b", "c"];
-    expect(expandCacheKey(arrayLike)).toBe("a/b/c");
+    expect(expandCacheKey(["foo", "bar", "baz"].values())).toBe("foo/bar/baz");
+  });
+
+  it("expand cache key prefers cache key with version over cache key", () => {
+    const key = {
+      cacheKeyWithVersion() {
+        return "versioned_key";
+      },
+      cacheKey() {
+        return "plain_key";
+      },
+    };
+    expect(expandCacheKey(key)).toBe("versioned_key");
   });
 });
