@@ -173,6 +173,28 @@ describe("AutomaticInverseFindingTests", () => {
   it("has one and belongs to with non default foreign key should not find inverse automatically", async () => {
     const user = await User.create({});
     const ownedRoom = await Room.create({ owner_id: (user as any).id });
+    const getterSrc = Object.getOwnPropertyDescriptor((User as any).prototype, "room")
+      ?.get?.toString()
+      .slice(0, 80);
+    const preloadedHas = (user as any)._preloadedAssociations?.has("room");
+    const preloadedVal = (user as any)._preloadedAssociations?.get("room");
+    const assocInst = (user as any)._associationInstances?.get("room");
+
+    console.error("DIAG user.room getter:", getterSrc);
+
+    console.error(
+      "DIAG user preloaded room:",
+      preloadedHas,
+      typeof preloadedVal,
+      String(preloadedVal),
+    );
+
+    console.error(
+      "DIAG user assocInst room:",
+      typeof assocInst,
+      assocInst?.target?.constructor?.name,
+      String(assocInst?.target),
+    );
     const roomVal = (user as any).room;
 
     console.error("DIAG room:", typeof roomVal, roomVal?.constructor?.name, String(roomVal));
@@ -223,6 +245,32 @@ describe("AutomaticInverseFindingTests", () => {
     expect(bookReflection.scope).toBeTruthy();
     const book = books("tlg");
     const sub0 = association(book, "subscriptions").build({});
+    const subGetterSrc = Object.getOwnPropertyDescriptor((Subscription as any).prototype, "book")
+      ?.get?.toString()
+      .slice(0, 80);
+    const subPreloadedHas = (sub0 as any)._preloadedAssociations?.has("book");
+    const subPreloadedVal = (sub0 as any)._preloadedAssociations?.get("book");
+    const subAssocInst = (sub0 as any)._associationInstances?.get("book");
+    const subInvCache = subscriptionReflection._inverseNameCache;
+    const bookInvCache = bookReflection._inverseNameCache;
+
+    console.error("DIAG sub.book getter:", subGetterSrc);
+
+    console.error(
+      "DIAG sub preloaded book:",
+      subPreloadedHas,
+      typeof subPreloadedVal,
+      String(subPreloadedVal),
+    );
+
+    console.error(
+      "DIAG sub assocInst book:",
+      typeof subAssocInst,
+      subAssocInst?.target?.constructor?.name,
+      String(subAssocInst?.target),
+    );
+
+    console.error("DIAG invCaches sub/book:", subInvCache, bookInvCache);
     const bookVal = (sub0 as any).book;
 
     console.error("DIAG sub.book:", typeof bookVal, bookVal?.constructor?.name, String(bookVal));
@@ -1021,6 +1069,28 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("child instance should be shared with replaced via accessor parent", async () => {
     const face = faces("confused");
+    const phGetterSrc = Object.getOwnPropertyDescriptor((Face as any).prototype, "polymorphicHuman")
+      ?.get?.toString()
+      .slice(0, 80);
+    const phPreloadedHas = (face as any)._preloadedAssociations?.has("polymorphicHuman");
+    const phPreloadedVal = (face as any)._preloadedAssociations?.get("polymorphicHuman");
+    const phAssocInst = (face as any)._associationInstances?.get("polymorphicHuman");
+
+    console.error("DIAG face.polymorphicHuman getter:", phGetterSrc);
+
+    console.error(
+      "DIAG face preloaded ph:",
+      phPreloadedHas,
+      typeof phPreloadedVal,
+      String(phPreloadedVal),
+    );
+
+    console.error(
+      "DIAG face assocInst ph:",
+      typeof phAssocInst,
+      phAssocInst?.target?.constructor?.name,
+      String(phAssocInst?.target),
+    );
     const phVal = (face as any).polymorphicHuman;
 
     console.error("DIAG polymorphicHuman:", typeof phVal, phVal?.constructor?.name, String(phVal));
