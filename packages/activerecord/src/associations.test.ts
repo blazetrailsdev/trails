@@ -585,7 +585,7 @@ describe("PreloaderTest", () => {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      // wave-3 deferred: through/polymorphic-taggings tests, SL (favorites join), PP, PWTISS
+      // wave-3 deferred: through/polymorphic-taggings tests (GMM/GGT/GAT/PT), SL (favorites join), PP
       gat_posts: { title: "string" },
       gat_taggings: { gat_post_id: "integer", gat_tag_id: "integer" },
       gat_tags: { name: "string" },
