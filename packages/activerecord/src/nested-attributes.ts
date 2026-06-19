@@ -7,7 +7,11 @@ import {
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
-import { isMarkedForDestruction, markForDestruction } from "./autosave-association.js";
+import {
+  isMarkedForDestruction,
+  markForDestruction,
+  defineAutosaveValidationCallbacks,
+} from "./autosave-association.js";
 import { BooleanType } from "@blazetrails/activemodel";
 
 /**
@@ -79,6 +83,21 @@ export function acceptsNestedAttributesFor(
   // `acceptsNestedAttributesFor(Model, "assoc")` callers, not only those who
   // also pass `{ autosave: true }` to `hasMany`.
   assocExists.options = { ...assocExists.options, autosave: true };
+
+  // Rails accepts_nested_attributes_for calls `define_autosave_validation_callbacks`
+  // after flipping autosave (nested_attributes.rb:368-370). The association's
+  // own declaration registered the autosave *save* callbacks, but its validation
+  // callback is gated on `reflection.validate?` — false at declaration time for a
+  // plain belongs_to/has_one (autosave not yet set). Re-running it here wires the
+  // nested-record validator so a singular nested association is validated.
+  const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
+  if (reflection) {
+    // Rails `reflection.autosave = true` — flip it on the rich reflection too
+    // (not just the `_associations` entry the save path reads) so
+    // `reflection.validate?` sees it and the validation callback is wired.
+    reflection.autosave = true;
+    defineAutosaveValidationCallbacks(modelClass, reflection);
+  }
 
   // Rails does NOT reject polymorphic belongs_to at declaration time — the
   // check is deferred to build time (the writer raises when it tries to build
