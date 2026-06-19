@@ -170,23 +170,40 @@ function declaredIdsFor(adapter: object): Map<string, Map<string, number | strin
 // the author_addresses rows were inserted. The fixture-data modules import `ref`
 // from this file, so the registry is loaded via a deferred dynamic import (a static
 // import would form an initialization cycle) and primed before any row is resolved.
+//
+// The DB table name is derived by underscoring the registry key, which matches
+// `model.tableName` for ordinary sets but not for the few deliberately-misnamed
+// ones (e.g. `all/namespaced/accounts` -> AdminAccount#admin_accounts). Loading
+// every model to read `tableName` is unsafe (import-time `encrypts()` side effects
+// need add-ons), so when two keys collapse to the same derived table and disagree
+// on a label's id, that label is dropped — resolution falls back to CRC32 rather
+// than guess the wrong pinned id.
 let staticDeclaredIds: Map<string, Map<string, number | string>> | null = null;
 
 async function ensureStaticDeclaredIds(): Promise<void> {
   if (staticDeclaredIds) return;
   const { fixtureRegistry, isJoinTableEntry } = await import("./fixtures-registry.js");
   const map = new Map<string, Map<string, number | string>>();
+  const ambiguous = new Set<string>();
   for (const [key, entry] of Object.entries(fixtureRegistry)) {
     if (isJoinTableEntry(entry)) continue;
     const table = underscore(key.split("/").pop() ?? key);
-    const labelIds = new Map<string, number | string>();
+    let labelIds = map.get(table);
+    if (!labelIds) {
+      labelIds = new Map<string, number | string>();
+      map.set(table, labelIds);
+    }
     for (const [label, attrs] of Object.entries(entry.data)) {
       const id = (attrs as FixtureAttrs).id;
-      if ((typeof id === "number" && Number.isInteger(id)) || typeof id === "string") {
+      if (!((typeof id === "number" && Number.isInteger(id)) || typeof id === "string")) continue;
+      const prior = labelIds.get(label);
+      if (prior !== undefined && prior !== id) {
+        ambiguous.add(`${table} ${label}`);
+        labelIds.delete(label);
+      } else if (!ambiguous.has(`${table} ${label}`)) {
         labelIds.set(label, id);
       }
     }
-    if (labelIds.size > 0) map.set(table, labelIds);
   }
   staticDeclaredIds = map;
 }
