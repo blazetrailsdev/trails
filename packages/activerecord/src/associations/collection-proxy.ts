@@ -1637,11 +1637,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     // Mirror Rails CollectionAssociation#concat: a new-record owner loads the
-    // target up front (`load_target` marks the association loaded; with a null
-    // owner key loadHasMany short-circuits to []) so the pushed records merge
-    // into and are tracked against the in-memory target rather than being lost.
+    // target up front. Rails' `load_target` skips the query entirely for a
+    // new-record owner (`find_target?` is false) and just runs `loaded!`, so we
+    // mark the association loaded over its current in-memory target rather than
+    // routing through the full load path — which would also raise the
+    // strict-loading check that Rails never reaches for a new record.
     if (this._record.isNewRecord() && !this._targetLoaded) {
-      await this.loadTarget();
+      this._targetLoaded = true;
     }
 
     const ctor = this._record.constructor as typeof Base;
