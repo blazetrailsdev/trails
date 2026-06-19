@@ -1780,15 +1780,18 @@ export class ToSql extends Visitor {
   }
 
   private visitBindValue(value: unknown, collector: SQLString): void {
+    // Mirrors Rails' `visit_Arel_Nodes_BoundSqlLiteral` (to_sql.rb:774-790):
+    // non-Arel values are routed through `collector.add_bind` / `add_binds`,
+    // NOT inline-quoted. On the Composite path this yields parameterized SQL
+    // (`topics.id = ?`) plus a bind list — so the prepared-statement template is
+    // reused across values — while the inlining `SubstituteBinds` collector
+    // still renders the quoted literal for `to_sql`.
     if (value instanceof Node) {
       this.visit(value, collector);
     } else if (Array.isArray(value)) {
-      value.forEach((v, i) => {
-        if (i > 0) collector.append(", ");
-        this.visitBindValue(v, collector);
-      });
+      collector.addBinds(value, null, this.bindBlock());
     } else {
-      collector.append(this.quote(value));
+      collector.addBind(value, this.bindBlock());
     }
   }
 

@@ -373,7 +373,9 @@ describe("the to_sql visitor", () => {
     it("ignores excess named parameters", () => {
       const node = new Nodes.BoundSqlLiteral("id = :id", [], { id: 1, extra: 2 });
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("1");
+      // `:id` renders as a `?` placeholder (add_bind), `:extra` is unreferenced
+      // and silently ignored — Rails to_sql_test.rb.
+      expect(sql).toBe("id = ?");
     });
   });
 
@@ -1177,13 +1179,16 @@ describe("the to_sql visitor", () => {
     it("works with positional binds", () => {
       const node = new Nodes.BoundSqlLiteral("id = ?", [1]);
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("id = 1");
+      // Rails: `add_bind` emits the placeholder (BIND_BLOCK = proc { "?" }) into
+      // a plain SQLString collector, so `compile` renders `id = ?`, not the
+      // inlined value (to_sql_test.rb).
+      expect(sql).toBe("id = ?");
     });
 
     it("works with named binds", () => {
       const node = new Nodes.BoundSqlLiteral("id = :id", [], { id: 1 });
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("id = 1");
+      expect(sql).toBe("id = ?");
     });
 
     it("works with array values", () => {
