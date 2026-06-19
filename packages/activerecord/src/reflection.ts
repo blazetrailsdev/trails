@@ -342,13 +342,21 @@ export class AbstractReflection {
         const normFk = (fk: unknown): string[] =>
           Array.isArray(fk) ? fk.map(String) : [String(fk)];
         const btFkNorm = normFk(btFk);
+        // Use a live registry lookup (not self.klass) to avoid poisoning _klassCache
+        // with a stale registry entry during class-definition time (addCounterCacheCallbacks
+        // fires while the module is first loaded, potentially before the target class
+        // is properly registered — a bespoke registration in an earlier test would
+        // otherwise be cached permanently on the reflection's _klassCache).
+        const klassName = self.className;
+        const resolvedKlass = modelRegistry.get(klassName);
+        if (!resolvedKlass) throw new Error(`${klassName} not in registry`);
         const targetAssocs: Array<{ type: string; name: string; options: any }> =
-          (self.klass as any)._associations ?? [];
+          (resolvedKlass as any)._associations ?? [];
         // Match on both class name AND FK so that when a target declares multiple
         // hasManyS to the same class with different FKs (e.g. DogLover has
         // hasMany("trainedDogs") and hasMany("dogs")), we pick the one whose FK
         // matches the belongsTo's FK rather than the first class-name match.
-        const hmDefaultFk = `${underscore((self.klass as any).name)}_id`;
+        const hmDefaultFk = `${underscore((resolvedKlass as any).name)}_id`;
         const inverseHm = targetAssocs.find((a) => {
           if (a.type !== "hasMany") return false;
           if ((a.options.className ?? camelize(singularize(a.name))) !== ownerName) return false;
