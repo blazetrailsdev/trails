@@ -30,7 +30,7 @@ import {
   AuditLog,
   type Developer as DeveloperT,
 } from "./test-helpers/models/developer.js";
-import { Post, FirstPost } from "./test-helpers/models/post.js";
+import { Post, FirstPost, Postesque } from "./test-helpers/models/post.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
@@ -95,10 +95,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.hasMany("cpkOrderItems", {
-          foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
-          className: "CpkOrderItem",
-        });
       }
     }
     class CpkOrderItem extends Base {
@@ -109,6 +105,10 @@ describe("AssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
+    Associations.hasMany.call(CpkOrder, "cpkOrderItems", {
+      foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
+      className: "CpkOrderItem",
+    });
     registerModel("CpkOrder", CpkOrder);
     registerModel("CpkOrderItem", CpkOrderItem);
     const order = await CpkOrder.create({ shop_id: 1, id: 1, status: "open" });
@@ -459,6 +459,7 @@ describe("PreloaderTest", () => {
   let CpkOrderAgreementPL: typeof Base;
   let Dog: typeof Base;
   let EssaySpecial: typeof Base;
+  let PostesquePL: typeof Base;
 
   beforeAll(async () => {
     Author = (await import("./test-helpers/models/author.js")).Author as never;
@@ -493,6 +494,7 @@ describe("PreloaderTest", () => {
     CpkOrderAgreementPL = cpkMod.CpkOrderAgreement as never;
     Dog = (await import("./test-helpers/models/dog.js")).Dog as never;
     EssaySpecial = (await import("./test-helpers/models/essay.js")).EssaySpecial as never;
+    PostesquePL = Postesque as never;
   });
 
   beforeEach(() => {
@@ -522,6 +524,7 @@ describe("PreloaderTest", () => {
     registerModel("CpkOrderAgreement", CpkOrderAgreementPL);
     registerModel("Dog", Dog);
     registerModel("EssaySpecial", EssaySpecial);
+    registerModel("Postesque", PostesquePL);
   });
 
   it("preload with scope", async () => {
@@ -696,96 +699,49 @@ describe("PreloaderTest", () => {
     ]);
   });
   it("preload with instance dependent scope", async () => {
-    class PIDSAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.hasMany("pidsPostsMentioning", {
-          className: "PIDSPost",
-          foreignKey: "author_id",
-          scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
-        });
-      }
-    }
-    class PIDSPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    registerModel("PIDSAuthor", PIDSAuthor);
-    registerModel("PIDSPost", PIDSPost);
-
-    const david = await PIDSAuthor.create({ name: "David" });
-    const david2 = await PIDSAuthor.create({ name: "David" });
-    const bob = await PIDSAuthor.create({ name: "Bob" });
-    const post1 = await PIDSPost.create({ author_id: david.id, title: "Post 1", body: "david" });
-    const post2 = await PIDSPost.create({ author_id: david.id, title: "Post 2", body: "david" });
+    const david = await Author.create({ name: "David" });
+    const david2 = await Author.create({ name: "David" });
+    const bob = await Author.create({ name: "Bob" });
+    const post1 = await Post.create({ author_id: david.id, title: "Post 1", body: "david" });
+    const post2 = await Post.create({ author_id: david.id, title: "Post 2", body: "david" });
 
     await new Preloader({
       records: [david, david2, bob],
-      associations: ["pidsPostsMentioning"],
+      associations: ["postsMentioningAuthor"],
     }).call();
 
-    const davidPosts = (david as any)._preloadedAssociations.get("pidsPostsMentioning") as any[];
-    const david2Posts = (david2 as any)._preloadedAssociations.get("pidsPostsMentioning") as any[];
-    const bobPosts = (bob as any)._preloadedAssociations.get("pidsPostsMentioning") as any[];
+    const davidPosts = (david as any)._preloadedAssociations.get("postsMentioningAuthor") as any[];
+    const david2Posts = (david2 as any)._preloadedAssociations.get(
+      "postsMentioningAuthor",
+    ) as any[];
+    const bobPosts = (bob as any)._preloadedAssociations.get("postsMentioningAuthor") as any[];
 
     expect(davidPosts.map((p: any) => p.id).sort()).toEqual([post1.id, post2.id].sort());
     expect(david2Posts).toEqual([]);
     expect(bobPosts).toEqual([]);
   });
   it("preload with instance dependent through scope", async () => {
-    class PWITSAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.hasMany("pwitsAuthorPosts", {
-          className: "PWITSPost",
-          foreignKey: "author_id",
-        });
-        this.hasMany("pwitsCommentsMentioning", {
-          className: "PWITSComment",
-          through: "pwitsAuthorPosts",
-          source: "pwitsPostComments",
-          scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
-        });
-      }
-    }
-    class PWITSPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.hasMany("pwitsPostComments", {
-          className: "PWITSComment",
-          foreignKey: "post_id",
-        });
-      }
-    }
-    class PWITSComment extends Base {
-      static {
-        this._tableName = "comments";
-      }
-    }
-    registerModel("PWITSAuthor", PWITSAuthor);
-    registerModel("PWITSPost", PWITSPost);
-    registerModel("PWITSComment", PWITSComment);
-
-    const david = await PWITSAuthor.create({ name: "David" });
-    const david2 = await PWITSAuthor.create({ name: "David" });
-    const bob = await PWITSAuthor.create({ name: "Bob" });
-    const davidPost = await PWITSPost.create({ author_id: david.id, title: "Post", body: "body" });
-    const comment1 = await PWITSComment.create({ post_id: davidPost.id, body: "david" });
-    await PWITSComment.create({ post_id: davidPost.id, body: "other" });
+    const david = await Author.create({ name: "David" });
+    const david2 = await Author.create({ name: "David" });
+    const bob = await Author.create({ name: "Bob" });
+    const davidPost = await Post.create({ author_id: david.id, title: "Post", body: "body" });
+    const comment1 = await Comment.create({ post_id: davidPost.id, body: "david" });
+    await Comment.create({ post_id: davidPost.id, body: "other" });
 
     await new Preloader({
       records: [david, david2, bob],
-      associations: ["pwitsCommentsMentioning"],
+      associations: ["commentsMentioningAuthor"],
     }).call();
 
     const davidComments = (david as any)._preloadedAssociations.get(
-      "pwitsCommentsMentioning",
+      "commentsMentioningAuthor",
     ) as any[];
     const david2Comments = (david2 as any)._preloadedAssociations.get(
-      "pwitsCommentsMentioning",
+      "commentsMentioningAuthor",
     ) as any[];
-    const bobComments = (bob as any)._preloadedAssociations.get("pwitsCommentsMentioning") as any[];
+    const bobComments = (bob as any)._preloadedAssociations.get(
+      "commentsMentioningAuthor",
+    ) as any[];
 
     expect(davidComments.map((c: any) => c.id)).toEqual([comment1.id]);
     expect(david2Comments).toEqual([]);
@@ -901,164 +857,61 @@ describe("PreloaderTest", () => {
   });
 
   it("preload groups queries with same scope at second level", async () => {
-    class GSLAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.hasMany("gslThinkingPosts", {
-          className: "GSLPost",
-          foreignKey: "author_id",
-          scope: (rel: any) => rel.where({ title: "Thinking" }),
-        });
-        this.hasMany("gslWelcomePosts", {
-          className: "GSLPost",
-          foreignKey: "author_id",
-          scope: (rel: any) => rel.where({ title: "Welcome" }),
-        });
-      }
-    }
-    class GSLPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.hasMany("gslComments", {
-          className: "GSLComment",
-          foreignKey: "post_id",
-        });
-      }
-    }
-    class GSLComment extends Base {
-      static {
-        this._tableName = "comments";
-      }
-    }
-    registerModel("GSLAuthor", GSLAuthor);
-    registerModel("GSLPost", GSLPost);
-    registerModel("GSLComment", GSLComment);
-    const a = await GSLAuthor.create({ name: "David" });
-    const tp = await GSLPost.create({ title: "Thinking", body: "body", author_id: a.id });
-    const wp = await GSLPost.create({ title: "Welcome", body: "body", author_id: a.id });
-    await GSLComment.create({ body: "c1", post_id: tp.id });
-    await GSLComment.create({ body: "c2", post_id: wp.id });
+    const a = await Author.create({ name: "David" });
+    const tp = await Post.create({ title: "So I was thinking", body: "body", author_id: a.id });
+    const wp = await Post.create({ title: "Welcome to the weblog", body: "body", author_id: a.id });
+    await Comment.create({ body: "c1", post_id: tp.id });
+    await Comment.create({ body: "c2", post_id: wp.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [a],
-      associations: [{ gslThinkingPosts: "gslComments" }, { gslWelcomePosts: "gslComments" }],
+      associations: [{ thinkingPosts: "comments" }, { welcomePosts: "comments" }],
     }).call();
     // 3 batched DB calls: thinking_posts, welcome_posts, then ONE coalesced comments call.
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload groups queries with same sql at second level", async () => {
-    const gseExtension = {
-      mostRecent(this: any) {
-        return this.order("id DESC").first();
-      },
-    };
-    class GSEAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.hasMany("gseThinkingPosts", {
-          className: "GSEPost",
-          foreignKey: "author_id",
-          scope: (rel: any) => rel.where({ title: "Thinking" }),
-        });
-        this.hasMany("gseWelcomePosts", {
-          className: "GSEPost",
-          foreignKey: "author_id",
-          scope: (rel: any) => rel.where({ title: "Welcome" }),
-        });
-      }
-    }
-    class GSEPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.hasMany("gseComments", {
-          className: "GSEComment",
-          foreignKey: "post_id",
-        });
-        this.hasMany("gseCommentsWithExtending", {
-          className: "GSEComment",
-          foreignKey: "post_id",
-          scope: (rel: any) => rel.extending(gseExtension),
-        });
-      }
-    }
-    class GSEComment extends Base {
-      static {
-        this._tableName = "comments";
-      }
-    }
-    // Same SQL as gseComments, differing only by an `extending` module — Rails
-    // excludes `:extending` from `values_for_queries`, so these coalesce.
-    registerModel("GSEAuthor", GSEAuthor);
-    registerModel("GSEPost", GSEPost);
-    registerModel("GSEComment", GSEComment);
-    const a = await GSEAuthor.create({ name: "David" });
-    const tp = await GSEPost.create({ title: "Thinking", body: "body", author_id: a.id });
-    const wp = await GSEPost.create({ title: "Welcome", body: "body", author_id: a.id });
-    await GSEComment.create({ body: "c1", post_id: tp.id });
-    await GSEComment.create({ body: "c2", post_id: wp.id });
+    const a = await Author.create({ name: "David" });
+    const tp = await Post.create({ title: "So I was thinking", body: "body", author_id: a.id });
+    const wp = await Post.create({ title: "Welcome to the weblog", body: "body", author_id: a.id });
+    await Comment.create({ body: "c1", post_id: tp.id });
+    await Comment.create({ body: "c2", post_id: wp.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [a],
-      associations: [
-        { gseThinkingPosts: "gseComments" },
-        { gseWelcomePosts: "gseCommentsWithExtending" },
-      ],
+      associations: [{ thinkingPosts: "comments" }, { welcomePosts: "commentsWithExtending" }],
     }).call();
     // 3 batched DB calls: thinking_posts, welcome_posts, then ONE coalesced
-    // comments call shared by gseComments and gseCommentsWithExtending.
+    // comments call shared by comments and commentsWithExtending (extending excluded from SQL fingerprint).
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload with grouping sets inverse association", async () => {
-    class IAAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.hasMany("iaFavs", {
-          className: "IAFav",
-          foreignKey: "author_id",
-          inverseOf: "iaAuthor",
-        });
-      }
-    }
-    class IAFav extends Base {
-      static {
-        this._tableName = "author_favorites";
-        this.belongsTo("iaAuthor", {
-          className: "IAAuthor",
-          foreignKey: "author_id",
-          inverseOf: "iaFavs",
-        });
-        this.belongsTo("iaFavoriteAuthor", {
-          className: "IAAuthor",
-          foreignKey: "favorite_author_id",
-        });
-      }
-    }
-    registerModel("IAAuthor", IAAuthor);
-    registerModel("IAFav", IAFav);
-    const mary = await IAAuthor.create({ name: "Mary" });
-    const bob = await IAAuthor.create({ name: "Bob" });
-    await IAFav.create({ author_id: mary.id, favorite_author_id: bob.id });
-    const favorites = await IAFav.all().toArray();
+    const mary = await Author.create({ name: "Mary" });
+    const bob = await Author.create({ name: "Bob" });
+    await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
+    const favorites = await AuthorFavorite.all().toArray();
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: favorites,
-      associations: ["iaAuthor", "iaFavoriteAuthor"],
+      associations: ["author", "favoriteAuthor"],
     }).call();
     // Both belongs_to loaders hit the same table with the same scope/key →
     // coalesced into 1 batched query.
     expect(spy).toHaveBeenCalledTimes(1);
     const fav = favorites[0] as any;
-    expect(fav._preloadedAssociations.get("iaAuthor").name).toBe("Mary");
-    expect(fav._preloadedAssociations.get("iaFavoriteAuthor").name).toBe("Bob");
+    expect(fav._preloadedAssociations.get("author").name).toBe("Mary");
+    expect(fav._preloadedAssociations.get("favoriteAuthor").name).toBe("Bob");
     // Mirrors Rails `test_preload_with_grouping_sets_inverse_association`
     // (associations_test.rb:1120): after the coalesced preload, both belongs_to
     // targets are reachable with no further queries. The has_many inverse
-    // (`mary.iaFavs`) is intentionally NOT back-populated — Rails gates that on
-    // `has_many_inversing` (BelongsToAssociation#invertible_for?), which is unset
-    // here, so the loaded author carries no inverse collection.
+    // (`mary.authorFavorites`) is intentionally NOT back-populated — Rails gates
+    // that on `has_many_inversing` (BelongsToAssociation#invertible_for?), which
+    // is unset here, so the loaded author carries no inverse collection.
     spy.mockClear();
-    const reloadedAuthor = (await loadBelongsTo(fav, "iaAuthor", { inverseOf: "iaFavs" })) as any;
-    const reloadedFavorite = (await loadBelongsTo(fav, "iaFavoriteAuthor", {})) as any;
+    const reloadedAuthor = (await loadBelongsTo(fav, "author", {
+      inverseOf: "authorFavorites",
+    })) as any;
+    const reloadedFavorite = (await loadBelongsTo(fav, "favoriteAuthor", {})) as any;
     expect(reloadedAuthor.name).toBe("Mary");
     expect(reloadedFavorite.name).toBe("Bob");
     expect(spy).not.toHaveBeenCalled();
@@ -1134,76 +987,28 @@ describe("PreloaderTest", () => {
     expect(spy.mock.calls.length).toBe(preloadCalls);
   });
   it("preload does not group same class different scope", async () => {
-    class DCAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class DCPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.belongsTo("dcAuthorWithLetterA", {
-          className: "DCAuthor",
-          foreignKey: "author_id",
-          scope: (rel: any) => rel.where({ name: "Alice" }),
-        });
-        this.belongsTo("dcAuthorPlain", {
-          className: "DCAuthor",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    registerModel("DCAuthor", DCAuthor);
-    registerModel("DCPost", DCPost);
-    const alice = await DCAuthor.create({ name: "Alice" });
-    const p1 = await DCPost.create({ title: "P1", body: "body", author_id: alice.id });
-    const p2 = await DCPost.create({ title: "P2", body: "body", author_id: alice.id });
+    const alice = await Author.create({ name: "Alice" });
+    const p1 = await Post.create({ title: "P1", body: "body", author_id: alice.id });
+    const p2 = await Post.create({ title: "P2", body: "body", author_id: alice.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [p1, p2],
-      associations: ["dcAuthorWithLetterA", "dcAuthorPlain"],
+      associations: ["authorWithTheLetterA", "author"],
     }).call();
-    // Same class (DCAuthor), same key, but different scope (WHERE clause vs none) →
+    // Same class (Author), same key, but different scope (LIKE vs none) →
     // must NOT coalesce.
     expect(spy).toHaveBeenCalledTimes(2);
   });
   it("preload does not group same scope different key name", async () => {
-    class DKNAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class DKNPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.belongsTo("dknAuthor", {
-          className: "DKNAuthor",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class DKNPostesque extends Base {
-      static {
-        this._tableName = "postesques";
-        this.belongsTo("dknAuthor", {
-          className: "DKNAuthor",
-          foreignKey: "author_name",
-          primaryKey: "name",
-        });
-      }
-    }
     // Mirrors Rails Postesque.belongs_to :author, foreign_key: :author_name, primary_key: :name.
     // Same scope (no WHERE), same class, but distinct join-primary-key → must NOT coalesce.
-    registerModel("DKNAuthor", DKNAuthor);
-    registerModel("DKNPost", DKNPost);
-    registerModel("DKNPostesque", DKNPostesque);
-    const author = await DKNAuthor.create({ name: "Alice" });
-    const post = await DKNPost.create({ title: "P1", body: "body", author_id: author.id });
-    const postesque = await DKNPostesque.create({ author_name: author.name });
+    const author = await Author.create({ name: "Alice" });
+    const post = await Post.create({ title: "P1", body: "body", author_id: author.id });
+    const postesque = await PostesquePL.create({ author_name: author.name });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [post, postesque],
-      associations: ["dknAuthor"],
+      associations: ["author"],
     }).call();
     expect(spy).toHaveBeenCalledTimes(2);
   });
@@ -1649,10 +1454,6 @@ describe("PreloaderTest", () => {
     class PKAuthor extends Base {
       static {
         this._tableName = "authors";
-        this.hasMany("pkPosts", {
-          className: "PKPost",
-          foreignKey: "author_id",
-        });
       }
     }
     class PKPost extends Base {
@@ -1660,6 +1461,10 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
+    Associations.hasMany.call(PKAuthor, "pkPosts", {
+      className: "PKPost",
+      foreignKey: "author_id",
+    });
     registerModel("PKAuthor", PKAuthor);
     registerModel("PKPost", PKPost);
 
@@ -1677,10 +1482,6 @@ describe("PreloaderTest", () => {
     class PKQAuthor extends Base {
       static {
         this._tableName = "authors";
-        this.hasMany("pkqPosts", {
-          className: "PKQPost",
-          foreignKey: "author_id",
-        });
       }
     }
     class PKQPost extends Base {
@@ -1688,6 +1489,10 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
+    Associations.hasMany.call(PKQAuthor, "pkqPosts", {
+      className: "PKQPost",
+      foreignKey: "author_id",
+    });
     registerModel("PKQAuthor", PKQAuthor);
     registerModel("PKQPost", PKQPost);
 
@@ -1710,12 +1515,12 @@ describe("PreloaderTest", () => {
     class PKBPost extends Base {
       static {
         this._tableName = "posts";
-        this.belongsTo("pkbAuthor", {
-          className: "PKBAuthor",
-          foreignKey: "author_id",
-        });
       }
     }
+    Associations.belongsTo.call(PKBPost, "pkbAuthor", {
+      className: "PKBAuthor",
+      foreignKey: "author_id",
+    });
     registerModel("PKBAuthor", PKBAuthor);
     registerModel("PKBPost", PKBPost);
 
@@ -1738,12 +1543,12 @@ describe("PreloaderTest", () => {
     class PKBAPost extends Base {
       static {
         this._tableName = "posts";
-        this.belongsTo("pkbaAuthor", {
-          className: "PKBAAuthor",
-          foreignKey: "author_id",
-        });
       }
     }
+    Associations.belongsTo.call(PKBAPost, "pkbaAuthor", {
+      className: "PKBAAuthor",
+      foreignKey: "author_id",
+    });
     registerModel("PKBAAuthor", PKBAAuthor);
     registerModel("PKBAPost", PKBAPost);
 
@@ -1768,12 +1573,12 @@ describe("PreloaderTest", () => {
     class PTLBPost extends Base {
       static {
         this._tableName = "posts";
-        this.belongsTo("ptlbAuthor", {
-          className: "PTLBAuthor",
-          foreignKey: "author_id",
-        });
       }
     }
+    Associations.belongsTo.call(PTLBPost, "ptlbAuthor", {
+      className: "PTLBAuthor",
+      foreignKey: "author_id",
+    });
     registerModel("PTLBAuthor", PTLBAuthor);
     registerModel("PTLBPost", PTLBPost);
 
@@ -1791,10 +1596,6 @@ describe("PreloaderTest", () => {
     class PTLCAuthor extends Base {
       static {
         this._tableName = "authors";
-        this.hasMany("ptlcPosts", {
-          className: "PTLCPost",
-          foreignKey: "author_id",
-        });
       }
     }
     class PTLCPost extends Base {
@@ -1802,6 +1603,10 @@ describe("PreloaderTest", () => {
         this._tableName = "posts";
       }
     }
+    Associations.hasMany.call(PTLCAuthor, "ptlcPosts", {
+      className: "PTLCPost",
+      foreignKey: "author_id",
+    });
     registerModel("PTLCAuthor", PTLCAuthor);
     registerModel("PTLCPost", PTLCPost);
 
