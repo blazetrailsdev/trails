@@ -173,21 +173,7 @@ describe("AutomaticInverseFindingTests", () => {
   it("has one and belongs to with non default foreign key should not find inverse automatically", async () => {
     const user = await User.create({});
     const ownedRoom = await Room.create({ owner_id: (user as any).id });
-    const ownRoomDesc = Object.getOwnPropertyDescriptor(user, "room");
-    const userAssocFnSrc =
-      typeof (user as any).association === "function"
-        ? (user as any).association.toString().slice(0, 60)
-        : String((user as any).association);
-
-    console.error(
-      "DIAG user own room prop:",
-      ownRoomDesc ? `val=${String(ownRoomDesc.value)} get=${String(ownRoomDesc.get)}` : "none",
-    );
-    console.error("DIAG user.association fn:", userAssocFnSrc);
-    const roomVal = (user as any).room;
-
-    console.error("DIAG room:", typeof roomVal, roomVal?.constructor?.name, String(roomVal));
-    expect(roomVal).toBeNull();
+    expect(await (user as any).room).toBeNull();
     expect((ownedRoom as any).user).toBeNull();
     expect((await (ownedRoom as any).loadBelongsTo("owner")).id).toBe((user as any).id);
     expect((await (user as any).loadHasOne("ownedRoom")).id).toBe((ownedRoom as any).id);
@@ -228,45 +214,19 @@ describe("AutomaticInverseFindingTests", () => {
   });
 
   it("has many with scoped belongs to does not find inverse automatically", async () => {
+    const book = books("tlg");
+    // Mirror Rails: book.update_attribute(:author_visibility, :invisible) so the scoped
+    // belongs_to query (author_visibility: 0) returns nil even when the FK is set.
+    await (book as any).updateAttribute("author_visibility", 1);
+    expect(await association(book, "subscriptions").build({}).book).toBeNull();
+
     const subscriptionReflection = (Book as any).reflectOnAssociation("subscriptions");
     const bookReflection = (Subscription as any).reflectOnAssociation("book");
     expect(subscriptionReflection.scope).toBeFalsy();
     expect(bookReflection.scope).toBeTruthy();
-    const book = books("tlg");
-    const sub0 = association(book, "subscriptions").build({});
-    const subGetterSrc = Object.getOwnPropertyDescriptor((Subscription as any).prototype, "book")
-      ?.get?.toString()
-      .slice(0, 80);
-    const subPreloadedHas = (sub0 as any)._preloadedAssociations?.has("book");
-    const subPreloadedVal = (sub0 as any)._preloadedAssociations?.get("book");
-    const subAssocInst = (sub0 as any)._associationInstances?.get("book");
-    const subInvCache = subscriptionReflection._inverseNameCache;
-    const bookInvCache = bookReflection._inverseNameCache;
 
-    console.error("DIAG sub.book getter:", subGetterSrc);
-
-    console.error(
-      "DIAG sub preloaded book:",
-      subPreloadedHas,
-      typeof subPreloadedVal,
-      String(subPreloadedVal),
-    );
-
-    console.error(
-      "DIAG sub assocInst book:",
-      typeof subAssocInst,
-      subAssocInst?.target?.constructor?.name,
-      String(subAssocInst?.target),
-    );
-
-    console.error("DIAG invCaches sub/book:", subInvCache, bookInvCache);
-    const bookVal = (sub0 as any).book;
-
-    console.error("DIAG sub.book:", typeof bookVal, bookVal?.constructor?.name, String(bookVal));
-    expect(bookVal).toBeNull();
-    await withAutomaticScopeInversing([bookReflection, subscriptionReflection], () => {
-      const sub = association(book, "subscriptions").build({});
-      expect((sub as any).book).toBeNull();
+    await withAutomaticScopeInversing([bookReflection, subscriptionReflection], async () => {
+      expect(await association(book, "subscriptions").build({}).book).toBeNull();
     });
   });
 
@@ -1058,32 +1018,6 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("child instance should be shared with replaced via accessor parent", async () => {
     const face = faces("confused");
-    const phGetterSrc = Object.getOwnPropertyDescriptor((Face as any).prototype, "polymorphicHuman")
-      ?.get?.toString()
-      .slice(0, 80);
-    const phPreloadedHas = (face as any)._preloadedAssociations?.has("polymorphicHuman");
-    const phPreloadedVal = (face as any)._preloadedAssociations?.get("polymorphicHuman");
-    const phAssocInst = (face as any)._associationInstances?.get("polymorphicHuman");
-
-    console.error("DIAG face.polymorphicHuman getter:", phGetterSrc);
-
-    console.error(
-      "DIAG face preloaded ph:",
-      phPreloadedHas,
-      typeof phPreloadedVal,
-      String(phPreloadedVal),
-    );
-
-    console.error(
-      "DIAG face assocInst ph:",
-      typeof phAssocInst,
-      phAssocInst?.target?.constructor?.name,
-      String(phAssocInst?.target),
-    );
-    const phVal = (face as any).polymorphicHuman;
-
-    console.error("DIAG polymorphicHuman:", typeof phVal, phVal?.constructor?.name, String(phVal));
-    expect(phVal).toBeNull();
     await (face as any).loadBelongsTo("polymorphicHuman");
     expect((face as any).polymorphicHuman).not.toBeNull();
     const newHuman = new Human();
