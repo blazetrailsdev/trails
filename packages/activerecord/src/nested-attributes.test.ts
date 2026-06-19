@@ -1656,16 +1656,16 @@ describe("should automatically build new associated models for each entry in a h
     registerModel(CanonicalPirate);
     acceptsNestedAttributesFor(CanonicalPirate, "birds");
     const pirate = await CanonicalPirate.create({ catchphrase: "build test" });
-    // Entries without id should build new records
-    assignNestedAttributes(pirate, "birds", {
+    // Entries without an id build new, unsaved records (Rails asserts the
+    // built records are not yet persisted before the parent is saved).
+    (pirate as any).birdsAttributes = {
       foo: { name: "Grace OMalley" },
       bar: { name: "Privateers Greed" },
-    });
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.length).toBe(2);
-    const names = birds.map((b: any) => b.name).sort();
-    expect(names).toEqual(["Grace OMalley", "Privateers Greed"]);
+    };
+    const built = (await collectionProxyFor(pirate, "birds").loadTarget()) as CanonicalBird[];
+    expect(built.length).toBe(2);
+    expect(built.every((b) => !b.isPersisted())).toBe(true);
+    expect(built.map((b) => b.name).sort()).toEqual(["Grace OMalley", "Privateers Greed"]);
   });
 });
 
