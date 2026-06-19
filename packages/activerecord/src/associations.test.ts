@@ -995,7 +995,7 @@ describe("PreloaderTest", () => {
     const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(2);
     for (const p of posts) {
-      expect((p as any)._preloadedAssociations.has("author")).toBe(true);
+      expect(p.association("author").isLoaded()).toBe(true);
     }
   });
 
@@ -1391,9 +1391,9 @@ describe("PreloaderTest", () => {
 
     const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any)._preloadedAssociations.get("author");
-    expect(preloaded).toBeDefined();
-    expect(preloaded.name).toBe("Available");
+    const authorAssoc = posts[0]!.association("author");
+    expect(authorAssoc.isLoaded()).toBe(true);
+    expect((authorAssoc.target as any).name).toBe("Available");
   });
 
   it("preload with available records sti", async () => {
@@ -1441,7 +1441,7 @@ describe("PreloaderTest", () => {
     const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(2);
     // Both should have preloaded authors
-    const names = posts.map((p: any) => p._preloadedAssociations.get("author")?.name);
+    const names = posts.map((p) => (p.association("author").target as any)?.name);
     expect(names).toContain("A1");
     expect(names).toContain("A2");
   });
@@ -1454,8 +1454,8 @@ describe("PreloaderTest", () => {
     const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(2);
     // Both should point to the same author
-    const author1 = (posts[0] as any)._preloadedAssociations.get("author");
-    const author2 = (posts[1] as any)._preloadedAssociations.get("author");
+    const author1 = posts[0]!.association("author").target as any;
+    const author2 = posts[1]!.association("author").target as any;
     expect(author1.name).toBe("Loaded");
     expect(author2.name).toBe("Loaded");
   });
@@ -1533,7 +1533,7 @@ describe("PreloaderTest", () => {
     // Preload both belongsTo and hasMany
     const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(1);
-    expect((posts[0] as any)._preloadedAssociations.get("author").name).toBe("Auth");
+    expect((posts[0]!.association("author").target as any).name).toBe("Auth");
   });
 
   it("preload with available records queries when scoped", async () => {
@@ -1582,20 +1582,21 @@ describe("PreloaderTest", () => {
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     // Bob doesn't match david's key → still 1 query
     expect(queryCalls).toHaveLength(1);
-    const preloaded = (post as any)._preloadedAssociations.get("author");
+    const preloaded = post.association("author").target as any;
     expect(preloaded?.id).toBe(david.id);
   });
 
   it("preload with unpersisted records no ops", async () => {
-    // Unpersisted record - no id, so preloading should be a no-op
-    const post = new Post({ title: "Unsaved", body: "body", author_id: null });
-    // Manually test that preloading doesn't crash for unpersisted
-    const posts = [post];
-    // The record has no _preloadedAssociations by default or it's empty
-    expect(
-      (post as any)._preloadedAssociations === undefined ||
-        (post as any)._preloadedAssociations.size === 0,
-    ).toBe(true);
+    const author = new Author({});
+    const newPostWithAuthor = new Post({ author });
+    const newPostWithoutAuthor = new Post({});
+    const posts = [newPostWithAuthor, newPostWithoutAuthor];
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: posts, associations: ["author"] }).call();
+      expect(newPostWithAuthor.association("author").target).toBe(author);
+      expect(newPostWithoutAuthor.association("author").target).toBeNull();
+    });
+    expect(sqls).toHaveLength(0);
   });
 
   it("preload wont set the wrong target", async () => {
@@ -1605,7 +1606,7 @@ describe("PreloaderTest", () => {
 
     const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any)._preloadedAssociations.get("author");
+    const preloaded = posts[0]!.association("author").target as any;
     expect(preloaded.name).toBe("Right");
     expect(preloaded.name).not.toBe("Wrong");
   });
