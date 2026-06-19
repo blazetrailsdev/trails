@@ -66,13 +66,10 @@ export class BelongsToAssociation extends SingularAssociation {
    * Set the default value for this association if the current reader is nil.
    * Called by the before_validation callback set up by the builder.
    */
-  default(block: (owner: Base) => Base | null): void {
-    // Rails: `writer(...) if reader.nil?` — reader blocks synchronously.
-    // We check foreignKeyPresent() instead to avoid calling the async-capable
-    // reader getter. Deviation: orphaned FKs (present but no matching record)
-    // won't fire the default; Rails would. This is acceptable — orphaned FKs
-    // are a data-integrity problem, not a legitimate default-setting scenario.
-    if (!this.foreignKeyPresent()) {
+  async default(block: (owner: Base) => Base | null): Promise<void> {
+    // Rails: `writer(...) if reader.nil?` — loads synchronously, fires when nil.
+    // reader returns a Promise when FK is present but unloaded; await resolves it.
+    if ((await this.reader) == null) {
       const value = block(this.owner);
       if (value != null) {
         this.writer(value);
