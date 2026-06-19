@@ -1889,3 +1889,52 @@ describe("attribute_alias arelTable integration", () => {
     expect(attr.name).toBe("username");
   });
 });
+
+describe("AttributeMethodsTest", () => {
+  // Rails: a model that overrides only the writer still gets the generated reader
+  // (activerecord/test/models/bulb.rb:27-29 — color= override, no explicit reader).
+  it("setter-only override does not suppress generated reader", () => {
+    class Widget extends Base {
+      static {
+        this.attribute("color", "string");
+      }
+      set color(v: string) {
+        (this as any).writeAttribute("color", (v as string).toUpperCase());
+      }
+    }
+    (Widget as any).defineAttributeMethods();
+    const desc = Object.getOwnPropertyDescriptor(Widget.prototype, "color");
+    expect(desc?.get).toBeDefined();
+    expect(desc?.set).toBeDefined();
+  });
+
+  it("getter-only override does not suppress generated setter", () => {
+    class Widget extends Base {
+      static {
+        this.attribute("color", "string");
+      }
+      get color(): unknown {
+        return ((this as any).readAttribute("color") as string | null)?.toLowerCase() ?? null;
+      }
+    }
+    (Widget as any).defineAttributeMethods();
+    const desc = Object.getOwnPropertyDescriptor(Widget.prototype, "color");
+    expect(desc?.get).toBeDefined();
+    expect(desc?.set).toBeDefined();
+  });
+
+  it("full accessor override is not clobbered by generation", () => {
+    class Widget extends Base {
+      static {
+        this.attribute("color", "string");
+      }
+      get color(): unknown {
+        return "fixed";
+      }
+      set color(_v: unknown) {}
+    }
+    (Widget as any).defineAttributeMethods();
+    const w = new (Widget as any)();
+    expect(w.color).toBe("fixed");
+  });
+});

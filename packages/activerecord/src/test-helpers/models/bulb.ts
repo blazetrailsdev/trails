@@ -38,13 +38,6 @@ export class Bulb extends Base {
     });
   }
 
-  // Rails overrides only `color=` and keeps the generated attribute reader
-  // (bulb.rb:27-29). Defining a TS setter on the prototype suppresses our
-  // generated `color` getter, so mirror the reader explicitly.
-  get color(): unknown {
-    return this.readAttribute("color");
-  }
-
   set color(color: string) {
     this.writeAttribute("color", color.toUpperCase() + "!");
   }
