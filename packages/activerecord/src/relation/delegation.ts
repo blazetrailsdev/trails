@@ -154,22 +154,66 @@ export function name(): string {
 }
 
 /**
+ * The curated set of `Array` methods CollectionProxy/Relation delegate to their
+ * loaded records, mapped to JS method names.
+ *
+ * Rails delegates only a curated list via `delegate ... to: :records`
+ * (delegation.rb:101) — `to_xml, encode_with, length, each, join, intersect?,
+ * [], &, |, +, -, sample, reverse, rotate, compact, in_groups, in_groups_of,
+ * to_sentence, to_fs, to_formatted_s, as_json, shuffle, split, slice, index,
+ * rindex` — plus the `Enumerable` methods `Relation` mixes in (`map`, `select`,
+ * `find`, `any?`, `all?`, `include?`, `inject`, `sort`, `flat_map`, …). Calls
+ * outside that surface fall through to `method_missing` → `super` and raise
+ * `NoMethodError`.
+ *
+ * We mirror that boundary: only JS `Array.prototype` methods whose behavior maps
+ * to a Rails-reachable method are delegated. Ruby-only entries (`sample`,
+ * `rotate`, `compact`, `in_groups`, `to_sentence`, …) have no JS analogue and
+ * are dropped. JS-only methods absent from Rails (`findIndex`, `flat`,
+ * `copyWithin`, `fill`, `lastIndexOf`, …) are intentionally excluded so they
+ * raise like Rails rather than silently succeeding.
+ */
+const DELEGATED_ARRAY_METHODS = new Set<string>([
+  // curated delegate-to-records list (delegation.rb) → JS equivalents
+  "forEach", // each
+  "join",
+  "reverse",
+  "slice", // slice / []
+  "at", // []
+  "indexOf", // index
+  "concat", // +
+  // Enumerable methods (`Relation` includes Enumerable) with JS analogues
+  "map", // map / collect
+  "filter", // select
+  "find", // detect
+  "some", // any?
+  "every", // all?
+  "includes", // include?
+  "reduce", // inject / reduce
+  "reduceRight",
+  "sort",
+  "flatMap", // flat_map
+]);
+
+/**
  * Array-method delegation — mirrors Rails' `delegate ... to: :records`
  * (delegation.rb): once a property isn't an own/scope/model method,
- * CollectionProxy/Relation route genuine `Array` methods through the loaded
- * records (Ruby's method_missing → `to_a` → `Array#<method>`, e.g.
+ * CollectionProxy/Relation route curated `Array`/`Enumerable` methods through
+ * the loaded records (Ruby's method_missing → `to_a` → `Array#<method>`, e.g.
  * `categories.sort`). JS has no blocking IO, so this reads already-loaded
  * records — await the relation/proxy (or `load()`) first for a fresh load —
  * and operates on a copy of the records so Ruby's non-mutating semantics hold
  * (`sort`, not `sort!`).
  *
- * Returns a bound callable when `prop` names an `Array.prototype` method,
- * otherwise `undefined` so the caller can fall through to its own default.
+ * Returns a bound callable when `prop` names a delegated `Array.prototype`
+ * method, otherwise `undefined` so the caller can fall through to its own
+ * default (and raise for methods Rails would also reject).
  */
 export function delegateArrayMethod(
   prop: string,
   records: () => unknown[],
 ): ((...args: any[]) => unknown) | undefined {
+  if (!DELEGATED_ARRAY_METHODS.has(prop)) return undefined;
   const arrayMethod = (Array.prototype as unknown as Record<string, unknown>)[prop];
   if (typeof arrayMethod !== "function") return undefined;
   return (...args: any[]) => (arrayMethod as (...a: any[]) => unknown).apply([...records()], args);

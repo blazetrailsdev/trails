@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Relation } from "../index.js";
+import { delegateArrayMethod } from "./delegation.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -186,4 +187,28 @@ describe("DelegationTest", () => {
       );
     });
   }); // DelegationCachingTest
+
+  describe("delegateArrayMethod curated list", () => {
+    // Rails delegates only the curated `delegate ... to: :records` set plus the
+    // Enumerable methods `Relation` mixes in (delegation.rb:101); anything else
+    // falls through method_missing → super and raises NoMethodError. trails must
+    // mirror that boundary rather than delegating arbitrary `Array.prototype`
+    // methods (the PR #3497 deviation).
+    const records = () => ["a", "b", "c"];
+
+    it("delegates curated/Enumerable members to the records", () => {
+      for (const method of ["forEach", "join", "reverse", "slice", "map", "sort", "indexOf"]) {
+        expect(typeof delegateArrayMethod(method, records)).toBe("function");
+      }
+      expect(delegateArrayMethod("join", records)!(",")).toBe("a,b,c");
+    });
+
+    it("does not delegate JS-only Array methods absent from Rails", () => {
+      // These raise NoMethodError in Rails; returning undefined lets the proxy
+      // fall through so the call is rejected rather than silently succeeding.
+      for (const method of ["findIndex", "flat", "copyWithin", "fill", "lastIndexOf"]) {
+        expect(delegateArrayMethod(method, records)).toBeUndefined();
+      }
+    });
+  });
 });
