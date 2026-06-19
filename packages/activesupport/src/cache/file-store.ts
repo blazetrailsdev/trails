@@ -66,6 +66,7 @@ export class FileStore implements CacheStore {
       } catch {}
       return null;
     }
+    if (entry.encodedValue === undefined) return null; // old format, treat as miss
     return coder.load(entry.encodedValue);
   }
 
