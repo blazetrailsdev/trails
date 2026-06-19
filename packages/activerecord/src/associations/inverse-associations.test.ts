@@ -173,7 +173,10 @@ describe("AutomaticInverseFindingTests", () => {
   it("has one and belongs to with non default foreign key should not find inverse automatically", async () => {
     const user = await User.create({});
     const ownedRoom = await Room.create({ owner_id: (user as any).id });
-    expect((user as any).room).toBeNull();
+    const roomVal = (user as any).room;
+
+    console.error("DIAG room:", typeof roomVal, roomVal?.constructor?.name, String(roomVal));
+    expect(roomVal).toBeNull();
     expect((ownedRoom as any).user).toBeNull();
     expect((await (ownedRoom as any).loadBelongsTo("owner")).id).toBe((user as any).id);
     expect((await (user as any).loadHasOne("ownedRoom")).id).toBe((ownedRoom as any).id);
@@ -219,7 +222,11 @@ describe("AutomaticInverseFindingTests", () => {
     expect(subscriptionReflection.scope).toBeFalsy();
     expect(bookReflection.scope).toBeTruthy();
     const book = books("tlg");
-    expect((association(book, "subscriptions").build({}) as any).book).toBeNull();
+    const sub0 = association(book, "subscriptions").build({});
+    const bookVal = (sub0 as any).book;
+
+    console.error("DIAG sub.book:", typeof bookVal, bookVal?.constructor?.name, String(bookVal));
+    expect(bookVal).toBeNull();
     await withAutomaticScopeInversing([bookReflection, subscriptionReflection], () => {
       const sub = association(book, "subscriptions").build({});
       expect((sub as any).book).toBeNull();
@@ -1014,7 +1021,10 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("child instance should be shared with replaced via accessor parent", async () => {
     const face = faces("confused");
-    expect((face as any).polymorphicHuman).toBeNull();
+    const phVal = (face as any).polymorphicHuman;
+
+    console.error("DIAG polymorphicHuman:", typeof phVal, phVal?.constructor?.name, String(phVal));
+    expect(phVal).toBeNull();
     await (face as any).loadBelongsTo("polymorphicHuman");
     expect((face as any).polymorphicHuman).not.toBeNull();
     const newHuman = new Human();
