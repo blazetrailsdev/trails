@@ -1273,19 +1273,22 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records sti", async () => {
-    const book = await (Book as any).create({ name: "B" });
-    const essaySpecial = await (EssaySpecial as any).create({ name: "s", book_id: book.id });
+    const book = await (Book as any).create({});
+    const essaySpecial = await (EssaySpecial as any).create({ book_id: book.id });
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({
-      records: [book],
-      associations: "essay",
-      availableRecords: [[essaySpecial]],
-    }).call();
-    const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    expect(queryCalls).toHaveLength(0);
-    const preloaded = (book as any)._preloadedAssociations.get("essay");
-    expect(preloaded).toBe(essaySpecial);
+    expect(book.association("essay").isLoaded()).toBe(false);
+
+    const sqls = await captureSql(async () => {
+      await new Preloader({
+        records: [book],
+        associations: "essay",
+        availableRecords: [[essaySpecial]],
+      }).call();
+    });
+    expect(sqls).toHaveLength(0);
+
+    expect(book.association("essay").isLoaded()).toBe(true);
+    expect(book.association("essay").target).toBe(essaySpecial);
   });
 
   it("preload with only some records available", async () => {
