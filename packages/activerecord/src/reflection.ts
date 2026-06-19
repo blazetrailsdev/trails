@@ -772,7 +772,7 @@ export class AssociationReflection extends MacroReflection {
       if (inv) return String((inv as any).computeForeignKey?.(false) ?? (inv as any).foreignKey);
     }
     const baseName = (this.activeRecord as any)._demodulizedName ?? this.activeRecord.name;
-    return `${underscore(baseName)}_id`;
+    return `${underscore(demodulize(baseName))}_id`;
   }
 
   private deriveFkQueryConstraints(foreignKey: string): string | string[] {

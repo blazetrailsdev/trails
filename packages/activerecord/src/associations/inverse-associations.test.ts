@@ -219,6 +219,7 @@ describe("AutomaticInverseFindingTests", () => {
     expect(subscriptionReflection.scope).toBeFalsy();
     expect(bookReflection.scope).toBeTruthy();
     const book = books("tlg");
+    expect((association(book, "subscriptions").build({}) as any).book).toBeNull();
     await withAutomaticScopeInversing([bookReflection, subscriptionReflection], () => {
       const sub = association(book, "subscriptions").build({});
       expect((sub as any).book).toBeNull();
@@ -1014,10 +1015,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   it("child instance should be shared with replaced via accessor parent", async () => {
     const face = faces("confused");
     expect((face as any).polymorphicHuman).toBeNull();
-    await (face as any).loadBelongsTo("polymorphicHuman", {
-      polymorphic: true,
-      inverseOf: "polymorphicFace",
-    });
+    await (face as any).loadBelongsTo("polymorphicHuman");
     expect((face as any).polymorphicHuman).not.toBeNull();
     const newHuman = new Human();
     (face as any).polymorphicHuman = newHuman;
