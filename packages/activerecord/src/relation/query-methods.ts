@@ -1646,23 +1646,20 @@ export function buildCastValue(name: string, value: unknown): Attribute {
 }
 
 /**
- * Normalize a bind value before handing it to `BoundSqlLiteral`. Mirrors Rails'
- * `build_bound_sql_literal` (query_methods.rb): Arel nodes are rendered to SQL,
- * and Relation-like values (which respond to `toSql`/`toArel` but are not Arel
- * nodes) are inlined as a `SqlLiteral` so `where("id IN (?)", SomeRelation)`
- * produces a subquery rather than reaching `visitBindValue`'s `quote()`.
+ * Normalize a bind value before handing it to `BoundSqlLiteral`. Mirrors the
+ * `ActiveRecord::Relation === value` branch of Rails' `build_bound_sql_literal`
+ * / `build_named_bound_sql_literal` (query_methods.rb): a Relation is inlined as
+ * `Arel.sql(value.to_sql)` so `where("id IN (?)", SomeRelation)` produces a
+ * subquery rather than reaching `visitBindValue`'s `quote()`. Arel nodes are
+ * rendered to SQL the same way (trails passes nodes here where Rails would not).
  * @internal
  */
 function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.Node) {
     return arelSql(this._modelClass.connection.toSql(value));
   }
-  if (
-    value != null &&
-    typeof value === "object" &&
-    (typeof (value as any).toArel === "function" || typeof (value as any).toSql === "function")
-  ) {
-    return arelSql((value as any).toSql());
+  if (isRelationLike(value)) {
+    return arelSql((value as { toSql(): string }).toSql());
   }
   return value;
 }
