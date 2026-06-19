@@ -601,6 +601,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Load and return all associated records.
    */
   async toArray(): Promise<T[]> {
+    // Rails `to_a` runs `merge_target_lists` (preferring in-memory records over
+    // fresh DB rows); we apply the same merge here. We deliberately do NOT
+    // hydrate/cache `_target` or mark the association loaded the way Rails'
+    // `load_target` does: trails' `toArray` is the cache-bypassing re-query path
+    // (the bang-mutation case below re-queries with the mutated scope, and the
+    // through-association destroy path prunes join rows without pruning a cached
+    // `_target`, so a cached `toArray` would return stale rows). Converging
+    // `toArray` onto full `load_target` hydration is tracked separately.
     const results = await this._execLoad();
     return this._mergeTargetLists(results);
   }
