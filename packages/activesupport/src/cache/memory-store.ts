@@ -1,5 +1,5 @@
 import type { CacheOptions, CacheStore } from "./index.js";
-import { type CacheEntry, namespaceKey, isExpired } from "./entry.js";
+import { type CacheEntry, namespaceKey, isExpired } from "./entry-record.js";
 
 export class MemoryStore implements CacheStore {
   private store: Map<string, CacheEntry> = new Map();
