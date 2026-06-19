@@ -343,12 +343,20 @@ export class BelongsToAssociation extends SingularAssociation {
       const qc = queryConstraintsList.call(targetCtor);
       if (qc) return qc;
     }
-    if (record) {
-      const pk = (record.constructor as any).primaryKey;
-      if (pk) return Array.isArray(pk) ? pk : [pk];
+    // Mirrors Rails `BelongsToReflection#association_primary_key`
+    // (reflection.rb:935-938): when the target has a composite primary key of
+    // shape `[<tenant_key>, :id]` (and no query_constraints / explicit
+    // primaryKey), Rails infers the single `"id"` as the association primary
+    // key; only when the composite PK lacks an `"id"` column does it keep the
+    // full array. Without this, the composite FK zip in `replaceKeys` would line
+    // a scalar `<name>_id` FK up against a 2-column target PK.
+    const pk = ((record?.constructor ?? this.klass) as any)?.primaryKey;
+    if (pk) {
+      if (Array.isArray(pk)) {
+        return pk.includes("id") ? ["id"] : pk;
+      }
+      return [pk];
     }
-    const pk = (this.klass as any)?.primaryKey;
-    if (pk) return Array.isArray(pk) ? pk : [pk];
     return ["id"];
   }
 
