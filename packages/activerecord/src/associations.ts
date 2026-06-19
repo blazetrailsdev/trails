@@ -1370,9 +1370,15 @@ export function buildHasOne(
     ? (options.foreignKey ?? `${underscore(options.as)}_id`)
     : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
 
+  if (options.as) {
+    if (Array.isArray(primaryKey) && !(primaryKey as string[]).includes("id")) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, _assocName);
+    }
+  }
+  const effectivePk = options.as && Array.isArray(primaryKey) ? "id" : (primaryKey as string);
   const buildAttrs: Record<string, unknown> = {
     ...attrs,
-    [foreignKey as string]: record._readAttribute(primaryKey as string),
+    [foreignKey as string]: record._readAttribute(effectivePk),
   };
   if (options.as) {
     buildAttrs[`${underscore(options.as)}_type`] = polymorphicName(ctor);
