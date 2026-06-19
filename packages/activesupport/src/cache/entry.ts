@@ -1,5 +1,6 @@
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./index.js";
+import { coder } from "./coder.js";
 
 /** @internal */
 export class Entry {
@@ -77,7 +78,7 @@ export class Entry {
     } else if (typeof value === "string") {
       return byteLength(this._value as string);
     } else {
-      return (this._bytesize ??= byteLength(JSON.stringify(this._value)));
+      return (this._bytesize ??= byteLength(coder.dump(this._value)));
     }
   }
 
@@ -89,8 +90,8 @@ export class Entry {
   // Duplicates the value to protect against accidental cache modifications,
   // unless it is compressed, Numeric, or boolean. Mirrors Rails Entry#dup_value!
   // (entry.rb:105-112). JS strings are immutable so the String branch is a
-  // no-op; non-String values are deep-cloned via the JSON round-trip that
-  // stands in for Marshal here.
+  // no-op; non-String values are deep-cloned via the fidelity Coder round-trip
+  // that stands in for Marshal here.
   dupValueBang(): void {
     if (
       this._value != null &&
@@ -98,7 +99,7 @@ export class Entry {
       !(typeof this._value === "number" || typeof this._value === "boolean")
     ) {
       if (typeof this._value !== "string") {
-        this._value = JSON.parse(JSON.stringify(this._value));
+        this._value = coder.load(coder.dump(this._value));
       }
     }
   }
@@ -129,15 +130,16 @@ export class Entry {
     } else if (typeof this._value === "string") {
       uncompressedSize = byteLength(this._value);
     } else {
-      serialized = JSON.stringify(this._value);
+      serialized = coder.dump(this._value);
       uncompressedSize = byteLength(serialized);
     }
 
     // Mirrors Rails' shape: the threshold is checked against the raw value size
     // (entry.rb:84 `@value.bytesize`) while what actually gets compressed is the
-    // serialized form (entry.rb:90 `Marshal.dump`) — here JSON.
+    // serialized form (entry.rb:90 `Marshal.dump`) — here the trails
+    // Marshal-equivalent fidelity Coder (see coder.ts).
     if (uncompressedSize >= compressThreshold) {
-      serialized ??= JSON.stringify(this._value);
+      serialized ??= coder.dump(this._value);
       const compressed = deflate(serialized);
       // deflate returns a latin1 string (one char per byte), so its byte size is
       // its length; serialized is utf8, counted by byteLength above.
@@ -157,11 +159,11 @@ export class Entry {
   }
 
   // Mirrors Rails Entry#marshal_load (entry.rb:127-130): deserialize, raising
-  // Cache::DeserializationError when the payload is malformed. JSON.parse stands
-  // in for Marshal.load here.
+  // Cache::DeserializationError when the payload is malformed. The trails
+  // Marshal-equivalent fidelity Coder (see coder.ts) stands in for Marshal.load.
   private marshalLoad(payload: string): unknown {
     try {
-      return JSON.parse(payload);
+      return coder.load(payload);
     } catch (error) {
       throw new DeserializationError(error instanceof Error ? error.message : String(error));
     }
