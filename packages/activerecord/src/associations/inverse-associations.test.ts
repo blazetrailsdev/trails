@@ -855,10 +855,12 @@ describe("InverseBelongsToTests", () => {
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("trainspotting");
     const human = (await loadBelongsTo(interest, "human", { inverseOf: "interests" }))!;
-    await (human as any).interests.load();
     // Rails: human.interests.detect { |_iz| _iz.id == interest.id } — block-find
-    // over the loaded CollectionProxy (Enumerable#detect), not the AR PK finder.
-    const iz = (human as any).interests.detect((i: any) => i.id === (interest as any).id) as any;
+    // over the CollectionProxy (Enumerable#detect loads the target), not the AR
+    // PK finder.
+    const iz = (await (human as any).interests.detect(
+      (i: any) => i.id === (interest as any).id,
+    )) as any;
     expect(iz).toBeDefined();
     expect(iz.topic).toBe((interest as any).topic);
     (interest as any).topic = "Eating cheese with a spoon";
@@ -1066,11 +1068,10 @@ describe("InversePolymorphicBelongsToTests", () => {
       polymorphic: true,
       inverseOf: "polymorphicInterests",
     })) as any;
-    await (human as any).polymorphicInterests.load();
     // Rails: human.polymorphic_interests.detect { |_iz| _iz.id == interest.id }
-    const iz = (human as any).polymorphicInterests.detect(
+    const iz = (await (human as any).polymorphicInterests.detect(
       (i: any) => i.id === (interest as any).id,
-    ) as any;
+    )) as any;
     expect(iz).toBeDefined();
     expect(iz.topic).toBe((interest as any).topic);
     (interest as any).topic = "Eating cheese with a spoon";
