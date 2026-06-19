@@ -202,16 +202,25 @@ export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends Thr
 
 export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
   constructor(
-    owner = "",
-    association = "",
-    primaryKey: string | string[] = "",
-    foreignKey: string | string[] = "",
+    owner?: string,
+    association?: string,
+    primaryKey?: string | string[],
+    foreignKey?: string | string[],
   ) {
-    const pk = Array.isArray(primaryKey) ? primaryKey.join(", ") : primaryKey;
-    const fk = Array.isArray(foreignKey) ? foreignKey.join(", ") : foreignKey;
-    super(
-      `Association ${owner}#${association} primary key ${pk} doesn't match with foreign key ${fk}. Please specify query_constraints, or primary_key and foreign_key values.`,
-    );
+    let message: string;
+    if (
+      owner !== undefined &&
+      association !== undefined &&
+      primaryKey !== undefined &&
+      foreignKey !== undefined
+    ) {
+      const pk = Array.isArray(primaryKey) ? primaryKey.join(", ") : primaryKey;
+      const fk = Array.isArray(foreignKey) ? foreignKey.join(", ") : foreignKey;
+      message = `Association ${owner}#${association} primary key ${pk} doesn't match with foreign key ${fk}. Please specify query_constraints, or primary_key and foreign_key values.`;
+    } else {
+      message = "Association primary key doesn't match with foreign key.";
+    }
+    super(message);
     this.name = "CompositePrimaryKeyMismatchError";
   }
 }
