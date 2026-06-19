@@ -20,82 +20,85 @@
 // Coder rather than their own ad-hoc JSON — is tracked as pending convergence
 // by `activesupport-messagepack-port` and `cache-entry-remaining-methods`.
 
-const TYPE_TAG = "__trailsCacheType__";
+// Special values are encoded as a compact 1- or 2-element array whose head is a
+// short sentinel code: `["~#d", 1750000000000]` for a Date, `["~#u"]` for
+// undefined, etc. This keeps per-tag overhead to a handful of bytes (vs. the
+// ~30 a `{ "__type__": …, "value": … }` object would repeat for every Date in
+// a record). Because tags are arrays, plain objects never collide and pass
+// through untouched; only a real array whose head is itself a sentinel string
+// needs escaping (see ARRAY_ESCAPE below).
+const PREFIX = "~#";
+const UNDEF = "~#u";
+const BIGINT = "~#b";
+const DATE = "~#d";
+const NUMBER = "~#n";
+const ARRAY_ESCAPE = "~#a";
 
-interface Tagged {
-  [TYPE_TAG]: "undefined" | "bigint" | "date" | "number" | "object";
-  value?: unknown;
-}
-
-function isPlainTaggable(value: object): boolean {
-  return Object.prototype.hasOwnProperty.call(value, TYPE_TAG);
+function looksTagged(head: unknown): head is string {
+  return typeof head === "string" && head.startsWith(PREFIX);
 }
 
 function encode(value: unknown): unknown {
-  if (value === undefined) return { [TYPE_TAG]: "undefined" } satisfies Tagged;
+  if (value === undefined) return [UNDEF];
   if (value === null) return null;
 
   const type = typeof value;
-  if (type === "bigint") {
-    return { [TYPE_TAG]: "bigint", value: (value as bigint).toString() } satisfies Tagged;
-  }
+  if (type === "bigint") return [BIGINT, (value as bigint).toString()];
   if (type === "number") {
     const n = value as number;
-    if (Number.isNaN(n)) return { [TYPE_TAG]: "number", value: "NaN" } satisfies Tagged;
-    if (n === Infinity) return { [TYPE_TAG]: "number", value: "Infinity" } satisfies Tagged;
-    if (n === -Infinity) return { [TYPE_TAG]: "number", value: "-Infinity" } satisfies Tagged;
+    if (Number.isNaN(n)) return [NUMBER, "NaN"];
+    if (n === Infinity) return [NUMBER, "Infinity"];
+    if (n === -Infinity) return [NUMBER, "-Infinity"];
     return n;
   }
   if (type !== "object") return value;
 
   // boundary: cache values are arbitrary JS objects; a real JS Date must be
   // preserved with full fidelity, so we tag it explicitly here.
-  if (value instanceof Date) {
-    return { [TYPE_TAG]: "date", value: value.getTime() } satisfies Tagged;
+  if (value instanceof Date) return [DATE, value.getTime()];
+
+  if (Array.isArray(value)) {
+    const encoded = value.map(encode);
+    // A genuine array whose head encodes to a sentinel string would be misread
+    // as a tag on the way back, so prefix it with the escape marker.
+    return looksTagged(encoded[0]) ? [ARRAY_ESCAPE, ...encoded] : encoded;
   }
-  if (Array.isArray(value)) return value.map(encode);
 
   const encoded: Record<string, unknown> = {};
   for (const key of Object.keys(value as Record<string, unknown>)) {
     encoded[key] = encode((value as Record<string, unknown>)[key]);
-  }
-  // A real value that happens to carry our sentinel key is escaped so it never
-  // collides with a genuine tag on the way back through decode().
-  if (isPlainTaggable(value as object)) {
-    return { [TYPE_TAG]: "object", value: encoded } satisfies Tagged;
   }
   return encoded;
 }
 
 function decode(node: unknown): unknown {
   if (node === null || typeof node !== "object") return node;
-  if (Array.isArray(node)) return node.map(decode);
 
-  if (isPlainTaggable(node)) {
-    const tagged = node as Tagged;
-    switch (tagged[TYPE_TAG]) {
-      case "undefined":
-        return undefined;
-      case "bigint":
-        return BigInt(tagged.value as string);
-      case "date":
-        // boundary: restoring the JS Date tagged on the way out.
-        return new Date(tagged.value as number);
-      case "number": {
-        const v = tagged.value as string;
-        return v === "NaN" ? NaN : v === "Infinity" ? Infinity : -Infinity;
+  if (Array.isArray(node)) {
+    const head = node[0];
+    if (looksTagged(head)) {
+      switch (head) {
+        case UNDEF:
+          return undefined;
+        case BIGINT:
+          return BigInt(node[1] as string);
+        case DATE:
+          // boundary: restoring the JS Date tagged on the way out.
+          return new Date(node[1] as number);
+        case NUMBER: {
+          const v = node[1] as string;
+          return v === "NaN" ? NaN : v === "Infinity" ? Infinity : -Infinity;
+        }
+        case ARRAY_ESCAPE:
+          return node.slice(1).map(decode);
       }
-      case "object":
-        return decodePlain(tagged.value as Record<string, unknown>);
     }
+    return node.map(decode);
   }
-  return decodePlain(node as Record<string, unknown>);
-}
 
-function decodePlain(node: Record<string, unknown>): Record<string, unknown> {
   const decoded: Record<string, unknown> = {};
   for (const key of Object.keys(node)) {
-    decoded[key] = decode(node[key]);
+    decoded[key] = decode((node as Record<string, unknown>)[key]);
   }
   return decoded;
 }

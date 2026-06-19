@@ -48,11 +48,19 @@ describe("cache coder fidelity", () => {
     expect(roundtrip(value)).toEqual(value);
   });
 
-  it("escapes objects that carry the sentinel key", () => {
-    const value = { __trailsCacheType__: "date", value: "not really a date" };
+  it("escapes arrays whose head collides with a type tag", () => {
+    // A genuine user array that happens to start with a sentinel-looking string
+    // must not be mistaken for a Date/bigint/etc. tag.
+    const value = ["~#d", 1750000000000];
     const result = roundtrip(value);
     expect(result).toEqual(value);
     expect(result).not.toBeInstanceOf(Date);
+  });
+
+  it("leaves objects carrying a tag-like key untouched", () => {
+    // Tags are arrays, so objects never collide regardless of their keys.
+    const value = { "~#d": "not really a date", value: 1 };
+    expect(roundtrip(value)).toEqual(value);
   });
 
   it("leaves plain JSON-safe values untouched", () => {
