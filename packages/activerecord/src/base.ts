@@ -114,6 +114,7 @@ import {
   runAllCallbacks as cbRunAll,
   runAfterCallbacksOnProto as cbRunAfter,
   sanitizeForMassAssignment,
+  shouldValidate,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import {
@@ -566,6 +567,23 @@ function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   // non-all_queries `where` conditions propagate on create.
   const c = ctor as any;
   return !!c.currentScope || (c.defaultScopes?.length ?? 0) > 0 || hasDefaultScopeOverride(ctor);
+}
+
+/**
+ * Mirror of the `on:` context guard that `setOptionsForCallback`
+ * (activemodel/validations/callbacks.ts) installs onto sync validators:
+ * `options[:on].intersect?(Array(o.validation_context))`. Deferred (async)
+ * validators bypass the callback chain, so we re-apply the same intersection
+ * here. No `on:` means the validator runs in every context.
+ */
+function asyncValidationContextMatches(
+  context: string | string[] | null,
+  on: string | string[] | undefined,
+): boolean {
+  if (on == null) return true;
+  const onArr = Array.isArray(on) ? on : [on];
+  const ctxArr = Array.isArray(context) ? context : context == null ? [] : [context];
+  return onArr.some((o) => ctxArr.includes(o));
 }
 
 function _applyScopeAttributes(
@@ -2879,7 +2897,15 @@ export class Base extends Model {
     const asyncValidators: Array<{ attribute: string; options: any }> =
       (ctor as any)._asyncValidations ?? [];
 
+    // The sync validation pass (performValidations) restores _validationContext
+    // to its prior value once it returns, so by the time we reach here it is
+    // null again. Recompute the effective context the same way isValid does so
+    // deferred validators honor on:/if:/unless: like Rails' callback chain.
+    const context = this._validationContext ?? defaultValidationContext.call(this);
+
     for (const { attribute, options } of asyncValidators) {
+      if (!asyncValidationContextMatches(context, options.on)) continue;
+      if (!shouldValidate(this, options)) continue;
       const value = this.readAttribute(attribute);
       if (value === null || value === undefined) continue;
       const validator = new UniquenessValidator({ ...options, attributes: attribute, class: ctor });

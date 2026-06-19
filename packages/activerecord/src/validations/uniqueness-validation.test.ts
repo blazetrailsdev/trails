@@ -1550,4 +1550,84 @@ describe("UniquenessValidationTest", () => {
       }
     }
   });
+
+  it("validatesUniqueness with on create only validates on create", async () => {
+    class Email extends Base {
+      static {
+        this.attribute("address", "string");
+        this.validatesUniqueness("address", { on: "create" });
+      }
+    }
+    await Email.create({ address: "dup@example.com" });
+
+    // create context: duplicate is rejected
+    const created = new Email({ address: "dup@example.com" });
+    expect(await created.save()).toBe(false);
+    expect(created.errors.on("address")).toBeTruthy();
+
+    // update context: uniqueness does not fire, so a duplicate is allowed
+    const persisted = await Email.create({ address: "unique@example.com" });
+    persisted.address = "dup@example.com";
+    expect(await persisted.save()).toBe(true);
+    expect(persisted.errors.empty).toBe(true);
+  });
+
+  it("validatesUniqueness with on update only validates on update", async () => {
+    class Email extends Base {
+      static {
+        this.attribute("address", "string");
+        this.validatesUniqueness("address", { on: "update" });
+      }
+    }
+    await Email.create({ address: "dup@example.com" });
+
+    // create context: uniqueness does not fire, so a duplicate is allowed
+    const created = new Email({ address: "dup@example.com" });
+    expect(await created.save()).toBe(true);
+    expect(created.errors.empty).toBe(true);
+
+    // update context: duplicate is rejected
+    const persisted = await Email.create({ address: "unique@example.com" });
+    persisted.address = "dup@example.com";
+    expect(await persisted.save()).toBe(false);
+    expect(persisted.errors.on("address")).toBeTruthy();
+  });
+
+  it("validates with uniqueness and on create only validates on create", async () => {
+    class Username extends Base {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { uniqueness: true, on: "create" });
+      }
+    }
+    await Username.create({ name: "taken" });
+
+    const created = new Username({ name: "taken" });
+    expect(await created.save()).toBe(false);
+    expect(created.errors.on("name")).toBeTruthy();
+
+    const persisted = await Username.create({ name: "free" });
+    persisted.name = "taken";
+    expect(await persisted.save()).toBe(true);
+    expect(persisted.errors.empty).toBe(true);
+  });
+
+  it("validates with uniqueness and on update only validates on update", async () => {
+    class Username extends Base {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { uniqueness: true, on: "update" });
+      }
+    }
+    await Username.create({ name: "taken" });
+
+    const created = new Username({ name: "taken" });
+    expect(await created.save()).toBe(true);
+    expect(created.errors.empty).toBe(true);
+
+    const persisted = await Username.create({ name: "free" });
+    persisted.name = "taken";
+    expect(await persisted.save()).toBe(false);
+    expect(persisted.errors.on("name")).toBeTruthy();
+  });
 });
