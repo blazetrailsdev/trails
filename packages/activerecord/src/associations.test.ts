@@ -540,13 +540,16 @@ describe("PreloaderTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
-      // Canonical tables for wave-1 PreloaderTest conversions
+      // Canonical tables for PreloaderTest conversions
       authors: canonicalSchema.authors,
       posts: canonicalSchema.posts,
       comments: canonicalSchema.comments,
       books: canonicalSchema.books,
       categories: canonicalSchema.categories,
       categories_posts: canonicalSchema.categories_posts,
+      author_favorites: canonicalSchema.author_favorites,
+      postesques: canonicalSchema.postesques,
+      essays: canonicalSchema.essays,
       cfk_bt_authors: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
@@ -582,11 +585,7 @@ describe("PreloaderTest", () => {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      dc_authors: { name: "string" },
-      dc_posts: { dc_author_id: "integer", title: "string" },
-      dkn_authors: { name: "string" },
-      dkn_postesques: { dkn_author_name: "string" },
-      dkn_posts: { dkn_author_id: "integer", title: "string" },
+      // wave-3 deferred: through/polymorphic-taggings tests, SL (favorites join), PP, PWTISS
       gat_posts: { title: "string" },
       gat_taggings: { gat_post_id: "integer", gat_tag_id: "integer" },
       gat_tags: { name: "string" },
@@ -596,73 +595,22 @@ describe("PreloaderTest", () => {
       gmm_posts: { title: "string" },
       gmm_taggings: { gmm_post_id: "integer", gmm_tag_id: "integer" },
       gmm_tags: { name: "string" },
-      gse_authors: { name: "string" },
-      gse_comments: { body: "string", gse_post_id: "integer" },
-      gse_posts: { gse_author_id: "integer", title: "string" },
-      gsl_authors: { name: "string" },
-      gsl_comments: { body: "string", gsl_post_id: "integer" },
-      gsl_posts: { gsl_author_id: "integer", title: "string" },
-      ia_authors: { name: "string" },
-      ia_favs: { ia_author_id: "integer", ia_favorite_author_id: "integer" },
-      md_comments: { body: "string", origin_id: "integer", origin_type: "string" },
-      mdd_dogs: { name: "string", md_owner_id: "integer", md_owner_type: "string" },
-      mdd_other_dogs: { name: "string", md_owner_id: "integer", md_owner_type: "string" },
-      mdd_comments: { mdd_commentable_id: "integer", mdd_commentable_type: "string" },
-      pa_authors: { name: "string" },
-      pa_posts: { pa_author_id: "integer", title: "string" },
-      pids_authors: { name: "string" },
-      pids_posts: { mention: "string", pids_author_id: "integer" },
-      pk_authors: { name: "string" },
-      pk_posts: { pk_author_id: "integer", title: "string" },
-      pkb_authors: { name: "string" },
-      pkb_posts: { pkb_author_id: "integer", title: "string" },
-      pkba_authors: { name: "string" },
-      pkba_posts: { pkba_author_id: "integer", title: "string" },
-      ptlb_authors: { name: "string" },
-      ptlb_posts: { ptlb_author_id: "integer", title: "string" },
-      ptlc_authors: { name: "string" },
-      ptlc_posts: { ptlc_author_id: "integer", title: "string" },
-      pkq_authors: { name: "string" },
-      pkq_posts: { pkq_author_id: "integer", title: "string" },
-      pl_authors: { name: "string" },
-      pl_posts: { pl_author_id: "integer", title: "string" },
-      pm_authors: { name: "string" },
-      pm_comments: { body: "string", pm_post_id: "integer" },
-      pm_posts: { pm_author_id: "integer", title: "string" },
       pp_author_favorites: { pp_author_id: "integer", pp_favorite_author_id: "integer" },
       pp_authors: { name: "string" },
       pp_comments: { body: "string", pp_post_id: "integer" },
       pp_posts: { pp_author_id: "integer", title: "string" },
       pp_taggings: { pp_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
       pp_tags: { name: "string" },
-      ps_authors: { name: "string" },
-      ps_posts: { ps_author_id: "integer", title: "string" },
       pt_posts: { title: "string" },
       pt_taggings: { pt_post_id: "integer", pt_tag_id: "integer" },
       pt_tags: { name: "string" },
-      pu_authors: { name: "string" },
-      pu_posts: { pu_author_id: "integer", title: "string" },
-      pw_authors: { name: "string" },
-      pw_posts: { pw_author_id: "integer", title: "string" },
-      pwits_authors: { name: "string" },
-      pwits_comments: { mention: "string", pwits_post_id: "integer" },
-      pwits_posts: { pwits_author_id: "integer" },
       pwtiss_authors: { name: "string" },
       pwtiss_comments: { pwtiss_post_id: "integer" },
       pwtiss_posts: { mention: "string", pwtiss_author_id: "integer" },
-      qc_comments: { body: "string", qc_post_id: "integer" },
-      qc_posts: { title: "string" },
-      qi_authors: { name: "string" },
-      qi_posts: { qi_author_id: "integer", title: "string" },
-      qs_authors: { name: "string" },
-      qs_posts: { qs_author_id: "integer", title: "string" },
-      sa_authors: { name: "string" },
-      sa_posts: { sa_author_id: "integer", title: "string" },
       sl_author_favorites: { sl_author_id: "integer", sl_favorite_author_id: "integer" },
       sl_authors: { name: "string" },
       sl_posts: { sl_author_id: "integer", title: "string" },
-      sti_books: { title: "string" },
-      sti_essays: { body: "string", sti_book_id: "integer", type: "string" },
+      // ta/tb essays-through tests cannot use canonical essays (author_id is varchar there)
       ta_authors: { name: "string" },
       ta_categories: { name: "string" },
       ta_essays: { ta_author_id: "integer", ta_category_id: "integer" },
@@ -971,28 +919,27 @@ describe("PreloaderTest", () => {
   it("preload with instance dependent scope", async () => {
     class PIDSAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PIDSPost extends Base {
       static {
-        this.attribute("pids_author_id", "integer");
-        this.attribute("mention", "string");
+        this._tableName = "posts";
       }
     }
     registerModel("PIDSAuthor", PIDSAuthor);
     registerModel("PIDSPost", PIDSPost);
     Associations.hasMany.call(PIDSAuthor, "pidsPostsMentioning", {
       className: "PIDSPost",
-      foreignKey: "pids_author_id",
-      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
+      foreignKey: "author_id",
+      scope: (_rel: any, owner: any) => _rel.where({ title: owner.name.toLowerCase() }),
     });
 
     const david = await PIDSAuthor.create({ name: "David" });
     const david2 = await PIDSAuthor.create({ name: "David" });
     const bob = await PIDSAuthor.create({ name: "Bob" });
-    const post1 = await PIDSPost.create({ pids_author_id: david.id, mention: "david" });
-    const post2 = await PIDSPost.create({ pids_author_id: david.id, mention: "david" });
+    const post1 = await PIDSPost.create({ author_id: david.id, title: "david", body: "body" });
+    const post2 = await PIDSPost.create({ author_id: david.id, title: "david", body: "body" });
 
     await new Preloader({
       records: [david, david2, bob],
@@ -1010,18 +957,17 @@ describe("PreloaderTest", () => {
   it("preload with instance dependent through scope", async () => {
     class PWITSAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PWITSPost extends Base {
       static {
-        this.attribute("pwits_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     class PWITSComment extends Base {
       static {
-        this.attribute("pwits_post_id", "integer");
-        this.attribute("mention", "string");
+        this._tableName = "comments";
       }
     }
     registerModel("PWITSAuthor", PWITSAuthor);
@@ -1029,26 +975,26 @@ describe("PreloaderTest", () => {
     registerModel("PWITSComment", PWITSComment);
     Associations.hasMany.call(PWITSAuthor, "pwitsAuthorPosts", {
       className: "PWITSPost",
-      foreignKey: "pwits_author_id",
+      foreignKey: "author_id",
     });
     Associations.hasMany.call(PWITSPost, "pwitsPostComments", {
       className: "PWITSComment",
-      foreignKey: "pwits_post_id",
+      foreignKey: "post_id",
     });
-    // Instance-dependent scope on through association: filter comments by mention == owner.name
+    // Instance-dependent scope on through association: filter comments by body == owner.name
     Associations.hasMany.call(PWITSAuthor, "pwitsCommentsMentioning", {
       className: "PWITSComment",
       through: "pwitsAuthorPosts",
       source: "pwitsPostComments",
-      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
+      scope: (_rel: any, owner: any) => _rel.where({ body: owner.name.toLowerCase() }),
     });
 
     const david = await PWITSAuthor.create({ name: "David" });
     const david2 = await PWITSAuthor.create({ name: "David" });
     const bob = await PWITSAuthor.create({ name: "Bob" });
-    const davidPost = await PWITSPost.create({ pwits_author_id: david.id });
-    const comment1 = await PWITSComment.create({ pwits_post_id: davidPost.id, mention: "david" });
-    await PWITSComment.create({ pwits_post_id: davidPost.id, mention: "other" });
+    const davidPost = await PWITSPost.create({ author_id: david.id, title: "Post", body: "body" });
+    const comment1 = await PWITSComment.create({ post_id: davidPost.id, body: "david" });
+    await PWITSComment.create({ post_id: davidPost.id, body: "other" });
 
     await new Preloader({
       records: [david, david2, bob],
@@ -1138,25 +1084,24 @@ describe("PreloaderTest", () => {
   it("some already loaded associations", async () => {
     class SAAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class SAPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("sa_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(SAPost, "saAuthor", {
       className: "SAAuthor",
-      foreignKey: "sa_author_id",
+      foreignKey: "author_id",
     });
     registerModel("SAAuthor", SAAuthor);
     registerModel("SAPost", SAPost);
 
     const a = await SAAuthor.create({ name: "Auth" });
-    await SAPost.create({ title: "P1", sa_author_id: a.id });
-    await SAPost.create({ title: "P2", sa_author_id: a.id });
+    await SAPost.create({ title: "P1", body: "body", author_id: a.id });
+    await SAPost.create({ title: "P2", body: "body", author_id: a.id });
 
     // One post already has preloaded, the other doesn't; includes should fill both
     const posts = await SAPost.all().includes("saAuthor").toArray();
@@ -1216,43 +1161,41 @@ describe("PreloaderTest", () => {
   it("preload groups queries with same scope at second level", async () => {
     class GSLAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class GSLPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("gsl_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     class GSLComment extends Base {
       static {
-        this.attribute("body", "string");
-        this.attribute("gsl_post_id", "integer");
+        this._tableName = "comments";
       }
     }
     Associations.hasMany.call(GSLAuthor, "gslThinkingPosts", {
       className: "GSLPost",
-      foreignKey: "gsl_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.where({ title: "Thinking" }),
     });
     Associations.hasMany.call(GSLAuthor, "gslWelcomePosts", {
       className: "GSLPost",
-      foreignKey: "gsl_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.where({ title: "Welcome" }),
     });
     Associations.hasMany.call(GSLPost, "gslComments", {
       className: "GSLComment",
-      foreignKey: "gsl_post_id",
+      foreignKey: "post_id",
     });
     registerModel("GSLAuthor", GSLAuthor);
     registerModel("GSLPost", GSLPost);
     registerModel("GSLComment", GSLComment);
     const a = await GSLAuthor.create({ name: "David" });
-    const tp = await GSLPost.create({ title: "Thinking", gsl_author_id: a.id });
-    const wp = await GSLPost.create({ title: "Welcome", gsl_author_id: a.id });
-    await GSLComment.create({ body: "c1", gsl_post_id: tp.id });
-    await GSLComment.create({ body: "c2", gsl_post_id: wp.id });
+    const tp = await GSLPost.create({ title: "Thinking", body: "body", author_id: a.id });
+    const wp = await GSLPost.create({ title: "Welcome", body: "body", author_id: a.id });
+    await GSLComment.create({ body: "c1", post_id: tp.id });
+    await GSLComment.create({ body: "c2", post_id: wp.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [a],
@@ -1269,50 +1212,48 @@ describe("PreloaderTest", () => {
     };
     class GSEAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class GSEPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("gse_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     class GSEComment extends Base {
       static {
-        this.attribute("body", "string");
-        this.attribute("gse_post_id", "integer");
+        this._tableName = "comments";
       }
     }
     Associations.hasMany.call(GSEAuthor, "gseThinkingPosts", {
       className: "GSEPost",
-      foreignKey: "gse_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.where({ title: "Thinking" }),
     });
     Associations.hasMany.call(GSEAuthor, "gseWelcomePosts", {
       className: "GSEPost",
-      foreignKey: "gse_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.where({ title: "Welcome" }),
     });
     Associations.hasMany.call(GSEPost, "gseComments", {
       className: "GSEComment",
-      foreignKey: "gse_post_id",
+      foreignKey: "post_id",
     });
     // Same SQL as gseComments, differing only by an `extending` module — Rails
     // excludes `:extending` from `values_for_queries`, so these coalesce.
     Associations.hasMany.call(GSEPost, "gseCommentsWithExtending", {
       className: "GSEComment",
-      foreignKey: "gse_post_id",
+      foreignKey: "post_id",
       scope: (rel: any) => rel.extending(gseExtension),
     });
     registerModel("GSEAuthor", GSEAuthor);
     registerModel("GSEPost", GSEPost);
     registerModel("GSEComment", GSEComment);
     const a = await GSEAuthor.create({ name: "David" });
-    const tp = await GSEPost.create({ title: "Thinking", gse_author_id: a.id });
-    const wp = await GSEPost.create({ title: "Welcome", gse_author_id: a.id });
-    await GSEComment.create({ body: "c1", gse_post_id: tp.id });
-    await GSEComment.create({ body: "c2", gse_post_id: wp.id });
+    const tp = await GSEPost.create({ title: "Thinking", body: "body", author_id: a.id });
+    const wp = await GSEPost.create({ title: "Welcome", body: "body", author_id: a.id });
+    await GSEComment.create({ body: "c1", post_id: tp.id });
+    await GSEComment.create({ body: "c2", post_id: wp.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [a],
@@ -1328,34 +1269,33 @@ describe("PreloaderTest", () => {
   it("preload with grouping sets inverse association", async () => {
     class IAAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class IAFav extends Base {
       static {
-        this.attribute("ia_author_id", "integer");
-        this.attribute("ia_favorite_author_id", "integer");
+        this._tableName = "author_favorites";
       }
     }
     Associations.hasMany.call(IAAuthor, "iaFavs", {
       className: "IAFav",
-      foreignKey: "ia_author_id",
+      foreignKey: "author_id",
       inverseOf: "iaAuthor",
     });
     Associations.belongsTo.call(IAFav, "iaAuthor", {
       className: "IAAuthor",
-      foreignKey: "ia_author_id",
+      foreignKey: "author_id",
       inverseOf: "iaFavs",
     });
     Associations.belongsTo.call(IAFav, "iaFavoriteAuthor", {
       className: "IAAuthor",
-      foreignKey: "ia_favorite_author_id",
+      foreignKey: "favorite_author_id",
     });
     registerModel("IAAuthor", IAAuthor);
     registerModel("IAFav", IAFav);
     const mary = await IAAuthor.create({ name: "Mary" });
     const bob = await IAAuthor.create({ name: "Bob" });
-    await IAFav.create({ ia_author_id: mary.id, ia_favorite_author_id: bob.id });
+    await IAFav.create({ author_id: mary.id, favorite_author_id: bob.id });
     const favorites = await IAFav.all().toArray();
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
@@ -1592,29 +1532,28 @@ describe("PreloaderTest", () => {
   it("preload does not group same class different scope", async () => {
     class DCAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class DCPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("dc_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(DCPost, "dcAuthorWithLetterA", {
       className: "DCAuthor",
-      foreignKey: "dc_author_id",
+      foreignKey: "author_id",
       scope: (rel: any) => rel.where({ name: "Alice" }),
     });
     Associations.belongsTo.call(DCPost, "dcAuthorPlain", {
       className: "DCAuthor",
-      foreignKey: "dc_author_id",
+      foreignKey: "author_id",
     });
     registerModel("DCAuthor", DCAuthor);
     registerModel("DCPost", DCPost);
     const alice = await DCAuthor.create({ name: "Alice" });
-    const p1 = await DCPost.create({ title: "P1", dc_author_id: alice.id });
-    const p2 = await DCPost.create({ title: "P2", dc_author_id: alice.id });
+    const p1 = await DCPost.create({ title: "P1", body: "body", author_id: alice.id });
+    const p2 = await DCPost.create({ title: "P2", body: "body", author_id: alice.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [p1, p2],
@@ -1627,37 +1566,36 @@ describe("PreloaderTest", () => {
   it("preload does not group same scope different key name", async () => {
     class DKNAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class DKNPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("dkn_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     class DKNPostesque extends Base {
       static {
-        this.attribute("dkn_author_name", "string");
+        this._tableName = "postesques";
       }
     }
     Associations.belongsTo.call(DKNPost, "dknAuthor", {
       className: "DKNAuthor",
-      foreignKey: "dkn_author_id",
+      foreignKey: "author_id",
     });
     // Mirrors Rails Postesque.belongs_to :author, foreign_key: :author_name, primary_key: :name.
     // Same scope (no WHERE), same class, but distinct join-primary-key → must NOT coalesce.
     Associations.belongsTo.call(DKNPostesque, "dknAuthor", {
       className: "DKNAuthor",
-      foreignKey: "dkn_author_name",
+      foreignKey: "author_name",
       primaryKey: "name",
     });
     registerModel("DKNAuthor", DKNAuthor);
     registerModel("DKNPost", DKNPost);
     registerModel("DKNPostesque", DKNPostesque);
     const author = await DKNAuthor.create({ name: "Alice" });
-    const post = await DKNPost.create({ title: "P1", dkn_author_id: author.id });
-    const postesque = await DKNPostesque.create({ dkn_author_name: author.name });
+    const post = await DKNPost.create({ title: "P1", body: "body", author_id: author.id });
+    const postesque = await DKNPostesque.create({ author_name: author.name });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [post, postesque],
@@ -1734,24 +1672,23 @@ describe("PreloaderTest", () => {
   it("preload with available records", async () => {
     class PAAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PAPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pa_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PAPost, "paAuthor", {
       className: "PAAuthor",
-      foreignKey: "pa_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PAAuthor", PAAuthor);
     registerModel("PAPost", PAPost);
 
     const a = await PAAuthor.create({ name: "Available" });
-    await PAPost.create({ title: "P1", pa_author_id: a.id });
+    await PAPost.create({ title: "P1", body: "body", author_id: a.id });
 
     const posts = await PAPost.all().includes("paAuthor").toArray();
     expect(posts).toHaveLength(1);
@@ -1763,29 +1700,26 @@ describe("PreloaderTest", () => {
   it("preload with available records sti", async () => {
     class StiBook extends Base {
       static {
-        this.attribute("title", "string");
+        this._tableName = "books";
       }
     }
     class StiEssay extends Base {
       static {
-        this.tableName = "sti_essays";
-        this.attribute("body", "string");
-        this.attribute("type", "string");
-        this.attribute("sti_book_id", "integer");
+        this._tableName = "essays";
         this.inheritanceColumn = "type";
       }
     }
     class StiEssaySpecial extends StiEssay {}
     Associations.hasOne.call(StiBook, "essay", {
       className: "StiEssay",
-      foreignKey: "sti_book_id",
+      foreignKey: "book_id",
     });
     registerModel("StiBook", StiBook);
     registerModel("StiEssay", StiEssay);
     registerModel("StiEssaySpecial", StiEssaySpecial);
 
-    const book = await StiBook.create({ title: "B" });
-    const essaySpecial = await StiEssaySpecial.create({ body: "s", sti_book_id: book.id });
+    const book = await StiBook.create({ name: "B" });
+    const essaySpecial = await StiEssaySpecial.create({ name: "s", book_id: book.id });
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({
@@ -1802,26 +1736,25 @@ describe("PreloaderTest", () => {
   it("preload with only some records available", async () => {
     class PSAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PSPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("ps_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PSPost, "psAuthor", {
       className: "PSAuthor",
-      foreignKey: "ps_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PSAuthor", PSAuthor);
     registerModel("PSPost", PSPost);
 
     const a1 = await PSAuthor.create({ name: "A1" });
     const a2 = await PSAuthor.create({ name: "A2" });
-    await PSPost.create({ title: "P1", ps_author_id: a1.id });
-    await PSPost.create({ title: "P2", ps_author_id: a2.id });
+    await PSPost.create({ title: "P1", body: "body", author_id: a1.id });
+    await PSPost.create({ title: "P2", body: "body", author_id: a2.id });
 
     const posts = await PSPost.all().includes("psAuthor").toArray();
     expect(posts).toHaveLength(2);
@@ -1834,25 +1767,24 @@ describe("PreloaderTest", () => {
   it("preload with some records already loaded", async () => {
     class PLAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PLPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pl_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PLPost, "plAuthor", {
       className: "PLAuthor",
-      foreignKey: "pl_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PLAuthor", PLAuthor);
     registerModel("PLPost", PLPost);
 
     const a = await PLAuthor.create({ name: "Loaded" });
-    await PLPost.create({ title: "P1", pl_author_id: a.id });
-    await PLPost.create({ title: "P2", pl_author_id: a.id });
+    await PLPost.create({ title: "P1", body: "body", author_id: a.id });
+    await PLPost.create({ title: "P2", body: "body", author_id: a.id });
 
     const posts = await PLPost.all().includes("plAuthor").toArray();
     expect(posts).toHaveLength(2);
@@ -1974,37 +1906,35 @@ describe("PreloaderTest", () => {
   it("preload with available records with multiple classes", async () => {
     class PMAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PMComment extends Base {
       static {
-        this.attribute("body", "string");
-        this.attribute("pm_post_id", "integer");
+        this._tableName = "comments";
       }
     }
     class PMPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pm_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PMPost, "pmAuthor", {
       className: "PMAuthor",
-      foreignKey: "pm_author_id",
+      foreignKey: "author_id",
     });
 
     Associations.hasMany.call(PMPost, "pmComments", {
       className: "PMComment",
-      foreignKey: "pm_post_id",
+      foreignKey: "post_id",
     });
     registerModel("PMAuthor", PMAuthor);
     registerModel("PMComment", PMComment);
     registerModel("PMPost", PMPost);
 
     const a = await PMAuthor.create({ name: "Auth" });
-    const post = await PMPost.create({ title: "P1", pm_author_id: a.id });
-    await PMComment.create({ body: "C1", pm_post_id: post.id });
+    const post = await PMPost.create({ title: "P1", body: "body", author_id: a.id });
+    await PMComment.create({ body: "C1", post_id: post.id });
 
     // Preload both belongsTo and hasMany
     const posts = await PMPost.all().includes("pmAuthor").toArray();
@@ -2015,24 +1945,23 @@ describe("PreloaderTest", () => {
   it("preload with available records queries when scoped", async () => {
     class QSAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class QSPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("qs_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(QSPost, "author", {
       className: "QSAuthor",
-      foreignKey: "qs_author_id",
+      foreignKey: "author_id",
     });
     registerModel("QSAuthor", QSAuthor);
     registerModel("QSPost", QSPost);
 
     const david = await QSAuthor.create({ name: "David" });
-    const post = await QSPost.create({ title: "P", qs_author_id: david.id });
+    const post = await QSPost.create({ title: "P", body: "body", author_id: david.id });
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({
@@ -2049,24 +1978,23 @@ describe("PreloaderTest", () => {
   it("preload with available records queries when collection", async () => {
     class QCPost extends Base {
       static {
-        this.attribute("title", "string");
+        this._tableName = "posts";
       }
     }
     class QCComment extends Base {
       static {
-        this.attribute("body", "string");
-        this.attribute("qc_post_id", "integer");
+        this._tableName = "comments";
       }
     }
     Associations.hasMany.call(QCPost, "comments", {
       className: "QCComment",
-      foreignKey: "qc_post_id",
+      foreignKey: "post_id",
     });
     registerModel("QCPost", QCPost);
     registerModel("QCComment", QCComment);
 
-    const post = await QCPost.create({ title: "P" });
-    const c1 = await QCComment.create({ body: "c1", qc_post_id: post.id });
+    const post = await QCPost.create({ title: "P", body: "body" });
+    const c1 = await QCComment.create({ body: "c1", post_id: post.id });
     const comments = [c1];
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
@@ -2083,25 +2011,24 @@ describe("PreloaderTest", () => {
   it("preload with available records queries when incomplete", async () => {
     class QIAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class QIPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("qi_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(QIPost, "author", {
       className: "QIAuthor",
-      foreignKey: "qi_author_id",
+      foreignKey: "author_id",
     });
     registerModel("QIAuthor", QIAuthor);
     registerModel("QIPost", QIPost);
 
     const david = await QIAuthor.create({ name: "David" });
     const bob = await QIAuthor.create({ name: "Bob" });
-    const post = await QIPost.create({ title: "P", qi_author_id: david.id });
+    const post = await QIPost.create({ title: "P", body: "body", author_id: david.id });
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({
@@ -2119,24 +2046,23 @@ describe("PreloaderTest", () => {
   it("preload with unpersisted records no ops", async () => {
     class PUAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PUPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pu_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PUPost, "puAuthor", {
       className: "PUAuthor",
-      foreignKey: "pu_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PUAuthor", PUAuthor);
     registerModel("PUPost", PUPost);
 
     // Unpersisted record - no id, so preloading should be a no-op
-    const post = new PUPost({ title: "Unsaved", pu_author_id: null });
+    const post = new PUPost({ title: "Unsaved", body: "body", author_id: null });
     // Manually test that preloading doesn't crash for unpersisted
     const posts = [post];
     // The record has no _preloadedAssociations by default or it's empty
@@ -2149,25 +2075,24 @@ describe("PreloaderTest", () => {
   it("preload wont set the wrong target", async () => {
     class PWAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PWPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pw_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PWPost, "pwAuthor", {
       className: "PWAuthor",
-      foreignKey: "pw_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PWAuthor", PWAuthor);
     registerModel("PWPost", PWPost);
 
     const a1 = await PWAuthor.create({ name: "Right" });
     const a2 = await PWAuthor.create({ name: "Wrong" });
-    await PWPost.create({ title: "P1", pw_author_id: a1.id });
+    await PWPost.create({ title: "P1", body: "body", author_id: a1.id });
 
     const posts = await PWPost.all().includes("pwAuthor").toArray();
     expect(posts).toHaveLength(1);
@@ -2418,24 +2343,23 @@ describe("PreloaderTest", () => {
   it("preload keeps built has many records no ops", async () => {
     class PKAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PKPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pk_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.hasMany.call(PKAuthor, "pkPosts", {
       className: "PKPost",
-      foreignKey: "pk_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PKAuthor", PKAuthor);
     registerModel("PKPost", PKPost);
 
     const author = await PKAuthor.create({ name: "Auth" });
-    await PKPost.create({ title: "P1", pk_author_id: author.id });
+    await PKPost.create({ title: "P1", body: "body", author_id: author.id });
 
     const authors = await PKAuthor.all().includes("pkPosts").toArray();
     expect(authors).toHaveLength(1);
@@ -2447,25 +2371,24 @@ describe("PreloaderTest", () => {
   it("preload keeps built has many records after query", async () => {
     class PKQAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PKQPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pkq_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.hasMany.call(PKQAuthor, "pkqPosts", {
       className: "PKQPost",
-      foreignKey: "pkq_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PKQAuthor", PKQAuthor);
     registerModel("PKQPost", PKQPost);
 
     const author = await PKQAuthor.create({ name: "Auth" });
-    await PKQPost.create({ title: "P1", pkq_author_id: author.id });
-    await PKQPost.create({ title: "P2", pkq_author_id: author.id });
+    await PKQPost.create({ title: "P1", body: "body", author_id: author.id });
+    await PKQPost.create({ title: "P2", body: "body", author_id: author.id });
 
     const authors = await PKQAuthor.all().includes("pkqPosts").toArray();
     expect(authors).toHaveLength(1);
@@ -2476,24 +2399,23 @@ describe("PreloaderTest", () => {
   it("preload keeps built belongs to records no ops", async () => {
     class PKBAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PKBPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pkb_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PKBPost, "pkbAuthor", {
       className: "PKBAuthor",
-      foreignKey: "pkb_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PKBAuthor", PKBAuthor);
     registerModel("PKBPost", PKBPost);
 
     const a = await PKBAuthor.create({ name: "Auth" });
-    await PKBPost.create({ title: "P1", pkb_author_id: a.id });
+    await PKBPost.create({ title: "P1", body: "body", author_id: a.id });
 
     const posts = await PKBPost.all().includes("pkbAuthor").toArray();
     expect(posts).toHaveLength(1);
@@ -2505,26 +2427,25 @@ describe("PreloaderTest", () => {
   it("preload keeps built belongs to records after query", async () => {
     class PKBAAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PKBAPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("pkba_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PKBAPost, "pkbaAuthor", {
       className: "PKBAAuthor",
-      foreignKey: "pkba_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PKBAAuthor", PKBAAuthor);
     registerModel("PKBAPost", PKBAPost);
 
     const a1 = await PKBAAuthor.create({ name: "A1" });
     const a2 = await PKBAAuthor.create({ name: "A2" });
-    await PKBAPost.create({ title: "P1", pkba_author_id: a1.id });
-    await PKBAPost.create({ title: "P2", pkba_author_id: a2.id });
+    await PKBAPost.create({ title: "P1", body: "body", author_id: a1.id });
+    await PKBAPost.create({ title: "P2", body: "body", author_id: a2.id });
 
     const posts = await PKBAPost.all().includes("pkbaAuthor").toArray();
     expect(posts).toHaveLength(2);
@@ -2536,24 +2457,23 @@ describe("PreloaderTest", () => {
   it("preload marks belongs_to association loaded on owner", async () => {
     class PTLBAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PTLBPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("ptlb_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.belongsTo.call(PTLBPost, "ptlbAuthor", {
       className: "PTLBAuthor",
-      foreignKey: "ptlb_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PTLBAuthor", PTLBAuthor);
     registerModel("PTLBPost", PTLBPost);
 
     const a = await PTLBAuthor.create({ name: "A" });
-    await PTLBPost.create({ title: "P", ptlb_author_id: a.id });
+    await PTLBPost.create({ title: "P", body: "body", author_id: a.id });
 
     const posts = await PTLBPost.all().includes("ptlbAuthor").toArray();
     expect(posts).toHaveLength(1);
@@ -2565,25 +2485,24 @@ describe("PreloaderTest", () => {
   it("preload sets has_many association target on owner", async () => {
     class PTLCAuthor extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "authors";
       }
     }
     class PTLCPost extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("ptlc_author_id", "integer");
+        this._tableName = "posts";
       }
     }
     Associations.hasMany.call(PTLCAuthor, "ptlcPosts", {
       className: "PTLCPost",
-      foreignKey: "ptlc_author_id",
+      foreignKey: "author_id",
     });
     registerModel("PTLCAuthor", PTLCAuthor);
     registerModel("PTLCPost", PTLCPost);
 
     const a = await PTLCAuthor.create({ name: "A" });
-    await PTLCPost.create({ title: "P1", ptlc_author_id: a.id });
-    await PTLCPost.create({ title: "P2", ptlc_author_id: a.id });
+    await PTLCPost.create({ title: "P1", body: "body", author_id: a.id });
+    await PTLCPost.create({ title: "P2", body: "body", author_id: a.id });
 
     const authors = await PTLCAuthor.all().includes("ptlcPosts").toArray();
     const owner = authors.find((x) => x.id === a.id)!;
