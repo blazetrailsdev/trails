@@ -39,6 +39,25 @@ class CpkSeedChild extends Base {
   }
 }
 
+// Target whose composite PK has the shape `[tenant_key, tenant_id]` — no `"id"`
+// column — so Rails keeps the full composite array as the association PK.
+class TenantPkParent extends Base {
+  static _tableName = "cpk_tenant_parents";
+  static {
+    this._primaryKey = ["shop_id", "tenant_id"];
+    this.attribute("shop_id", "integer");
+    this.attribute("tenant_id", "integer");
+  }
+}
+
+class CpkTenantChild extends Base {
+  static _tableName = "cpk_tenant_children";
+  static {
+    this.attribute("tenant_pk_parent_id", "integer");
+    this.belongsTo("tenantPkParent", { className: "TenantPkParent" });
+  }
+}
+
 describe("belongs_to inverse seeding with a composite-PK target", () => {
   registerModel(CompositePkParent);
   registerModel(CpkSeedChild);
@@ -63,5 +82,27 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((child as any).composite_pk_parent_id).toBe(42);
+  });
+
+  it("infers id as the association primary key for a [tenant_key, id]-PK target", () => {
+    const child = new CpkSeedChild();
+    const parent = new CompositePkParent({ shop_id: 7, id: 42 });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const holder = child.association("compositePkParent") as any;
+    expect(holder.associationPrimaryKeys(parent)).toEqual(["id"]);
+  });
+});
+
+describe("belongs_to to a composite-PK target without an id column", () => {
+  registerModel(CpkTenantChild);
+
+  it("keeps the full composite array as the association primary key", () => {
+    const child = new CpkTenantChild();
+    const parent = new TenantPkParent({ shop_id: 7, tenant_id: 42 });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const holder = child.association("tenantPkParent") as any;
+    expect(holder.associationPrimaryKeys(parent)).toEqual(["shop_id", "tenant_id"]);
   });
 });

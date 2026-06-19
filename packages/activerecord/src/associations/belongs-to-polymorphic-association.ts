@@ -3,7 +3,7 @@ import type { AssociationDefinition } from "../associations.js";
 import { resolveModel, loadBelongsTo, modelRegistry } from "../associations.js";
 import { baseClass } from "../inheritance.js";
 import { underscore } from "@blazetrails/activesupport";
-import { BelongsToAssociation } from "./belongs-to-association.js";
+import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
 
 /**
  * Extends BelongsToAssociation to handle polymorphic type columns.
@@ -107,18 +107,24 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   protected override associationPrimaryKeys(record: Base | null): string[] {
     const configured = this.reflection.options.primaryKey;
     if (configured) return Array.isArray(configured) ? configured : [configured];
+    // Mirrors Rails `BelongsToReflection#association_primary_key`
+    // (reflection.rb:935-938): a composite PK of shape `[<tenant_key>, :id]`
+    // infers the single `"id"` as the association primary key (else keeps the
+    // array). The `klass` argument Rails passes is the runtime polymorphic
+    // target, so this branch applies to polymorphic belongs_to too — without it
+    // a scalar `<name>_id` FK would zip against the 2-column target PK.
     if (record) {
-      const pk = (record.constructor as any).primaryKey;
-      if (pk) return Array.isArray(pk) ? pk : [pk];
+      const recordPk = (record.constructor as any).primaryKey;
+      if (recordPk) return inferCompositePrimaryKey(recordPk);
     }
     // Polymorphic belongs_to: this.klass is dynamic — resolved at runtime
     // from the _type column. Preserve the base class's klass-fallback for
     // scope() / counter-cache paths that hit `associationPrimaryKeys(null)`
     // once the _type column is set.
     const pk = (this.klass as any)?.primaryKey;
-    if (pk) return Array.isArray(pk) ? pk : [pk];
+    if (pk) return inferCompositePrimaryKey(pk);
     const targetPk = (this.target as any)?.constructor?.primaryKey;
-    if (targetPk) return Array.isArray(targetPk) ? targetPk : [targetPk];
+    if (targetPk) return inferCompositePrimaryKey(targetPk);
     return ["id"];
   }
 

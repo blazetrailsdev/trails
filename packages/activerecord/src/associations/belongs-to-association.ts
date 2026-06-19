@@ -343,12 +343,15 @@ export class BelongsToAssociation extends SingularAssociation {
       const qc = queryConstraintsList.call(targetCtor);
       if (qc) return qc;
     }
-    if (record) {
-      const pk = (record.constructor as any).primaryKey;
-      if (pk) return Array.isArray(pk) ? pk : [pk];
-    }
-    const pk = (this.klass as any)?.primaryKey;
-    if (pk) return Array.isArray(pk) ? pk : [pk];
+    // Mirrors Rails `BelongsToReflection#association_primary_key`
+    // (reflection.rb:935-938): when the target has a composite primary key of
+    // shape `[<tenant_key>, :id]` (and no query_constraints / explicit
+    // primaryKey), Rails infers the single `"id"` as the association primary
+    // key; only when the composite PK lacks an `"id"` column does it keep the
+    // full array. Without this, the composite FK zip in `replaceKeys` would line
+    // a scalar `<name>_id` FK up against a 2-column target PK.
+    const pk = ((record?.constructor ?? this.klass) as any)?.primaryKey;
+    if (pk) return inferCompositePrimaryKey(pk);
     return ["id"];
   }
 
@@ -359,12 +362,7 @@ export class BelongsToAssociation extends SingularAssociation {
    */
   protected replaceKeys(record: Base | null): void {
     const fks = this.foreignKeyNames();
-    let pks = this.associationPrimaryKeys(record);
-    // Mirrors Rails `BelongsToReflection#association_primary_key` (reflection.rb:936-938):
-    // scalar FK + composite PK → collapse to ["id"] when present.
-    if (fks.length === 1 && pks.length > 1) {
-      pks = pks.includes("id") ? ["id"] : pks;
-    }
+    const pks = this.associationPrimaryKeys(record);
 
     for (let i = 0; i < fks.length; i++) {
       const pkCol = pks[i] ?? pks[0];
@@ -466,6 +464,18 @@ export class BelongsToAssociation extends SingularAssociation {
       return (this.owner as any).isSavedChangeToAttribute(attr);
     return false;
   }
+}
+
+/**
+ * Mirrors Rails `BelongsToReflection#association_primary_key`'s composite-PK
+ * branch (reflection.rb:935-938): a composite primary key that includes `"id"`
+ * infers the single `"id"`; otherwise the full composite array is kept. A
+ * scalar primary key is returned as a one-element array.
+ * @internal
+ */
+export function inferCompositePrimaryKey(pk: string | string[]): string[] {
+  if (Array.isArray(pk)) return pk.includes("id") ? ["id"] : pk;
+  return [pk];
 }
 
 /** @internal */
