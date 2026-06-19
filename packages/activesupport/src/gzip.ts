@@ -1,4 +1,4 @@
-import { gzipSync, gunzipSync, constants } from "node:zlib";
+import { gzipSync, gunzipSync, deflateSync, inflateSync, constants } from "node:zlib";
 
 export class Stream {
   private _buffer: Buffer;
@@ -58,4 +58,15 @@ export namespace Gzip {
   ): string {
     return gzipSync(source, { level, strategy }).toString("latin1");
   }
+}
+
+// zlib-framed DEFLATE (RFC 1950), matching Ruby's Zlib::Deflate.deflate /
+// Zlib::Inflate.inflate — distinct from the gzip-framed Gzip namespace above
+// and from headerless raw DEFLATE (RFC 1951 / deflateRawSync).
+export function deflate(source: string): string {
+  return deflateSync(Buffer.from(source, "utf8")).toString("latin1");
+}
+
+export function inflate(source: string): string {
+  return inflateSync(Buffer.from(source, "latin1")).toString("utf8");
 }
