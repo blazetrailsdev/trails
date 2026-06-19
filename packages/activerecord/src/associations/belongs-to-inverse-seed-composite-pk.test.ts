@@ -1,15 +1,21 @@
 /**
  * Regression guard for RFC 0022 b1: seeding an inverse belongs_to target
  * through the holder (`record.association(name).setTarget(target)`) marks the
- * holder loaded, which captures `staleState()` → `foreignKeyNames()`. The
- * target need not be registered in the model registry, since we hold the
- * instance. Before the fix, the target class was resolved from the registry
- * (throwing `Model '...' not found`) instead of being read from the instance.
+ * holder loaded, which captures `staleState()` → `foreignKeyNames()`. Before
+ * the fix, the target class was resolved from the registry (throwing
+ * `Model '...' not found`) instead of being read from the instance.
  *
  * Also covers scalar-FK + composite-PK-target assignment: when the target has
  * composite PK `[shop_id, id]` and no explicit `foreignKey`, the inferred
  * scalar FK (`composite_pk_parent_id`) must write the `"id"` component —
  * mirrors Rails `BelongsToReflection#association_primary_key` (reflection.rb:936-938).
+ *
+ * NOTE: Both models must now be registered because constructor-level
+ * `checkKlass()` (matching Rails' `Association#initialize → check_validity!`)
+ * requires the target class in the registry before `association()` is called.
+ * This weakens the original guard: a future regression where `staleState()`
+ * falls back to a registry lookup instead of reading from the held instance
+ * would go undetected. Catching that would require a spy on `resolveModel`.
  */
 import { describe, it, expect } from "vitest";
 
@@ -34,11 +40,6 @@ class CpkSeedChild extends Base {
 }
 
 describe("belongs_to inverse seeding with a composite-PK target", () => {
-  // Register both models — the constructor now calls checkKlass() (matching
-  // Rails' Association#initialize → check_validity! timing), so the target
-  // class must be in the registry when association() is first called.
-  // The regression being guarded here (staleState resolving from registry
-  // instead of from the held instance) is independent of registration.
   registerModel(CompositePkParent);
   registerModel(CpkSeedChild);
 
