@@ -2560,6 +2560,18 @@ function wrapCollectionProxy<T extends Base = Base>(
         });
       }
 
+      // Enumerable-method delegation (`partition`) — resolved on the proxy
+      // *before* the scope lookup. The scoped AssociationRelation now also
+      // responds to `partition` (delegation.ts), but routing through it would
+      // load the relation's own `_records` and bypass the collection cache.
+      // Rails' `CollectionProxy#records` calls `load_target`, which hydrates
+      // `@target` and marks the association loaded (collection_proxy.rb,
+      // collection_association.rb#load_target); `target.load()` does the same,
+      // so an awaited `post.comments.partition(...)` leaves `loaded?`/`target`
+      // populated. Async + self-loading (JS has no blocking IO).
+      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.load());
+      if (enumerableDelegate) return enumerableDelegate;
+
       const scope = target.scope();
       const scopeVal = Reflect.get(scope, prop, scope);
       if (typeof scopeVal === "function") {
@@ -2594,21 +2606,14 @@ function wrapCollectionProxy<T extends Base = Base>(
         };
       }
 
-      // Array/Enumerable-method delegation — mirrors Rails' CollectionProxy/
-      // Relation `delegate ... to: :records` plus the `include Enumerable`
-      // mixin (delegation.rb). Falls through here once the scope and model
-      // class don't respond. Last in the trap, so it never shadows own/scope/
-      // model methods.
+      // Array-method delegation — mirrors Rails' CollectionProxy/Relation
+      // `delegate ... to: :records` (delegation.rb). Falls through here once
+      // the scope and model class don't respond, routing genuine `Array`
+      // methods (e.g. `categories.sort`) through the loaded target. Last in
+      // the trap, so it never shadows own/scope/model methods.
       if (scopeVal === undefined) {
-        // Array methods (e.g. `categories.sort`) are synchronous and read the
-        // already-loaded target.
         const arrayDelegate = delegateArrayMethod(prop, () => target.target);
         if (arrayDelegate) return arrayDelegate;
-        // Enumerable methods (`partition`) are async and self-loading —
-        // `load()` fetches the associated rows first, matching Rails' `records`
-        // → `load` so an unloaded proxy partitions DB rows, not an empty buffer.
-        const enumerableDelegate = delegateEnumerableMethod(prop, () => target.load());
-        if (enumerableDelegate) return enumerableDelegate;
       }
 
       return scopeVal;

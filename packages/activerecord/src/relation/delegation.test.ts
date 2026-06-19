@@ -239,12 +239,24 @@ describe("DelegationTest", () => {
       const target = (post as any).comments;
       // Unloaded — partition is still present and loads the rows on call.
       expect(typeof (target as any).partition).toBe("function");
+      expect((target as any).loaded).toBe(false);
 
-      const records: any[] = await (target as any).load();
-      const firstId = records[0].id;
-      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === firstId);
-      expect(matched.map((c: any) => c.id)).toEqual([firstId]);
-      expect(unmatched.map((c: any) => c.id)).toEqual(records.slice(1).map((c: any) => c.id));
+      // Predicate value from an independent query so the proxy stays unloaded.
+      const someId = (await Comment.first())!.id;
+      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === someId);
+
+      // Rails' CollectionProxy#records → load_target hydrates @target and marks
+      // the association loaded; the awaited partition does the same.
+      expect((target as any).loaded).toBe(true);
+      const records: any[] = (target as any).target;
+      expect(records.length).toBeGreaterThan(0);
+      // [matched, unmatched] preserve the records' relative order.
+      expect(matched.map((c: any) => c.id)).toEqual(
+        records.filter((c: any) => c.id === someId).map((c: any) => c.id),
+      );
+      expect(unmatched.map((c: any) => c.id)).toEqual(
+        records.filter((c: any) => c.id !== someId).map((c: any) => c.id),
+      );
     });
   }); // DelegationAssociationTest
 
@@ -254,11 +266,18 @@ describe("DelegationTest", () => {
       // Unloaded — partition is still present and loads the rows on call.
       expect(typeof (target as any).partition).toBe("function");
 
+      const someId = (await Comment.first())!.id;
+      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === someId);
+
       const records: any[] = await (target as any).toArray();
-      const firstId = records[0].id;
-      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === firstId);
-      expect(matched.map((c: any) => c.id)).toEqual([firstId]);
-      expect(unmatched.map((c: any) => c.id)).toEqual(records.slice(1).map((c: any) => c.id));
+      expect(records.length).toBeGreaterThan(0);
+      // [matched, unmatched] preserve the records' relative order.
+      expect(matched.map((c: any) => c.id)).toEqual(
+        records.filter((c: any) => c.id === someId).map((c: any) => c.id),
+      );
+      expect(unmatched.map((c: any) => c.id)).toEqual(
+        records.filter((c: any) => c.id !== someId).map((c: any) => c.id),
+      );
     });
   }); // DelegationRelationTest
 });
