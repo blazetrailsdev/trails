@@ -162,12 +162,11 @@ describe("DupTest", () => {
     expect(newCar.attributeChanged("lock_version")).toBe(false);
   });
 
-  it("dup after initialize callbacks", async () => {
-    new Topic({});
+  it("dup after initialize callbacks", () => {
+    const topic = new Topic({});
     expect(Topic.afterInitializeCalled).toBe(true);
     Topic.afterInitializeCalled = false;
-    const topic = await Topic.first();
-    topic!.dup();
+    topic.dup();
     expect(Topic.afterInitializeCalled).toBe(true);
   });
 
