@@ -1,16 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { coder } from "./coder.js";
 
 describe("CacheCoderTest", () => {
-  // Simple coder that serializes/deserializes values
-  const coder = {
-    dump(value: unknown): string {
-      return JSON.stringify(value);
-    },
-    load(str: string): unknown {
-      return JSON.parse(str);
-    },
-  };
-
   it("roundtrips entry", () => {
     const value = { name: "test", count: 42 };
     const dumped = coder.dump(value);
