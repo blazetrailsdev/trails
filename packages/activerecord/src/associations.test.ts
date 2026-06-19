@@ -1491,7 +1491,7 @@ describe("PreloaderTest", () => {
 
   it("preload with available records with through association", async () => {
     const author = await Author.create({ name: "David" });
-    const general = await Category.create({ name: "General" });
+    await Category.create({ name: "General" });
     await Essay.create({
       name: "A Modest Proposal",
       writer_type: "Author",
@@ -1510,9 +1510,10 @@ describe("PreloaderTest", () => {
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     expect(queryCalls).toHaveLength(1);
     expect(association(author, "essayCategory").loaded).toBe(true);
+    // Mirrors Rails' __id__ check: the preloaded category is the *same instance*
+    // taken from availableRecords, not a freshly-loaded row.
     const preloaded = (author as any)._preloadedAssociations.get("essayCategory");
-    expect(preloaded.id).toBe(general.id);
-    expect(categories.map((c: any) => c.id)).toContain(preloaded.id);
+    expect(categories).toContain(preloaded);
   });
 
   it("preload with only some records available with through associations", async () => {
@@ -1543,9 +1544,11 @@ describe("PreloaderTest", () => {
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
     expect(queryCalls).toHaveLength(2);
     // Mirrors Rails' assert_no_queries: preloaded associations are served from
-    // cache on read, so the singular reader must not hit the DB.
+    // cache on read, so the singular reader must not hit the DB. mary's category
+    // comes from availableRecords (assert_same → toBe), dave's is freshly loaded
+    // (assert_equal → value equality).
     const reads = await captureSql(async () => {
-      expect((association(mary, "essayCategory").reader as any).id).toBe(tech.id);
+      expect(association(mary, "essayCategory").reader).toBe(tech);
       expect((association(dave, "essayCategory").reader as any).id).toBe(general.id);
     });
     expect(reads).toHaveLength(0);
