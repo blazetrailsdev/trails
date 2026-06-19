@@ -1,10 +1,6 @@
 import { RuleTester } from "eslint";
 import rule from "./require-table-teardown.mjs";
 
-// Point the rule at a non-existent exclude baseline so the committed list
-// never grandfathers these synthetic fixtures.
-process.env.REQUIRE_TABLE_TEARDOWN_EXCLUDE_PATH = "/nonexistent-exclude.json";
-
 const tester = new RuleTester({
   languageOptions: {
     parser: (await import("typescript-eslint")).parser,

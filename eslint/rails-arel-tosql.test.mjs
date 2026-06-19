@@ -6,10 +6,9 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 
-// Hermetic fixtures: point the rule at tmp snapshot + exclude files via the
-// env overrides it reads lazily, so the test never touches the committed one.
+// Hermetic fixture: point the rule at a tmp manifest snapshot via the env
+// override it reads lazily, so the test never touches the committed one.
 const MANIFEST_FIXTURE = path.join(__dirname, ".tmp-rails-tosql-classes.test.json");
-const EXCLUDE_FIXTURE = path.join(__dirname, ".tmp-rails-arel-tosql-exclude.test.json");
 
 const manifest = {
   generatedAt: "test",
@@ -35,16 +34,11 @@ const manifest = {
   },
 };
 
-const excludedRel = "packages/activerecord/src/legacy-builder.ts";
-
 fs.writeFileSync(MANIFEST_FIXTURE, JSON.stringify(manifest, null, 2));
-fs.writeFileSync(EXCLUDE_FIXTURE, JSON.stringify([excludedRel], null, 2));
 process.env.RAILS_TOSQL_CLASSES_PATH = MANIFEST_FIXTURE;
-process.env.RAILS_AREL_TOSQL_EXCLUDE_PATH = EXCLUDE_FIXTURE;
 
 process.on("exit", () => {
   fs.rmSync(MANIFEST_FIXTURE, { force: true });
-  fs.rmSync(EXCLUDE_FIXTURE, { force: true });
 });
 
 // Imported after the env vars are set; the rule resolves the paths lazily so
@@ -59,7 +53,6 @@ const dbStmtFile = path.join(
   REPO_ROOT,
   "packages/activerecord/src/connection-adapters/abstract/database-statements.ts",
 );
-const excludedFile = path.join(REPO_ROOT, excludedRel);
 
 const tester = new RuleTester({
   languageOptions: {
@@ -81,8 +74,6 @@ tester.run("rails-arel-tosql", rule, {
       filename: dbStmtFile,
       code: `export class DatabaseStatements { toSqlAndBinds(a) { return [a]; } }\n`,
     },
-    // Excluded (grandfathered) file: bespoke toSql is skipped.
-    { filename: excludedFile, code: `export class LegacyBuilder { toSql() { return "x"; } }\n` },
     // A method named toSql on a class with NO toSql counterpart but in a
     // different (non-class) position — plain function — is not flagged.
     { filename: builderFile, code: `function toSql() { return "x"; }\n` },

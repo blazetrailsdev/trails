@@ -15,8 +15,7 @@
  * defines `toSql`, so it must come from the manifest. Getter / regular method
  * / static all count.
  *
- * Pre-existing violators are grandfathered via the ratchet baseline
- * `eslint/rails-arel-tosql-exclude.json` (it only shrinks). Snapshot:
+ * Snapshot the Rails API manifest with:
  *   pnpm tsx scripts/build-rails-tosql-manifest.ts
  */
 import fs from "fs";
@@ -32,9 +31,6 @@ const TOSQL_METHODS = new Set(["toSql", "toSqlAndBinds"]);
 // env vars without import-time ordering games.
 const manifestPath = () =>
   process.env.RAILS_TOSQL_CLASSES_PATH ?? path.join(__dirname, "rails-tosql-classes.json");
-const excludePath = () =>
-  process.env.RAILS_AREL_TOSQL_EXCLUDE_PATH ??
-  path.join(__dirname, "rails-arel-tosql-exclude.json");
 
 function loadJson(p, fallback) {
   if (!fs.existsSync(p)) return fallback;
@@ -74,10 +70,6 @@ function loadAllow() {
   }
   cache.set(cacheKey, allow);
   return allow;
-}
-
-function loadExclude() {
-  return new Set(loadJson(excludePath(), []));
 }
 
 /** Repo-relative path (POSIX) for the in-scope packages; null if out of scope. */
@@ -132,7 +124,6 @@ const rule = {
     const filename = context.filename ?? context.getFilename?.() ?? "";
     const scope = repoRel(filename);
     if (!scope) return {};
-    if (loadExclude().has(scope.rel)) return {};
 
     const pkgAllow = loadAllow().get(scope.pkg);
 

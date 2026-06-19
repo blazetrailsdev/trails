@@ -244,8 +244,7 @@ export default defineConfig(
   //    Arel fidelity — build SQL through real Arel AST nodes + visitors, not
   //    hand-mashed strings. Allow-set: eslint/rails-tosql-classes.json (built
   //    by `pnpm tsx scripts/build-rails-tosql-manifest.ts` from the api-compare
-  //    manifest). Pre-existing violators are grandfathered in
-  //    eslint/rails-arel-tosql-exclude.json and ratcheted down. ──
+  //    manifest). ──
   {
     files: [
       "packages/activerecord/src/**/*.ts",
@@ -360,9 +359,7 @@ export default defineConfig(
   //    carpet-bomb dropAllTables() is forbidden. Leaked tables collide with
   //    sibling files under parallel forks. test-helpers/** is exempt — those
   //    tests exercise createTable/dropTable/dropAllTables as the subject under
-  //    test. Existing violators are grandfathered in
-  //    eslint/require-table-teardown-exclude.json and ratcheted down.
-  //    See eslint/require-table-teardown.mjs. ──
+  //    test. See eslint/require-table-teardown.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
     ignores: ["packages/activerecord/src/test-helpers/**"],
@@ -375,9 +372,7 @@ export default defineConfig(
   //    RFC-0022 `sql.replace`/`sql.concat` string-surgery pattern) outside the
   //    adapter/DDL layer. Build queries with @blazetrails/arel. The adapter
   //    layer, migrations, and schema dumpers legitimately render SQL and are
-  //    excluded. Existing violators are grandfathered in
-  //    eslint/no-raw-sql-exclude.json and ratcheted down (RFC-0022 burndown).
-  //    See eslint/no-raw-sql.mjs. ──
+  //    excluded. See eslint/no-raw-sql.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.ts"],
     ignores: [

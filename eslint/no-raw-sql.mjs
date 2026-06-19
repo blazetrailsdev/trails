@@ -19,37 +19,7 @@
  * by filename): activerecord src .ts, excluding test files, connection-adapters,
  * adapters, tasks, schema-*.ts, and the test-infra DDL helpers (test-helpers/
  * and test-setup-*.ts) — those legitimately render SQL by design.
- *
- * Existing violators are grandfathered via `eslint/no-raw-sql-exclude.json`
- * (repo-relative paths) — a ratchet baseline; the list is the RFC-0022 burndown
- * worklist and shrinks as call sites migrate to arel.
  */
-
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Env override lets the rule's own unit test point at a tmp baseline rather
-// than mutating the committed list. Resolved lazily (per call, not at module
-// load) so a test that sets the env var after importing the rule still wins.
-function excludePath() {
-  return process.env.NO_RAW_SQL_EXCLUDE_PATH ?? path.join(__dirname, "no-raw-sql-exclude.json");
-}
-
-// Cache by path+mtime so a single eslint run reads the baseline at most once.
-let excludeCache = null;
-function loadExclude() {
-  const p = excludePath();
-  if (!fs.existsSync(p)) return new Set();
-  const mtime = fs.statSync(p).mtimeMs;
-  if (excludeCache && excludeCache.path === p && excludeCache.mtime === mtime) {
-    return excludeCache.value;
-  }
-  const value = new Set(JSON.parse(fs.readFileSync(p, "utf8")));
-  excludeCache = { path: p, mtime, value };
-  return value;
-}
 
 /** Repo-relative path under packages/activerecord/src; null if outside it. */
 function repoRel(filename) {
@@ -126,8 +96,8 @@ const rule = {
   create(context) {
     const filename = context.filename ?? context.getFilename();
     const rel = repoRel(filename);
-    // Outside activerecord src, out-of-scope dir, or grandfathered → no-op.
-    if (!rel || isExcludedPath(rel) || loadExclude().has(rel)) return {};
+    // Outside activerecord src or out-of-scope dir → no-op.
+    if (!rel || isExcludedPath(rel)) return {};
 
     return {
       CallExpression(node) {
