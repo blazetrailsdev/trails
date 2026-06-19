@@ -76,6 +76,16 @@ export class AttributeSet {
     const existing = this.attributes.get(name);
     if (existing) {
       this.attributes.set(name, existing.withValueFromUser(value));
+    } else if (name == null) {
+      // Mirrors Rails `@attributes[name] = self[name].with_value_from_user(value)`:
+      // an absent name falls through to the Null attribute, whose
+      // `withValueFromUser` raises MissingAttributeError. This is what lets a
+      // key-less model's `id=` raise without a bespoke guard (the nil primary
+      // key reaches here as a null name). A non-null unknown name still
+      // materializes a fresh attribute below, because trails populates the set
+      // lazily rather than from a complete schema like Rails — so map-absence
+      // does not yet imply "unknown column" for a real name.
+      this.getAttribute(name).withValueFromUser(value);
     } else {
       // New attribute not previously declared — create a FromUser with default type
       this.attributes.set(name, Attribute.fromUser(name, value, typeRegistry.lookup("value")));

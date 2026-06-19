@@ -3038,7 +3038,10 @@ export class Base extends Model {
           typeof (ctor.connection as any).lastInsertedId === "function"
             ? (ctor.connection as any).lastInsertedId(rawId)
             : rawId;
-        if (!Array.isArray(ctor.primaryKey) && this.id === null) {
+        if (!Array.isArray(ctor.primaryKey) && ctor.primaryKey != null && this.id === null) {
+          // Rails writes the generated id back only `if @primary_key` — a
+          // key-less table has no slot to write, and `_write_attribute(nil, …)`
+          // would raise MissingAttributeError via the Null attribute.
           this._writeAttribute(ctor.primaryKey as string, insertedId);
         } else if (
           Array.isArray(ctor.primaryKey) &&

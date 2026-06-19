@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
 import { underscore } from "@blazetrails/activesupport";
-import { MissingAttributeError } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "../attribute-methods.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
@@ -103,14 +102,10 @@ interface PrimaryKeyInstance {
 export function getId(this: PrimaryKeyInstance): unknown {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
-  if (pk == null) {
-    // Rails: `_read_attribute(@primary_key)` with a nil primary key reads
-    // through the AttributeSet's Null attribute, which returns nil without
-    // raising (unlike the write path, which raises MissingAttributeError).
-    return null;
-  }
   if (Array.isArray(pk)) return pk.map((col) => this._readAttribute(col));
-  return this._readAttribute(pk);
+  // Rails: `_read_attribute(@primary_key)`. A nil primary key reads through the
+  // AttributeSet's Null attribute, returning nil without raising.
+  return this._readAttribute(pk as string);
 }
 
 /**
@@ -120,13 +115,6 @@ export function getId(this: PrimaryKeyInstance): unknown {
 export function setId(this: PrimaryKeyInstance, value: unknown): void {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
-  if (pk == null) {
-    // Rails: `_write_attribute(@primary_key, value)` with a nil primary key
-    // routes through the AttributeSet's Null attribute, which raises
-    // MissingAttributeError("can't write unknown attribute `#{name}`"). The nil
-    // pk interpolates to an empty name, so the backticks are empty here too.
-    throw new MissingAttributeError("can't write unknown attribute ``");
-  }
   if (Array.isArray(pk)) {
     if (!Array.isArray(value)) {
       throw new TypeError(
@@ -135,7 +123,10 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
     }
     pk.forEach((col, i) => this._writeAttribute(col, (value as unknown[])[i]));
   } else {
-    this._writeAttribute(pk, value);
+    // A null pk (key-less table) reaches `_writeAttribute(null, …)`, which
+    // raises MissingAttributeError via the Null attribute — mirroring Rails
+    // `_write_attribute(@primary_key, value)` with a nil primary key.
+    this._writeAttribute(pk as string, value);
   }
 }
 
