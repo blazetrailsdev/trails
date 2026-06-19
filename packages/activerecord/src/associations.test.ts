@@ -725,8 +725,13 @@ describe("PreloaderTest", () => {
     const david2 = await Author.create({ name: "David" });
     const bob = await Author.create({ name: "Bob" });
     const davidPost = await Post.create({ author_id: david.id, title: "Post", body: "body" });
-    const comment1 = await Comment.create({ post_id: davidPost.id, body: "david" });
-    await Comment.create({ post_id: davidPost.id, body: "other" });
+    // Both bodies contain "david" (lowercase) so they match the LIKE/ILIKE scope
+    // on all three CI databases.
+    const comment1 = await Comment.create({ post_id: davidPost.id, body: "Hi david!" });
+    const comment2 = await Comment.create({
+      post_id: davidPost.id,
+      body: "This comment mentions david",
+    });
 
     await new Preloader({
       records: [david, david2, bob],
@@ -743,7 +748,7 @@ describe("PreloaderTest", () => {
       "commentsMentioningAuthor",
     ) as any[];
 
-    expect(davidComments.map((c: any) => c.id)).toEqual([comment1.id]);
+    expect(davidComments.map((c: any) => c.id).sort()).toEqual([comment1.id, comment2.id].sort());
     expect(david2Comments).toEqual([]);
     expect(bobComments).toEqual([]);
   });
@@ -987,16 +992,16 @@ describe("PreloaderTest", () => {
     expect(spy.mock.calls.length).toBe(preloadCalls);
   });
   it("preload does not group same class different scope", async () => {
+    // Post#authorWithTheLetterA has scope `name LIKE '%a%'`; Postesque#authorWithTheLetterA
+    // has no scope — same association name, different SQL → must NOT coalesce.
     const alice = await Author.create({ name: "Alice" });
-    const p1 = await Post.create({ title: "P1", body: "body", author_id: alice.id });
-    const p2 = await Post.create({ title: "P2", body: "body", author_id: alice.id });
+    const post = await Post.create({ title: "P1", body: "body", author_id: alice.id });
+    const postesque = await PostesquePL.create({ author_id: alice.id, author_name: alice.name });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
-      records: [p1, p2],
-      associations: ["authorWithTheLetterA", "author"],
+      records: [post, postesque],
+      associations: ["authorWithTheLetterA"],
     }).call();
-    // Same class (Author), same key, but different scope (LIKE vs none) →
-    // must NOT coalesce.
     expect(spy).toHaveBeenCalledTimes(2);
   });
   it("preload does not group same scope different key name", async () => {
