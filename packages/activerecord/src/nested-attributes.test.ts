@@ -3069,6 +3069,8 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
       const grandchild = (inMemoryPart.trinkets as any).target[0];
       expect(grandchild.name).toBe("Ruby");
     });
+    await ship.save();
+    expect(((ship.parts as any).target[0].trinkets as any).target[0].name).toBe("Ruby");
   });
 
   it("when grandchild changed in memory, saving parent should save grandchild", async () => {
@@ -3134,6 +3136,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const part = new ShipPart({ name: "Stern" });
     (part as any).shipAttributes = { name: null };
     expect(part.isValid()).toBe(false);
+    expect(part.errors.fullMessages).toEqual(["Ship name can't be blank"]);
   });
 
   it("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", async () => {
