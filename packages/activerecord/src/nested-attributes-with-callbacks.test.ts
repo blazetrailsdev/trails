@@ -47,7 +47,10 @@ NwcPirate.hasMany("birds", {
 // load is async, so the proc can only fire-and-forget (`void`). The added
 // record still lands in the in-memory target via the sync build path, so the
 // observable assertions match Rails; only the proc's own side-effect load is
-// non-blocking. Tracked-pending-convergence deviation — see
+// non-blocking. This is settled (not convergeable): it is a direct
+// consequence of the async-everywhere DB model — there is no synchronous
+// `loadTarget()` and the entry point (`birds_with_add_load_attributes=`) is a
+// sync TS property setter, so the proc cannot `await`. See
 // packages/website/docs/guides/activerecord-rails-deviations.md §11.
 NwcPirate.hasMany("birdsWithAddLoad", {
   className: "NwcBird",
