@@ -602,13 +602,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async toArray(): Promise<T[]> {
     // Rails `to_a` runs `merge_target_lists` (preferring in-memory records over
-    // fresh DB rows); we apply the same merge here. We deliberately do NOT
+    // fresh DB rows); we apply the same merge here. We deliberately do NOT yet
     // hydrate/cache `_target` or mark the association loaded the way Rails'
-    // `load_target` does: trails' `toArray` is the cache-bypassing re-query path
-    // (the bang-mutation case below re-queries with the mutated scope, and the
-    // through-association destroy path prunes join rows without pruning a cached
-    // `_target`, so a cached `toArray` would return stale rows). Converging
-    // `toArray` onto full `load_target` hydration is tracked separately.
+    // `load_target` does — `toArray` stays the cache-bypassing re-query path
+    // because two existing gaps surface as stale-cache reads once it caches:
+    //   (1) bang mutations (`whereBang`/etc.) must re-query with the mutated
+    //       scope without hydrating the association cache;
+    //   (2) `_deleteThrough` looks up join rows with a scalar-PK read, so for
+    //       composite-PK target models it can't prune the destroyed records
+    //       from a cached `_target` (re-querying masks this today).
+    // Converging `toArray` onto full `load_target` hydration is tracked
+    // separately and is gated on fixing (2).
     const results = await this._execLoad();
     return this._mergeTargetLists(results);
   }
