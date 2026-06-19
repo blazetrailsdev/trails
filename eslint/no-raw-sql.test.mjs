@@ -1,10 +1,6 @@
 import { RuleTester } from "eslint";
 import rule from "./no-raw-sql.mjs";
 
-// Point the rule at a non-existent exclude baseline so the committed list
-// never grandfathers these synthetic fixtures.
-process.env.NO_RAW_SQL_EXCLUDE_PATH = "/nonexistent-exclude.json";
-
 const tester = new RuleTester({
   languageOptions: {
     parser: (await import("typescript-eslint")).parser,
@@ -119,24 +115,4 @@ tester.run("no-raw-sql", rule, {
       errors: [{ messageId: "noRawSql", data: { sink: "selectValue" } }],
     },
   ],
-});
-
-// Grandfathering: a file listed in the committed baseline is a no-op even when
-// it contains a flaggable raw-SQL call. Point the rule at a one-entry baseline
-// to exercise the ratchet path without depending on the real committed list.
-const FIXTURE = "packages/activerecord/src/grandfathered-fixture.ts";
-process.env.NO_RAW_SQL_EXCLUDE_PATH = new URL(
-  "./no-raw-sql-baseline-fixture.json",
-  import.meta.url,
-).pathname;
-const grandfatherTester = new RuleTester({
-  languageOptions: {
-    parser: (await import("typescript-eslint")).parser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-  },
-});
-grandfatherTester.run("no-raw-sql (grandfathered)", rule, {
-  valid: [{ code: 'connection.execute("SELECT * FROM posts");', filename: FIXTURE }],
-  invalid: [],
 });

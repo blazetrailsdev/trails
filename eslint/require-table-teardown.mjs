@@ -48,42 +48,7 @@
  *
  * The `test-helpers/**` infra tests are exempt (configured in eslint.config.mjs)
  * — they exercise createTable/dropTable/dropAllTables as the subject under test.
- *
- * Existing files that pre-date the rule are grandfathered via
- * `eslint/require-table-teardown-exclude.json` (repo-relative paths) — a ratchet
- * baseline mirroring require-canonical-schema / expected-fixtures. New files are
- * enforced; the list shrinks as tests gain their missing teardown.
  */
-
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Env override lets the rule's own unit test point at a tmp baseline rather
-// than mutating the committed list.
-const EXCLUDE_PATH =
-  process.env.REQUIRE_TABLE_TEARDOWN_EXCLUDE_PATH ??
-  path.join(__dirname, "require-table-teardown-exclude.json");
-
-// Cache by mtime so a single eslint invocation reads the file at most once
-// while tests can swap baselines on disk between runs.
-let excludeCache = null;
-function loadExclude() {
-  if (!fs.existsSync(EXCLUDE_PATH)) return new Set();
-  const mtime = fs.statSync(EXCLUDE_PATH).mtimeMs;
-  if (excludeCache && excludeCache.mtime === mtime) return excludeCache.value;
-  const value = new Set(JSON.parse(fs.readFileSync(EXCLUDE_PATH, "utf8")));
-  excludeCache = { mtime, value };
-  return value;
-}
-
-/** Repo-relative path for exclude-list lookup; accepts absolute or relative. */
-function repoRel(filename) {
-  const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)(packages\/activerecord\/src\/.+\.test\.ts)$/);
-  return m ? m[1] : null;
-}
 
 /**
  * The called function's name, whether it's a bare call (`createTable(...)`) or
@@ -144,11 +109,6 @@ const rule = {
   },
 
   create(context) {
-    const filename = context.filename ?? context.getFilename();
-    const rel = repoRel(filename);
-    // Grandfathered file → no-op (ratchet baseline).
-    if (rel && loadExclude().has(rel)) return {};
-
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
