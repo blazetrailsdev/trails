@@ -3715,16 +3715,6 @@ describe.skip("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     const valid = await item.isValid();
     expect(valid).toBe(false);
   });
-  it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => {
-    // BLOCKED: needs canonical Author/PublishedBook (this file's bespoke
-    // same-named classes collide) + two impl gaps: validates(attr,{uniqueness})
-    // routing and propagateErrors save-phase error-format convergence.
-    // Tracked: 0030/autosave-uniqueness-rollback-and-error-format.
-  });
-  it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => {
-    // BLOCKED: see above —
-    // 0030/autosave-uniqueness-rollback-and-error-format.
-  });
   it("validations still fire on unchanged association with custom validation context", async () => {
     class Post extends Base {
       static {
@@ -3735,6 +3725,68 @@ describe.skip("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     const p = new Post({});
     expect(p.isValid("create")).toBe(false);
     expect(p.isValid("update")).toBe(true);
+  });
+});
+
+describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  // Dynamic import so esbuild doesn't rename the bespoke same-named classes
+  // declared inside the describe.skip blocks above (Author/Book) — see the
+  // canonical-import esbuild class-rename gotcha.
+  let AuthorM: typeof Base;
+  let BookM: typeof Base;
+  let PublishedBookM: typeof Base;
+
+  beforeAll(async () => {
+    // The file-level beforeAll rebuilds `books` from the bespoke
+    // UNIVERSAL_AUTOSAVE_SCHEMA (title-only, no isbn). Restore the canonical
+    // `books`/`authors` shape so PublishedBook's isbn uniqueness validator can
+    // query against a real column.
+    await defineSchema(
+      { authors: TEST_SCHEMA.authors, books: TEST_SCHEMA.books },
+      { dropExisting: true },
+    );
+    AuthorM = (await import("./test-helpers/models/author.js")).Author as never;
+    const bookMod = await import("./test-helpers/models/book.js");
+    BookM = bookMod.Book as never;
+    PublishedBookM = bookMod.PublishedBook as never;
+    registerModel("Author", AuthorM);
+    registerModel("Book", BookM);
+    registerModel("PublishedBook", PublishedBookM);
+  });
+
+  const buildAuthor = (): Base => {
+    const author = new AuthorM({ name: "DHH" });
+    (author as any).publishedBooks.build({ name: "Rework", isbn: "1234" });
+    (author as any).publishedBooks.build({ name: "Remote", isbn: "1234" });
+    return author;
+  };
+
+  it("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", async () => {
+    const authorCountBefore = await AuthorM.count();
+    const bookCountBefore = await BookM.count();
+    const author = buildAuthor();
+
+    await expect(author.saveBang()).rejects.toMatchObject({
+      message: "Validation failed: Published books is invalid",
+    });
+
+    expect(await AuthorM.count()).toBe(authorCountBefore);
+    expect(await BookM.count()).toBe(bookCountBefore);
+  });
+
+  it("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", async () => {
+    const authorCountBefore = await AuthorM.count();
+    const bookCountBefore = await BookM.count();
+    const author = buildAuthor();
+
+    const result = await author.save();
+    expect(result).toBe(false);
+
+    expect(await AuthorM.count()).toBe(authorCountBefore);
+    expect(await BookM.count()).toBe(bookCountBefore);
   });
 });
 

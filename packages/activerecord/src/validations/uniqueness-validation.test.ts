@@ -122,6 +122,39 @@ describe("UniquenessValidationTest", () => {
     expect(p2.errors.on("title")).toBeTruthy();
   });
 
+  it("routes validates(:attr, uniqueness: true) to the DB-backed UniquenessValidator", async () => {
+    // The AR `validates` override must route `uniqueness:` to the deferred
+    // _asyncValidations registry (validatesUniqueness), not fall through to
+    // ActiveModel — which has no DB-backed uniqueness validator.
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { uniqueness: true });
+      }
+    }
+    await Post.create({ title: "hello" });
+    const p2 = new Post({ title: "hello" });
+    expect(await p2.save()).toBe(false);
+    expect(p2.errors.on("title")).toBeTruthy();
+    // A distinct value still saves — the rule isn't rejecting everything.
+    expect(await new Post({ title: "world" }).save()).toBe(true);
+  });
+
+  it("validates(:attr, uniqueness: { scope }) forwards the scope option", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.validates("title", { uniqueness: { scope: "author" } });
+      }
+    }
+    await Post.create({ title: "hello", author: "alice" });
+    // Same title under a different author is allowed (scope honored).
+    expect(await new Post({ title: "hello", author: "bob" }).save()).toBe(true);
+    // Same title + same author collides.
+    expect(await new Post({ title: "hello", author: "alice" }).save()).toBe(false);
+  });
+
   it("validate uniqueness when integer out of range", async () => {
     class Item extends Base {
       static {

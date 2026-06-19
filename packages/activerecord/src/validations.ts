@@ -289,6 +289,19 @@ export function validates(
     delete arRules.numericality;
     this.validatesWith(NumericalityValidator, buildOpts(opts));
   }
+  if (arRules.uniqueness) {
+    const opts = arRules.uniqueness === true ? {} : (arRules.uniqueness as Record<string, unknown>);
+    delete arRules.uniqueness;
+    // Uniqueness needs a DB round-trip, so it routes to the deferred
+    // _asyncValidations registry via validatesUniqueness rather than the
+    // synchronous validatesWith chain (matching Rails' UniquenessValidator).
+    const { attributes: _attributes, ...uniqOpts } = buildOpts(opts);
+    validatesUniqueness.call(
+      this,
+      attribute,
+      uniqOpts as Parameters<typeof validatesUniqueness>[1],
+    );
+  }
   // Delegate remaining rules (inclusion/exclusion/format/...) to ActiveModel's validates.
   const hasRemaining = Object.keys(arRules).some(
     (k) => !["on", "if", "unless", "strict", "allowNil", "allowBlank"].includes(k),
