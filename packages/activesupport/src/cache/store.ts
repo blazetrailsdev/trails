@@ -211,27 +211,27 @@ export abstract class Store {
   }
 
   deleteMatched(_matcher: unknown, _options?: StoreOptions): void {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support delete_matched`);
   }
 
   increment(_name: string, _amount = 1, _options?: StoreOptions): number | null {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support increment`);
   }
 
   decrement(_name: string, _amount = 1, _options?: StoreOptions): number | null {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support decrement`);
   }
 
   cleanup(_options?: StoreOptions): void {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support cleanup`);
   }
 
   clear(_options?: StoreOptions): void {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support clear`);
   }
 
