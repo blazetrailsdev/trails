@@ -284,7 +284,7 @@ related records, etc.), they are almost always async. Always `await`
 them when composing manually; `save()` / `destroy()` / etc. do it for
 you.
 
-### Collection `before_add` cannot force-load the target (tracked pending convergence)
+### Collection `before_add` cannot force-load the target (settled — a consequence of §1)
 
 Rails fires collection `before_add` callbacks from the **synchronous**
 `CollectionAssociation#add_to_target`, and because Rails' collection load
@@ -325,11 +325,24 @@ semantics**: a `before_add` proc that depends on the target being loaded
 _as a side effect of the callback itself_ would not see it loaded in
 trails.
 
-Converging requires threading async through the add-callback path
-(`build` / `addToTarget` / `callback`) so a proc can be `async` and be
-awaited — a deeper change to a sync Rails-parity surface. Tracked for
-convergence; until then this is the one collection-callback semantic that
-trails' async-everywhere model cannot reproduce.
+**This cannot be converged** — it is a direct, irreducible consequence of
+deviation §1 ("async everywhere DB is touched"), not an independent defect.
+Force-loading the target inside the proc means a **synchronous** DB read, and
+trails has no synchronous DB-access path: `toArray()` / `loadTarget()` are
+async by construction. Every layer above the proc is synchronous and
+un-awaitable too: the entry point is the Rails-parity attribute setter
+`pirate.birds_with_add_load_attributes = …`, which in TypeScript is a plain
+property setter (setters cannot be `async`), and Rails' test reads the effect
+off that _un-awaited_ assignment immediately. That setter calls the sync
+Rails-parity `build()`, which fires `before_add` on the synchronous stack. To
+let the proc `await` the load we would have to make either the property setter
+or the DB read synchronous — the former is impossible in TypeScript, the
+latter would unwind the entire async-everywhere architecture. So a proc whose
+_only_ effect is a force-load (the `to_a` here) is a no-op-by-floating in
+trails, with observable parity preserved by the sync build path. This is the
+one collection-callback semantic that trails' async-everywhere model cannot
+reproduce, and it is ratified as such rather than tracked for a convergence
+that the design forecloses.
 
 ## 12. `Base.update(:all, ...)` sentinel is `":all"`
 
