@@ -228,21 +228,21 @@ describe("DelegationTest", () => {
 
   // Mirrors Rails' DelegationWhitelistBlacklistTests, which generates a
   // `test_delegates_<method>_to_Array` per ARRAY_DELEGATES entry; `partition`
-  // is an `Enumerable` method `Relation`/`CollectionProxy` mix in. JS has no
-  // blocking IO, so we load the target first (Rails' `assert_respond_to`
-  // doesn't trigger a load) before asserting the delegated method is present,
-  // then exercise it: `Enumerable#partition` returns `[matched, unmatched]`
-  // preserving order.
+  // is an `Enumerable` method `Relation`/`CollectionProxy` mix in. It is
+  // present on an *unloaded* target (Rails' `assert_respond_to`) and — because
+  // JS has no blocking IO — is async: invoking it loads the records itself
+  // (mirroring Rails' `records` → `load`), then splits them. `partition`
+  // returns `[matched, unmatched]` preserving order.
   describe("DelegationAssociationTest", () => {
     it("delegates partition to Array", async () => {
       const post = await Post.first();
       const target = (post as any).comments;
-      await target.load();
+      // Unloaded — partition is still present and loads the rows on call.
       expect(typeof (target as any).partition).toBe("function");
 
-      const records: any[] = await (target as any).toArray();
+      const records: any[] = await (target as any).load();
       const firstId = records[0].id;
-      const [matched, unmatched] = (target as any).partition((c: any) => c.id === firstId);
+      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === firstId);
       expect(matched.map((c: any) => c.id)).toEqual([firstId]);
       expect(unmatched.map((c: any) => c.id)).toEqual(records.slice(1).map((c: any) => c.id));
     });
@@ -250,12 +250,13 @@ describe("DelegationTest", () => {
 
   describe("DelegationRelationTest", () => {
     it("delegates partition to Array", async () => {
-      const target = await Comment.all().load();
+      const target = Comment.all();
+      // Unloaded — partition is still present and loads the rows on call.
       expect(typeof (target as any).partition).toBe("function");
 
       const records: any[] = await (target as any).toArray();
       const firstId = records[0].id;
-      const [matched, unmatched] = (target as any).partition((c: any) => c.id === firstId);
+      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === firstId);
       expect(matched.map((c: any) => c.id)).toEqual([firstId]);
       expect(unmatched.map((c: any) => c.id)).toEqual(records.slice(1).map((c: any) => c.id));
     });
