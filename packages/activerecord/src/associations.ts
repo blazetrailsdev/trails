@@ -5,7 +5,7 @@ import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { ScopeRegistry } from "./scoping.js";
-import { delegateArrayMethod } from "./relation/delegation.js";
+import { delegateArrayMethod, delegateEnumerableMethod } from "./relation/delegation.js";
 // Re-export the slot's setter so the package entry and other internal
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -2602,6 +2602,8 @@ function wrapCollectionProxy<T extends Base = Base>(
       if (scopeVal === undefined) {
         const arrayDelegate = delegateArrayMethod(prop, () => target.target);
         if (arrayDelegate) return arrayDelegate;
+        const enumerableDelegate = delegateEnumerableMethod(prop, () => target.target);
+        if (enumerableDelegate) return enumerableDelegate;
       }
 
       return scopeVal;

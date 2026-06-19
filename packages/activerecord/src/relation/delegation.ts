@@ -220,6 +220,35 @@ export function delegateArrayMethod(
   return (...args: any[]) => (arrayMethod as (...a: any[]) => unknown).apply([...records()], args);
 }
 
+/**
+ * Enumerable-method delegation — Rails' `Relation`/`CollectionProxy`
+ * `include Enumerable`, so `Enumerable` methods that have no JS
+ * `Array.prototype` analogue (and therefore aren't reachable through
+ * `delegateArrayMethod`) are routed here. `partition` mirrors
+ * `Enumerable#partition`: it splits the loaded records into
+ * `[matched, unmatched]` in a single pass, preserving order, and never
+ * mutates the underlying records.
+ *
+ * Returns a bound callable when `prop` names a supported Enumerable method,
+ * otherwise `undefined` so the caller can fall through to its own default.
+ */
+export function delegateEnumerableMethod(
+  prop: string,
+  records: () => unknown[],
+): ((...args: any[]) => unknown) | undefined {
+  if (prop === "partition") {
+    return (predicate: (value: unknown, index: number) => unknown) => {
+      const matched: unknown[] = [];
+      const unmatched: unknown[] = [];
+      records().forEach((record, index) => {
+        (predicate(record, index) ? matched : unmatched).push(record);
+      });
+      return [matched, unmatched];
+    };
+  }
+  return undefined;
+}
+
 export function wrapWithScopeProxy<T extends object>(rel: T): T {
   return new Proxy(rel, {
     get(target: any, prop: string | symbol, receiver: any) {
@@ -257,16 +286,20 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
         };
       }
 
-      // Array-method delegation (delegation.rb `delegate ... to: :records`).
-      // Only when the relation is already loaded — JS can't block on the DB,
-      // so an unloaded relation keeps its `undefined` default rather than
-      // delegating against records that aren't here yet.
-      if ((target as any)._loaded) {
-        const arrayDelegate = delegateArrayMethod(
-          prop as string,
-          () => (target as any)._records ?? [],
-        );
+      // Array/Enumerable-method delegation (delegation.rb `delegate ... to:
+      // :records` plus the `Enumerable` mixin). Only when the relation is
+      // already loaded — JS can't block on the DB, so an unloaded relation
+      // keeps its `undefined` default rather than delegating against records
+      // that aren't here yet. CollectionProxy tracks its loaded membership in
+      // `_target`/`_targetLoaded` (RFC 0006 collection store) rather than the
+      // Relation `_records`/`_loaded`, so we read whichever is populated.
+      const loaded = (target as any)._loaded || (target as any)._targetLoaded;
+      if (loaded) {
+        const records = () => (target as any)._records ?? (target as any)._target ?? [];
+        const arrayDelegate = delegateArrayMethod(prop as string, records);
         if (arrayDelegate) return arrayDelegate;
+        const enumerableDelegate = delegateEnumerableMethod(prop as string, records);
+        if (enumerableDelegate) return enumerableDelegate;
       }
       return value;
     },

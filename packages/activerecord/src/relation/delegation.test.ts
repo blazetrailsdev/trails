@@ -4,7 +4,7 @@
  * Mirrors: activerecord/test/cases/relation/delegation_test.rb
  */
 import { describe, it, expect } from "vitest";
-import { Relation } from "../index.js";
+import { Relation, registerModel } from "../index.js";
 import { delegateArrayMethod } from "./delegation.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -14,7 +14,12 @@ import { Comment } from "../test-helpers/models/comment.js";
 
 describe("DelegationTest", () => {
   // Mirrors Rails `fixtures :posts` (DelegationCachingTest declares fixtures).
-  useHandlerFixtures(["posts"], { schema: canonicalSchema });
+  // `comments` is added for the Enumerable delegation sweep below
+  // (DelegationRelationTest declares `fixtures :comments`).
+  useHandlerFixtures(["posts", "comments"], { schema: canonicalSchema });
+
+  registerModel(Post);
+  registerModel(Comment);
 
   it("not respond to arel method", () => {
     // Rails: `assert_not_respond_to target, :exists` — `:exists` is an Arel
@@ -220,4 +225,39 @@ describe("DelegationTest", () => {
       }
     });
   });
+
+  // Mirrors Rails' DelegationWhitelistBlacklistTests, which generates a
+  // `test_delegates_<method>_to_Array` per ARRAY_DELEGATES entry; `partition`
+  // is an `Enumerable` method `Relation`/`CollectionProxy` mix in. JS has no
+  // blocking IO, so we load the target first (Rails' `assert_respond_to`
+  // doesn't trigger a load) before asserting the delegated method is present,
+  // then exercise it: `Enumerable#partition` returns `[matched, unmatched]`
+  // preserving order.
+  describe("DelegationAssociationTest", () => {
+    it("delegates partition to Array", async () => {
+      const post = await Post.first();
+      const target = (post as any).comments;
+      await target.load();
+      expect(typeof (target as any).partition).toBe("function");
+
+      const records: any[] = await (target as any).toArray();
+      const firstId = records[0].id;
+      const [matched, unmatched] = (target as any).partition((c: any) => c.id === firstId);
+      expect(matched.map((c: any) => c.id)).toEqual([firstId]);
+      expect(unmatched.map((c: any) => c.id)).toEqual(records.slice(1).map((c: any) => c.id));
+    });
+  }); // DelegationAssociationTest
+
+  describe("DelegationRelationTest", () => {
+    it("delegates partition to Array", async () => {
+      const target = await Comment.all().load();
+      expect(typeof (target as any).partition).toBe("function");
+
+      const records: any[] = await (target as any).toArray();
+      const firstId = records[0].id;
+      const [matched, unmatched] = (target as any).partition((c: any) => c.id === firstId);
+      expect(matched.map((c: any) => c.id)).toEqual([firstId]);
+      expect(unmatched.map((c: any) => c.id)).toEqual(records.slice(1).map((c: any) => c.id));
+    });
+  }); // DelegationRelationTest
 });
