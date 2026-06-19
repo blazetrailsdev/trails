@@ -1,5 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
+import { association as associationProxy } from "../associations.js";
 import { underscore, isAbortSignal } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
@@ -551,6 +552,32 @@ export class CollectionAssociation extends Association {
 
   override isCollection(): boolean {
     return true;
+  }
+
+  /**
+   * Mirrors Rails' `CollectionAssociation#target=` (collection_association.rb
+   * :285-296): the inverse-wiring chain `set_inverse_instance` → `inversed_from`
+   * → `self.target =`. Under `has_many_inversing`, a single inverse record folds
+   * into the collection via `replace_on_target(record, true, replace: true,
+   * inversing: true)`; without the flag it falls back to the plain holder write
+   * (`super`). A `nil` cannot be removed from the inverse (Rails no-ops too).
+   *
+   * The trails analog of `replace_on_target`'s `@target` write is the
+   * `CollectionProxy` — the canonical has_many store surfaced via
+   * `Base#_associationCache` — reached through `_wireInverseTarget`, so a
+   * belongs_to build under `has_many_inversing` lands in the parent's collection
+   * where readers (`size()`/`load()`) see it.
+   */
+  override inversedFrom(record: Base | null): void {
+    if (!(this.klass as typeof Base | undefined)?.hasManyInversing) {
+      super.inversedFrom(record);
+      return;
+    }
+    if (record === null) return;
+    const proxy = associationProxy(this.owner, this.reflection.name) as unknown as {
+      _wireInverseTarget: (r: Base) => void;
+    };
+    proxy._wireInverseTarget(record);
   }
 
   override get reader(): Base[] {
