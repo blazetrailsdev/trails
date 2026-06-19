@@ -298,7 +298,11 @@ export function validates(
     // _runAsyncValidations honors the forwarded on/if/unless/strict guards, so
     // they pass through unmodified.
     const { attributes: _attributes, ...uniqOpts } = buildOpts(opts) as Record<string, unknown>;
-    validatesUniqueness.call(this, attribute, uniqOpts as Parameters<typeof validatesUniqueness>[1]);
+    validatesUniqueness.call(
+      this,
+      attribute,
+      uniqOpts as Parameters<typeof validatesUniqueness>[1],
+    );
   }
   // Delegate remaining rules (inclusion/exclusion/format/...) to ActiveModel's validates.
   const hasRemaining = Object.keys(arRules).some(
