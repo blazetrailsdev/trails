@@ -633,7 +633,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
  */
 function _resolveBelongsToForeignKey(
   assoc: AssociationDefinition,
-  assocRecord?: Base,
+  _assocRecord?: Base,
   reflection?: any,
 ): string[] {
   if (assoc.options.foreignKey != null) {
