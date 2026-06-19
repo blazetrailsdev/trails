@@ -76,6 +76,19 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
+   * Find the first record matching the current scope, or build one (unsaved).
+   * Routes build through the association so the FK and polymorphic type are
+   * set even when the owner is unsaved (no FK in the where clause).
+   *
+   * Mirrors: ActiveRecord::AssociationRelation#first_or_initialize
+   */
+  async firstOrInitialize(extra?: Record<string, unknown>): Promise<T> {
+    const records = await this.limit(1).toArray();
+    if (records.length > 0) return records[0];
+    return this.build(extra ?? {});
+  }
+
+  /**
    * Build and persist an associated record through the owning association.
    *
    * Mirrors: ActiveRecord::AssociationRelation#_create / #create

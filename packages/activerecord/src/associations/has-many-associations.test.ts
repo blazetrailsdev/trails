@@ -682,7 +682,7 @@ describe("HasManyAssociationsTest", () => {
     const post = HmPost.new({ title: "title", body: "bar" });
     const tag = await HmTag.create({ name: "foo" });
 
-    const tagging = await post.taggings.firstOrInitialize({ tag });
+    const tagging = await post.taggings.where({ tag }).firstOrInitialize();
 
     expect(tagging.tag_id).toBe(tag.id);
     expect(tagging.taggable_type).toBe("Post");
