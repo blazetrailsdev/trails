@@ -586,13 +586,6 @@ describe("PreloaderTest", () => {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
       },
-      // ta/tb essays-through tests cannot use canonical essays (author_id is varchar there)
-      ta_authors: { name: "string" },
-      ta_categories: { name: "string" },
-      ta_essays: { ta_author_id: "integer", ta_category_id: "integer" },
-      tb_authors: { name: "string" },
-      tb_categories: { name: "string" },
-      tb_essays: { tb_author_id: "integer", tb_category_id: "integer" },
     });
   });
 
@@ -609,6 +602,7 @@ describe("PreloaderTest", () => {
   let Tag: typeof Base;
   let Tagging: typeof Base;
   let AuthorFavorite: typeof Base;
+  let Essay: typeof Base;
 
   beforeAll(async () => {
     Author = (await import("./test-helpers/models/author.js")).Author as never;
@@ -623,6 +617,7 @@ describe("PreloaderTest", () => {
     SpecialCategory = catMod.SpecialCategory as never;
     Tag = (await import("./test-helpers/models/tag.js")).Tag as never;
     Tagging = (await import("./test-helpers/models/tagging.js")).Tagging as never;
+    Essay = (await import("./test-helpers/models/essay.js")).Essay as never;
   });
 
   beforeEach(() => {
@@ -636,6 +631,7 @@ describe("PreloaderTest", () => {
     registerModel("SpecialCategory", SpecialCategory);
     registerModel("Tag", Tag);
     registerModel("Tagging", Tagging);
+    registerModel("Essay", Essay);
   });
 
   it("preload with scope", async () => {
@@ -1494,111 +1490,61 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records with through association", async () => {
-    class TAAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class TACategory extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class TAEssay extends Base {
-      static {
-        this.attribute("ta_author_id", "integer");
-        this.attribute("ta_category_id", "integer");
-      }
-    }
-    Associations.hasMany.call(TAAuthor, "essays", {
-      className: "TAEssay",
-      foreignKey: "ta_author_id",
+    const author = await Author.create({ name: "David" });
+    const general = await Category.create({ name: "General" });
+    await Essay.create({
+      name: "A Modest Proposal",
+      writer_type: "Author",
+      writer_id: "David",
+      category_id: "General",
     });
-    Associations.belongsTo.call(TAEssay, "category", {
-      className: "TACategory",
-      foreignKey: "ta_category_id",
-    });
-    Associations.hasMany.call(TAAuthor, "essayCategories", {
-      through: "essays",
-      source: "category",
-      className: "TACategory",
-    });
-    registerModel("TAAuthor", TAAuthor);
-    registerModel("TACategory", TACategory);
-    registerModel("TAEssay", TAEssay);
-
-    const author = await TAAuthor.create({ name: "David" });
-    const cat = await TACategory.create({ name: "General" });
-    await TAEssay.create({ ta_author_id: author.id, ta_category_id: cat.id });
-    const categories = await TACategory.all().toArray();
+    const categories = await Category.all().toArray();
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
+    // One query to get the middle records (i.e. essays); categories come from availableRecords
     await new Preloader({
       records: [author],
-      associations: "essayCategories",
+      associations: "essayCategory",
       availableRecords: categories,
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
-    // One query for the middle (essay) records; categories come from availableRecords
     expect(queryCalls).toHaveLength(1);
-    const preloaded = (author as any)._preloadedAssociations.get("essayCategories") ?? [];
-    expect(preloaded.map((c: any) => c.id)).toContain(cat.id);
+    const preloaded = (author as any)._preloadedAssociations.get("essayCategory");
+    expect(preloaded.id).toBe(general.id);
+    expect(categories.map((c: any) => c.id)).toContain(preloaded.id);
   });
 
   it("preload with only some records available with through associations", async () => {
-    class TBAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class TBCategory extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class TBEssay extends Base {
-      static {
-        this.attribute("tb_author_id", "integer");
-        this.attribute("tb_category_id", "integer");
-      }
-    }
-    Associations.hasMany.call(TBAuthor, "essays", {
-      className: "TBEssay",
-      foreignKey: "tb_author_id",
+    const mary = await Author.create({ name: "Mary" });
+    const dave = await Author.create({ name: "David" });
+    const tech = await Category.create({ name: "Technology" });
+    const general = await Category.create({ name: "General" });
+    await Essay.create({
+      name: "Stay Home",
+      writer_type: "Author",
+      writer_id: "Mary",
+      category_id: "Technology",
     });
-    Associations.belongsTo.call(TBEssay, "category", {
-      className: "TBCategory",
-      foreignKey: "tb_category_id",
+    await Essay.create({
+      name: "A Modest Proposal",
+      writer_type: "Author",
+      writer_id: "David",
+      category_id: "General",
     });
-    Associations.hasMany.call(TBAuthor, "essayCategories", {
-      through: "essays",
-      source: "category",
-      className: "TBCategory",
-    });
-    registerModel("TBAuthor", TBAuthor);
-    registerModel("TBCategory", TBCategory);
-    registerModel("TBEssay", TBEssay);
-
-    const mary = await TBAuthor.create({ name: "Mary" });
-    const dave = await TBAuthor.create({ name: "Dave" });
-    const tech = await TBCategory.create({ name: "Tech" });
-    const general = await TBCategory.create({ name: "General" });
-    await TBEssay.create({ tb_author_id: mary.id, tb_category_id: tech.id });
-    await TBEssay.create({ tb_author_id: dave.id, tb_category_id: general.id });
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
+    // One query for the middle (essay) records, one for the missing category (general)
     await new Preloader({
       records: [mary, dave],
-      associations: "essayCategories",
+      associations: "essayCategory",
       availableRecords: [tech],
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
-    // One query for essays, one for the missing category (general)
     expect(queryCalls).toHaveLength(2);
-    const maryCats = (mary as any)._preloadedAssociations.get("essayCategories") ?? [];
-    const daveCats = (dave as any)._preloadedAssociations.get("essayCategories") ?? [];
-    expect(maryCats.map((c: any) => c.id)).toContain(tech.id);
-    expect(daveCats.map((c: any) => c.id)).toContain(general.id);
+    const maryCat = (mary as any)._preloadedAssociations.get("essayCategory");
+    const daveCat = (dave as any)._preloadedAssociations.get("essayCategory");
+    expect(maryCat.id).toBe(tech.id);
+    expect(daveCat.id).toBe(general.id);
   });
 
   it("preload with available records with multiple classes", async () => {
