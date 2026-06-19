@@ -1285,7 +1285,16 @@ describe("TestNestedAttributesInGeneral", () => {
     const parentBirds = await CanonicalBird.where({ pirate_id: parentPirate.id }).toArray();
     expect(parentBirds.length).toBe(0);
 
-    // Subclass re-declares with different options (no reject)
+    // Subclass re-declares with different options (no reject). The explicit
+    // foreignKey + filter of the inherited `birds` reflection is a workaround
+    // for a trails deviation: assignNestedAttributes derives a has-many's FK
+    // from the runtime instance's class name (`underscore(ctor.name)_id`)
+    // rather than the association's owner reflection (see nested-attributes.ts
+    // `processNestedAttributes`). Without it a `SubPirate` instance resolves
+    // `birds` to a non-existent `sub_pirate_id` column. Rails resolves the FK
+    // from the reflection's `active_record` (always `Pirate` → `pirate_id`), so
+    // a bare `Class.new(Pirate)` needs no re-declaration. Tracked for
+    // convergence by story nested-attr-hasmany-fk-from-reflection.
     class SubPirate extends CanonicalPirate {
       static {
         this.tableName = "pirates";
