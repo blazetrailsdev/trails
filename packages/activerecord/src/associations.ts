@@ -1208,12 +1208,10 @@ function ownerReflectionForeignKey(
   assocName: string,
 ): string | string[] | undefined {
   return (
-    (
-      ctor as unknown as {
-        _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
-      }
-    )._reflectOnAssociation?.(assocName)?.foreignKey ?? undefined
-  );
+    ctor as unknown as {
+      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+    }
+  )._reflectOnAssociation?.(assocName)?.foreignKey;
 }
 
 /**
