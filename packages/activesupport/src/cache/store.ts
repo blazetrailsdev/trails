@@ -109,7 +109,7 @@ export abstract class Store {
       const key = this.normalizeKey(name, merged);
       let entry: Entry | null = null;
       if (!merged.force) {
-        this.instrument("read", name, merged, (payload) => {
+        this.instrument("read", key, merged, (payload) => {
           const cached = this.readEntry(key, merged);
           entry = this.handleExpiredEntry(cached, key, merged);
           if (entry) {
@@ -143,7 +143,7 @@ export abstract class Store {
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
     const version = this.normalizeVersion(name, merged);
-    return this.instrument("read", name, merged, (payload) => {
+    return this.instrument("read", key, merged, (payload) => {
       const entry = this.readEntry(key, merged);
       if (!entry) {
         payload.hit = false;
@@ -177,7 +177,7 @@ export abstract class Store {
     const keys = names.map((n) => this.normalizeKey(n, merged));
     return this.instrumentMulti("read_multi", keys, merged, (payload) => {
       const results = this.readMultiEntries(names, merged);
-      payload.hits = Object.keys(results);
+      payload.hits = Object.keys(results).map((n) => this.normalizeKey(n, merged));
       return results;
     });
   }
@@ -218,7 +218,7 @@ export abstract class Store {
           if (writes[k] == null) delete writes[k];
         }
       }
-      payload.hits = Object.keys(reads);
+      payload.hits = Object.keys(reads).map((n) => this.normalizeKey(n, merged));
       payload.super_operation = "fetch_multi";
       return result;
     });
@@ -229,7 +229,7 @@ export abstract class Store {
   write(name: string, value: unknown, options?: StoreOptions): boolean {
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
-    return this.instrument("write", name, merged, () =>
+    return this.instrument("write", key, merged, () =>
       this.writeEntry(
         key,
         new Entry(value, {
@@ -244,7 +244,7 @@ export abstract class Store {
   delete(name: string, options?: StoreOptions): boolean {
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
-    return this.instrument("delete", name, merged, () => this.deleteEntry(key, merged));
+    return this.instrument("delete", key, merged, () => this.deleteEntry(key, merged));
   }
 
   deleteMulti(names: string[], options?: StoreOptions): number {
@@ -305,37 +305,42 @@ export abstract class Store {
   protected instrument<T>(
     operation: string,
     key: unknown,
-    options: StoreOptions | undefined,
-    block: (payload: EventPayload) => T,
+    options?: StoreOptions,
+    block?: (payload: EventPayload) => T,
   ): T {
-    if (Store.logger?.isDebug?.() && !this.silence) {
-      const optStr =
-        options && Object.keys(options).length > 0 ? ` (${JSON.stringify(options)})` : "";
-      Store.logger.debug?.(`Cache ${operation}: ${this.normalizeKey(key, options)}${optStr}`);
-    }
-    const payload: EventPayload = { key, store: this.constructor.name };
-    if (options) Object.assign(payload, options);
-    return Notifications.instrument<T>(`cache_${operation}.active_support`, payload, () =>
-      block(payload),
-    ) as T;
+    return this._instrument(operation, false, key, options, block);
   }
 
   protected instrumentMulti<T>(
     operation: string,
     keys: unknown[],
+    options?: StoreOptions,
+    block?: (payload: EventPayload) => T,
+  ): T {
+    return this._instrument(operation, true, keys, options, block);
+  }
+
+  private _instrument<T>(
+    operation: string,
+    multi: boolean,
+    key: unknown,
     options: StoreOptions | undefined,
-    block: (payload: EventPayload) => T,
+    block?: (payload: EventPayload) => T,
   ): T {
     if (Store.logger?.isDebug?.() && !this.silence) {
-      const formattedKeys = keys.map((k) => `- ${String(k)}`).join("\n");
-      const optStr =
+      const debugKey = multi
+        ? `: ${(key as unknown[]).length} key(s) specified`
+        : key != null
+          ? `: ${String(key)}`
+          : "";
+      const debugOptions =
         options && Object.keys(options).length > 0 ? ` (${JSON.stringify(options)})` : "";
-      Store.logger.debug?.(`Caches multi ${operation}:\n${formattedKeys}${optStr}`);
+      Store.logger.debug?.(`Cache ${operation}${debugKey}${debugOptions}`);
     }
-    const payload: EventPayload = { key: keys, store: this.constructor.name };
+    const payload: EventPayload = { key, store: this.constructor.name };
     if (options) Object.assign(payload, options);
     return Notifications.instrument<T>(`cache_${operation}.active_support`, payload, () =>
-      block(payload),
+      block ? block(payload) : (undefined as T),
     ) as T;
   }
 
@@ -413,18 +418,21 @@ export abstract class Store {
     return entry;
   }
 
-  protected getEntryValue(entry: Entry, _name: string, _options: StoreOptions): unknown {
+  protected getEntryValue(entry: Entry, name: string, options: StoreOptions): unknown {
+    this.instrument("fetch_hit", name, options);
     return entry.value;
   }
 
   protected saveBlockResultToCache(
     name: string,
-    _key: string,
+    key: string,
     options: StoreOptions,
     block: (key: string, opts: WriteOptions) => unknown,
   ): unknown {
     const mutableOptions = { ...options };
-    const result = block(name, new WriteOptions(mutableOptions));
+    const result = this.instrument("generate", key, mutableOptions, () =>
+      block(name, new WriteOptions(mutableOptions)),
+    );
     if (result != null || !options.skipNil) this.write(name, result, mutableOptions);
     return result;
   }
