@@ -412,6 +412,7 @@ export class AssociationScope {
     if (joinPks.length !== joinFks.length) {
       const name = (reflection as { name?: string }).name ?? "<unknown>";
       const ownerName = (owner.constructor as typeof Base).name;
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
@@ -529,6 +530,7 @@ export class AssociationScope {
           .reflection ?? (reflection as { name?: string; activeRecord?: { name?: string } });
       const name = base.name ?? "<unknown>";
       const ownerName = base.activeRecord?.name ?? "<unknown>";
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,

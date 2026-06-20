@@ -1163,6 +1163,7 @@ export async function loadBelongsTo(
     if (Array.isArray(foreignKey)) {
       const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
       if (pkCols.length !== foreignKey.length) {
+        // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
           name: assocName,
@@ -1286,6 +1287,7 @@ export async function loadHasOne(
   // (matching Rails' join_id_for); otherwise reject.
   if (options.as) {
     if (Array.isArray(foreignKey)) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -1294,6 +1296,7 @@ export async function loadHasOne(
       });
     }
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -1338,6 +1341,7 @@ export async function loadHasOne(
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
+        // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
           name: assocName,
@@ -1403,6 +1407,7 @@ export function buildHasOne(
 
   if (options.as) {
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: _assocName,
@@ -1548,6 +1553,7 @@ export async function loadHasMany(
   // (matching Rails' join_id_for); otherwise reject.
   if (options.as) {
     if (Array.isArray(foreignKey)) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -1556,6 +1562,7 @@ export async function loadHasMany(
       });
     }
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -1613,6 +1620,7 @@ export async function loadHasMany(
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
+        // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
           name: assocName,
@@ -1697,6 +1705,7 @@ export function computeHasManyWhere(
   if (options.as) {
     const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
     if (Array.isArray(foreignKey)) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -1707,6 +1716,7 @@ export function computeHasManyWhere(
     // Collapse CPK to "id" when present (matching Rails' join_id_for).
     // CPK without "id" cannot map to a scalar <as>_id column.
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -1751,6 +1761,7 @@ export function computeHasManyWhere(
     // scope. Existing loaders throw CompositePrimaryKeyMismatchError; do
     // the same here so CollectionProxy construction fails loudly.
     if (!Array.isArray(primaryKey) || primaryKey.length !== foreignKey.length) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -1769,6 +1780,7 @@ export function computeHasManyWhere(
 
   // Scalar FK: a composite PK here is a mismatch too.
   if (Array.isArray(primaryKey)) {
+    // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
     throw new CompositePrimaryKeyMismatchError({
       activeRecord: ctor.name,
       name: assocName,

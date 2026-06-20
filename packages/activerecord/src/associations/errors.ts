@@ -210,6 +210,22 @@ export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends Thr
  * (association-scope, collection-proxy, autosave, the inline association
  * loaders) don't hold a reflection — they pass a `primaryKey` they already
  * resolved, which takes precedence when no macro predicates are present.
+ *
+ * Tracked deviation (RFC 0023 — story
+ * `composite-pk-mismatch-extra-guard-raise-sites`): Rails raises this error
+ * from exactly one place, `AbstractReflection#check_validity!`
+ * (reflection.rb:623,625), reached via `Association#initialize`
+ * (association.rb:39) on first use. The guard sites tagged
+ * `// Tracked deviation (composite-pk guard)` throughout `association-scope.ts`,
+ * `collection-proxy.ts`, `autosave-association.ts` and `associations.ts` are
+ * trails-only: they fire on inline-fallback / scope-building / autosave / `:as`
+ * collapse paths that never route through `checkValidityBang`, deriving the
+ * message from trails-computed join keys rather than Rails'
+ * `active_record_primary_key` / `association_primary_key`. They are kept (not
+ * removed) because dropping them would surface a silent broken WHERE /
+ * `readAttribute(undefined)` instead of a clear error. Converging these paths
+ * through the canonical `checkValidityBang` (and removing the duplicates) is
+ * tracked by story `route-composite-pk-guards-through-check-validity`.
  */
 export interface CompositePrimaryKeyMismatchReflection {
   /** The owner — a model class (whose `name` builds the message) or its name. */
