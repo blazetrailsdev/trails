@@ -487,6 +487,14 @@ class TestExtractor
         acc[:adapter_syms].concat(extract_symbol_args(node))
       elsif name =~ /\Asupports_.+\?\z/
         acc[:features] << name.sub(/\Asupports_/, "").sub(/\?\z/, "")
+      elsif name == "prepared_statements" || name == "prepared_statements?"
+        # A runtime predicate (per-connection config) the extractor cannot
+        # evaluate statically. Recording it as a guard makes any compound that
+        # mixes it with an adapter predicate (e.g. adapter_test.rb's
+        # `unless PG || (SQLite3 && !prepared_statements)`) a non-comparable
+        # gate — rather than silently dropping the qualifier and over/under-
+        # restricting the adapter set.
+        acc[:guards] << "prepared_statements"
       elsif name == "mariadb?"
         acc[:guards] << "mariadb"
       elsif name == "in_memory_db?"

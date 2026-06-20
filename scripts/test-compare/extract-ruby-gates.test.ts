@@ -68,6 +68,25 @@ describe("Ruby extractor gate detection", () => {
     expect(g["unconditional"] ?? null).toBeNull(); // no gate key → null over JSON
   });
 
+  it("treats prepared_statements as a guard, dropping the adapter set in a compound", () => {
+    const g = rubyGates({
+      "cases/bar_test.rb": `
+        unless current_adapter?(:PostgreSQLAdapter) ||
+            (current_adapter?(:SQLite3Adapter) && !ActiveRecord::Base.lease_connection.prepared_statements)
+          test "ps compound" do; end
+        end
+        if current_adapter?(:PostgreSQLAdapter) && ActiveRecord::Base.lease_connection.prepared_statements
+          test "pg and ps" do; end
+        end
+      `,
+    });
+    // The runtime `prepared_statements` predicate can't be evaluated statically,
+    // so a compound mixing it with an adapter check drops the (unsound) adapter
+    // set and keeps a non-comparable guard.
+    expect(g["ps compound"]).toEqual({ guards: ["prepared_statements"], source: ["class"] });
+    expect(g["pg and ps"]).toEqual({ guards: ["prepared_statements"], source: ["class"] });
+  });
+
   it("intersects a dir adapter with an in-body feature skip", () => {
     const g = rubyGates({
       "cases/adapters/postgresql/combo_test.rb": `test "pg json" do; skip "x" unless supports_json?; end`,
