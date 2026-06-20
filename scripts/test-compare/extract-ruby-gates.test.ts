@@ -114,6 +114,30 @@ describe("Ruby extractor gate detection", () => {
     expect(g["or compound"]).toEqual({ features: ["insert_returning"], source: ["class"] });
   });
 
+  it("does not emit an adapter exclusion under `unless` (negation → disjunction)", () => {
+    const g = rubyGates({
+      // `unless feature && !sqlite` runs when `!feature || sqlite` — a disjunction
+      // that isn't one adapter set, so only the inverted feature guard surfaces.
+      "cases/bar_test.rb": `
+        def test_unless_compound; end unless supports_insert_returning? && !current_adapter?(:SQLite3Adapter)
+      `,
+    });
+    expect(g["unless compound"]).toEqual({ guards: ["no_insert_returning"], source: ["class"] });
+  });
+
+  it("intersects a positive adapter with a negated adapter in a pure conjunction", () => {
+    const g = rubyGates({
+      "cases/bar_test.rb": `
+        def test_pg_not_mysql; end if current_adapter?(:PostgreSQLAdapter) && !current_adapter?(:Mysql2Adapter)
+        def test_pos_neg_or; end if current_adapter?(:PostgreSQLAdapter) || !current_adapter?(:Mysql2Adapter)
+      `,
+    });
+    // `&&` → PG minus MySQL = PG (sound intersection of the include and exclusion).
+    expect(g["pg not mysql"]).toEqual({ adapters: ["postgresql"], source: ["class"] });
+    // `||` mixing a positive and a negated adapter is unsound → no adapter set.
+    expect(g["pos neg or"] ?? null).toBeNull();
+  });
+
   it("intersects a dir adapter with an in-body feature skip", () => {
     const g = rubyGates({
       "cases/adapters/postgresql/combo_test.rb": `test "pg json" do; skip "x" unless supports_json?; end`,

@@ -460,9 +460,15 @@ class TestExtractor
     adapters = acc[:adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
     neg_adapters = acc[:neg_adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
     gate = {}
-    # A condition mixing a POSITIVE adapter predicate with a feature/guard is a
-    # compound (`&&`/`||`) — its run-on adapter set isn't sound, so drop it.
-    mixed = !adapters.empty? && !(acc[:features].empty? && acc[:guards].empty?)
+    # A POSITIVE adapter set isn't sound — and must be dropped — when the
+    # condition mixes it with a feature/guard (`supports_X? && current_adapter?`
+    # could be `&&` or `||`; the run-on set differs), or with a negated adapter
+    # under `||` (`current_adapter?(:A) || !current_adapter?(:B)` is the
+    # complement of B, not A). A pure positive `||` (`A || B`) stays sound — it
+    # is the union the concat already collected.
+    mixed = !adapters.empty? &&
+            (!(acc[:features].empty? && acc[:guards].empty?) ||
+             (acc[:has_or] && !neg_adapters.empty?))
     if !adapters.empty? && !mixed
       gate[:adapters] = positive ? adapters : (ALL_ADAPTERS - adapters)
     end
@@ -503,11 +509,15 @@ class TestExtractor
     acc[:has_or] = true if node[0] == :binary && (node[2] == :"||" || node[2] == :or)
     name = call_ident_name(node)
     if name
+      # Once a predicate is identified, stop: recursing into its own receiver/args
+      # would re-match the same call (e.g. the `:fcall` inside a `:method_add_arg`)
+      # and double-count it.
       if name == "current_adapter?"
         (negated ? acc[:neg_adapter_syms] : acc[:adapter_syms]).concat(extract_symbol_args(node))
         return
       elsif name =~ /\Asupports_.+\?\z/
         acc[:features] << name.sub(/\Asupports_/, "").sub(/\?\z/, "")
+        return
       elsif name == "prepared_statements" || name == "prepared_statements?"
         # A runtime predicate (per-connection config) the extractor cannot
         # evaluate statically. Recording it as a guard makes any compound that
@@ -516,12 +526,16 @@ class TestExtractor
         # gate — rather than silently dropping the qualifier and over/under-
         # restricting the adapter set.
         acc[:guards] << "prepared_statements"
+        return
       elsif name == "mariadb?"
         acc[:guards] << "mariadb"
+        return
       elsif name == "in_memory_db?"
         acc[:guards] << "in_memory_db"
+        return
       elsif name == "database_version"
         acc[:guards] << "version"
+        return
       end
     end
     node.each { |c| scan_run_condition(c, acc, negated) if c.is_a?(Array) }
