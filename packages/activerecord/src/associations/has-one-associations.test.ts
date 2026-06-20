@@ -603,25 +603,33 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("has one transaction", async () => {
+    // Drive the public property-setter (Rails `company.account = …`). On a
+    // saved owner the setter can't await, so it parks the persist on
+    // `_pendingWrite`; we await that promise to count the assignment's own
+    // queries (Rails counts them synchronously). The first assignment of an
+    // already-associated record (same id) runs no queries — exercising
+    // `sameRecord` through the setter.
     const company = companies("first_firm") as any;
     const account = await Account.find(1);
     await readHasOne(company, "account"); // force loading
     await assertNoQueries(false, async () => {
-      await company.association("account").writer(account);
+      company.account = account;
     });
 
-    await company.association("account").writer(null);
+    company.account = null;
+    await company.association("account")._pendingWrite;
     await assertNoQueries(false, async () => {
-      await company.association("account").writer(null);
+      company.account = null;
     });
 
     const account2 = await Account.find(2);
     await assertQueriesCount(3, false, async () => {
-      await company.association("account").writer(account2);
+      company.account = account2;
+      await company.association("account")._pendingWrite;
     });
 
     await assertNoQueries(false, async () => {
-      await (new Firm().association("account") as any).writer(account2);
+      (new Firm() as any).account = account2;
     });
   });
 
