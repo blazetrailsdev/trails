@@ -31,7 +31,13 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
-import { Associations, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
+import {
+  Associations,
+  buildHasManyRelation,
+  loadBelongsTo,
+  loadHasMany,
+  loadHasOne,
+} from "./associations.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
@@ -2674,6 +2680,88 @@ describe("AssociationsTest", () => {
       foreignKey: "order_id",
     });
     expect((agreement as any)?.signature).toBe("only");
+  });
+
+  // Exercises loadHasMany's inline (no-reflection) fallback for a POLYMORPHIC
+  // (`as`) association on a query_constraints owner. The owner key must resolve
+  // to the owner's query_constraints list (`[blog_id, id]`, mirroring
+  // `reflection.activeRecordPrimaryKey`) and the scalar `parent_id` FK must
+  // widen to the composite `[blog_id, parent_id]` (mirroring
+  // `deriveFkQueryConstraints`) so a same-`parent_id` row in a DIFFERENT shard
+  // is excluded — rather than keying on the scalar `id` alone, which would
+  // wrongly include it.
+  it("has many loads via inline fallback resolving polymorphic owner key from query constraints", async () => {
+    const post = await ShardedBlogPost.create({ blog_id: 1, title: "Parent" });
+    const pid = (post as any).id;
+    await ShardedBlogPost.create({
+      blog_id: 1,
+      parent_id: pid,
+      parent_type: "ShardedBlogPost",
+      title: "match",
+    });
+    await ShardedBlogPost.create({
+      blog_id: 2,
+      parent_id: pid,
+      parent_type: "ShardedBlogPost",
+      title: "wrongShard",
+    });
+    const children = await loadHasMany(post, "freshChildren", {
+      className: "ShardedBlogPost",
+      as: "parent",
+    });
+    expect(children.map((c) => (c as any).title)).toEqual(["match"]);
+  });
+
+  // Same no-reflection polymorphic fallback path as above, through loadHasOne.
+  it("has one loads via inline fallback resolving polymorphic owner key from query constraints", async () => {
+    const post = await ShardedBlogPost.create({ blog_id: 7, title: "Parent" });
+    const pid = (post as any).id;
+    await ShardedBlogPost.create({
+      blog_id: 7,
+      parent_id: pid,
+      parent_type: "ShardedBlogPost",
+      title: "match",
+    });
+    await ShardedBlogPost.create({
+      blog_id: 9,
+      parent_id: pid,
+      parent_type: "ShardedBlogPost",
+      title: "wrongShard",
+    });
+    const child = await loadHasOne(post, "freshChild", {
+      className: "ShardedBlogPost",
+      as: "parent",
+    });
+    expect((child as any)?.title).toBe("match");
+  });
+
+  // `buildHasManyRelation` (the seeded scope behind CollectionProxy /
+  // `.toSql()` / counts) shares `computeHasManyWhere`, which must apply the
+  // same query_constraints widening: a polymorphic `as` scope on a
+  // query_constraints owner keys on the composite `[blog_id, parent_id]` so a
+  // cross-shard same-`parent_id` row is excluded from the relation itself,
+  // not only from the AssociationScope load path.
+  it("has many builds polymorphic relation keyed on owner query constraints", async () => {
+    const post = await ShardedBlogPost.create({ blog_id: 1, title: "Parent" });
+    const pid = (post as any).id;
+    await ShardedBlogPost.create({
+      blog_id: 1,
+      parent_id: pid,
+      parent_type: "ShardedBlogPost",
+      title: "match",
+    });
+    await ShardedBlogPost.create({
+      blog_id: 2,
+      parent_id: pid,
+      parent_type: "ShardedBlogPost",
+      title: "wrongShard",
+    });
+    const rel = buildHasManyRelation(post, "freshChildren", {
+      className: "ShardedBlogPost",
+      as: "parent",
+    });
+    const rows: Base[] = await rel!.toArray();
+    expect(rows.map((r) => (r as any).title)).toEqual(["match"]);
   });
 
   it("delete single composite has many through join row", async () => {

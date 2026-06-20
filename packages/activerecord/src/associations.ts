@@ -1356,11 +1356,17 @@ export async function loadHasOne(
       result = await targetModel.findBy(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
-      const inlinePk = Array.isArray(primaryKey) ? "id" : primaryKey;
-      result = await targetModel.findBy({
-        [foreignKey]: record._readAttribute(inlinePk),
-        [typeCol]: polymorphicName(ctor),
-      });
+      const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
+        ctor,
+        options,
+        primaryKey,
+        foreignKey,
+      );
+      const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+      for (let i = 0; i < fkCols.length; i++) {
+        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
+      }
+      result = await targetModel.findBy(conditions);
     } else if (options.scope) {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       let rel = targetModel
@@ -1637,11 +1643,17 @@ export async function loadHasMany(
       rel = targetModel.all().where(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
-      const inlinePk = Array.isArray(primaryKey) ? "id" : primaryKey;
-      rel = targetModel.all().where({
-        [foreignKey]: record._readAttribute(inlinePk),
-        [typeCol]: polymorphicName(ctor),
-      });
+      const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
+        ctor,
+        options,
+        primaryKey,
+        foreignKey,
+      );
+      const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+      for (let i = 0; i < fkCols.length; i++) {
+        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
+      }
+      rel = targetModel.all().where(conditions);
     } else {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       rel = targetModel.all().where({ [foreignKey]: record._readAttribute(ownerKey as string) });
@@ -1699,6 +1711,53 @@ function _inlineOwnerKey(
 }
 
 /**
+ * Resolve the foreign-key column(s) and matching owner-key column(s) for an
+ * inline (no-reflection) polymorphic (`options.as`) association fallback,
+ * mirroring the reflection path: `reflection.activeRecordPrimaryKey` for the
+ * owner key and `BelongsToReflection#deriveFkQueryConstraints` for the
+ * foreign key (reflection.rb).
+ *
+ * For a query_constraints owner the scalar `${as}_id` FK widens to the
+ * composite `[shardKey, ${as}_id]` and the owner key becomes the
+ * query_constraints list — so the inline fallback keys against the full
+ * query_constraints list (e.g. `[blog_id, id]`) like AssociationScope, not
+ * the scalar `id` alone. A plain (non-query_constraints) owner keeps the
+ * scalar FK and the `_inlineOwnerKey`-resolved scalar key.
+ */
+function _inlinePolymorphicKeys(
+  ctor: typeof Base,
+  options: AssociationOptions,
+  primaryKey: string | string[],
+  scalarFk: string,
+): { fkCols: string[]; ownerKeyCols: string[] } {
+  if (
+    options.primaryKey === undefined &&
+    (options.queryConstraints || hasQueryConstraints.call(ctor as any))
+  ) {
+    const qc = options.queryConstraints ?? queryConstraintsList.call(ctor as any);
+    // Mirror deriveFkQueryConstraints' 2-attribute case: replace the owner-PK
+    // slot in the query_constraints list with the polymorphic `${as}_id` FK.
+    // Lists of a different shape (>2 attrs, no scalar PK, FK already present)
+    // are Rails ArgumentError cases with no valid config; fall through to the
+    // scalar collapse below rather than reproducing every Rails raise branch.
+    const ownerPk = ctor.primaryKey;
+    const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
+    if (qc && qc.length === 2 && ownerPkStr && qc.includes(ownerPkStr) && !qc.includes(scalarFk)) {
+      const [firstKey, lastKey] = qc;
+      const fkCols = firstKey === ownerPkStr ? [scalarFk, lastKey] : [firstKey, scalarFk];
+      return { fkCols, ownerKeyCols: qc };
+    }
+  }
+  // Scalar path — identical to the pre-fix inline behavior
+  // (`Array.isArray(primaryKey) ? "id" : primaryKey`): a scalar polymorphic FK
+  // pairs with a single owner key. `_inlineOwnerKey` can return the
+  // query_constraints array, which a scalar FK can't zip against, so collapse
+  // here rather than delegating.
+  const scalarOwnerKey = Array.isArray(primaryKey) ? "id" : primaryKey;
+  return { fkCols: [scalarFk], ownerKeyCols: [scalarOwnerKey] };
+}
+
+/**
  * Compute the WHERE condition hash that scopes a hasMany relation to its
  * owner. Returns null if primary key values are missing (Rails'
  * NullRelation fallback). Pure — no Relation construction.
@@ -1737,11 +1796,19 @@ export function computeHasManyWhere(
         foreignKey,
       });
     }
-    const scalarPk = Array.isArray(primaryKey) ? "id" : primaryKey;
-    const pkValue = record._readAttribute(scalarPk);
-    if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
-    return { [foreignKey]: pkValue, [typeCol]: polymorphicName(ctor) };
+    // Same query_constraints widening as the inline loadHasMany/loadHasOne
+    // polymorphic fallback: a query_constraints owner keys on the composite
+    // `[shardKey, ${as}_id]` against the query_constraints list, not the
+    // scalar `id` alone (which would leak cross-shard rows).
+    const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(ctor, options, primaryKey, foreignKey);
+    const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+    for (let i = 0; i < fkCols.length; i++) {
+      const pkValue = record._readAttribute(ownerKeyCols[i]);
+      if (pkValue === null || pkValue === undefined) return null;
+      conditions[fkCols[i]] = pkValue;
+    }
+    return conditions;
   }
 
   // Prefer the reflection's foreign key, which is derived from the class that
