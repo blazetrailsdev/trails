@@ -97,3 +97,29 @@ export async function captureSql(
   }
   return sqls;
 }
+
+/**
+ * captureLogOutput — mirror of Rails' `capture_log_output` test helper
+ * (insert_all_test.rb). Rails swaps `ActiveRecord::Base.logger` for one backed
+ * by a StringIO and yields the buffer; assertions then `assert_match` against
+ * the accumulated log text. The Rails log line for a statement is the
+ * `name` label ("Book Bulk Insert") followed by the SQL, so we reconstruct
+ * the same `"<name> <sql>"` text from each `sql.active_record` event and
+ * return the joined buffer.
+ * @internal
+ */
+export async function captureLogOutput(fn: () => void | Promise<void>): Promise<string> {
+  let output = "";
+  const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+    const payload = event.payload;
+    const name: unknown = payload?.name;
+    const sql: unknown = payload?.sql;
+    output += `${typeof name === "string" ? name : ""} ${typeof sql === "string" ? sql : ""}\n`;
+  });
+  try {
+    await fn();
+  } finally {
+    Notifications.unsubscribe(sub);
+  }
+  return output;
+}

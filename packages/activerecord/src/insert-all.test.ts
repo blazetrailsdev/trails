@@ -26,6 +26,7 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
+import { captureLogOutput } from "./testing/sql-capture.js";
 import { adapterSupports, itIfSupports } from "./test-helpers/supports.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
@@ -432,15 +433,26 @@ describe("InsertAllTest", () => {
     },
   );
 
-  itIfSupports("insert_conflict_target", "insert logs message including model name", (ctx) => {
-    ctx.skip();
-    // BLOCKED: SQL log assertion (capture_log_output). RFC 0030 d2-insert-all-canonical-models.
+  itIfSupports("insert_conflict_target", "insert logs message including model name", async () => {
+    const output = await captureLogOutput(async () => {
+      await Book.insert({ name: "Rework", author_id: 1 });
+    });
+    expect(output).toContain("Book Insert");
   });
 
-  itIfSupports("insert_conflict_target", "insert all logs message including model name", (ctx) => {
-    ctx.skip();
-    // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
-  });
+  itIfSupports(
+    "insert_conflict_target",
+    "insert all logs message including model name",
+    async () => {
+      const output = await captureLogOutput(async () => {
+        await Book.insertAll([
+          { name: "Remote", author_id: 1 },
+          { name: "Renote", author_id: 1 },
+        ]);
+      });
+      expect(output).toContain("Book Bulk Insert");
+    },
+  );
 
   itIfSupports(
     "insert_on_duplicate_update",
@@ -481,10 +493,16 @@ describe("InsertAllTest", () => {
     expect(category4.type).toBeNull();
   });
 
-  itIfSupports("insert_on_duplicate_update", "upsert logs message including model name", (ctx) => {
-    ctx.skip();
-    // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
-  });
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert logs message including model name",
+    async () => {
+      const output = await captureLogOutput(async () => {
+        await Book.upsert({ name: "Remote", author_id: 1 });
+      });
+      expect(output).toContain("Book Upsert");
+    },
+  );
 
   // Rails guards this with `unless in_memory_db?` (insert_all_test.rb:359).
   // trails' default SQLite worker is file-backed, never `:memory:`, so the
@@ -506,9 +524,14 @@ describe("InsertAllTest", () => {
   itIfSupports(
     "insert_on_duplicate_update",
     "upsert all logs message including model name",
-    (ctx) => {
-      ctx.skip();
-      // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
+    async () => {
+      const output = await captureLogOutput(async () => {
+        await Book.upsertAll([
+          { name: "Remote", author_id: 1 },
+          { name: "Renote", author_id: 1 },
+        ]);
+      });
+      expect(output).toContain("Book Bulk Upsert");
     },
   );
 
