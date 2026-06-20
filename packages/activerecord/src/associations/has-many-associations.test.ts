@@ -695,6 +695,20 @@ describe("HasManyAssociationsTest", () => {
     expect(tagging.tag_id).toBe(tag.id);
     expect(tagging.taggable_type).toBe("Post");
   });
+
+  it("deleting updates counter cache with dependent delete all", async () => {
+    const post = posts("welcome");
+    const startCount = (post as any).tags_count as number;
+    await post.updateColumns({ taggings_with_delete_all_count: startCount });
+
+    const first = (await post.taggingsWithDeleteAll.first())!;
+    await post.taggingsWithDeleteAll.delete(first);
+
+    await post.reload();
+    expect((post as any).taggings_with_delete_all_count).toBe(startCount - 1);
+    // dependent: :delete_all DELETEs the row — it must not survive with a null FK.
+    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
+  });
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -3910,37 +3924,6 @@ describe("HasManyAssociationsTest", () => {
     const post = await CcDelNdPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
     const reloaded = await CcDelNdAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(0);
-  });
-  it("deleting updates counter cache with dependent delete all", async () => {
-    class CcDelDaAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.hasMany("posts", {
-          className: "CcDelDaPost",
-          foreignKey: "author_id",
-          dependent: "delete",
-        });
-      }
-    }
-    class CcDelDaPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcDelDaAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcDelDaAuthor);
-    registerModel(CcDelDaPost);
-    const author = await CcDelDaAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcDelDaPost.create({ author_id: author.id, title: "A" });
-    await post.destroy();
-    const reloaded = await CcDelDaAuthor.find(author.id!);
     expect((reloaded as any).posts_count).toBe(0);
   });
   it("deleting updates counter cache with dependent destroy", async () => {

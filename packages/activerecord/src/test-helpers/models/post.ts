@@ -20,6 +20,7 @@ export class Post extends Base {
   declare body: string;
   declare comments: AssociationProxy<Comment>;
   declare taggings: AssociationProxy<Tagging>;
+  declare taggingsWithDeleteAll: AssociationProxy<Tagging>;
 
   static namedExtension = {
     author() {
