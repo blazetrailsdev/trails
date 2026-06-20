@@ -1,8 +1,9 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/optimizer_hints_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { describeIfPg, pgSupportsOptimizerHints, PostgreSQLAdapter } from "./test-helper.js";
+import { it, expect, beforeAll } from "vitest";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { describeIfSupports } from "../../test-helpers/supports.js";
 import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";
@@ -15,7 +16,7 @@ import { Post } from "../../test-helpers/models/post.js";
 // installed), so the examples never run on a server that lacks it. Mirror that
 // with a conditional describe.
 describeIfPg("PostgreSQLAdapter", () => {
-  describe.skipIf(!pgSupportsOptimizerHints)("PostgresqlOptimizerHintsTest", () => {
+  describeIfSupports("optimizer_hints", "PostgresqlOptimizerHintsTest", () => {
     // Mirrors Rails' `fixtures :posts`. Rails' posts.yml uses literal
     // `author_id: 1` (David); our ported posts fixture references the author by
     // label, so authors must be declared first for that ref to resolve to

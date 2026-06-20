@@ -1,8 +1,9 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/optimizer_hints_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { describeIfMysql, supportsOptimizerHints, Mysql2Adapter } from "./test-helper.js";
+import { it, expect, beforeAll } from "vitest";
+import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
+import { describeIfSupports } from "../../test-helpers/supports.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
@@ -13,7 +14,7 @@ import { Post } from "../../test-helpers/models/post.js";
 // (MySQL ≥ 5.7.7, never MariaDB), so the examples never run on a server that
 // reports no support. Mirror that with a conditional describe.
 describeIfMysql("Mysql2Adapter", () => {
-  describe.skipIf(!supportsOptimizerHints)("OptimizerHintsTest", () => {
+  describeIfSupports("optimizer_hints", "OptimizerHintsTest", () => {
     // mirrors Rails: fixtures :posts
     useHandlerFixtures(["posts"], { schema: canonicalSchema });
 

@@ -2341,33 +2341,37 @@ describe("MigrationTest", () => {
     expect(ran).toEqual([]);
   });
 
-  it.skipIf(adapterType !== "postgres")("with advisory lock closes connection", async () => {
-    // PG-specific: mirrors Rails test_with_advisory_lock_closes_connection.
-    // Rails queries pg_stat_activity for lingering lock queries; in JS we
-    // check that acquire/release are called symmetrically with the same
-    // lock id. After the Phase D-X collapse the advisory lock lives on
-    // the adapter's single persistent pg.Client (no separate pinned
-    // pool client), so releaseAdvisoryLock firing pg_advisory_unlock on
-    // the same session is the closure proof.
-    const { adapter: realAdapter } = createSidecarTestAdapter();
-    const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
-    const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
-    try {
-      const proxy: MigrationProxy = {
-        version: "200",
-        name: "NoOp",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
-      };
-      const migrator = new Migrator(realAdapter, [proxy]);
-      await migrator.migrate();
-      expect(getSpy).toHaveBeenCalledTimes(1);
-      expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
-      expect(await migrator.getAllVersions()).toContain("200");
-    } finally {
-      getSpy.mockRestore();
-      releaseSpy.mockRestore();
-    }
-  });
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "advisory_locks",
+    "with advisory lock closes connection",
+    async () => {
+      // PG-specific: mirrors Rails test_with_advisory_lock_closes_connection.
+      // Rails queries pg_stat_activity for lingering lock queries; in JS we
+      // check that acquire/release are called symmetrically with the same
+      // lock id. After the Phase D-X collapse the advisory lock lives on
+      // the adapter's single persistent pg.Client (no separate pinned
+      // pool client), so releaseAdvisoryLock firing pg_advisory_unlock on
+      // the same session is the closure proof.
+      const { adapter: realAdapter } = createSidecarTestAdapter();
+      const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
+      const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
+      try {
+        const proxy: MigrationProxy = {
+          version: "200",
+          name: "NoOp",
+          migration: () => ({ up: async () => {}, down: async () => {} }),
+        };
+        const migrator = new Migrator(realAdapter, [proxy]);
+        await migrator.migrate();
+        expect(getSpy).toHaveBeenCalledTimes(1);
+        expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
+        expect(await migrator.getAllVersions()).toContain("200");
+      } finally {
+        getSpy.mockRestore();
+        releaseSpy.mockRestore();
+      }
+    },
+  );
 
   it("with advisory lock raises the right error when it fails to release lock", async () => {
     const lockAdapter = makeLockAdapter({ acquires: true, releases: false });
@@ -3049,7 +3053,7 @@ describeIfMysql("BulkAlterTableMigrationsTest", () => {
     await adapter.close();
   });
 
-  it("updating auto increment", async () => {
+  itIfSupports("bulk_alter", "updating auto increment", async () => {
     const isAutoIncrement = async (): Promise<boolean> => {
       const cols = await adapter.columns("delete_me");
       const id = cols.find((c) => c.name === "id");

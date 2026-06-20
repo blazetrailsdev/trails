@@ -33,16 +33,28 @@ describe("TransactionIsolationUnsupportedTest", () => {
 });
 
 // Rails: TransactionIsolationTest (joining/nested subtests).
-// Rails guards the full class with supports_transaction_isolation? && !SQLite3,
-// but these two subtests exercise a framework-level check that fires before any
-// DB call, so they pass on every adapter and provide broader coverage here.
+// Rails guards the full class with `supports_transaction_isolation? &&
+// !current_adapter?(:SQLite3Adapter)`. The test:compare Ruby extractor collapses
+// such mixed adapter+feature conditions to the feature alone — its run-on adapter
+// set "isn't sound" for a compound `&&` (extract-ruby-tests.rb:462) — so the
+// canonical railsGate for these subtests is feature-only `transaction_isolation`,
+// no adapter. We mirror that with a bare `itIfSupports("transaction_isolation")`
+// (no `.skipIf(sqlite)`): it is the convergent gate AND safe, because these two
+// subtests exercise a framework-level isolation check that fires before any DB
+// call, so they pass on every adapter (SQLite included).
+//
+// The four isolation-LEVEL subtests below (read uncommitted/committed/repeatable
+// read/serializable) are NOT framework-only — they need real cross-connection PG
+// semantics, so they stay in the PG-bodied describeIfPg block and remain a
+// tracked wrong-gate in gate-wrong-gate-body-convergence (a generic-body rewrite
+// is required before their gate can drop the adapter restriction).
 describe("TransactionIsolationTest", () => {
   setupHandlerSuite();
   beforeAll(async () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
   });
 
-  itIfSupports.skipIf(adapterType === "sqlite")(
+  itIfSupports(
     "transaction_isolation",
     "setting isolation when joining a transaction raises an error",
     async () => {
@@ -59,7 +71,7 @@ describe("TransactionIsolationTest", () => {
     },
   );
 
-  itIfSupports.skipIf(adapterType === "sqlite")(
+  itIfSupports(
     "transaction_isolation",
     "setting isolation when starting a nested transaction raises error",
     async () => {
