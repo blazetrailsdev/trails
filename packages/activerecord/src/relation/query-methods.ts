@@ -876,17 +876,20 @@ export function buildWhereClause(
   if (opts instanceof Nodes.Node) return new WhereClause([opts]);
 
   if (typeof opts === "string") {
-    // Mirrors build_where_clause (query_methods.rb:1625-1627): a string fragment
-    // with binds becomes a BoundSqlLiteral node — named (`:name`) when the first
-    // rest arg is a Hash and the fragment carries a `:word` token, positional
-    // (`?`) otherwise. A bare fragment is wrapped verbatim as `Arel.sql(opts)`.
+    // Mirrors build_where_clause (query_methods.rb:1620-1628): a bare fragment is
+    // wrapped verbatim as Arel.sql(opts); a fragment whose first rest arg is a
+    // Hash and that carries a `:word` token builds a named BoundSqlLiteral; a `?`
+    // fragment builds a positional BoundSqlLiteral; any remaining rest-bearing
+    // fragment (no `?`, no named hash) falls back to sanitize_sql.
     let parts: Nodes.Node[];
     if (rest.length === 0) {
-      parts = opts.trim() ? [arelSql(opts)] : [];
+      parts = [arelSql(opts)];
     } else if (isPlainObject(rest[0]) && /:\w+/.test(opts)) {
       parts = [buildNamedBoundSqlLiteral.call(this, opts, rest[0])];
-    } else {
+    } else if (opts.includes("?")) {
       parts = [buildBoundSqlLiteral.call(this, opts, rest)];
+    } else {
+      parts = [new Nodes.SqlLiteral(this._modelClass.sanitizeSqlArray(opts, ...rest))];
     }
     return new WhereClause(parts);
   }
