@@ -171,10 +171,8 @@ export abstract class Store {
     return hash;
   }
 
-  fetchMulti(
-    ...namesAndBlock: [...string[], (key: string, opts: WriteOptions) => unknown]
-  ): Record<string, unknown> {
-    const block = namesAndBlock.pop() as ((key: string, opts: WriteOptions) => unknown) | undefined;
+  fetchMulti(...namesAndBlock: [...string[], (key: string) => unknown]): Record<string, unknown> {
+    const block = namesAndBlock.pop() as ((key: string) => unknown) | undefined;
     if (typeof block !== "function")
       throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
     const names = namesAndBlock as string[];
@@ -186,7 +184,7 @@ export abstract class Store {
     for (const name of names) {
       ordered[name] = Object.prototype.hasOwnProperty.call(reads, name)
         ? reads[name]
-        : (writes[name] = block(name, new WriteOptions(merged)));
+        : (writes[name] = block(name));
     }
     if (merged.skipNil) {
       for (const k of Object.keys(writes)) {
