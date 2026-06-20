@@ -309,6 +309,7 @@ export class JoinDependency {
     // Build JOIN via JoinAssociation when reflection is available (mirrors Rails),
     // falling back to inline predicate construction otherwise.
     let arelJoin: Nodes.Join;
+    let scopeJoinSources: Nodes.Node[] = [];
     if (reflection) {
       const joinAssoc = new JoinAssociation(reflection);
       const joins = joinAssoc.joinConstraints(
@@ -319,6 +320,7 @@ export class JoinDependency {
         (_refl, _remaining) => [targetArelTable, false],
       );
       arelJoin = joins[0] as Nodes.Join;
+      scopeJoinSources = joinAssoc.joinSources;
       // When the target table was aliased (collision), scope/STI predicates from
       // klass.all() reference the unaliased table. Rebind to the aliased table.
       // Skip when the source (foreign) table shares the target's real name — a
@@ -362,6 +364,7 @@ export class JoinDependency {
     }
 
     const treePart = reflection ? new JoinAssociation(reflection) : new JoinLeaf(targetModel);
+    treePart.scopeJoinSources = scopeJoinSources;
     treePart.tableIndex = tableIndex;
     treePart.arelTable = targetArelTable;
     treePart.tableAlias = tableAlias;
@@ -774,6 +777,8 @@ export class JoinDependency {
         joins.push(arelJoin);
       }
     }
+    // Scope-contributed raw-string joins (Rails `joins.concat arel.join_sources`).
+    for (const src of child.scopeJoinSources) joins.push(src as Nodes.Join);
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
   }
 
