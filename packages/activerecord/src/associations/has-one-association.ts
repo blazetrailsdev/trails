@@ -193,6 +193,16 @@ export class HasOneAssociation extends SingularAssociation {
   async persistReplace(): Promise<void> {
     const pending = this._pendingReplace;
     if (!pending) return;
+    // Clear before the first `await`. Two consecutive synchronous property-setter
+    // assignments (`owner.account = a; owner.account = b`) each run `replace`
+    // then `persistReplace` synchronously up to here; clearing now means the
+    // second `replace` sees a null `_pendingReplace` and builds a *fresh*
+    // record (the outer `else` branch) instead of mutating the object this call
+    // already captured in `pending` — so the two persists process `a` and `b`
+    // independently rather than both racing on `b`. There is no automatic retry
+    // (a failed save surfaces through `_pendingWrite` → `save()` rejection), so
+    // clearing early costs nothing on the error path.
+    this._pendingReplace = null;
     await transactionIf(this, true, async () => {
       if (
         pending.previousTarget &&
@@ -225,8 +235,6 @@ export class HasOneAssociation extends SingularAssociation {
         }
       }
     });
-    // Clear only after success — leave intact on error so save() retry can re-attempt
-    this._pendingReplace = null;
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
