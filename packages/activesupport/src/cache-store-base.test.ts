@@ -92,10 +92,7 @@ describe("CacheBehaviorTest", () => {
 
   it("fetch with block receiving write options", () => {
     let capturedOpts: WriteOptions | undefined;
-    cache.fetch("foo", (_key, opts) => {
-      capturedOpts = opts;
-      return "v";
-    });
+    cache.fetch("foo", (_key, opts) => ((capturedOpts = opts), "v"));
     expect(capturedOpts).toBeInstanceOf(WriteOptions);
   });
 
