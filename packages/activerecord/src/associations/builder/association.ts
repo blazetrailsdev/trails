@@ -6,6 +6,7 @@
  */
 
 import { ArgumentError } from "@blazetrails/activemodel";
+import { throwAbort } from "@blazetrails/activesupport";
 import * as Reflection from "../../reflection.js";
 import { beforeDestroy } from "../../callbacks.js";
 
@@ -276,8 +277,13 @@ export class Association {
 
   static addDestroyCallbacks(model: any, reflection: any): void {
     const name = reflection.name ?? reflection;
-    beforeDestroy(model, (record: any) => {
-      return record.association(name).handleDependency();
+    beforeDestroy(model, async (record: any) => {
+      // Rails' handle_dependency throws :abort to halt the owner's destroy when
+      // a dependent can't be removed (has_one_association.rb:34, etc.). Our
+      // handleDependency signals that with a `false` return; translate it to the
+      // abort sentinel here so the before_destroy chain halts (Rails 5+ only
+      // halts on throw :abort, never on a `false` return).
+      if ((await record.association(name).handleDependency()) === false) throwAbort();
     });
   }
 

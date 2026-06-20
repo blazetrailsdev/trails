@@ -357,7 +357,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("before add throwing abort prevents add", async () => {
     const { Post, Comment } = makePostWithCallbacks({
-      beforeAdd: () => false as const,
+      beforeAdd: () => throwAbort(),
     });
     const post = await Post.create({ title: "Post" });
     const proxy = association(post, "comments");
@@ -475,7 +475,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("before add abort prevents create from saving", async () => {
     const { Post, Comment } = makePostWithCallbacks({
-      beforeAdd: () => false as const,
+      beforeAdd: () => throwAbort(),
     });
     const post = await Post.create({ title: "Post" });
     const proxy = association(post, "comments");

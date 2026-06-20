@@ -1016,17 +1016,18 @@ function callback(assoc: CollectionAssociation, kind: string, record: Base): boo
   const catchAbort = kind.startsWith("before");
   for (const cb of callbacksFor(assoc, kind)) {
     if (typeof cb !== "function") continue;
-    // A before callback halts the add/remove by throwing the abort sentinel
-    // (faithful `throw :abort`) or, as a supported alias, returning false.
+    // A before callback halts the add/remove ONLY by throwing the abort sentinel
+    // (faithful `throw :abort`); a `false` return no longer halts (Rails 5+).
     if (catchAbort) {
       try {
-        if ((cb as any)(assoc.owner, record) === false) return false;
+        (cb as any)(assoc.owner, record);
       } catch (e) {
         if (!isAbortSignal(e)) throw e;
         return false;
       }
-    } else if ((cb as any)(assoc.owner, record) === false) {
-      return false;
+    } else {
+      // after callbacks run outside the catch; their return value is ignored.
+      (cb as any)(assoc.owner, record);
     }
   }
   return true;

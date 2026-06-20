@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, RecordInvalid } from "../index.js";
+import { throwAbort } from "@blazetrails/activesupport";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -2665,14 +2666,12 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("idestr_owner_id", "integer");
         this.attribute("idestr_tag_id", "integer");
         // before_destroy that prevents destruction
-        this.beforeDestroy((r: any) => {
-          return false;
-        });
+        this.beforeDestroy(() => throwAbort());
         this.belongsTo("idestrOwner", {
           foreignKey: "idestr_owner_id",
           counterCache: "indestructible_tags_count",
         });
-        this.belongsTo("idestrTag", { foreignKey: "idestr_tag_id" }); // prevent destroy by returning false
+        this.belongsTo("idestrTag", { foreignKey: "idestr_tag_id" }); // prevent destroy via throw :abort
       }
     }
     class IdestrTag extends Base {
@@ -2690,7 +2689,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const countBefore = await IdestrTagging.where({ idestr_owner_id: owner.id }).count();
     await owner.update({ indestructible_tags_count: Number(countBefore) });
 
-    // Try to destroy via collection — beforeDestroy callback returns false, preventing destruction
+    // Try to destroy via collection — beforeDestroy throws :abort, preventing destruction
     await (owner as any).idestrTags.delete(tag);
     await owner.reload();
     // Counter stays the same as before because destroy was prevented

@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { throwAbort } from "@blazetrails/activesupport";
 import {
   Base,
   registerModel,
@@ -750,7 +751,7 @@ describe("HasOneAssociationsTest", () => {
         this._tableName = "books";
         this.belongsTo("author", { className: "DestroyByParentAuthor" });
         this.beforeDestroy((record: any) => {
-          if (!record.destroyedByAssociation) return false;
+          if (!record.destroyedByAssociation) throwAbort();
         });
       }
     }
@@ -778,7 +779,7 @@ describe("HasOneAssociationsTest", () => {
         this._tableName = "books";
         this.belongsTo("author", { className: "DbaReplAuthor" });
         this.beforeDestroy((record: any) => {
-          if (!record.destroyedByAssociation) return false;
+          if (!record.destroyedByAssociation) throwAbort();
         });
       }
     }
@@ -807,7 +808,7 @@ describe("HasOneAssociationsTest", () => {
       static {
         this._tableName = "books";
         this.belongsTo("author", { className: "DestroyableAuthor" });
-        this.beforeDestroy(() => false);
+        this.beforeDestroy(() => throwAbort());
       }
     }
     class DestroyableAuthor extends Base {
