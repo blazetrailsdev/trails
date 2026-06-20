@@ -21,7 +21,7 @@ export interface CacheStore {
   fetch(key: string, fallback: () => unknown): unknown;
   clear(): void;
   cleanup(): void;
-  readMulti(...keys: string[]): Record<string, unknown>;
+  readMulti(...keys: [...string[], CacheOptions] | string[]): Record<string, unknown>;
   writeMulti(hash: Record<string, unknown>, options?: CacheOptions): void;
   deleteMulti(...keys: string[]): number;
   deleteMatched(pattern: string | RegExp): void;
