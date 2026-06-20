@@ -215,13 +215,18 @@ export abstract class Store {
     });
   }
 
-  fetchMulti(...namesAndBlock: [...string[], (key: string) => unknown]): Record<string, unknown> {
+  fetchMulti(
+    ...namesAndBlock:
+      | [...string[], StoreOptions, (key: string) => unknown]
+      | [...string[], (key: string) => unknown]
+  ): Record<string, unknown> {
     const block = namesAndBlock.pop() as ((key: string) => unknown) | undefined;
     if (typeof block !== "function")
       throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
+    const options = extractOptions(namesAndBlock as unknown[]);
     const names = namesAndBlock as string[];
     if (names.length === 0) return {};
-    const merged = this.mergedOptions(undefined);
+    const merged = this.mergedOptions(options);
     const keys = names.map((n) => this.normalizeKey(n, merged));
     const writes: Record<string, unknown> = {};
     const ordered = this.instrumentMulti("read_multi", keys, merged, (payload) => {

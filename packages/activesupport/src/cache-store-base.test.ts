@@ -262,6 +262,18 @@ describe("CacheInstrumentationBehavior", () => {
     expect(events[0].payload.store).toBe("TestStore");
   });
 
+  it("fetchMulti extracts a trailing options hash before instrumenting", () => {
+    const events = withInstrumentation("read_multi", () => {
+      cache.fetchMulti("a", "b", { namespace: "foo" }, (key: string) => key + key);
+    });
+    const opts = { namespace: "foo" };
+    expect(events[0].payload.key).toEqual([normalizedKey("a", opts), normalizedKey("b", opts)]);
+    expect(events[0].payload.namespace).toBe("foo");
+    // The options hash must not be treated as a cache name.
+    expect(cache.read("a", opts)).toBe("aa");
+    expect(cache.read("[object Object]")).toBeNull();
+  });
+
   // Cache::Store has no Rails instrumentation test for exist?/fetch (no public
   // behavior beyond the wrapped read), so these cover the remaining wrapped
   // operations our port adds: the exist? event, and fetch's read/fetch_hit/generate.
