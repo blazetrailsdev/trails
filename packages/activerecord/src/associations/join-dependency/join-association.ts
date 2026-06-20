@@ -176,11 +176,23 @@ export class JoinAssociation extends JoinPart {
       // fold back into its ON (Rails' behaviour for a plain cross-table scope).
       if (others.length > 0) {
         const sources: Nodes.Node[] = [];
+        // TODO: replace `scope._joinValues` with `scope.arel().join_sources` once
+        // Relation#arel() exists. Rails reads the materialized arel join sources
+        // (always proper Arel join nodes); reading `_joinValues` directly only
+        // handles raw-SQL strings and pre-built Nodes.Join — an association-name
+        // join source (Rails `.joins(:posts)`) would be mishandled here.
         for (const jv of (scope?._joinValues ?? []) as (string | Nodes.Node)[]) {
           sources.push(
             typeof jv === "string" ? new Nodes.StringJoin(arelSql(jv.trim()) as any) : jv,
           );
         }
+        // NOTE: `this.joinSources` accumulates across the chain but is only
+        // consumed by the single-step `has_one`/`has_many` join path
+        // (JoinDependency#addAssociation), whose reflection chain is length 1, so
+        // each source maps to its own join step. A through association whose
+        // intermediate scope also contributes string joins is not wired to
+        // capture `joinSources` at all yet — a separate fidelity gap, not a
+        // mis-ordering of this path.
         if (sources.length > 0) {
           const lastIdx = sources.length - 1;
           sources[lastIdx] = appendConstraints(sources[lastIdx], others) ?? sources[lastIdx];
@@ -278,12 +290,12 @@ function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | 
     const newLeft = allExprs.length === 1 ? allExprs[0] : new Nodes.And(allExprs);
     return new Nodes.StringJoin(newLeft);
   } else if (joinAny.right?.expr instanceof Nodes.Node) {
+    // Rails `append_constraints`: `right.expr = And.new([right.expr, *constraints])`
+    // — `right.expr` is nested as the first element rather than flattened, so an
+    // existing And stays nested (`And([And([...]), ...new])`). Matches Rails
+    // structurally (SQL-equivalent either way).
     const existing = joinAny.right.expr as Nodes.Node;
-    const allExprs: Nodes.Node[] =
-      existing instanceof Nodes.And
-        ? [...existing.children, ...arelConstraints]
-        : [existing, ...arelConstraints];
-    const newExpr = new Nodes.And(allExprs);
+    const newExpr = new Nodes.And([existing, ...arelConstraints]);
     return new (join as any).constructor(joinAny.left, new Nodes.On(newExpr));
   }
   return join as Nodes.Node | null;
