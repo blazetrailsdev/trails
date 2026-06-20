@@ -1689,8 +1689,10 @@ function _inlineOwnerKey(
   }
   // Mirror reflection.rb:597-600 active_record_primary_key composite_primary_key?
   // branch: a composite-PK owner without query_constraints collapses to "id"
-  // when the PK array contains it, else keeps the full composite PK.
-  if (Array.isArray(primaryKey) && (ctor as any).compositePrimaryKey) {
+  // when the PK array contains it, else keeps the full composite PK. (After the
+  // options.primaryKey early return, primaryKey === ctor.primaryKey, so an array
+  // PK already implies ctor.compositePrimaryKey.)
+  if (Array.isArray(primaryKey)) {
     return primaryKey.includes("id") ? "id" : primaryKey;
   }
   return primaryKey;
