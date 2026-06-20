@@ -879,6 +879,28 @@ describe("HasManyAssociationsTest", () => {
     expect(seen.length).toBe(3);
   });
 
+  it("finder bang method with dirty target", async () => {
+    const company = companies("first_firm") as any;
+    const newClients: any[] = [];
+
+    await assertQueriesCount(0, false, async () => {
+      newClients.push(company.clientsOfFirm.build({ name: "Another Client" }));
+      newClients.push(company.clientsOfFirm.build({ name: "Another Client II" }));
+      newClients.push(company.clientsOfFirm.build({ name: "Another Client III" }));
+    });
+
+    expect(company.clientsOfFirm.loaded).toBe(false);
+
+    await assertQueriesCount(1, false, async () => {
+      expect(await company.clientsOfFirm.thirdBang()).toBe(newClients[0]);
+      expect(await company.clientsOfFirm.fourthBang()).toBe(newClients[1]);
+      expect(await company.clientsOfFirm.fifthBang()).toBe(newClients[2]);
+      expect(await company.clientsOfFirm.thirdToLastBang()).toBe(newClients[0]);
+      expect(await company.clientsOfFirm.secondToLastBang()).toBe(newClients[1]);
+      expect(await company.clientsOfFirm.lastBang()).toBe(newClients[2]);
+    });
+  });
+
   // -- Deleting --
 
   it("deleting", async () => {
@@ -2454,26 +2476,6 @@ describe("HasManyAssociationsTest", () => {
     expect(found).toBeDefined();
   });
 
-  it("finder bang method with dirty target", async () => {
-    class FinderBangAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class FinderBangPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FinderBangAuthor);
-    registerModel(FinderBangPost);
-    const author = await FinderBangAuthor.create({ name: "Alice" });
-    const post = await FinderBangPost.create({ author_id: author.id, title: "A" });
-    const found = await FinderBangPost.find(post.id!);
-    expect(found).toBeDefined();
-    expect(found.id).toBe(post.id);
-  });
   it("create resets cached counters", async () => {
     class CcResetAuthor extends Base {
       static {

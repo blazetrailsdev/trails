@@ -17,6 +17,8 @@ export function _setAssociationRelationCtor(
 }
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import {
+  findNthFromLast as baseFindNthFromLast,
+  findNthWithLimit as baseFindNthWithLimit,
   normalizeFindArgs,
   raiseNotFoundAll,
   raiseNotFoundSingle,
@@ -2552,6 +2554,35 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
     }
     return record;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#find_nth_with_limit
+   * (`load_target if find_from_target?; super`). Once the target is loaded the
+   * base FinderMethods implementation reads it (the proxy keeps loaded state in
+   * `_target`/`_targetLoaded` rather than Relation's `_records`/`_loaded`, so we
+   * branch on `_targetLoaded` here); otherwise it falls through to the same
+   * ordered `LIMIT`/`OFFSET` query the base issues. This is the single override
+   * point that makes the inherited `second`/`third`/`fourth`/`fifth` (and their
+   * bang variants) read a loaded/dirty target without re-querying.
+   * @internal
+   */
+  protected override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
+    if (this.isFindFromTarget()) await this.loadTarget();
+    if (this._targetLoaded) return this._target.slice(index, index + limit);
+    return baseFindNthWithLimit.call(this as any, index, limit);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#find_nth_from_last
+   * (`load_target if find_from_target?; super`). Backs the inherited
+   * `secondToLast`/`thirdToLast` (and bang variants); see `findNthWithLimit`.
+   * @internal
+   */
+  protected override async findNthFromLast(index: number): Promise<T | null> {
+    if (this.isFindFromTarget()) await this.loadTarget();
+    if (this._targetLoaded) return this._target[this._target.length - 1 - index] ?? null;
+    return baseFindNthFromLast.call(this as any, index);
   }
 
   /**
