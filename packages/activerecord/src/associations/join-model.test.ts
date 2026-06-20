@@ -1257,6 +1257,14 @@ describe("AssociationsJoinModelTest", () => {
         .find(1);
     await expect(eagerLoadFind()).rejects.toThrow(ConfigurationError);
     await expect(eagerLoadFind()).rejects.toThrow(message);
+
+    const combinedFind = async () =>
+      Post.eagerLoad("nonexistentRelation")
+        .includes("nonexistentRelation")
+        .where({ nonexistentRelation: { name: "Rochester" } })
+        .find(1);
+    await expect(combinedFind()).rejects.toThrow(ConfigurationError);
+    await expect(combinedFind()).rejects.toThrow(message);
   });
 
   it("eager association with scope with string joins", async () => {
