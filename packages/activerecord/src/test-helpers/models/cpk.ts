@@ -3,7 +3,6 @@ import { throwAbort } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { generatesTokenFor } from "../../token-for.js";
-import { queryConstraints } from "../../persistence.js";
 
 // cpk/author.rb
 export class CpkAuthor extends Base {
@@ -173,11 +172,6 @@ export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
 export class CpkNonCpkOrder extends CpkOrder {
   static {
     this._primaryKey = "id";
-    // Rails: setting primary_key on a query-constrained parent resets
-    // query_constraints_list to ["id"], keeping has_query_constraints? true.
-    // Mirror that so associationPrimaryKey returns ["id"] (via
-    // compositeQueryConstraintsList) rather than the scalar "id".
-    queryConstraints.call(this, "id");
   }
 }
 
