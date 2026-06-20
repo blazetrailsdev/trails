@@ -6,15 +6,8 @@
  * GeneratedMethodsTest, and WithAnnotationsTest.
  */
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
-import {
-  Base,
-  association,
-  reflectOnAssociation,
-  registerModel,
-  ConfigurationError,
-  NameError,
-  pp,
-} from "./index.js";
+import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -2541,7 +2534,7 @@ describe("AssociationsTest", () => {
       } catch (e) {
         error = e;
       }
-      expect(error).toBeInstanceOf(ConfigurationError);
+      expect(error).toBeInstanceOf(ArgumentError);
       expect((error as Error).message).toContain("does not include the primary key");
     } finally {
       (ShardedBlogPost as any)._queryConstraintsList = original;
@@ -2566,7 +2559,7 @@ describe("AssociationsTest", () => {
       } catch (e) {
         error = e;
       }
-      expect(error).toBeInstanceOf(ConfigurationError);
+      expect(error).toBeInstanceOf(ArgumentError);
       expect((error as Error).message).toContain("does not include the primary key");
     } finally {
       (ShardedBlogPost as any)._queryConstraintsList = original;
