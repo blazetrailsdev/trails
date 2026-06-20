@@ -26,16 +26,27 @@ class TestStore extends Store {
   }
   override increment(name: string, amount = 1): number | null {
     const key = this.normalizeKey(name, {});
-    const entry = this.readEntry(key, {});
-    if (!entry) return null;
-    const n = Number(entry.value);
-    if (isNaN(n)) return null;
-    const next = n + amount;
-    this.writeEntry(key, new Entry(next), {});
-    return next;
+    return this.instrument("increment", key, { amount }, () => {
+      const entry = this.readEntry(key, {});
+      if (!entry) return null;
+      const n = Number(entry.value);
+      if (isNaN(n)) return null;
+      const next = n + amount;
+      this.writeEntry(key, new Entry(next), {});
+      return next;
+    });
   }
   override decrement(name: string, amount = 1): number | null {
-    return this.increment(name, -amount);
+    const key = this.normalizeKey(name, {});
+    return this.instrument("decrement", key, { amount }, () => {
+      const entry = this.readEntry(key, {});
+      if (!entry) return null;
+      const n = Number(entry.value);
+      if (isNaN(n)) return null;
+      const next = n - amount;
+      this.writeEntry(key, new Entry(next), {});
+      return next;
+    });
   }
   override deleteMatched(matcher: string | RegExp): void {
     const re = typeof matcher === "string" ? new RegExp(matcher) : matcher;
@@ -307,5 +318,25 @@ describe("CacheInstrumentationBehavior", () => {
     });
     expect(events.map((e) => e.name)).toEqual(["cache_fetch_hit.active_support"]);
     expect(events[0].payload.key).toBe("1");
+  });
+
+  it("test_increment_instrumentation", () => {
+    cache.write("1", 0);
+    const events = withInstrumentation("increment", () => {
+      cache.increment("1");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_increment.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1"));
+    expect(events[0].payload.store).toBe("TestStore");
+  });
+
+  it("test_decrement_instrumentation", () => {
+    cache.write("1", 0);
+    const events = withInstrumentation("decrement", () => {
+      cache.decrement("1");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_decrement.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1"));
+    expect(events[0].payload.store).toBe("TestStore");
   });
 });
