@@ -1653,8 +1653,19 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   inverseOf(): AssociationReflection | ThroughReflection | null {
-    return this._delegate.inverseOf();
+    // Rails resolves inverse_of via AbstractReflection#inverse_of, i.e.
+    // `klass._reflect_on_association(inverse_name)` against the through
+    // reflection's OWN klass (the source reflection's target). Delegating to
+    // the underlying reflection would resolve the inverse against the delegate's
+    // name-derived klass (`leadDeveloper` → nonexistent `LeadDeveloper`) instead
+    // of the source class (`Developer`).
+    const name = this.inverseName();
+    if (!name) return null;
+    if (this._inverseOfCache !== undefined) return this._inverseOfCache;
+    this._inverseOfCache = this.klass._reflectOnAssociation(name) ?? null;
+    return this._inverseOfCache;
   }
+  private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
   /** @internal */
   override inverseName(): string | null {

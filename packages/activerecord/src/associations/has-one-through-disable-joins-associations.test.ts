@@ -3,11 +3,23 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { registerModel, enableSti } from "../index.js";
+import { registerModel, enableSti, registerSubclass } from "../index.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Organization } from "../test-helpers/models/organization.js";
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
 import { Club } from "../test-helpers/models/club.js";
+import {
+  Company,
+  Firm,
+  DependentFirm,
+  ExclusivelyDependentFirm,
+  RestrictedWithExceptionFirm,
+  RestrictedWithErrorFirm,
+  Client,
+} from "../test-helpers/models/company.js";
+import { Account } from "../test-helpers/models/account.js";
+import { Project } from "../test-helpers/models/project.js";
+import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import {
   Membership,
   CurrentMembership,
@@ -27,6 +39,24 @@ registerModel(CurrentMembership);
 registerModel(SuperMembership);
 registerModel(SelectedMembership);
 registerModel(TenantMembership);
+registerModel(Company);
+registerModel(Firm);
+registerModel(DependentFirm);
+registerModel(ExclusivelyDependentFirm);
+registerModel(RestrictedWithExceptionFirm);
+registerModel(RestrictedWithErrorFirm);
+registerModel(Client);
+registerModel(Account);
+registerModel(Project);
+registerModel(Developer);
+registerModel(AuditLog);
+enableSti(Company);
+registerSubclass(Firm);
+registerSubclass(DependentFirm);
+registerSubclass(ExclusivelyDependentFirm);
+registerSubclass(RestrictedWithExceptionFirm);
+registerSubclass(RestrictedWithErrorFirm);
+registerSubclass(Client);
 
 /**
  * Capture the non-SCHEMA `sql.active_record` statements emitted while running
@@ -58,6 +88,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     "clubs",
     "memberships",
     "categories",
+    "companies",
+    "developers",
+    "projects",
+    "accounts",
   ]);
 
   let member: Member;
@@ -123,15 +157,27 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     expect(queriedNoJoins).toEqual([]);
   });
 
-  it.skip("has one through with belongs to on disable joins", () => {
-    // BLOCKED: associations/reflection — has_one :through klass/inverse resolution gap.
-    // ROOT-CAUSE: Project has_one :leadDeveloper, through: :firm (no explicit :source).
-    // The source reflection on Firm is `leadDeveloper` (className "Developer"), but the
-    // through reflection computes the target class from the association NAME, deriving a
-    // non-existent "LeadDeveloper" model instead of delegating to the source reflection's
-    // klass — `Model 'LeadDeveloper' not found in registry`. Needs an upstream fix in
-    // ThroughReflection klass/inverseOf resolution. Tracked via the upstream-fix story
-    // ho-through-source-klass-resolution (RFC 0030).
+  it("has one through with belongs to on disable joins", async () => {
+    const firm = await Firm.create({ name: "Adequate Holdings" });
+    const project = await Project.create({ name: "Project 1", firm });
+    await Developer.create({ name: "Gorbypuff", firm });
+
+    let leadDeveloper: unknown;
+    let leadDeveloperDisableJoins: unknown;
+    const joins = await captureSql(async () => {
+      leadDeveloper = await project.loadHasOne("leadDeveloper");
+    });
+    const noJoins = await captureSql(async () => {
+      leadDeveloperDisableJoins = await project.loadHasOne("leadDeveloperDisableJoins");
+    });
+
+    expect((leadDeveloperDisableJoins as Developer)?.id).toBe((leadDeveloper as Developer)?.id);
+    expect(noJoins.length).toBe(2);
+    expect(joins.length).toBe(1);
+    expect(joins[0]).toMatch(/INNER JOIN/i);
+    for (const nj of noJoins) {
+      expect(nj).not.toMatch(/INNER JOIN/i);
+    }
   });
 
   it("disable joins through with enum type", async () => {
