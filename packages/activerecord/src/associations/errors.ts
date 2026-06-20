@@ -200,32 +200,98 @@ export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends Thr
   }
 }
 
-export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
-  constructor(
-    owner?: string,
-    association?: string,
-    primaryKey?: string | string[],
-    foreignKey?: string | string[],
+/**
+ * Reflection-shaped object that `CompositePrimaryKeyMismatchError` derives its
+ * message from. Rails (associations/errors.rb:190-200) is passed the real
+ * reflection and branches on macro to pick `active_record_primary_key`
+ * (has_one / collection) or `association_primary_key` (belongs_to). The
+ * canonical `AbstractReflection#checkValidityBang` raise site passes the real
+ * reflection, so we replicate that branch here. Trails-only defensive guards
+ * (association-scope, collection-proxy, autosave, the inline association
+ * loaders) don't hold a reflection — they pass a `primaryKey` they already
+ * resolved, which takes precedence when no macro predicates are present.
+ */
+export interface CompositePrimaryKeyMismatchReflection {
+  /** The owner — a model class (whose `name` builds the message) or its name. */
+  activeRecord?: unknown;
+  name?: string;
+  foreignKey?: string | string[];
+  /** Real-reflection accessors mirrored from Rails' constructor branch. */
+  hasOne?: () => boolean;
+  isCollection?: () => boolean;
+  belongsTo?: () => boolean;
+  activeRecordPrimaryKey?: string | string[];
+  associationPrimaryKey?: string | string[];
+  /** Pre-resolved key for trails-only guard sites that hold no reflection. */
+  primaryKey?: string | string[];
+}
+
+function formatKey(key: string | string[]): string {
+  return Array.isArray(key) ? `[${key.map((k) => `"${k}"`).join(", ")}]` : key;
+}
+
+/**
+ * Resolve the primary key the message reports. Mirrors Rails' macro branch in
+ * `CompositePrimaryKeyMismatchError#initialize` (errors.rb:192-196): a real
+ * reflection uses `activeRecordPrimaryKey` for has_one/collection and
+ * `associationPrimaryKey` for belongs_to; a bare guard object supplies its own
+ * already-resolved `primaryKey`.
+ *
+ * @internal
+ */
+function reflectionPrimaryKey(
+  reflection: CompositePrimaryKeyMismatchReflection,
+): string | string[] | undefined {
+  if (
+    typeof reflection.hasOne === "function" ||
+    typeof reflection.isCollection === "function" ||
+    typeof reflection.belongsTo === "function"
   ) {
+    if (reflection.hasOne?.() || reflection.isCollection?.()) {
+      return reflection.activeRecordPrimaryKey;
+    }
+    return reflection.associationPrimaryKey;
+  }
+  return reflection.primaryKey;
+}
+
+/**
+ * Mirrors Rails' `CompositePrimaryKeyMismatchError` (associations/errors.rb:187):
+ * declares a `reflection` reader and derives the message from the passed
+ * reflection inside the constructor, branching on the reflection's macro to
+ * choose the primary key to report.
+ *
+ * Fidelity note: Rails 8.0.2 declares `attr_reader :reflection` but
+ * `initialize` never assigns `@reflection` (errors.rb:190-200), so
+ * `error.reflection` is always `nil`. We mirror that exactly — the reader
+ * exists for API parity but is never populated from the constructor argument.
+ */
+export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
+  readonly reflection: CompositePrimaryKeyMismatchReflection | null = null;
+
+  constructor(reflection?: CompositePrimaryKeyMismatchReflection | null) {
     let message: string;
+    const primaryKey = reflection ? reflectionPrimaryKey(reflection) : undefined;
     if (
-      owner !== undefined &&
-      association !== undefined &&
+      reflection &&
+      reflection.activeRecord != null &&
+      reflection.name !== undefined &&
       primaryKey !== undefined &&
-      foreignKey !== undefined
+      reflection.foreignKey !== undefined
     ) {
-      const pk = Array.isArray(primaryKey)
-        ? `[${primaryKey.map((k) => `"${k}"`).join(", ")}]`
-        : primaryKey;
-      const fk = Array.isArray(foreignKey)
-        ? `[${foreignKey.map((k) => `"${k}"`).join(", ")}]`
-        : foreignKey;
-      message = `Association ${owner}#${association} primary key ${pk} doesn't match with foreign key ${fk}. Please specify query_constraints, or primary_key and foreign_key values.`;
+      const owner =
+        typeof reflection.activeRecord === "string"
+          ? reflection.activeRecord
+          : (reflection.activeRecord as { name?: string }).name;
+      const pk = formatKey(primaryKey);
+      const fk = formatKey(reflection.foreignKey);
+      message = `Association ${owner}#${reflection.name} primary key ${pk} doesn't match with foreign key ${fk}. Please specify query_constraints, or primary_key and foreign_key values.`;
     } else {
       message = "Association primary key doesn't match with foreign key.";
     }
     super(message);
     this.name = "CompositePrimaryKeyMismatchError";
+    // Rails never assigns @reflection (errors.rb:190-200); leave the reader null.
   }
 }
 

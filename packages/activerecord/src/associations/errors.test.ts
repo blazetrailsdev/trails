@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   AssociationNotFoundError,
+  CompositePrimaryKeyMismatchError,
   HasManyThroughAssociationNotFoundError,
   InverseOfAssociationNotFoundError,
 } from "./errors.js";
@@ -70,5 +71,65 @@ describe("AssociationErrors", () => {
   it("InverseOfAssociationNotFoundError.associatedClass defaults to null", () => {
     const err = new InverseOfAssociationNotFoundError("posts", "author");
     expect(err.associatedClass).toBeNull();
+  });
+
+  it("CompositePrimaryKeyMismatchError derives its message from the reflection but leaves reflection nil", () => {
+    // Rails parity: activerecord/lib/active_record/associations/errors.rb:187.
+    // CompositePrimaryKeyMismatchError builds its message from the reflection
+    // inside the constructor, branching on the macro: belongs_to uses
+    // `association_primary_key` (errors.rb:195). Rails declares
+    // `attr_reader :reflection` but `initialize` never assigns @reflection
+    // (errors.rb:190-200), so `error.reflection` is always nil — we mirror that.
+    const reflection = {
+      activeRecord: { name: "CpkBrokenBook" },
+      name: "order",
+      belongsTo: () => true,
+      associationPrimaryKey: ["shop_id", "status"],
+      activeRecordPrimaryKey: "id",
+      foreignKey: "order_id",
+    };
+    const err = new CompositePrimaryKeyMismatchError(reflection);
+    expect(err.reflection).toBeNull();
+    expect(err.message).toBe(
+      `Association CpkBrokenBook#order primary key ["shop_id", "status"] doesn't match with foreign key order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
+  });
+
+  it("CompositePrimaryKeyMismatchError uses active_record_primary_key for collection/has_one reflections", () => {
+    // Rails parity (errors.rb:192-193): has_one? || collection? reflections
+    // report `active_record_primary_key` instead of association_primary_key.
+    const reflection = {
+      activeRecord: { name: "CpkBrokenOrder" },
+      name: "books",
+      isCollection: () => true,
+      activeRecordPrimaryKey: ["shop_id", "status"],
+      associationPrimaryKey: "id",
+      foreignKey: "cpk_broken_order_id",
+    };
+    const err = new CompositePrimaryKeyMismatchError(reflection);
+    expect(err.message).toBe(
+      `Association CpkBrokenOrder#books primary key ["shop_id", "status"] doesn't match with foreign key cpk_broken_order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
+  });
+
+  it("CompositePrimaryKeyMismatchError accepts a pre-resolved primaryKey for reflection-less guards", () => {
+    // Trails-only defensive guards (association-scope, collection-proxy,
+    // autosave) hold no reflection; they pass the key pair they resolved.
+    const reflection = {
+      activeRecord: "CpkBrokenBook",
+      name: "order",
+      primaryKey: ["id"],
+      foreignKey: ["shop_id", "order_id"],
+    };
+    const err = new CompositePrimaryKeyMismatchError(reflection);
+    expect(err.message).toBe(
+      `Association CpkBrokenBook#order primary key ["id"] doesn't match with foreign key ["shop_id", "order_id"]. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
+  });
+
+  it("CompositePrimaryKeyMismatchError falls back to the generic message and null reflection", () => {
+    const err = new CompositePrimaryKeyMismatchError();
+    expect(err.reflection).toBeNull();
+    expect(err.message).toBe("Association primary key doesn't match with foreign key.");
   });
 });

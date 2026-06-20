@@ -1163,7 +1163,12 @@ export async function loadBelongsTo(
     if (Array.isArray(foreignKey)) {
       const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
       if (pkCols.length !== foreignKey.length) {
-        throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, pkCols, foreignKey);
+        throw new CompositePrimaryKeyMismatchError({
+          activeRecord: ctor.name,
+          name: assocName,
+          primaryKey: pkCols,
+          foreignKey,
+        });
       }
       const conditions: Record<string, unknown> = {};
       for (let i = 0; i < foreignKey.length; i++) {
@@ -1258,10 +1263,20 @@ export async function loadHasOne(
   // (matching Rails' join_id_for); otherwise reject.
   if (options.as) {
     if (Array.isArray(foreignKey)) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
     }
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
     }
   }
   // Route through AssociationScope (handles scalar, composite, :as, STI
@@ -1300,7 +1315,12 @@ export async function loadHasOne(
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
-        throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, pkCols, foreignKey);
+        throw new CompositePrimaryKeyMismatchError({
+          activeRecord: ctor.name,
+          name: assocName,
+          primaryKey: pkCols,
+          foreignKey,
+        });
       }
       const conditions: Record<string, unknown> = {};
       for (let i = 0; i < foreignKey.length; i++) {
@@ -1358,7 +1378,12 @@ export function buildHasOne(
 
   if (options.as) {
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, _assocName, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: _assocName,
+        primaryKey,
+        foreignKey,
+      });
     }
   }
   const effectivePk = options.as && Array.isArray(primaryKey) ? "id" : (primaryKey as string);
@@ -1495,10 +1520,20 @@ export async function loadHasMany(
   // (matching Rails' join_id_for); otherwise reject.
   if (options.as) {
     if (Array.isArray(foreignKey)) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
     }
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
     }
   }
   // Route through AssociationScope when we have a reflection registered.
@@ -1550,7 +1585,12 @@ export async function loadHasMany(
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
-        throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, pkCols, foreignKey);
+        throw new CompositePrimaryKeyMismatchError({
+          activeRecord: ctor.name,
+          name: assocName,
+          primaryKey: pkCols,
+          foreignKey,
+        });
       }
       const conditions: Record<string, unknown> = {};
       for (let i = 0; i < foreignKey.length; i++) {
@@ -1629,12 +1669,22 @@ export function computeHasManyWhere(
   if (options.as) {
     const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
     if (Array.isArray(foreignKey)) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
     }
     // Collapse CPK to "id" when present (matching Rails' join_id_for).
     // CPK without "id" cannot map to a scalar <as>_id column.
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
     }
     const scalarPk = Array.isArray(primaryKey) ? "id" : primaryKey;
     const pkValue = record._readAttribute(scalarPk);
@@ -1673,7 +1723,12 @@ export function computeHasManyWhere(
     // scope. Existing loaders throw CompositePrimaryKeyMismatchError; do
     // the same here so CollectionProxy construction fails loudly.
     if (!Array.isArray(primaryKey) || primaryKey.length !== foreignKey.length) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
     }
     const conditions: Record<string, unknown> = {};
     for (let i = 0; i < foreignKey.length; i++) {
@@ -1686,7 +1741,12 @@ export function computeHasManyWhere(
 
   // Scalar FK: a composite PK here is a mismatch too.
   if (Array.isArray(primaryKey)) {
-    throw new CompositePrimaryKeyMismatchError(ctor.name, assocName, primaryKey, foreignKey);
+    throw new CompositePrimaryKeyMismatchError({
+      activeRecord: ctor.name,
+      name: assocName,
+      primaryKey,
+      foreignKey,
+    });
   }
   const pkValue = record._readAttribute(primaryKey);
   if (pkValue === null || pkValue === undefined) return null;
