@@ -36,7 +36,7 @@ function emitTableSql(td: TableDefinition): string {
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports, describeIfSupports } from "./test-helpers/supports.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 import {
   describeIfMysql,
@@ -517,7 +517,7 @@ describe("MigrationTest", () => {
   });
 
   describe("IndexForTableWithSchemaMigrationTest", () => {
-    it("add and remove index", async () => {
+    it.skipIf(adapterType !== "postgres")("add and remove index", async () => {
       const { ctx } = freshContext();
       await ctx.createTable("users", {}, (t) => {
         t.string("email");
@@ -1374,7 +1374,7 @@ describe("MigrationTest", () => {
     expect(typeof adapter.execute).toBe("function");
   });
 
-  it("out of range integer limit should raise", () => {
+  it.skipIf(adapterType === "sqlite")("out of range integer limit should raise", () => {
     // When an integer value exceeds limits, it should be stored as-is in memory adapter
     class Counter extends Base {
       static {
@@ -1723,7 +1723,7 @@ describe("MigrationTest", () => {
     expect(await migrator.currentVersion()).toBe(1);
   });
 
-  it("migrator one up with exception and rollback", async () => {
+  itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
     const adapter = createTestAdapter();
     const migrations: MigrationProxy[] = [
       {
@@ -1744,27 +1744,31 @@ describe("MigrationTest", () => {
     expect(versions).not.toContain("100");
   });
 
-  it("migrator one up with exception and rollback using run", async () => {
-    const adapter = createTestAdapter();
-    const migrations: MigrationProxy[] = [
-      {
-        version: "100",
-        name: "Broken",
-        migration: () => ({
-          up: async () => {
-            throw new Error("Something broke");
-          },
-          down: async () => {},
-        }),
-      },
-    ];
-    const migrator = new Migrator(adapter, migrations);
-    await expect(migrator.migrate()).rejects.toThrow("Something broke");
-    const versions = await migrator.getAllVersions();
-    expect(versions).not.toContain("100");
-  });
+  itIfSupports(
+    "ddl_transactions",
+    "migrator one up with exception and rollback using run",
+    async () => {
+      const adapter = createTestAdapter();
+      const migrations: MigrationProxy[] = [
+        {
+          version: "100",
+          name: "Broken",
+          migration: () => ({
+            up: async () => {
+              throw new Error("Something broke");
+            },
+            down: async () => {},
+          }),
+        },
+      ];
+      const migrator = new Migrator(adapter, migrations);
+      await expect(migrator.migrate()).rejects.toThrow("Something broke");
+      const versions = await migrator.getAllVersions();
+      expect(versions).not.toContain("100");
+    },
+  );
 
-  it("migration without transaction", async () => {
+  itIfSupports("ddl_transactions", "migration without transaction", async () => {
     const adapter = freshAdapter();
     let columnAdded = false;
 
@@ -2305,7 +2309,7 @@ describe("MigrationTest", () => {
     expect(lockId.toString(2).length).toBeLessThanOrEqual(63);
   });
 
-  it("migrator one up with unavailable lock", async () => {
+  itIfSupports("advisory_locks", "migrator one up with unavailable lock", async () => {
     const ran: string[] = [];
     const proxy: MigrationProxy = {
       version: "100",
@@ -2323,7 +2327,7 @@ describe("MigrationTest", () => {
     expect(ran).toEqual([]);
   });
 
-  it("migrator one up with unavailable lock using run", async () => {
+  itIfSupports("advisory_locks", "migrator one up with unavailable lock using run", async () => {
     const ran: string[] = [];
     const proxy: MigrationProxy = {
       version: "100",
@@ -2373,15 +2377,19 @@ describe("MigrationTest", () => {
     },
   );
 
-  it("with advisory lock raises the right error when it fails to release lock", async () => {
-    const lockAdapter = makeLockAdapter({ acquires: true, releases: false });
-    const migrator = new Migrator(lockAdapter, []);
-    const error = await migrator.withAdvisoryLock(async () => {}).catch((e) => e);
-    expect(error).toBeInstanceOf(ConcurrentMigrationError);
-    expect(error.message).toMatch(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
-  });
+  itIfSupports(
+    "advisory_locks",
+    "with advisory lock raises the right error when it fails to release lock",
+    async () => {
+      const lockAdapter = makeLockAdapter({ acquires: true, releases: false });
+      const migrator = new Migrator(lockAdapter, []);
+      const error = await migrator.withAdvisoryLock(async () => {}).catch((e) => e);
+      expect(error).toBeInstanceOf(ConcurrentMigrationError);
+      expect(error.message).toMatch(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
+    },
+  );
 
-  it("out of range text limit should raise", () => {
+  it.skipIf(adapterType === "sqlite")("out of range text limit should raise", () => {
     // In our memory adapter, large text columns are represented as strings without size limits
     class Article extends Base {
       static {
@@ -2393,7 +2401,7 @@ describe("MigrationTest", () => {
     expect(cols["body"].type).toBe("string");
   });
 
-  it("out of range binary limit should raise", () => {
+  it.skipIf(adapterType === "sqlite")("out of range binary limit should raise", () => {
     // In our memory adapter, binary data is represented as strings without size limits
     class Attachment extends Base {
       static {
@@ -2405,7 +2413,7 @@ describe("MigrationTest", () => {
     expect(cols["data"].type).toBe("string");
   });
 
-  it("invalid text size should raise", () => {
+  it.skipIf(adapterType !== "mysql")("invalid text size should raise", () => {
     // In our memory adapter, text columns don't enforce size limits; verify basic attribute definition
     class Post extends Base {
       static {
@@ -2442,7 +2450,7 @@ describe("MigrationTest", () => {
     });
   });
 
-  describe("BulkAlterTableMigrationsTest", () => {
+  describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     // Helper for bulk alter table tests — fresh adapter per test via beforeEach
     let bulkAdapter: DatabaseAdapter;
     beforeEach(() => {
@@ -2681,7 +2689,7 @@ describe("MigrationTest", () => {
     });
   }); // BulkAlterTableMigrationsTest
 
-  describe("RevertBulkAlterTableMigrationsTest", () => {
+  describeIfSupports("bulk_alter", "RevertBulkAlterTableMigrationsTest", () => {
     it("bulk revert", async () => {
       const rvAdapter = freshAdapter();
       function makeRvMig(m: Migration): Migration {
