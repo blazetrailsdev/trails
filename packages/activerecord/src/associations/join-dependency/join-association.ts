@@ -24,10 +24,13 @@ export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
   private _table: Table | null = null;
   readonly tables: Table[] = [];
-  // Extra join sources contributed by the association scope's own `joins(...)`
-  // (Rails `joins.concat arel.join_sources`). Kept separate from the per-chain
-  // constraint joins so callers that map joins 1:1 to chain entries aren't
-  // disturbed; `makeConstraints` emits these after the node's own join.
+  /**
+   * Extra join sources contributed by the association scope's own `joins(...)`
+   * (Rails `joins.concat arel.join_sources`). Kept separate from the per-chain
+   * constraint joins so callers that map joins 1:1 to chain entries aren't
+   * disturbed; `makeConstraints` emits these after the node's own join.
+   * @internal
+   */
   readonly joinSources: Nodes.Node[] = [];
   private _readonly?: boolean;
   private _strictLoading?: boolean;
@@ -153,42 +156,41 @@ export class JoinAssociation extends JoinPart {
             remaining.push(child);
           }
         }
-        if (others.length === 0) {
-          // no cross-table predicates: leave `nodes` as-is
-        } else if (remaining.length === 0) {
-          nodes = new Nodes.True();
-        } else {
-          nodes = remaining.length === 1 ? remaining[0] : new Nodes.And(remaining);
+        if (others.length > 0) {
+          if (remaining.length === 0) nodes = new Nodes.True();
+          else nodes = remaining.length === 1 ? remaining[0] : new Nodes.And(remaining);
         }
       }
 
       joins.push(new joinType(table, new Nodes.On(nodes)));
 
-      // Rails `joins.concat arel.join_sources`: a raw-string join in the scope
-      // (e.g. `joins("JOIN posts AS p1 ON ...")`) introduces an alias the scope's
-      // WHERE references, so it is emitted as its own join source.
-      const sources: Nodes.Node[] = [];
-      for (const jv of (scope?._joinValues ?? []) as (string | Nodes.Node)[]) {
-        sources.push(typeof jv === "string" ? new Nodes.StringJoin(arelSql(jv.trim()) as any) : jv);
-      }
-
-      // Rails appends `others` to the LAST join (`append_constraints(joins.last,
-      // others)`): the trailing string-join source when one exists, else this
-      // association's own ON. Attaching to the later source keeps any alias the
-      // source introduces in scope for stricter adapters (PG/MySQL), which reject
-      // an ON that references a table joined further right.
+      // Rails, gated on `unless others.empty?`:
+      //   joins.concat arel.join_sources
+      //   append_constraints(joins.last, others)
+      // A raw-string join in the scope (e.g. `joins("JOIN posts AS p1 ON ...")`)
+      // is emitted as its own join source, and the cross-table `others`
+      // predicates are appended to that trailing source's ON — keeping the
+      // source's alias in scope for stricter adapters (PG/MySQL), which reject an
+      // ON that references a table joined further right. When the scope has no
+      // join source, `joins.last` is this association's own join, so `others`
+      // fold back into its ON (Rails' behaviour for a plain cross-table scope).
       if (others.length > 0) {
+        const sources: Nodes.Node[] = [];
+        for (const jv of (scope?._joinValues ?? []) as (string | Nodes.Node)[]) {
+          sources.push(
+            typeof jv === "string" ? new Nodes.StringJoin(arelSql(jv.trim()) as any) : jv,
+          );
+        }
         if (sources.length > 0) {
           const lastIdx = sources.length - 1;
           sources[lastIdx] = appendConstraints(sources[lastIdx], others) ?? sources[lastIdx];
+          this.joinSources.push(...sources);
         } else {
           const lastIdx = joins.length - 1;
           joins[lastIdx] = (appendConstraints(joins[lastIdx], others) ??
             joins[lastIdx]) as Nodes.Join;
         }
       }
-
-      this.joinSources.push(...sources);
 
       foreignTable = table;
       foreignKlass = klass;
