@@ -21,7 +21,10 @@ export interface AssociationInstanceHost {
 /** @internal */
 export interface AssociationProxyLike {
   reader: unknown;
-  writer(value: unknown): void;
+  // has_one's writer persists on assignment to a saved owner and so returns a
+  // Promise; belongs_to / collection writers stay synchronous (void).
+  writer(value: unknown): void | Promise<void>;
+  _pendingWrite?: Promise<void> | null;
   idsReader(): unknown;
   idsWriter(ids: unknown): void;
   forceReloadReader(): unknown;
@@ -240,7 +243,23 @@ export class Association {
     Object.defineProperty(mixin, name, {
       get: existing?.get,
       set(this: AssociationInstanceHost, value: unknown) {
-        this.association(name).writer(value);
+        const assoc = this.association(name);
+        const result = assoc.writer(value);
+        // A JS property setter cannot `await`, but has_one persists on
+        // assignment to a saved owner (Rails does this synchronously inside
+        // `HasOneAssociation#replace`). Expose the in-flight write as
+        // `_pendingWrite` so the owner's next `save()` awaits it
+        // (`flushPendingReplaces`) — eliminating the assign-then-save race —
+        // and any `RecordNotSaved` surfaces through that `save()` rather than
+        // being silently dropped. The `.catch` keeps an un-awaited rejection
+        // from becoming an unhandled rejection without masking it from
+        // `await`ers (the promise stays rejected). Callers that need to
+        // observe the write directly should use
+        // `record.association(name).writer(value)` and `await` it.
+        if (result && typeof result.then === "function") {
+          result.catch(() => {});
+          assoc._pendingWrite = result;
+        }
       },
       configurable: true,
     });

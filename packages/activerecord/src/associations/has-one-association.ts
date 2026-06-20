@@ -17,6 +17,10 @@ import { polymorphicName } from "../inheritance.js";
  */
 export class HasOneAssociation extends SingularAssociation {
   _pendingReplace: { record: Base | null; readonly previousTarget: Base | null } | null = null;
+  // Set by the property-setter (`builder/association.ts` defineWriters) to the
+  // fire-and-forget `persistReplace` promise it cannot await; the owner's next
+  // `save()` (`flushPendingReplaces`) awaits and clears it.
+  _pendingWrite: Promise<void> | null = null;
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
@@ -25,6 +29,7 @@ export class HasOneAssociation extends SingularAssociation {
   override reset(): void {
     super.reset();
     this._pendingReplace = null;
+    this._pendingWrite = null;
   }
 
   /**

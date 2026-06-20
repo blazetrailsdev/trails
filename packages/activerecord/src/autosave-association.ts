@@ -291,6 +291,17 @@ export async function flushPendingReplaces(record: Base): Promise<void> {
   const instances: Map<string, unknown> = (record as any)._associationInstances;
   if (!instances?.values) return;
   for (const assoc of instances.values()) {
+    // A property-setter assignment (`owner.account = x`) on a saved owner kicks
+    // off `persistReplace` fire-and-forget because the setter can't await; it
+    // parks the in-flight promise on `_pendingWrite`. Await it first so this
+    // save sequences after that write (and re-raises its rejection) rather than
+    // racing a second `persistReplace` against it — by the time it resolves,
+    // `_pendingReplace` is cleared, so the check below is a no-op.
+    const pendingWrite = (assoc as any)._pendingWrite as Promise<void> | null | undefined;
+    if (pendingWrite) {
+      (assoc as any)._pendingWrite = null;
+      await pendingWrite;
+    }
     if (typeof (assoc as any).persistReplace === "function" && (assoc as any)._pendingReplace) {
       await (assoc as any).persistReplace();
     }
