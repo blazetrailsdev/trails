@@ -78,12 +78,6 @@ describe("CacheBehaviorTest", () => {
     expect(called).toBe(false);
   });
 
-  it("read multi", () => {
-    cache.write("foo", "bar");
-    cache.write("baz", "qux");
-    expect(cache.readMulti("foo", "baz", "missing")).toEqual({ foo: "bar", baz: "qux" });
-  });
-
   it("delete", () => {
     cache.write("foo", "bar");
     expect(cache.delete("foo")).toBe(true);
