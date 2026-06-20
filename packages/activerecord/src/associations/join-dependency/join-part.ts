@@ -28,6 +28,13 @@ export abstract class JoinPart {
   assocName = "";
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
   arelJoin: Nodes.Join | null = null;
+  /**
+   * Extra join sources from the association scope's own `joins(...)` (raw-string
+   * joins). Emitted by `makeConstraints` right after this node's `arelJoin` so
+   * aliases the scope introduces (and its WHERE references) are in scope.
+   * @internal
+   */
+  scopeJoinSources: Nodes.Node[] = [];
   /** @internal */
   nodeReflection: any | null = null;
   isThroughNode = false;

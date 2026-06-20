@@ -1245,9 +1245,8 @@ describe("AssociationsJoinModelTest", () => {
     // convergence tracked in RFC 0023
   });
 
-  it.skip("eager association with scope with string joins", async () => {
-    // trails: scope string joins in hasOne association scopes produce invalid SQL on SQLite —
-    // convergence tracked in RFC 0023
+  it("eager association with scope with string joins", async () => {
+    await expect(Post.joins("verySpecialCommentWithStringJoins").first()).resolves.not.toThrow();
   });
 
   it("has many through goes through all sti classes", async () => {

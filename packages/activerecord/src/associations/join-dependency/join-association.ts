@@ -9,7 +9,7 @@
  */
 
 import type { Base } from "../../base.js";
-import { Table, Nodes } from "@blazetrails/arel";
+import { Table, Nodes, sql as arelSql } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import type { AliasTracker } from "../alias-tracker.js";
@@ -24,6 +24,14 @@ export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
   private _table: Table | null = null;
   readonly tables: Table[] = [];
+  /**
+   * Extra join sources contributed by the association scope's own `joins(...)`
+   * (Rails `joins.concat arel.join_sources`). Kept separate from the per-chain
+   * constraint joins so callers that map joins 1:1 to chain entries aren't
+   * disturbed; `makeConstraints` emits these after the node's own join.
+   * @internal
+   */
+  readonly joinSources: Nodes.Node[] = [];
   private _readonly?: boolean;
   private _strictLoading?: boolean;
 
@@ -137,10 +145,9 @@ export class JoinAssociation extends JoinPart {
         nodes = eqs.length === 1 ? eqs[0] : new Nodes.And(eqs);
       }
 
-      // Rails: extract nodes that DON'T belong to this table into "others"
-      let others: Nodes.Node[] | null = null;
+      // Rails: extract predicates that DON'T belong to this table into "others"
+      const others: Nodes.Node[] = [];
       if (nodes instanceof Nodes.And) {
-        others = [];
         const remaining: Nodes.Node[] = [];
         for (const child of nodes.children) {
           if (!nodeReferencesTable(child, table.tableAlias ?? table.name)) {
@@ -149,25 +156,53 @@ export class JoinAssociation extends JoinPart {
             remaining.push(child);
           }
         }
-        if (others.length === 0) {
-          others = null;
-        } else if (remaining.length === 0) {
-          // All predicates are cross-table — use a no-op ON condition;
-          // others will be merged back into nodes below
-          nodes = new Nodes.True();
-        } else {
-          nodes = remaining.length === 1 ? remaining[0] : new Nodes.And(remaining);
+        if (others.length > 0) {
+          if (remaining.length === 0) nodes = new Nodes.True();
+          else nodes = remaining.length === 1 ? remaining[0] : new Nodes.And(remaining);
         }
       }
 
-      if (others && others.length > 0) {
-        nodes =
-          nodes instanceof Nodes.And
-            ? new Nodes.And([...nodes.children, ...others])
-            : new Nodes.And([nodes, ...others]);
-      }
-
       joins.push(new joinType(table, new Nodes.On(nodes)));
+
+      // Rails, gated on `unless others.empty?`:
+      //   joins.concat arel.join_sources
+      //   append_constraints(joins.last, others)
+      // A raw-string join in the scope (e.g. `joins("JOIN posts AS p1 ON ...")`)
+      // is emitted as its own join source, and the cross-table `others`
+      // predicates are appended to that trailing source's ON — keeping the
+      // source's alias in scope for stricter adapters (PG/MySQL), which reject an
+      // ON that references a table joined further right. When the scope has no
+      // join source, `joins.last` is this association's own join, so `others`
+      // fold back into its ON (Rails' behaviour for a plain cross-table scope).
+      if (others.length > 0) {
+        const sources: Nodes.Node[] = [];
+        // TODO: replace `scope._joinValues` with `scope.arel().join_sources` once
+        // Relation#arel() exists. Rails reads the materialized arel join sources
+        // (always proper Arel join nodes); reading `_joinValues` directly only
+        // handles raw-SQL strings and pre-built Nodes.Join — an association-name
+        // join source (Rails `.joins(:posts)`) would be mishandled here.
+        for (const jv of (scope?._joinValues ?? []) as (string | Nodes.Node)[]) {
+          sources.push(
+            typeof jv === "string" ? new Nodes.StringJoin(arelSql(jv.trim()) as any) : jv,
+          );
+        }
+        // NOTE: `this.joinSources` accumulates across the chain but is only
+        // consumed by the single-step `has_one`/`has_many` join path
+        // (JoinDependency#addAssociation), whose reflection chain is length 1, so
+        // each source maps to its own join step. A through association whose
+        // intermediate scope also contributes string joins is not wired to
+        // capture `joinSources` at all yet — a separate fidelity gap, not a
+        // mis-ordering of this path.
+        if (sources.length > 0) {
+          const lastIdx = sources.length - 1;
+          sources[lastIdx] = appendConstraints(sources[lastIdx], others) ?? sources[lastIdx];
+          this.joinSources.push(...sources);
+        } else {
+          const lastIdx = joins.length - 1;
+          joins[lastIdx] = (appendConstraints(joins[lastIdx], others) ??
+            joins[lastIdx]) as Nodes.Join;
+        }
+      }
 
       foreignTable = table;
       foreignKlass = klass;
@@ -255,12 +290,12 @@ function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | 
     const newLeft = allExprs.length === 1 ? allExprs[0] : new Nodes.And(allExprs);
     return new Nodes.StringJoin(newLeft);
   } else if (joinAny.right?.expr instanceof Nodes.Node) {
+    // Rails `append_constraints`: `right.expr = And.new([right.expr, *constraints])`
+    // — `right.expr` is nested as the first element rather than flattened, so an
+    // existing And stays nested (`And([And([...]), ...new])`). Matches Rails
+    // structurally (SQL-equivalent either way).
     const existing = joinAny.right.expr as Nodes.Node;
-    const allExprs: Nodes.Node[] =
-      existing instanceof Nodes.And
-        ? [...existing.children, ...arelConstraints]
-        : [existing, ...arelConstraints];
-    const newExpr = new Nodes.And(allExprs);
+    const newExpr = new Nodes.And([existing, ...arelConstraints]);
     return new (join as any).constructor(joinAny.left, new Nodes.On(newExpr));
   }
   return join as Nodes.Node | null;
