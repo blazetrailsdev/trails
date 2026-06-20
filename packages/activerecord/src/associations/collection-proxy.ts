@@ -2226,10 +2226,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this._removeFromTarget(removed);
       return removed;
     }
+    // Rails `delete(*records)` flattens its arguments, so `delete([a, b])` and
+    // `delete(a, b)` behave identically. Mirror that before coercing/finding.
+    const flatRecords = records.flat();
     // Coerce id args via the scoped `find` (Rails delete_or_destroy).
-    const modelRecords = records.every((r) => typeof r === "object")
-      ? records
-      : ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[]);
+    const modelRecords = flatRecords.every((r) => typeof r === "object")
+      ? (flatRecords as T[])
+      : ([await this.find(...(flatRecords as unknown[]))].flat().filter(Boolean) as T[]);
 
     // Persisted children are nullified via update_all (Rails delete_records
     // else-branch), bypassing validations/callbacks. New-record children have
