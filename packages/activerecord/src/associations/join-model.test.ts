@@ -363,7 +363,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("delete polymorphic has one with destroy", async () => {
     const welcome = await Post.find(posts("welcome").id);
-    const tagging = (await (welcome as any).association("tagging").loadTarget()) as Tagging;
+    const tagging = (await (welcome as any).tagging) as Tagging;
     expect(tagging).toBeTruthy();
     await (tagging as any).updateColumns({ taggable_type: "PostWithHasOneDestroy" });
     const post = await findPostWithDependency(welcome.id as number, PostWithHasOneDestroy);
@@ -372,12 +372,12 @@ describe("AssociationsJoinModelTest", () => {
     await (post as any).destroy();
     expect(await Tagging.count()).toBe(oldCount - 1);
     await (welcome as any).association("tagging").reload();
-    expect((welcome as any).association("tagging").target).toBeNull();
+    expect(await (welcome as any).tagging).toBeNull();
   });
 
   it("delete polymorphic has one with nullify", async () => {
     const welcome = await Post.find(posts("welcome").id);
-    const tagging = (await (welcome as any).association("tagging").loadTarget()) as Tagging;
+    const tagging = (await (welcome as any).tagging) as Tagging;
     expect(tagging).toBeTruthy();
     await (tagging as any).updateColumns({ taggable_type: "PostWithHasOneNullify" });
     const post = await findPostWithDependency(welcome.id as number, PostWithHasOneNullify);
@@ -386,7 +386,7 @@ describe("AssociationsJoinModelTest", () => {
     await (post as any).destroy();
     expect(await Tagging.count()).toBe(oldCount);
     await (welcome as any).association("tagging").reload();
-    expect((welcome as any).association("tagging").target).toBeNull();
+    expect(await (welcome as any).tagging).toBeNull();
   });
 
   it("belongs to polymorphic with counter cache", async () => {
