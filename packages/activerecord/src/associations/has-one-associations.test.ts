@@ -203,8 +203,17 @@ describe("HasOneAssociationsTest", () => {
     // fix in associations.ts / instance-methods.ts).
     const firm = companies("rails_core") as any;
     const oldAccountId = (await readHasOne(firm, "account")).id;
-    await firm.association("account").writer(new Account({ credit_limit: 5 }));
-    // account is dependent with nullify, therefore its firm_id should be nil
+    const newAccount = new Account({ credit_limit: 5 });
+    // Exercise the public property-setter path end-to-end: a JS setter can't
+    // await, so the persist fires fire-and-forget and is parked on
+    // `_pendingWrite`; `firm.save()` (flushPendingReplaces) awaits it before
+    // returning. This is not the old defer-to-save deviation — the write is
+    // triggered by the assignment, and save() only sequences after it.
+    firm.account = newAccount;
+    await firm.save();
+    // The new record's FK was written and persisted on assignment...
+    expect(newAccount.firm_id).toBe(firm.id);
+    // ...and account is dependent with nullify, so the displaced firm_id is nil.
     expect((await Account.find(oldAccountId)).firm_id).toBeNull();
   });
 
