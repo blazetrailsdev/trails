@@ -599,9 +599,18 @@ export interface InsertBuilder {
  *
  * Mirrors: ActiveRecord::InsertAll::Builder
  *
- * All identifiers use double quotes (standard SQL). The MySQL adapter
- * converts them to backticks at execution time via mysqlQuote(), matching
- * how the rest of the codebase works with Arel-generated SQL.
+ * Identifier quoting delegates to the connection's `quoteColumnName` /
+ * `quoteTableName` (mirroring Rails' `quote_column` → `quote_column_name`
+ * indirection), so each dialect emits its own form directly: SQLite/PG
+ * double-quote (with embedded `"` doubled), MySQL backticks. Embedded-quote
+ * doubling therefore comes from the adapter, not ad-hoc `.replace` here.
+ *
+ * MySQL note: the adapter's `mysqlQuote()` still rewrites double-quoted
+ * identifiers to backticks at execution time for *Arel-generated* SQL (the
+ * compiled VALUES list runs through the visitor). That blanket pass is still
+ * needed and stays; the identifiers this Builder emits for MySQL are already
+ * backticks, which `mysqlQuote()` passes through unchanged (it only rewrites
+ * `"`), so there is no double-conversion.
  */
 export class Builder implements InsertBuilder {
   readonly model: ModelClass;
@@ -614,6 +623,16 @@ export class Builder implements InsertBuilder {
     this._dialect = dialect;
   }
 
+  /** Mirrors Rails `quote_column` → `connection.quote_column_name`. @internal */
+  private quoteColumn(name: string): string {
+    return this._insertAll.connection.quoteColumnName(name);
+  }
+
+  /** Mirrors Rails `connection.quote_table_name`. @internal */
+  private quoteTable(name: string): string {
+    return this._insertAll.connection.quoteTableName(name);
+  }
+
   returning(): string | undefined {
     const ret = this._insertAll.returning;
     if (!ret) return undefined;
@@ -624,9 +643,9 @@ export class Builder implements InsertBuilder {
       .map((attr: string) => {
         const physical = aliases?.[attr];
         if (physical) {
-          return `"${physical.replace(/"/g, '""')}" AS "${attr.replace(/"/g, '""')}"`;
+          return `${this.quoteColumn(physical)} AS ${this.quoteColumn(attr)}`;
         }
-        return `"${attr.replace(/"/g, '""')}"`;
+        return this.quoteColumn(attr);
       })
       .join(",");
   }
@@ -640,7 +659,7 @@ export class Builder implements InsertBuilder {
   }
 
   into(): string {
-    const tableName = `"${this.model.arelTable.name}"`;
+    const tableName = this.quoteTable(this.model.arelTable.name);
     const keys = [...this._insertAll.keysIncludingTimestamps()];
     if (keys.length === 0) {
       if (this._insertAll.inserts.length > 1) {
@@ -651,7 +670,7 @@ export class Builder implements InsertBuilder {
       }
       return `INTO ${tableName} DEFAULT VALUES`;
     }
-    const columnsList = keys.map((k) => `"${k}"`).join(", ");
+    const columnsList = keys.map((k) => this.quoteColumn(k)).join(",");
     const compiledValues = this._visitor().compile(this.valuesList());
     return `INTO ${tableName} (${columnsList}) ${compiledValues}`;
   }
@@ -696,20 +715,22 @@ export class Builder implements InsertBuilder {
       // "(lower(external_id))"), kept verbatim like Rails' format_columns;
       // ordinary column lists are quoted.
       const rawCols = index.columns as unknown as string | string[];
-      const cols = Array.isArray(rawCols) ? rawCols.map((c) => `"${c}"`).join(", ") : rawCols;
+      const cols = Array.isArray(rawCols)
+        ? rawCols.map((c) => this.quoteColumn(c)).join(",")
+        : rawCols;
       return index.where ? `(${cols}) WHERE ${index.where}` : `(${cols})`;
     }
     if (this._insertAll.updateDuplicates()) {
       return `(${this._insertAll
         .primaryKeys()
-        .map((c) => `"${c}"`)
-        .join(", ")})`;
+        .map((c) => this.quoteColumn(c))
+        .join(",")})`;
     }
     return "";
   }
 
   updatableColumns(): string[] {
-    return this._insertAll.updatableColumns().map((c) => `"${c}"`);
+    return this._insertAll.updatableColumns().map((c) => this.quoteColumn(c));
   }
 
   touchModelTimestampsUnless(
@@ -727,9 +748,11 @@ export class Builder implements InsertBuilder {
     const conditions = quotedUpdatable.map(block).join(" AND ");
     for (const col of this._insertAll.updateTimestampColumnsInModel()) {
       if (!updatable.includes(col)) {
-        const qcol = `"${col}"`;
+        // Rails emits the timestamp column name raw here — only quoted_table_name
+        // is quoted (insert_all.rb:284): `#{column_name}=(CASE WHEN (...) THEN
+        // #{model.quoted_table_name}.#{column_name} ELSE ...)`.
         parts.push(
-          `${qcol}=(CASE WHEN (${conditions}) THEN ${tableName}.${qcol} ELSE ${nowValue} END)`,
+          `${col}=(CASE WHEN (${conditions}) THEN ${tableName}.${col} ELSE ${nowValue} END)`,
         );
       }
     }
@@ -738,7 +761,7 @@ export class Builder implements InsertBuilder {
 
   /** @internal Mirrors Rails `insert.model.quoted_table_name`. */
   quotedTableName(): string {
-    return `"${this.model.arelTable.name}"`;
+    return this.quoteTable(this.model.arelTable.name);
   }
 
   rawUpdateSql(): Nodes.SqlLiteral | undefined {
@@ -762,7 +785,7 @@ export class Builder implements InsertBuilder {
    */
   firstColumn(): string | undefined {
     const [first] = this._insertAll.keys;
-    return first === undefined ? undefined : `"${first}"`;
+    return first === undefined ? undefined : this.quoteColumn(first);
   }
 
   private _arrayColumnSet(): Set<string> {
