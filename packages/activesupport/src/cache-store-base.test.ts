@@ -97,7 +97,6 @@ describe("CacheBehaviorTest", () => {
       return "v";
     });
     expect(capturedOpts).toBeInstanceOf(WriteOptions);
-    expect(capturedOpts!.key).toBe("foo");
   });
 
   it("increment", () => {

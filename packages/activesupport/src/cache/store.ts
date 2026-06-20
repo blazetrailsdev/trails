@@ -22,18 +22,26 @@ export type StoreOptions = Record<string, unknown>;
 
 /** Mirrors Rails Cache::Store::WriteOptions (cache.rb:1064). @internal */
 export class WriteOptions {
-  constructor(
-    readonly key: string,
-    private _opts: StoreOptions,
-  ) {}
-  set expiresIn(v: number) {
+  constructor(private _opts: StoreOptions) {}
+  get expiresIn() {
+    return this._opts.expiresIn as number | undefined;
+  }
+  set expiresIn(v: number | undefined) {
     delete this._opts.expiresAt;
     this._opts.expiresIn = v;
   }
-  set expiresAt(v: number) {
+  get expiresAt() {
+    return this._opts.expiresAt as number | undefined;
+  }
+  set expiresAt(v: number | undefined) {
     delete this._opts.expiresIn;
-    const s = (v - Date.now()) / 1000;
-    this._opts.expiresIn = s > 0 ? s : 0;
+    this._opts.expiresAt = v;
+  }
+  get version() {
+    return this._opts.version as string | undefined;
+  }
+  set version(v: string | undefined) {
+    this._opts.version = v;
   }
 }
 
@@ -178,7 +186,7 @@ export abstract class Store {
     for (const name of names) {
       ordered[name] = Object.prototype.hasOwnProperty.call(reads, name)
         ? reads[name]
-        : (writes[name] = block(name, new WriteOptions(name, merged)));
+        : (writes[name] = block(name, new WriteOptions(merged)));
     }
     if (merged.skipNil) {
       for (const k of Object.keys(writes)) {
@@ -308,8 +316,6 @@ export abstract class Store {
 
   protected expandedKey(key: unknown): string {
     if (key != null && typeof key === "object") {
-      if ("cacheKeyWithVersion" in key)
-        return String((key as { cacheKeyWithVersion(): string }).cacheKeyWithVersion());
       if ("cacheKey" in key) return String((key as { cacheKey(): string }).cacheKey());
       if (Array.isArray(key)) return key.map((k) => this.expandedKey(k)).join("/");
       return Object.entries(key as Record<string, unknown>)
@@ -347,7 +353,7 @@ export abstract class Store {
     block: (key: string, opts: WriteOptions) => unknown,
   ): unknown {
     const mutableOptions = { ...options };
-    const result = block(name, new WriteOptions(name, mutableOptions));
+    const result = block(name, new WriteOptions(mutableOptions));
     if (result != null || !options.skipNil) this.write(name, result, mutableOptions);
     return result;
   }
