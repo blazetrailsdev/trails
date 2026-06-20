@@ -295,8 +295,62 @@ export abstract class Store {
     return keys.filter((k) => this.deleteEntry(k, options)).length;
   }
 
+  /** Mirrors Rails `Cache::Store#merged_options` (cache.rb:861–888). */
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
-    return callOptions ? { ...this.options, ...callOptions } : this.options;
+    if (!callOptions) return this.options;
+
+    const call = Store.normalizeOptions({ ...callOptions });
+
+    if (call.expiresIn != null && call.expiresAt != null) {
+      throw new ArgumentError("Either :expires_in or :expires_at can be supplied, but not both");
+    }
+
+    const expiresAt = call.expiresAt as number | undefined;
+    if (expiresAt != null) {
+      call.expiresIn = expiresAt - Date.now();
+      delete call.expiresAt;
+    }
+
+    // boundary: mirrors cache.rb:871–874 — raises when expires_in is accidentally a Time/Date object.
+    if (call.expiresIn instanceof Date) {
+      throw new ArgumentError(
+        `expires_in parameter should not be a Date. Did you mean to use expiresAt? Got: ${call.expiresIn}`,
+      );
+    }
+
+    if (call.expiresIn != null && (call.expiresIn as number) < 0) {
+      const expiresIn = call.expiresIn;
+      delete call.expiresIn;
+      Store.handleInvalidExpiresIn(
+        `Cache expiration time is invalid, cannot be negative: ${expiresIn}`,
+      );
+    }
+
+    return { ...this.options, ...call };
+  }
+
+  /** Mirrors Rails `Cache::Store#normalize_options` (cache.rb:905–911). */
+  static normalizeOptions(options: StoreOptions): StoreOptions {
+    const opts = { ...options };
+    // OPTION_ALIASES = { expires_in: [:expire_in, :expired_in] }
+    // Alias is only applied if the canonical key is not already present (mirrors ||=).
+    const aliasKey =
+      opts.expire_in != null ? "expire_in" : opts.expired_in != null ? "expired_in" : null;
+    if (aliasKey != null) {
+      if (opts.expiresIn == null) opts.expiresIn = opts[aliasKey];
+      delete opts.expire_in;
+      delete opts.expired_in;
+    }
+    return opts;
+  }
+
+  /** Mirrors Rails `Cache::Store#handle_invalid_expires_in` (cache.rb:892–898). */
+  static handleInvalidExpiresIn(message: string): void {
+    const error = new ArgumentError(message);
+    if (Store.raiseOnInvalidCacheExpirationTime) {
+      throw error;
+    }
+    Store.logger?.error?.(`${error.name}: ${error.message}`);
   }
 
   protected normalizeKey(key: unknown, options?: StoreOptions): string {
