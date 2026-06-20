@@ -204,9 +204,9 @@ describe("HasOneAssociationsTest", () => {
     // fix in associations.ts / instance-methods.ts).
     const firm = companies("rails_core") as any;
     const oldAccountId = (await readHasOne(firm, "account")).id;
+    // Property setter queues the change; `firm.save()` flushes it
+    // (flushPendingReplaces → persistReplace), nullifying the displaced account.
     firm.account = new Account({ credit_limit: 5 });
-    // DEVIATION: Rails persists the has_one write on assignment to a saved owner
-    // (no save() call); trails defers the displaced record's FK nullify to save().
     await firm.save();
     // account is dependent with nullify, therefore its firm_id should be nil
     expect((await Account.find(oldAccountId)).firm_id).toBeNull();
@@ -238,10 +238,9 @@ describe("HasOneAssociationsTest", () => {
 
   it("association change calls delete", async () => {
     const firm = companies("first_firm") as any;
-    firm.deletableAccount = new Account({ credit_limit: 5 });
-    // DEVIATION: Rails persists the has_one write on assignment to a saved owner
-    // (no save() call); trails defers the displaced record's delete to save().
+    // Property setter queues; `firm.save()` flushes the displaced-record delete.
     // dependent: :delete skips callbacks, so destroyed_account_ids stays empty.
+    firm.deletableAccount = new Account({ credit_limit: 5 });
     await firm.save();
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
   });
@@ -606,21 +605,29 @@ describe("HasOneAssociationsTest", () => {
     const account = await Account.find(1);
     await readHasOne(company, "account"); // force loading
     await assertNoQueries(false, async () => {
+      // Re-assigning the already-loaded record is a `sameRecord` no-op — the
+      // property setter queues nothing, so no queries fire.
       company.account = account;
     });
 
-    company.account = null;
+    // Rails persists `company.account = nil` immediately (destroying the
+    // dependent account); JS setters can't await, so drive the awaitable writer
+    // to do the same — otherwise the destroy would defer and inflate the
+    // account2 assignment's query count below.
+    await company.association("account").writer(null);
     await assertNoQueries(false, async () => {
       company.account = null;
     });
 
     const account2 = await Account.find(2);
-    // DEVIATION: Rails persists has_one writes on assignment to a saved owner —
-    // `assert_queries_count(3) { company.account = account }`. trails defers the
-    // nullify-old + update-new writes to save(), so the assignment runs no
-    // queries (the 3 writes happen on the owner's next save()).
-    await assertNoQueries(false, async () => {
-      company.account = account2;
+    // Rails counts the writes synchronously on the bare assignment
+    // (`assert_queries_count(3) { company.account = account }`). The JS property
+    // setter (`company.account = account2`) cannot persist synchronously without
+    // a floating promise, so it defers to save(); to count the assignment's own
+    // queries here we drive the Rails-faithful awaitable writer, which persists
+    // immediately (savepoint + FK update + release = 3).
+    await assertQueriesCount(3, false, async () => {
+      await company.association("account").writer(account2);
     });
 
     await assertNoQueries(false, async () => {
@@ -636,7 +643,7 @@ describe("HasOneAssociationsTest", () => {
     ship.name = "new name";
     expect(ship.changed).toBe(true);
     await assertQueriesCount(3, false, async () => {
-      (pirate.association("ship") as any).writer(ship);
+      (pirate as any).ship = ship;
       await pirate.save();
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
@@ -649,7 +656,7 @@ describe("HasOneAssociationsTest", () => {
 
     const newShip = await Ship.create({ name: "new name" });
     await assertQueriesCount(4, false, async () => {
-      (pirate.association("ship") as any).writer(newShip);
+      (pirate as any).ship = newShip;
       await pirate.save();
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");

@@ -40,6 +40,23 @@ export class HasOne extends SingularAssociation {
     return super.build(model, name, scope, options);
   }
 
+  static override defineWriters(mixin: object, name: string): void {
+    if (!mixin || typeof mixin !== "object") return;
+    const existing = Object.getOwnPropertyDescriptor(mixin, name);
+    if (existing && !existing.configurable) return;
+    Object.defineProperty(mixin, name, {
+      get: existing?.get,
+      // A JS property setter cannot `await`, so the has_one writer queues the
+      // change (sets `_pendingReplace`) for the owner's next `save()` to flush —
+      // no DB I/O, no floating promise. Callers that need the Rails-faithful
+      // immediate persist use `record.association(name).writer(value)` and await it.
+      set(this: { association(n: string): { queueWrite(v: unknown): void } }, value: unknown) {
+        this.association(name).queueWrite(value);
+      },
+      configurable: true,
+    });
+  }
+
   static override validDependentOptions(): string[] {
     return [
       "destroy",
