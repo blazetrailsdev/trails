@@ -165,8 +165,8 @@ export abstract class Store {
   }
 
   readMulti(...names: [...string[], StoreOptions] | string[]): Record<string, unknown> {
-    const options = extractOptions(names as unknown[]);
     if (names.length === 0) return {};
+    const options = extractOptions(names as unknown[]);
     return this.readMultiEntries(names as string[], this.mergedOptions(options));
   }
 
