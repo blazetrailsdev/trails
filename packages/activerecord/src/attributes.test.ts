@@ -9,6 +9,7 @@ import { typeRegistry } from "@blazetrails/activemodel";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { adapterType } from "./test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -320,7 +321,7 @@ describe("CustomPropertiesTest", () => {
     expect(reloaded.status).toBe("draft");
   });
 
-  it("array types can be specified", async () => {
+  it.skipIf(adapterType !== "postgres")("array types can be specified", async () => {
     class Post extends Base {
       static {
         this.attribute("tags", "string", { default: "[]" });
@@ -331,7 +332,7 @@ describe("CustomPropertiesTest", () => {
     p.tags = '["a","b"]';
     expect(p.tags).toBe('["a","b"]');
   });
-  it("range types can be specified", async () => {
+  it.skipIf(adapterType !== "postgres")("range types can be specified", async () => {
     class Post extends Base {
       static {
         this.attribute("price_range", "string", { default: "0-100" });

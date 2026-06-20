@@ -9,7 +9,7 @@ import { loadSchemaFromAdapter } from "./model-schema.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { NotNullViolation } from "./errors.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
@@ -21,7 +21,7 @@ import {
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -227,7 +227,9 @@ describe("DefaultNumbersTest", () => {
   });
 });
 
-describe("DefaultBinaryTest", () => {
+// Rails gates these binary-default cases `unless current_adapter?(:Mysql2)`
+// (MySQL string/binary default handling differs). adapters: postgresql + sqlite.
+describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -282,7 +284,7 @@ describe("DefaultTest", () => {
     expect(p.title).toBeNull();
   });
 
-  it("multiline default text", async () => {
+  it.skipIf(adapterType === "mysql")("multiline default text", async () => {
     class Post extends Base {
       static {
         this.attribute("body", "string", { default: "line1\nline2\nline3" });
@@ -365,7 +367,7 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
   });
 });
 
-describe("DefaultTextTest", () => {
+describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

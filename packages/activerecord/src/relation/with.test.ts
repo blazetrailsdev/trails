@@ -12,6 +12,7 @@ import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company } from "../test-helpers/models/company.js";
+import { describeIfSupports } from "../test-helpers/supports.js";
 
 const SPECIAL_POSTS = [2];
 const POSTS_WITH_TAGS = [1, 2, 7, 8, 9, 10, 11];
@@ -35,7 +36,7 @@ function toIds(ids: any[]): number[] {
 // ==========================================================================
 // WithTest — targets relation/with_test.rb
 // ==========================================================================
-describe("WithTest", () => {
+describeIfSupports("common_table_expressions", "WithTest", () => {
   useHandlerFixtures(["comments", "posts", "companies"], { schema: canonicalSchema });
   // Force-recreate `comments`/`posts`/`companies` to the canonical shape. Under
   // vitest's per-file module isolation the signature/schema caches reset to
@@ -243,7 +244,12 @@ describe("WithTest", () => {
     expect((unscoped.values()["with"] as any[]).length).toBe(0);
     expect(await unscoped.count()).toEqual(await Post.count());
   });
+});
 
+// Rails' `else` branch for adapters lacking CTE support is ungated (it asserts
+// the no-CTE-support fallback), so it stays OUTSIDE the describeIfSupports gate
+// above to mirror Rails exactly.
+describe("WithTest", () => {
   it.skip("common table expressions are unsupported", () => {
     // PERMANENT-SKIP: Rails' `else` branch for adapters lacking CTE support.
     // Every adapter trails exercises (SQLite/PG/MySQL) supports CTEs, so this

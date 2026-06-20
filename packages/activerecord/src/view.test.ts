@@ -15,7 +15,7 @@ import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
 import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
 
 // In Rails, AbstractAdapter includes SchemaStatements, so introspection
@@ -141,7 +141,7 @@ describe("ViewWithPrimaryKeyTest", () => {
 // ---------------------------------------------------------------------------
 // Rails sets `self.use_transactional_tests = false` on this class
 // (vendor/rails/activerecord/test/cases/view_test.rb:100).
-describe("ViewWithoutPrimaryKeyTest", () => {
+describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   setupHandlerSuite();
   const { books } = useFixtures(["books", "authors"], () => Base.connection, {
     schema: canonicalSchema,

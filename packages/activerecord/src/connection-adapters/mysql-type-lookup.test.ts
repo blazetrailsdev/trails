@@ -1,8 +1,9 @@
 /**
  * Mirrors Rails activerecord/test/cases/connection_adapters/mysql_type_lookup_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { it, expect, beforeEach } from "vitest";
 import { AbstractMysqlAdapter } from "./abstract-mysql-adapter.js";
+import { describeIfMysql } from "../adapters/abstract-mysql-adapter/test-helper.js";
 
 // Minimal subclass — only the type map is needed; no live connection.
 class TestMysqlAdapter extends AbstractMysqlAdapter {
@@ -29,7 +30,7 @@ function assertLookupType(expected: string, lookup: string) {
   expect(castType.type()).toBe(expected);
 }
 
-describe("MysqlTypeLookupTest", () => {
+describeIfMysql("MysqlTypeLookupTest", () => {
   it("boolean types", () => {
     // emulate_booleans = true: tinyint(1) → boolean
     assertLookupType("boolean", "tinyint(1)");

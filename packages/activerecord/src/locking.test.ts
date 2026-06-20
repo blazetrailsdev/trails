@@ -917,7 +917,7 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  it("with lock locks with no args", async () => {
+  it.skipIf(adapterType !== "postgres")("with lock locks with no args", async () => {
     const p = await Person.find(people("michael").id);
     await p.withLock(async () => {
       expect(p.first_name).toBe("Michael");
