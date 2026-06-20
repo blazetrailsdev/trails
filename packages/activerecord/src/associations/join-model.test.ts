@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
 import { association, setHasOne, loadBelongsTo } from "../associations.js";
-import { AssociationTypeMismatch } from "../errors.js";
+import { AssociationTypeMismatch, ConfigurationError } from "../errors.js";
 import {
   HasManyThroughAssociationNotFoundError,
   HasManyThroughAssociationPolymorphicSourceError,
@@ -1240,9 +1240,23 @@ describe("AssociationsJoinModelTest", () => {
     }
   });
 
-  it.skip("proper error message for eager load and includes association errors", async () => {
-    // trails: throws ArgumentError not ConfigurationError for unknown associations —
-    // convergence tracked in RFC 0023
+  it("proper error message for eager load and includes association errors", async () => {
+    const message =
+      "Can't join 'Post' to association named 'nonexistentRelation'; perhaps you misspelled it?";
+
+    const includesFind = async () =>
+      Post.includes("nonexistentRelation")
+        .where({ nonexistentRelation: { name: "Rochester" } })
+        .find(1);
+    await expect(includesFind()).rejects.toThrow(ConfigurationError);
+    await expect(includesFind()).rejects.toThrow(message);
+
+    const eagerLoadFind = async () =>
+      Post.eagerLoad("nonexistentRelation")
+        .where({ nonexistentRelation: { name: "Rochester" } })
+        .find(1);
+    await expect(eagerLoadFind()).rejects.toThrow(ConfigurationError);
+    await expect(eagerLoadFind()).rejects.toThrow(message);
   });
 
   it("eager association with scope with string joins", async () => {
