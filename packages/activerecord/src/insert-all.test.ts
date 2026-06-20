@@ -22,7 +22,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
@@ -1088,18 +1088,17 @@ describe("InsertAllTest", () => {
   });
 
   // Rails skips this unless BOTH supports_insert_conflict_target? AND
-  // supports_insert_on_duplicate_update? (insert_all_test.rb:812).
-  describeIfSupports("insert_on_duplicate_update", "upsert all sql + unique by", () => {
-    itIfSupports(
-      "insert_conflict_target",
-      "upsert all updates using provided sql and unique by",
-      (ctx) => {
-        ctx.skip();
-        // BLOCKED: unique-index introspection — unique_by [name, author_id].
-        // RFC 0030 d2-insert-all-unique-index-introspection.
-      },
-    );
-  });
+  // supports_insert_on_duplicate_update? (insert_all_test.rb:812); the
+  // comma-joined key gates on the conjunction.
+  itIfSupports(
+    "insert_conflict_target,insert_on_duplicate_update",
+    "upsert all updates using provided sql and unique by",
+    (ctx) => {
+      ctx.skip();
+      // BLOCKED: unique-index introspection — unique_by [name, author_id].
+      // RFC 0030 d2-insert-all-unique-index-introspection.
+    },
+  );
 
   it.skipIf(supportsInsertConflictTarget)(
     "upsert all with unique by fails cleanly for adapters not supporting insert conflict target",
