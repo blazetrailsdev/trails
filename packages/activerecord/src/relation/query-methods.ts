@@ -1641,7 +1641,28 @@ function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (isRelationLike(value)) {
     return arelSql((value as { toSql(): string }).toSql());
   }
+  // Mirrors the array / id_for_database transforms in build_bound_sql_literal /
+  // build_named_bound_sql_literal (query_methods.rb:1686-1715): a collection
+  // maps id_for_database over its elements (empty → nil), and a scalar AR object
+  // is reduced to its id_for_database. The visitor's cast_bound_value + quote
+  // run later, at render time. (Array/Set only, matching `quoteBoundValue` in
+  // sanitization.ts rather than every `respond_to?(:map)` iterable.)
+  if (Array.isArray(value) || value instanceof Set) {
+    const mapped = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase() : v));
+    return mapped.length === 0 ? null : mapped;
+  }
+  if (hasIdForDatabase(value)) return value.idForDatabase();
   return value;
+}
+
+function hasIdForDatabase(value: unknown): value is { idForDatabase(): unknown } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !(value instanceof Set) &&
+    typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
+  );
 }
 
 /** @internal */

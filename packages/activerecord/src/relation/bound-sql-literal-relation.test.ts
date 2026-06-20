@@ -56,6 +56,27 @@ describe("bound SQL literal with Relation bind value", () => {
     expect(expected.length).toBeGreaterThan(0);
   });
 
+  it("extracts id_for_database from an AR object positional bind", async () => {
+    const [first] = sortedIds(await Topic.where({ approved: true }).toArray());
+    const topic = await Topic.find(first);
+    const relation = Topic.where("id = ?", topic);
+
+    // build_bound_sql_literal reduces the model to its id_for_database
+    // (query_methods.rb:1707-1709) before the value reaches the quoter.
+    expect(relation.toSql()).toContain(String(first));
+    const rows = await relation.toArray();
+    expect(rows.map((r) => Number(r.id))).toEqual([first]);
+  });
+
+  it("maps id_for_database over an array positional bind", async () => {
+    const ids = sortedIds(await Topic.where({ approved: true }).toArray());
+    const topics = await Topic.where({ approved: true }).toArray();
+    const relation = Topic.where("id IN (?)", topics);
+
+    expect(sortedIds(await relation.toArray())).toEqual(ids);
+    expect(ids.length).toBeGreaterThan(0);
+  });
+
   // Direct coverage for the builders that `buildWhereClause` now routes string
   // fragments through (see `build_where_clause`, query_methods.rb:1625-1627);
   // call them here so the Relation→`Arel.sql(toSql)` branch has a focused
