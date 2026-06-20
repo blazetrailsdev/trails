@@ -1205,10 +1205,16 @@ describe("InsertAllTest", () => {
   itIfSupports(
     "insert_conflict_target,insert_on_duplicate_update",
     "upsert all updates using provided sql and unique by",
-    (ctx) => {
-      ctx.skip();
-      // BLOCKED: unique-index introspection — unique_by [name, author_id].
-      // RFC 0030 d2-insert-all-unique-index-introspection.
+    async () => {
+      const { sql } = await import("@blazetrails/arel");
+      const book = (await Book.find(2)) as any; // books(:rfr)
+      expect(book.status).toBe("proposed");
+
+      await Book.upsertAll([{ name: book.name, author_id: book.author_id }], {
+        uniqueBy: ["name", "author_id"],
+        onDuplicate: sql("status = 2"),
+      });
+      expect(((await Book.find(2)) as any).status).toBe("published");
     },
   );
 
