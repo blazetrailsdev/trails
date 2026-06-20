@@ -226,6 +226,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   override get active(): boolean {
     return this.driver?.isOpen() ?? false;
   }
+  /**
+   * @internal The underlying driver connection handle. Exposed for
+   * client-specific extensions (e.g. the libsql embedded-replica adapter's
+   * `syncReplica()`, which reaches the connection's `sync()` escape hatch).
+   * Core code uses `this.driver` directly; subclasses must go through here.
+   */
+  protected sqliteConnection(): SqliteConnection {
+    return this.driver;
+  }
+
   private _inTransaction = false;
   private _sqlite3SchemaCreation?: SQLite3SchemaCreation;
   private _readonly: boolean;
