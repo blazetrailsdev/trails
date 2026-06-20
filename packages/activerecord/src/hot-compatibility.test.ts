@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { createPooledTestAdapter, adapterType } from "./test-adapter.js";
+import { createPooledTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { PreparedStatementCacheExpired } from "./errors.js";
 import type { StatementPool } from "./connection-adapters/postgresql-adapter.js";
@@ -18,13 +18,78 @@ function preparedStatementCacheSize(adapter: DatabaseAdapter): number {
 }
 
 describe("HotCompatibilityTest", () => {
-  it.skip("insert after remove_column", () => {
-    // BLOCKED: schema-cache hot-reload — warm schema cache, remove_column via raw
-    // connection, verify INSERT succeeds with stale cache (Rails hot_compatibility_test.rb:25-43).
+  // Rails' setup builds the table + model fresh per test (use_transactional_tests
+  // = false). We mirror that with a helper that creates the table and a model
+  // bound to a fresh adapter, returning both so the test can drive remove_column
+  // on the same connection the model reads through.
+  async function setupHotCompatibility(): Promise<{
+    klass: typeof Base;
+    adapter: DatabaseAdapter;
+  }> {
+    const adapter = createTestAdapter();
+    const migration = new MigrationContext(adapter);
+    await migration.createTable("hot_compatibilities", { force: true }, (t) => {
+      t.string("foo");
+      t.string("bar");
+    });
+
+    class HotCompatibility extends Base {}
+    HotCompatibility.tableName = "hot_compatibilities";
+    (HotCompatibility as unknown as { adapter: DatabaseAdapter }).adapter = adapter;
+    // Rails' AR test suite runs with the gem default `partial_inserts = true`
+    // (dirty.rb:50); only attributes assigned away from their default are
+    // written, so the dropped `bar` is simply omitted from the INSERT. The
+    // trails test harness flips this to false via `load_defaults("7.0")`
+    // (test-setup-ar.ts), so restore the Rails-ambient default for this model.
+    HotCompatibility.partialInserts = true;
+
+    return { klass: HotCompatibility, adapter };
+  }
+
+  it("insert after remove_column", async () => {
+    const { klass, adapter } = await setupHotCompatibility();
+    try {
+      // warm cache
+      await klass.create();
+      await klass.loadSchema();
+
+      // we have 3 columns
+      expect(klass.columns().length).toBe(3);
+
+      // remove one of them
+      await new MigrationContext(adapter).removeColumn("hot_compatibilities", "bar");
+
+      // we still have 3 columns in the cache
+      expect(klass.columns().length).toBe(3);
+
+      // but we can successfully create a record so long as we don't
+      // reference the removed column
+      const record = await klass.create({ foo: "foo" });
+      await record.reload();
+      expect((record as unknown as { foo: string }).foo).toBe("foo");
+    } finally {
+      await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
+    }
   });
-  it.skip("update after remove_column", () => {
-    // BLOCKED: schema-cache hot-reload — same setup as above but for UPDATE path
-    // (Rails hot_compatibility_test.rb:45-57).
+
+  it("update after remove_column", async () => {
+    const { klass, adapter } = await setupHotCompatibility();
+    try {
+      const record = await klass.create({ foo: "foo" });
+      await klass.loadSchema();
+      expect(klass.columns().length).toBe(3);
+      await new MigrationContext(adapter).removeColumn("hot_compatibilities", "bar");
+      expect(klass.columns().length).toBe(3);
+
+      await record.reload();
+      expect((record as unknown as { foo: string }).foo).toBe("foo");
+      (record as unknown as { foo: string }).foo = "bar";
+      await record.save();
+      await record.reload();
+      expect((record as unknown as { foo: string }).foo).toBe("bar");
+    } finally {
+      await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
+    }
   });
 
   // Rails gates these on current_adapter?(:PostgreSQL) + prepared_statements.
