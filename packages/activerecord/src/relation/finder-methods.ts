@@ -361,20 +361,26 @@ function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
 
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
   if (this._isNone) return n !== undefined ? [] : null;
-  let rel: any;
-  if (!hasReversibleOrder(this)) {
-    rel = orderByPk(this, "desc");
-  } else {
-    rel = this.reverseOrder();
-  }
-  if (n !== undefined) {
-    rel = rel.limit(n);
+  // orderByPk/reverseOrder resolve order matchers, which read the deprecated
+  // _modelClass.connection getter; run them (and the load) inside the connection
+  // shim so we don't permanently lease a connection under
+  // permanent_connection_checkout = :deprecated | :disallowed.
+  return (this as any)._withQueryConnection(async () => {
+    let rel: any;
+    if (!hasReversibleOrder(this)) {
+      rel = orderByPk(this, "desc");
+    } else {
+      rel = this.reverseOrder();
+    }
+    if (n !== undefined) {
+      rel = rel.limit(n);
+      const records = await rel.toArray();
+      return records.reverse();
+    }
+    rel = rel.limit(1);
     const records = await rel.toArray();
-    return records.reverse();
-  }
-  rel = rel.limit(1);
-  const records = await rel.toArray();
-  return records[0] ?? null;
+    return records[0] ?? null;
+  });
 }
 
 export async function performLastBang(this: FinderRelation): Promise<any> {
@@ -426,15 +432,21 @@ export async function findNthWithLimit(
   if ((this as any)._loaded) {
     return (this as any)._records.slice(index, index + limit) ?? [];
   }
-  let relation: any = orderedRelation(this);
-  if ((this as any)._limitValue != null) {
-    limit = Math.min((this as any)._limitValue - index, limit);
-  }
-  if (limit <= 0) return [];
-  if (index > 0) {
-    relation = relation.offset(((this as any)._offsetValue ?? 0) + index);
-  }
-  return relation.limit(limit).toArray();
+  // orderedRelation calls order(...), whose resolveOrderMatcher reads the
+  // deprecated _modelClass.connection getter; run it (and the load) inside the
+  // connection shim so we don't permanently lease a connection under
+  // permanent_connection_checkout = :deprecated | :disallowed.
+  return (this as any)._withQueryConnection(() => {
+    let relation: any = orderedRelation(this);
+    if ((this as any)._limitValue != null) {
+      limit = Math.min((this as any)._limitValue - index, limit);
+    }
+    if (limit <= 0) return [];
+    if (index > 0) {
+      relation = relation.offset(((this as any)._offsetValue ?? 0) + index);
+    }
+    return relation.limit(limit).toArray();
+  });
 }
 
 /** @internal */
@@ -443,15 +455,21 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
     const records: any[] = (this as any)._records;
     return records[records.length - 1 - index] ?? null;
   }
-  const relation: any = orderedRelation(this);
-  // Rails: `if relation.order_values.empty? || relation.has_limit_or_offset?`
-  // Use hasOrder() on the result so _rawOrderClauses (e.g. inOrderOf) are also
-  // treated as "has an order" — avoids loading all records for those relations.
-  if (!hasOrder(relation) || relation._limitValue != null || relation._offsetValue != null) {
-    const records = await relation.toArray();
-    return records[records.length - 1 - index] ?? null;
-  }
-  return relation.reverseOrder().offset(index).first();
+  // orderedRelation calls order(...), whose resolveOrderMatcher reads the
+  // deprecated _modelClass.connection getter; run it (and the load) inside the
+  // connection shim so we don't permanently lease a connection under
+  // permanent_connection_checkout = :deprecated | :disallowed.
+  return (this as any)._withQueryConnection(async () => {
+    const relation: any = orderedRelation(this);
+    // Rails: `if relation.order_values.empty? || relation.has_limit_or_offset?`
+    // Use hasOrder() on the result so _rawOrderClauses (e.g. inOrderOf) are also
+    // treated as "has an order" — avoids loading all records for those relations.
+    if (!hasOrder(relation) || relation._limitValue != null || relation._offsetValue != null) {
+      const records = await relation.toArray();
+      return records[records.length - 1 - index] ?? null;
+    }
+    return relation.reverseOrder().offset(index).first();
+  });
 }
 
 export async function performSecond(this: FinderRelation): Promise<any | null> {

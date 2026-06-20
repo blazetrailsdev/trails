@@ -783,6 +783,15 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
     await Post.first();
     expect(Post.connectionPool().activeConnection).toBeNull();
 
+    await Post.first(2);
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.second();
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.last();
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
     await Post.count();
     expect(Post.connectionPool().activeConnection).toBeNull();
   });
