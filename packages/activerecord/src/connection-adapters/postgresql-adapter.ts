@@ -1296,7 +1296,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       } catch (e) {
         if (prepare && this._isInvalidCachedPlan(e)) {
           this._poolFor(client).delete(this.sqlKey(sql));
-          if (this._inTransaction) {
+          // Mirrors Rails' `exec_cache` rescue (postgresql/database_statements.rb):
+          // `if in_transaction?` raises `PreparedStatementCacheExpired`, else
+          // deallocates and retries. `in_transaction?` is `open_transactions > 0`,
+          // so an open *lazy* (un-materialized) transaction frame still counts —
+          // `_inTransaction` only tracks whether a physical `BEGIN` was emitted,
+          // which a read-only block (e.g. `transaction { record.reload }`) never
+          // triggers since reads don't materialize.
+          if (this._inTransaction || this._transactionManager.openTransactions > 0) {
             throw new PreparedStatementCacheExpired(
               (e as { message?: string })?.message ?? "cached plan expired",
               { sql, binds, cause: e },
