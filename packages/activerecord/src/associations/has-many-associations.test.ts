@@ -69,6 +69,7 @@ import { Human } from "../test-helpers/models/human.js";
 import { Category } from "../test-helpers/models/category.js";
 import {
   CpkBook,
+  CpkOrder,
   CpkBrokenOrder,
   CpkBrokenOrderWithNonCpkBooks,
   CpkNonCpkBook,
@@ -7736,5 +7737,53 @@ describe("HasManyAssociationsTest", () => {
     await assertNoQueries(false, async () => {
       expect(await (author as any).posts.isEmpty()).toBe(false);
     });
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // Regression for HasManyAssociation#deleteRecords (the association-layer
+  // `delete`, reached only via `record.association(name)` for a non-through
+  // has_many; the CollectionProxy intercepts the proxy-level delete). It must
+  // scope to the given records by tuple, not by a per-column cartesian AND.
+  // CpkBook's composite PK [author_id, id] varies in BOTH columns across one
+  // order's books (the FK is [shop_id, order_id], not author_id), so a
+  // cartesian `author_id IN (1,2) AND id IN (10,20)` would also match the
+  // diagonal rows (1,20)/(2,10) and nullify them. Mirrors Rails
+  // has_many_association.rb:132-135.
+  it("deleting composite-key records scopes by tuple, not cartesian product", async () => {
+    registerModel([CpkOrder, CpkBook]);
+    const order = await CpkOrder.create({ shop_id: 1, status: "open" });
+    const shopId = (order as any).shop_id;
+    const orderId = (order as any).idValue;
+    const mk = (authorId: number, id: number) =>
+      CpkBook.create({
+        author_id: authorId,
+        id,
+        shop_id: shopId,
+        order_id: orderId,
+        title: `b${authorId}-${id}`,
+      });
+    const b1 = await mk(1, 10);
+    const b2 = await mk(2, 20);
+    await mk(1, 20); // diagonal — must survive
+    await mk(2, 10); // diagonal — must survive
+
+    await (order as any).association("books").delete(b1, b2);
+
+    // Only the two requested books are nullified; the diagonal rows survive.
+    const survivor1 = await CpkBook.findBy({ author_id: 1, id: 20 });
+    const survivor2 = await CpkBook.findBy({ author_id: 2, id: 10 });
+    expect((survivor1 as any).order_id).toBe(orderId);
+    expect((survivor2 as any).order_id).toBe(orderId);
+    const deleted1 = await CpkBook.findBy({ author_id: 1, id: 10 });
+    const deleted2 = await CpkBook.findBy({ author_id: 2, id: 20 });
+    expect((deleted1 as any).order_id).toBeNull();
+    expect((deleted2 as any).order_id).toBeNull();
   });
 });
