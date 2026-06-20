@@ -1223,6 +1223,9 @@ export async function reload<T extends ReloadRecord>(
 
 interface DupRecord {
   attributes: Record<string, unknown>;
+  _readonly: boolean;
+  assignAttributes(attrs: Record<string, unknown>): void;
+  initializeDup(other: unknown): void;
   constructor: new (attrs: Record<string, unknown>) => unknown;
 }
 
@@ -1231,6 +1234,15 @@ interface DupRecord {
  *
  * Mirrors: ActiveRecord::Inheritance#dup (Rails 7.2+ moved it from Core to
  * Inheritance; the behavior is: copy attributes minus primary key[s]).
+ *
+ * Rails' `Object#dup` produces a new_record whose attributes are dirty against
+ * their column defaults — `Model.first.dup.changes` equals a fresh record with
+ * the same attributes assigned. We replay that observable shape: construct an
+ * empty record (so `after_initialize` fires on the dup) and then assign the
+ * non-PK attributes through the user path, which tracks them as changes. Ruby's
+ * `Object#dup` also copies `@readonly` and runs the `initialize_dup` chain, so
+ * carry `@readonly` over and invoke the composed hook (aggregations cache +
+ * locking/timestamp clear).
  */
 export function dup<T extends DupRecord>(this: T): T {
   const ctor = this.constructor as typeof this.constructor & {
@@ -1241,7 +1253,11 @@ export function dup<T extends DupRecord>(this: T): T {
   for (const col of pkCols) {
     delete attrs[col];
   }
-  return new ctor(attrs) as T;
+  const duped = new ctor({}) as T;
+  duped.assignAttributes(attrs);
+  duped._readonly = this._readonly;
+  duped.initializeDup(this);
+  return duped;
 }
 
 interface CloneRecord {
