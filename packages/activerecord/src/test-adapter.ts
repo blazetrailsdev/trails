@@ -17,10 +17,7 @@
 
 import type { DatabaseAdapter } from "./adapter.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
-import {
-  clearAppliedSchemaSignatures,
-  restoreCanonicalSchemaSignaturesUnlessAdapter,
-} from "./test-helpers/define-schema.js";
+import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { Base } from "./base.js";
 import { getEnv } from "@blazetrails/activesupport";
@@ -285,7 +282,6 @@ export async function resetTestAdapterState(): Promise<void> {
       // also need the global signature cache cleared.
       _pool.connections.forEach((a) => a.schemaCache?.clear());
       clearAppliedSchemaSignatures();
-      restoreCanonicalSchemaSignaturesUnlessAdapter(adapter);
       Base._modelsByName.clear();
     },
     { preventPermanentCheckout: true },
