@@ -2262,6 +2262,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           for (const record of persistedRecords) {
             await (record as any).destroyBang();
           }
+          // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
+          // The destroy callbacks decrement the owner's counter through the child's
+          // belongs_to inverse only when that inverse points at THIS reflection's
+          // counter column; otherwise (e.g. a has_many `counter_cache:` distinct from
+          // the inverse's) decrement here so we don't silently skip it.
+          const reflection = (
+            this._record.constructor as typeof Base & {
+              _reflectOnAssociation?: (
+                n: string,
+              ) => { inverseWhichUpdatesCounterCache?: () => unknown } | undefined;
+            }
+          )._reflectOnAssociation?.(this._assocName);
+          if (!reflection?.inverseWhichUpdatesCounterCache?.()) {
+            await this._decrementCounterCache(persistedRecords.length);
+          }
         } else {
           // Scope to the specific records via composite_query_constraints_list
           // (persistence.rb:234). Single-column: `where({col: ids})`; composite:
@@ -2293,9 +2308,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             }
           }
           // Rails delete_records else-branch: update_counter(-delete_count). The
-          // bulk DELETE/UPDATE bypasses the belongs_to inverse, so decrement the
-          // owner's counter cache directly. (The :destroy branch leaves this to
-          // the inverse callback, like HasManyAssociation#delete_records.)
+          // bulk DELETE/UPDATE bypasses callbacks (and thus the belongs_to inverse),
+          // so Rails always decrements the owner's counter cache by the affected
+          // count here — unlike the :destroy branch, which is gated on
+          // inverse_updates_counter_cache?.
           if (count > 0) await this._decrementCounterCache(count);
         }
       }

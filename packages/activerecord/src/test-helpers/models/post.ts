@@ -21,6 +21,7 @@ export class Post extends Base {
   declare comments: AssociationProxy<Comment>;
   declare taggings: AssociationProxy<Tagging>;
   declare taggingsWithDeleteAll: AssociationProxy<Tagging>;
+  declare taggingsWithDestroy: AssociationProxy<Tagging>;
 
   static namedExtension = {
     author() {
