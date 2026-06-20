@@ -73,20 +73,26 @@ export class Entry {
   // size when the data is compressed. Mirrors Rails Entry#bytesize
   // (entry.rb:60-69); the non-String branch is memoized like Rails' `@s`.
   bytesize(): number {
-    // Rails measures `Marshal.dump(@value).bytesize` for compressed non-String
-    // values (entry.rb:65-68), which includes Marshal framing overhead. trails
-    // has no Marshal, so we return the raw compressed byte count instead
-    // (latin1 string length = byte count). This is a tracked deviation for
-    // non-String compressed values (nil/bool/Numeric are never compressed per
-    // entry.rb:79-82, so only Array/Object hits this branch in practice).
-    if (this._compressed) return (this._value as string).length;
     const value = this.value;
     if (value == null) {
       return 0;
     } else if (typeof value === "string") {
-      return byteLength(this._value as string);
+      // Rails `@value.bytesize` — the *stored* value's byte size. When the entry
+      // is compressed, @value is the binary deflated payload (a latin1 string,
+      // one char per byte) so its byte size is its length; otherwise it is a
+      // UTF-8 string.
+      return this._compressed ? (this._value as string).length : byteLength(this._value as string);
     } else {
-      return (this._bytesize ??= byteLength(coder.dump(this._value)));
+      // Rails `@s ||= Marshal.dump(@value).bytesize` (entry.rb:65-68). When the
+      // entry is compressed, @value is the binary deflated payload string and
+      // Marshal.dump wraps it in framing overhead (version + type tag + length),
+      // which we reproduce exactly via marshalStringBytesize. Uncompressed,
+      // @value is the Array/Object serialized by the Marshal-equivalent fidelity
+      // Coder. nil/bool/Numeric are never compressed (entry.rb:79-82), so only
+      // Array/Object reaches the compressed branch in practice.
+      return (this._bytesize ??= this._compressed
+        ? marshalStringBytesize((this._value as string).length)
+        : byteLength(coder.dump(this._value)));
     }
   }
 
@@ -176,6 +182,25 @@ export class Entry {
       throw new DeserializationError(error instanceof Error ? error.message : String(error));
     }
   }
+}
+
+// Byte size of `Marshal.dump(str)` for a binary (ASCII-8BIT) Ruby String of
+// `byteLen` bytes — the form a deflated cache payload takes. The dump is the
+// 2-byte Marshal version, a 1-byte `"` String tag, the Marshal-encoded byte
+// length, then the bytes themselves. Binary strings carry no encoding instance
+// variable, so there is no extra framing. Matches `Marshal.dump(str).bytesize`.
+function marshalStringBytesize(byteLen: number): number {
+  return 2 + 1 + marshalUintSize(byteLen) + byteLen;
+}
+
+// Number of bytes Ruby's Marshal uses to encode a non-negative integer `n`.
+// 0 and 1..122 fit in a single tagged byte; larger values are a 1-byte count
+// followed by `count` little-endian bytes (entry payload lengths only).
+function marshalUintSize(n: number): number {
+  if (n <= 122) return 1;
+  let count = 0;
+  for (let v = n; v > 0; v = Math.floor(v / 256)) count++;
+  return 1 + count;
 }
 
 function byteLength(value: string): number {
