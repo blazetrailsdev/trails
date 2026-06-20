@@ -3039,11 +3039,18 @@ export class Base extends Model {
         const def = ctor._attributeDefinitions.get(c);
         const isArray = def?.type?.name === "array";
         const raw = values[i];
-        // Bind scalar values as prepared-statement parameters (matching Rails'
+        // Bind string values as prepared-statement parameters (matching Rails'
         // type_casted_binds) instead of inlining them, so a value containing a
         // null byte (\x00) round-trips rather than truncating the SQL at the
-        // C-string boundary. Array literals keep their bespoke inline quoting.
-        const val = isArray ? arelSql(quoteSqlValue(raw, true)) : new Nodes.BindParam(raw);
+        // C-string boundary. Non-string DB values (numbers, dates, binary, json)
+        // keep their existing inline path: the visitor's `quote()` finishes
+        // serializing intermediate objects that the driver's bind type-cast
+        // can't accept. Array literals keep their bespoke inline quoting.
+        const val = isArray
+          ? arelSql(quoteSqlValue(raw, true))
+          : typeof raw === "string"
+            ? new Nodes.BindParam(raw)
+            : raw;
         return [table.get(c), val];
       });
       im.insert(insertValues);
@@ -3164,12 +3171,16 @@ export class Base extends Model {
         const val = dbValues[key];
         const def = ctor._attributeDefinitions.get(key);
         const isArray = def?.type?.name === "array";
-        // Bind scalar SET values as prepared-statement parameters (see
+        // Bind string SET values as prepared-statement parameters (see
         // _performInsert) so null-byte values survive instead of truncating
-        // the inlined SQL.
+        // the inlined SQL. Non-string values keep their existing inline path.
         return [
           table.get(key),
-          isArray ? arelSql(quoteSqlValue(val, true)) : new Nodes.BindParam(val),
+          isArray
+            ? arelSql(quoteSqlValue(val, true))
+            : typeof val === "string"
+              ? new Nodes.BindParam(val)
+              : val,
         ];
       },
     );
