@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { IntegerType } from "@blazetrails/activemodel";
+import { adapterType } from "../test-adapter.js";
 
 let adapter: AbstractSQLite3Adapter;
 
@@ -21,7 +22,9 @@ function assertLookupType(expected: string, sqlType: string) {
   expect(castType.type()).toBe(expected);
 }
 
-describe("TypeLookupTest", () => {
+// Rails: class TypeLookupTest, gated `unless current_adapter?(:PostgreSQLAdapter)`
+// (PostgreSQL has its own type-lookup suite). adapters: mysql + sqlite.
+describe.skipIf(adapterType === "postgres")("TypeLookupTest", () => {
   it("boolean types", () => {
     assertLookupType("boolean", "boolean");
     assertLookupType("boolean", "BOOLEAN");

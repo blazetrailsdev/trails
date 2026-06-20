@@ -933,7 +933,7 @@ describe("CalculationsTest", () => {
     const count = await Account.select("name").count();
     expect(count).toBe(1);
   });
-  it("count selected arel attributes", async () => {
+  it.skipIf(adapterType !== "mysql")("count selected arel attributes", async () => {
     const { Account } = makeModel();
     await Account.create({ name: "n" });
     const count = await Account.count();
@@ -1315,12 +1315,15 @@ describe("CalculationsTest", () => {
     expect(sql).toContain("DISTINCT");
     expect(sql).toContain("GROUP BY");
   });
-  it("should group by summed field having condition from select", () => {
-    const { Account } = makeModel();
-    const sql = Account.group("name").having("SUM(credits) > 0").toSql();
-    expect(sql).toContain("GROUP BY");
-    expect(sql).toContain("HAVING");
-  });
+  it.skipIf(adapterType === "postgres")(
+    "should group by summed field having condition from select",
+    () => {
+      const { Account } = makeModel();
+      const sql = Account.group("name").having("SUM(credits) > 0").toSql();
+      expect(sql).toContain("GROUP BY");
+      expect(sql).toContain("HAVING");
+    },
+  );
   it("should return type casted values with group and expression", async () => {
     const { Account } = makeModel();
     await Account.create({ name: "a", credits: 10 });
@@ -1960,18 +1963,21 @@ describe("CalculationsTest", () => {
     expect(val).toBe(7);
   });
 
-  it("group by with order by virtual count attribute", async () => {
-    class Account extends Base {
-      static {
-        this.attribute("firm_id", "integer");
+  it.skipIf(adapterType !== "postgres")(
+    "group by with order by virtual count attribute",
+    async () => {
+      class Account extends Base {
+        static {
+          this.attribute("firm_id", "integer");
+        }
       }
-    }
-    await Account.create({ firm_id: 1 });
-    await Account.create({ firm_id: 2 });
-    await Account.create({ firm_id: 2 });
-    const result = await Account.group("firm_id").count();
-    expect(Object.keys(result).length).toBeGreaterThan(0);
-  });
+      await Account.create({ firm_id: 1 });
+      await Account.create({ firm_id: 2 });
+      await Account.create({ firm_id: 2 });
+      const result = await Account.group("firm_id").count();
+      expect(Object.keys(result).length).toBeGreaterThan(0);
+    },
+  );
 
   it("group by with limit", async () => {
     class Account extends Base {

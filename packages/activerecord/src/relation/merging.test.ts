@@ -8,6 +8,7 @@ import { Base } from "../index.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { itIfSupports } from "../test-helpers/supports.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -249,7 +250,7 @@ describe("MergingDifferentRelationsTest", () => {
     expect(results.length).toBe(1);
   });
 
-  it("merging relation with common table expression", () => {
+  itIfSupports("common_table_expressions", "merging relation with common table expression", () => {
     const { Post } = makeModel();
     const sql = Post.where({ title: "x" })
       .merge(Post.where({ author: "y" }))
@@ -257,17 +258,25 @@ describe("MergingDifferentRelationsTest", () => {
     expect(sql).toContain("WHERE");
   });
 
-  it("merging multiple relations with common table expression", () => {
-    const { Post } = makeModel();
-    const sql = Post.where({ title: "x" }).where({ author: "y" }).toSql();
-    expect(sql).toContain("WHERE");
-  });
+  itIfSupports(
+    "common_table_expressions",
+    "merging multiple relations with common table expression",
+    () => {
+      const { Post } = makeModel();
+      const sql = Post.where({ title: "x" }).where({ author: "y" }).toSql();
+      expect(sql).toContain("WHERE");
+    },
+  );
 
-  it("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
-  });
+  itIfSupports(
+    "common_table_expressions",
+    "relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed",
+    () => {
+      const { Post } = makeModel();
+      const sql = Post.all().toSql();
+      expect(sql).toContain("SELECT");
+    },
+  );
 });
 
 describe("RelationMergingTest", () => {

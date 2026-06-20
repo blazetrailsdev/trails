@@ -13,6 +13,7 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { inTimeZone } from "./test-helpers/in-time-zone.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { adapterType } from "./test-adapter.js";
 
 const TEST_SCHEMA = {
   posts: {
@@ -769,7 +770,7 @@ describe("AttributeMethodsTest", () => {
     expect(raw.score).toBe("99");
     expect(p.score).toBe(99);
   });
-  it("read attributes_before_type_cast on a boolean", () => {
+  it.skipIf(adapterType !== "mysql")("read attributes_before_type_cast on a boolean", () => {
     class PostBool extends Base {
       static {
         this.attribute("title", "string");

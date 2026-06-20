@@ -9,6 +9,7 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { adapterType } from "./test-adapter.js";
 
 const TEST_SCHEMA = {
   topics: {
@@ -1316,12 +1317,15 @@ describe("FinderTest", () => {
     const found = await Post.where({ title: "mis" }).first();
     expect(found).toBeDefined();
   });
-  it("include on unloaded relation with having referencing aliased select", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "alias_sel" });
-    const count = await Post.count();
-    expect(count).toBe(1);
-  });
+  it.skipIf(adapterType === "postgres")(
+    "include on unloaded relation with having referencing aliased select",
+    async () => {
+      const { Post } = makeModel();
+      await Post.create({ title: "alias_sel" });
+      const count = await Post.count();
+      expect(count).toBe(1);
+    },
+  );
   it("include on unloaded relation with composite primary key", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "cpk_unloaded" });

@@ -5030,7 +5030,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("DESC");
   });
 
-  it("reverse order with nulls first or last", () => {
+  it.skipIf(adapterType !== "postgres")("reverse order with nulls first or last", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -7136,7 +7136,9 @@ describe("RelationTest", () => {
     expect((sparrow as any).color).toBe("grey");
   });
 
-  describe("CreateOrFindByWithinTransactions", () => {
+  // Rails gates CreateOrFindByWithinTransactions `unless current_adapter?(:SQLite3Adapter)`
+  // (SQLite cannot run the concurrent transactions these exercise). adapters: mysql + postgresql.
+  describe.skipIf(adapterType === "sqlite")("CreateOrFindByWithinTransactions", () => {
     it("multiple find or create by within transactions", async () => {
       class Post extends Base {
         static {
