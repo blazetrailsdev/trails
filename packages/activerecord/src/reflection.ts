@@ -171,6 +171,18 @@ export function resolveAliasedColumn(
 export class AbstractReflection {
   /**
    * @internal
+   * Memoized `counterCacheColumn()` result, keyed on the resolved target class
+   * identity (`_counterCacheColumnKlass`). Rails memoizes unconditionally
+   * (`@counter_cache_column ||=`), but trails resolves the target through the
+   * model registry (flat class names emulate demodulize), so a class re-defined
+   * between tests would otherwise return a stale column. Keying on identity
+   * means a re-registration invalidates the cache.
+   */
+  private _counterCacheColumn?: string | null;
+  private _counterCacheColumnKlass?: typeof Base;
+
+  /**
+   * @internal
    * Narrow `this` to the concrete reflection shape so shared base-class methods
    * can read subclass fields (`name`, `options`, `macro`, …) without casting to
    * `any`. See {@link ConcreteReflection}.
@@ -351,6 +363,14 @@ export class AbstractReflection {
         const klassName = self.className;
         const resolvedKlass = modelRegistry.get(klassName);
         if (!resolvedKlass) throw new Error(`${klassName} not in registry`);
+        // Rails memoizes `@counter_cache_column ||=`. Here the registry lookup
+        // above stays live (cheap, and required so a re-defined target is
+        // re-resolved — PR #3696), but we memoize the inverse-hasMany scan keyed
+        // on the resolved class identity. A re-registration yields a different
+        // class object, which misses the cache and recomputes.
+        if (this._counterCacheColumnKlass === resolvedKlass) {
+          return this._counterCacheColumn as string | null;
+        }
         const targetAssocs: Array<{ type: string; name: string; options: any }> =
           (resolvedKlass as any)._associations ?? [];
         // Match on both class name AND FK so that when a target declares multiple
@@ -370,10 +390,13 @@ export class AbstractReflection {
         // rejecting aliased hasManyS (Comment does NOT end with "LatestComment"
         // ← singularize("latestComments")), for which Rails still derives from
         // the child model name (comments_count, not latest_comments_count).
-        if (inverseHm && ownerName.endsWith(camelize(singularize(inverseHm.name)))) {
-          return `${underscore(inverseHm.name)}_count`;
-        }
-        return belongsToCounterCacheColumn(counterCache, ownerName);
+        const column =
+          inverseHm && ownerName.endsWith(camelize(singularize(inverseHm.name)))
+            ? `${underscore(inverseHm.name)}_count`
+            : belongsToCounterCacheColumn(counterCache, ownerName);
+        this._counterCacheColumnKlass = resolvedKlass;
+        this._counterCacheColumn = column;
+        return column;
       } catch {
         return belongsToCounterCacheColumn(counterCache, self.activeRecord?.name ?? "");
       }
