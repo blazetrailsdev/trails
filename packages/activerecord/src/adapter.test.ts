@@ -613,12 +613,26 @@ describe("AdapterForeignKeyTest", () => {
       : "ALTER TABLE fk_test_has_fk DROP CONSTRAINT IF EXISTS fk_name";
 
   const cleanup = async (): Promise<void> => {
-    await Base.connection.execute("DELETE FROM fk_test_has_fk");
-    await Base.connection.execute("DELETE FROM fk_test_has_pk");
+    await Base.connection.executeMutation("DELETE FROM fk_test_has_fk");
+    await Base.connection.executeMutation("DELETE FROM fk_test_has_pk");
   };
 
   beforeAll(async () => {
-    if (adapterType === "sqlite") return;
+    if (adapterType === "sqlite") {
+      // SQLite can't `ALTER TABLE … ADD CONSTRAINT`, so create the FK inline
+      // (Rails' schema.rb declares the foreign_key). SQLite enforces it because
+      // the adapter sets `PRAGMA foreign_keys=ON` by default.
+      await Base.connection.executeMutation("DROP TABLE IF EXISTS fk_test_has_fk");
+      await Base.connection.executeMutation("DROP TABLE IF EXISTS fk_test_has_pk");
+      await Base.connection.executeMutation(
+        "CREATE TABLE fk_test_has_pk (pk_id INTEGER NOT NULL PRIMARY KEY)",
+      );
+      await Base.connection.executeMutation(
+        "CREATE TABLE fk_test_has_fk (id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+          "fk_id INTEGER NOT NULL, FOREIGN KEY (fk_id) REFERENCES fk_test_has_pk (pk_id))",
+      );
+      return;
+    }
     // These tables aren't fixture-backed here; create them (mirrors schema.rb)
     // then add the FK constraint defineSchema can't express.
     await defineSchema({
@@ -629,66 +643,57 @@ describe("AdapterForeignKeyTest", () => {
     await Base.connection.execute(addFkSql());
   });
   afterAll(async () => {
-    if (adapterType === "sqlite") return;
+    if (adapterType === "sqlite") {
+      await Base.connection.executeMutation("DROP TABLE IF EXISTS fk_test_has_fk");
+      await Base.connection.executeMutation("DROP TABLE IF EXISTS fk_test_has_pk");
+      return;
+    }
     await Base.connection.execute(dropFkSql()).catch(() => {});
   });
-  beforeEach(async () => {
-    if (adapterType !== "sqlite") await cleanup();
-  });
-  afterEach(async () => {
-    if (adapterType !== "sqlite") await cleanup();
-  });
+  beforeEach(cleanup);
+  afterEach(cleanup);
 
   const insertIntoFkTestHasFk = (fkId = 0): Promise<unknown> =>
     (Base.connection as AbstractAdapter).insert(
       `INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`,
     );
 
-  it.skipIf(adapterType === "sqlite")(
-    "foreign key violations are translated to specific exception with validate false",
-    async () => {
-      class KlassHasFk extends Base {
-        static {
-          this.tableName = "fk_test_has_fk";
-        }
+  it("foreign key violations are translated to specific exception with validate false", async () => {
+    class KlassHasFk extends Base {
+      static {
+        this.tableName = "fk_test_has_fk";
       }
-      const hasFk = new KlassHasFk({ fk_id: 1231231231 });
-      const error = await hasFk.save({ validate: false }).catch((e) => e);
-      expect(error).toBeInstanceOf(InvalidForeignKey);
-      expect(error.cause).toBeTruthy();
-    },
-  );
+    }
+    const hasFk = new KlassHasFk({ fk_id: 1231231231 });
+    const error = await hasFk.save({ validate: false }).catch((e) => e);
+    expect(error).toBeInstanceOf(InvalidForeignKey);
+    expect(error.cause).toBeTruthy();
+  });
 
-  it.skipIf(adapterType === "sqlite")(
-    "foreign key violations on insert are translated to specific exception",
-    async () => {
-      const error = (await insertIntoFkTestHasFk().catch((e) => e)) as { cause?: unknown };
-      expect(error).toBeInstanceOf(InvalidForeignKey);
-      expect(error.cause).toBeTruthy();
-    },
-  );
+  it("foreign key violations on insert are translated to specific exception", async () => {
+    const error = (await insertIntoFkTestHasFk().catch((e) => e)) as { cause?: unknown };
+    expect(error).toBeInstanceOf(InvalidForeignKey);
+    expect(error.cause).toBeTruthy();
+  });
 
-  it.skipIf(adapterType === "sqlite")(
-    "foreign key violations on delete are translated to specific exception",
-    async () => {
-      await Base.connection.execute("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
-      await insertIntoFkTestHasFk(1);
-      const error = await Base.connection
-        .execute("DELETE FROM fk_test_has_pk WHERE pk_id = 1")
-        .catch((e) => e);
-      expect(error).toBeInstanceOf(InvalidForeignKey);
-      expect(error.cause).toBeTruthy();
-    },
-  );
+  it("foreign key violations on delete are translated to specific exception", async () => {
+    await Base.connection.executeMutation("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
+    await insertIntoFkTestHasFk(1);
+    const error = await Base.connection
+      .executeMutation("DELETE FROM fk_test_has_pk WHERE pk_id = 1")
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(InvalidForeignKey);
+    expect(error.cause).toBeTruthy();
+  });
 
-  it.skipIf(adapterType === "sqlite")("disable referential integrity", async () => {
+  it("disable referential integrity", async () => {
     const conn = Base.connection as AbstractAdapter;
     // assert_nothing_raised: a throw inside the block fails the test.
     await conn.disableReferentialIntegrity(async () => {
       await insertIntoFkTestHasFk();
       // delete created record as otherwise disableReferentialIntegrity will
       // try to enable constraints after the block and fail.
-      await conn.execute("DELETE FROM fk_test_has_fk");
+      await conn.executeMutation("DELETE FROM fk_test_has_fk");
     });
   });
 });
@@ -790,8 +795,13 @@ describe("AdapterTestWithoutTransaction", () => {
     }
   });
 
-  // Rails gates these on `respond_to?(:reset_pk_sequence!)` — PostgreSQL only.
-  it.skipIf(adapterType !== "postgres")("reset empty table with custom pk", async () => {
+  // Rails gates these on `respond_to?(:reset_pk_sequence!)` — a method-presence
+  // capability guard, not an adapter-fidelity gate (Rails runs the suite
+  // unconditionally). PostgreSQL is the only adapter that defines
+  // `resetPkSequenceBang` (exactly mirroring Rails, where only the PG adapter
+  // defines `reset_pk_sequence!`), so this capability flag is the faithful gate.
+  const respondsToResetPkSequence = adapterType === "postgres";
+  it.skipIf(!respondsToResetPkSequence)("reset empty table with custom pk", async () => {
     const conn = Base.connection as DatabaseAdapter & {
       resetPkSequenceBang(table: string): Promise<void>;
     };
@@ -801,7 +811,7 @@ describe("AdapterTestWithoutTransaction", () => {
     expect(movie.id).toBe(1);
   });
 
-  it.skipIf(adapterType !== "postgres")("reset table with non integer pk", async () => {
+  it.skipIf(!respondsToResetPkSequence)("reset table with non integer pk", async () => {
     const conn = Base.connection as DatabaseAdapter & {
       resetPkSequenceBang(table: string): Promise<void>;
     };
@@ -1360,29 +1370,37 @@ describe("AdapterThreadSafetyTest", () => {
 describe("InvalidateTransactionTest", () => {
   setupHandlerSuite();
 
-  it.skipIf(adapterType !== "mysql")("invalidates transaction on rollback error", async () => {
-    let invalidated = false;
-    const connection = Base.connection as AbstractAdapter;
+  // Rails wraps this in `if connection.savepoint_errors_invalidate_transactions?`
+  // — a capability guard (true only on MySQL), not an adapter-fidelity gate
+  // (Rails runs the file unconditionally). MySQL is the only adapter whose
+  // `isSavepointErrorsInvalidateTransactions()` returns true, mirroring Rails.
+  const savepointErrorsInvalidateTransactions = adapterType === "mysql";
+  it.skipIf(!savepointErrorsInvalidateTransactions)(
+    "invalidates transaction on rollback error",
+    async () => {
+      let invalidated = false;
+      const connection = Base.connection as AbstractAdapter;
 
-    await connection.transaction(async () => {
-      try {
-        await connection.withRawConnection(async () => {
-          throw new Deadlocked("made-up deadlock");
-        });
-      } catch (error) {
-        if (!(error instanceof Deadlocked) || error.message !== "made-up deadlock") {
-          throw new Error("Rescuing wrong error", { cause: error });
+      await connection.transaction(async () => {
+        try {
+          await connection.withRawConnection(async () => {
+            throw new Deadlocked("made-up deadlock");
+          });
+        } catch (error) {
+          if (!(error instanceof Deadlocked) || error.message !== "made-up deadlock") {
+            throw new Error("Rescuing wrong error", { cause: error });
+          }
+          invalidated = (
+            connection.currentTransaction() as { isInvalidated(): boolean }
+          ).isInvalidated();
         }
-        invalidated = (
-          connection.currentTransaction() as { isInvalidated(): boolean }
-        ).isInvalidated();
-      }
-    });
+      });
 
-    // asserting outside of the transaction to make sure we actually reach the
-    // end of the test and perform the assertion
-    expect(invalidated).toBe(true);
-  });
+      // asserting outside of the transaction to make sure we actually reach the
+      // end of the test and perform the assertion
+      expect(invalidated).toBe(true);
+    },
+  );
 });
 
 // MySQL-gated AdapterTest probes from Rails adapter_test.rb: the

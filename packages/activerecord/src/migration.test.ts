@@ -2213,18 +2213,20 @@ describe("MigrationTest", () => {
     ]);
   });
 
-  it.skipIf(adapterType === "mysql")("create table with query", async () => {
+  it("create table with query", async () => {
     const adapter = freshAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("people_src", {}, (t) => {
       t.integer("person_id");
     });
-    await adapter.executeMutation(`INSERT INTO "people_src" ("person_id") VALUES (1)`);
+    // Unquoted lowercase identifiers parse identically on PG/SQLite/MySQL;
+    // Rails-style `"…"` quoting is a string literal on MySQL.
+    await adapter.executeMutation(`INSERT INTO people_src (person_id) VALUES (1)`);
 
     await ctx.createTable("table_from_query_testings", {
       as: `SELECT person_id FROM people_src WHERE person_id = 1`,
     });
-    const rows = await adapter.execute(`SELECT * FROM "table_from_query_testings"`);
+    const rows = await adapter.execute(`SELECT * FROM table_from_query_testings`);
     expect(rows).toHaveLength(1);
     expect(ctx.columnExists("table_from_query_testings", "person_id")).toBe(true);
 
@@ -2238,18 +2240,21 @@ describe("MigrationTest", () => {
     await ctx.dropTable("people_src");
   });
 
-  it.skipIf(adapterType === "mysql")("create table with query from relation", async () => {
+  it("create table with query from relation", async () => {
     const adapter = freshAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("people_src2", {}, (t) => {
       t.integer("person_id");
     });
-    await adapter.executeMutation(`INSERT INTO "people_src2" ("person_id") VALUES (1)`);
+    await adapter.executeMutation(`INSERT INTO people_src2 (person_id) VALUES (1)`);
 
-    // Build a relation SQL string directly (mirrors Rails `Person.select(:id).where(id: 1).to_sql`)
-    const sql = `SELECT "people_src2"."person_id" FROM "people_src2" WHERE "people_src2"."person_id" = 1`;
+    // Build a relation SQL string directly (mirrors Rails `Person.select(:id).where(id: 1).to_sql`).
+    // Quote identifiers with the adapter's own quoting so it is valid on MySQL too.
+    const t = adapter.quoteTableName("people_src2");
+    const c = `${t}.${adapter.quoteColumnName("person_id")}`;
+    const sql = `SELECT ${c} FROM ${t} WHERE ${c} = 1`;
     await ctx.createTable("table_from_query_testings2", { as: sql });
-    const rows = await adapter.execute(`SELECT * FROM "table_from_query_testings2"`);
+    const rows = await adapter.execute(`SELECT * FROM table_from_query_testings2`);
     expect(rows).toHaveLength(1);
 
     await ctx.dropTable("table_from_query_testings2");
