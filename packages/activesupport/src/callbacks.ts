@@ -894,9 +894,8 @@ export class CallbackChain {
         // by rejecting with the abort sentinel (handled in the catch blocks
         // below). A `false` resolution no longer halts, matching Rails 5+.
         return (async () => {
-          let firstResolved: unknown;
           try {
-            firstResolved = await cbResult;
+            await cbResult;
           } catch (e) {
             // Default terminator only (custom terminators already threw above;
             // `terminator: false` never halts, so it must NOT swallow abort —
