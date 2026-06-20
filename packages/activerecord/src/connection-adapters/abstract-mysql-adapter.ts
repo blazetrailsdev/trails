@@ -1167,9 +1167,22 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return column.isCaseSensitive();
   }
 
-  columnsForDistinct(columns: string, orders: string[]): string {
-    void orders;
-    return columns;
+  // Mirrors: AbstractMysqlAdapter#columns_for_distinct. MySQL rejects
+  // `SELECT DISTINCT ... ORDER BY <col>` when <col> is not in the select list,
+  // so project each ORDER BY column into the SELECT as `<col> AS alias_<i>`.
+  columnsForDistinct(columns: string, orders?: (string | Nodes.Node)[]): string {
+    const visitor = this.arelVisitor();
+    // Two-pass compact_blank (mirroring Rails): filter blanks before AND after
+    // stripping so an order that becomes empty after stripping doesn't consume
+    // an alias index slot.
+    const orderColumns = (orders ?? [])
+      .map((o) => (typeof o === "string" ? o : visitor.compile(o)))
+      .filter((o) => o.trim().length > 0)
+      .map((o) => o.replace(/\s+(?:ASC|DESC)\b/gi, "").trim())
+      .filter((col) => col.length > 0)
+      .map((col, i) => `${col} AS alias_${i}`);
+    if (orderColumns.length === 0) return columns;
+    return [...orderColumns, columns].join(", ");
   }
 
   isStrictMode(): boolean {

@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_and_belongs_to_many_associations_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { association } from "../associations.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
@@ -868,20 +868,16 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("association proxy transaction method starts transaction in association class", async () => {
     const category = await Category.first();
-    let called = false;
-    const original = (Post as any).transaction;
-    (Post as any).transaction = function (this: unknown, ...args: any[]) {
-      called = true;
-      return original.apply(this, args);
-    };
+    const proxy = association(category!, "posts") as any;
+    const spy = vi.spyOn(Post as any, "transaction");
     try {
-      await (association(category!, "posts") as any).transaction(async () => {
+      await proxy.transaction(async () => {
         // nothing
       });
+      expect(spy).toHaveBeenCalled();
     } finally {
-      (Post as any).transaction = original;
+      vi.restoreAllMocks();
     }
-    expect(called).toBe(true);
   });
 
   it("attributes are being set when initialized from habtm association with where clause", async () => {
