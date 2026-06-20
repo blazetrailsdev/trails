@@ -152,11 +152,17 @@ export class HasOneAssociation extends SingularAssociation {
         if (this._pendingReplace) {
           // Only clear on a true revert: a different-record assignment being set back.
           // Same-record (dirty) assignments must not clear even if record === previousTarget.
-          const wasAssignedAnother =
-            this._pendingReplace.previousTarget !== this._pendingReplace.record;
-          if (wasAssignedAnother && record === this._pendingReplace.previousTarget) {
+          const wasAssignedAnother = !sameRecord(
+            this._pendingReplace.previousTarget,
+            this._pendingReplace.record,
+          );
+          if (wasAssignedAnother && sameRecord(record, this._pendingReplace.previousTarget)) {
             this._pendingReplace = null;
-          } else if (displaced && (displaced as any).isPersisted?.() && displaced !== record) {
+          } else if (
+            displaced &&
+            (displaced as any).isPersisted?.() &&
+            !sameRecord(displaced, record)
+          ) {
             // The previously-pending record was persisted independently (e.g.
             // built then saved directly), so it is now the real associated
             // record being displaced and must have its FK nullified. This case
