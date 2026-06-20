@@ -1061,24 +1061,12 @@ export class AssociationReflection extends MacroReflection {
     ) {
       const fk = this.foreignKey;
       if (this.hasOne() || this.isCollection()) {
-        const pk = this.activeRecordPrimaryKey;
-        if (arrayLen(pk) !== arrayLen(fk)) {
-          throw new CompositePrimaryKeyMismatchError({
-            activeRecord: this.activeRecord.name,
-            name: this.name,
-            primaryKey: pk,
-            foreignKey: fk,
-          });
+        if (arrayLen(this.activeRecordPrimaryKey) !== arrayLen(fk)) {
+          throw new CompositePrimaryKeyMismatchError(this);
         }
       } else if (this.belongsTo()) {
-        const pk = this.associationPrimaryKey;
-        if (arrayLen(pk) !== arrayLen(fk)) {
-          throw new CompositePrimaryKeyMismatchError({
-            activeRecord: this.activeRecord.name,
-            name: this.name,
-            primaryKey: pk,
-            foreignKey: fk,
-          });
+        if (arrayLen(this.associationPrimaryKey) !== arrayLen(fk)) {
+          throw new CompositePrimaryKeyMismatchError(this);
         }
       }
     }
