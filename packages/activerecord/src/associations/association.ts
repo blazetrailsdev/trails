@@ -369,12 +369,18 @@ export class Association {
     this.setInverseInstance(record);
   }
 
-  async create(attributes?: Record<string, unknown>): Promise<Base | null> {
-    return this._createRecord(attributes, false);
+  async create(
+    attributes?: Record<string, unknown>,
+    block?: (record: Base) => void,
+  ): Promise<Base | null> {
+    return this._createRecord(attributes, false, block);
   }
 
-  async createBang(attributes?: Record<string, unknown>): Promise<Base> {
-    const record = await this._createRecord(attributes, true);
+  async createBang(
+    attributes?: Record<string, unknown>,
+    block?: (record: Base) => void,
+  ): Promise<Base> {
+    const record = await this._createRecord(attributes, true, block);
     if (!record) {
       throw new Error("Failed to create associated record");
     }
@@ -434,9 +440,13 @@ export class Association {
   protected async _createRecord(
     attributes?: Record<string, unknown>,
     shouldRaise = false,
+    block?: (record: Base) => void,
   ): Promise<Base | null> {
     const record = this.buildRecord(attributes);
     if (!record) return null;
+    // Rails yields the record inside `build_record` (association.rb), before the
+    // save — so the block can mutate attributes that get persisted.
+    if (block) block(record);
     if (typeof (record as any).save === "function") {
       const saved = await (record as any).save();
       if (!saved && shouldRaise) {

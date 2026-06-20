@@ -145,9 +145,13 @@ export class SingularAssociation extends Association {
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     shouldRaise = false,
+    block?: (record: Base) => void,
   ): Promise<Base | null> {
     const record = this.buildRecord(attributes);
     if (!record) return null;
+    // Rails yields the record in `build_record` before the save (block can
+    // mutate persisted attributes).
+    if (block) block(record);
     // Set FK/inverse before saving so the record persists with correct owner reference
     this.setNewRecord(record);
     if (typeof (record as any).save === "function") {

@@ -77,7 +77,11 @@ import type { AssociationReflection } from "../reflection.js";
  * single-target path. @internal
  */
 interface SingularCreateHolder {
-  build(attributes?: Record<string, unknown>): Base | null;
+  create(
+    attributes?: Record<string, unknown>,
+    block?: (record: Base) => void,
+  ): Promise<Base | null>;
+  createBang(attributes?: Record<string, unknown>, block?: (record: Base) => void): Promise<Base>;
 }
 
 // Declaration merging with `class CollectionProxy extends Relation`
@@ -815,14 +819,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const holder = (
       this._record as unknown as { association(name: string): SingularCreateHolder }
     ).association(this._assocName);
-    // Mirror Rails' build-then-save split (SingularAssociation#create_record)
-    // so the `create`/`createBang` block can mutate the record before save,
-    // matching the collection path's `block(record)` semantics.
-    const record = holder.build(attrs) as T;
-    if (block) block(record);
-    const saved = await (record as unknown as { save(): Promise<boolean> }).save();
-    if (!saved && shouldRaise) throw new RecordInvalid(record);
-    return record;
+    const cb = block as ((r: Base) => void) | undefined;
+    const record = shouldRaise
+      ? await holder.createBang(attrs, cb)
+      : await holder.create(attrs, cb);
+    return record as T;
   }
 
   private _checkStrictLoading(): void {
