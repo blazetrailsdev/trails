@@ -175,7 +175,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // it changes array length or only content.
   private _cpMutated = false;
 
-  // A `ConfigurationError` raised while deriving the has_many foreign key
+  // An `ArgumentError` raised while deriving the has_many foreign key
   // (e.g. an owner whose `query_constraints` list has >2 attributes, so the FK
   // is underivable). Rails surfaces this only when the association is *loaded*
   // (`blog_post.comments.to_a`), not when the proxy is constructed — the
@@ -484,7 +484,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Then `_copyStateFrom` onto `this`. Missing owner PK →
       // `_isNone = true` (Rails' NullRelation fallback).
       // `buildHasManyRelation` derives the foreign key, which can raise a
-      // `ConfigurationError` when the owner's `query_constraints` make the FK
+      // `ArgumentError` when the owner's `query_constraints` make the FK
       // underivable. Rails defers that error to load time (the FK is computed
       // lazily inside `load_target`'s scope build), so catch it here, seed a
       // none relation to keep construction valid, and re-throw on load via
@@ -494,7 +494,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       try {
         seedRel = buildHasManyRelation(record, assocName, assocDef.options) as Relation<T> | null;
       } catch (err) {
-        if (err instanceof ConfigurationError) {
+        if (err instanceof ArgumentError) {
           this._deferredFkError = err;
           proxySelf.noneBang();
           seedRel = null;
@@ -634,7 +634,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private async _execLoad(): Promise<T[]> {
     // Re-throw a foreign-key derivation error deferred from construction, so
-    // the underivable-FK `ConfigurationError` surfaces at load time (Rails'
+    // the underivable-FK `ArgumentError` surfaces at load time (Rails'
     // `load_target`), not when the proxy was built.
     if (this._deferredFkError !== undefined) throw this._deferredFkError;
     const queryExecutor = this._cpMutated
