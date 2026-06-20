@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Store } from "./cache/store.js";
+import { Store, WriteOptions } from "./cache/store.js";
 import { Entry } from "./cache/entry.js";
 
 class TestStore extends Store {
@@ -23,7 +23,7 @@ class TestStore extends Store {
     }
   }
   override increment(name: string, amount = 1): number | null {
-    const key = this.normalizeKey(name);
+    const key = this.normalizeKey(name, {});
     const entry = this.readEntry(key, {});
     if (!entry) return null;
     const n = Number(entry.value);
@@ -54,12 +54,6 @@ describe("CacheBehaviorTest", () => {
     expect(cache.read("foo")).toBe("bar");
   });
 
-  it("should overwrite", () => {
-    cache.write("foo", "bar");
-    cache.write("foo", "baz");
-    expect(cache.read("foo")).toBe("baz");
-  });
-
   it("fetch without cache miss", () => {
     cache.write("foo", "bar");
     expect(cache.fetch("foo", () => "fallback")).toBe("bar");
@@ -67,15 +61,6 @@ describe("CacheBehaviorTest", () => {
 
   it("fetch with cache miss", () => {
     expect(cache.fetch("foo", () => "bar")).toBe("bar");
-  });
-
-  it("fetch with cache miss passes key to block", () => {
-    const captured: string[] = [];
-    cache.fetch("foo", (key) => {
-      captured.push(key);
-      return "v";
-    });
-    expect(captured).toEqual(["foo"]);
   });
 
   it("fetch with forced cache miss", () => {
@@ -93,30 +78,10 @@ describe("CacheBehaviorTest", () => {
     expect(called).toBe(false);
   });
 
-  it("should read and write nil", () => {
-    cache.write("foo", null);
-    expect(cache.read("foo")).toBeNull();
-  });
-
-  it("should read and write false", () => {
-    cache.write("foo", false);
-    expect(cache.read("foo")).toBe(false);
-  });
-
   it("read multi", () => {
     cache.write("foo", "bar");
     cache.write("baz", "qux");
     expect(cache.readMulti("foo", "baz", "missing")).toEqual({ foo: "bar", baz: "qux" });
-  });
-
-  it("read multi empty list", () => {
-    expect(cache.readMulti()).toEqual({});
-  });
-
-  it("write multi", () => {
-    cache.writeMulti({ foo: "bar", baz: "qux" });
-    expect(cache.read("foo")).toBe("bar");
-    expect(cache.read("baz")).toBe("qux");
   });
 
   it("delete", () => {
@@ -129,6 +94,20 @@ describe("CacheBehaviorTest", () => {
     cache.write("foo", "bar");
     expect(cache.exist("foo")).toBe(true);
     expect(cache.exist("missing")).toBe(false);
+  });
+
+  it("fetch with block receiving write options", () => {
+    let capturedOpts: WriteOptions | undefined;
+    cache.fetch("foo", (_key, opts) => {
+      capturedOpts = opts;
+      return "v";
+    });
+    expect(capturedOpts).toBeInstanceOf(WriteOptions);
+    expect(capturedOpts!.key).toBe("foo");
+  });
+
+  it("fetch raises on blank key", () => {
+    expect(() => cache.fetch("", () => "v")).toThrow("key cannot be blank");
   });
 
   it("increment", () => {

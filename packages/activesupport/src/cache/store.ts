@@ -20,6 +20,23 @@ export interface CacheLogger {
 
 export type StoreOptions = Record<string, unknown>;
 
+/** Mirrors Rails Cache::Store::WriteOptions (cache.rb:1064). @internal */
+export class WriteOptions {
+  constructor(
+    readonly key: string,
+    private _opts: StoreOptions,
+  ) {}
+  set expiresIn(v: number) {
+    delete this._opts.expiresAt;
+    this._opts.expiresIn = v;
+  }
+  set expiresAt(v: number) {
+    delete this._opts.expiresIn;
+    const s = (v - Date.now()) / 1000;
+    this._opts.expiresIn = s > 0 ? s : 0;
+  }
+}
+
 /** Mirrors Rails `ActiveSupport::Cache::Store` (cache.rb). @internal */
 export abstract class Store {
   static logger: CacheLogger | null = null;
@@ -57,15 +74,19 @@ export abstract class Store {
     }
   }
 
-  fetch(name: string, options?: StoreOptions, block?: (key: string) => unknown): unknown;
-  fetch(name: string, block: (key: string) => unknown): unknown;
   fetch(
     name: string,
-    optionsOrBlock?: StoreOptions | ((key: string) => unknown),
-    maybeBlock?: (key: string) => unknown,
+    options?: StoreOptions,
+    block?: (key: string, opts: WriteOptions) => unknown,
+  ): unknown;
+  fetch(name: string, block: (key: string, opts: WriteOptions) => unknown): unknown;
+  fetch(
+    name: string,
+    optionsOrBlock?: StoreOptions | ((key: string, opts: WriteOptions) => unknown),
+    maybeBlock?: (key: string, opts: WriteOptions) => unknown,
   ): unknown {
     let opts: StoreOptions | undefined;
-    let block: ((key: string) => unknown) | undefined;
+    let block: ((key: string, opts: WriteOptions) => unknown) | undefined;
     if (typeof optionsOrBlock === "function") {
       block = optionsOrBlock;
     } else {
@@ -142,8 +163,12 @@ export abstract class Store {
     return hash;
   }
 
-  fetchMulti(...namesAndBlock: [...string[], (key: string) => unknown]): Record<string, unknown> {
-    const block = namesAndBlock.pop() as (key: string) => unknown;
+  fetchMulti(
+    ...namesAndBlock: [...string[], (key: string, opts: WriteOptions) => unknown]
+  ): Record<string, unknown> {
+    const block = namesAndBlock.pop() as ((key: string, opts: WriteOptions) => unknown) | undefined;
+    if (typeof block !== "function")
+      throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
     const names = namesAndBlock as string[];
     if (names.length === 0) return {};
     const merged = this.mergedOptions(undefined);
@@ -153,7 +178,7 @@ export abstract class Store {
     for (const name of names) {
       ordered[name] = Object.prototype.hasOwnProperty.call(reads, name)
         ? reads[name]
-        : (writes[name] = block(name));
+        : (writes[name] = block(name, new WriteOptions(name, merged)));
     }
     if (merged.skipNil) {
       for (const k of Object.keys(writes)) {
@@ -268,8 +293,10 @@ export abstract class Store {
     return callOptions ? { ...this.options, ...callOptions } : this.options;
   }
 
-  protected normalizeKey(key: string, options?: StoreOptions): string {
-    return this.namespaceKey(String(key), options);
+  protected normalizeKey(key: unknown, options?: StoreOptions): string {
+    const str = this.expandedKey(key);
+    if (!str) throw new ArgumentError("key cannot be blank");
+    return this.namespaceKey(str, options);
   }
 
   protected namespaceKey(key: string, options?: StoreOptions): string {
@@ -280,10 +307,17 @@ export abstract class Store {
   }
 
   protected expandedKey(key: unknown): string {
-    if (key && typeof key === "object" && "cacheKey" in key) {
-      return String((key as { cacheKey: () => string }).cacheKey());
+    if (key != null && typeof key === "object") {
+      if ("cacheKeyWithVersion" in key)
+        return String((key as { cacheKeyWithVersion(): string }).cacheKeyWithVersion());
+      if ("cacheKey" in key) return String((key as { cacheKey(): string }).cacheKey());
+      if (Array.isArray(key)) return key.map((k) => this.expandedKey(k)).join("/");
+      return Object.entries(key as Record<string, unknown>)
+        .map(([k, v]) => `${k}=${v}`)
+        .sort()
+        .join("/");
     }
-    return Array.isArray(key) ? key.map((k) => this.expandedKey(k)).join("/") : String(key);
+    return String(key ?? "");
   }
 
   protected normalizeVersion(_key: string, options?: StoreOptions): string | undefined {
@@ -310,10 +344,11 @@ export abstract class Store {
     name: string,
     _key: string,
     options: StoreOptions,
-    block: (key: string) => unknown,
+    block: (key: string, opts: WriteOptions) => unknown,
   ): unknown {
-    const result = block(name);
-    if (result != null || !options.skipNil) this.write(name, result, options);
+    const mutableOptions = { ...options };
+    const result = block(name, new WriteOptions(name, mutableOptions));
+    if (result != null || !options.skipNil) this.write(name, result, mutableOptions);
     return result;
   }
 }
