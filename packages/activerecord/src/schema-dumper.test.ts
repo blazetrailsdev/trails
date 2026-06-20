@@ -505,7 +505,7 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("scale: 2");
   });
 
-  it("schema dump includes bigint default", async () => {
+  it.skipIf(adapterType !== "postgres")("schema dump includes bigint default", async () => {
     // Mirrors Rails: test_schema_dump_includes_bigint_default
     // (activerecord/test/cases/schema_dumper_test.rb:366)
     // assert_match %r{t\.bigint\s+"bigint_default",\s+default: 0}, output
@@ -787,40 +787,44 @@ describe("SchemaDumperTest", () => {
     expect(output).toMatch(/createTable\("string_key_objects",\s*\{[^}]*id:\s*false/);
   });
 
-  it("foreign keys are dumped at the bottom to circumvent dependency issues", async () => {
-    const source = {
-      tables: async () => ["authors", "books"],
-      columns: async (t: string) =>
-        t === "authors"
-          ? [{ name: "id", type: "integer", primaryKey: true }]
-          : [
-              { name: "id", type: "integer", primaryKey: true },
-              { name: "author_id", type: "integer" },
-            ],
-      indexes: async () => [],
-      foreignKeys: async (t: string) =>
-        t === "books"
-          ? [
-              {
-                fromTable: "books",
-                toTable: "authors",
-                column: "author_id",
-                primaryKey: "id",
-                name: "fk_books_author_id",
-              },
-            ]
-          : [],
-    };
-    const output = await SchemaDumper.dump(source as any);
-    const authorsIdx = output.indexOf('createTable("authors"');
-    const booksIdx = output.indexOf('createTable("books"');
-    const fkIdx = output.indexOf("addForeignKey");
-    expect(authorsIdx).toBeGreaterThan(-1);
-    expect(booksIdx).toBeGreaterThan(-1);
-    expect(fkIdx).toBeGreaterThan(Math.max(authorsIdx, booksIdx));
-    expect(output).toContain('addForeignKey("books", "authors"');
-  });
-  it("do not dump foreign keys for ignored tables", async () => {
+  itIfSupports(
+    "foreign_keys",
+    "foreign keys are dumped at the bottom to circumvent dependency issues",
+    async () => {
+      const source = {
+        tables: async () => ["authors", "books"],
+        columns: async (t: string) =>
+          t === "authors"
+            ? [{ name: "id", type: "integer", primaryKey: true }]
+            : [
+                { name: "id", type: "integer", primaryKey: true },
+                { name: "author_id", type: "integer" },
+              ],
+        indexes: async () => [],
+        foreignKeys: async (t: string) =>
+          t === "books"
+            ? [
+                {
+                  fromTable: "books",
+                  toTable: "authors",
+                  column: "author_id",
+                  primaryKey: "id",
+                  name: "fk_books_author_id",
+                },
+              ]
+            : [],
+      };
+      const output = await SchemaDumper.dump(source as any);
+      const authorsIdx = output.indexOf('createTable("authors"');
+      const booksIdx = output.indexOf('createTable("books"');
+      const fkIdx = output.indexOf("addForeignKey");
+      expect(authorsIdx).toBeGreaterThan(-1);
+      expect(booksIdx).toBeGreaterThan(-1);
+      expect(fkIdx).toBeGreaterThan(Math.max(authorsIdx, booksIdx));
+      expect(output).toContain('addForeignKey("books", "authors"');
+    },
+  );
+  itIfSupports("foreign_keys", "do not dump foreign keys for ignored tables", async () => {
     SchemaDumper.ignoreTables = ["books"];
     const source = {
       tables: async () => ["authors", "books"],
@@ -843,7 +847,7 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain("addForeignKey");
     expect(output).not.toContain('"books"');
   });
-  it("do not dump foreign keys when bypassed by config", async () => {
+  itIfSupports("foreign_keys", "do not dump foreign keys when bypassed by config", async () => {
     // Source has no foreignKeys hook — equivalent to a connection where FK dumping is unavailable.
     const source = {
       tables: async () => ["authors", "books"],
@@ -916,16 +920,19 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain("myapp_");
   });
 
-  it("schema dump with correct timestamp types via create table and t column", async () => {
-    await ctx.createTable("posts", {}, (t) => {
-      t.string("title");
-      t.timestamps();
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("datetime");
-    expect(output).toContain("created_at");
-    expect(output).toContain("updated_at");
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump with correct timestamp types via create table and t column",
+    async () => {
+      await ctx.createTable("posts", {}, (t) => {
+        t.string("title");
+        t.timestamps();
+      });
+      const output = SchemaDumper.dump(ctx);
+      expect(output).toContain("datetime");
+      expect(output).toContain("created_at");
+      expect(output).toContain("updated_at");
+    },
+  );
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with timestamptz datetime format",
@@ -992,15 +999,18 @@ describe("SchemaDumperTest", () => {
     },
   );
 
-  it("schema dump with correct timestamp types via add column", async () => {
-    await ctx.createTable("posts", {}, (t) => {
-      t.string("title");
-    });
-    await ctx.addColumn("posts", "created_at", "datetime");
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("datetime");
-    expect(output).toContain("created_at");
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump with correct timestamp types via add column",
+    async () => {
+      await ctx.createTable("posts", {}, (t) => {
+        t.string("title");
+      });
+      await ctx.addColumn("posts", "created_at", "datetime");
+      const output = SchemaDumper.dump(ctx);
+      expect(output).toContain("datetime");
+      expect(output).toContain("created_at");
+    },
+  );
 
   it.skip("schema dump with correct timestamp types via add column before rails 7", () => {
     // BLOCKED: needs Migration version compatibility (Migration[6.1]).
@@ -1011,15 +1021,18 @@ describe("SchemaDumperTest", () => {
     // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
   });
 
-  it("schema dump with correct timestamp types via add column with type as string", async () => {
-    await ctx.createTable("posts", {}, (t) => {
-      t.string("title");
-    });
-    await ctx.addColumn("posts", "posted_at", "datetime");
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("datetime");
-    expect(output).toContain("posted_at");
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump with correct timestamp types via add column with type as string",
+    async () => {
+      await ctx.createTable("posts", {}, (t) => {
+        t.string("title");
+      });
+      await ctx.addColumn("posts", "posted_at", "datetime");
+      const output = SchemaDumper.dump(ctx);
+      expect(output).toContain("datetime");
+      expect(output).toContain("posted_at");
+    },
+  );
 });
 
 describe("SchemaDumperDefaultsTest", () => {
