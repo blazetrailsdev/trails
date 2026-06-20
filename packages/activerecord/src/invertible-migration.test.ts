@@ -9,6 +9,7 @@ import { CommandRecorder } from "./migration/command-recorder.js";
 import { Base } from "./base.js";
 
 import { createTestAdapter, adapterType } from "./test-adapter.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -225,7 +226,7 @@ describe("InvertibleMigrationTest", () => {
     await migration2.migrate("down");
     expect(await nameDefault()).toBe("Sekitoba");
   });
-  it("migrate revert change column comment", () => {
+  itIfSupports("comments", "migrate revert change column comment", () => {
     const recorder = new CommandRecorder();
     recorder.record("changeColumnComment", ["horses", "name", { from: "Old", to: "New" }]);
     const inv = recorder.inverseOf("changeColumnComment", [
@@ -236,14 +237,14 @@ describe("InvertibleMigrationTest", () => {
     expect(inv.cmd).toBe("changeColumnComment");
     expect(inv.args).toEqual(["horses", "name", { from: "New", to: "Old" }]);
   });
-  it("migrate revert change table comment", () => {
+  itIfSupports("comments", "migrate revert change table comment", () => {
     const recorder = new CommandRecorder();
     recorder.record("changeTableComment", ["horses", { from: "Old", to: "New" }]);
     const inv = recorder.inverseOf("changeTableComment", ["horses", { from: "Old", to: "New" }]);
     expect(inv.cmd).toBe("changeTableComment");
     expect(inv.args).toEqual(["horses", { from: "New", to: "Old" }]);
   });
-  it("migrate enable and disable extension", () => {
+  it.skipIf(adapterType !== "postgres")("migrate enable and disable extension", () => {
     const recorder = new CommandRecorder();
     const enableInv = recorder.inverseOf("enableExtension", ["hstore"]);
     expect(enableInv.cmd).toBe("disableExtension");
@@ -390,7 +391,7 @@ describe("InvertibleMigrationTest", () => {
     await m.down();
   });
 
-  it("migrate revert add index with name", async () => {
+  it.skipIf(adapterType === "mysql")("migrate revert add index with name", async () => {
     class AddIdxMig extends Migration {
       async change() {
         await this.createTable("idx_test", (t) => {
@@ -453,21 +454,25 @@ describe("InvertibleMigrationTest", () => {
     expect(upOnlyCalled).toBe(false);
   });
 
-  it("migrate revert add unique constraint with invalid option", () => {
-    const recorder = new CommandRecorder();
-    // Unknown options pass through without breaking inversion
-    const inv = recorder.inverseOf("addUniqueConstraint", [
-      "horses",
-      "place_id",
-      { unknownOption: true },
-    ]);
-    expect(inv.cmd).toBe("removeUniqueConstraint");
-    expect(inv.args[0]).toBe("horses");
-    // usingIndex makes it irreversible
-    expect(() =>
-      recorder.inverseOf("addUniqueConstraint", ["horses", "place_id", { usingIndex: "my_idx" }]),
-    ).toThrow(IrreversibleMigration);
-  });
+  itIfSupports(
+    "unique_constraints",
+    "migrate revert add unique constraint with invalid option",
+    () => {
+      const recorder = new CommandRecorder();
+      // Unknown options pass through without breaking inversion
+      const inv = recorder.inverseOf("addUniqueConstraint", [
+        "horses",
+        "place_id",
+        { unknownOption: true },
+      ]);
+      expect(inv.cmd).toBe("removeUniqueConstraint");
+      expect(inv.args[0]).toBe("horses");
+      // usingIndex makes it irreversible
+      expect(() =>
+        recorder.inverseOf("addUniqueConstraint", ["horses", "place_id", { usingIndex: "my_idx" }]),
+      ).toThrow(IrreversibleMigration);
+    },
+  );
   it("migrate revert add foreign key with invalid option", async () => {
     // addForeignKey is reversible even with unknown options (they're forwarded, not validated)
     const recorder = new CommandRecorder();
