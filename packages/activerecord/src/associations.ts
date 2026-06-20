@@ -1738,8 +1738,8 @@ function _inlinePolymorphicKeys(
     // Mirror deriveFkQueryConstraints' 2-attribute case: replace the owner-PK
     // slot in the query_constraints list with the polymorphic `${as}_id` FK.
     // Lists of a different shape (>2 attrs, no scalar PK, FK already present)
-    // fall through to the scalar path — same as the pre-existing inline
-    // behavior — rather than reproducing every Rails ArgumentError branch.
+    // are Rails ArgumentError cases with no valid config; fall through to the
+    // scalar collapse below rather than reproducing every Rails raise branch.
     const ownerPk = ctor.primaryKey;
     const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
     if (qc && qc.length === 2 && ownerPkStr && qc.includes(ownerPkStr) && !qc.includes(scalarFk)) {
@@ -1748,8 +1748,13 @@ function _inlinePolymorphicKeys(
       return { fkCols, ownerKeyCols: qc };
     }
   }
-  const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-  return { fkCols: [scalarFk], ownerKeyCols: Array.isArray(ownerKey) ? ownerKey : [ownerKey] };
+  // Scalar path — identical to the pre-fix inline behavior
+  // (`Array.isArray(primaryKey) ? "id" : primaryKey`): a scalar polymorphic FK
+  // pairs with a single owner key. `_inlineOwnerKey` can return the
+  // query_constraints array, which a scalar FK can't zip against, so collapse
+  // here rather than delegating.
+  const scalarOwnerKey = Array.isArray(primaryKey) ? "id" : primaryKey;
+  return { fkCols: [scalarFk], ownerKeyCols: [scalarOwnerKey] };
 }
 
 /**
@@ -1791,11 +1796,19 @@ export function computeHasManyWhere(
         foreignKey,
       });
     }
-    const scalarPk = Array.isArray(primaryKey) ? "id" : primaryKey;
-    const pkValue = record._readAttribute(scalarPk);
-    if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
-    return { [foreignKey]: pkValue, [typeCol]: polymorphicName(ctor) };
+    // Same query_constraints widening as the inline loadHasMany/loadHasOne
+    // polymorphic fallback: a query_constraints owner keys on the composite
+    // `[shardKey, ${as}_id]` against the query_constraints list, not the
+    // scalar `id` alone (which would leak cross-shard rows).
+    const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(ctor, options, primaryKey, foreignKey);
+    const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+    for (let i = 0; i < fkCols.length; i++) {
+      const pkValue = record._readAttribute(ownerKeyCols[i]);
+      if (pkValue === null || pkValue === undefined) return null;
+      conditions[fkCols[i]] = pkValue;
+    }
+    return conditions;
   }
 
   // Prefer the reflection's foreign key, which is derived from the class that
