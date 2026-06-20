@@ -490,6 +490,7 @@ async function _insertCollectionRecordFallback(
   const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
   if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
     if (primaryKey.length !== foreignKey.length) {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assoc.name,
@@ -505,6 +506,7 @@ async function _insertCollectionRecordFallback(
     const pkValue = record._readAttribute(primaryKey);
     if (pkValue != null) child._writeAttribute(foreignKey, pkValue);
   } else {
+    // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
     throw new CompositePrimaryKeyMismatchError({
       activeRecord: ctor.name,
       name: assoc.name,
@@ -591,6 +593,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     }
     if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
       if (primaryKey.length !== foreignKey.length) {
+        // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: (record.constructor as typeof Base).name,
           name: assoc.name,
@@ -606,6 +609,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
       const pkValue = record._readAttribute(primaryKey);
       if (pkValue != null) childRecord._writeAttribute(foreignKey, pkValue);
     } else {
+      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: (record.constructor as typeof Base).name,
         name: assoc.name,
