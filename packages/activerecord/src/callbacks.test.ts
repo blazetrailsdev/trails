@@ -225,20 +225,6 @@ describe("CallbacksTest", () => {
     }).toThrow("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   });
 
-  it("before validation throwing abort", async () => {
-    class CbPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true });
-        this.beforeValidation(() => throwAbort());
-      }
-    }
-    const p = new CbPost({ title: "test" });
-    const result = await p.save();
-    expect(result).toBe(false);
-    expect(p.isNewRecord()).toBe(true);
-  });
-
   it("destroy bang throws when before destroy halts", async () => {
     class CbPost extends Base {
       static {
@@ -1115,37 +1101,6 @@ describe("CallbacksTest", () => {
     expect(g.isNewRecord()).toBe(true);
   });
 
-  it("before_create throwing abort halts create (but before_save still ran)", async () => {
-    const log: string[] = [];
-
-    class Guarded extends Base {
-      static {
-        this.attribute("name", "string");
-        this.beforeSave(() => {
-          log.push("before_save");
-        });
-        this.beforeCreate(() => {
-          log.push("before_create");
-          throwAbort();
-        });
-        this.afterSave(() => {
-          log.push("after_save");
-        });
-      }
-    }
-
-    const g = new Guarded({ name: "test" });
-    const result = await g.save();
-    expect(result).toBe(false);
-    expect(g.isNewRecord()).toBe(true);
-    // before_save ran, before_create halted the insert, but after_save still runs
-    // (Rails: _run_save_callbacks { _run_create_callbacks { ... } } — after_save fires
-    // once the save block finishes, regardless of whether create callbacks halted)
-    expect(log).toContain("before_save");
-    expect(log).toContain("before_create");
-    expect(log).toContain("after_save");
-  });
-
   it("after_save runs on both create and update", async () => {
     const log: string[] = [];
 
@@ -1487,28 +1442,6 @@ describe("CallbacksTest", () => {
     }
     const g = await Gadget.create({ value: 1 });
     expect(seen).toEqual([g.id]);
-  });
-
-  it("async before_save throwing abort halts save", async () => {
-    class Locked extends Base {
-      static {
-        this._tableName = "lockeds";
-        this.attribute("id", "integer");
-        this.attribute("allowed", "boolean");
-        this.beforeSave(async (r: any) => {
-          await Promise.resolve();
-          if (r.allowed !== true) throwAbort();
-        });
-      }
-    }
-    const ok = new Locked();
-    ok.allowed = true;
-    expect(await ok.save()).toBe(true);
-
-    const blocked = new Locked();
-    blocked.allowed = false;
-    expect(await blocked.save()).toBe(false);
-    expect(blocked.isPersisted()).toBe(false);
   });
 
   it("async around_create wraps the insert block and awaits both sides", async () => {

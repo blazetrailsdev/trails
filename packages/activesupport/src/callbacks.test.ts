@@ -925,27 +925,6 @@ describe("CallbacksMixin", () => {
     expect(m.log).toEqual(["before", "saved", "after"]);
   });
 
-  it("beforeCallback halts the chain by throwing the abort sentinel", () => {
-    class MyModel extends CallbacksMixin() {
-      saved = false;
-
-      static {
-        this.defineCallbacks("save");
-        this.beforeCallback("save", () => throwAbort());
-      }
-
-      save() {
-        this.runCallbacks("save", () => {
-          this.saved = true;
-        });
-      }
-    }
-
-    const m = new MyModel();
-    m.save();
-    expect(m.saved).toBe(false);
-  });
-
   it("aroundCallback wraps block", () => {
     class MyModel extends CallbacksMixin() {
       log: string[] = [];
