@@ -1066,6 +1066,28 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(face.association("autosaveHuman").target).not.toBeNull();
   });
 
+  // Regression (trails-specific, surfaced in PR #3503): the module-level
+  // `association()` helper returns a CollectionProxy for *every* association
+  // type, so a has_one `createBang` used to append the new record to the
+  // proxy's array `_target`. That array surfaced through `_associationCache`
+  // as an array-shaped singular `target`, and `autosaveHasOne` bailed on
+  // `Array.isArray(child)` — silently skipping the child on owner save.
+  it("has_one createBang stores a single record as target, not an array", async () => {
+    const human = await Human.createBang({});
+    const face = await association(human, "autosaveFace").createBang({ description: "haunted" });
+
+    const holder = (human as any).association("autosaveFace");
+    expect(Array.isArray(holder.target)).toBe(false);
+    expect(holder.target).toBe(face);
+
+    // autosave must not bail: a description change on the created child is
+    // persisted when the owner is saved.
+    (face as any).description = "new description";
+    await human.saveBang();
+    await (face as any).reload();
+    expect((face as any).description).toBe("new description");
+  });
+
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("llama_wrangling");
     const human = (await loadBelongsTo(interest, "polymorphicHuman", {
