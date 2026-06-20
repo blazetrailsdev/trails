@@ -34,14 +34,11 @@ describe("TransactionIsolationUnsupportedTest", () => {
 
 // Rails: TransactionIsolationTest (joining/nested subtests).
 // Rails guards the full class with `supports_transaction_isolation? &&
-// !current_adapter?(:SQLite3Adapter)`. The test:compare Ruby extractor collapses
-// such mixed adapter+feature conditions to the feature alone — its run-on adapter
-// set "isn't sound" for a compound `&&` (extract-ruby-tests.rb:462) — so the
-// canonical railsGate for these subtests is feature-only `transaction_isolation`,
-// no adapter. We mirror that with a bare `itIfSupports("transaction_isolation")`
-// (no `.skipIf(sqlite)`): it is the convergent gate AND safe, because these two
-// subtests exercise a framework-level isolation check that fires before any DB
-// call, so they pass on every adapter (SQLite included).
+// !current_adapter?(:SQLite3Adapter)`. The test:compare Ruby extractor now
+// captures both halves of that compound trailing-`if` — feature
+// `transaction_isolation` plus a SQLite exclusion — so the canonical railsGate is
+// `adapters:[mysql,postgresql] + features:[transaction_isolation]`. We mirror it
+// with `itIfSupports.skipIf(adapterType === "sqlite")`.
 //
 // The four isolation-LEVEL subtests below (read uncommitted/committed/repeatable
 // read/serializable) are NOT framework-only — they need real cross-connection PG
@@ -54,7 +51,7 @@ describe("TransactionIsolationTest", () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
   });
 
-  itIfSupports(
+  itIfSupports.skipIf(adapterType === "sqlite")(
     "transaction_isolation",
     "setting isolation when joining a transaction raises an error",
     async () => {
@@ -71,7 +68,7 @@ describe("TransactionIsolationTest", () => {
     },
   );
 
-  itIfSupports(
+  itIfSupports.skipIf(adapterType === "sqlite")(
     "transaction_isolation",
     "setting isolation when starting a nested transaction raises error",
     async () => {
