@@ -3029,6 +3029,7 @@ export class Base extends Model {
     const values: unknown[] = columns.map((k) => attrs[k]);
 
     let sql: string;
+    let insertBinds: unknown[] = [];
     if (columns.length === 0) {
       const emptyValue = ctor.connection.emptyInsertStatementValue();
       sql = `INSERT INTO ${ctor.connection.quoteTableName(table.name)} ${emptyValue}`;
@@ -3038,11 +3039,15 @@ export class Base extends Model {
         const def = ctor._attributeDefinitions.get(c);
         const isArray = def?.type?.name === "array";
         const raw = values[i];
-        const val = isArray ? arelSql(quoteSqlValue(raw, true)) : raw;
+        // Bind scalar values as prepared-statement parameters (matching Rails'
+        // type_casted_binds) instead of inlining them, so a value containing a
+        // null byte (\x00) round-trips rather than truncating the SQL at the
+        // C-string boundary. Array literals keep their bespoke inline quoting.
+        const val = isArray ? arelSql(quoteSqlValue(raw, true)) : new Nodes.BindParam(raw);
         return [table.get(c), val];
       });
       im.insert(insertValues);
-      sql = ctor.connection.toSql(im);
+      [sql, insertBinds] = ctor.connection.toSqlAndBinds(im);
     }
     // A custom-named serial/identity PK (e.g. `owner_id`) needs its column name
     // threaded through so the adapter emits `RETURNING <pk>` and the DB-generated
@@ -3055,7 +3060,14 @@ export class Base extends Model {
         ? [insertPk]
         : undefined;
     this._pendingOperation = ctor.connection
-      .execInsert(sql, `${ctor.name} Create`, [], namedReturning?.[0], undefined, namedReturning)
+      .execInsert(
+        sql,
+        `${ctor.name} Create`,
+        insertBinds,
+        namedReturning?.[0],
+        undefined,
+        namedReturning,
+      )
       .then((rawId) => {
         // Adapters with RETURNING support (PG) may return a Result-like object
         // instead of the bare id — extract via adapter.lastInsertedId when available.
@@ -3152,7 +3164,13 @@ export class Base extends Model {
         const val = dbValues[key];
         const def = ctor._attributeDefinitions.get(key);
         const isArray = def?.type?.name === "array";
-        return [table.get(key), isArray ? arelSql(quoteSqlValue(val, true)) : val];
+        // Bind scalar SET values as prepared-statement parameters (see
+        // _performInsert) so null-byte values survive instead of truncating
+        // the inlined SQL.
+        return [
+          table.get(key),
+          isArray ? arelSql(quoteSqlValue(val, true)) : new Nodes.BindParam(val),
+        ];
       },
     );
 
