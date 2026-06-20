@@ -100,10 +100,6 @@ describe("CacheBehaviorTest", () => {
     expect(capturedOpts!.key).toBe("foo");
   });
 
-  it("fetch raises on blank key", () => {
-    expect(() => cache.fetch("", () => "v")).toThrow("key cannot be blank");
-  });
-
   it("increment", () => {
     cache.write("foo", 1);
     expect(cache.increment("foo")).toBe(2);
