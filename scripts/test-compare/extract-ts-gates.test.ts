@@ -58,6 +58,31 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
+  it("extracts adapterSupports() feature predicates polarity-blind", () => {
+    // skipIf(!adapterSupports("insert_returning")) → feature gate
+    expect(gateFromGuardExpr('!adapterSupports("insert_returning")', false)).toEqual({
+      features: ["insert_returning"],
+      source: ["test"],
+    });
+    // Positive form, no `!` (skipIf(adapterSupports("x")) — runs where the
+    // feature is absent) collects the same feature: polarity is not inspected.
+    expect(gateFromGuardExpr('adapterSupports("insert_conflict_target")', false)).toEqual({
+      features: ["insert_conflict_target"],
+      source: ["test"],
+    });
+    // Negation is ignored (mirrors Ruby `skip unless a? && !b?` listing both):
+    // multiple calls in one compound expression union into the feature set.
+    expect(
+      gateFromGuardExpr(
+        '!adapterSupports("insert_conflict_target") || !adapterSupports("partial_index")',
+        false,
+      ),
+    ).toEqual({
+      features: ["insert_conflict_target", "partial_index"],
+      source: ["test"],
+    });
+  });
+
   it("falls back to an unknown guard for unrecognized expressions", () => {
     expect(gateFromGuardExpr("!supportsConflictTarget", false)).toEqual({
       guards: ["unknown"],

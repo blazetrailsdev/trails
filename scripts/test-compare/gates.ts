@@ -120,6 +120,19 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
     }
   }
 
+  // `adapterSupports("feature")` calls — the TS analog of Rails' `supports_X?`
+  // feature predicates. Collected polarity-blind (any `!`/`||` negation is
+  // ignored), exactly as the Ruby extractor's `scan_run_condition` lists every
+  // `supports_X?` it finds in the run condition regardless of negation. This
+  // lets `it.skipIf(!adapterSupports("a") || adapterSupports("b"))(...)` carry
+  // the same feature set Rails derives from `skip unless a? && !b?`.
+  const featureMatches = [...text.matchAll(/adapterSupports\(\s*["']([a-z0-9_]+)["']\s*\)/g)].map(
+    (m) => m[1],
+  );
+  if (featureMatches.length) {
+    return { features: sortedUnique(featureMatches), source: ["test"] };
+  }
+
   return { guards: ["unknown"], source: ["test"] };
 }
 
