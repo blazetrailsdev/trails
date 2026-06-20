@@ -26,7 +26,6 @@
  */
 import { buildTestDatabaseConfig } from "./test-helpers/test-database-config.js";
 import { generateSchemaFile } from "./test-helpers/schema-file-generator.js";
-import { seedSchemaSignatures, setCanonicalSchemaPreload } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -81,14 +80,6 @@ if (missingTables.length > 0) {
     `[test-setup-dy] DatabaseTasks schema load incomplete — missing tables: ${missingTables.join(", ")}`,
   );
 }
-
-// Seed the signature cache so handler-path files' defineSchema(TEST_SCHEMA)
-// calls remain cache-hit no-ops. DatabaseTasks.loadSchema goes through
-// MigrationContext (not defineSchema), so _appliedSchemaSignatures is empty
-// after the load — seedSchemaSignatures bridges the gap before
-// setCanonicalSchemaPreload snapshots the cache.
-seedSchemaSignatures(Base.connection, TEST_SCHEMA);
-setCanonicalSchemaPreload(Base.connection);
 
 // Remove the connection pool from the handler so old-path workers don't
 // inherit an active pool.  isConnectedQ() returns false after this, so
