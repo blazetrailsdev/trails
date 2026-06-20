@@ -1260,11 +1260,21 @@ describe("InsertAllTest", () => {
   );
 
   // Rails gates this on current_adapter?(:Mysql2) (insert_all_test.rb).
-  it.skipIf(adapterType !== "mysql")("insert all when table name contains database", (ctx) => {
-    ctx.skip();
-    // BLOCKED: test-harness multi-DB sharding — Rails (MySQL-only) qualifies the
-    // table with connection_db_config.database, but the handler suite shards
-    // `books` into a per-worker database that currentDatabase() does not name.
-    // RFC 0030 d2-insert-all-canonical-models.
+  // The handler suite suffixes MYSQL_TEST_URL with a per-worker slot DB
+  // (test-setup-worker-db.ts), so connectionDbConfig().database names the
+  // real database `books` lives in — exactly what Rails qualifies with.
+  it.skipIf(adapterType !== "mysql")("insert all when table name contains database", async () => {
+    const databaseName = Book.connectionDbConfig().database;
+    Book.tableName = `${databaseName}.books`;
+
+    let raised: unknown;
+    try {
+      await Book.insertAllBang([{ name: "Rework", author_id: 1 }]);
+    } catch (e) {
+      raised = e;
+    } finally {
+      Book.tableName = "books";
+    }
+    expect(raised).toBeUndefined();
   });
 });
