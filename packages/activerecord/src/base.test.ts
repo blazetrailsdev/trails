@@ -22,7 +22,7 @@ import { registerModel } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
-import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
+import { Notifications, Logger, TimeWithZone, throwAbort } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -3476,7 +3476,7 @@ describe("BasicsTest", () => {
       class Guarded extends Base {
         static {
           this.attribute("name", "string");
-          this.beforeSave(() => false);
+          this.beforeSave(() => throwAbort());
         }
       }
 

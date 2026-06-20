@@ -151,7 +151,6 @@ describe("RedirectTest", () => {
     }
     C.beforeAction((controller) => {
       (controller as Base).redirectTo("/login");
-      return false;
     });
 
     const c = new C();

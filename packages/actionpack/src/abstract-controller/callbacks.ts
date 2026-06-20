@@ -12,6 +12,7 @@ import {
   setCallback as asSetCallback,
   runCallbacks as asRunCallbacks,
   getCallbackChains,
+  throwAbort,
   type CallbackKind,
   type CallbackCondition,
   type CallbackOptions as ASCallbackOptions,
@@ -236,16 +237,18 @@ interface WrappedBefore {
 }
 
 /**
- * Wrap a before callback to halt (return `false`) once the controller is
- * marked performed. Replaces Rails' `terminator: ->(c, lambda) { lambda.call;
- * c.performed? }`: AS rejects custom terminators paired with async befores,
- * so we encode the check in the callback and rely on default `=== false` halt.
+ * Wrap a before callback to halt (throw the abort sentinel) once the controller
+ * is marked performed. Replaces Rails' `terminator: ->(c, lambda) { lambda.call;
+ * c.performed? }`: AS rejects custom terminators paired with async befores, so we
+ * encode the performed? check in the callback and halt via {@link throwAbort} —
+ * the sentinel the default terminator catches (Rails 5+ no longer halts on a
+ * `false` return).
  * @internal
  */
 function _wrapBefore(callback: ActionCallback): WrappedBefore {
   const wrapped = async (target: object): Promise<unknown> => {
     const result = await callback(target as AbstractController);
-    if ((target as AbstractController).performed) return false;
+    if ((target as AbstractController).performed) throwAbort();
     return result;
   };
   (wrapped as WrappedBefore).__originalCb = callback;
