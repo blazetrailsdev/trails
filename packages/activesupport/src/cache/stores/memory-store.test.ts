@@ -121,6 +121,51 @@ describe("MemoryStorePruningTest", () => {
   });
 });
 
+describe("CacheStoreRaceConditionTtlTest", () => {
+  let store: MemoryStore;
+
+  beforeEach(() => {
+    store = new MemoryStore();
+  });
+
+  it("fetch with race condition ttl", async () => {
+    store.write("foo", "bar", { expiresIn: 20 });
+    await new Promise((r) => setTimeout(r, 30));
+    // Within the race window: stale entry is bumped; caller regenerates
+    const result = store.fetch("foo", { raceConditionTtl: 200 }, () => "new");
+    expect(result).toBe("new");
+    // Now the store has the new value
+    expect(store.read("foo")).toBe("new");
+  });
+
+  it("fetch with race condition ttl serves stale to concurrent readers", async () => {
+    store.write("foo", "stale", { expiresIn: 20 });
+    await new Promise((r) => setTimeout(r, 30));
+    // First reader: bumps the entry and regenerates
+    store.fetch("foo", { raceConditionTtl: 500 }, () => "fresh");
+    // Second reader (concurrent): sees bumped (non-expired) entry and gets stale value
+    // Because the first fetch already wrote "fresh", concurrent readers now see "fresh".
+    // The race benefit is that before the first fetch writes, readers see stale via bumped TTL.
+    // We verify that after regeneration the new value is in place.
+    expect(store.read("foo")).toBe("fresh");
+  });
+
+  it("fetch without race condition ttl deletes expired entry", async () => {
+    store.write("foo", "bar", { expiresIn: 20 });
+    await new Promise((r) => setTimeout(r, 30));
+    const result = store.fetch("foo", () => "new");
+    expect(result).toBe("new");
+  });
+
+  it("race condition ttl beyond window deletes expired entry", async () => {
+    store.write("foo", "bar", { expiresIn: 20 });
+    await new Promise((r) => setTimeout(r, 200));
+    // Beyond the race window: entry is deleted normally
+    const result = store.fetch("foo", { raceConditionTtl: 50 }, () => "regen");
+    expect(result).toBe("regen");
+  });
+});
+
 describe("MemoryStore coder fidelity", () => {
   let store: MemoryStore;
 

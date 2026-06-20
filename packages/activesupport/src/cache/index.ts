@@ -11,6 +11,7 @@ export interface CacheOptions {
   compress?: boolean;
   compressThreshold?: number;
   unlessExist?: boolean;
+  raceConditionTtl?: number; // milliseconds
 }
 
 export interface CacheStore {
