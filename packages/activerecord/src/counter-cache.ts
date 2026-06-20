@@ -256,7 +256,10 @@ function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
   if (matchingKeys.length === 0) return inherited ?? new Set<string>();
   const next: Set<string> = owns && inherited ? inherited : new Set(inherited ?? []);
   for (const key of matchingKeys) {
-    for (const col of pendingCounterCacheColumns.get(key)!) next.add(col);
+    // Re-derive each column now that the target class is registered; staging
+    // thunks (not strings) lets a belongs_to declared before its target see the
+    // correct demodulized column at flush time. See counter-cache-state.ts.
+    for (const col of pendingCounterCacheColumns.get(key)!) next.add(col());
     // Intentionally keep the pending entry so that if the target class is
     // re-defined and re-registered (e.g. between tests), the next
     // registerModel call also flushes the column into the new class.
