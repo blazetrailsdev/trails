@@ -1356,11 +1356,17 @@ export async function loadHasOne(
       result = await targetModel.findBy(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
-      const inlinePk = Array.isArray(primaryKey) ? "id" : primaryKey;
-      result = await targetModel.findBy({
-        [foreignKey]: record._readAttribute(inlinePk),
-        [typeCol]: polymorphicName(ctor),
-      });
+      const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
+        ctor,
+        options,
+        primaryKey,
+        foreignKey,
+      );
+      const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+      for (let i = 0; i < fkCols.length; i++) {
+        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
+      }
+      result = await targetModel.findBy(conditions);
     } else if (options.scope) {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       let rel = targetModel
@@ -1637,11 +1643,17 @@ export async function loadHasMany(
       rel = targetModel.all().where(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
-      const inlinePk = Array.isArray(primaryKey) ? "id" : primaryKey;
-      rel = targetModel.all().where({
-        [foreignKey]: record._readAttribute(inlinePk),
-        [typeCol]: polymorphicName(ctor),
-      });
+      const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
+        ctor,
+        options,
+        primaryKey,
+        foreignKey,
+      );
+      const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+      for (let i = 0; i < fkCols.length; i++) {
+        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
+      }
+      rel = targetModel.all().where(conditions);
     } else {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       rel = targetModel.all().where({ [foreignKey]: record._readAttribute(ownerKey as string) });
@@ -1696,6 +1708,48 @@ function _inlineOwnerKey(
     return primaryKey.includes("id") ? "id" : primaryKey;
   }
   return primaryKey;
+}
+
+/**
+ * Resolve the foreign-key column(s) and matching owner-key column(s) for an
+ * inline (no-reflection) polymorphic (`options.as`) association fallback,
+ * mirroring the reflection path: `reflection.activeRecordPrimaryKey` for the
+ * owner key and `BelongsToReflection#deriveFkQueryConstraints` for the
+ * foreign key (reflection.rb).
+ *
+ * For a query_constraints owner the scalar `${as}_id` FK widens to the
+ * composite `[shardKey, ${as}_id]` and the owner key becomes the
+ * query_constraints list — so the inline fallback keys against the full
+ * query_constraints list (e.g. `[blog_id, id]`) like AssociationScope, not
+ * the scalar `id` alone. A plain (non-query_constraints) owner keeps the
+ * scalar FK and the `_inlineOwnerKey`-resolved scalar key.
+ */
+function _inlinePolymorphicKeys(
+  ctor: typeof Base,
+  options: AssociationOptions,
+  primaryKey: string | string[],
+  scalarFk: string,
+): { fkCols: string[]; ownerKeyCols: string[] } {
+  if (
+    options.primaryKey === undefined &&
+    (options.queryConstraints || hasQueryConstraints.call(ctor as any))
+  ) {
+    const qc = options.queryConstraints ?? queryConstraintsList.call(ctor as any);
+    // Mirror deriveFkQueryConstraints' 2-attribute case: replace the owner-PK
+    // slot in the query_constraints list with the polymorphic `${as}_id` FK.
+    // Lists of a different shape (>2 attrs, no scalar PK, FK already present)
+    // fall through to the scalar path — same as the pre-existing inline
+    // behavior — rather than reproducing every Rails ArgumentError branch.
+    const ownerPk = ctor.primaryKey;
+    const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
+    if (qc && qc.length === 2 && ownerPkStr && qc.includes(ownerPkStr) && !qc.includes(scalarFk)) {
+      const [firstKey, lastKey] = qc;
+      const fkCols = firstKey === ownerPkStr ? [scalarFk, lastKey] : [firstKey, scalarFk];
+      return { fkCols, ownerKeyCols: qc };
+    }
+  }
+  const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
+  return { fkCols: [scalarFk], ownerKeyCols: Array.isArray(ownerKey) ? ownerKey : [ownerKey] };
 }
 
 /**
