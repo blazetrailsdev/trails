@@ -523,7 +523,13 @@ describe("AdapterTest", () => {
     },
   );
 
-  it.skip("update prepared statement", () => {
+  // Rails runs this `unless current_adapter?(:PostgreSQLAdapter) ||
+  // (current_adapter?(:SQLite3Adapter) && !prepared_statements)` (adapter_test.rb:19) —
+  // i.e. on MySQL and SQLite (SQLite defaults prepared_statements: true), excluding
+  // only PostgreSQL. The extractor cannot evaluate the runtime `!prepared_statements`,
+  // so its railsGate over-excludes SQLite; gate to Rails' real condition regardless.
+  it.skipIf(adapterType === "postgres")("update prepared statement", (ctx) => {
+    ctx.skip();
     // BLOCKED: binds-inlining
     // ROOT-CAUSE: trails inlines string literals into INSERT SQL rather than binding
     // them as prepared-statement parameters, so an embedded null byte (\x00) truncates

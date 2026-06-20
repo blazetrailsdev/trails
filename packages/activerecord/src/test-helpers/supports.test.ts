@@ -28,6 +28,20 @@ describe("adapterSupports", () => {
   it("throws on an unknown feature key (catches typos)", () => {
     expect(() => adapterSupports("not_a_real_feature")).toThrow(/unknown feature/);
   });
+
+  it("treats a comma-joined key as a conjunction (all features must hold)", () => {
+    // insert_on_duplicate_update is supported everywhere; insert_conflict_target
+    // is the binding constraint (not on mysql), so the conjunction tracks it.
+    expect(adapterSupports("insert_conflict_target,insert_on_duplicate_update")).toBe(
+      adapterType !== "mysql",
+    );
+    // exclusion_constraints is postgres-only → conjunction false off postgres.
+    expect(adapterSupports("json,exclusion_constraints")).toBe(adapterType === "postgres");
+  });
+
+  it("throws when a member of a comma-joined key is unknown", () => {
+    expect(() => adapterSupports("json,not_a_real_feature")).toThrow(/unknown feature/);
+  });
 });
 
 // Smoke: the gate wrappers register without throwing and skip when unsupported.

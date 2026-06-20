@@ -22,6 +22,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
@@ -159,12 +160,17 @@ describe("InsertAllTest", () => {
     expect(await Book.count()).toBe(before + 1);
   });
 
-  it.skip("insert with type casting and serialize is consistent", () => {
-    // BLOCKED: Rails passes an array as the (string) book name and relies on
-    // serialize round-tripping; trails' Book.name is a plain string type, so
-    // this exercises serialize behavior out of scope here.
-    // RFC 0030 d2-insert-all-returning-result.
-  });
+  itIfSupports(
+    "insert_returning",
+    "insert with type casting and serialize is consistent",
+    (ctx) => {
+      ctx.skip();
+      // BLOCKED: Rails passes an array as the (string) book name and relies on
+      // serialize round-tripping; trails' Book.name is a plain string type, so
+      // this exercises serialize behavior out of scope here.
+      // RFC 0030 d2-insert-all-returning-result.
+    },
+  );
 
   it("insert all", async () => {
     const before = (await Book.count()) as number;
@@ -427,11 +433,13 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skip("insert logs message including model name", () => {
+  itIfSupports("insert_conflict_target", "insert logs message including model name", (ctx) => {
+    ctx.skip();
     // BLOCKED: SQL log assertion (capture_log_output). RFC 0030 d2-insert-all-canonical-models.
   });
 
-  it.skip("insert all logs message including model name", () => {
+  itIfSupports("insert_conflict_target", "insert all logs message including model name", (ctx) => {
+    ctx.skip();
     // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
   });
 
@@ -474,7 +482,8 @@ describe("InsertAllTest", () => {
     expect(category4.type).toBeNull();
   });
 
-  it.skip("upsert logs message including model name", () => {
+  itIfSupports("insert_on_duplicate_update", "upsert logs message including model name", (ctx) => {
+    ctx.skip();
     // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
   });
 
@@ -495,9 +504,14 @@ describe("InsertAllTest", () => {
     }
   });
 
-  it.skip("upsert all logs message including model name", () => {
-    // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
-  });
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all logs message including model name",
+    (ctx) => {
+      ctx.skip();
+      // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
+    },
+  );
 
   itIfSupports("insert_on_duplicate_update", "upsert all updates existing records", async () => {
     const newName = "Agile Web Development with Rails, 4th Edition";
@@ -1186,10 +1200,18 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skip("upsert all updates using provided sql and unique by", () => {
-    // BLOCKED: unique-index introspection — unique_by [name, author_id].
-    // RFC 0030 d2-insert-all-unique-index-introspection.
-  });
+  // Rails skips this unless BOTH supports_insert_conflict_target? AND
+  // supports_insert_on_duplicate_update? (insert_all_test.rb:812); the
+  // comma-joined key gates on the conjunction.
+  itIfSupports(
+    "insert_conflict_target,insert_on_duplicate_update",
+    "upsert all updates using provided sql and unique by",
+    (ctx) => {
+      ctx.skip();
+      // BLOCKED: unique-index introspection — unique_by [name, author_id].
+      // RFC 0030 d2-insert-all-unique-index-introspection.
+    },
+  );
 
   it.skipIf(supportsInsertConflictTarget)(
     "upsert all with unique by fails cleanly for adapters not supporting insert conflict target",
@@ -1200,7 +1222,9 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skip("insert all when table name contains database", () => {
+  // Rails gates this on current_adapter?(:Mysql2) (insert_all_test.rb).
+  it.skipIf(adapterType !== "mysql")("insert all when table name contains database", (ctx) => {
+    ctx.skip();
     // BLOCKED: test-harness multi-DB sharding — Rails (MySQL-only) qualifies the
     // table with connection_db_config.database, but the handler suite shards
     // `books` into a per-worker database that currentDatabase() does not name.

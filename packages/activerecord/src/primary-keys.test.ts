@@ -741,7 +741,9 @@ describe("PrimaryKeyIntegerTest", () => {
     },
   );
 
-  it.skip("schema dump primary key with serial/integer", async () => {
+  // Rails gates this on current_adapter?(:Mysql2, :PostgreSQL) (primary_keys_test.rb).
+  it.skipIf(adapterType === "sqlite")("schema dump primary key with serial/integer", (ctx) => {
+    ctx.skip();
     // BLOCKED (PG only): on PG @pk_type is :serial and Rails emits `id: :serial`. The
     // root cause is upstream of the dumper: TS PG createTable emits SERIAL (int4) for the
     // *default* primary key (NATIVE_DATABASE_TYPES says bigserial, but schema-creation

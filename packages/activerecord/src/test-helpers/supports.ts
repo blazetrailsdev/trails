@@ -132,8 +132,19 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   transaction_isolation: ALL,
 };
 
-/** Does the active backend support Rails' `supports_<feature>?` capability? */
+/**
+ * Does the active backend support Rails' `supports_<feature>?` capability?
+ *
+ * A comma-joined key (`"insert_conflict_target,insert_on_duplicate_update"`)
+ * is a conjunction — true only when every listed feature is supported. This
+ * mirrors a Rails test body that stacks multiple `skip unless supports_X?`
+ * guards, and lets {@link itIfSupports} express it as one flat (un-nested) gate
+ * whose extracted feature key matches Rails' multi-feature gate.
+ */
 export function adapterSupports(feature: string): boolean {
+  if (feature.includes(",")) {
+    return feature.split(",").every((f) => adapterSupports(f.trim()));
+  }
   const backends = SUPPORTS[feature];
   if (!backends) {
     throw new Error(
