@@ -748,9 +748,11 @@ export class Builder implements InsertBuilder {
     const conditions = quotedUpdatable.map(block).join(" AND ");
     for (const col of this._insertAll.updateTimestampColumnsInModel()) {
       if (!updatable.includes(col)) {
-        const qcol = this.quoteColumn(col);
+        // Rails emits the timestamp column name raw here — only quoted_table_name
+        // is quoted (insert_all.rb:282): `#{column_name}=(CASE WHEN (...) THEN
+        // #{model.quoted_table_name}.#{column_name} ELSE ...)`.
         parts.push(
-          `${qcol}=(CASE WHEN (${conditions}) THEN ${tableName}.${qcol} ELSE ${nowValue} END)`,
+          `${col}=(CASE WHEN (${conditions}) THEN ${tableName}.${col} ELSE ${nowValue} END)`,
         );
       }
     }
