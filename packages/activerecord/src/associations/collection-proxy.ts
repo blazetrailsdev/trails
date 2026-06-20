@@ -17,6 +17,8 @@ export function _setAssociationRelationCtor(
 }
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import {
+  findNthFromLast as baseFindNthFromLast,
+  findNthWithLimit as baseFindNthWithLimit,
   normalizeFindArgs,
   raiseNotFoundAll,
   raiseNotFoundSingle,
@@ -2555,89 +2557,32 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Return the nth associated record from the loaded target without
-   * re-querying. Mirrors how `first`/`last`/`take` read the loaded target
-   * (CollectionProxy keeps state in `_target`/`_targetLoaded`, not Relation's
-   * `_records`/`_loaded`, so the inherited finder-method overrides would
-   * otherwise always re-query).
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#find_nth_with_limit
+   * (`load_target if find_from_target?; super`). Once the target is loaded the
+   * base FinderMethods implementation reads it (the proxy keeps loaded state in
+   * `_target`/`_targetLoaded` rather than Relation's `_records`/`_loaded`, so we
+   * branch on `_targetLoaded` here); otherwise it falls through to the same
+   * ordered `LIMIT`/`OFFSET` query the base issues. This is the single override
+   * point that makes the inherited `second`/`third`/`fourth`/`fifth` (and their
+   * bang variants) read a loaded/dirty target without re-querying.
    * @internal
    */
-  private async findOrdinalFromTarget(index: number): Promise<T | null> {
+  protected override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    const records = this._targetLoaded ? this._target : await this.toArray();
-    return records[index] ?? null;
+    if (this._targetLoaded) return this._target.slice(index, index + limit);
+    return baseFindNthWithLimit.call(this as any, index, limit);
   }
 
   /**
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#second
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#find_nth_from_last
+   * (`load_target if find_from_target?; super`). Backs the inherited
+   * `secondToLast`/`thirdToLast` (and bang variants); see `findNthWithLimit`.
+   * @internal
    */
-  override second(): Promise<T | null> {
-    return this.findOrdinalFromTarget(1);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#second!
-   */
-  override async secondBang(): Promise<T> {
-    const record = await this.second();
-    if (!record) {
-      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
-    }
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#third
-   */
-  override third(): Promise<T | null> {
-    return this.findOrdinalFromTarget(2);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#third!
-   */
-  override async thirdBang(): Promise<T> {
-    const record = await this.third();
-    if (!record) {
-      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
-    }
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#fourth
-   */
-  override fourth(): Promise<T | null> {
-    return this.findOrdinalFromTarget(3);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#fourth!
-   */
-  override async fourthBang(): Promise<T> {
-    const record = await this.fourth();
-    if (!record) {
-      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
-    }
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#fifth
-   */
-  override fifth(): Promise<T | null> {
-    return this.findOrdinalFromTarget(4);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#fifth!
-   */
-  override async fifthBang(): Promise<T> {
-    const record = await this.fifth();
-    if (!record) {
-      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
-    }
-    return record;
+  protected override async findNthFromLast(index: number): Promise<T | null> {
+    if (this.isFindFromTarget()) await this.loadTarget();
+    if (this._targetLoaded) return this._target[this._target.length - 1 - index] ?? null;
+    return baseFindNthFromLast.call(this as any, index);
   }
 
   /**

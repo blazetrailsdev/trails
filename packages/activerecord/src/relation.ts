@@ -6654,12 +6654,12 @@ export class Relation<T extends Base> {
   }
 
   /** @internal */
-  private findNthWithLimit(index: number, limit: number): Promise<any[]> {
+  protected findNthWithLimit(index: number, limit: number): Promise<any[]> {
     return _fm.findNthWithLimit.call(this as any, index, limit);
   }
 
   /** @internal */
-  private findNthFromLast(index: number): Promise<any | null> {
+  protected findNthFromLast(index: number): Promise<any | null> {
     return _fm.findNthFromLast.call(this as any, index);
   }
 

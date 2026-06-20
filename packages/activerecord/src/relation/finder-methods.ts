@@ -216,6 +216,10 @@ interface FinderRelation {
   order(...args: any[]): any;
   reverseOrder(): any;
   toArray(): Promise<any[]>;
+  /** @internal */
+  findNthWithLimit(index: number, limit: number): Promise<any[]>;
+  /** @internal */
+  findNthFromLast(index: number): Promise<any | null>;
 }
 
 function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
@@ -451,31 +455,31 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
 }
 
 export async function performSecond(this: FinderRelation): Promise<any | null> {
-  return (await findNthWithLimit.call(this, 1, 1))[0] ?? null;
+  return (await this.findNthWithLimit(1, 1))[0] ?? null;
 }
 
 export async function performThird(this: FinderRelation): Promise<any | null> {
-  return (await findNthWithLimit.call(this, 2, 1))[0] ?? null;
+  return (await this.findNthWithLimit(2, 1))[0] ?? null;
 }
 
 export async function performFourth(this: FinderRelation): Promise<any | null> {
-  return (await findNthWithLimit.call(this, 3, 1))[0] ?? null;
+  return (await this.findNthWithLimit(3, 1))[0] ?? null;
 }
 
 export async function performFifth(this: FinderRelation): Promise<any | null> {
-  return (await findNthWithLimit.call(this, 4, 1))[0] ?? null;
+  return (await this.findNthWithLimit(4, 1))[0] ?? null;
 }
 
 export async function performFortyTwo(this: FinderRelation): Promise<any | null> {
-  return (await findNthWithLimit.call(this, 41, 1))[0] ?? null;
+  return (await this.findNthWithLimit(41, 1))[0] ?? null;
 }
 
 export async function performSecondToLast(this: FinderRelation): Promise<any | null> {
-  return findNthFromLast.call(this, 1);
+  return this.findNthFromLast(1);
 }
 
 export async function performThirdToLast(this: FinderRelation): Promise<any | null> {
-  return findNthFromLast.call(this, 2);
+  return this.findNthFromLast(2);
 }
 
 function bangFinder(finder: (this: FinderRelation) => Promise<any | null>) {
@@ -772,7 +776,7 @@ export async function findTakeWithLimit(rel: FinderRelation, limit: number): Pro
 
 /** @internal */
 export async function findNth(rel: FinderRelation, index: number): Promise<any | null> {
-  return (await findNthWithLimit.call(rel, index, 1))[0] ?? null;
+  return (await rel.findNthWithLimit(index, 1))[0] ?? null;
 }
 
 /** @internal */
