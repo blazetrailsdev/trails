@@ -49,6 +49,9 @@ const rule = {
     messages: {
       forbidden:
         "Do not disable `@typescript-eslint/no-explicit-any` inline. Fix the `any` instead of silencing the rule (RFC 0037).",
+      // Reported at line 0 (see below); name the real line so it's findable.
+      forbiddenBare:
+        "Bare `eslint-disable` on line {{line}} disables every rule (including this one). Remove it; fix the `any` instead of silencing it (RFC 0037).",
     },
   },
   create(context) {
@@ -60,10 +63,15 @@ const rule = {
           if (!directive) continue;
           const selfSuppressing =
             directive.bare && (directive.type === "block" || directive.type === "line");
-          context.report({
-            loc: selfSuppressing ? { line: 0, column: 0 } : comment.loc,
-            messageId: "forbidden",
-          });
+          if (selfSuppressing) {
+            context.report({
+              loc: { line: 0, column: 0 },
+              messageId: "forbiddenBare",
+              data: { line: String(comment.loc.start.line) },
+            });
+          } else {
+            context.report({ loc: comment.loc, messageId: "forbidden" });
+          }
         }
       },
     };
