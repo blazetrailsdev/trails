@@ -876,41 +876,22 @@ export function buildWhereClause(
   if (opts instanceof Nodes.Node) return new WhereClause([opts]);
 
   if (typeof opts === "string") {
-    const firstBind = rest[0];
-    const hasPositional = opts.includes("?");
-    const hasNamedToken = /(?<!:):[a-zA-Z_]\w*/.test(opts);
-    const isNamedBinds =
-      rest.length === 1 && isPlainObject(firstBind) && hasNamedToken && !hasPositional;
-
-    let sql: string;
-    if (isNamedBinds) {
-      sql = opts;
-      const namedBinds = firstBind;
-      const adapter = connectionFor((this as any)._modelClass);
-      for (const [name, value] of Object.entries(namedBinds)) {
-        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // A Relation bind inlines its SQL as a subquery rather than being
-        // quoted as a scalar — mirrors the `ActiveRecord::Relation === value`
-        // branch of Rails' `replace_bind_variable` (sanitization.rb:211-216),
-        // which `replace_named_bind_variables` delegates to per token.
-        const replacement = isRelationLike(value)
-          ? (value as { toSql(): string }).toSql()
-          : Array.isArray(value)
-            ? value.map((v) => adapter.quote(v)).join(", ")
-            : adapter.quote(value);
-        // Named-bind substitution on a user-supplied SQL fragment, not an arel
-        // AST — mirrors Rails `sanitize_sql` → `replace_named_bind_variables`
-        // (sanitization.rb), which likewise `gsub`s `:name` tokens with quoted
-        // values. There is no AST to build here; the fragment is opaque text.
-        // eslint-disable-next-line blazetrails/no-raw-sql
-        sql = sql.replace(new RegExp(`(?<!:):${escaped}\\b`, "g"), () => replacement);
-      }
-    } else if (rest.length > 0) {
-      sql = this._modelClass.sanitizeSqlArray(opts, ...rest);
+    // Mirrors build_where_clause (query_methods.rb:1620-1628): a bare fragment is
+    // wrapped verbatim as Arel.sql(opts); a fragment whose first rest arg is a
+    // Hash and that carries a `:word` token builds a named BoundSqlLiteral; a `?`
+    // fragment builds a positional BoundSqlLiteral; any remaining rest-bearing
+    // fragment (no `?`, no named hash) falls back to sanitize_sql.
+    let parts: Nodes.Node[];
+    if (rest.length === 0) {
+      parts = [arelSql(opts)];
+    } else if (isPlainObject(rest[0]) && /:\w+/.test(opts)) {
+      parts = [buildNamedBoundSqlLiteral.call(this, opts, rest[0])];
+    } else if (opts.includes("?")) {
+      parts = [buildBoundSqlLiteral.call(this, opts, rest)];
     } else {
-      sql = opts;
+      parts = [new Nodes.SqlLiteral(this._modelClass.sanitizeSqlArray(opts, ...rest))];
     }
-    return new WhereClause(sql.trim() ? [new Nodes.SqlLiteral(sql)] : []);
+    return new WhereClause(parts);
   }
 
   if (isPlainObject(opts)) {
@@ -1651,13 +1632,6 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  * `Arel.sql(value.to_sql)` so `where("id IN (?)", SomeRelation)` produces a
  * subquery rather than reaching `visitBindValue`'s `quote()`. Arel nodes are
  * rendered to SQL the same way (trails passes nodes here where Rails would not).
- *
- * NOTE: `buildBoundSqlLiteral` / `buildNamedBoundSqlLiteral` are not yet wired
- * into `buildWhereClause` — trails' `where` still routes `?`/`:name` fragments
- * through `sanitizeSqlArray` / the named-bind substitution loop above, where the
- * same Relation handling lives. Converging `buildWhereClause` onto these
- * `BoundSqlLiteral` builders (as Rails' `build_where_clause` does) is tracked by
- * the `converge-build-where-clause-bound-sql-literal` story.
  * @internal
  */
 function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
@@ -1667,7 +1641,28 @@ function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (isRelationLike(value)) {
     return arelSql((value as { toSql(): string }).toSql());
   }
+  // Mirrors the array / id_for_database transforms in build_bound_sql_literal /
+  // build_named_bound_sql_literal (query_methods.rb:1686-1715): a collection
+  // maps id_for_database over its elements (empty → nil), and a scalar AR object
+  // is reduced to its id_for_database. The visitor's cast_bound_value + quote
+  // run later, at render time. (Array/Set only, matching `quoteBoundValue` in
+  // sanitization.ts rather than every `respond_to?(:map)` iterable.)
+  if (Array.isArray(value) || value instanceof Set) {
+    const mapped = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase() : v));
+    return mapped.length === 0 ? null : mapped;
+  }
+  if (hasIdForDatabase(value)) return value.idForDatabase();
   return value;
+}
+
+function hasIdForDatabase(value: unknown): value is { idForDatabase(): unknown } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !(value instanceof Set) &&
+    typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
+  );
 }
 
 /** @internal */

@@ -156,8 +156,12 @@ describe("RelationTest", () => {
 
     it("where with named binds", async () => {
       const sql = Post.where("views > :min AND views < :max", { min: 10, max: 200 }).toSql();
-      expect(sql).toContain("views > 10");
-      expect(sql).toContain("views < 200");
+      const a = Post.connection as unknown as {
+        castBoundValue(v: unknown): unknown;
+        quote(v: unknown): string;
+      };
+      expect(sql).toContain(`views > ${a.quote(a.castBoundValue(10))}`);
+      expect(sql).toContain(`views < ${a.quote(a.castBoundValue(200))}`);
     });
 
     it("where returns empty when no match", async () => {
