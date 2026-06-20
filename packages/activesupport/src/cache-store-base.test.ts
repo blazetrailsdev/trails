@@ -25,28 +25,20 @@ class TestStore extends Store {
     }
   }
   override increment(name: string, amount = 1): number | null {
-    const key = this.normalizeKey(name, {});
-    return this.instrument("increment", key, { amount }, () => {
-      const entry = this.readEntry(key, {});
-      if (!entry) return null;
-      const n = Number(entry.value);
-      if (isNaN(n)) return null;
-      const next = n + amount;
-      this.writeEntry(key, new Entry(next), {});
-      return next;
-    });
+    return this.instrument("increment", name, { amount }, () => this.modifyValue(name, amount));
   }
   override decrement(name: string, amount = 1): number | null {
+    return this.instrument("decrement", name, { amount }, () => this.modifyValue(name, -amount));
+  }
+  private modifyValue(name: string, amount: number): number | null {
     const key = this.normalizeKey(name, {});
-    return this.instrument("decrement", key, { amount }, () => {
-      const entry = this.readEntry(key, {});
-      if (!entry) return null;
-      const n = Number(entry.value);
-      if (isNaN(n)) return null;
-      const next = n - amount;
-      this.writeEntry(key, new Entry(next), {});
-      return next;
-    });
+    const entry = this.readEntry(key, {});
+    if (!entry) return null;
+    const n = Number(entry.value);
+    if (isNaN(n)) return null;
+    const next = n + amount;
+    this.writeEntry(key, new Entry(next), {});
+    return next;
   }
   override deleteMatched(matcher: string | RegExp): void {
     const re = typeof matcher === "string" ? new RegExp(matcher) : matcher;
