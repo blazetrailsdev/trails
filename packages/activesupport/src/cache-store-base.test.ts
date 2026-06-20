@@ -132,6 +132,16 @@ describe("CacheStoreNamespaceTest", () => {
     expect(cache.exist("foo")).toBe(false);
     expect(cache.exist("fu")).toBe(true);
   });
+
+  it("read multi with namespace option", () => {
+    const cache = new TestStore();
+    cache.write("foo", "bar", { namespace: "tester" });
+    cache.write("fu", "baz", { namespace: "tester" });
+    expect(cache.readMulti("foo", "fu", { namespace: "tester" })).toEqual({
+      foo: "bar",
+      fu: "baz",
+    });
+  });
 });
 
 describe("CacheInstrumentationBehavior", () => {

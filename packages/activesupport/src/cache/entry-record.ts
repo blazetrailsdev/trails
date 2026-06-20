@@ -22,3 +22,17 @@ export function namespaceKey(key: string, namespace?: string): string {
 export function isExpired(entry: CacheEntry): boolean {
   return entry.expiresAt !== null && Date.now() > entry.expiresAt;
 }
+
+/**
+ * Mirrors Ruby `Array#extract_options!`: mutably pops a trailing plain-object
+ * options hash off a `readMulti(...keys)` arg array, returning it (or
+ * undefined). Lets per-call options (namespace, etc.) ride the last arg like
+ * Rails `Cache::Store#read_multi`. @internal
+ */
+export function extractCacheOptions<T>(keys: unknown[]): T | undefined {
+  const last = keys[keys.length - 1];
+  if (last != null && typeof last === "object" && !Array.isArray(last)) {
+    return keys.pop() as T;
+  }
+  return undefined;
+}

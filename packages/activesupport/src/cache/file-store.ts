@@ -1,7 +1,7 @@
 import { getFs, getPath } from "../fs-adapter.js";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
-import { type CacheEntry, namespaceKey, isExpired } from "./entry-record.js";
+import { type CacheEntry, namespaceKey, isExpired, extractCacheOptions } from "./entry-record.js";
 
 const FILENAME_MAX_SIZE = 228;
 
@@ -183,10 +183,11 @@ export class FileStore implements CacheStore {
     } catch {}
   }
 
-  readMulti(...keys: string[]): Record<string, unknown> {
+  readMulti(...keys: [...string[], CacheOptions] | string[]): Record<string, unknown> {
+    const options = extractCacheOptions<CacheOptions>(keys as unknown[]);
     const result: Record<string, unknown> = {};
-    for (const key of keys) {
-      const val = this.read(key);
+    for (const key of keys as string[]) {
+      const val = this.read(key, options);
       if (val !== null) result[key] = val;
     }
     return result;

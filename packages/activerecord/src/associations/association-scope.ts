@@ -412,7 +412,12 @@ export class AssociationScope {
     if (joinPks.length !== joinFks.length) {
       const name = (reflection as { name?: string }).name ?? "<unknown>";
       const ownerName = (owner.constructor as typeof Base).name;
-      throw new CompositePrimaryKeyMismatchError(ownerName, name, joinPks, joinFks);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ownerName,
+        name,
+        primaryKey: joinPks,
+        foreignKey: joinFks,
+      });
     }
     // Rails passes `reflection.aliased_table` (an Arel node) to apply_scope;
     // resolve it the same way `nextChainScope` does so the identity check
@@ -524,7 +529,12 @@ export class AssociationScope {
           .reflection ?? (reflection as { name?: string; activeRecord?: { name?: string } });
       const name = base.name ?? "<unknown>";
       const ownerName = base.activeRecord?.name ?? "<unknown>";
-      throw new CompositePrimaryKeyMismatchError(ownerName, name, joinPks, joinFks);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ownerName,
+        name,
+        primaryKey: joinPks,
+        foreignKey: joinFks,
+      });
     }
     // For polymorphic belongsTo-through with sourceType, r.klass may
     // throw (polymorphic) or resolve to the wrong class; prefer the

@@ -1,6 +1,6 @@
 import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
-import { type CacheEntry, namespaceKey, isExpired } from "./entry-record.js";
+import { type CacheEntry, namespaceKey, isExpired, extractCacheOptions } from "./entry-record.js";
 
 export class MemoryStore implements CacheStore {
   private store: Map<string, CacheEntry> = new Map();
@@ -25,6 +25,20 @@ export class MemoryStore implements CacheStore {
       return undefined;
     }
     return entry;
+  }
+
+  // Mirrors Rails cache.rb handle_expired_entry: bump expiresAt within the race window so
+  // concurrent readers get stale; delete beyond it.
+  private handleExpiredEntry(
+    resolvedKey: string,
+    entry: CacheEntry,
+    raceConditionTtl: number,
+  ): void {
+    if (raceConditionTtl > 0 && Date.now() - entry.expiresAt! <= raceConditionTtl) {
+      this.store.set(resolvedKey, { ...entry, expiresAt: Date.now() + raceConditionTtl });
+    } else {
+      this.store.delete(resolvedKey);
+    }
   }
 
   read(key: string, options?: CacheOptions): unknown {
@@ -83,15 +97,24 @@ export class MemoryStore implements CacheStore {
       fallback = maybeFallback;
     }
 
-    const cached = this.read(key, options);
-    if (cached !== null) return cached;
+    const rk = this.resolveKey(key, options);
 
+    // Mirrors cache.rb:445-478: block path calls handle_expired_entry; no-block path falls to read().
     if (fallback) {
+      const raw = this.store.get(rk);
+      if (raw && !isExpired(raw)) {
+        raw.accessedAt = Date.now();
+        return coder.load(raw.encodedValue);
+      }
+      // Always call handleExpiredEntry on the block path (cache.rb:453); it decides bump-vs-delete.
+      if (raw) this.handleExpiredEntry(rk, raw, options?.raceConditionTtl ?? 0);
       const value = fallback();
       this.write(key, value, options);
       return value;
     }
-    return null;
+
+    // No block: mirrors cache.rb:478 — delegate to read(), which deletes expired entries.
+    return this.read(key, options);
   }
 
   clear(): void {
@@ -106,10 +129,11 @@ export class MemoryStore implements CacheStore {
     }
   }
 
-  readMulti(...keys: string[]): Record<string, unknown> {
+  readMulti(...keys: [...string[], CacheOptions] | string[]): Record<string, unknown> {
+    const options = extractCacheOptions<CacheOptions>(keys as unknown[]);
     const result: Record<string, unknown> = {};
-    for (const key of keys) {
-      const val = this.read(key);
+    for (const key of keys as string[]) {
+      const val = this.read(key, options);
       if (val !== null) result[key] = val;
     }
     return result;

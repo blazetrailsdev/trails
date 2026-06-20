@@ -121,6 +121,54 @@ describe("MemoryStorePruningTest", () => {
   });
 });
 
+describe("CacheStoreRaceConditionTtlTest", () => {
+  let store: MemoryStore;
+
+  beforeEach(() => {
+    store = new MemoryStore();
+  });
+
+  it("fetch with race condition ttl", async () => {
+    store.write("foo", "bar", { expiresIn: 20 });
+    await new Promise((r) => setTimeout(r, 30));
+    // Within the race window: stale entry is bumped; caller regenerates
+    const result = store.fetch("foo", { raceConditionTtl: 200 }, () => "new");
+    expect(result).toBe("new");
+    // Now the store has the new value
+    expect(store.read("foo")).toBe("new");
+  });
+
+  it("fetch with race condition ttl serves stale to concurrent readers", async () => {
+    store.write("foo", "stale", { expiresIn: 20 });
+    await new Promise((r) => setTimeout(r, 30));
+    // Simulate a concurrent reader by reading inside the fallback callback.
+    // At that point handleExpiredEntry has bumped the entry back into the store,
+    // so read() returns the stale value (not null) — the race-window guarantee.
+    let seenDuringRegen: unknown;
+    store.fetch("foo", { raceConditionTtl: 500 }, () => {
+      seenDuringRegen = store.read("foo");
+      return "fresh";
+    });
+    expect(seenDuringRegen).toBe("stale");
+    expect(store.read("foo")).toBe("fresh");
+  });
+
+  it("fetch without race condition ttl deletes expired entry", async () => {
+    store.write("foo", "bar", { expiresIn: 20 });
+    await new Promise((r) => setTimeout(r, 30));
+    const result = store.fetch("foo", () => "new");
+    expect(result).toBe("new");
+  });
+
+  it("race condition ttl beyond window deletes expired entry", async () => {
+    store.write("foo", "bar", { expiresIn: 20 });
+    await new Promise((r) => setTimeout(r, 200));
+    // Beyond the race window: entry is deleted normally
+    const result = store.fetch("foo", { raceConditionTtl: 50 }, () => "regen");
+    expect(result).toBe("regen");
+  });
+});
+
 describe("MemoryStore coder fidelity", () => {
   let store: MemoryStore;
 

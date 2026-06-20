@@ -22,6 +22,18 @@ export interface CacheLogger {
 
 export type StoreOptions = Record<string, unknown>;
 
+/**
+ * Mirrors Ruby `Array#extract_options!`: mutably pops a trailing plain-object
+ * options hash off the args array, returning it (or undefined). @internal
+ */
+function extractOptions(args: unknown[]): StoreOptions | undefined {
+  const last = args[args.length - 1];
+  if (last != null && typeof last === "object" && !Array.isArray(last)) {
+    return args.pop() as StoreOptions;
+  }
+  return undefined;
+}
+
 /** Mirrors Rails Cache::Store::WriteOptions (cache.rb:1064). @internal */
 export class WriteOptions {
   constructor(private _opts: StoreOptions) {}
@@ -171,12 +183,14 @@ export abstract class Store {
     });
   }
 
-  readMulti(...names: string[]): Record<string, unknown> {
+  readMulti(...names: [...string[], StoreOptions] | string[]): Record<string, unknown> {
     if (names.length === 0) return {};
-    const merged = this.mergedOptions(undefined);
-    const keys = names.map((n) => this.normalizeKey(n, merged));
+    const options = extractOptions(names as unknown[]);
+    const nameList = names as string[];
+    const merged = this.mergedOptions(options);
+    const keys = nameList.map((n) => this.normalizeKey(n, merged));
     return this.instrumentMulti("read_multi", keys, merged, (payload) => {
-      const results = this.readMultiEntries(names, merged);
+      const results = this.readMultiEntries(nameList, merged);
       payload.hits = Object.keys(results).map((n) => this.normalizeKey(n, merged));
       return results;
     });
@@ -387,8 +401,62 @@ export abstract class Store {
     return keys.filter((k) => this.deleteEntry(k, options)).length;
   }
 
+  /** Mirrors Rails `Cache::Store#merged_options` (cache.rb:861–888). */
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
-    return callOptions ? { ...this.options, ...callOptions } : this.options;
+    if (!callOptions) return this.options;
+
+    const call = Store.normalizeOptions({ ...callOptions });
+
+    if (call.expiresIn != null && call.expiresAt != null) {
+      throw new ArgumentError("Either :expires_in or :expires_at can be supplied, but not both");
+    }
+
+    const expiresAt = call.expiresAt as number | undefined;
+    if (expiresAt != null) {
+      call.expiresIn = expiresAt - Date.now();
+      delete call.expiresAt;
+    }
+
+    // boundary: mirrors cache.rb:871–874 — raises when expires_in is accidentally a Time/Date object.
+    if (call.expiresIn instanceof Date) {
+      throw new ArgumentError(
+        `expires_in parameter should not be a Date. Did you mean to use expiresAt? Got: ${call.expiresIn}`,
+      );
+    }
+
+    if (call.expiresIn != null && (call.expiresIn as number) < 0) {
+      const expiresIn = call.expiresIn;
+      delete call.expiresIn;
+      Store.handleInvalidExpiresIn(
+        `Cache expiration time is invalid, cannot be negative: ${expiresIn}`,
+      );
+    }
+
+    return { ...this.options, ...call };
+  }
+
+  /** Mirrors Rails `Cache::Store#normalize_options` (cache.rb:905–911). */
+  static normalizeOptions(options: StoreOptions): StoreOptions {
+    const opts = { ...options };
+    // OPTION_ALIASES = { expires_in: [:expire_in, :expired_in] }
+    // Alias is only applied if the canonical key is not already present (mirrors ||=).
+    const aliasKey =
+      opts.expire_in != null ? "expire_in" : opts.expired_in != null ? "expired_in" : null;
+    if (aliasKey != null) {
+      if (opts.expiresIn == null) opts.expiresIn = opts[aliasKey];
+      delete opts.expire_in;
+      delete opts.expired_in;
+    }
+    return opts;
+  }
+
+  /** Mirrors Rails `Cache::Store#handle_invalid_expires_in` (cache.rb:892–898). */
+  static handleInvalidExpiresIn(message: string): void {
+    const error = new ArgumentError(message);
+    if (Store.raiseOnInvalidCacheExpirationTime) {
+      throw error;
+    }
+    Store.logger?.error?.(`${error.name}: ${error.message}`);
   }
 
   protected normalizeKey(key: unknown, options?: StoreOptions): string {

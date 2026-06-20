@@ -67,6 +67,13 @@ describe("MemoryStoreTest", () => {
     expect(result).toEqual({ a: 1, b: 2 });
   });
 
+  it("readMulti applies trailing namespace option", () => {
+    store.write("a", 1, { namespace: "tester" });
+    store.write("b", 2, { namespace: "tester" });
+    expect(store.readMulti("a", "b", { namespace: "tester" })).toEqual({ a: 1, b: 2 });
+    expect(store.readMulti("a", "b")).toEqual({});
+  });
+
   it("writeMulti writes multiple keys", () => {
     store.writeMulti({ x: 10, y: 20 });
     expect(store.read("x")).toBe(10);
@@ -331,6 +338,13 @@ describe("FileStoreTest", () => {
     store.write("b", 2);
     const result = store.readMulti("a", "b", "c");
     expect(result).toEqual({ a: 1, b: 2 });
+  });
+
+  it("readMulti applies trailing namespace option", () => {
+    store.write("a", 1, { namespace: "tester" });
+    store.write("b", 2, { namespace: "tester" });
+    expect(store.readMulti("a", "b", { namespace: "tester" })).toEqual({ a: 1, b: 2 });
+    expect(store.readMulti("a", "b")).toEqual({});
   });
 
   it("writeMulti writes multiple keys", () => {
