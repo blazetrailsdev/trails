@@ -821,7 +821,7 @@ export class AssociationReflection extends MacroReflection {
     const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
 
     if (primaryQueryConstraints.length > 2) {
-      throw new ConfigurationError(
+      throw new ArgumentError(
         `The query constraints list on the \`${this.activeRecord.name}\` model has more than 2 ` +
           `attributes. Active Record is unable to derive the query constraints ` +
           `for the association. You need to explicitly define the query constraints ` +
@@ -830,7 +830,7 @@ export class AssociationReflection extends MacroReflection {
     }
 
     if (ownerPkStr && !primaryQueryConstraints.includes(ownerPkStr)) {
-      throw new ConfigurationError(
+      throw new ArgumentError(
         `The query constraints on the \`${this.activeRecord.name}\` model does not include the primary ` +
           `key so Active Record is unable to derive the foreign key constraints for ` +
           `the association. You need to explicitly define the query constraints for this ` +
@@ -848,7 +848,7 @@ export class AssociationReflection extends MacroReflection {
       return [firstKey, foreignKey];
     }
 
-    throw new ConfigurationError(
+    throw new ArgumentError(
       `Active Record couldn't correctly interpret the query constraints ` +
         `for the \`${this.activeRecord.name}\` model. The query constraints on \`${this.activeRecord.name}\` are ` +
         `\`${primaryQueryConstraints}\` and the foreign key is \`${foreignKey}\`. ` +
