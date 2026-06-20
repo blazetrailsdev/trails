@@ -532,6 +532,34 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
   if (mc.partialInserts) {
     const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;
     candidates = changed ?? attributeNames;
+    // Rails Locking::Optimistic#_create_record force-unions the locking column
+    // into the create attribute names (`attribute_names |= [locking_column]`,
+    // optimistic.rb:78-82), so a new record always writes its initial lock
+    // version even under partial inserts (where it is otherwise
+    // unchanged-from-default and dropped). If it were dropped, the in-memory
+    // value (0) and the DB value (its own default) can disagree and every later
+    // update's `WHERE <lock_col> = ?` matches zero rows, raising StaleObjectError.
+    //
+    // DEVIATION from optimistic.rb:82 (unconditional union): we additionally
+    // require a non-null in-memory value. Rails can union unconditionally
+    // because schema reflection initializes the locking column to its default
+    // (0) at load time, so it is never nil for a new record. trails models do
+    // not always declare the locking column as an `attribute()` entry (e.g.
+    // LockPersonalLegacyThing in locking.test.ts has a custom `version` column
+    // with no declaration), so `_readAttribute(lockingColumn)` is null; forcing
+    // a null value would write explicit NULL and break a NOT NULL column. The
+    // guard omits it instead, letting the DB default apply — correct observable
+    // result, divergent mechanism. Removing the guard (and converging to Rails'
+    // unconditional union) requires initializing the locking column from its
+    // schema default; tracked by
+    // partial-inserts-locking-column-schema-default-init (RFC 0023).
+    if (
+      mc.lockingEnabled &&
+      this._readAttribute?.(mc.lockingColumn) != null &&
+      !candidates.includes(mc.lockingColumn)
+    ) {
+      candidates = [...candidates, mc.lockingColumn];
+    }
   } else {
     candidates = attributeNames.filter((name) => {
       const col = mc.columnForAttribute?.(name);

@@ -128,6 +128,27 @@ const TEST_SCHEMA: Schema = {
   },
 };
 
+// TRACKED OPT-OUT (RFC 0023 partial-inserts-test-schema-db-default-fidelity):
+// The harness runs the Rails AR-test ambient `partial_inserts = true`
+// (test-setup-ar.ts), under which an INSERT omits columns left at their model
+// default and relies on the DB column to supply that default. This file's
+// bespoke models declare counter defaults (`attribute(.., { default: N })`) but
+// build their tables from a local `defineSchema` that does NOT carry matching
+// DB-column defaults — and the same shared columns (e.g. `views_count`,
+// `replies_count`) take conflicting per-test defaults (0/5/10), so no single
+// schema default can satisfy them. Until the schema-default fidelity story adds
+// per-model tables/defaults, run this file at `partial_inserts = false` so the
+// model default is written explicitly. File-scoped + restored to avoid leaking
+// into other files sharing the worker.
+let _partialInsertsWas: boolean;
+beforeAll(() => {
+  _partialInsertsWas = Base.partialInserts;
+  Base.partialInserts = false;
+});
+afterAll(() => {
+  Base.partialInserts = _partialInsertsWas;
+});
+
 // -- Helpers --
 // ==========================================================================
 // CounterCacheTest — targets counter_cache_test.rb
