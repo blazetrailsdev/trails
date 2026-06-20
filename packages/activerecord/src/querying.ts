@@ -30,14 +30,23 @@ export async function findBySql<T extends typeof Base>(
 ): Promise<InstanceType<T>[]> {
   const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
   const resolvedBlock = typeof opts === "function" ? opts : block;
-  const rows = await _queryBySql.call(this, sql, binds, {
+  const result = await _queryBySql.call(this, sql, binds, {
     allowRetry: resolvedOpts.allowRetry,
     preparable: resolvedOpts.preparable,
   });
-  return _loadFromSql.call<T, [Record<string, unknown>[], typeof resolvedBlock], InstanceType<T>[]>(
+  return _loadFromSql.call<
+    T,
+    [
+      Record<string, unknown>[],
+      typeof resolvedBlock,
+      Record<string, { deserialize(value: unknown): unknown }>,
+    ],
+    InstanceType<T>[]
+  >(
     this,
-    rows,
+    result.toArray(),
     resolvedBlock,
+    result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
   );
 }
 
@@ -101,21 +110,17 @@ export async function _queryBySql(
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
   opts: { preparable?: boolean | null; async?: boolean; allowRetry?: boolean } = {},
-): Promise<Record<string, unknown>[]> {
+): Promise<Result> {
   // Rails: connection.select_all(sanitize_sql(sql), "#{name} Load", binds, allow_retry:)
+  // Returns the full Result (not just rows) so `_load_from_sql` can slice the
+  // result set's column_types to type-cast extra/computed select columns.
   const resolvedSql = Array.isArray(sql) ? (this.sanitizeSql(sql) ?? "") : sql;
   const resolvedBinds = Array.isArray(sql) ? [] : binds;
   const selectOpts: { allowRetry: boolean; preparable?: boolean | null } = {
     allowRetry: opts.allowRetry ?? false,
   };
   if (opts.preparable != null) selectOpts.preparable = opts.preparable;
-  const result = await this.connection.selectAll(
-    resolvedSql,
-    `${this.name} Load`,
-    resolvedBinds,
-    selectOpts,
-  );
-  return result.toArray();
+  return this.connection.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, selectOpts);
 }
 
 /**
@@ -127,6 +132,7 @@ export function _loadFromSql<T extends typeof Base>(
   this: T,
   rows: Record<string, unknown>[],
   block?: (record: InstanceType<T>) => void,
+  columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
 ): InstanceType<T>[] {
   if (rows.length === 0) return [];
 
@@ -138,7 +144,12 @@ export function _loadFromSql<T extends typeof Base>(
     // column value is absent (undefined is falsy), covering both paths.
     // The block is threaded into instantiate so it runs (Rails'
     // `init_with_attributes` yield) before the find/initialize callbacks.
-    rows.map((row) => this._instantiate(row, block as ((r: InstanceType<T>) => void) | undefined)),
+    // `columnTypes` casts extra/computed columns absent from the schema; known
+    // columns ignore it and keep their declared cast type, mirroring Rails'
+    // `column_types.reject { |k,_| attribute_types.key?(k) }`.
+    rows.map((row) =>
+      this._instantiate(row, block as ((r: InstanceType<T>) => void) | undefined, columnTypes),
+    ),
   );
   return records;
 }

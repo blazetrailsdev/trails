@@ -2813,8 +2813,13 @@ export class Relation<T extends Base> {
     // If no associations could be JOINed, fall back entirely to preload
     if (jd.nodes.length === 0) {
       const sql = this._toSql();
-      const rows = await this._modelClass.connection.execute(sql, this._lastSelectBinds);
-      this._records = this._instrumentInstantiation(rows);
+      // selectAll (not execute) so the adapter-reported column_types cast
+      // extra/computed select columns, matching the JOIN and plain load paths.
+      const result = await this._modelClass.connection.selectAll(sql, "SQL", this._lastSelectBinds);
+      this._records = this._instrumentInstantiation(
+        result.toArray(),
+        result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+      );
       if (fallbackAssocs.length > 0) {
         await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
       }
