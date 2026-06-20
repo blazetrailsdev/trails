@@ -139,13 +139,12 @@ describe("CacheKeyTest", () => {
   it("cache_version calls updated_at when the value is generated at create time", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
-    // DIVERGENCE (tracked, convergence story create-record-timestamp-came-from-user):
-    // Rails keeps the create-time timestamp as a user-written Time (came_from_user?
-    // true), so cache_version calls the `updated_at` reader. trails' create path
-    // leaves updated_at as a cast value (cameFromUser false, raw before-type-cast is
-    // the DB string), so the fast path is taken and the reader is NOT called. We
-    // therefore cannot observe the call here; assert value equivalence instead.
-    expect(record.cacheVersion()).toBe(usec(record.readAttribute("updated_at")));
+    // The create-time timestamp stays user-sourced (cameFromUser true, before-type-cast
+    // is the assigned Time), so the fast path is skipped and the reader is called.
+    const spy = vi.spyOn(record, "readAttribute");
+    const version = record.cacheVersion();
+    expect(spy).toHaveBeenCalledWith("updated_at");
+    expect(version).toBe(usec(record.readAttribute("updated_at")));
   });
 
   it.skipIf(adapterType !== "sqlite")(
