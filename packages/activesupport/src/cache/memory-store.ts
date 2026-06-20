@@ -27,24 +27,18 @@ export class MemoryStore implements CacheStore {
     return entry;
   }
 
-  // Mirrors Rails cache.rb handle_expired_entry: when an entry has expired but
-  // is within raceConditionTtl ms of its expiry, bump its expiresAt and write
-  // it back so concurrent readers get the stale value while one writer
-  // regenerates. Returns the entry to serve (stale), or undefined to delete.
+  // Mirrors Rails cache.rb handle_expired_entry: bump expiresAt within the race window so
+  // concurrent readers get stale; delete beyond it.
   private handleExpiredEntry(
     resolvedKey: string,
     entry: CacheEntry,
     raceConditionTtl: number,
-  ): CacheEntry | undefined {
-    const now = Date.now();
-    const expiredAt = entry.expiresAt!;
-    if (now - expiredAt <= raceConditionTtl) {
-      const bumped: CacheEntry = { ...entry, expiresAt: now + raceConditionTtl };
-      this.store.set(resolvedKey, bumped);
-      return bumped;
+  ): void {
+    if (Date.now() - entry.expiresAt! <= raceConditionTtl) {
+      this.store.set(resolvedKey, { ...entry, expiresAt: Date.now() + raceConditionTtl });
+    } else {
+      this.store.delete(resolvedKey);
     }
-    this.store.delete(resolvedKey);
-    return undefined;
   }
 
   read(key: string, options?: CacheOptions): unknown {
@@ -108,13 +102,11 @@ export class MemoryStore implements CacheStore {
 
     if (raceConditionTtl > 0) {
       const raw = this.store.get(rk);
-      if (raw && !isExpired(raw)) {
-        raw.accessedAt = Date.now();
-        return coder.load(raw.encodedValue);
-      }
-      if (raw && isExpired(raw)) {
-        // Bump and write back so concurrent readers get the stale value.
-        // Always regenerate for the current caller (mirrors Rails handle_expired_entry → nil).
+      if (raw) {
+        if (!isExpired(raw)) {
+          raw.accessedAt = Date.now();
+          return coder.load(raw.encodedValue);
+        }
         this.handleExpiredEntry(rk, raw, raceConditionTtl);
         if (fallback) {
           const value = fallback();
