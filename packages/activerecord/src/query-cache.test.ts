@@ -934,7 +934,13 @@ describe("QuerySerializedParamTest", () => {
 });
 
 describe("QueryCacheExpiryTest", () => {
-  it.skipIf(adapterType === "sqlite")("cache gets cleared after migration", async () => {
+  // Rails runs this unconditionally. On SQLite trails' changeColumn emits a raw
+  // `ALTER TABLE … ALTER COLUMN` (unsupported by SQLite, which needs the
+  // table-rebuild path), so the migration step fails — a tracked trails gap, not
+  // an adapter-fidelity gate. Encoded as a runtime guard (incomparable to Rails)
+  // pending convergence story `sqlite-change-column-table-rebuild`.
+  const sqliteChangeColumnBlocked = adapterType === "sqlite";
+  it.skipIf(sqliteChangeColumnBlocked)("cache gets cleared after migration", async () => {
     const cached = rawAdapter();
     cached._queryCache = new Store();
     const { Migration } = await import("./migration.js");

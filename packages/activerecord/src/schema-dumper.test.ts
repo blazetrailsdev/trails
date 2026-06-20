@@ -4,7 +4,7 @@ import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { cleanDefault, cleanRawPgExpression } from "./schema-dumper.js";
 import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 function freshCtx(): { adapter: TestDatabaseAdapter; ctx: MigrationContext } {
@@ -98,7 +98,7 @@ describe("SchemaDumperTest", () => {
     expect(output).toMatch(/createTable\("authors",\s*\{[^}]*force:\s*"cascade"[^}]*\}/);
   });
 
-  it.skipIf(adapterType !== "sqlite")("schema dump excludes sqlite sequence", async () => {
+  it("schema dump excludes sqlite sequence", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const adapter = createTestAdapter();
     const testCtx = new MigrationContext(adapter);
@@ -200,7 +200,10 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("idx_ba");
   });
 
-  it.skipIf(adapterType === "mysql")("schema dumps partial indices", async () => {
+  // Rails runs this unconditionally and branches the expected dump on
+  // `supports_partial_index?`. Gate on that capability (faithful to Rails)
+  // rather than a hardcoded adapter: only partial-index backends emit `where:`.
+  it.skipIf(!adapterSupports("partial_index"))("schema dumps partial indices", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("email");
       t.boolean("active");
@@ -212,7 +215,9 @@ describe("SchemaDumperTest", () => {
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain('where: "active = true"');
   });
-  it.skipIf(adapterType !== "postgres")("schema dumps nulls not distinct", async () => {
+  // Rails runs this unconditionally and branches on `supports_nulls_not_distinct?`
+  // (PostgreSQL ≥ 15 only). Gate on that capability rather than a hardcoded adapter.
+  it.skipIf(!adapterSupports("nulls_not_distinct"))("schema dumps nulls not distinct", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("email");
     });

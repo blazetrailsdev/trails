@@ -77,21 +77,21 @@ describe("ViewWithPrimaryKeyTest", () => {
     await dropView("ebooks'");
   });
 
-  itIfSupports("views", "reading", async () => {
+  it("reading", async () => {
     const ebookRecords = await Ebook.all();
     expect(ebookRecords.map((b: any) => b.id)).toEqual([books("rfr").id]);
     expect(ebookRecords.map((b: any) => b.name)).toEqual(["Ruby for Rails"]);
   });
 
-  itIfSupports("views", "views", async () => {
+  it("views", async () => {
     expect(await conn().views()).toEqual([Ebook._tableName]);
   });
 
-  itIfSupports("views", "view exists", async () => {
+  it("view exists", async () => {
     expect(await conn().viewExists(Ebook._tableName)).toBe(true);
   });
 
-  itIfSupports("views", "table exists", async () => {
+  it("table exists", async () => {
     expect(await conn().tableExists(Ebook._tableName)).toBe(false);
   });
 
@@ -99,7 +99,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     expect(await conn().isDataSourceExists(Ebook._tableName)).toBe(true);
   });
 
-  itIfSupports("views", "column definitions", async () => {
+  it("column definitions", async () => {
     expect(Ebook.columns().map((c: any) => [c.name, c.type])).toEqual([
       ["id", "integer"],
       ["name", "string"],
@@ -108,7 +108,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     ]);
   });
 
-  itIfSupports("views", "attributes", async () => {
+  it("attributes", async () => {
     const ebook = await Ebook.first();
     expect((ebook as any).attributes).toEqual({
       id: 2,
@@ -129,7 +129,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     expect(Model.primaryKey).toBeNull();
   });
 
-  itIfSupports("views", "does not dump view as table", async () => {
+  it("does not dump view as table", async () => {
     const schema = await dumpTableSchema(conn() as any, "ebooks'");
     // TS schema DSL: ctx.createTable("ebooks'", ...) — not the Ruby create_table form
     expect(schema).not.toMatch(/ctx\.createTable\("ebooks'"/);
@@ -163,31 +163,36 @@ describe("ViewWithoutPrimaryKeyTest", () => {
     await dropView("paperbacks");
   });
 
-  it("reading", async () => {
+  // Rails defines these tests directly inside `ViewWithoutPrimaryKeyTest`, which
+  // sits textually under `if supports_views?` — so they carry a `views` feature
+  // gate (vs the ViewBehavior-module tests above, which the extractor sees as
+  // unconditional). All adapters support views, so this gates nothing at runtime;
+  // it keeps the gate-fidelity match with Rails.
+  itIfSupports("views", "reading", async () => {
     const records = await Paperback.all();
     expect(records.map((b: any) => b.name)).toEqual([books("awdr").name]);
   });
 
-  it("views", async () => {
+  itIfSupports("views", "views", async () => {
     expect(await conn().views()).toEqual([Paperback._tableName]);
   });
 
-  it("view exists", async () => {
+  itIfSupports("views", "view exists", async () => {
     expect(await conn().viewExists(Paperback._tableName)).toBe(true);
   });
 
-  it("table exists", async () => {
+  itIfSupports("views", "table exists", async () => {
     expect(await conn().tableExists(Paperback._tableName)).toBe(false);
   });
 
-  it("column definitions", async () => {
+  itIfSupports("views", "column definitions", async () => {
     expect(Paperback.columns().map((c: any) => [c.name, c.type])).toEqual([
       ["name", "string"],
       ["status", "integer"],
     ]);
   });
 
-  it("attributes", async () => {
+  itIfSupports("views", "attributes", async () => {
     const record = await Paperback.first();
     expect((record as any).attributes).toEqual({
       name: "Agile Web Development with Rails",
@@ -195,11 +200,11 @@ describe("ViewWithoutPrimaryKeyTest", () => {
     });
   });
 
-  it("does not have a primary key", () => {
+  itIfSupports("views", "does not have a primary key", () => {
     expect(Paperback.primaryKey).toBeNull();
   });
 
-  it("does not dump view as table", async () => {
+  itIfSupports("views", "does not dump view as table", async () => {
     const schema = await dumpTableSchema(conn() as any, "paperbacks");
     // TS schema DSL: ctx.createTable("paperbacks", ...) — not the Ruby create_table form
     expect(schema).not.toMatch(/ctx\.createTable\("paperbacks"/);

@@ -62,8 +62,11 @@ const call = <T>(recv: object, name: string): T => (recv as Record<string, () =>
 // Two datetime tests below pass on SQLite + MySQL but expose a PostgreSQL-only
 // dirty-tracking gap: a datetime attribute on an anonymous reflected class
 // (`Class.new { table_name = "topics" }`) reads back `undefined` after create on
-// PG. They're gated with `it.skipIf(adapterType === "postgres")` — the form
-// `test:compare`'s gate extractor recognizes — keeping SQLite/MySQL coverage.
+// PG. Rails runs both unconditionally, so an `adapterType`-based gate is an
+// adapter-fidelity mismatch (over-gated). This is a tracked trails gap, not an
+// adapter-fidelity decision, so it is encoded as a runtime guard (incomparable
+// to Rails) pending convergence story `dirty-pg-anon-class-datetime-tracking`.
+const pgDirtyTrackingBlocked = adapterType === "postgres";
 
 /** Mirrors Rails' private `with_partial_writes(klass, on = true)`. */
 async function withPartialWrites(
@@ -356,7 +359,7 @@ describe("DirtyTest", () => {
     }
   });
 
-  it.skipIf(adapterType === "postgres")(
+  it.skipIf(pgDirtyTrackingBlocked)(
     "nullable datetime not marked as changed if new value is blank",
     async () => {
       await withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
@@ -822,7 +825,7 @@ describe("DirtyTest", () => {
     // to MySQL DDL cost. Column-name reflection is covered elsewhere.
   });
 
-  it.skipIf(adapterType === "postgres")(
+  it.skipIf(pgDirtyTrackingBlocked)(
     "datetime attribute can be updated with fractional seconds",
     async () => {
       await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
