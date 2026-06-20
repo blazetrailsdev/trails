@@ -7,6 +7,7 @@ import { generatesTokenFor } from "../../token-for.js";
 // cpk/author.rb
 export class CpkAuthor extends Base {
   static _tableName = "cpk_authors";
+  static _demodulizedName = "Author";
 
   static {
     // Rails: dependent: :delete_all — "deleteAll" not yet in AssociationOptions.dependent type
@@ -17,6 +18,7 @@ export class CpkAuthor extends Base {
 // cpk/book.rb
 export class CpkBook extends Base {
   static _tableName = "cpk_books";
+  static _demodulizedName = "Book";
 
   failDestroy = false;
 
@@ -44,15 +46,19 @@ export class CpkBook extends Base {
 acceptsNestedAttributesFor(CpkBook, "chapters");
 generatesTokenFor(CpkBook, "test");
 
-export class CpkBestSeller extends CpkBook {}
+export class CpkBestSeller extends CpkBook {
+  static _demodulizedName = "BestSeller";
+}
 
 export class CpkBrokenBook extends CpkBook {
+  static _demodulizedName = "BrokenBook";
   static {
     this.belongsTo("order", { className: "CpkOrderWithSpecialPrimaryKey" });
   }
 }
 
 export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
+  static _demodulizedName = "BrokenBookWithNonCpkOrder";
   static {
     this.belongsTo("order", {
       className: "CpkNonCpkOrder",
@@ -62,6 +68,7 @@ export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
 }
 
 export class CpkNonCpkBook extends CpkBook {
+  static _demodulizedName = "NonCpkBook";
   static {
     this._primaryKey = "id";
     this.belongsTo("nonCpkOrder", { className: "CpkNonCpkOrder", foreignKey: ["order_id"] });
@@ -69,6 +76,7 @@ export class CpkNonCpkBook extends CpkBook {
 }
 
 export class CpkNullifiedBook extends CpkBook {
+  static _demodulizedName = "NullifiedBook";
   static {
     this.hasOne("chapter", {
       className: "CpkChapter",
@@ -79,6 +87,7 @@ export class CpkNullifiedBook extends CpkBook {
 }
 
 export class CpkBookWithOrderAgreements extends CpkBook {
+  static _demodulizedName = "BookWithOrderAgreements";
   static {
     this.hasMany("orderAgreements", { through: "order" });
     this.hasOne("orderAgreement", { through: "order", source: "orderAgreements" });
@@ -87,6 +96,7 @@ export class CpkBookWithOrderAgreements extends CpkBook {
 
 // cpk/book_destroy_async.rb
 export class CpkBookDestroyAsync extends Base {
+  static _demodulizedName = "BookDestroyAsync";
   static _tableName = "cpk_books";
 
   static {
@@ -101,6 +111,7 @@ export class CpkBookDestroyAsync extends Base {
 
 // cpk/chapter.rb
 export class CpkChapter extends Base {
+  static _demodulizedName = "Chapter";
   static _tableName = "cpk_chapters";
 
   static {
@@ -111,6 +122,7 @@ export class CpkChapter extends Base {
 
 // cpk/chapter_destroy_async.rb
 export class CpkChapterDestroyAsync extends Base {
+  static _demodulizedName = "ChapterDestroyAsync";
   static _tableName = "cpk_chapters";
 
   static {
@@ -125,6 +137,7 @@ export class CpkChapterDestroyAsync extends Base {
 // cpk/order.rb
 export class CpkOrder extends Base {
   static _tableName = "cpk_orders";
+  static _demodulizedName = "Order";
 
   static {
     this._primaryKey = ["shop_id", "id"];
@@ -146,6 +159,7 @@ export class CpkOrder extends Base {
 }
 
 export class CpkBrokenOrder extends CpkOrder {
+  static _demodulizedName = "BrokenOrder";
   static {
     this._primaryKey = ["shop_id", "status"];
     this.hasMany("books", { className: "CpkBook" });
@@ -154,6 +168,7 @@ export class CpkBrokenOrder extends CpkOrder {
 }
 
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
+  static _demodulizedName = "OrderWithSpecialPrimaryKey";
   static {
     this._primaryKey = ["shop_id", "status"];
     this.hasMany("books", { className: "CpkBook", foreignKey: ["shop_id", "status"] });
@@ -162,6 +177,7 @@ export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
 }
 
 export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
+  static _demodulizedName = "BrokenOrderWithNonCpkBooks";
   static {
     this._primaryKey = ["shop_id", "status"];
     this.hasMany("books", { className: "CpkNonCpkBook" });
@@ -170,18 +186,21 @@ export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
 }
 
 export class CpkNonCpkOrder extends CpkOrder {
+  static _demodulizedName = "NonCpkOrder";
   static {
     this._primaryKey = "id";
   }
 }
 
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
+  static _demodulizedName = "OrderWithPrimaryKeyAssociatedBook";
   static {
     this.hasOne("book", { className: "CpkBook", foreignKey: "order_id", primaryKey: "id" });
   }
 }
 
 export class CpkOrderWithNullifiedBook extends CpkOrder {
+  static _demodulizedName = "OrderWithNullifiedBook";
   static {
     this.hasOne("book", {
       className: "CpkBook",
@@ -192,6 +211,7 @@ export class CpkOrderWithNullifiedBook extends CpkOrder {
 }
 
 export class CpkOrderWithSingularBookChapters extends CpkOrder {
+  static _demodulizedName = "OrderWithSingularBookChapters";
   static {
     this.hasMany("chapters", { className: "CpkChapter", through: "book" });
   }
@@ -199,6 +219,7 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
 
 // cpk/order_agreement.rb
 export class CpkOrderAgreement extends Base {
+  static _demodulizedName = "OrderAgreement";
   static _tableName = "cpk_order_agreements";
 
   static {
@@ -208,6 +229,7 @@ export class CpkOrderAgreement extends Base {
 
 // cpk/order_tag.rb
 export class CpkOrderTag extends Base {
+  static _demodulizedName = "OrderTag";
   static _tableName = "cpk_order_tags";
   static _primaryKey = ["order_id", "tag_id"];
 
@@ -219,6 +241,7 @@ export class CpkOrderTag extends Base {
 
 // cpk/tag.rb
 export class CpkTag extends Base {
+  static _demodulizedName = "Tag";
   static _tableName = "cpk_tags";
 
   static {
@@ -229,6 +252,7 @@ export class CpkTag extends Base {
 
 // cpk/post.rb
 export class CpkPost extends Base {
+  static _demodulizedName = "Post";
   static _tableName = "cpk_posts";
 
   static {
@@ -242,6 +266,7 @@ export class CpkPost extends Base {
 
 // cpk/comment.rb
 export class CpkComment extends Base {
+  static _demodulizedName = "Comment";
   static _tableName = "cpk_comments";
 
   static {
@@ -259,6 +284,7 @@ export class CpkComment extends Base {
 
 // cpk/review.rb
 export class CpkReview extends Base {
+  static _demodulizedName = "Review";
   static _tableName = "cpk_reviews";
 
   static {

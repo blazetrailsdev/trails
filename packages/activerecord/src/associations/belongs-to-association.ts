@@ -336,9 +336,24 @@ export class BelongsToAssociation extends SingularAssociation {
     // `[blog_id, id]`, not `[id, id]`). Gate on the target, not the owner, exactly
     // as Rails branches on `(klass || self.klass).has_query_constraints?`.
     const targetCtor = (record?.constructor ?? this.klass) as never;
+    // A composite (array) `foreign_key` is normalized into `query_constraints`
+    // on the *rich* reflection (Rails reflection.rb:533 deletes
+    // `options[:foreign_key]`), so the lightweight `this.reflection.options`
+    // here still carries the array and lacks `queryConstraints`. Consult the
+    // rich reflection's `queryConstraints` too, otherwise a composite FK falls
+    // through to the single-`id` inference below and the FK zip in `replaceKeys`
+    // lines up `[author_id, book_id]` against `[id]` — writing the target's
+    // `id` into the owner's first FK column.
+    const richReflection = (
+      this.owner.constructor as {
+        _reflectOnAssociation?: (n: string) => { options?: { queryConstraints?: unknown } } | null;
+      }
+    )._reflectOnAssociation?.(this.reflection.name);
     if (
       targetCtor &&
-      (hasQueryConstraints.call(targetCtor) || this.reflection.options.queryConstraints)
+      (hasQueryConstraints.call(targetCtor) ||
+        this.reflection.options.queryConstraints ||
+        richReflection?.options?.queryConstraints)
     ) {
       const qc = queryConstraintsList.call(targetCtor);
       if (qc) return qc;
