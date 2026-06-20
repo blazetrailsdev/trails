@@ -32,7 +32,7 @@ export class LibSQLReplicaAdapter extends AbstractSQLite3Adapter {
    * `sync()` escape hatch (not part of the core `SqliteConnection` interface).
    */
   async syncReplica(): Promise<void> {
-    const conn = this.sqliteConnection() as Partial<SyncableSqliteConnection>;
+    const conn = (await this.sqliteConnection()) as Partial<SyncableSqliteConnection>;
     if (typeof conn.sync !== "function") {
       throw new ConfigurationError(
         "syncReplica() requires a libsql embedded-replica connection (opened " +

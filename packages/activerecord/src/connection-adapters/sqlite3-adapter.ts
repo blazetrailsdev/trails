@@ -231,8 +231,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * client-specific extensions (e.g. the libsql embedded-replica adapter's
    * `syncReplica()`, which reaches the connection's `sync()` escape hatch).
    * Core code uses `this.driver` directly; subclasses must go through here.
+   *
+   * Awaits `ensureConnected()` first so async-only drivers (whose `driver` is
+   * unset until `completeAsyncConnect()` runs) don't hand back `undefined` when
+   * called before the deferred open completes.
    */
-  protected sqliteConnection(): SqliteConnection {
+  protected async sqliteConnection(): Promise<SqliteConnection> {
+    await this.ensureConnected();
     return this.driver;
   }
 
