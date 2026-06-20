@@ -163,12 +163,16 @@ describe("InsertAllTest", () => {
   itIfSupports(
     "insert_returning",
     "insert with type casting and serialize is consistent",
-    (ctx) => {
-      ctx.skip();
-      // BLOCKED: Rails passes an array as the (string) book name and relies on
-      // serialize round-tripping; trails' Book.name is a plain string type, so
-      // this exercises serialize behavior out of scope here.
-      // RFC 0030 d2-insert-all-returning-result.
+    async () => {
+      // Rails assigns an array to the string `name` column and asserts the
+      // create! path and the insert!(returning:) path type-cast it identically.
+      const bookName = ["Array"];
+      const createdBookId = ((await Book.createBang({ name: bookName })) as any).id;
+      const insertResult = await Book.insertBang({ name: bookName }, { returning: "id" });
+      const insertedBookId = insertResult.toArray()[0]["id"];
+      const createdBook = (await Book.findByBang({ id: createdBookId })) as any;
+      const insertedBook = (await Book.findByBang({ id: insertedBookId })) as any;
+      expect(createdBook.name).toEqual(insertedBook.name);
     },
   );
 
