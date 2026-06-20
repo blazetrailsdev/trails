@@ -1157,7 +1157,10 @@ export async function loadBelongsTo(
     const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
     rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    result = await rel.first();
+    // Rails SingularAssociation#find_target uses `scope.take` — an unordered
+    // LIMIT 1 — not `scope.first` (which orders by primary key). See
+    // has_one_associations_test `test_has_one_does_not_use_order_by`.
+    result = await rel.take();
   } else {
     // Inline fallback: no reflection registered.
     if (Array.isArray(foreignKey)) {
@@ -1334,7 +1337,8 @@ export async function loadHasOne(
     const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
     rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    result = await rel.first();
+    // Rails has_one loads via `scope.take` (unordered LIMIT 1), not `first`.
+    result = await rel.take();
   } else {
     // Inline fallback: no reflection registered.
     if (Array.isArray(foreignKey)) {
@@ -1366,7 +1370,7 @@ export async function loadHasOne(
         .all()
         .where({ [foreignKey]: record._readAttribute(primaryKey as string) });
       rel = applyAssociationScope(rel, options.scope, record);
-      result = await rel.first();
+      result = await rel.take();
     } else {
       result = await targetModel.findBy({
         [foreignKey]: record._readAttribute(primaryKey as string),
