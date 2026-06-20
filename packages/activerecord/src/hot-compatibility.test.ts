@@ -50,7 +50,7 @@ describe("HotCompatibilityTest", () => {
     const { klass, adapter } = await setupHotCompatibility();
     try {
       // warm cache
-      await klass.create();
+      await klass.createBang();
 
       // we have 3 columns
       expect(klass.columns().length).toBe(3);
@@ -63,7 +63,7 @@ describe("HotCompatibilityTest", () => {
 
       // but we can successfully create a record so long as we don't
       // reference the removed column
-      const record = await klass.create({ foo: "foo" });
+      const record = await klass.createBang({ foo: "foo" });
       await record.reload();
       expect((record as unknown as { foo: string }).foo).toBe("foo");
     } finally {
@@ -74,7 +74,7 @@ describe("HotCompatibilityTest", () => {
   it("update after remove_column", async () => {
     const { klass, adapter } = await setupHotCompatibility();
     try {
-      const record = await klass.create({ foo: "foo" });
+      const record = await klass.createBang({ foo: "foo" });
       expect(klass.columns().length).toBe(3);
       await new MigrationContext(adapter).removeColumn("hot_compatibilities", "bar");
       expect(klass.columns().length).toBe(3);
@@ -82,7 +82,7 @@ describe("HotCompatibilityTest", () => {
       await record.reload();
       expect((record as unknown as { foo: string }).foo).toBe("foo");
       (record as unknown as { foo: string }).foo = "bar";
-      await record.save();
+      await record.saveBang();
       await record.reload();
       expect((record as unknown as { foo: string }).foo).toBe("bar");
     } finally {
