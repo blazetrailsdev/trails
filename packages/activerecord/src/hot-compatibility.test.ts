@@ -70,7 +70,11 @@ describe("HotCompatibilityTest", () => {
         expect(preparedStatementCacheSize(adapter)).toBe(0);
       } finally {
         await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
+        // Mirror Rails' `with_two_connections` ensure
+        // (`clear_all_connections!(:all)`): return both the checked-out DDL
+        // connection and the leased model connection to the shared pool.
         pool.checkin(ddlConnection);
+        pool.releaseConnection();
       }
     },
   );
@@ -116,7 +120,11 @@ describe("HotCompatibilityTest", () => {
         expect(preparedStatementCacheSize(adapter)).toBe(0);
       } finally {
         await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
+        // Mirror Rails' `with_two_connections` ensure
+        // (`clear_all_connections!(:all)`): return both the checked-out DDL
+        // connection and the leased model connection to the shared pool.
         pool.checkin(ddlConnection);
+        pool.releaseConnection();
       }
     },
   );
