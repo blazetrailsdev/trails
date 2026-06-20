@@ -2606,7 +2606,10 @@ export class Relation<T extends Base> {
       );
       if (token !== this._loadToken) return [];
       const rows = result.toArray();
-      loadedRecords = this._instrumentInstantiation(rows);
+      loadedRecords = this._instrumentInstantiation(
+        rows,
+        result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+      );
       this.loadRecords(loadedRecords);
     }
 
@@ -2792,7 +2795,10 @@ export class Relation<T extends Base> {
         this._lastSelectBinds,
         { preparable: this._lastSelectPreparable },
       );
-      this._records = this._instrumentInstantiation(result.toArray());
+      this._records = this._instrumentInstantiation(
+        result.toArray(),
+        result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+      );
       await this._preloadAssociationsForRecords(this._records, eagerAssociations);
       return;
     }
@@ -2807,8 +2813,13 @@ export class Relation<T extends Base> {
     // If no associations could be JOINed, fall back entirely to preload
     if (jd.nodes.length === 0) {
       const sql = this._toSql();
-      const rows = await this._modelClass.connection.execute(sql, this._lastSelectBinds);
-      this._records = this._instrumentInstantiation(rows);
+      // selectAll (not execute) so the adapter-reported column_types cast
+      // extra/computed select columns, matching the JOIN and plain load paths.
+      const result = await this._modelClass.connection.selectAll(sql, "SQL", this._lastSelectBinds);
+      this._records = this._instrumentInstantiation(
+        result.toArray(),
+        result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+      );
       if (fallbackAssocs.length > 0) {
         await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
       }
@@ -2838,9 +2849,18 @@ export class Relation<T extends Base> {
       sql = `${sql} ${comments}`;
     }
 
-    const rows = await this._modelClass.connection.execute(sql, eagerBinds);
+    // Read through selectAll (not execute) so the adapter-reported result
+    // column_types are available to type-cast extra/computed `select` columns
+    // hydrated onto the base record — mirroring Rails' JoinDependency#instantiate,
+    // which slices `result_set.column_types`.
+    const result = await this._modelClass.connection.selectAll(sql, "SQL", eagerBinds);
+    const rows = result.toArray();
 
-    const { parents, associations } = jd.instantiateFromRows(rows, this._isStrictLoading);
+    const { parents, associations } = jd.instantiateFromRows(
+      rows,
+      this._isStrictLoading,
+      result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+    );
 
     const inverseMap = new Map<string, string | undefined>();
     const modelAssocs: any[] = (this._modelClass as any)._associations ?? [];
@@ -4508,12 +4528,15 @@ export class Relation<T extends Base> {
     }
   }
 
-  private _instrumentInstantiation(rows: Record<string, unknown>[]): T[] {
+  private _instrumentInstantiation(
+    rows: Record<string, unknown>[],
+    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+  ): T[] {
     if (rows.length === 0) return [];
     const payload = { record_count: rows.length, class_name: this._modelClass.name };
     const block = this._instantiateBlock;
     return Notifications.instrument("instantiation.active_record", payload, () =>
-      rows.map((row) => this._modelClass._instantiate(row, block as never) as T),
+      rows.map((row) => this._modelClass._instantiate(row, block as never, columnTypes) as T),
     );
   }
 

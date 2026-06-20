@@ -784,8 +784,12 @@ export class JoinDependency {
    * Mirrors: ActiveRecord::Associations::JoinDependency#instantiate
    * (returns `parents.values`).
    */
-  instantiate(resultSet: Record<string, unknown>[], strictLoadingValue?: boolean): any[] {
-    return this.instantiateFromRows(resultSet, strictLoadingValue).parents;
+  instantiate(
+    resultSet: Record<string, unknown>[],
+    strictLoadingValue?: boolean,
+    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+  ): any[] {
+    return this.instantiateFromRows(resultSet, strictLoadingValue, columnTypes).parents;
   }
 
   /**
@@ -873,6 +877,7 @@ export class JoinDependency {
   instantiateFromRows(
     rows: Record<string, unknown>[],
     strictLoadingValue?: boolean,
+    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): {
     parents: any[];
     associations: Map<unknown, Map<string, any[]>>;
@@ -908,7 +913,7 @@ export class JoinDependency {
       const parentKey = this._keyFor(basePkCols.map((c) => parentAttrs[c]));
       let parent = parents.get(parentKey);
       if (!parent) {
-        parent = (this._baseModel as any)._instantiate(parentAttrs);
+        parent = (this._baseModel as any)._instantiate(parentAttrs, undefined, columnTypes);
         if (strictLoadingValue && typeof parent.strictLoadingBang === "function") {
           parent.strictLoadingBang();
         }

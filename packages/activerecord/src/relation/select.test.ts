@@ -255,14 +255,14 @@ describe("SelectTest", () => {
     const posts = Post.select("posts.id * 1.1 AS foo").eagerLoad("comments");
     const post = (await posts.first()) as never as { readAttribute(n: string): unknown };
     // The explicit extra select is preserved through the JoinDependency and
-    // hydrated onto the base record. Rails additionally type-casts the value to
-    // Float (1.1) via the result set's column_types; trails does not yet cast
-    // arbitrary computed select columns by their DB result type — a pre-existing,
-    // adapter-wide gap (SQLite returns a number, but MySQL/PG return the string
-    // "1.1" because their adapters report no result column_types). Tracked for
-    // convergence: RFC 0030 story eager-load-extra-select-result-type-cast. Until
-    // then, assert the numeric value to keep the projection/hydration fix covered
-    // on every adapter.
+    // hydrated onto the base record, type-cast via the result set's column_types
+    // (mirrors Rails' JoinDependency#instantiate slicing `result_set.column_types`).
+    // Rails asserts `assert_equal 1.1, posts.first.foo`, which is numeric
+    // equality: SQLite yields a native Float, while PG (`numeric`) and MySQL
+    // (`NEWDECIMAL`) yield a BigDecimal — and Ruby's `BigDecimal == Float` is
+    // true. JS has no cross-type `===` for BigDecimal vs number, so we assert the
+    // same numeric equality (the value is now a typed numeric, not the raw "1.1"
+    // string it was before extra-select columns were cast by column type).
     expect(Number(post.readAttribute("foo"))).toBe(1.1);
   });
 

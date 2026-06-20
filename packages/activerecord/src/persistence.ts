@@ -37,7 +37,11 @@ import { reconcileVirtualAttributes } from "./model-schema.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
-  _instantiate(row: Record<string, unknown>, block?: (record: any) => void): any;
+  _instantiate(
+    row: Record<string, unknown>,
+    block?: (record: any) => void,
+    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+  ): any;
   /** @internal */
   discriminateClassForRecord?(attributes: Record<string, unknown>): PersistenceHost;
   primaryKey: string | string[];
@@ -130,11 +134,15 @@ export function instantiate(
   const klass = this.discriminateClassForRecord
     ? this.discriminateClassForRecord(attributes)
     : this;
-  // `columnTypes` is unused by `_instantiate` (schema cast types come from the
-  // model's attribute definitions); thread the block so it runs before the
-  // find/initialize callbacks, mirroring Rails' `init_with_attributes` yield.
-  void columnTypes;
-  return klass._instantiate(attributes, block);
+  // Schema cast types come from the model's attribute definitions; `columnTypes`
+  // only supplies types for extra/computed select columns absent from the schema,
+  // mirroring Rails' `instantiate(record, column_types)`. Thread the block so it
+  // runs before the find/initialize callbacks (Rails' `init_with_attributes`).
+  return klass._instantiate(
+    attributes,
+    block,
+    columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+  );
 }
 
 /**
@@ -1678,13 +1686,22 @@ export function _raiseRecordNotTouchedError(): never {
 
 /** @internal */
 function instantiateInstanceOf(
-  klass: { _instantiate(attrs: Record<string, unknown>, block?: (r: any) => void): any },
+  klass: {
+    _instantiate(
+      attrs: Record<string, unknown>,
+      block?: (r: any) => void,
+      columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+    ): any;
+  },
   attributes: Record<string, unknown>,
   columnTypes: Record<string, unknown> = {},
   block?: (r: any) => void,
 ): any {
-  void columnTypes;
-  return klass._instantiate(attributes, block);
+  return klass._instantiate(
+    attributes,
+    block,
+    columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+  );
 }
 
 /** @internal */
