@@ -2438,6 +2438,7 @@ export class Base extends Model {
     this: T,
     row: Record<string, unknown>,
     block?: (record: InstanceType<T>) => void,
+    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): InstanceType<T> {
     // Delegate to the correct STI subclass when the row carries a present
     // inheritance-column value that names a different class. `inheritance_column`
@@ -2457,6 +2458,7 @@ export class Base extends Model {
         stiBase,
         row,
         block as ((record: Base) => void) | undefined,
+        columnTypes,
       ) as InstanceType<T>;
     }
 
@@ -2496,9 +2498,13 @@ export class Base extends Model {
         delete (this as any)._suppressAbstractCheck;
       }
     }
-    // Load DB values through deserialize (not cast) so encrypted types decrypt
+    // Load DB values through deserialize (not cast) so encrypted types decrypt.
+    // Extra/computed select columns aren't in the schema, so pass the result
+    // set's column type (when the adapter reported one) to cast them — mirrors
+    // Rails' `instantiate(record, column_types)` slice in find_by_sql /
+    // JoinDependency#instantiate.
     for (const [key, value] of Object.entries(row)) {
-      record._attributes.writeFromDatabase(key, value);
+      record._attributes.writeFromDatabase(key, value, columnTypes?.[key] as never);
     }
     // A SELECT that projects only a subset of columns yields a row with just
     // those keys, so hasAttribute() must reflect what was loaded rather than

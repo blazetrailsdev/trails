@@ -61,13 +61,22 @@ export class AttributeSet {
     return this.getAttribute(name).value;
   }
 
-  writeFromDatabase(name: string, value: unknown): void {
+  writeFromDatabase(name: string, value: unknown, type?: import("./type/value.js").Type): void {
     this.assertNotFrozen();
     const existing = this.attributes.get(name);
     if (existing) {
       this.attributes.set(name, existing.withValueFromDatabase(value));
     } else {
-      this.attributes.set(name, Attribute.fromDatabase(name, value, typeRegistry.lookup("value")));
+      // An unknown column (e.g. a computed/aliased extra `select`) is not in the
+      // schema, so there is no declared cast type. Rails type-casts it with the
+      // result set's `column_types` slice; thread that type here when supplied,
+      // falling back to the identity `value` type. Mirrors
+      // ActiveModel::AttributeSet::Builder#build_from_database casting unknown
+      // keys via `types[name]`.
+      this.attributes.set(
+        name,
+        Attribute.fromDatabase(name, value, type ?? typeRegistry.lookup("value")),
+      );
     }
   }
 
