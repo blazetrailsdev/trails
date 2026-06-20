@@ -180,6 +180,48 @@ describe("CacheInstrumentationBehavior", () => {
     expect(events[0].payload.namespace).toBe("foo");
   });
 
+  it("test_write_multi_instrumentation", () => {
+    const writes = { a: "aa", b: "bb" };
+    const events = withInstrumentation("write_multi", () => {
+      cache.writeMulti(writes);
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_write_multi.active_support"]);
+    expect(events[0].payload.super_operation).toBeUndefined();
+    expect(events[0].payload.key).toEqual({
+      [normalizedKey("a")]: "aa",
+      [normalizedKey("b")]: "bb",
+    });
+  });
+
+  it("test_fetch_multi_instrumentation_order_of_operations", () => {
+    const operations: string[] = [];
+    const sub = Notifications.subscribe(/^cache_(read_multi|write_multi)\.active_support$/, (e) =>
+      operations.push(e.name),
+    );
+    try {
+      cache.fetchMulti("a", "b", (key: string) => key + key);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(operations).toEqual([
+      "cache_read_multi.active_support",
+      "cache_write_multi.active_support",
+    ]);
+  });
+
+  it("test_delete_multi_instrumentation", () => {
+    const options = { namespace: "foo" };
+    const events = withInstrumentation("delete_multi", () => {
+      cache.deleteMulti(["b", "a"], options);
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_delete_multi.active_support"]);
+    expect(events[0].payload.key).toEqual([
+      normalizedKey("b", options),
+      normalizedKey("a", options),
+    ]);
+    expect(events[0].payload.store).toBe("TestStore");
+  });
+
   it("test_read_multi_instrumentation", () => {
     cache.write("b", "bb");
     const events = withInstrumentation("read_multi", () => {

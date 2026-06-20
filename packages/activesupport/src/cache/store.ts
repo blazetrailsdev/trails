@@ -185,14 +185,20 @@ export abstract class Store {
   writeMulti(hash: Record<string, unknown>, options?: StoreOptions): Record<string, unknown> {
     if (Object.keys(hash).length === 0) return hash;
     const merged = this.mergedOptions(options);
-    const entries: Record<string, Entry> = {};
+    const normalizedHash: Record<string, unknown> = {};
     for (const [name, value] of Object.entries(hash)) {
-      entries[this.normalizeKey(name, merged)] = new Entry(value, {
-        expiresIn: typeof merged.expiresIn === "number" ? merged.expiresIn : null,
-        version: this.normalizeVersion(name, merged) ?? undefined,
-      });
+      normalizedHash[this.normalizeKey(name, merged)] = value;
     }
-    this.writeMultiEntries(entries, merged);
+    this.instrumentMulti("write_multi", normalizedHash, merged, () => {
+      const entries: Record<string, Entry> = {};
+      for (const [name, value] of Object.entries(hash)) {
+        entries[this.normalizeKey(name, merged)] = new Entry(value, {
+          expiresIn: typeof merged.expiresIn === "number" ? merged.expiresIn : null,
+          version: this.normalizeVersion(name, merged) ?? undefined,
+        });
+      }
+      this.writeMultiEntries(entries, merged);
+    });
     return hash;
   }
 
@@ -250,9 +256,9 @@ export abstract class Store {
   deleteMulti(names: string[], options?: StoreOptions): number {
     if (names.length === 0) return 0;
     const merged = this.mergedOptions(options);
-    return this.deleteMultiEntries(
-      names.map((n) => this.normalizeKey(n, merged)),
-      merged,
+    const keys = names.map((n) => this.normalizeKey(n, merged));
+    return this.instrumentMulti("delete_multi", keys, merged, () =>
+      this.deleteMultiEntries(keys, merged),
     );
   }
 
@@ -313,7 +319,7 @@ export abstract class Store {
 
   protected instrumentMulti<T>(
     operation: string,
-    keys: unknown[],
+    keys: unknown,
     options?: StoreOptions,
     block?: (payload: EventPayload) => T,
   ): T {
@@ -328,8 +334,13 @@ export abstract class Store {
     block?: (payload: EventPayload) => T,
   ): T {
     if (Store.logger?.isDebug?.() && !this.silence) {
+      const multiSize = Array.isArray(key)
+        ? key.length
+        : key && typeof key === "object"
+          ? Object.keys(key).length
+          : 0;
       const debugKey = multi
-        ? `: ${(key as unknown[]).length} key(s) specified`
+        ? `: ${multiSize} key(s) specified`
         : key != null
           ? `: ${String(key)}`
           : "";
