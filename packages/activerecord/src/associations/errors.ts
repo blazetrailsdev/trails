@@ -257,12 +257,17 @@ function reflectionPrimaryKey(
 
 /**
  * Mirrors Rails' `CompositePrimaryKeyMismatchError` (associations/errors.rb:187):
- * stores the reflection via `attr_reader :reflection` and derives the message
- * from it inside the constructor, branching on the reflection's macro to choose
- * the primary key to report.
+ * declares a `reflection` reader and derives the message from the passed
+ * reflection inside the constructor, branching on the reflection's macro to
+ * choose the primary key to report.
+ *
+ * Fidelity note: Rails 8.0.2 declares `attr_reader :reflection` but
+ * `initialize` never assigns `@reflection` (errors.rb:190-200), so
+ * `error.reflection` is always `nil`. We mirror that exactly — the reader
+ * exists for API parity but is never populated from the constructor argument.
  */
 export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
-  readonly reflection: CompositePrimaryKeyMismatchReflection | null;
+  readonly reflection: CompositePrimaryKeyMismatchReflection | null = null;
 
   constructor(reflection?: CompositePrimaryKeyMismatchReflection | null) {
     let message: string;
@@ -286,7 +291,7 @@ export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
     }
     super(message);
     this.name = "CompositePrimaryKeyMismatchError";
-    this.reflection = reflection ?? null;
+    // Rails never assigns @reflection (errors.rb:190-200); leave the reader null.
   }
 }
 

@@ -73,11 +73,13 @@ describe("AssociationErrors", () => {
     expect(err.associatedClass).toBeNull();
   });
 
-  it("CompositePrimaryKeyMismatchError exposes the reflection and derives its message from it", () => {
+  it("CompositePrimaryKeyMismatchError derives its message from the reflection but leaves reflection nil", () => {
     // Rails parity: activerecord/lib/active_record/associations/errors.rb:187.
-    // CompositePrimaryKeyMismatchError has `attr_reader :reflection` and builds
-    // its message from the reflection inside the constructor, branching on the
-    // macro: belongs_to uses `association_primary_key` (errors.rb:195).
+    // CompositePrimaryKeyMismatchError builds its message from the reflection
+    // inside the constructor, branching on the macro: belongs_to uses
+    // `association_primary_key` (errors.rb:195). Rails declares
+    // `attr_reader :reflection` but `initialize` never assigns @reflection
+    // (errors.rb:190-200), so `error.reflection` is always nil — we mirror that.
     const reflection = {
       activeRecord: { name: "CpkBrokenBook" },
       name: "order",
@@ -87,7 +89,7 @@ describe("AssociationErrors", () => {
       foreignKey: "order_id",
     };
     const err = new CompositePrimaryKeyMismatchError(reflection);
-    expect(err.reflection).toBe(reflection);
+    expect(err.reflection).toBeNull();
     expect(err.message).toBe(
       `Association CpkBrokenBook#order primary key ["shop_id", "status"] doesn't match with foreign key order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
     );
