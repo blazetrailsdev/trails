@@ -5418,7 +5418,8 @@ describe("EagerAssociationTest", () => {
 describe("EagerAssociationTest", () => {
   const { companies } = useHandlerFixtures(["companies"]);
   beforeAll(async () => {
-    await defineSchema(canonicalSchema, { dropExisting: true });
+    // Partial schema: the eager SELECT projects only real `companies` columns.
+    await defineSchema({ companies: canonicalSchema.companies }, { dropExisting: true });
   });
   registerModel(Company);
   registerModel(Firm);
