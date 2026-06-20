@@ -67,6 +67,13 @@ import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Category } from "../test-helpers/models/category.js";
+import {
+  CpkBook,
+  CpkBrokenOrder,
+  CpkBrokenOrderWithNonCpkBooks,
+  CpkNonCpkBook,
+} from "../test-helpers/models/cpk.js";
+import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
@@ -6713,35 +6720,33 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(remaining.length).toBe(0);
   });
-  it("composite primary key malformed association class", async () => {
-    class CpkMalAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+  it("composite primary key malformed association class", () => {
+    registerModel(CpkBook);
+    const order = new CpkBrokenOrder();
+    let error: Error | undefined;
+    try {
+      order.association("books");
+    } catch (e) {
+      error = e as Error;
     }
-    registerModel(CpkMalAuthor);
-    // Declaring association with non-existent class should not throw at declaration time
-    expect(() => {
-      Associations.hasMany.call(CpkMalAuthor, "cpk_mal_posts", {
-        className: "CpkMalNonExistent",
-        foreignKey: "author_id",
-      });
-    }).not.toThrow();
+    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
+    expect(error?.message).toBe(
+      `Association CpkBrokenOrder#books primary key ["shop_id", "status"] doesn't match with foreign key cpk_broken_order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
   });
-  it("composite primary key malformed association owner class", async () => {
-    class CpkMalOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+  it("composite primary key malformed association owner class", () => {
+    registerModel(CpkNonCpkBook);
+    const order = new CpkBrokenOrderWithNonCpkBooks();
+    let error: Error | undefined;
+    try {
+      order.association("books");
+    } catch (e) {
+      error = e as Error;
     }
-    registerModel(CpkMalOwner);
-    // Association declaration should succeed regardless of primary key setup
-    expect(() => {
-      Associations.hasMany.call(CpkMalOwner, "cpk_mal_owner_posts", {
-        className: "CpkMalOwner",
-        foreignKey: "owner_id",
-      });
-    }).not.toThrow();
+    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
+    expect(error?.message).toBe(
+      `Association CpkBrokenOrderWithNonCpkBooks#books primary key ["shop_id", "status"] doesn't match with foreign key cpk_broken_order_with_non_cpk_books_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
   });
   it("ids reader on preloaded association with composite primary key", async () => {
     class PreCpkAuthor extends Base {
