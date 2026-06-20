@@ -876,41 +876,19 @@ export function buildWhereClause(
   if (opts instanceof Nodes.Node) return new WhereClause([opts]);
 
   if (typeof opts === "string") {
-    const firstBind = rest[0];
-    const hasPositional = opts.includes("?");
-    const hasNamedToken = /(?<!:):[a-zA-Z_]\w*/.test(opts);
-    const isNamedBinds =
-      rest.length === 1 && isPlainObject(firstBind) && hasNamedToken && !hasPositional;
-
-    let sql: string;
-    if (isNamedBinds) {
-      sql = opts;
-      const namedBinds = firstBind;
-      const adapter = connectionFor((this as any)._modelClass);
-      for (const [name, value] of Object.entries(namedBinds)) {
-        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // A Relation bind inlines its SQL as a subquery rather than being
-        // quoted as a scalar — mirrors the `ActiveRecord::Relation === value`
-        // branch of Rails' `replace_bind_variable` (sanitization.rb:211-216),
-        // which `replace_named_bind_variables` delegates to per token.
-        const replacement = isRelationLike(value)
-          ? (value as { toSql(): string }).toSql()
-          : Array.isArray(value)
-            ? value.map((v) => adapter.quote(v)).join(", ")
-            : adapter.quote(value);
-        // Named-bind substitution on a user-supplied SQL fragment, not an arel
-        // AST — mirrors Rails `sanitize_sql` → `replace_named_bind_variables`
-        // (sanitization.rb), which likewise `gsub`s `:name` tokens with quoted
-        // values. There is no AST to build here; the fragment is opaque text.
-        // eslint-disable-next-line blazetrails/no-raw-sql
-        sql = sql.replace(new RegExp(`(?<!:):${escaped}\\b`, "g"), () => replacement);
-      }
-    } else if (rest.length > 0) {
-      sql = this._modelClass.sanitizeSqlArray(opts, ...rest);
+    // Mirrors build_where_clause (query_methods.rb:1625-1627): a string fragment
+    // with binds becomes a BoundSqlLiteral node — named (`:name`) when the first
+    // rest arg is a Hash and the fragment carries a `:word` token, positional
+    // (`?`) otherwise. A bare fragment is wrapped verbatim as `Arel.sql(opts)`.
+    let parts: Nodes.Node[];
+    if (rest.length === 0) {
+      parts = opts.trim() ? [arelSql(opts)] : [];
+    } else if (isPlainObject(rest[0]) && /:\w+/.test(opts)) {
+      parts = [buildNamedBoundSqlLiteral.call(this, opts, rest[0])];
     } else {
-      sql = opts;
+      parts = [buildBoundSqlLiteral.call(this, opts, rest)];
     }
-    return new WhereClause(sql.trim() ? [new Nodes.SqlLiteral(sql)] : []);
+    return new WhereClause(parts);
   }
 
   if (isPlainObject(opts)) {
@@ -1651,13 +1629,6 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  * `Arel.sql(value.to_sql)` so `where("id IN (?)", SomeRelation)` produces a
  * subquery rather than reaching `visitBindValue`'s `quote()`. Arel nodes are
  * rendered to SQL the same way (trails passes nodes here where Rails would not).
- *
- * NOTE: `buildBoundSqlLiteral` / `buildNamedBoundSqlLiteral` are not yet wired
- * into `buildWhereClause` — trails' `where` still routes `?`/`:name` fragments
- * through `sanitizeSqlArray` / the named-bind substitution loop above, where the
- * same Relation handling lives. Converging `buildWhereClause` onto these
- * `BoundSqlLiteral` builders (as Rails' `build_where_clause` does) is tracked by
- * the `converge-build-where-clause-bound-sql-literal` story.
  * @internal
  */
 function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {

@@ -56,10 +56,10 @@ describe("bound SQL literal with Relation bind value", () => {
     expect(expected.length).toBeGreaterThan(0);
   });
 
-  // Direct coverage for the builders that `normalizeBoundValue` feeds. These are
-  // not yet wired into `buildWhereClause` (see the note on `normalizeBoundValue`),
-  // so the `where(...)` cases above exercise the sanitization path instead; call
-  // them here so the Relation→`Arel.sql(toSql)` branch has a regression guard.
+  // Direct coverage for the builders that `buildWhereClause` now routes string
+  // fragments through (see `build_where_clause`, query_methods.rb:1625-1627);
+  // call them here so the Relation→`Arel.sql(toSql)` branch has a focused
+  // regression guard independent of the full `where(...)` path.
   it("buildBoundSqlLiteral inlines a Relation positional bind as a SqlLiteral", () => {
     const approvedIds = Topic.where({ approved: true }).select("id");
     const builders = Topic.all() as unknown as BoundSqlLiteralBuilders;
