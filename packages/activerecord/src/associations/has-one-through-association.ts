@@ -128,10 +128,15 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   override async persistReplace(): Promise<void> {
     const pending = this._pendingReplace;
     if (!pending) return;
+    // Clear before the first `await` — mirrors HasOneAssociation#persistReplace.
+    // The new awaitable `writer` (inherited from HasOneAssociation) makes this
+    // path reachable concurrently (`await writer(a); await writer(b)`); without
+    // the early clear a second `replace` would mutate the shared `_pendingReplace`
+    // object still captured by reference in this call's `pending`.
+    this._pendingReplace = null;
     await transaction(this, async () => {
       await createThroughRecord(this, pending.record, true);
     });
-    this._pendingReplace = null;
   }
 }
 
