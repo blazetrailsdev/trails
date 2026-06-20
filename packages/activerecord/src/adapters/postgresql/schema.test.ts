@@ -2,7 +2,8 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
-import { describeIfPg, pgSupportsNativePartitioning, PostgreSQLAdapter } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { itIfSupports } from "../../test-helpers/supports.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
@@ -960,7 +961,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaIndexNullsNotDistinctTest", () => {
-    it("nulls not distinct is dumped", async () => {
+    itIfSupports("nulls_not_distinct", "nulls not distinct is dumped", async () => {
       try {
         await adapter.exec(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
         await adapter.getDatabaseVersion();
@@ -975,7 +976,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
       }
     });
-    it("nulls distinct is dumped", async () => {
+    itIfSupports("nulls_not_distinct", "nulls distinct is dumped", async () => {
       try {
         await adapter.exec(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
         await adapter.getDatabaseVersion();
@@ -1011,7 +1012,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.dropTable("vehicles", { ifExists: true });
     });
 
-    it.skipIf(!pgSupportsNativePartitioning)("list partition options is dumped", async () => {
+    itIfSupports("native_partitioning", "list partition options is dumped", async () => {
       const options = "PARTITION BY LIST (kind)";
       await adapter.schemaStatements().createTable("trains", { id: false, options }, (t) => {
         t.string("name");
@@ -1022,7 +1023,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
 
-    it.skipIf(!pgSupportsNativePartitioning)("range partition options is dumped", async () => {
+    itIfSupports("native_partitioning", "range partition options is dumped", async () => {
       const options = "PARTITION BY RANGE (created_at)";
       await adapter.schemaStatements().createTable("trains", { id: false, options }, (t) => {
         t.string("name");

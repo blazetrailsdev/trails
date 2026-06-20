@@ -3,6 +3,7 @@
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
+import { itIfSupports } from "../../test-helpers/supports.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { Notifications } from "@blazetrails/activesupport";
@@ -409,21 +410,21 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(index.where).toBe("price > 0");
   });
 
-  it("expression index", async () => {
+  itIfSupports("expression_index", "expression index", async () => {
     adapter.exec(`CREATE INDEX "expression" ON "items" (max(id, price))`);
     const indexes = (await adapter.indexes("items")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");
     expect(index.columns).toBe("max(id, price)");
   });
 
-  it("expression index with trailing comment", async () => {
+  itIfSupports("expression_index", "expression index with trailing comment", async () => {
     adapter.exec(`CREATE INDEX expression on items (price % 10) /* comment */`);
     const indexes = (await adapter.indexes("items")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");
     expect(index.columns).toBe("price % 10");
   });
 
-  it("expression index with where", async () => {
+  itIfSupports("expression_index", "expression index with where", async () => {
     adapter.exec(`CREATE INDEX "expression" ON "items" (id % 10, max(id, price)) WHERE id > 1000`);
     const indexes = (await adapter.indexes("items")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");
@@ -431,7 +432,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(index.where).toBe("id > 1000");
   });
 
-  it("complicated expression", async () => {
+  itIfSupports("expression_index", "complicated expression", async () => {
     adapter.exec(
       `CREATE INDEX expression ON items (id % 10, (CASE WHEN price > 0 THEN max(id, price) END))WHERE(id > 1000)`,
     );
@@ -441,7 +442,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(index.where).toBe("(id > 1000)");
   });
 
-  it("not everything an expression", async () => {
+  itIfSupports("expression_index", "not everything an expression", async () => {
     adapter.exec(`CREATE INDEX "expression" ON "items" (id, max(id, price))`);
     const indexes = (await adapter.indexes("items")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");

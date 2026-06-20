@@ -78,6 +78,12 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_native_partitioning?`: PostgreSQL ≥ 10.0 (pg17 qualifies), abstract default false.
   // (postgresql_adapter.rb:287)
   native_partitioning: ["postgres"],
+  // `supports_partitioned_indexes?`: PostgreSQL ≥ 11.0 (pg17 qualifies), abstract default false.
+  // (postgresql_adapter.rb:212)
+  partitioned_indexes: ["postgres"],
+  // `supports_pgcrypto_uuid?`: PostgreSQL database_version >= 9.4.0 (pg17 qualifies);
+  // PostgreSQL-only (abstract default false). (postgresql_adapter.rb:299)
+  pgcrypto_uuid: ["postgres"],
   // `supports_insert_returning?`: PostgreSQL true; MySQL only for MariaDB ≥ 10.5 (mysql:8
   // is not MariaDB → false); SQLite ≥ 3.35.0 (current node sqlite qualifies → true).
   // (postgresql_adapter.rb:264, abstract_mysql_adapter.rb:173, sqlite3_adapter.rb:187)

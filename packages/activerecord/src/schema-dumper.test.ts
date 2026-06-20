@@ -252,7 +252,7 @@ describe("SchemaDumperTest", () => {
     // Sub-part prefix lengths are MySQL-only; other adapters drop the option.
     expect(line?.includes("length: 10")).toBe(adapterType === "mysql");
   });
-  it.skipIf(adapterType !== "postgres")("schema dumps check constraints", async () => {
+  itIfSupports("check_constraints", "schema dumps check constraints", async () => {
     const { SchemaStatements } =
       await import("./connection-adapters/abstract/schema-statements.js");
     const { adapter: testAdapter, ctx: testCtx } = freshSidecarCtx();
@@ -1039,7 +1039,7 @@ describe("SchemaDumperDefaultsTest", () => {
   });
 
   // MySQL 8 strict mode forbids TEXT column defaults; MariaDB allowed them.
-  it.skipIf(adapterType === "mysql")("schema dump with text column", async () => {
+  itIfSupports("text_column_with_default", "schema dump with text column", async () => {
     await ctx.createTable("dump_defaults", {}, (t) => {
       t.text("text_with_default", { default: "John" });
     });

@@ -5,6 +5,7 @@ import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { itIfSupports } from "../../test-helpers/supports.js";
 import * as Arel from "@blazetrails/arel";
 import {
   ConnectionFailed,
@@ -975,7 +976,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(indexes.find((i) => i.name === "idx_keyword_order")).toBeDefined();
     });
 
-    it("include index", async () => {
+    itIfSupports("index_include", "include index", async () => {
       await adapter.exec(
         `CREATE TABLE "ex_include" ("id" SERIAL PRIMARY KEY, "name" TEXT, "email" TEXT)`,
       );
@@ -987,7 +988,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(indexes.find((i) => i.name === "idx_include_name")).toBeDefined();
     });
 
-    it("include multiple columns index", async () => {
+    itIfSupports("index_include", "include multiple columns index", async () => {
       await adapter.exec(
         `CREATE TABLE "ex_include2" ("id" SERIAL PRIMARY KEY, "a" TEXT, "b" TEXT, "c" TEXT)`,
       );
@@ -999,7 +1000,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(indexes.find((i) => i.name === "idx_include_multi")).toBeDefined();
     });
 
-    it("include keyword column name", async () => {
+    itIfSupports("index_include", "include keyword column name", async () => {
       await adapter.exec(
         `CREATE TABLE "ex_incl_kw" ("id" SERIAL PRIMARY KEY, "name" TEXT, "order" INTEGER)`,
       );
@@ -1011,7 +1012,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(indexes.find((i) => i.name === "idx_incl_kw")).toBeDefined();
     });
 
-    it("include escaped quotes column name", async () => {
+    itIfSupports("index_include", "include escaped quotes column name", async () => {
       await adapter.exec(
         `CREATE TABLE "ex_incl_esc" ("id" SERIAL PRIMARY KEY, "name" TEXT, "desc" TEXT)`,
       );
@@ -1030,7 +1031,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toThrow();
     });
 
-    it("index with not distinct nulls", async () => {
+    itIfSupports("nulls_not_distinct", "index with not distinct nulls", async () => {
       await adapter.exec(`CREATE TABLE "ex_nulls_nd" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       await adapter.addIndex("ex_nulls_nd", ["name"], {
         name: "idx_nulls_nd",

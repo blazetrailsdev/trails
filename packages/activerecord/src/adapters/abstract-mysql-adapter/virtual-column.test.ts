@@ -1,8 +1,9 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/virtual_column_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfSupports } from "../../test-helpers/supports.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -36,7 +37,7 @@ describeIfMysql("Mysql2Adapter", () => {
     await adapter.close();
   });
 
-  describe("VirtualColumnTest", () => {
+  describeIfSupports("virtual_columns", "VirtualColumnTest", () => {
     const findColumn = async (name: string) => {
       const cols = (await adapter.columns("virtual_columns")) as unknown as Array<{
         name: string;

@@ -8,6 +8,7 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 import { RecordNotFound } from "../../errors.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { itIfSupports } from "../../test-helpers/supports.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base, registerModel } from "../../index.js";
 
@@ -474,7 +475,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("uuid column default", async () => {
+    itIfSupports("pgcrypto_uuid", "uuid column default", async () => {
       await adapter.exec(`DROP TABLE IF EXISTS uuid_column_default_test`);
       await adapter.exec(`
         CREATE TABLE uuid_column_default_test (

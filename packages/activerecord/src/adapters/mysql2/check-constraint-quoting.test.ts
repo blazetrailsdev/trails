@@ -1,13 +1,14 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/mysql2/check_constraint_quoting_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
 import {
   describeIfMysql,
   isMariaDb,
   Mysql2Adapter,
   MYSQL_TEST_URL,
 } from "../abstract-mysql-adapter/test-helper.js";
+import { describeIfSupports } from "../../test-helpers/supports.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -22,7 +23,7 @@ describeIfMysql("Mysql2Adapter", () => {
     await adapter.close();
   });
 
-  describe("MySQL2CheckConstraintQuotingTest", () => {
+  describeIfSupports("check_constraints", "MySQL2CheckConstraintQuotingTest", () => {
     it("check constraint no duplicate expression quoting", async () => {
       await adapter.addCheckConstraint("trades", "name != 'forbidden_string'");
 
