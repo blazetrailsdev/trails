@@ -157,7 +157,13 @@ export class HasManyAssociation extends CollectionAssociation {
     if (!baseScope) return 0;
     const queryConstraints = compositeQueryConstraintsList.call(this.klass as any);
     const scope = scopeForRecords(baseScope, queryConstraints, records);
-    const count = await deleteCount(this, method, scope);
+    // Canonical models map Rails' `dependent: :delete_all` to the `"delete"`
+    // string (deleteAll is not yet in the AssociationOptions type), so normalize
+    // it to the delete_all strategy here the same way `deleteAll()` does
+    // (collection-association.ts). Without this the per-record delete path falls
+    // through to nullify, which fails for NOT-NULL composite-PK foreign keys.
+    const strategy = method === "delete" ? "deleteAll" : method;
+    const count = await deleteCount(this, strategy, scope);
     if (count > 0) await updateCounter(this, -count);
     return count;
   }

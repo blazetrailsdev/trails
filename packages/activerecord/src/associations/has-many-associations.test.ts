@@ -74,6 +74,7 @@ import {
   CpkBrokenOrderWithNonCpkBooks,
   CpkNonCpkBook,
 } from "../test-helpers/models/cpk.js";
+import { captureSql } from "../testing/sql-capture.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
@@ -3743,52 +3744,6 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("Updated");
-  });
-  it("deleting models with composite keys", async () => {
-    class CompKeyAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class CompKeyPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(CompKeyAuthor);
-    registerModel(CompKeyPost);
-    const author = await CompKeyAuthor.create({ name: "Alice" });
-    const post = await CompKeyPost.create({ author_id: author.id, title: "A" });
-    await post.destroy();
-    const posts = await loadHasMany(author, "comp_key_posts", {
-      className: "CompKeyPost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(0);
-  });
-  it("sharded deleting models", async () => {
-    class ShardAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class ShardPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ShardAuthor);
-    registerModel(ShardPost);
-    const author = await ShardAuthor.create({ name: "Alice" });
-    const post = await ShardPost.create({ author_id: author.id, title: "A" });
-    await post.destroy();
-    const posts = await loadHasMany(author, "shard_posts", {
-      className: "ShardPost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(0);
   });
   it("counter cache updates in memory after concat", async () => {
     class CcConcatAuthor extends Base {
@@ -7754,5 +7709,90 @@ describe("HasManyAssociationsTest", () => {
     const deleted2 = await CpkBook.findBy({ author_id: 2, id: 20 });
     expect((deleted1 as any).order_id).toBeNull();
     expect((deleted2 as any).order_id).toBeNull();
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  const { cpkAuthors, shardedBlogPosts } = useHandlerFixtures(
+    ["cpkAuthors", "cpkBooks", "shardedBlogs", "shardedBlogPosts", "shardedComments"],
+    { schema: TEST_SCHEMA },
+  );
+
+  // useHandlerFixtures loads the fixture rows but does not register the models
+  // under the class names the associations resolve by (`CpkBook`,
+  // `ShardedComment`), so register them here (dynamic import keeps these out of
+  // the file's top-level scope, where bespoke same-named classes in
+  // still-unconverted describes would otherwise be renamed by esbuild).
+  beforeAll(async () => {
+    const cpk = await import("../test-helpers/models/cpk.js");
+    registerModel("CpkAuthor", cpk.CpkAuthor);
+    registerModel("CpkBook", cpk.CpkBook);
+    const sharded = await import("../test-helpers/models/sharded.js");
+    registerModel("ShardedBlog", sharded.ShardedBlog);
+    registerModel("ShardedBlogPost", sharded.ShardedBlogPost);
+    registerModel("ShardedComment", sharded.ShardedComment);
+  });
+
+  // Rails has_many_associations_test.rb:1294 test_deleting_models_with_composite_keys.
+  // cpk_great_author has 2 books (cpk_books.yml); delete one, reload, assert 1
+  // remains. CpkAuthor#books is `dependent: :delete_all`, so the delete DELETEs
+  // the book row — its author_id is part of the composite PK and cannot be
+  // nullified.
+  //
+  // tracked-pending-convergence: Rails (:1299) calls the proxy
+  // `great_author.books.delete(books.first)`, but trails' `CollectionProxy#delete`
+  // for non-through associations unconditionally nullifies, ignoring `:dependent`
+  // (collection-proxy.ts:2254–2273), so it would fail the NOT-NULL composite-PK
+  // FK here. Until that is fixed (story
+  // 0023-surfaced-deviations/collection-proxy-delete-honor-dependent-non-through)
+  // we drive the dependent-aware association-layer path
+  // (CollectionAssociation#delete) directly.
+  it("deleting models with composite keys", async () => {
+    const greatAuthor = cpkAuthors("cpk_great_author") as any;
+    const books = await greatAuthor.books.toArray();
+
+    expect(books.length).toBe(2);
+
+    await greatAuthor.association("books").delete(books[0]);
+    await greatAuthor.reload();
+
+    expect(await greatAuthor.books.size()).toBe(1);
+  });
+
+  // Rails has_many_associations_test.rb:1306 test_sharded_deleting_models.
+  // great_post_blog_one has 3 comments (sharded_comments.yml); delete two and
+  // assert the generated DELETE scopes by an OR-of-AND composite-key tuple form,
+  // then check the reloaded size.
+  //
+  // tracked-pending-convergence: as in the composite-key test above, Rails
+  // (:1315) calls the proxy `blog_post.delete_comments.delete(...)`; we route
+  // through the association layer until `CollectionProxy#delete` honors
+  // `:dependent` for non-through associations (story
+  // 0023-surfaced-deviations/collection-proxy-delete-honor-dependent-non-through).
+  it("sharded deleting models", async () => {
+    const blogPost = shardedBlogPosts("great_post_blog_one") as any;
+    const comments = await blogPost.deleteComments.toArray();
+
+    expect(comments.length).toBe(3);
+
+    const commentsToDelete = [comments[0], comments[1]];
+
+    const sqls = await captureSql(async () => {
+      await blogPost.association("deleteComments").delete(commentsToDelete);
+    });
+
+    // Mirror Rails' OR-of-AND tuple-form assertion (adapter-agnostic on the
+    // identifier quoting): each deleted row is scoped by its full composite key
+    // `(blog_id = .. AND id = ..)`, the two rows joined by OR.
+    const col = (name: string) => `["\`]?sharded_comments["\`]?\\.["\`]?${name}["\`]?`;
+    const tuple = `\\(${col("blog_id")} = .*? AND ${col("id")} = .*?\\)`;
+    const expectation = new RegExp(`DELETE.*WHERE.*${tuple} OR ${tuple}`, "i");
+    const deleteSql = sqls.find((s) => /DELETE/i.test(s));
+    expect(deleteSql).toBeDefined();
+    expect(deleteSql).toMatch(expectation);
+
+    await blogPost.reload();
+
+    expect(await blogPost.comments.size()).toBe(1);
   });
 });
