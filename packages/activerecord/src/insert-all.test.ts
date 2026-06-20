@@ -26,6 +26,7 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
+import { adapterSupports, itIfSupports } from "./test-helpers/supports.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -39,15 +40,13 @@ import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Subscription } from "./test-helpers/models/subscription.js";
 
 // Adapter capability gates (mirror Rails' supports_* predicates / current_adapter?).
-// MySQL's ON DUPLICATE KEY UPDATE has no conflict-target syntax and no RETURNING.
-const supportsInsertConflictTarget = adapterType !== "mysql";
-const supportsInsertReturning = adapterType !== "mysql";
+// Feature-gated tests use itIfSupports(...) / adapterSupports(...) so the
+// test:compare gate extractor sees the same supports_* features Rails skips on.
+// These two remain as plain booleans because they feed a helper / a guard-only
+// `skip if` (not a comparable feature gate).
+const supportsInsertReturning = adapterSupports("insert_returning");
+const supportsInsertConflictTarget = adapterSupports("insert_conflict_target");
 const isMysql = adapterType === "mysql";
-// MySQL/MariaDB lack partial indexes; MariaDB also lacks expression indexes.
-// The harness collapses both to adapterType "mysql", so gate off it — matching
-// Rails' supports_partial_index? / supports_expression_index? on the tests.
-const supportsPartialIndex = adapterType !== "mysql";
-const supportsExpressionIndex = adapterType !== "mysql";
 
 // ReadonlyNameBook < Book with attr_readonly :name (insert_all_test.rb:14).
 class ReadonlyNameBook extends Book {
@@ -146,7 +145,7 @@ describe("InsertAllTest", () => {
     ]);
   });
 
-  it("insert", async () => {
+  itIfSupports("insert_on_duplicate_skip", "insert", async () => {
     const id = 1_000_000;
     await Book.insert({ id, name: "Rework", author_id: 1 });
     expect(await Book.exists(id)).toBe(true);
@@ -184,7 +183,7 @@ describe("InsertAllTest", () => {
     expect(await Book.count()).toBe(before + 10);
   });
 
-  it("insert all should handle empty arrays", async () => {
+  itIfSupports("insert_on_duplicate_update", "insert all should handle empty arrays", async () => {
     // Rails asserts assert_empty on the returned ActiveRecord::Result.
     expect((await Book.insertAll([])).length).toBe(0);
     expect((await Book.insertAllBang([])).length).toBe(0);
@@ -208,7 +207,8 @@ describe("InsertAllTest", () => {
     expect(result).toBeInstanceOf(Result);
   });
 
-  it.skipIf(!supportsInsertReturning)(
+  itIfSupports(
+    "insert_returning",
     "insert all returns primary key if returning is supported",
     async () => {
       const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }]);
@@ -216,34 +216,28 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!supportsInsertReturning)(
-    "insert all returns nothing if returning is empty",
-    async () => {
-      const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
-        returning: [],
-      });
-      expect(result.columns).toEqual([]);
-    },
-  );
+  itIfSupports("insert_returning", "insert all returns nothing if returning is empty", async () => {
+    const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
+      returning: [],
+    });
+    expect(result.columns).toEqual([]);
+  });
 
-  it.skipIf(!supportsInsertReturning)(
-    "insert all returns nothing if returning is false",
-    async () => {
-      const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
-        returning: false,
-      });
-      expect(result.columns).toEqual([]);
-    },
-  );
+  itIfSupports("insert_returning", "insert all returns nothing if returning is false", async () => {
+    const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
+      returning: false,
+    });
+    expect(result.columns).toEqual([]);
+  });
 
-  it.skipIf(!supportsInsertReturning)("insert all returns requested fields", async () => {
+  itIfSupports("insert_returning", "insert all returns requested fields", async () => {
     const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
       returning: ["id", "name"],
     });
     expect(result.pluck("name")).toEqual(["Rework"]);
   });
 
-  it.skipIf(!supportsInsertReturning)("insert all returns requested sql fields", async () => {
+  itIfSupports("insert_returning", "insert all returns requested sql fields", async () => {
     const { sql } = await import("@blazetrails/arel");
     const result = await Book.insertAllBang([{ name: "Rework", author_id: 1 }], {
       returning: sql("UPPER(name) as name"),
@@ -251,7 +245,7 @@ describe("InsertAllTest", () => {
     expect(result.pluck("name")).toEqual(["REWORK"]);
   });
 
-  it("insert all can skip duplicate records", async () => {
+  itIfSupports("insert_on_duplicate_skip", "insert all can skip duplicate records", async () => {
     const before = (await Book.count()) as number;
     // id 1 is the `awdr` fixture, so the row is skipped on the PK conflict.
     await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
@@ -261,46 +255,67 @@ describe("InsertAllTest", () => {
   // Rails gates these to MySQL (`if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`):
   // ON DUPLICATE KEY UPDATE is MySQL-specific, and SQLite/PG reject
   // `DEFAULT VALUES ON CONFLICT`.
-  it.skipIf(!isMysql)("insert all generates correct sql", async () => {
-    await assertQueriesMatch(/ON DUPLICATE KEY UPDATE/, undefined, false, async () => {
-      await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
-    });
-  });
+  itIfSupports.skipIf(adapterType !== "mysql")(
+    "insert_on_duplicate_skip",
+    "insert all generates correct sql",
+    async () => {
+      await assertQueriesMatch(/ON DUPLICATE KEY UPDATE/, undefined, false, async () => {
+        await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
+      });
+    },
+  );
 
-  it.skipIf(!isMysql)("insert all succeeds when passed no attributes", async () => {
-    await expect(Book.insertAll([{}])).resolves.not.toThrow();
-  });
+  itIfSupports.skipIf(adapterType !== "mysql")(
+    "insert_on_duplicate_skip",
+    "insert all succeeds when passed no attributes",
+    async () => {
+      await expect(Book.insertAll([{}])).resolves.not.toThrow();
+    },
+  );
 
-  it("insert all with skip duplicates and autonumber id not given", async () => {
-    const before = (await Book.count()) as number;
-    // Duplicates per the unique [author_id, name] index, but their IDs are not
-    // specified, so one is skipped by the index rather than by id.
-    await Book.insertAll([
-      { author_id: 8, name: "Refactoring" },
-      { author_id: 8, name: "Refactoring" },
-    ]);
-    expect(((await Book.count()) as number) - before).toBe(1);
-  });
+  itIfSupports(
+    "insert_on_duplicate_skip",
+    "insert all with skip duplicates and autonumber id not given",
+    async () => {
+      const before = (await Book.count()) as number;
+      // Duplicates per the unique [author_id, name] index, but their IDs are not
+      // specified, so one is skipped by the index rather than by id.
+      await Book.insertAll([
+        { author_id: 8, name: "Refactoring" },
+        { author_id: 8, name: "Refactoring" },
+      ]);
+      expect(((await Book.count()) as number) - before).toBe(1);
+    },
+  );
 
-  it("insert all with skip duplicates and autonumber id given", async () => {
-    const before = (await Book.count()) as number;
-    await Book.insertAll([
-      { id: 200, author_id: 8, name: "Refactoring" },
-      { id: 201, author_id: 8, name: "Refactoring" },
-    ]);
-    expect(((await Book.count()) as number) - before).toBe(1);
-  });
+  itIfSupports(
+    "insert_on_duplicate_skip",
+    "insert all with skip duplicates and autonumber id given",
+    async () => {
+      const before = (await Book.count()) as number;
+      await Book.insertAll([
+        { id: 200, author_id: 8, name: "Refactoring" },
+        { id: 201, author_id: 8, name: "Refactoring" },
+      ]);
+      expect(((await Book.count()) as number) - before).toBe(1);
+    },
+  );
 
-  it("skip duplicates strategy does not secretly upsert", async () => {
-    const book = await Book.create({ format: "EXPECTED", author_id: 8, name: "Refactoring" });
-    const before = (await Book.count()) as number;
-    await Book.insertAll([{ format: "UNEXPECTED", author_id: 8, name: "Refactoring" }]);
-    expect((await Book.count()) as number).toBe(before);
-    await book.reload();
-    expect(book.format).toBe("EXPECTED");
-  });
+  itIfSupports(
+    "insert_on_duplicate_skip",
+    "skip duplicates strategy does not secretly upsert",
+    async () => {
+      const book = await Book.create({ format: "EXPECTED", author_id: 8, name: "Refactoring" });
+      const before = (await Book.count()) as number;
+      await Book.insertAll([{ format: "UNEXPECTED", author_id: 8, name: "Refactoring" }]);
+      expect((await Book.count()) as number).toBe(before);
+      await book.reload();
+      expect(book.format).toBe("EXPECTED");
+    },
+  );
 
-  it.skipIf(!supportsInsertConflictTarget)(
+  itIfSupports.skipIf(!adapterSupports("insert_on_duplicate_skip"))(
+    "insert_conflict_target",
     "insert all will raise if duplicates are skipped only for a certain conflict target",
     async () => {
       // The awdr fixture occupies id 1; the conflict target is (author_id, name),
@@ -313,7 +328,8 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!supportsInsertConflictTarget)(
+  itIfSupports(
+    "insert_conflict_target",
     "insert all and upsert all with index finding options",
     async () => {
       const before = (await Book.count()) as number;
@@ -331,7 +347,8 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!supportsInsertConflictTarget || !supportsExpressionIndex)(
+  itIfSupports.skipIf(!adapterSupports("expression_index"))(
+    "insert_conflict_target",
     "insert all and upsert all with expression index",
     async () => {
       const book = await Book.create({ external_id: "abc" });
@@ -349,7 +366,8 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!supportsInsertConflictTarget)(
+  itIfSupports(
+    "insert_conflict_target",
     "insert all and upsert all raises when index is missing",
     async () => {
       for (const missing of ["cats", ["author_id", "isbn"], "author_id"] as const) {
@@ -363,7 +381,8 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!supportsInsertConflictTarget)(
+  itIfSupports(
+    "insert_conflict_target",
     "insert all and upsert all finds index with inverted unique by columns",
     async () => {
       const before = (await Book.count()) as number;
@@ -375,7 +394,8 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!supportsInsertConflictTarget)(
+  itIfSupports(
+    "insert_conflict_target",
     "insert all and upsert all works with composite primary keys when unique by is provided",
     async () => {
       const before = (await Cart.count()) as number;
@@ -395,7 +415,8 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(supportsInsertConflictTarget)(
+  itIfSupports.skipIf(adapterSupports("insert_conflict_target"))(
+    "insert_on_duplicate_skip",
     "insert all and upsert all works with composite primary keys when unique by is not provided",
     async () => {
       const before = (await Cart.count()) as number;
@@ -414,21 +435,25 @@ describe("InsertAllTest", () => {
     // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
   });
 
-  it("insert all and upsert all with aliased attributes", async () => {
-    await assertInsertAllReturningAlias();
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "insert all and upsert all with aliased attributes",
+    async () => {
+      await assertInsertAllReturningAlias();
 
-    await Book.upsertAll([{ id: 101, title: "Perelandra", author_id: 7, isbn: "1974522598" }]);
-    await Book.upsertAll([{ id: 101, title: "Perelandra 2", author_id: 6, isbn: "111111" }], {
-      updateOnly: ["title", "isbn"],
-    });
+      await Book.upsertAll([{ id: 101, title: "Perelandra", author_id: 7, isbn: "1974522598" }]);
+      await Book.upsertAll([{ id: 101, title: "Perelandra 2", author_id: 6, isbn: "111111" }], {
+        updateOnly: ["title", "isbn"],
+      });
 
-    const book = (await Book.find(101)) as any;
-    expect(book.title).toBe("Perelandra 2");
-    expect(book.isbn).toBe("111111");
-    expect(book.author_id).toBe(7);
-  });
+      const book = (await Book.find(101)) as any;
+      expect(book.title).toBe("Perelandra 2");
+      expect(book.isbn).toBe("111111");
+      expect(book.author_id).toBe(7);
+    },
+  );
 
-  it("insert all and upsert all with sti", async () => {
+  itIfSupports("insert_on_duplicate_update", "insert all and upsert all with sti", async () => {
     const before = (await Category.count()) as number;
     await SpecialCategory.insertAll([{ name: "First" }, { name: "Second", type: null }]);
     expect(await Category.count()).toBe(before + 2);
@@ -456,7 +481,7 @@ describe("InsertAllTest", () => {
   // Rails guards this with `unless in_memory_db?` (insert_all_test.rb:359).
   // trails' default SQLite worker is file-backed, never `:memory:`, so the
   // guard is a no-op here and the test runs on every adapter.
-  it("upsert and db warnings", async () => {
+  itIfSupports("insert_on_duplicate_update", "upsert and db warnings", async () => {
     try {
       await withDbWarningsAction("raise", async () => {
         await expect(
@@ -474,13 +499,14 @@ describe("InsertAllTest", () => {
     // BLOCKED: SQL log assertion. RFC 0030 d2-insert-all-canonical-models.
   });
 
-  it("upsert all updates existing records", async () => {
+  itIfSupports("insert_on_duplicate_update", "upsert all updates existing records", async () => {
     const newName = "Agile Web Development with Rails, 4th Edition";
     await Book.upsertAll([{ id: 1, name: newName }]);
     expect(((await Book.find(1)) as any).name).toBe(newName);
   });
 
-  it.skipIf(!supportsInsertConflictTarget)(
+  itIfSupports(
+    "insert_conflict_target",
     "upsert all updates existing record by primary key",
     async () => {
       await Book.upsertAll([{ id: 1, name: "New edition" }], { uniqueBy: "id" });
@@ -488,7 +514,8 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(supportsInsertConflictTarget)(
+  itIfSupports.skipIf(adapterSupports("insert_conflict_target"))(
+    "insert_on_duplicate_update",
     "upsert all does notupdates existing record by when there is no key",
     async () => {
       await Speedometer.create({ speedometer_id: "s3", name: "Very fast" });
@@ -497,7 +524,8 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(!supportsInsertConflictTarget)(
+  itIfSupports.skipIf(!adapterSupports("insert_on_duplicate_update"))(
+    "insert_conflict_target",
     "upsert all updates existing record by configured primary key fails when database supports insert conflict target",
     async () => {
       // speedometer_id is the configured PK but has no backing unique index on
@@ -528,22 +556,30 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it("upsert all does not update readonly attributes", async () => {
-    const newName = "Agile Web Development with Rails, 4th Edition";
-    await ReadonlyNameBook.upsertAll([{ id: 1, name: newName }]);
-    expect(((await Book.find(1)) as any).name).not.toBe(newName);
-  });
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all does not update readonly attributes",
+    async () => {
+      const newName = "Agile Web Development with Rails, 4th Edition";
+      await ReadonlyNameBook.upsertAll([{ id: 1, name: newName }]);
+      expect(((await Book.find(1)) as any).name).not.toBe(newName);
+    },
+  );
 
-  it.skipIf(!supportsInsertConflictTarget)("upsert all does not update primary keys", async () => {
-    await Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7 }]);
-    await Book.upsertAll([{ id: 103, name: "Perelandra", author_id: 7, isbn: "1974522598" }], {
-      uniqueBy: "index_books_on_author_id_and_name",
-    });
+  itIfSupports.skipIf(!adapterSupports("insert_on_duplicate_update"))(
+    "insert_conflict_target",
+    "upsert all does not update primary keys",
+    async () => {
+      await Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7 }]);
+      await Book.upsertAll([{ id: 103, name: "Perelandra", author_id: 7, isbn: "1974522598" }], {
+        uniqueBy: "index_books_on_author_id_and_name",
+      });
 
-    const book = (await Book.findBy({ name: "Perelandra" })) as any;
-    expect(book.id).toBe(101);
-    expect(book.isbn).toBe("1974522598");
-  });
+      const book = (await Book.findBy({ name: "Perelandra" })) as any;
+      expect(book.id).toBe(101);
+      expect(book.isbn).toBe("1974522598");
+    },
+  );
 
   it("upsert all passing both on duplicate and update only will raise an error", async () => {
     const { sql } = await import("@blazetrails/arel");
@@ -555,28 +591,39 @@ describe("InsertAllTest", () => {
     ).rejects.toThrow(ArgumentError);
   });
 
-  it("upsert all only updates the column provided via update only", async () => {
-    await Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7, isbn: "1974522598" }]);
-    await Book.upsertAll([{ id: 101, name: "Perelandra 2", author_id: 7, isbn: "111111" }], {
-      updateOnly: "name",
-    });
-    const book = (await Book.find(101)) as any;
-    expect(book.name).toBe("Perelandra 2");
-    expect(book.isbn).toBe("1974522598");
-  });
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all only updates the column provided via update only",
+    async () => {
+      await Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7, isbn: "1974522598" }]);
+      await Book.upsertAll([{ id: 101, name: "Perelandra 2", author_id: 7, isbn: "111111" }], {
+        updateOnly: "name",
+      });
+      const book = (await Book.find(101)) as any;
+      expect(book.name).toBe("Perelandra 2");
+      expect(book.isbn).toBe("1974522598");
+    },
+  );
 
-  it("upsert all only updates the list of columns provided via update only", async () => {
-    await Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7, isbn: "1974522598" }]);
-    await Book.upsertAll([{ id: 101, name: "Perelandra 2", author_id: 6, isbn: "111111" }], {
-      updateOnly: ["name", "isbn"],
-    });
-    const book = (await Book.find(101)) as any;
-    expect(book.name).toBe("Perelandra 2");
-    expect(book.isbn).toBe("111111");
-    expect(book.author_id).toBe(7);
-  });
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all only updates the list of columns provided via update only",
+    async () => {
+      await Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7, isbn: "1974522598" }]);
+      await Book.upsertAll([{ id: 101, name: "Perelandra 2", author_id: 6, isbn: "111111" }], {
+        updateOnly: ["name", "isbn"],
+      });
+      const book = (await Book.find(101)) as any;
+      expect(book.name).toBe("Perelandra 2");
+      expect(book.isbn).toBe("111111");
+      expect(book.author_id).toBe(7);
+    },
+  );
 
-  it.skipIf(!supportsInsertConflictTarget || !supportsPartialIndex)(
+  itIfSupports.skipIf(
+    !adapterSupports("insert_conflict_target") || !adapterSupports("partial_index"),
+  )(
+    "insert_on_duplicate_update",
     "upsert all does not perform an upsert if a partial index doesnt apply",
     async () => {
       await Book.upsertAll([
@@ -600,273 +647,335 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it("upsert all does not touch updated at when values do not change", async () => {
-    const updatedAt = Temporal.Instant.from("2018-01-01T00:00:00Z");
-    await Book.insertAll(
-      [
-        {
-          id: 101,
-          name: "Out of the Silent Planet",
-          published_on: "1938-04-01",
-          updated_at: updatedAt,
-        },
-      ],
-      { recordTimestamps: false },
-    );
-    await Book.upsertAll([
-      { id: 101, name: "Out of the Silent Planet", published_on: "1938-04-01" },
-    ]);
-    expect(getYear(((await Book.find(101)) as any).updated_at)).toBe(2018);
-  });
-
-  it("upsert all touches updated at and updated on when values change", async () => {
-    const old = Temporal.Instant.from("2018-01-01T00:00:00Z");
-    await Book.insertAll(
-      [
-        {
-          id: 101,
-          name: "Out of the Silent Planet",
-          published_on: "1938-04-01",
-          updated_at: old,
-          updated_on: "2018-01-01",
-        },
-      ],
-      { recordTimestamps: false },
-    );
-    await Book.upsertAll([
-      { id: 101, name: "Out of the Silent Planet", published_on: "1938-04-08" },
-    ]);
-    const year = new Date().getUTCFullYear();
-    expect(getYear(((await Book.find(101)) as any).updated_at)).toBe(year);
-    expect(getYear(((await Book.find(101)) as any).updated_on)).toBe(year);
-  });
-
-  it("upsert all respects updated at precision when touched implicitly", async () => {
-    await Book.insertAll(
-      [
-        {
-          id: 101,
-          name: "Out of the Silent Planet",
-          published_on: "1938-04-01",
-          updated_at: Temporal.Instant.from("2018-01-01T00:00:00Z"),
-        },
-      ],
-      { recordTimestamps: false },
-    );
-    let hasSubsecond = false;
-    for (let i = 1; i <= 100 && !hasSubsecond; i++) {
-      await Book.upsertAll([{ id: 101, name: `Out of the Silent Planet (Edition ${i})` }]);
-      const ua = ((await Book.find(101)) as any).updated_at as Temporal.Instant | null;
-      if (ua) hasSubsecond = ua.epochMilliseconds % 1000 !== 0;
-    }
-    expect(hasSubsecond).toBe(true);
-  });
-
-  it("upsert all uses given updated at over implicit updated at", async () => {
-    const updatedAt = Temporal.Instant.from("2025-01-01T00:00:00Z");
-    await Book.insertAll(
-      [
-        {
-          id: 101,
-          name: "Out of the Silent Planet",
-          published_on: "1938-04-01",
-          updated_at: Temporal.Instant.from("2018-01-01T00:00:00Z"),
-        },
-      ],
-      { recordTimestamps: false },
-    );
-    await Book.upsertAll([
-      {
-        id: 101,
-        name: "Out of the Silent Planet",
-        published_on: "1938-04-08",
-        updated_at: updatedAt,
-      },
-    ]);
-    expect(getYear(((await Book.find(101)) as any).updated_at)).toBe(2025);
-  });
-
-  it("upsert all uses given updated on over implicit updated on", async () => {
-    await Book.insertAll(
-      [
-        {
-          id: 101,
-          name: "Out of the Silent Planet",
-          published_on: "1938-04-01",
-          updated_on: "2018-01-01",
-        },
-      ],
-      { recordTimestamps: false },
-    );
-    await Book.upsertAll([
-      {
-        id: 101,
-        name: "Out of the Silent Planet",
-        published_on: "1938-04-08",
-        updated_on: "2025-06-01",
-      },
-    ]);
-    expect(getYear(((await Book.find(101)) as any).updated_on)).toBe(2025);
-  });
-
-  it("upsert all implicitly sets timestamps on create when model record timestamps is true", async () => {
-    await withRecordTimestamps(Ship, true, async () => {
-      await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }]);
-      const ship = (await Ship.find(101)) as any;
-      const year = new Date().getUTCFullYear();
-      expect(getYear(ship.created_at)).toBe(year);
-      expect(getYear(ship.created_on)).toBe(year);
-      expect(getYear(ship.updated_at)).toBe(year);
-      expect(getYear(ship.updated_on)).toBe(year);
-    });
-  });
-
-  it("upsert all does not implicitly set timestamps on create when model record timestamps is true but overridden", async () => {
-    await withRecordTimestamps(Ship, true, async () => {
-      await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
-        recordTimestamps: false,
-      });
-      const ship = (await Ship.find(101)) as any;
-      expect(ship.created_at).toBeNull();
-      expect(ship.created_on).toBeNull();
-      expect(ship.updated_at).toBeNull();
-      expect(ship.updated_on).toBeNull();
-    });
-  });
-
-  it("upsert all does not implicitly set timestamps on create when model record timestamps is false", async () => {
-    await withRecordTimestamps(Ship, false, async () => {
-      await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }]);
-      const ship = (await Ship.find(101)) as any;
-      expect(ship.created_at).toBeNull();
-      expect(ship.created_on).toBeNull();
-      expect(ship.updated_at).toBeNull();
-      expect(ship.updated_on).toBeNull();
-    });
-  });
-
-  it("upsert all implicitly sets timestamps on create when model record timestamps is false but overridden", async () => {
-    await withRecordTimestamps(Ship, false, async () => {
-      await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }], { recordTimestamps: true });
-      const ship = (await Ship.find(101)) as any;
-      const year = new Date().getUTCFullYear();
-      expect(getYear(ship.created_at)).toBe(year);
-      expect(getYear(ship.created_on)).toBe(year);
-      expect(getYear(ship.updated_at)).toBe(year);
-      expect(getYear(ship.updated_on)).toBe(year);
-    });
-  });
-
-  it("upsert all respects created at precision when touched implicitly", async () => {
-    let hasSubsecond = false;
-    await withRecordTimestamps(Ship, true, async () => {
-      for (let i = 1; i <= 100 && !hasSubsecond; i++) {
-        await Ship.upsertAll([{ id: 200 + i, name: "Boaty" }]);
-        const ca = ((await Ship.find(200 + i)) as any).created_at as Temporal.Instant | null;
-        if (ca) hasSubsecond = ca.epochMilliseconds % 1000 !== 0;
-      }
-    });
-    expect(hasSubsecond).toBe(true);
-  });
-
-  it("upsert all implicitly sets timestamps on update when model record timestamps is true", async () => {
-    await withRecordTimestamps(Ship, true, async () => {
-      const seed = Temporal.Instant.from("2016-04-17T00:00:00Z");
-      await Ship.insertAll(
-        [{ id: 101, name: "RSS Boaty McBoatface", created_at: seed, created_on: "2016-04-17" }],
-        { recordTimestamps: false },
-      );
-      await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }]);
-      const ship = (await Ship.find(101)) as any;
-      const year = new Date().getUTCFullYear();
-      expect(getYear(ship.created_at)).toBe(2016);
-      expect(getYear(ship.created_on)).toBe(2016);
-      expect(getYear(ship.updated_at)).toBe(year);
-      expect(getYear(ship.updated_on)).toBe(year);
-    });
-  });
-
-  it("upsert all does not implicitly set timestamps on update when model record timestamps is true but overridden", async () => {
-    await withRecordTimestamps(Ship, true, async () => {
-      const seed = Temporal.Instant.from("2016-04-17T00:00:00Z");
-      await Ship.insertAll(
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all does not touch updated at when values do not change",
+    async () => {
+      const updatedAt = Temporal.Instant.from("2018-01-01T00:00:00Z");
+      await Book.insertAll(
         [
           {
             id: 101,
-            name: "RSS Boaty McBoatface",
-            created_at: seed,
-            created_on: "2016-04-17",
-            updated_at: seed,
-            updated_on: "2016-04-17",
+            name: "Out of the Silent Planet",
+            published_on: "1938-04-01",
+            updated_at: updatedAt,
           },
         ],
         { recordTimestamps: false },
       );
-      await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }], {
-        recordTimestamps: false,
+      await Book.upsertAll([
+        { id: 101, name: "Out of the Silent Planet", published_on: "1938-04-01" },
+      ]);
+      expect(getYear(((await Book.find(101)) as any).updated_at)).toBe(2018);
+    },
+  );
+
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all touches updated at and updated on when values change",
+    async () => {
+      const old = Temporal.Instant.from("2018-01-01T00:00:00Z");
+      await Book.insertAll(
+        [
+          {
+            id: 101,
+            name: "Out of the Silent Planet",
+            published_on: "1938-04-01",
+            updated_at: old,
+            updated_on: "2018-01-01",
+          },
+        ],
+        { recordTimestamps: false },
+      );
+      await Book.upsertAll([
+        { id: 101, name: "Out of the Silent Planet", published_on: "1938-04-08" },
+      ]);
+      const year = new Date().getUTCFullYear();
+      expect(getYear(((await Book.find(101)) as any).updated_at)).toBe(year);
+      expect(getYear(((await Book.find(101)) as any).updated_on)).toBe(year);
+    },
+  );
+
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all respects updated at precision when touched implicitly",
+    async () => {
+      await Book.insertAll(
+        [
+          {
+            id: 101,
+            name: "Out of the Silent Planet",
+            published_on: "1938-04-01",
+            updated_at: Temporal.Instant.from("2018-01-01T00:00:00Z"),
+          },
+        ],
+        { recordTimestamps: false },
+      );
+      let hasSubsecond = false;
+      for (let i = 1; i <= 100 && !hasSubsecond; i++) {
+        await Book.upsertAll([{ id: 101, name: `Out of the Silent Planet (Edition ${i})` }]);
+        const ua = ((await Book.find(101)) as any).updated_at as Temporal.Instant | null;
+        if (ua) hasSubsecond = ua.epochMilliseconds % 1000 !== 0;
+      }
+      expect(hasSubsecond).toBe(true);
+    },
+  );
+
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all uses given updated at over implicit updated at",
+    async () => {
+      const updatedAt = Temporal.Instant.from("2025-01-01T00:00:00Z");
+      await Book.insertAll(
+        [
+          {
+            id: 101,
+            name: "Out of the Silent Planet",
+            published_on: "1938-04-01",
+            updated_at: Temporal.Instant.from("2018-01-01T00:00:00Z"),
+          },
+        ],
+        { recordTimestamps: false },
+      );
+      await Book.upsertAll([
+        {
+          id: 101,
+          name: "Out of the Silent Planet",
+          published_on: "1938-04-08",
+          updated_at: updatedAt,
+        },
+      ]);
+      expect(getYear(((await Book.find(101)) as any).updated_at)).toBe(2025);
+    },
+  );
+
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all uses given updated on over implicit updated on",
+    async () => {
+      await Book.insertAll(
+        [
+          {
+            id: 101,
+            name: "Out of the Silent Planet",
+            published_on: "1938-04-01",
+            updated_on: "2018-01-01",
+          },
+        ],
+        { recordTimestamps: false },
+      );
+      await Book.upsertAll([
+        {
+          id: 101,
+          name: "Out of the Silent Planet",
+          published_on: "1938-04-08",
+          updated_on: "2025-06-01",
+        },
+      ]);
+      expect(getYear(((await Book.find(101)) as any).updated_on)).toBe(2025);
+    },
+  );
+
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all implicitly sets timestamps on create when model record timestamps is true",
+    async () => {
+      await withRecordTimestamps(Ship, true, async () => {
+        await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }]);
+        const ship = (await Ship.find(101)) as any;
+        const year = new Date().getUTCFullYear();
+        expect(getYear(ship.created_at)).toBe(year);
+        expect(getYear(ship.created_on)).toBe(year);
+        expect(getYear(ship.updated_at)).toBe(year);
+        expect(getYear(ship.updated_on)).toBe(year);
       });
-      const ship = (await Ship.find(101)) as any;
-      expect(getYear(ship.created_at)).toBe(2016);
-      expect(getYear(ship.created_on)).toBe(2016);
-      expect(getYear(ship.updated_at)).toBe(2016);
-      expect(getYear(ship.updated_on)).toBe(2016);
-    });
-  });
+    },
+  );
 
-  it("upsert all does not implicitly set timestamps on update when model record timestamps is false", async () => {
-    await withRecordTimestamps(Ship, false, async () => {
-      await Ship.insertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
-        recordTimestamps: false,
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all does not implicitly set timestamps on create when model record timestamps is true but overridden",
+    async () => {
+      await withRecordTimestamps(Ship, true, async () => {
+        await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
+          recordTimestamps: false,
+        });
+        const ship = (await Ship.find(101)) as any;
+        expect(ship.created_at).toBeNull();
+        expect(ship.created_on).toBeNull();
+        expect(ship.updated_at).toBeNull();
+        expect(ship.updated_on).toBeNull();
       });
-      await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }]);
-      const ship = (await Ship.find(101)) as any;
-      expect(ship.created_at).toBeNull();
-      expect(ship.created_on).toBeNull();
-      expect(ship.updated_at).toBeNull();
-      expect(ship.updated_on).toBeNull();
-    });
-  });
+    },
+  );
 
-  it("upsert all implicitly sets timestamps on update when model record timestamps is false but overridden", async () => {
-    await withRecordTimestamps(Ship, false, async () => {
-      await Ship.insertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
-        recordTimestamps: false,
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all does not implicitly set timestamps on create when model record timestamps is false",
+    async () => {
+      await withRecordTimestamps(Ship, false, async () => {
+        await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }]);
+        const ship = (await Ship.find(101)) as any;
+        expect(ship.created_at).toBeNull();
+        expect(ship.created_on).toBeNull();
+        expect(ship.updated_at).toBeNull();
+        expect(ship.updated_on).toBeNull();
       });
-      await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }], {
-        recordTimestamps: true,
+    },
+  );
+
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all implicitly sets timestamps on create when model record timestamps is false but overridden",
+    async () => {
+      await withRecordTimestamps(Ship, false, async () => {
+        await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
+          recordTimestamps: true,
+        });
+        const ship = (await Ship.find(101)) as any;
+        const year = new Date().getUTCFullYear();
+        expect(getYear(ship.created_at)).toBe(year);
+        expect(getYear(ship.created_on)).toBe(year);
+        expect(getYear(ship.updated_at)).toBe(year);
+        expect(getYear(ship.updated_on)).toBe(year);
       });
-      const ship = (await Ship.find(101)) as any;
-      expect(ship.created_at).toBeNull();
-      expect(ship.created_on).toBeNull();
-      expect(getYear(ship.updated_at)).toBe(new Date().getUTCFullYear());
-      expect(getYear(ship.updated_on)).toBe(new Date().getUTCFullYear());
-    });
-  });
+    },
+  );
 
-  it("upsert all implicitly sets timestamps even when columns are aliased", async () => {
-    await Developer.upsertAll([{ id: 101, name: "Alice" }]);
-    const alice = (await Developer.find(101)) as any;
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all respects created at precision when touched implicitly",
+    async () => {
+      let hasSubsecond = false;
+      await withRecordTimestamps(Ship, true, async () => {
+        for (let i = 1; i <= 100 && !hasSubsecond; i++) {
+          await Ship.upsertAll([{ id: 200 + i, name: "Boaty" }]);
+          const ca = ((await Ship.find(200 + i)) as any).created_at as Temporal.Instant | null;
+          if (ca) hasSubsecond = ca.epochMilliseconds % 1000 !== 0;
+        }
+      });
+      expect(hasSubsecond).toBe(true);
+    },
+  );
 
-    expect(alice.created_at).not.toBeNull();
-    expect(alice.created_on).not.toBeNull();
-    expect(alice.updated_at).not.toBeNull();
-    expect(alice.updated_on).not.toBeNull();
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all implicitly sets timestamps on update when model record timestamps is true",
+    async () => {
+      await withRecordTimestamps(Ship, true, async () => {
+        const seed = Temporal.Instant.from("2016-04-17T00:00:00Z");
+        await Ship.insertAll(
+          [{ id: 101, name: "RSS Boaty McBoatface", created_at: seed, created_on: "2016-04-17" }],
+          { recordTimestamps: false },
+        );
+        await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }]);
+        const ship = (await Ship.find(101)) as any;
+        const year = new Date().getUTCFullYear();
+        expect(getYear(ship.created_at)).toBe(2016);
+        expect(getYear(ship.created_on)).toBe(2016);
+        expect(getYear(ship.updated_at)).toBe(year);
+        expect(getYear(ship.updated_on)).toBe(year);
+      });
+    },
+  );
 
-    await alice.updateBang({
-      created_at: null,
-      created_on: null,
-      updated_at: null,
-      updated_on: null,
-    });
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all does not implicitly set timestamps on update when model record timestamps is true but overridden",
+    async () => {
+      await withRecordTimestamps(Ship, true, async () => {
+        const seed = Temporal.Instant.from("2016-04-17T00:00:00Z");
+        await Ship.insertAll(
+          [
+            {
+              id: 101,
+              name: "RSS Boaty McBoatface",
+              created_at: seed,
+              created_on: "2016-04-17",
+              updated_at: seed,
+              updated_on: "2016-04-17",
+            },
+          ],
+          { recordTimestamps: false },
+        );
+        await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }], {
+          recordTimestamps: false,
+        });
+        const ship = (await Ship.find(101)) as any;
+        expect(getYear(ship.created_at)).toBe(2016);
+        expect(getYear(ship.created_on)).toBe(2016);
+        expect(getYear(ship.updated_at)).toBe(2016);
+        expect(getYear(ship.updated_on)).toBe(2016);
+      });
+    },
+  );
 
-    await Developer.upsertAll([{ id: alice.id, name: alice.name, salary: alice.salary * 2 }]);
-    await alice.reload();
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all does not implicitly set timestamps on update when model record timestamps is false",
+    async () => {
+      await withRecordTimestamps(Ship, false, async () => {
+        await Ship.insertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
+          recordTimestamps: false,
+        });
+        await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }]);
+        const ship = (await Ship.find(101)) as any;
+        expect(ship.created_at).toBeNull();
+        expect(ship.created_on).toBeNull();
+        expect(ship.updated_at).toBeNull();
+        expect(ship.updated_on).toBeNull();
+      });
+    },
+  );
 
-    expect(alice.created_at).toBeNull();
-    expect(alice.created_on).toBeNull();
-    expect(alice.updated_at).not.toBeNull();
-    expect(alice.updated_on).not.toBeNull();
-  });
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all implicitly sets timestamps on update when model record timestamps is false but overridden",
+    async () => {
+      await withRecordTimestamps(Ship, false, async () => {
+        await Ship.insertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
+          recordTimestamps: false,
+        });
+        await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }], {
+          recordTimestamps: true,
+        });
+        const ship = (await Ship.find(101)) as any;
+        expect(ship.created_at).toBeNull();
+        expect(ship.created_on).toBeNull();
+        expect(getYear(ship.updated_at)).toBe(new Date().getUTCFullYear());
+        expect(getYear(ship.updated_on)).toBe(new Date().getUTCFullYear());
+      });
+    },
+  );
+
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all implicitly sets timestamps even when columns are aliased",
+    async () => {
+      await Developer.upsertAll([{ id: 101, name: "Alice" }]);
+      const alice = (await Developer.find(101)) as any;
+
+      expect(alice.created_at).not.toBeNull();
+      expect(alice.created_on).not.toBeNull();
+      expect(alice.updated_at).not.toBeNull();
+      expect(alice.updated_on).not.toBeNull();
+
+      await alice.updateBang({
+        created_at: null,
+        created_on: null,
+        updated_at: null,
+        updated_on: null,
+      });
+
+      await Developer.upsertAll([{ id: alice.id, name: alice.name, salary: alice.salary * 2 }]);
+      await alice.reload();
+
+      expect(alice.created_at).toBeNull();
+      expect(alice.created_on).toBeNull();
+      expect(alice.updated_at).not.toBeNull();
+      expect(alice.updated_on).not.toBeNull();
+    },
+  );
 
   it("insert all raises on unknown attribute", async () => {
     await expect(Book.insertAllBang([{ unknown_attribute: "Test" }])).rejects.toThrow(
@@ -1013,14 +1122,14 @@ describe("InsertAllTest", () => {
     );
   });
 
-  it("upsert all on relation", async () => {
+  itIfSupports("insert_on_duplicate_update", "upsert all on relation", async () => {
     const author = await Author.create({ name: "Jimmy" });
     const before = (await (author as any).books.count()) as number;
     await (author as any).books.upsertAll([{ name: "My little book", isbn: "1974522598" }]);
     expect(await (author as any).books.count()).toBe(before + 1);
   });
 
-  it("upsert all on relation precedence", async () => {
+  itIfSupports("insert_on_duplicate_update", "upsert all on relation precedence", async () => {
     const author = await Author.create({ name: "Jimmy" });
     const secondAuthor = await Author.create({ name: "Bob" });
     const before = (await (author as any).books.count()) as number;
@@ -1030,18 +1139,18 @@ describe("InsertAllTest", () => {
     expect(await (author as any).books.count()).toBe(before + 1);
   });
 
-  it("upsert all create with", async () => {
+  itIfSupports("insert_on_duplicate_update", "upsert all create with", async () => {
     const before = (await Book.where({ format: "X" }).count()) as number;
     await Book.createWith({ format: "X" }).upsertAll([{ name: "A" }, { name: "B" }]);
     expect(await Book.where({ format: "X" }).count()).toBe(before + 2);
   });
 
-  it("upsert all has many through", async () => {
+  itIfSupports("insert_on_duplicate_update", "upsert all has many through", async () => {
     const book = (await Book.first()) as any;
     await expect(book.subscribers.upsertAll([{ nick: "Jimmy" }])).rejects.toThrow(ArgumentError);
   });
 
-  it("upsert all updates using provided sql", async () => {
+  itIfSupports("insert_on_duplicate_update", "upsert all updates using provided sql", async () => {
     const { sql } = await import("@blazetrails/arel");
     const operator = adapterType === "sqlite" ? "MAX" : "GREATEST";
     await Book.upsertAll(
@@ -1058,20 +1167,24 @@ describe("InsertAllTest", () => {
   });
 
   // Rails gates to MySQL: VALUES() is MySQL-only ON DUPLICATE KEY UPDATE syntax.
-  it.skipIf(!isMysql)("upsert all updates using values function on duplicate raw sql", async () => {
-    const { sql } = await import("@blazetrails/arel");
-    const b1 = await Book.create({ name: "Name" });
-    const b2 = await Book.create({ name: null as any });
-    await Book.upsertAll(
-      [
-        { id: (b1 as any).id, name: "No Name" },
-        { id: (b2 as any).id, name: "No Name" },
-      ],
-      { onDuplicate: sql("name = IFNULL(name, values(name))") },
-    );
-    expect(((await Book.find((b1 as any).id)) as any).name).toBe("Name");
-    expect(((await Book.find((b2 as any).id)) as any).name).toBe("No Name");
-  });
+  itIfSupports.skipIf(adapterType !== "mysql")(
+    "insert_on_duplicate_update",
+    "upsert all updates using values function on duplicate raw sql",
+    async () => {
+      const { sql } = await import("@blazetrails/arel");
+      const b1 = await Book.create({ name: "Name" });
+      const b2 = await Book.create({ name: null as any });
+      await Book.upsertAll(
+        [
+          { id: (b1 as any).id, name: "No Name" },
+          { id: (b2 as any).id, name: "No Name" },
+        ],
+        { onDuplicate: sql("name = IFNULL(name, values(name))") },
+      );
+      expect(((await Book.find((b1 as any).id)) as any).name).toBe("Name");
+      expect(((await Book.find((b2 as any).id)) as any).name).toBe("No Name");
+    },
+  );
 
   it.skip("upsert all updates using provided sql and unique by", () => {
     // BLOCKED: unique-index introspection — unique_by [name, author_id].
