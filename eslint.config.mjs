@@ -23,6 +23,7 @@ import requireCanonicalSchema from "./eslint/require-canonical-schema.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
+import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import { readFileSync } from "node:fs";
 
 /** @type {string[]} */
@@ -142,6 +143,7 @@ export default defineConfig(
           "require-table-teardown": requireTableTeardown,
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
+          "no-explicit-any-disable": noExplicitAnyDisable,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
         },
@@ -473,6 +475,16 @@ export default defineConfig(
   {
     files: [...noExplicitAnySrcExclude, ...noExplicitAnyTestExclude],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
+  },
+  // ── no-explicit-any-disable: forbid silencing `no-explicit-any` inline.
+  //    With the rule at `error`, the workaround shifts from `as any` to an
+  //    inline `eslint-disable`. Disabling the rule must itself be an error —
+  //    fix the `any`. No allowlist; applies to src and tests. ──
+  {
+    files: ["packages/activerecord/src/**/*.ts"],
+    rules: {
+      "blazetrails/no-explicit-any-disable": "error",
+    },
   },
 
   // ── no conditionals in tests (all packages except activerecord) ──

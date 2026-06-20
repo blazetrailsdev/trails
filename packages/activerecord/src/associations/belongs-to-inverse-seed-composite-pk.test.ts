@@ -96,19 +96,20 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
     const child = new CpkSeedChild();
     const parent = new CompositePkParent({ shop_id: 7, id: 42 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (child.association("compositePkParent") as any).writer(parent);
+    (child.association("compositePkParent") as unknown as { writer(target: unknown): void }).writer(
+      parent,
+    );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((child as any).composite_pk_parent_id).toBe(42);
+    expect((child as Record<string, unknown>).composite_pk_parent_id).toBe(42);
   });
 
   it("infers id as the association primary key for a [tenant_key, id]-PK target", () => {
     const child = new CpkSeedChild();
     const parent = new CompositePkParent({ shop_id: 7, id: 42 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const holder = child.association("compositePkParent") as any;
+    const holder = child.association("compositePkParent") as unknown as {
+      associationPrimaryKeys(target: unknown): string[];
+    };
     expect(holder.associationPrimaryKeys(parent)).toEqual(["id"]);
   });
 });
