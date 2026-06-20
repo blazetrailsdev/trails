@@ -142,6 +142,30 @@ describe("CacheStoreNamespaceTest", () => {
       fu: "baz",
     });
   });
+
+  it("fetch multi with namespace option", () => {
+    const cache = new TestStore();
+    cache.write("foo", "bar", { namespace: "tester" });
+    cache.write("fu", "baz", { namespace: "tester" });
+    const values = cache.fetchMulti("foo", "fu", { namespace: "tester" }, (key) => key + " block");
+    expect(values).toEqual({ foo: "bar", fu: "baz" });
+    expect(cache.read("foo", { namespace: "tester" })).toBe("bar");
+  });
+
+  it("fetch multi with force option", () => {
+    const cache = new TestStore();
+    cache.write("foo", "bar");
+    const values = cache.fetchMulti("foo", "fu", { force: true }, (key) => key + " block");
+    expect(values).toEqual({ foo: "foo block", fu: "fu block" });
+    expect(cache.read("foo")).toBe("foo block");
+  });
+
+  it("fetch multi with expires in option", () => {
+    const cache = new TestStore();
+    const values = cache.fetchMulti("foo", { expiresIn: 10 }, (key) => key + " block");
+    expect(values).toEqual({ foo: "foo block" });
+    expect(cache.read("foo")).toBe("foo block");
+  });
 });
 
 describe("CacheInstrumentationBehavior", () => {

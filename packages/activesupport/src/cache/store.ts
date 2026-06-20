@@ -223,9 +223,9 @@ export abstract class Store {
     const block = namesAndBlock.pop() as ((key: string) => unknown) | undefined;
     if (typeof block !== "function")
       throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
+    if (namesAndBlock.length === 0) return {};
     const options = extractOptions(namesAndBlock as unknown[]);
     const names = namesAndBlock as string[];
-    if (names.length === 0) return {};
     const merged = this.mergedOptions(options);
     const keys = names.map((n) => this.normalizeKey(n, merged));
     const writes: Record<string, unknown> = {};
