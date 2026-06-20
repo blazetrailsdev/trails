@@ -72,10 +72,11 @@ tester.run("no-explicit-any-disable", rule, {
       code: `/* eslint-disable */\nconst f = 1 as any;\n`,
       errors: [{ messageId: "forbiddenBare", data: { line: "1" }, line: 0 }],
     },
-    // Bare disable-next-line does not cover its own line, so it reports normally.
+    // Bare disable-next-line disables every rule too, but doesn't cover its own
+    // line, so it reports in place (still the "bare" message).
     {
       code: `// eslint-disable-next-line\nconst g = 1 as any;\n`,
-      errors: [{ messageId: "forbidden" }],
+      errors: [{ messageId: "forbiddenBare", data: { line: "1" }, line: 1 }],
     },
     // Bare disable-line — covers its own line, so it's the line-0 form too.
     {

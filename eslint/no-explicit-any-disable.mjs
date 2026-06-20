@@ -61,11 +61,15 @@ const rule = {
         for (const comment of sourceCode.getAllComments()) {
           const directive = classifyDirective(comment.value);
           if (!directive) continue;
-          const selfSuppressing =
-            directive.bare && (directive.type === "block" || directive.type === "line");
-          if (selfSuppressing) {
+          if (directive.bare) {
+            // A bare directive disables every rule, so describe it as such. A
+            // bare block or `-line` also covers its own location and would
+            // suppress this very report, so emit it at line 0 to escape that;
+            // bare `-next-line` only covers the following line, so report it in
+            // place. Either way the message names the real line.
+            const selfSuppressing = directive.type === "block" || directive.type === "line";
             context.report({
-              loc: { line: 0, column: 0 },
+              loc: selfSuppressing ? { line: 0, column: 0 } : comment.loc,
               messageId: "forbiddenBare",
               data: { line: String(comment.loc.start.line) },
             });
