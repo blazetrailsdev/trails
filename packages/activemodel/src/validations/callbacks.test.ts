@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { throwAbort } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 
 // Mirrors Rails validations/callbacks_test.rb: a base `Dog` with a `history`
@@ -110,7 +111,7 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
         this.attribute("name", "string");
         this.beforeValidation(() => {
           order.push("before");
-          return false;
+          throwAbort();
         });
         this.afterValidation(() => {
           order.push("after");

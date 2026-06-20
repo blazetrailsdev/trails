@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { throwAbort } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import {
   _registerCallbackOnProto,
@@ -16,7 +17,7 @@ describe("CallbacksTest", () => {
         this.attribute("name", "string");
         this.beforeValidation((_r: any) => {
           log.push("before");
-          return false;
+          throwAbort();
         });
         this.afterValidation((_r: any) => {
           log.push("after");
@@ -108,7 +109,7 @@ describe("CallbacksTest", () => {
         });
         this.beforeSave(() => {
           order.push("halt");
-          return false;
+          throwAbort();
         });
         this.beforeSave(() => {
           order.push("never");
@@ -332,23 +333,6 @@ describe("CallbackChain.run", () => {
     expect(log).toEqual(["block:start", "block:end", "after"]);
   });
 
-  it("returns false and skips block when before callback halts", () => {
-    const proto = Object.create(null);
-    const log: string[] = [];
-    _registerCallbackOnProto(proto, "before", "save", () => {
-      log.push("before");
-      return false;
-    });
-    _registerCallbackOnProto(proto, "after", "save", () => {
-      log.push("after");
-    });
-    const result = runAllCallbacks(proto, "save", {}, () => {
-      log.push("block");
-    });
-    expect(result).toBe(false);
-    expect(log).toEqual(["before"]);
-  });
-
   it("around callbacks wrap the block", () => {
     const proto = Object.create(null);
     const log: string[] = [];
@@ -364,23 +348,6 @@ describe("CallbackChain.run", () => {
       log.push("block");
     });
     expect(log).toEqual(["around:before", "block", "around:after", "after"]);
-  });
-
-  it("before callback that returns false halts the chain", () => {
-    const proto = Object.create(null);
-    const log: string[] = [];
-    _registerCallbackOnProto(proto, "before", "save", () => {
-      log.push("before");
-      return false;
-    });
-    _registerCallbackOnProto(proto, "after", "save", () => {
-      log.push("after");
-    });
-    const result = runAllCallbacks(proto, "save", {}, () => {
-      log.push("block");
-    });
-    expect(result).toBe(false);
-    expect(log).toEqual(["before"]);
   });
 
   it("after callbacks run in registration order", () => {
@@ -624,16 +591,6 @@ describe("unified sync/async runner", () => {
     expect(log).toEqual(["b1", "b2", "block", "a1"]);
   });
 
-  it("async before halts chain when resolving to false", async () => {
-    const proto = Object.create(null);
-    const log: string[] = [];
-    _registerCallbackOnProto(proto, "before", "save", async () => false);
-    _registerCallbackOnProto(proto, "after", "save", () => log.push("after"));
-    const ok = await runAllCallbacks(proto, "save", {}, () => log.push("block"));
-    expect(ok).toBe(false);
-    expect(log).toEqual([]);
-  });
-
   it("strict: 'sync' throws when a before callback returns a Promise", () => {
     const proto = Object.create(null);
     _registerCallbackOnProto(proto, "before", "validation", async () => {});
@@ -752,7 +709,7 @@ describe("Callbacks", () => {
         this.attribute("name", "string");
         this.beforeSave(() => {
           order.push("before");
-          return false;
+          throwAbort();
         });
         this.afterSave(() => {
           order.push("after");
@@ -774,7 +731,7 @@ describe("Callbacks", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.beforeValidation(() => false);
+        this.beforeValidation(() => throwAbort());
       }
     }
     const n = new NoValidate();

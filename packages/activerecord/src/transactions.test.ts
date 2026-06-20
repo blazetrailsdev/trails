@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { throwAbort } from "@blazetrails/activesupport";
 import {
   Base,
   transaction,
@@ -1912,7 +1913,7 @@ describe("TransactionTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.beforeDestroy(() => false);
+        this.beforeDestroy(() => throwAbort());
       }
     }
     const post = (await Post.create({ title: "to keep" })) as any;

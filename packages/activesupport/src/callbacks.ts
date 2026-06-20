@@ -10,11 +10,11 @@ export type CallbackKind = "before" | "after" | "around";
  * the before-callback runner. A bare `throw "abort"` is deliberately NOT
  * recognized — catching strings risks swallowing genuine errors.
  *
- * Relationship to `return false`: trails keeps `return false` as a supported
- * **alias** for halting (Rails ≤4 behavior), in addition to this sentinel.
- * Both halt the chain and make `save`/`destroy` return false; only these two
- * halt — any other thrown value (Error subclasses, etc.) propagates unchanged,
- * matching Rails' `raise`-in-callback semantics.
+ * Relationship to `return false`: returning `false` from a before callback does
+ * NOT halt the chain. Modern Rails (5+) ignores a `false` return entirely; the
+ * default terminator halts ONLY on `throw :abort`. The sentinel is the sole halt
+ * mechanism — any other thrown value (Error subclasses, etc.) propagates
+ * unchanged, matching Rails' `raise`-in-callback semantics.
  */
 const ABORT = Symbol("blazetrails.activesupport.callbacks.abort");
 
@@ -40,9 +40,9 @@ export interface DefineCallbacksOptions<T extends object = object> {
   /**
    * Mirrors Rails' :terminator option. Pass a function `(target, fn) => boolean` (returns true
    * to halt) or `false` to disable halting entirely. With the default terminator a before
-   * callback halts the chain either by throwing the abort sentinel ({@link throwAbort} — the
-   * faithful port of Ruby `throw :abort`) or, as a supported alias, by returning `false`
-   * (Rails ≤4 behavior, kept for ergonomics). Any other thrown value propagates unchanged.
+   * callback halts the chain ONLY by throwing the abort sentinel ({@link throwAbort} — the
+   * faithful port of Ruby `throw :abort`), matching Rails 5+ default_terminator. A `false`
+   * return does NOT halt. Any other thrown value propagates unchanged.
    *
    * **Async constraint**: async before callbacks (those returning a Promise) are only supported
    * with the default terminator. Registering a custom terminator function and then running an
@@ -378,7 +378,16 @@ export class Before {
             fn();
             return false;
           }
-        : (chainConfig.terminator ?? ((_t: object, fn: () => unknown) => fn() === false));
+        : (chainConfig.terminator ??
+          ((_t: object, fn: () => unknown) => {
+            try {
+              fn();
+              return false;
+            } catch (e) {
+              if (isAbortSignal(e)) return true;
+              throw e;
+            }
+          }));
     this.filter = filter;
     this.name = name;
   }
@@ -406,7 +415,14 @@ export class Before {
         return true;
       } // run but never halt
       if (terminatorFn) return !terminatorFn(target, () => cb.call(target, target));
-      return cb.call(target, target) !== false;
+      // Default terminator: halt only on the abort sentinel (Rails 5+).
+      try {
+        cb.call(target, target);
+        return true;
+      } catch (e) {
+        if (isAbortSignal(e)) return false;
+        throw e;
+      }
     };
   }
 }
@@ -613,7 +629,14 @@ export class Callback {
     if (!Value.check(this.options, target)) return true;
 
     if (this.kind === "before") {
-      return (this.filter as BeforeCallback).call(target, target) !== false;
+      // Default terminator: halt only on the abort sentinel (Rails 5+).
+      try {
+        (this.filter as BeforeCallback).call(target, target);
+        return true;
+      } catch (e) {
+        if (isAbortSignal(e)) return false;
+        throw e;
+      }
     } else if (this.kind === "after") {
       (this.filter as AfterCallback).call(target, target);
       return true;
@@ -863,18 +886,16 @@ export class CallbackChain {
           throw new Error(
             `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
               `Custom terminators cannot evaluate Promise-returning callbacks. ` +
-              `Use the default terminator (halt on false) or make all before callbacks synchronous.`,
+              `Use the default terminator (halt via throwAbort()) or make all before callbacks synchronous.`,
           );
         }
         const remaining = befores.slice(i + 1);
-        // Default-terminator async halt: resolved === false. The terminator already fired
-        // once (for invocation control, saw the Promise); we use === false directly to avoid
-        // calling it a second time with the resolved value.
-        const asyncHalted = (v: unknown) => terminatorFn !== false && v === false;
+        // Default-terminator async halt is sentinel-only: an async before halts
+        // by rejecting with the abort sentinel (handled in the catch blocks
+        // below). A `false` resolution no longer halts, matching Rails 5+.
         return (async () => {
-          let firstResolved: unknown;
           try {
-            firstResolved = await cbResult;
+            await cbResult;
           } catch (e) {
             // Default terminator only (custom terminators already threw above;
             // `terminator: false` never halts, so it must NOT swallow abort —
@@ -883,8 +904,6 @@ export class CallbackChain {
             if (!isAbortSignal(e) || terminatorFn === false) throw e;
             return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
           }
-          if (asyncHalted(firstResolved))
-            return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
           for (const rem of remaining) {
             if (!Value.check(rem.options, target)) continue;
             // Invoke each remaining before through the terminator's lazy wrapper so
@@ -906,14 +925,13 @@ export class CallbackChain {
               if (!isAbortSignal(e) || terminatorFn === false) throw e;
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
             }
-            let resolved: unknown;
             try {
-              resolved = isThenable(remVal) ? await remVal : remVal;
+              if (isThenable(remVal)) await remVal;
             } catch (e) {
               if (!isAbortSignal(e) || terminatorFn === false) throw e;
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
             }
-            if (remSyncHalt || asyncHalted(resolved))
+            if (remSyncHalt)
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
           }
           return this._runAroundAndAfter(
@@ -929,7 +947,10 @@ export class CallbackChain {
 
       if (terminatorFn === false) {
         // never halt
-      } else if (terminatorFn ? terminatorHalted : cbResult === false) {
+      } else if (terminatorFn && terminatorHalted) {
+        // Default terminator halts ONLY on the abort sentinel (handled above via
+        // `aborted`), matching Rails 5+ default_terminator. A `false` return no
+        // longer halts. A custom terminator owns its own halt decision.
         halted = true;
         break;
       }

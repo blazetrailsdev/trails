@@ -45,7 +45,8 @@ export class HasOneAssociation extends SingularAssociation {
         if (await this.loadTarget()) {
           // Rails: owner.errors.add(:base, ...); throw(:abort). The owner is
           // NOT destroyed and no exception is raised — `destroy` returns false.
-          // We signal :abort to the before_destroy chain by returning false.
+          // We return false here; the before_destroy wrapper (builder/association.ts
+          // addDestroyCallbacks) translates that into throwAbort() to halt the chain.
           const owner = this.owner as Base & {
             errors: { add(a: string, t: string, opts?: Record<string, unknown>): void };
           };

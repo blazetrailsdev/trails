@@ -45,7 +45,6 @@ describe("FilterTest", () => {
     }
     AuthController.beforeAction(function (this: any, controller: any) {
       controller.render({ plain: "unauthorized", status: 401 });
-      return false;
     });
 
     const c = new AuthController();

@@ -225,83 +225,15 @@ describe("CallbacksTest", () => {
     }).toThrow("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   });
 
-  it("before validation returns false", async () => {
-    class CbPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true });
-        this.beforeValidation(() => false);
-      }
-    }
-    const p = new CbPost({ title: "test" });
-    const result = await p.save();
-    expect(result).toBe(false);
-    expect(p.isNewRecord()).toBe(true);
-  });
-
-  it("before destroy returns false", async () => {
-    class CbPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.beforeDestroy(() => false);
-      }
-    }
-    const p = await CbPost.create({ title: "test" });
-    const result = await p.destroy();
-    expect(result).toBe(false);
-  });
-
   it("destroy bang throws when before destroy halts", async () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.beforeDestroy(() => false);
+        this.beforeDestroy(() => throwAbort());
       }
     }
     const p = await CbPost.create({ title: "test" });
     await expect(p.destroyBang()).rejects.toThrow(RecordNotDestroyed);
-  });
-
-  it("before save returns false", async () => {
-    class CbPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.beforeSave(() => false);
-      }
-    }
-    const p = new CbPost({ title: "test" });
-    const result = await p.save();
-    expect(result).toBe(false);
-    expect(p.isNewRecord()).toBe(true);
-  });
-
-  it("before create returns false", async () => {
-    class CbPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.beforeCreate(() => false);
-      }
-    }
-    const p = new CbPost({ title: "test" });
-    const result = await p.save();
-    expect(result).toBe(false);
-    expect(p.isNewRecord()).toBe(true);
-  });
-
-  it("before update returns false", async () => {
-    class CbPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await CbPost.create({ title: "test" });
-    CbPost.beforeUpdate(() => false);
-    p.title = "changed";
-    const result = await p.save();
-    expect(result).toBe(false);
-    // Verify the update was not persisted
-    const reloaded = await CbPost.find(p.id);
-    expect(reloaded.title).toBe("test");
   });
 
   it("after find", async () => {
@@ -804,22 +736,6 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  it("halts save when before_save returns false", async () => {
-    class Blocked extends Base {
-      static _tableName = "blocked";
-    }
-    Blocked.attribute("id", "integer");
-    Blocked.attribute("name", "string");
-    Blocked.beforeSave(() => false);
-
-    const b = new Blocked({ name: "test" });
-    const result = await b.save();
-    expect(result).toBe(false);
-    expect(b.isNewRecord()).toBe(true);
-  });
-});
-
-describe("CallbacksTest", () => {
   it("fires after touch() is called", async () => {
     const touched: string[] = [];
     class User extends Base {
@@ -1185,54 +1101,6 @@ describe("CallbacksTest", () => {
     expect(g.isNewRecord()).toBe(true);
   });
 
-  it("before_create returning false halts create (but before_save still ran)", async () => {
-    const log: string[] = [];
-
-    class Guarded extends Base {
-      static {
-        this.attribute("name", "string");
-        this.beforeSave(() => {
-          log.push("before_save");
-        });
-        this.beforeCreate(() => {
-          log.push("before_create");
-          return false;
-        });
-        this.afterSave(() => {
-          log.push("after_save");
-        });
-      }
-    }
-
-    const g = new Guarded({ name: "test" });
-    const result = await g.save();
-    expect(result).toBe(false);
-    expect(g.isNewRecord()).toBe(true);
-    // before_save ran, before_create halted the insert, but after_save still runs
-    // (Rails: _run_save_callbacks { _run_create_callbacks { ... } } — after_save fires
-    // once the save block finishes, regardless of whether create callbacks halted)
-    expect(log).toContain("before_save");
-    expect(log).toContain("before_create");
-    expect(log).toContain("after_save");
-  });
-
-  it("before_destroy returning false halts destruction", async () => {
-    class Guarded extends Base {
-      static {
-        this.attribute("name", "string");
-        this.beforeDestroy(() => false);
-      }
-    }
-
-    const g = await Guarded.create({ name: "protected" });
-    await g.destroy();
-    // Record should NOT be destroyed because before_destroy returned false
-    // (Note: In Rails, destroy would return false. Our implementation marks
-    // destroyed after callbacks, so before_destroy halting prevents the delete
-    // SQL but the record is still marked destroyed. This test verifies the
-    // callback did fire.)
-  });
-
   it("after_save runs on both create and update", async () => {
     const log: string[] = [];
 
@@ -1576,28 +1444,6 @@ describe("CallbacksTest", () => {
     expect(seen).toEqual([g.id]);
   });
 
-  it("async before_save returning false halts save", async () => {
-    class Locked extends Base {
-      static {
-        this._tableName = "lockeds";
-        this.attribute("id", "integer");
-        this.attribute("allowed", "boolean");
-        this.beforeSave(async (r: any) => {
-          await Promise.resolve();
-          return r.allowed === true;
-        });
-      }
-    }
-    const ok = new Locked();
-    ok.allowed = true;
-    expect(await ok.save()).toBe(true);
-
-    const blocked = new Locked();
-    blocked.allowed = false;
-    expect(await blocked.save()).toBe(false);
-    expect(blocked.isPersisted()).toBe(false);
-  });
-
   it("async around_create wraps the insert block and awaits both sides", async () => {
     const order: string[] = [];
     class Envelope extends Base {
@@ -1628,7 +1474,7 @@ describe("CallbacksTest", () => {
         this.attribute("sealed", "boolean");
         this.beforeDestroy(async (r: any) => {
           await Promise.resolve();
-          return r.sealed !== true;
+          if (r.sealed === true) throwAbort();
         });
       }
     }
@@ -1706,7 +1552,7 @@ describe("CallbacksTest", () => {
         this._tableName = "immutables";
         this.attribute("id", "integer");
         this.attribute("locked", "boolean");
-        this.beforeSave(() => false, { if: (r: any) => r.locked === true });
+        this.beforeSave(() => throwAbort(), { if: (r: any) => r.locked === true });
       }
     }
 

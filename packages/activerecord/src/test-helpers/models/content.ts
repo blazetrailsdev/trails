@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/content.rb
 import { Base } from "../../base.js";
+import { throwAbort } from "@blazetrails/activesupport";
 
 export class Content extends Base {
   declare contentPosition: ContentPosition | null;
@@ -39,10 +40,9 @@ export class ContentWhichRequiresTwoDestroyCalls extends Base {
     });
     this.beforeDestroy((record: ContentWhichRequiresTwoDestroyCalls) => {
       record.destroyCount++;
-      // Rails `throw :abort` halts the destroy chain (destroy returns false); the
-      // trails terminator halts when a before callback returns false.
+      // Rails `throw :abort` halts the destroy chain (destroy returns false).
       if (record.destroyCount === 1) {
-        return false;
+        throwAbort();
       }
     });
   }

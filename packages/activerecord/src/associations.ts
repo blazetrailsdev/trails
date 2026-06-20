@@ -2323,13 +2323,15 @@ export function fireAssocCallbacks(
     // `throw :abort` from after_add/after_remove propagates (Rails parity).
     if (catchAbort) {
       try {
-        if (cb(owner, record) === false) return false;
+        cb(owner, record);
       } catch (e) {
         if (!isAbortSignal(e)) throw e;
         return false;
       }
-    } else if (cb(owner, record) === false) {
-      return false;
+    } else {
+      // after_add/after_remove run outside the catch; their return value is
+      // ignored (Rails 5+ only halts on `throw :abort`, never on `false`).
+      cb(owner, record);
     }
   }
   return true;

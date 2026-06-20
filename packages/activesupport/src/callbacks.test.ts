@@ -208,22 +208,6 @@ describe("Callbacks", () => {
       expect(target.log).toEqual([]);
     });
 
-    it("halts when before callback returns false", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", () => false);
-      setCallback(target, "save", "before", (t: any) => {
-        t.log.push("should-not-run");
-      });
-
-      const result = runCallbacks(target, "save", () => {
-        target.log.push("block");
-      });
-
-      expect(result).toBe(false);
-      expect(target.log).toEqual([]);
-    });
-
     it("does not swallow the abort sentinel when terminator is disabled", () => {
       // Rails scopes `catch(:abort)` to the default terminator; with the
       // terminator disabled the sentinel must propagate, not halt the chain.
@@ -690,17 +674,18 @@ describe("Callbacks", () => {
   describe("termination skips following before and around callbacks", () => {
     it("termination skips following before and around callbacks", () => {
       // CallbackTerminatorTest#test_termination_skips_following_before_and_around_callbacks
-      // In Rails with custom terminator: result == :halt stops chain.
-      // In our system, returning false from a before callback halts.
+      // Rails uses a custom terminator: result == :halt stops the chain.
       const history: string[] = [];
       const target = { history, saved: false as boolean | undefined };
-      defineCallbacks(target, "save");
+      defineCallbacks(target, "save", {
+        terminator: (_t: object, fn: () => unknown) => fn() === "halt",
+      });
       setCallback(target, "save", "before", (t: any) => {
         t.history.push("first");
       });
       setCallback(target, "save", "before", (t: any) => {
         t.history.push("second");
-        return false;
+        return "halt";
       }); // halts
       setCallback(target, "save", "around", (t: any, next: () => void) => {
         t.history.push("around1");
@@ -731,8 +716,10 @@ describe("Callbacks", () => {
     it("block never called if terminated", () => {
       // CallbackTerminatorTest#test_block_never_called_if_terminated
       const target = { saved: false as boolean };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", () => false); // halts
+      defineCallbacks(target, "save", {
+        terminator: (_t: object, fn: () => unknown) => fn() === "halt",
+      });
+      setCallback(target, "save", "before", () => "halt"); // halts
       runCallbacks(target, "save", () => {
         target.saved = true;
       });
@@ -936,27 +923,6 @@ describe("CallbacksMixin", () => {
     const m = new MyModel();
     m.save();
     expect(m.log).toEqual(["before", "saved", "after"]);
-  });
-
-  it("beforeCallback returning false halts the chain", () => {
-    class MyModel extends CallbacksMixin() {
-      saved = false;
-
-      static {
-        this.defineCallbacks("save");
-        this.beforeCallback("save", () => false);
-      }
-
-      save() {
-        this.runCallbacks("save", () => {
-          this.saved = true;
-        });
-      }
-    }
-
-    const m = new MyModel();
-    m.save();
-    expect(m.saved).toBe(false);
   });
 
   it("aroundCallback wraps block", () => {
@@ -1453,10 +1419,11 @@ describe("NotPermittedStringCallbackTest", () => {
 });
 
 describe("CallbackTerminatorTest", () => {
+  const haltTerminator = (_t: object, fn: () => unknown) => fn() === "halt";
   it("termination skips following before and around callbacks", () => {
     const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => false); // halts
+    defineCallbacks(target, "save", { terminator: haltTerminator });
+    setCallback(target, "save", "before", () => "halt"); // halts
     setCallback(target, "save", "before", (t: any) => t.log.push("after-halt"));
     runCallbacks(target, "save", () => target.log.push("body"));
     expect(target.log).not.toContain("after-halt");
@@ -1464,15 +1431,15 @@ describe("CallbackTerminatorTest", () => {
   });
   it("termination invokes hook", () => {
     const target = { log: [] as string[], halted: false };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => false);
+    defineCallbacks(target, "save", { terminator: haltTerminator });
+    setCallback(target, "save", "before", () => "halt");
     runCallbacks(target, "save");
     expect(target.halted).toBe(false); // hook not invoked automatically
   });
   it("block never called if terminated", () => {
     const target = { ran: false };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => false);
+    defineCallbacks(target, "save", { terminator: haltTerminator });
+    setCallback(target, "save", "before", () => "halt");
     runCallbacks(target, "save", () => {
       target.ran = true;
     });
@@ -1481,18 +1448,10 @@ describe("CallbackTerminatorTest", () => {
 });
 
 describe("CallbackDefaultTerminatorTest", () => {
-  it("default terminator halts on false", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => false);
-    setCallback(target, "save", "before", (t: any) => t.log.push("ran"));
-    runCallbacks(target, "save");
-    expect(target.log).not.toContain("ran");
-  });
   it("default termination", () => {
     const target = { ran: false };
     defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => false);
+    setCallback(target, "save", "before", () => throwAbort());
     runCallbacks(target, "save", () => {
       target.ran = true;
     });
@@ -1503,7 +1462,7 @@ describe("CallbackDefaultTerminatorTest", () => {
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", (t: any) => {
       t.count++;
-      return false;
+      throwAbort();
     });
     runCallbacks(target, "save");
     expect(target.count).toBe(1);
@@ -1511,7 +1470,7 @@ describe("CallbackDefaultTerminatorTest", () => {
   it("block never called if abort is thrown", () => {
     const target = { ran: false };
     defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => false);
+    setCallback(target, "save", "before", () => throwAbort());
     runCallbacks(target, "save", () => {
       target.ran = true;
     });
@@ -1744,7 +1703,7 @@ describe("skipAfterCallbacksIfTerminated", () => {
     const log: string[] = [];
     const target = { log };
     defineCallbacks(target, "save"); // no skipAfterCallbacksIfTerminated
-    setCallback(target, "save", "before", () => false);
+    setCallback(target, "save", "before", () => throwAbort());
     setCallback(target, "save", "after", (t: any) => t.log.push("after"));
     const result = runCallbacks(target, "save");
     expect(result).toBe(false); // halted
@@ -1755,7 +1714,7 @@ describe("skipAfterCallbacksIfTerminated", () => {
     const log: string[] = [];
     const target = { log };
     defineCallbacks(target, "save", { skipAfterCallbacksIfTerminated: true });
-    setCallback(target, "save", "before", () => false);
+    setCallback(target, "save", "before", () => throwAbort());
     setCallback(target, "save", "after", (t: any) => t.log.push("after"));
     runCallbacks(target, "save");
     expect(log).not.toContain("after");

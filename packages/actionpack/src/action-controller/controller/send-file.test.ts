@@ -212,7 +212,6 @@ describe("SendFileTest", () => {
     }
     C.beforeAction((controller) => {
       (controller as Base).sendFile(testFilePath);
-      return false;
     });
 
     const c = new C();

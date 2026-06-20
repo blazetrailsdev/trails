@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/tagging.rb
 import { Base } from "../../base.js";
+import { throwAbort } from "@blazetrails/activesupport";
 
 export class Tagging extends Base {
   declare tag_id: number;
@@ -29,6 +30,6 @@ export class Tagging extends Base {
 
 export class IndestructibleTagging extends Tagging {
   static {
-    this.beforeDestroy(() => false as const);
+    this.beforeDestroy(() => throwAbort());
   }
 }
