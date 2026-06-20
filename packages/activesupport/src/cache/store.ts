@@ -189,7 +189,7 @@ export abstract class Store {
     for (const [name, value] of Object.entries(hash)) {
       normalizedHash[this.normalizeKey(name, merged)] = value;
     }
-    this.instrumentMulti("write_multi", normalizedHash, merged, () => {
+    return this.instrumentMulti("write_multi", normalizedHash, merged, () => {
       const entries: Record<string, Entry> = {};
       for (const [name, value] of Object.entries(hash)) {
         entries[this.normalizeKey(name, merged)] = new Entry(value, {
@@ -197,9 +197,8 @@ export abstract class Store {
           version: this.normalizeVersion(name, merged) ?? undefined,
         });
       }
-      this.writeMultiEntries(entries, merged);
+      return this.writeMultiEntries(entries, merged);
     });
-    return hash;
   }
 
   fetchMulti(...namesAndBlock: [...string[], (key: string) => unknown]): Record<string, unknown> {
@@ -376,8 +375,12 @@ export abstract class Store {
     return results;
   }
 
-  protected writeMultiEntries(hash: Record<string, Entry>, options: StoreOptions): void {
+  protected writeMultiEntries(
+    hash: Record<string, Entry>,
+    options: StoreOptions,
+  ): Record<string, Entry> {
     for (const [key, entry] of Object.entries(hash)) this.writeEntry(key, entry, options);
+    return hash;
   }
 
   protected deleteMultiEntries(keys: string[], options: StoreOptions): number {

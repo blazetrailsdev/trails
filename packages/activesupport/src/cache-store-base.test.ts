@@ -182,8 +182,9 @@ describe("CacheInstrumentationBehavior", () => {
 
   it("test_write_multi_instrumentation", () => {
     const writes = { a: "aa", b: "bb" };
+    let returned: unknown;
     const events = withInstrumentation("write_multi", () => {
-      cache.writeMulti(writes);
+      returned = cache.writeMulti(writes);
     });
     expect(events.map((e) => e.name)).toEqual(["cache_write_multi.active_support"]);
     expect(events[0].payload.super_operation).toBeUndefined();
@@ -191,6 +192,12 @@ describe("CacheInstrumentationBehavior", () => {
       [normalizedKey("a")]: "aa",
       [normalizedKey("b")]: "bb",
     });
+    // Rails write_multi returns the write_multi_entries result (the normalized
+    // entries hash), not the input hash (cache.rb:551-563, 842-846).
+    expect(Object.keys(returned as Record<string, unknown>)).toEqual([
+      normalizedKey("a"),
+      normalizedKey("b"),
+    ]);
   });
 
   it("test_fetch_multi_instrumentation_order_of_operations", () => {
