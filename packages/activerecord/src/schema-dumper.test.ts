@@ -201,9 +201,10 @@ describe("SchemaDumperTest", () => {
   });
 
   // Rails runs this unconditionally and branches the expected dump on
-  // `supports_partial_index?`. Gate on that capability (faithful to Rails)
-  // rather than a hardcoded adapter: only partial-index backends emit `where:`.
-  it.skipIf(!adapterSupports("partial_index"))("schema dumps partial indices", async () => {
+  // `supports_partial_index?` (schema_dumper_test.rb:185). On backends without
+  // partial-index support (MySQL) the DDL drops the `where` clause, so the dump
+  // emits a plain index.
+  it("schema dumps partial indices", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("email");
       t.boolean("active");
@@ -213,11 +214,16 @@ describe("SchemaDumperTest", () => {
       where: "active = true",
     });
     const output = SchemaDumper.dump(ctx);
-    expect(output).toContain('where: "active = true"');
+    // Rails branches the full expected index line on supports_partial_index?;
+    // unsupported backends (MySQL) emit the plain index with no `where:`.
+    const expected = adapterSupports("partial_index")
+      ? '  await ctx.addIndex("users", "email", { name: "idx_users_email_where_active", where: "active = true" });'
+      : '  await ctx.addIndex("users", "email", { name: "idx_users_email_where_active" });';
+    expect(output).toContain(expected);
   });
   // Rails runs this unconditionally and branches on `supports_nulls_not_distinct?`
-  // (PostgreSQL ≥ 15 only). Gate on that capability rather than a hardcoded adapter.
-  it.skipIf(!adapterSupports("nulls_not_distinct"))("schema dumps nulls not distinct", async () => {
+  // (PostgreSQL ≥ 15 only). Backends without support emit a plain unique index.
+  it("schema dumps nulls not distinct", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("email");
     });
@@ -227,7 +233,12 @@ describe("SchemaDumperTest", () => {
       nullsNotDistinct: true,
     });
     const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("nullsNotDistinct: true");
+    // Rails branches on supports_nulls_not_distinct? (PostgreSQL ≥ 15 only);
+    // unsupported backends emit a plain unique index with no `nullsNotDistinct:`.
+    const expected = adapterSupports("nulls_not_distinct")
+      ? '  await ctx.addIndex("users", "email", { name: "idx_users_email_unique", unique: true, nullsNotDistinct: true });'
+      : '  await ctx.addIndex("users", "email", { name: "idx_users_email_unique", unique: true });';
+    expect(output).toContain(expected);
   });
   it("schema dumps index sort order", async () => {
     await ctx.createTable("users", {}, (t) => {
