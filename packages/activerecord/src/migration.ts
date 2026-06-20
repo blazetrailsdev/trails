@@ -2379,12 +2379,15 @@ export class MigrationContext {
       columns: cols,
       unique,
       name: indexName,
-      where: options?.where,
+      // Mirror what the DDL above actually persisted: `WHERE` is dropped on
+      // MySQL (no partial-index support) and `NULLS NOT DISTINCT` is Postgres
+      // -only, so the dumped schema matches the real round-trip per adapter.
+      where: an !== "mysql" ? options?.where : undefined,
       orders: options?.order,
       using: usingStr ? options?.using : undefined,
       type: an === "mysql" ? options?.type : undefined,
       lengths: an === "mysql" ? options?.length : undefined,
-      nullsNotDistinct: options?.nullsNotDistinct,
+      nullsNotDistinct: an === "postgres" ? options?.nullsNotDistinct : undefined,
       include: options?.include,
       comment,
     });
