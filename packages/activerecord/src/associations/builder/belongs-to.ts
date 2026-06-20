@@ -71,10 +71,13 @@ export class BelongsTo extends SingularAssociation {
     // Register the counter column on the target class so isCounterCacheColumn
     // works on the has-many side — mirrors Rails' builder/belongs_to.rb line:
     //   klass._counter_cache_columns |= [cache_column]
-    const cacheColumn: string =
-      typeof reflection.counterCacheColumn === "function"
-        ? (reflection.counterCacheColumn() ?? `${pluralize(underscore(model.name))}_count`)
-        : `${pluralize(underscore(model.name))}_count`;
+    // Re-derived at flush time, not now: see counter-cache-state.ts. Resolving
+    // eagerly here can fall back to the non-demodulized column (cpk_books_count)
+    // when the target class isn't registered yet.
+    const cacheColumn = (): string =>
+      (typeof reflection.counterCacheColumn === "function"
+        ? reflection.counterCacheColumn()
+        : null) ?? `${pluralize(underscore(model.name))}_count`;
     const targetClassName = reflection.options?.className ?? camelize(name);
     // Rails: `klass = reflection.class_name.safe_constantize` — silently nil
     // when the target class isn't loaded yet, then guarded by
@@ -85,7 +88,7 @@ export class BelongsTo extends SingularAssociation {
     // (test re-runs, hot reload), at which point registerModel re-flushes —
     // mirroring Rails' behavior where re-loading the target class re-runs
     // the include chain.
-    const pending = pendingCounterCacheColumns.get(targetClassName) ?? new Set<string>();
+    const pending = pendingCounterCacheColumns.get(targetClassName) ?? new Set<() => string>();
     pending.add(cacheColumn);
     pendingCounterCacheColumns.set(targetClassName, pending);
     if (modelRegistry.has(targetClassName)) {

@@ -805,6 +805,17 @@ describe("CounterCacheTest", () => {
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(1);
   });
+  it("flushed counter cache column uses demodulized name when owner is defined before target", async () => {
+    // CpkBook (belongs_to :order, counter_cache) is defined before CpkOrder in
+    // cpk.ts, so addCounterCacheCallbacks stages the column while CpkOrder is
+    // unregistered. The staged value must be re-derived at flush time to the
+    // demodulized `books_count`, not the flat `cpk_books_count`.
+    const { CpkOrder } = await import("./test-helpers/models/cpk.js");
+    registerModel(CpkOrder);
+    const cols = (CpkOrder as any)._counterCacheColumns as Set<string>;
+    expect(cols.has("books_count")).toBe(true);
+    expect(cols.has("cpk_books_count")).toBe(false);
+  });
   it("update counter caches on update", async () => {
     class Topic extends Base {
       static {
