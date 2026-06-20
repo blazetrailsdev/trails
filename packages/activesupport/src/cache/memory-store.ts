@@ -34,7 +34,7 @@ export class MemoryStore implements CacheStore {
     entry: CacheEntry,
     raceConditionTtl: number,
   ): void {
-    if (Date.now() - entry.expiresAt! <= raceConditionTtl) {
+    if (raceConditionTtl > 0 && Date.now() - entry.expiresAt! <= raceConditionTtl) {
       this.store.set(resolvedKey, { ...entry, expiresAt: Date.now() + raceConditionTtl });
     } else {
       this.store.delete(resolvedKey);
