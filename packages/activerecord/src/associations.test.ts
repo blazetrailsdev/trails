@@ -2248,10 +2248,11 @@ describe("AssociationsTest", () => {
     let blogPost: any = shardedBlogPosts("great_post_blog_one");
     blogPost = await ShardedBlogPostWithRevision.find(blogPost.id);
 
-    // Rails raises when the association is loaded (`.to_a`); trails derives the
-    // foreign key eagerly when the proxy is built, so the throw surfaces on the
-    // accessor itself.
-    expect(() => blogPost.commentsWithoutQueryConstraints).toThrow(
+    // Rails raises only when the association is loaded (`.to_a`), not when the
+    // proxy is built — the FK is derived lazily inside `load_target`'s scope
+    // build. Reading the accessor must NOT throw; awaiting/loading does.
+    const proxy = blogPost.commentsWithoutQueryConstraints;
+    await expect(proxy.toArray()).rejects.toThrow(
       // Full Rails message tail (omitting the owner class name, which differs
       // between Rails `Sharded::BlogPostWithRevision` and the trails class).
       /has more than 2 attributes\. Active Record is unable to derive the query constraints for the association\. You need to explicitly define the query constraints for this association\./,
