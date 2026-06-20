@@ -316,15 +316,12 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
         t.text("non_null_text", { null: false });
         t.blob("non_null_blob", { null: false });
       });
+      // The harness runs the Rails AR-test ambient `partial_inserts = true`
+      // (dirty.rb:50; test-setup-ar.ts), so `new` (no attrs) omits the NOT NULL
+      // columns from the INSERT — letting the DB apply implicit 0/"" defaults in
+      // non-strict mode — exactly as Rails exercises this test.
       class TestMysqlNotNullDefault extends Base {
         static override tableName = "test_mysql_not_null_defaults";
-        // Rails' AR test suite runs with the framework default
-        // `partial_inserts = true` (dirty.rb:50), which the trails harness flips
-        // to false via `load_defaults 7.0` (test-setup-ar.ts). Restore the Rails
-        // test-env value here so `new` (no attrs) omits the NOT NULL columns from
-        // the INSERT — letting the DB apply implicit 0/"" defaults in non-strict
-        // mode — exactly as Rails exercises this test.
-        static override partialInserts = true;
       }
       TestMysqlNotNullDefault.adapter = adapter;
       await TestMysqlNotNullDefault.loadSchema();
