@@ -181,15 +181,14 @@ describe("HasOneAssociationsTest", () => {
   it("natural assignment", async () => {
     const apple = await Firm.create({ name: "Apple" });
     const citibank = await Account.create({ credit_limit: 10 });
-    (apple as any).account = citibank;
+    await (apple.association("account") as any).writer(citibank);
     expect((citibank as any).firm_id).toBe(apple.id);
   });
 
   it("natural assignment to nil", async () => {
     const firm = companies("first_firm") as any;
     const oldAccountId = (await readHasOne(firm, "account")).id;
-    firm.account = null;
-    await firm.save();
+    await firm.association("account").writer(null);
     expect(await readHasOne(firm, "account")).toBeNull();
     // account is dependent, therefore is destroyed when reference to owner is lost
     await expect(Account.find(oldAccountId)).rejects.toThrow(RecordNotFound);
@@ -204,10 +203,7 @@ describe("HasOneAssociationsTest", () => {
     // fix in associations.ts / instance-methods.ts).
     const firm = companies("rails_core") as any;
     const oldAccountId = (await readHasOne(firm, "account")).id;
-    firm.account = new Account({ credit_limit: 5 });
-    // DEVIATION: Rails persists the has_one write on assignment to a saved owner
-    // (no save() call); trails defers the displaced record's FK nullify to save().
-    await firm.save();
+    await firm.association("account").writer(new Account({ credit_limit: 5 }));
     // account is dependent with nullify, therefore its firm_id should be nil
     expect((await Account.find(oldAccountId)).firm_id).toBeNull();
   });
@@ -231,18 +227,15 @@ describe("HasOneAssociationsTest", () => {
     const account = await readHasOne(firm, "account");
     const oldAccountId = account.id;
     await account.destroy();
-    firm.account = null;
+    await firm.association("account").writer(null);
     expect(await readHasOne(companies("rails_core"), "account")).toBeNull();
     await expect(Account.find(oldAccountId)).rejects.toThrow(RecordNotFound);
   });
 
   it("association change calls delete", async () => {
     const firm = companies("first_firm") as any;
-    firm.deletableAccount = new Account({ credit_limit: 5 });
-    // DEVIATION: Rails persists the has_one write on assignment to a saved owner
-    // (no save() call); trails defers the displaced record's delete to save().
     // dependent: :delete skips callbacks, so destroyed_account_ids stays empty.
-    await firm.save();
+    await firm.association("deletableAccount").writer(new Account({ credit_limit: 5 }));
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
   });
 
@@ -439,7 +432,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = new Firm({ name: "GlobalMegaCorp" });
     await (firm as any).save();
     const account = new Account({ credit_limit: 1000 });
-    (firm as any).account = account;
+    await (firm.association("account") as any).writer(account);
     expect((await readHasOne(firm, "account")).id).toBe(account.id ?? account.id);
     expect(await account.save()).toBeTruthy();
     await firm.reload();
@@ -450,8 +443,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = new Firm({ name: "GlobalMegaCorp" });
     await (firm as any).save();
     const account = await Account.create({ credit_limit: 1000 });
-    (firm as any).account = account;
-    await firm.save();
+    await (firm.association("account") as any).writer(account);
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
@@ -606,25 +598,21 @@ describe("HasOneAssociationsTest", () => {
     const account = await Account.find(1);
     await readHasOne(company, "account"); // force loading
     await assertNoQueries(false, async () => {
-      company.account = account;
+      await company.association("account").writer(account);
     });
 
-    company.account = null;
+    await company.association("account").writer(null);
     await assertNoQueries(false, async () => {
-      company.account = null;
+      await company.association("account").writer(null);
     });
 
     const account2 = await Account.find(2);
-    // DEVIATION: Rails persists has_one writes on assignment to a saved owner —
-    // `assert_queries_count(3) { company.account = account }`. trails defers the
-    // nullify-old + update-new writes to save(), so the assignment runs no
-    // queries (the 3 writes happen on the owner's next save()).
-    await assertNoQueries(false, async () => {
-      company.account = account2;
+    await assertQueriesCount(3, false, async () => {
+      await company.association("account").writer(account2);
     });
 
     await assertNoQueries(false, async () => {
-      (new Firm() as any).account = account2;
+      await (new Firm().association("account") as any).writer(account2);
     });
   });
 
@@ -636,7 +624,7 @@ describe("HasOneAssociationsTest", () => {
     ship.name = "new name";
     expect(ship.changed).toBe(true);
     await assertQueriesCount(3, false, async () => {
-      (pirate.association("ship") as any).writer(ship);
+      await (pirate.association("ship") as any).writer(ship);
       await pirate.save();
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
@@ -649,7 +637,7 @@ describe("HasOneAssociationsTest", () => {
 
     const newShip = await Ship.create({ name: "new name" });
     await assertQueriesCount(4, false, async () => {
-      (pirate.association("ship") as any).writer(newShip);
+      await (pirate.association("ship") as any).writer(newShip);
       await pirate.save();
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");

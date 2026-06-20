@@ -28,6 +28,24 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
+   * Mirrors Rails `HasOneAssociation#replace`, which persists on assignment to
+   * a *saved* owner: the displaced record is nullified/deleted/destroyed and
+   * the new record is saved immediately (no `owner.save` needed). `replace`
+   * itself stays synchronous — it raises type mismatches synchronously and
+   * records the pending change — and `writer` returns the resulting
+   * `persistReplace()` promise so callers can `await` the immediate writes.
+   *
+   * For a *new* owner the foreign key isn't known yet, so persistence is
+   * deferred to the owner's next save (`flushPendingReplaces` → `persistReplace`).
+   */
+  override writer(record: Base | null): void | Promise<void> {
+    this.replace(record);
+    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.() && this._pendingReplace) {
+      return this.persistReplace();
+    }
+  }
+
+  /**
    * Handle the :dependent option when the owner is being destroyed.
    */
   async handleDependency(): Promise<void | false> {
@@ -117,7 +135,7 @@ export class HasOneAssociation extends SingularAssociation {
 
   protected override replace(record: Base | null, save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
-    const assigningAnother = this.target !== record;
+    const assigningAnother = !sameRecord(this.target, record);
     if (assigningAnother || (record as any)?.hasChangesToSave) {
       if (record) {
         this.setOwnerAttributes(record);
@@ -168,7 +186,7 @@ export class HasOneAssociation extends SingularAssociation {
       if (
         pending.previousTarget &&
         !(pending.previousTarget as any).isDestroyed?.() &&
-        pending.previousTarget !== pending.record
+        !sameRecord(pending.previousTarget, pending.record)
       ) {
         // removeTargetBang reads assoc.target; temporarily restore previousTarget
         // so it operates on the old record, not the new one already set in replace()
@@ -272,6 +290,22 @@ export class HasOneAssociation extends SingularAssociation {
       }
     }
   }
+}
+
+/**
+ * Mirrors Rails' `target != record` in `HasOneAssociation#replace`, where
+ * `!=` is ActiveRecord::Core#== — two records are the "same" when they are the
+ * identical object, or persisted instances of the same class with the same id.
+ * Using object identity alone would treat a freshly-found record (e.g.
+ * `Account.find(1)`) as a *different* record from the already-loaded target,
+ * triggering a spurious nullify/destroy of the row that is being re-assigned.
+ *
+ * @internal
+ */
+function sameRecord(a: Base | null, b: Base | null): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  return (a as { isEqual?: (other: unknown) => boolean }).isEqual?.(b) === true;
 }
 
 /** @internal */
