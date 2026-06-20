@@ -2176,21 +2176,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ? records
       : ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[]);
 
-    // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
-    // return` (collection_association.rb#remove_records): if any record's
-    // before_remove halts, the entire operation aborts and nothing is deleted.
-    for (const record of modelRecords) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true))
-        return [];
-    }
     // Persisted children are nullified via update_all (Rails delete_records
     // else-branch), bypassing validations/callbacks. New-record children have
     // no DB row — skip the DB call.
     const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
 
     // Mirror Rails remove_records (collection_association.rb#remove_records): the
-    // DB update + in-memory target removal + after_remove callbacks form one unit.
+    // before_remove loop, DB update, in-memory target removal, and after_remove
+    // callbacks form one unit — all run inside the transaction when there are
+    // persisted records, so before_remove side-effects participate in rollback.
+    let aborted = false;
     const removeRecords = async () => {
+      // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
+      // return`: if any record's before_remove halts, the entire operation aborts
+      // and nothing is deleted (the transaction commits with no work done).
+      for (const record of modelRecords) {
+        if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true)) {
+          aborted = true;
+          return;
+        }
+      }
       if (persistedRecords.length > 0) {
         const nullUpdates = this._buildNullifyUpdates();
         // Mirror Rails delete_records else-branch: scope to the specific records via
@@ -2232,6 +2237,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       await removeRecords();
     }
+    if (aborted) return [];
     return modelRecords as Base[];
   }
 
