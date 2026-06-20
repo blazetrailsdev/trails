@@ -2677,3 +2677,63 @@ describe("Counter Cache (Rails-guided)", () => {
     expect(topic.num_replies).toBe(1);
   });
 });
+
+// Trails-specific guard (no Rails analogue): Rails memoizes
+// `counter_cache_column` unconditionally with `@counter_cache_column ||=`,
+// because its target class resolves once via constant lookup. Trails resolves
+// the belongs_to target through the model registry on every call (flat class
+// names emulate Rails' demodulize), so a target re-registered between tests
+// would otherwise return a stale memo. PR #3704 keys the memo on the resolved
+// class identity (`_counterCacheColumnKlass`); this exercises that invalidation
+// path directly: compute -> re-register the target with a different inverse
+// hasMany shape -> recompute yields the new column, not the cached one.
+describe("counterCacheColumn memo invalidation on target re-registration", () => {
+  const makeShelfWithoutInverse = (): typeof Base => {
+    class Shelf extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    return Shelf;
+  };
+
+  const makeShelfWithInverse = (): typeof Base => {
+    class Shelf extends Base {
+      static {
+        this.attribute("name", "string");
+        // hasMany whose singular camelCase ("Book") is a suffix of the flat
+        // owner name "FooBook" -> demodulized "books_count" rather than the
+        // default pluralized-owner "foo_books_count".
+        this.hasMany("books", { className: "FooBook" });
+      }
+    }
+    return Shelf;
+  };
+
+  it("recomputes the counter cache column after the target class is re-registered", async () => {
+    const { modelRegistry } = await import("./associations.js");
+    modelRegistry.delete("Shelf");
+
+    class FooBook extends Base {
+      static {
+        this.attribute("shelf_id", "integer");
+        this.belongsTo("shelf", { counterCache: true });
+      }
+    }
+    registerModel(FooBook);
+
+    const reflection = (FooBook as any)._reflectOnAssociation("shelf");
+
+    // First target: no inverse hasMany -> column derives from the flat owner
+    // name. This populates the identity-keyed memo.
+    registerModel(makeShelfWithoutInverse());
+    expect(reflection.counterCacheColumn()).toBe("foo_books_count");
+
+    // Re-register a *different* class object under the same name, now carrying
+    // the inverse hasMany. The registry returns the new identity, so the memo
+    // misses and recomputes to the demodulized column instead of the stale one.
+    modelRegistry.delete("Shelf");
+    registerModel(makeShelfWithInverse());
+    expect(reflection.counterCacheColumn()).toBe("books_count");
+  });
+});
