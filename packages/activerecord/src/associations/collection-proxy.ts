@@ -2252,29 +2252,67 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         }
       }
       if (persistedRecords.length > 0) {
-        const nullUpdates = this._buildNullifyUpdates();
-        // Mirror Rails delete_records else-branch: scope to the specific records via
-        // composite_query_constraints_list (persistence.rb:234). Single-column: use
-        // `where({col: ids})`; composite: use `where(cols, tuples)` (OR-of-AND) to
-        // avoid the cartesian-product that `AND col1 IN (...) AND col2 IN (...)` produces.
-        const queryCols = compositeQueryConstraintsList.call(
-          (this as any)._modelClass as typeof Base,
-        );
-        const readCol = (r: Base, col: string) => (r as any)._readAttribute(col);
-        let scope = this.scope();
-        if (queryCols.length === 1) {
-          scope = scope.where({
-            [queryCols[0]]: persistedRecords.map((r) => readCol(r, queryCols[0])),
-          });
-        } else {
-          const tuples = persistedRecords.map((r) => queryCols.map((col) => readCol(r, col)));
-          scope = scope.where(queryCols, tuples);
-        }
-        await scope.updateAll(nullUpdates);
-        for (const record of persistedRecords) {
-          for (const [col, val] of Object.entries(nullUpdates)) {
-            record._writeAttribute(col, val);
+        // Mirror Rails CollectionProxy#delete → HasManyAssociation#delete_records:
+        // the effective strategy comes from the reflection's `:dependent`. `:destroy`
+        // destroys each record (callbacks run); `:delete_all` bulk-DELETEs the scoped
+        // rows; otherwise (incl. nil → the has_many default) nullify the FK.
+        const strategy = this._deleteStrategy();
+        if (strategy === "destroy") {
+          // Rails: records.each(&:destroy!).
+          for (const record of persistedRecords) {
+            await (record as any).destroyBang();
           }
+          // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
+          // The destroy callbacks decrement the owner's counter through the child's
+          // belongs_to inverse only when that inverse points at THIS reflection's
+          // counter column; otherwise (e.g. a has_many `counter_cache:` distinct from
+          // the inverse's) decrement here so we don't silently skip it.
+          const reflection = (
+            this._record.constructor as typeof Base & {
+              _reflectOnAssociation?: (
+                n: string,
+              ) => { inverseWhichUpdatesCounterCache?: () => unknown } | undefined;
+            }
+          )._reflectOnAssociation?.(this._assocName);
+          if (!reflection?.inverseWhichUpdatesCounterCache?.()) {
+            await this._decrementCounterCache(persistedRecords.length);
+          }
+        } else {
+          // Scope to the specific records via composite_query_constraints_list
+          // (persistence.rb:234). Single-column: `where({col: ids})`; composite:
+          // `where(cols, tuples)` (OR-of-AND) to avoid the cartesian-product that
+          // `AND col1 IN (...) AND col2 IN (...)` would produce.
+          const queryCols = compositeQueryConstraintsList.call(
+            (this as any)._modelClass as typeof Base,
+          );
+          const readCol = (r: Base, col: string) => (r as any)._readAttribute(col);
+          let scope = this.scope();
+          if (queryCols.length === 1) {
+            scope = scope.where({
+              [queryCols[0]]: persistedRecords.map((r) => readCol(r, queryCols[0])),
+            });
+          } else {
+            const tuples = persistedRecords.map((r) => queryCols.map((col) => readCol(r, col)));
+            scope = scope.where(queryCols, tuples);
+          }
+          let count: number;
+          if (strategy === "delete_all") {
+            count = await scope.deleteAll();
+          } else {
+            const nullUpdates = this._buildNullifyUpdates();
+            count = await scope.updateAll(nullUpdates);
+            for (const record of persistedRecords) {
+              for (const [col, val] of Object.entries(nullUpdates)) {
+                record._writeAttribute(col, val);
+              }
+            }
+          }
+          // Rails delete_records else-branch: update_counter(-delete_count). The
+          // bulk DELETE/UPDATE bypasses callbacks (and thus the belongs_to inverse),
+          // so Rails always decrements the owner's counter cache by the affected
+          // count here — unlike the :destroy branch, which is gated on
+          // inverse_updates_counter_cache?.
+          if (count > 0) await this._decrementCounterCache(count);
         }
       }
       // Remove from target first, then fire after_remove for all records.
@@ -2400,6 +2438,45 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       conditions[`${underscore(sourceName)}_type`] = this._assocDef.options.sourceType;
     }
     return (throughModel as any).where(conditions).deleteAll();
+  }
+
+  /**
+   * Resolve the effective `:dependent` strategy for a record-level `delete`,
+   * mirroring Rails `HasManyAssociation#delete_records`: `:destroy` destroys each
+   * record, `:delete_all` (or the `delete`/camelCase aliases) bulk-DELETEs, and
+   * everything else — including the nil default for a plain has_many — nullifies
+   * the FK. Unlike `deleteAll`, `delete` does NOT collapse `:destroy` to
+   * `:delete_all`, so destroy callbacks run.
+   */
+  private _deleteStrategy(): "delete_all" | "destroy" | "nullify" {
+    switch (this._assocDef.options.dependent as string | undefined) {
+      case "destroy":
+        return "destroy";
+      case "delete_all":
+      case "deleteAll":
+      case "delete":
+        return "delete_all";
+      default:
+        return "nullify";
+    }
+  }
+
+  /**
+   * Decrement the owner's counter cache by `count`, mirroring Rails
+   * `CollectionAssociation#update_counter` for the bulk delete/nullify path.
+   */
+  private async _decrementCounterCache(count: number): Promise<void> {
+    const counterCol = this._assocDef.options.counterCache;
+    if (!counterCol) return;
+    const owner = this._record as any;
+    const column = String(counterCol);
+    if (typeof owner.incrementBang === "function") {
+      await owner.incrementBang(column, -count);
+    } else if (typeof owner.updateCounters === "function") {
+      await owner.updateCounters({ [column]: -count });
+    } else if (typeof owner.increment === "function") {
+      owner.increment(column, -count);
+    }
   }
 
   private _buildNullifyUpdates(): Record<string, null> {

@@ -695,6 +695,37 @@ describe("HasManyAssociationsTest", () => {
     expect(tagging.tag_id).toBe(tag.id);
     expect(tagging.taggable_type).toBe("Post");
   });
+
+  it("deleting updates counter cache with dependent delete all", async () => {
+    const post = posts("welcome");
+    const startCount = (post as any).tags_count as number;
+    await post.updateColumns({ taggings_with_delete_all_count: startCount });
+
+    const first = (await post.taggingsWithDeleteAll.first())!;
+    await post.taggingsWithDeleteAll.delete(first);
+
+    await post.reload();
+    expect((post as any).taggings_with_delete_all_count).toBe(startCount - 1);
+    // dependent: :delete_all DELETEs the row — it must not survive with a null FK.
+    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
+  });
+
+  it("deleting updates counter cache with dependent destroy", async () => {
+    const post = posts("welcome");
+    const startCount = (post as any).tags_count as number;
+    await post.updateColumns({ taggings_with_destroy_count: startCount });
+
+    const first = (await post.taggingsWithDestroy.first())!;
+    await post.taggingsWithDestroy.delete(first);
+
+    await post.reload();
+    // The has_many counter (taggings_with_destroy_count) differs from the
+    // belongs_to inverse's (tags_count), so inverse_updates_counter_cache? is
+    // false and the destroy must still decrement it.
+    expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
+    // dependent: :destroy removes the row.
+    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
+  });
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -3910,68 +3941,6 @@ describe("HasManyAssociationsTest", () => {
     const post = await CcDelNdPost.create({ author_id: author.id, title: "A" });
     await post.destroy();
     const reloaded = await CcDelNdAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(0);
-  });
-  it("deleting updates counter cache with dependent delete all", async () => {
-    class CcDelDaAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.hasMany("posts", {
-          className: "CcDelDaPost",
-          foreignKey: "author_id",
-          dependent: "delete",
-        });
-      }
-    }
-    class CcDelDaPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcDelDaAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcDelDaAuthor);
-    registerModel(CcDelDaPost);
-    const author = await CcDelDaAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcDelDaPost.create({ author_id: author.id, title: "A" });
-    await post.destroy();
-    const reloaded = await CcDelDaAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(0);
-  });
-  it("deleting updates counter cache with dependent destroy", async () => {
-    class CcDelDsAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.hasMany("posts", {
-          className: "CcDelDsPost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class CcDelDsPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcDelDsAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcDelDsAuthor);
-    registerModel(CcDelDsPost);
-    const author = await CcDelDsAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcDelDsPost.create({ author_id: author.id, title: "A" });
-    await post.destroy();
-    const reloaded = await CcDelDsAuthor.find(author.id!);
     expect((reloaded as any).posts_count).toBe(0);
   });
   it("calling update on id changes the counter cache", async () => {
