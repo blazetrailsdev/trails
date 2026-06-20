@@ -2700,19 +2700,14 @@ function wrapCollectionProxy<T extends Base = Base>(
  */
 function destroyedByAssociationForeignKey(
   destroyed: Base,
-  dba: { foreignKey?: unknown; name?: string; options?: AssociationOptions },
+  dba: { foreignKey?: unknown; options?: AssociationOptions },
 ): unknown {
   if (dba.foreignKey != null) return dba.foreignKey;
   const options = dba.options ?? {};
   if (options.foreignKey != null) return options.foreignKey;
   if (options.queryConstraints != null) return options.queryConstraints;
   if (options.as != null) return `${underscore(String(options.as))}_id`;
-  // Prefer the rich reflection's foreignKey (declaring class, not the STI
-  // subclass owner) before the owner-class fallback — Rails `reflection.foreign_key`.
-  const ctor = destroyed.constructor as typeof Base;
-  const reflectionFk = dba.name != null ? ctor._reflectOnAssociation?.(dba.name)?.foreignKey : null;
-  if (reflectionFk != null) return reflectionFk;
-  return `${underscore(ctor.name)}_id`;
+  return `${underscore((destroyed.constructor as typeof Base).name)}_id`;
 }
 
 export async function updateCounterCaches(
