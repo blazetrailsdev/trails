@@ -141,12 +141,15 @@ describe("CacheStoreRaceConditionTtlTest", () => {
   it("fetch with race condition ttl serves stale to concurrent readers", async () => {
     store.write("foo", "stale", { expiresIn: 20 });
     await new Promise((r) => setTimeout(r, 30));
-    // First reader: bumps the entry and regenerates
-    store.fetch("foo", { raceConditionTtl: 500 }, () => "fresh");
-    // Second reader (concurrent): sees bumped (non-expired) entry and gets stale value
-    // Because the first fetch already wrote "fresh", concurrent readers now see "fresh".
-    // The race benefit is that before the first fetch writes, readers see stale via bumped TTL.
-    // We verify that after regeneration the new value is in place.
+    // Simulate a concurrent reader by reading inside the fallback callback.
+    // At that point handleExpiredEntry has bumped the entry back into the store,
+    // so read() returns the stale value (not null) — the race-window guarantee.
+    let seenDuringRegen: unknown;
+    store.fetch("foo", { raceConditionTtl: 500 }, () => {
+      seenDuringRegen = store.read("foo");
+      return "fresh";
+    });
+    expect(seenDuringRegen).toBe("stale");
     expect(store.read("foo")).toBe("fresh");
   });
 

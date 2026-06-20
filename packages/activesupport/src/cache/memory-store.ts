@@ -97,35 +97,24 @@ export class MemoryStore implements CacheStore {
       fallback = maybeFallback;
     }
 
-    const raceConditionTtl = options?.raceConditionTtl ?? 0;
     const rk = this.resolveKey(key, options);
 
-    if (raceConditionTtl > 0) {
-      const raw = this.store.get(rk);
-      if (raw) {
-        if (!isExpired(raw)) {
-          raw.accessedAt = Date.now();
-          return coder.load(raw.encodedValue);
-        }
-        this.handleExpiredEntry(rk, raw, raceConditionTtl);
-        if (fallback) {
-          const value = fallback();
-          this.write(key, value, options);
-          return value;
-        }
-        return null;
-      }
-    }
-
-    const cached = this.read(key, options);
-    if (cached !== null) return cached;
-
+    // Mirrors cache.rb:445-478: block path calls handle_expired_entry; no-block path falls to read().
     if (fallback) {
+      const raw = this.store.get(rk);
+      if (raw && !isExpired(raw)) {
+        raw.accessedAt = Date.now();
+        return coder.load(raw.encodedValue);
+      }
+      // Always call handleExpiredEntry on the block path (cache.rb:453); it decides bump-vs-delete.
+      if (raw) this.handleExpiredEntry(rk, raw, options?.raceConditionTtl ?? 0);
       const value = fallback();
       this.write(key, value, options);
       return value;
     }
-    return null;
+
+    // No block: mirrors cache.rb:478 — delegate to read(), which deletes expired entries.
+    return this.read(key, options);
   }
 
   clear(): void {
