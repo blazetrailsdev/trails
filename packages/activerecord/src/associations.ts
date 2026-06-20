@@ -1362,14 +1362,16 @@ export async function loadHasOne(
         [typeCol]: polymorphicName(ctor),
       });
     } else if (options.scope) {
+      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       let rel = targetModel
         .all()
-        .where({ [foreignKey]: record._readAttribute(primaryKey as string) });
+        .where({ [foreignKey]: record._readAttribute(ownerKey as string) });
       rel = applyAssociationScope(rel, options.scope, record);
       result = await rel.first();
     } else {
+      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       result = await targetModel.findBy({
-        [foreignKey]: record._readAttribute(primaryKey as string),
+        [foreignKey]: record._readAttribute(ownerKey as string),
       });
     }
   }
@@ -1641,7 +1643,8 @@ export async function loadHasMany(
         [typeCol]: polymorphicName(ctor),
       });
     } else {
-      rel = targetModel.all().where({ [foreignKey]: record._readAttribute(primaryKey as string) });
+      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
+      rel = targetModel.all().where({ [foreignKey]: record._readAttribute(ownerKey as string) });
     }
     rel = applyAssociationScope(rel, options.scope, record);
   }
@@ -1667,20 +1670,31 @@ export async function loadHasMany(
  * fallback, mirroring `reflection.activeRecordPrimaryKey` semantics
  * (reflection.rb:587 `active_record_primary_key`): for a composite-FK
  * query_constraints owner with a scalar primary key, key on the owner's
- * query_constraints list rather than the scalar `id`. `primaryKey` already
- * reflects any explicit `options.primaryKey`, so only widen the default.
+ * query_constraints list rather than the scalar `id`; for a composite-PK
+ * owner without query_constraints, collapse the PK array to `"id"` when it
+ * contains it, else keep the full composite PK (reflection.rb:597-600).
+ * `primaryKey` already reflects any explicit `options.primaryKey`, so only
+ * widen the default.
  */
 function _inlineOwnerKey(
   ctor: typeof Base,
   options: AssociationOptions,
   primaryKey: string | string[],
 ): string | string[] {
+  if (options.primaryKey !== undefined) {
+    return primaryKey;
+  }
   if (
     !Array.isArray(primaryKey) &&
-    options.primaryKey === undefined &&
     (options.queryConstraints || hasQueryConstraints.call(ctor as any))
   ) {
     return queryConstraintsList.call(ctor as any) ?? primaryKey;
+  }
+  // Mirror reflection.rb:597-600 active_record_primary_key composite_primary_key?
+  // branch: a composite-PK owner without query_constraints collapses to "id"
+  // when the PK array contains it, else keeps the full composite PK.
+  if (Array.isArray(primaryKey) && (ctor as any).compositePrimaryKey) {
+    return primaryKey.includes("id") ? "id" : primaryKey;
   }
   return primaryKey;
 }

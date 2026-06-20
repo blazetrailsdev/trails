@@ -2645,6 +2645,37 @@ describe("AssociationsTest", () => {
     expect((comment as any)?.body).toBe("Only");
   });
 
+  // Exercises the inline (no-reflection) fallback against a composite-PK owner
+  // WITHOUT query_constraints (CpkOrder's PK is `[shop_id, id]`). Invoked with a
+  // scalar FK and an unregistered association name, the fallback must collapse
+  // the composite owner PK to `"id"` (mirroring the `composite_primary_key?`
+  // branch of `reflection.activeRecordPrimaryKey`, reflection.rb:597-600) rather
+  // than reading the whole `[shop_id, id]` array as a scalar attribute.
+  it("has many loads via inline fallback resolving composite owner key as id attribute", async () => {
+    const order = await CpkOrder.create({ shop_id: 1 });
+    const [, orderId] = order.id as [number, number];
+    await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
+    await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
+    const agreements = await loadHasMany(order, "freshAgreements", {
+      className: "CpkOrderAgreement",
+      foreignKey: "order_id",
+    });
+    expect(agreements).toHaveLength(2);
+    expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
+  });
+
+  // Same no-reflection fallback path as above, through loadHasOne.
+  it("has one loads via inline fallback resolving composite owner key as id attribute", async () => {
+    const order = await CpkOrder.create({ shop_id: 1 });
+    const [, orderId] = order.id as [number, number];
+    await CpkOrderAgreement.create({ order_id: orderId, signature: "only" });
+    const agreement = await loadHasOne(order, "freshAgreement", {
+      className: "CpkOrderAgreement",
+      foreignKey: "order_id",
+    });
+    expect((agreement as any)?.signature).toBe("only");
+  });
+
   it("delete single composite has many through join row", async () => {
     // Covers the composite-aware delete on a has_many :through: the join lookup
     // must AND across both [blog_id, blog_post_id] columns so only the owning
