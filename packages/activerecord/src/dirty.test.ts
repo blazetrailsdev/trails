@@ -38,7 +38,6 @@ import { Person } from "./test-helpers/models/person.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
-import { adapterType } from "./test-adapter.js";
 import {
   assertNoQueries,
   assertNoQueriesMatch,
@@ -58,15 +57,6 @@ type Rec = Base & Record<string, unknown>;
  * Invoke them through their receiver (preserving `this`) with a typed return.
  */
 const call = <T>(recv: object, name: string): T => (recv as Record<string, () => T>)[name]();
-
-// Two datetime tests below pass on SQLite + MySQL but expose a PostgreSQL-only
-// dirty-tracking gap: a datetime attribute on an anonymous reflected class
-// (`Class.new { table_name = "topics" }`) reads back `undefined` after create on
-// PG. Rails runs both unconditionally, so an `adapterType`-based gate is an
-// adapter-fidelity mismatch (over-gated). This is a tracked trails gap, not an
-// adapter-fidelity decision, so it is encoded as a runtime guard (incomparable
-// to Rails) pending convergence story `dirty-pg-anon-class-datetime-tracking`.
-const pgDirtyTrackingBlocked = adapterType === "postgres";
 
 /** Mirrors Rails' private `with_partial_writes(klass, on = true)`. */
 async function withPartialWrites(
@@ -359,25 +349,22 @@ describe("DirtyTest", () => {
     }
   });
 
-  it.skipIf(pgDirtyTrackingBlocked)(
-    "nullable datetime not marked as changed if new value is blank",
-    async () => {
-      await withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
-        const Target = class extends Base {
-          static tableName = "topics";
-        };
+  it("nullable datetime not marked as changed if new value is blank", async () => {
+    await withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
+      const Target = class extends Base {
+        static tableName = "topics";
+      };
 
-        const topic = (await Target.create({})) as Rec;
+      const topic = (await Target.create({})) as Rec;
+      expect(topic.written_on).toBeNull();
+
+      for (const value of ["", null]) {
+        topic.written_on = value;
         expect(topic.written_on).toBeNull();
-
-        for (const value of ["", null]) {
-          topic.written_on = value;
-          expect(topic.written_on).toBeNull();
-          expect(topic.attributeChanged("written_on")).toBe(false);
-        }
-      });
-    },
-  );
+        expect(topic.attributeChanged("written_on")).toBe(false);
+      }
+    });
+  });
 
   it("integer zero to string zero not marked as changed", async () => {
     const pirate = new Pirate() as Rec;
@@ -825,27 +812,24 @@ describe("DirtyTest", () => {
     // to MySQL DDL cost. Column-name reflection is covered elsewhere.
   });
 
-  it.skipIf(pgDirtyTrackingBlocked)(
-    "datetime attribute can be updated with fractional seconds",
-    async () => {
-      await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
-        const Target = class extends Base {
-          static tableName = "topics";
-        };
-        const zone = getZone()!;
+  it("datetime attribute can be updated with fractional seconds", async () => {
+    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+      const Target = class extends Base {
+        static tableName = "topics";
+      };
+      const zone = getZone()!;
 
-        const writtenOn = new TimeWithZone(Temporal.Instant.from("2012-12-01T12:00:00Z"), zone);
+      const writtenOn = new TimeWithZone(Temporal.Instant.from("2012-12-01T12:00:00Z"), zone);
 
-        const topic = (await Target.create({ written_on: writtenOn })) as Rec;
-        topic.written_on = new TimeWithZone(
-          (topic.written_on as TimeWithZone).utc().add({ milliseconds: 300 }),
-          zone,
-        );
+      const topic = (await Target.create({ written_on: writtenOn })) as Rec;
+      topic.written_on = new TimeWithZone(
+        (topic.written_on as TimeWithZone).utc().add({ milliseconds: 300 }),
+        zone,
+      );
 
-        expect(topic.attributeChanged("written_on")).toBe(true);
-      });
-    },
-  );
+      expect(topic.attributeChanged("written_on")).toBe(true);
+    });
+  });
 
   it("datetime attribute doesnt change if zone is modified in string", async () => {
     await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
