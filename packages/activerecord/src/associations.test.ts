@@ -2573,16 +2573,15 @@ describe("AssociationsTest", () => {
     // than silently exempting composite-PK owners.
     const originalList = (ShardedBlogPost as any)._queryConstraintsList;
     const originalPk = (ShardedBlogPost as any)._primaryKey;
+    const originalAssociations = [...((ShardedBlogPost as any)._associations ?? [])];
     try {
       (ShardedBlogPost as any)._primaryKey = ["blog_id", "id"];
       (ShardedBlogPost as any)._queryConstraintsList = ["blog_id", "id"];
       (ShardedBlogPost as any)._hasQueryConstraints = true;
-      if (!reflectOnAssociation(ShardedBlogPost, "commentsWithCompositePkOwner")) {
-        (ShardedBlogPost as any).hasMany("commentsWithCompositePkOwner", {
-          primaryKey: ["blog_id", "id"],
-          className: "ShardedComment",
-        });
-      }
+      (ShardedBlogPost as any).hasMany("commentsWithCompositePkOwner", {
+        primaryKey: ["blog_id", "id"],
+        className: "ShardedComment",
+      });
       const blogPost = shardedBlogPosts("great_post_blog_one");
       let error: unknown;
       try {
@@ -2595,6 +2594,7 @@ describe("AssociationsTest", () => {
     } finally {
       (ShardedBlogPost as any)._queryConstraintsList = originalList;
       (ShardedBlogPost as any)._primaryKey = originalPk;
+      (ShardedBlogPost as any)._associations = originalAssociations;
     }
   });
 
