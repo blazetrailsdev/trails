@@ -53,6 +53,7 @@ export function normalizeAdapterName(name: string): string {
     case "expo-sqlite":
     case "libsql":
     case "libsql-remote":
+    case "libsql-replica":
       return "sqlite";
     default:
       return name;
@@ -116,6 +117,7 @@ export function buildAdapterArg(
       preparedStatements,
       driverOptions,
       authToken,
+      syncUrl,
     } = configuration;
     const options: Record<string, unknown> = {};
     if (readonly !== undefined) options.readonly = readonly;
@@ -127,11 +129,15 @@ export function buildAdapterArg(
     if (driverOptions !== undefined) options.driverOptions = driverOptions;
     // Merge authToken into any pre-existing driverOptions so callers that pass
     // both { authToken, driverOptions: { tls: true } } don't lose the latter.
-    if (authToken !== undefined)
-      options.driverOptions = {
-        ...(options.driverOptions as Record<string, unknown> | undefined),
-        authToken,
-      };
+    // syncUrl (embedded-replica mode) and authToken both belong in
+    // driverOptions; merge so callers that also pass a driverOptions object
+    // keep its keys.
+    if (authToken !== undefined || syncUrl !== undefined) {
+      const merged = { ...(options.driverOptions as Record<string, unknown> | undefined) };
+      if (authToken !== undefined) merged.authToken = authToken;
+      if (syncUrl !== undefined) merged.syncUrl = syncUrl;
+      options.driverOptions = merged;
+    }
     return Object.keys(options).length > 0 ? [filename, options] : [filename];
   }
   if (url && database === undefined) {

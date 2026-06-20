@@ -116,6 +116,8 @@ const libsqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/libsql-adapter.js")).LibSQLAdapter as any;
 const libsqlRemoteLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/libsql-remote-adapter.js")).LibSQLRemoteAdapter as any;
+const libsqlReplicaLoader: AdapterLoader = async () =>
+  (await import("./connection-adapters/libsql-replica-adapter.js")).LibSQLReplicaAdapter as any;
 const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
@@ -130,6 +132,10 @@ register("libsql", libsqlLoader);
 // `libsql-remote` uses the async-open path (no openSync); the driver opens
 // network-backed Turso databases via `new Database(url, { authToken })`.
 register("libsql-remote", libsqlRemoteLoader);
+// `libsql-replica` is an embedded replica: a local file kept in sync with a
+// remote primary via `new Database(localPath, { syncUrl, authToken })`. Like
+// the remote driver it uses the async-open path (initial sync runs on connect).
+register("libsql-replica", libsqlReplicaLoader);
 register("mysql2", mysql2Loader);
 register("postgresql", postgresqlLoader);
 

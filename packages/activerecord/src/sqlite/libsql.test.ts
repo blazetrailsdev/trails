@@ -2,9 +2,16 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
 import { getOs } from "@blazetrails/activesupport/os-adapter";
-import { libsqlDriver, libsqlRemoteDriver, isRemoteLibsqlUrl } from "./libsql.js";
+import {
+  libsqlDriver,
+  libsqlRemoteDriver,
+  libsqlReplicaDriver,
+  isRemoteLibsqlUrl,
+  isReplicaConfig,
+} from "./libsql.js";
 import { LibSQLAdapter } from "../connection-adapters/libsql-adapter.js";
 import { LibSQLRemoteAdapter } from "../connection-adapters/libsql-remote-adapter.js";
+import { LibSQLReplicaAdapter } from "../connection-adapters/libsql-replica-adapter.js";
 import { buildAdapterArg, parseSqliteUrl } from "../connection-adapters/adapter-args.js";
 
 describe("SqliteDriver — libsql round-trip", () => {
@@ -357,6 +364,76 @@ describe("buildAdapterArg — authToken threading", () => {
   });
 });
 
+describe("isReplicaConfig — embedded-replica mode selection", () => {
+  it("selects replica mode when a non-empty syncUrl is present", () => {
+    expect(
+      isReplicaConfig({
+        database: "/tmp/replica.db",
+        driverOptions: { syncUrl: "libsql://primary.turso.io", authToken: "tok" },
+      }),
+    ).toBe(true);
+  });
+
+  it("does not select replica mode without a syncUrl", () => {
+    expect(isReplicaConfig({ database: "/tmp/replica.db" })).toBe(false);
+    expect(
+      isReplicaConfig({ database: "/tmp/replica.db", driverOptions: { authToken: "tok" } }),
+    ).toBe(false);
+  });
+
+  it("does not select replica mode for an empty syncUrl", () => {
+    expect(isReplicaConfig({ database: "/tmp/replica.db", driverOptions: { syncUrl: "" } })).toBe(
+      false,
+    );
+  });
+});
+
+describe("libsqlReplicaDriver — capabilities and async-open dispatch", () => {
+  it("has inProcessSync: false", () => {
+    expect(libsqlReplicaDriver.capabilities.inProcessSync).toBe(false);
+  });
+
+  it("omits openSync so the async-open path is used", () => {
+    expect(libsqlReplicaDriver.openSync).toBeUndefined();
+  });
+
+  it("omits databaseExists and restoreFromPath", () => {
+    expect(libsqlReplicaDriver.databaseExists).toBeUndefined();
+    expect(libsqlReplicaDriver.restoreFromPath).toBeUndefined();
+  });
+
+  it("rejects opening a replica config without a syncUrl", async () => {
+    await expect(libsqlReplicaDriver.open({ database: "/tmp/no-sync.db" })).rejects.toThrow(
+      /syncUrl/,
+    );
+  });
+});
+
+describe("buildAdapterArg — syncUrl threading (replica mode)", () => {
+  it("threads syncUrl and authToken into driverOptions", () => {
+    const [filename, options] = buildAdapterArg("libsql-replica", {
+      database: "/tmp/replica.db",
+      syncUrl: "libsql://primary.turso.io",
+      authToken: "tok_secret",
+    }) as [string, Record<string, unknown>];
+    expect(filename).toBe("/tmp/replica.db");
+    const driverOpts = options.driverOptions as Record<string, unknown>;
+    expect(driverOpts.syncUrl).toBe("libsql://primary.turso.io");
+    expect(driverOpts.authToken).toBe("tok_secret");
+  });
+
+  it("merges syncUrl into a pre-existing driverOptions object", () => {
+    const [, options] = buildAdapterArg("libsql-replica", {
+      database: "/tmp/replica.db",
+      syncUrl: "libsql://primary.turso.io",
+      driverOptions: { tls: true },
+    }) as [string, Record<string, unknown>];
+    const driverOpts = options.driverOptions as Record<string, unknown>;
+    expect(driverOpts.syncUrl).toBe("libsql://primary.turso.io");
+    expect(driverOpts.tls).toBe(true);
+  });
+});
+
 const tursoUrl = typeof process !== "undefined" ? process.env["TURSO_DATABASE_URL"] : undefined;
 const tursoToken = typeof process !== "undefined" ? process.env["TURSO_AUTH_TOKEN"] : undefined;
 const hasCredentials = Boolean(tursoUrl && tursoToken);
@@ -400,3 +477,63 @@ describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke 
     expect((rows[0] as { n: number }).n).toBe(1);
   });
 });
+
+describe.skipIf(!hasCredentials)(
+  "LibSQLReplicaAdapter — embedded-replica round-trip (TURSO_*)",
+  () => {
+    const replicaPath = `${getOs().tmpdir()}/libsql-replica-${Date.now()}-${Math.floor(Math.random() * 1e9)}.db`;
+    const sidecars = [
+      replicaPath,
+      `${replicaPath}-wal`,
+      `${replicaPath}-shm`,
+      `${replicaPath}-info`,
+    ];
+    const removeFiles = (): void => {
+      for (const p of sidecars) {
+        try {
+          getFs().unlinkSync(p);
+        } catch {
+          /* best effort */
+        }
+      }
+    };
+
+    let primary: Awaited<ReturnType<typeof LibSQLRemoteAdapter.openAsync>>;
+    let replica: LibSQLReplicaAdapter;
+    const table = `replica_smoke_${Date.now()}`;
+
+    beforeAll(async () => {
+      removeFiles();
+      // Write to the primary directly so we have a known remote state to pull.
+      primary = await LibSQLRemoteAdapter.openAsync(tursoUrl, {
+        driverOptions: { authToken: tursoToken },
+      });
+      await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
+      await primary.executeMutation(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
+      await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (1, 'remote')`);
+
+      replica = (await LibSQLReplicaAdapter.openAsync(replicaPath, {
+        driverOptions: { syncUrl: tursoUrl, authToken: tursoToken },
+      })) as LibSQLReplicaAdapter;
+    });
+
+    afterAll(async () => {
+      await replica.close();
+      await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
+      await primary.close();
+      removeFiles();
+    });
+
+    it("reflects a remote write after syncReplica()", async () => {
+      await replica.syncReplica();
+      const rows = await replica.execute(`SELECT label FROM ${table} WHERE id = 1`);
+      expect((rows[0] as { label: string }).label).toBe("remote");
+
+      // A subsequent remote write is invisible until the next sync.
+      await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (2, 'later')`);
+      await replica.syncReplica();
+      const after = await replica.execute(`SELECT count(*) AS c FROM ${table}`);
+      expect(Number((after[0] as { c: number }).c)).toBe(2);
+    });
+  },
+);

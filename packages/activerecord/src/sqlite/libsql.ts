@@ -92,6 +92,25 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
   close(): void {
     this.raw.close();
   }
+
+  /**
+   * Pull the latest changes from the remote primary into this embedded
+   * replica. Only meaningful for replica handles (opened with a `syncUrl`);
+   * libsql's `Database.sync()` throws for plain local/remote handles, so the
+   * replica adapter is the only caller. Exposed here as the narrow,
+   * libsql-specific escape hatch the core `SqliteConnection` interface omits.
+   */
+  async sync(): Promise<void> {
+    await this.raw.sync();
+  }
+}
+
+/**
+ * A libsql connection that can pull from a remote primary via {@link sync}.
+ * Embedded-replica handles satisfy this; plain local/remote handles do not.
+ */
+export interface SyncableSqliteConnection extends SqliteConnection {
+  sync(): Promise<void>;
 }
 
 /**
@@ -202,6 +221,65 @@ export const libsqlRemoteDriver: SqliteDriver = {
 
   open(config: SqliteOpenConfig): Promise<SqliteConnection> {
     return Promise.resolve(new LibsqlConnection(openRemoteDatabase(config)));
+  },
+};
+
+/**
+ * Returns true when a config selects libsql **embedded-replica** mode — i.e. a
+ * non-empty `syncUrl` is present in `driverOptions`. A replica keeps a local
+ * file (`config.database`) in sync with the remote primary named by `syncUrl`;
+ * this distinguishes it from a plain remote config (no local file) or a plain
+ * local config (no `syncUrl`).
+ */
+export function isReplicaConfig(config: SqliteOpenConfig): boolean {
+  const syncUrl = (config.driverOptions as { syncUrl?: unknown } | undefined)?.syncUrl;
+  return typeof syncUrl === "string" && syncUrl.length > 0;
+}
+
+/** @internal */
+function openReplicaDatabase(config: SqliteOpenConfig): Database.Database {
+  if (!isReplicaConfig(config)) {
+    throw new ConfigurationError(
+      "libsql embedded-replica mode requires a non-empty `syncUrl` in " +
+        "driverOptions (alongside the local replica path); none was provided.",
+    );
+  }
+  // driverOptions carries syncUrl + authToken (and any other driver keys). The
+  // local replica file is config.database, so unlike the remote driver we open
+  // a path, not a URL. Don't force readonly — replicas accept writes (which are
+  // forwarded to the primary).
+  const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
+  if (config.timeout !== undefined) opts.timeout = config.timeout;
+  return new Database(config.database, opts);
+}
+
+const replicaCapabilities: SqliteDriverCapabilities = {
+  inProcessSync: false,
+  streaming: false,
+  loadExtension: false,
+  concurrentStatements: false,
+  foreignKeysOnByDefault: false,
+  immediateTransactions: false,
+};
+
+/**
+ * libsql driver for **embedded-replica** connections: a local file
+ * (`config.database`) kept in sync with a remote Turso primary named by
+ * `driverOptions.syncUrl`. Reads are served locally; `sync()` pulls the latest
+ * primary state into the local file.
+ *
+ * Construction (`new Database(localPath, { syncUrl, authToken })`) performs an
+ * initial network sync, so the driver goes through the async-open path
+ * (`openSync` omitted, like the remote driver). `databaseExists` and
+ * `restoreFromPath` are omitted — the replica file is materialized by libsql on
+ * first sync, not a caller-managed local DB.
+ */
+export const libsqlReplicaDriver: SqliteDriver = {
+  name: "libsql-replica",
+  capabilities: replicaCapabilities,
+
+  async open(config: SqliteOpenConfig): Promise<SqliteConnection> {
+    return new LibsqlConnection(openReplicaDatabase(config));
   },
 };
 
