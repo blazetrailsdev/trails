@@ -262,6 +262,23 @@ describe("AssociationProxyTest", () => {
     expect(david.firstPosts.loaded).toBe(true);
   });
 
+  it("finder bang method with dirty target", async () => {
+    const david = authors("david") as any;
+    const expectedSecond = await david.posts.second();
+    const expectedThird = await david.posts.third();
+    const expectedFourth = await david.posts.fourth();
+    const expectedFifth = await david.posts.fifth();
+    await david.posts.reload();
+    const sqls = await captureSql(async () => {
+      expect((await david.posts.secondBang()).id).toBe(expectedSecond!.id);
+      expect((await david.posts.thirdBang()).id).toBe(expectedThird!.id);
+      expect((await david.posts.fourthBang()).id).toBe(expectedFourth!.id);
+      expect((await david.posts.fifthBang()).id).toBe(expectedFifth!.id);
+    });
+    expect(sqls).toHaveLength(0);
+    expect(david.posts.loaded).toBe(true);
+  });
+
   it("size differentiates between new and persisted in memory records when loaded records are empty", async () => {
     const member = members("blarpy_winkup") as any;
     expect(await member.favoriteMemberships.isEmpty()).toBe(true);

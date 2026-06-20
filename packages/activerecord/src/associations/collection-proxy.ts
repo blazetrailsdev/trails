@@ -2555,6 +2555,92 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * Return the nth associated record from the loaded target without
+   * re-querying. Mirrors how `first`/`last`/`take` read the loaded target
+   * (CollectionProxy keeps state in `_target`/`_targetLoaded`, not Relation's
+   * `_records`/`_loaded`, so the inherited finder-method overrides would
+   * otherwise always re-query).
+   * @internal
+   */
+  private async findOrdinalFromTarget(index: number): Promise<T | null> {
+    if (this.isFindFromTarget()) await this.loadTarget();
+    const records = this._targetLoaded ? this._target : await this.toArray();
+    return records[index] ?? null;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#second
+   */
+  override second(): Promise<T | null> {
+    return this.findOrdinalFromTarget(1);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#second!
+   */
+  override async secondBang(): Promise<T> {
+    const record = await this.second();
+    if (!record) {
+      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
+    }
+    return record;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#third
+   */
+  override third(): Promise<T | null> {
+    return this.findOrdinalFromTarget(2);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#third!
+   */
+  override async thirdBang(): Promise<T> {
+    const record = await this.third();
+    if (!record) {
+      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
+    }
+    return record;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#fourth
+   */
+  override fourth(): Promise<T | null> {
+    return this.findOrdinalFromTarget(3);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#fourth!
+   */
+  override async fourthBang(): Promise<T> {
+    const record = await this.fourth();
+    if (!record) {
+      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
+    }
+    return record;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#fifth
+   */
+  override fifth(): Promise<T | null> {
+    return this.findOrdinalFromTarget(4);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#fifth!
+   */
+  override async fifthBang(): Promise<T> {
+    const record = await this.fifth();
+    if (!record) {
+      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
+    }
+    return record;
+  }
+
+  /**
    * True if the collection has more than one record.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#many?
