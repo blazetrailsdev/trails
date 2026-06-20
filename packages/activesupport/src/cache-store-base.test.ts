@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Store, WriteOptions } from "./cache/store.js";
 import { Entry } from "./cache/entry.js";
+import { Notifications } from "./notifications.js";
+import type { Event } from "./notifications/instrumenter.js";
 
 class TestStore extends Store {
   private _data = new Map<string, Entry>();
@@ -139,5 +141,171 @@ describe("CacheStoreNamespaceTest", () => {
       foo: "bar",
       fu: "baz",
     });
+  });
+});
+
+describe("CacheInstrumentationBehavior", () => {
+  let cache: TestStore;
+  beforeEach(() => {
+    cache = new TestStore();
+  });
+
+  function withInstrumentation(operation: string, block: () => void): Event[] {
+    return Notifications.collectEvents(`cache_${operation}.active_support`, block);
+  }
+
+  const normalizedKey = (key: string, options?: Record<string, unknown>) =>
+    (
+      cache as unknown as { normalizeKey(k: unknown, o?: Record<string, unknown>): string }
+    ).normalizeKey(key, options);
+
+  it("test_read_instrumentation", () => {
+    cache.write("1", "aaaaaaaaaa");
+    const events = withInstrumentation("read", () => {
+      cache.read("1");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_read.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1"));
+    expect(events[0].payload.hit).toBe(true);
+    expect(events[0].payload.store).toBe("TestStore");
+  });
+
+  it("test_write_instrumentation", () => {
+    const events = withInstrumentation("write", () => {
+      cache.write("1", "aaaaaaaaaa");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_write.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1"));
+    expect(events[0].payload.store).toBe("TestStore");
+  });
+
+  it("test_delete_instrumentation", () => {
+    const options = { namespace: "foo" };
+    const events = withInstrumentation("delete", () => {
+      cache.delete("1", options);
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_delete.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1", options));
+    expect(events[0].payload.store).toBe("TestStore");
+    expect(events[0].payload.namespace).toBe("foo");
+  });
+
+  it("test_write_multi_instrumentation", () => {
+    const writes = { a: "aa", b: "bb" };
+    let returned: unknown;
+    const events = withInstrumentation("write_multi", () => {
+      returned = cache.writeMulti(writes);
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_write_multi.active_support"]);
+    expect(events[0].payload.super_operation).toBeUndefined();
+    expect(events[0].payload.key).toEqual({
+      [normalizedKey("a")]: "aa",
+      [normalizedKey("b")]: "bb",
+    });
+    // Rails write_multi returns the write_multi_entries result (the normalized
+    // entries hash), not the input hash (cache.rb:551-563, 842-846).
+    expect(Object.keys(returned as Record<string, unknown>)).toEqual([
+      normalizedKey("a"),
+      normalizedKey("b"),
+    ]);
+  });
+
+  it("test_fetch_multi_instrumentation_order_of_operations", () => {
+    const operations: string[] = [];
+    const sub = Notifications.subscribe(/^cache_(read_multi|write_multi)\.active_support$/, (e) =>
+      operations.push(e.name),
+    );
+    try {
+      cache.fetchMulti("a", "b", (key: string) => key + key);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(operations).toEqual([
+      "cache_read_multi.active_support",
+      "cache_write_multi.active_support",
+    ]);
+  });
+
+  it("test_delete_multi_instrumentation", () => {
+    const options = { namespace: "foo" };
+    const events = withInstrumentation("delete_multi", () => {
+      cache.deleteMulti(["b", "a"], options);
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_delete_multi.active_support"]);
+    expect(events[0].payload.key).toEqual([
+      normalizedKey("b", options),
+      normalizedKey("a", options),
+    ]);
+    expect(events[0].payload.store).toBe("TestStore");
+  });
+
+  it("test_read_multi_instrumentation", () => {
+    cache.write("b", "bb");
+    const events = withInstrumentation("read_multi", () => {
+      cache.readMulti("a", "b");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_read_multi.active_support"]);
+    expect(events[0].payload.key).toEqual([normalizedKey("a"), normalizedKey("b")]);
+    expect(events[0].payload.hits).toEqual([normalizedKey("b")]);
+    expect(events[0].payload.store).toBe("TestStore");
+  });
+
+  it("test_instrumentation_with_fetch_multi_as_super_operation", () => {
+    cache.write("b", "bb");
+    const events = withInstrumentation("read_multi", () => {
+      cache.fetchMulti("a", "b", (key: string) => key + key);
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_read_multi.active_support"]);
+    expect(events[0].payload.super_operation).toBe("fetch_multi");
+    expect(events[0].payload.key).toEqual([normalizedKey("a"), normalizedKey("b")]);
+    expect(events[0].payload.hits).toEqual([normalizedKey("b")]);
+    expect(events[0].payload.store).toBe("TestStore");
+  });
+
+  it("fetchMulti extracts a trailing options hash before instrumenting", () => {
+    const events = withInstrumentation("read_multi", () => {
+      cache.fetchMulti("a", "b", { namespace: "foo" }, (key: string) => key + key);
+    });
+    const opts = { namespace: "foo" };
+    expect(events[0].payload.key).toEqual([normalizedKey("a", opts), normalizedKey("b", opts)]);
+    expect(events[0].payload.namespace).toBe("foo");
+    // The options hash must not be treated as a cache name.
+    expect(cache.read("a", opts)).toBe("aa");
+    expect(cache.read("[object Object]")).toBeNull();
+  });
+
+  // Cache::Store has no Rails instrumentation test for exist?/fetch (no public
+  // behavior beyond the wrapped read), so these cover the remaining wrapped
+  // operations our port adds: the exist? event, and fetch's read/fetch_hit/generate.
+  it("exist? fires cache_exist?.active_support with the normalized key", () => {
+    cache.write("1", "aaaaaaaaaa");
+    const events = withInstrumentation("exist?", () => {
+      cache.exist("1");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_exist?.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1"));
+  });
+
+  it("fetch miss fires cache_read (super_operation fetch) then cache_generate", () => {
+    const read = withInstrumentation("read", () => {
+      cache.fetch("1", () => "aaaaaaaaaa");
+    });
+    expect(read[0].payload.super_operation).toBe("fetch");
+    expect(read[0].payload.hit).toBe(false);
+
+    const generate = withInstrumentation("generate", () => {
+      cache.fetch("2", () => "bbbbbbbbbb");
+    });
+    expect(generate.map((e) => e.name)).toEqual(["cache_generate.active_support"]);
+    expect(generate[0].payload.key).toBe(normalizedKey("2"));
+  });
+
+  it("fetch hit fires cache_fetch_hit.active_support with the raw name", () => {
+    cache.write("1", "aaaaaaaaaa");
+    const events = withInstrumentation("fetch_hit", () => {
+      cache.fetch("1", () => "bbbbbbbbbb");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_fetch_hit.active_support"]);
+    expect(events[0].payload.key).toBe("1");
   });
 });

@@ -1,5 +1,7 @@
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
+import { Notifications } from "../notifications.js";
+import type { EventPayload } from "../notifications/instrumenter.js";
 
 /** Mirrors Ruby ArgumentError. @internal */
 export class ArgumentError extends Error {
@@ -119,20 +121,24 @@ export abstract class Store {
       const key = this.normalizeKey(name, merged);
       let entry: Entry | null = null;
       if (!merged.force) {
-        const cached = this.readEntry(key, merged);
-        entry = this.handleExpiredEntry(cached, key, merged);
-        if (entry) {
-          if (entry.isMismatched(this.normalizeVersion(name, merged) ?? null)) {
-            entry = null;
-          } else {
-            try {
-              void entry.value;
-            } catch (e) {
-              if (e instanceof DeserializationError) entry = null;
-              else throw e;
+        this.instrument("read", key, merged, (payload) => {
+          const cached = this.readEntry(key, merged);
+          entry = this.handleExpiredEntry(cached, key, merged);
+          if (entry) {
+            if (entry.isMismatched(this.normalizeVersion(name, merged) ?? null)) {
+              entry = null;
+            } else {
+              try {
+                void entry.value;
+              } catch (e) {
+                if (e instanceof DeserializationError) entry = null;
+                else throw e;
+              }
             }
           }
-        }
+          payload.super_operation = "fetch";
+          payload.hit = !!entry;
+        });
       }
       if (entry) return this.getEntryValue(entry, name, merged);
       return this.saveBlockResultToCache(name, key, merged, block);
@@ -149,61 +155,97 @@ export abstract class Store {
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
     const version = this.normalizeVersion(name, merged);
-    const entry = this.readEntry(key, merged);
-    if (!entry) return null;
-    if (entry.isExpired()) {
-      this.deleteEntry(key, merged);
-      return null;
-    }
-    if (entry.isMismatched(version ?? null)) return null;
-    try {
-      return entry.value;
-    } catch (e) {
-      if (e instanceof DeserializationError) return null;
-      throw e;
-    }
+    return this.instrument("read", key, merged, (payload) => {
+      const entry = this.readEntry(key, merged);
+      if (!entry) {
+        payload.hit = false;
+        return null;
+      }
+      if (entry.isExpired()) {
+        this.deleteEntry(key, merged);
+        payload.hit = false;
+        return null;
+      }
+      if (entry.isMismatched(version ?? null)) {
+        payload.hit = false;
+        return null;
+      }
+      payload.hit = true;
+      try {
+        return entry.value;
+      } catch (e) {
+        if (e instanceof DeserializationError) {
+          payload.hit = false;
+          return null;
+        }
+        throw e;
+      }
+    });
   }
 
   readMulti(...names: [...string[], StoreOptions] | string[]): Record<string, unknown> {
     if (names.length === 0) return {};
     const options = extractOptions(names as unknown[]);
-    return this.readMultiEntries(names as string[], this.mergedOptions(options));
+    const nameList = names as string[];
+    const merged = this.mergedOptions(options);
+    const keys = nameList.map((n) => this.normalizeKey(n, merged));
+    return this.instrumentMulti("read_multi", keys, merged, (payload) => {
+      const results = this.readMultiEntries(nameList, merged);
+      payload.hits = Object.keys(results).map((n) => this.normalizeKey(n, merged));
+      return results;
+    });
   }
 
   writeMulti(hash: Record<string, unknown>, options?: StoreOptions): Record<string, unknown> {
     if (Object.keys(hash).length === 0) return hash;
     const merged = this.mergedOptions(options);
-    const entries: Record<string, Entry> = {};
+    const normalizedHash: Record<string, unknown> = {};
     for (const [name, value] of Object.entries(hash)) {
-      entries[this.normalizeKey(name, merged)] = new Entry(value, {
-        expiresIn: typeof merged.expiresIn === "number" ? merged.expiresIn : null,
-        version: this.normalizeVersion(name, merged) ?? undefined,
-      });
+      normalizedHash[this.normalizeKey(name, merged)] = value;
     }
-    this.writeMultiEntries(entries, merged);
-    return hash;
+    return this.instrumentMulti("write_multi", normalizedHash, merged, () => {
+      const entries: Record<string, Entry> = {};
+      for (const [name, value] of Object.entries(hash)) {
+        entries[this.normalizeKey(name, merged)] = new Entry(value, {
+          expiresIn: typeof merged.expiresIn === "number" ? merged.expiresIn : null,
+          version: this.normalizeVersion(name, merged) ?? undefined,
+        });
+      }
+      return this.writeMultiEntries(entries, merged);
+    });
   }
 
-  fetchMulti(...namesAndBlock: [...string[], (key: string) => unknown]): Record<string, unknown> {
+  fetchMulti(
+    ...namesAndBlock:
+      | [...string[], StoreOptions, (key: string) => unknown]
+      | [...string[], (key: string) => unknown]
+  ): Record<string, unknown> {
     const block = namesAndBlock.pop() as ((key: string) => unknown) | undefined;
     if (typeof block !== "function")
       throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
+    const options = extractOptions(namesAndBlock as unknown[]);
     const names = namesAndBlock as string[];
     if (names.length === 0) return {};
-    const merged = this.mergedOptions(undefined);
-    const reads = merged.force ? {} : this.readMultiEntries(names, merged);
+    const merged = this.mergedOptions(options);
+    const keys = names.map((n) => this.normalizeKey(n, merged));
     const writes: Record<string, unknown> = {};
-    const ordered: Record<string, unknown> = {};
-    for (const name of names) {
-      ordered[name] = Object.prototype.hasOwnProperty.call(reads, name)
-        ? reads[name]
-        : (writes[name] = block(name));
-    }
-    if (merged.skipNil) {
-      for (const k of Object.keys(writes)) {
-        if (writes[k] == null) delete writes[k];
+    const ordered = this.instrumentMulti("read_multi", keys, merged, (payload) => {
+      const reads = merged.force ? {} : this.readMultiEntries(names, merged);
+      const result: Record<string, unknown> = {};
+      for (const name of names) {
+        result[name] = Object.prototype.hasOwnProperty.call(reads, name)
+          ? reads[name]
+          : (writes[name] = block(name));
       }
-    }
+      if (merged.skipNil) {
+        for (const k of Object.keys(writes)) {
+          if (writes[k] == null) delete writes[k];
+        }
+      }
+      payload.hits = Object.keys(reads).map((n) => this.normalizeKey(n, merged));
+      payload.super_operation = "fetch_multi";
+      return result;
+    });
     this.writeMulti(writes, merged);
     return ordered;
   }
@@ -211,39 +253,44 @@ export abstract class Store {
   write(name: string, value: unknown, options?: StoreOptions): boolean {
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
-    return this.writeEntry(
-      key,
-      new Entry(value, {
-        expiresIn: typeof merged.expiresIn === "number" ? merged.expiresIn : null,
-        version: this.normalizeVersion(name, merged) ?? undefined,
-      }),
-      merged,
+    return this.instrument("write", key, merged, () =>
+      this.writeEntry(
+        key,
+        new Entry(value, {
+          expiresIn: typeof merged.expiresIn === "number" ? merged.expiresIn : null,
+          version: this.normalizeVersion(name, merged) ?? undefined,
+        }),
+        merged,
+      ),
     );
   }
 
   delete(name: string, options?: StoreOptions): boolean {
     const merged = this.mergedOptions(options);
-    return this.deleteEntry(this.normalizeKey(name, merged), merged);
+    const key = this.normalizeKey(name, merged);
+    return this.instrument("delete", key, merged, () => this.deleteEntry(key, merged));
   }
 
   deleteMulti(names: string[], options?: StoreOptions): number {
     if (names.length === 0) return 0;
     const merged = this.mergedOptions(options);
-    return this.deleteMultiEntries(
-      names.map((n) => this.normalizeKey(n, merged)),
-      merged,
+    const keys = names.map((n) => this.normalizeKey(n, merged));
+    return this.instrumentMulti("delete_multi", keys, merged, () =>
+      this.deleteMultiEntries(keys, merged),
     );
   }
 
   exist(name: string, options?: StoreOptions): boolean {
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
-    const entry = this.readEntry(key, merged);
-    return !!(
-      entry &&
-      !entry.isExpired() &&
-      !entry.isMismatched(this.normalizeVersion(name, merged) ?? null)
-    );
+    return this.instrument("exist?", key, undefined, () => {
+      const entry = this.readEntry(key, merged);
+      return !!(
+        entry &&
+        !entry.isExpired() &&
+        !entry.isMismatched(this.normalizeVersion(name, merged) ?? null)
+      );
+    });
   }
 
   newEntry(value: unknown, options?: StoreOptions): Entry {
@@ -279,6 +326,53 @@ export abstract class Store {
     throw new NotImplementedError(`${this.constructor.name} does not support clear`);
   }
 
+  protected instrument<T>(
+    operation: string,
+    key: unknown,
+    options?: StoreOptions,
+    block?: (payload: EventPayload) => T,
+  ): T {
+    return this._instrument(operation, false, key, options, block);
+  }
+
+  protected instrumentMulti<T>(
+    operation: string,
+    keys: unknown,
+    options?: StoreOptions,
+    block?: (payload: EventPayload) => T,
+  ): T {
+    return this._instrument(operation, true, keys, options, block);
+  }
+
+  private _instrument<T>(
+    operation: string,
+    multi: boolean,
+    key: unknown,
+    options: StoreOptions | undefined,
+    block?: (payload: EventPayload) => T,
+  ): T {
+    if (Store.logger?.isDebug?.() && !this.silence) {
+      const multiSize = Array.isArray(key)
+        ? key.length
+        : key && typeof key === "object"
+          ? Object.keys(key).length
+          : 0;
+      const debugKey = multi
+        ? `: ${multiSize} key(s) specified`
+        : key != null
+          ? `: ${String(key)}`
+          : "";
+      const debugOptions =
+        options && Object.keys(options).length > 0 ? ` (${JSON.stringify(options)})` : "";
+      Store.logger.debug?.(`Cache ${operation}${debugKey}${debugOptions}`);
+    }
+    const payload: EventPayload = { key, store: this.constructor.name };
+    if (options) Object.assign(payload, options);
+    return Notifications.instrument<T>(`cache_${operation}.active_support`, payload, () =>
+      block ? block(payload) : (undefined as T),
+    ) as T;
+  }
+
   protected abstract readEntry(key: string, options: StoreOptions): Entry | null;
   protected abstract writeEntry(key: string, entry: Entry, options: StoreOptions): boolean;
   protected abstract deleteEntry(key: string, options: StoreOptions): boolean;
@@ -300,8 +394,12 @@ export abstract class Store {
     return results;
   }
 
-  protected writeMultiEntries(hash: Record<string, Entry>, options: StoreOptions): void {
+  protected writeMultiEntries(
+    hash: Record<string, Entry>,
+    options: StoreOptions,
+  ): Record<string, Entry> {
     for (const [key, entry] of Object.entries(hash)) this.writeEntry(key, entry, options);
+    return hash;
   }
 
   protected deleteMultiEntries(keys: string[], options: StoreOptions): number {
@@ -407,18 +505,21 @@ export abstract class Store {
     return entry;
   }
 
-  protected getEntryValue(entry: Entry, _name: string, _options: StoreOptions): unknown {
+  protected getEntryValue(entry: Entry, name: string, options: StoreOptions): unknown {
+    this.instrument("fetch_hit", name, options);
     return entry.value;
   }
 
   protected saveBlockResultToCache(
     name: string,
-    _key: string,
+    key: string,
     options: StoreOptions,
     block: (key: string, opts: WriteOptions) => unknown,
   ): unknown {
     const mutableOptions = { ...options };
-    const result = block(name, new WriteOptions(mutableOptions));
+    const result = this.instrument("generate", key, mutableOptions, () =>
+      block(name, new WriteOptions(mutableOptions)),
+    );
     if (result != null || !options.skipNil) this.write(name, result, mutableOptions);
     return result;
   }
