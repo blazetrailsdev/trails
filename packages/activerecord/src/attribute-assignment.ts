@@ -161,7 +161,11 @@ export function assignAssociationIfMatch(
   if (!assoc) return false;
   if (typeof host.association !== "function") return false;
   const proxy = host.association(key) as
-    | { replace?: (v: unknown[]) => void; writer?: (v: unknown) => void }
+    | {
+        replace?: (v: unknown[]) => void;
+        writer?: (v: unknown) => void;
+        queueWrite?: (v: unknown) => void;
+      }
     | null
     | undefined;
   if (!proxy) return false;
@@ -175,7 +179,15 @@ export function assignAssociationIfMatch(
     proxy.replace(value as unknown[]);
     return true;
   }
-  if (assoc.type === "hasOne" || assoc.type === "belongsTo") {
+  if (assoc.type === "hasOne") {
+    // has_one's `writer` persists immediately (Rails-faithful, awaitable);
+    // mass-assignment can't await, so queue the change for the owner's next
+    // save() — no floating promise. Mirrors the queue-only property setter.
+    if (typeof proxy.queueWrite !== "function") return false;
+    proxy.queueWrite(value);
+    return true;
+  }
+  if (assoc.type === "belongsTo") {
     if (typeof proxy.writer !== "function") return false;
     proxy.writer(value);
     return true;

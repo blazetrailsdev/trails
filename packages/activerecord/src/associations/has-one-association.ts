@@ -28,6 +28,34 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
+   * Queue-only writer for the JS property setter (`owner.account = x`,
+   * builder/has-one.ts `defineWriters`) and mass-assignment, neither of which
+   * can `await`. Records the pending change (FK set in-memory via `replace`)
+   * and defers persistence to the owner's next `save()` (`flushPendingReplaces`
+   * → `persistReplace`) — no DB I/O, no Promise returned, no floating promise.
+   * The awaitable `writer` below is the Rails-faithful immediate-persist path.
+   */
+  queueWrite(record: Base | null): void {
+    this.replace(record);
+  }
+
+  /**
+   * Mirrors Rails `HasOneAssociation#replace`, which persists on assignment to
+   * a *saved* owner: the displaced record is nullified/deleted/destroyed and
+   * the new record saved immediately. Returns the `persistReplace()` Promise so
+   * callers can `await` the writes — the only floating-promise-free way to
+   * reach the immediate path from JS (the sync property setter cannot await, so
+   * it uses `queueWrite` instead). For a *new* owner the foreign key isn't known
+   * yet, so persistence defers to the owner's next save (`flushPendingReplaces`).
+   */
+  override writer(record: Base | null): void | Promise<void> {
+    this.replace(record);
+    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.() && this._pendingReplace) {
+      return this.persistReplace();
+    }
+  }
+
+  /**
    * Handle the :dependent option when the owner is being destroyed.
    */
   async handleDependency(): Promise<void | false> {
@@ -117,7 +145,7 @@ export class HasOneAssociation extends SingularAssociation {
 
   protected override replace(record: Base | null, save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
-    const assigningAnother = this.target !== record;
+    const assigningAnother = !sameRecord(this.target, record);
     if (assigningAnother || (record as any)?.hasChangesToSave) {
       if (record) {
         this.setOwnerAttributes(record);
@@ -129,11 +157,17 @@ export class HasOneAssociation extends SingularAssociation {
         if (this._pendingReplace) {
           // Only clear on a true revert: a different-record assignment being set back.
           // Same-record (dirty) assignments must not clear even if record === previousTarget.
-          const wasAssignedAnother =
-            this._pendingReplace.previousTarget !== this._pendingReplace.record;
-          if (wasAssignedAnother && record === this._pendingReplace.previousTarget) {
+          const wasAssignedAnother = !sameRecord(
+            this._pendingReplace.previousTarget,
+            this._pendingReplace.record,
+          );
+          if (wasAssignedAnother && sameRecord(record, this._pendingReplace.previousTarget)) {
             this._pendingReplace = null;
-          } else if (displaced && (displaced as any).isPersisted?.() && displaced !== record) {
+          } else if (
+            displaced &&
+            (displaced as any).isPersisted?.() &&
+            !sameRecord(displaced, record)
+          ) {
             // The previously-pending record was persisted independently (e.g.
             // built then saved directly), so it is now the real associated
             // record being displaced and must have its FK nullified. This case
@@ -164,11 +198,18 @@ export class HasOneAssociation extends SingularAssociation {
   async persistReplace(): Promise<void> {
     const pending = this._pendingReplace;
     if (!pending) return;
+    // Clear before the first `await`. Two consecutive synchronous property-setter
+    // assignments (`owner.account = a; owner.account = b`) each run `replace` then
+    // queue; clearing now means a concurrent `persistReplace` sees a null
+    // `_pendingReplace` and processes its own captured `pending` rather than
+    // racing on a mutated object. A failed save surfaces through the awaiting
+    // caller / `save()` rejection, so clearing early costs nothing on the error path.
+    this._pendingReplace = null;
     await transactionIf(this, true, async () => {
       if (
         pending.previousTarget &&
         !(pending.previousTarget as any).isDestroyed?.() &&
-        pending.previousTarget !== pending.record
+        !sameRecord(pending.previousTarget, pending.record)
       ) {
         // removeTargetBang reads assoc.target; temporarily restore previousTarget
         // so it operates on the old record, not the new one already set in replace()
@@ -196,8 +237,6 @@ export class HasOneAssociation extends SingularAssociation {
         }
       }
     });
-    // Clear only after success — leave intact on error so save() retry can re-attempt
-    this._pendingReplace = null;
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
@@ -272,6 +311,22 @@ export class HasOneAssociation extends SingularAssociation {
       }
     }
   }
+}
+
+/**
+ * Mirrors Rails' `target != record` in `HasOneAssociation#replace`, where `!=`
+ * is `ActiveRecord::Core#==` — two records are the "same" when they are the
+ * identical object, or persisted instances of the same class with the same id.
+ * Using object identity alone would treat a freshly-found record (e.g.
+ * `Account.find(1)`) as a *different* record from the already-loaded target,
+ * triggering a spurious nullify/destroy of the row being re-assigned.
+ *
+ * @internal
+ */
+export function sameRecord(a: Base | null, b: Base | null): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  return (a as { isEqual?: (other: unknown) => boolean }).isEqual?.(b) === true;
 }
 
 /** @internal */

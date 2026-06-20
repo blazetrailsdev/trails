@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { HasOneAssociation } from "./has-one-association.js";
+import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import {
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
   HasOneThroughNestedAssociationsAreReadonly,
@@ -40,7 +40,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    */
   protected override replace(record: Base | null, save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
-    const assigningAnother = this.target !== record;
+    const assigningAnother = !sameRecord(this.target, record);
     // When assigning nil to an unloaded association, the through record may
     // still exist in the DB. Schedule the pending replace so persistReplace
     // loads the through proxy and destroys it when present — matching Rails'
@@ -51,9 +51,11 @@ export class HasOneThroughAssociation extends HasOneAssociation {
         // Store pending regardless of owner.isPersisted() — for new owners,
         // persistReplace runs after owner.save() when owner is now persisted.
         if (this._pendingReplace) {
-          const wasAssignedAnother =
-            this._pendingReplace.previousTarget !== this._pendingReplace.record;
-          if (wasAssignedAnother && record === this._pendingReplace.previousTarget) {
+          const wasAssignedAnother = !sameRecord(
+            this._pendingReplace.previousTarget,
+            this._pendingReplace.record,
+          );
+          if (wasAssignedAnother && sameRecord(record, this._pendingReplace.previousTarget)) {
             this._pendingReplace = null;
           } else {
             this._pendingReplace.record = record;
@@ -126,10 +128,15 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   override async persistReplace(): Promise<void> {
     const pending = this._pendingReplace;
     if (!pending) return;
+    // Clear before the first `await` — mirrors HasOneAssociation#persistReplace.
+    // The new awaitable `writer` (inherited from HasOneAssociation) makes this
+    // path reachable concurrently (`await writer(a); await writer(b)`); without
+    // the early clear a second `replace` would mutate the shared `_pendingReplace`
+    // object still captured by reference in this call's `pending`.
+    this._pendingReplace = null;
     await transaction(this, async () => {
       await createThroughRecord(this, pending.record, true);
     });
-    this._pendingReplace = null;
   }
 }
 

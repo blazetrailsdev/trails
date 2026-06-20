@@ -21,7 +21,9 @@ export class SingularAssociation extends Association {
     this.target = null;
   }
 
-  writer(record: Base | null): void {
+  // has_one overrides this with an awaitable immediate-persist path that may
+  // return a Promise; belongs_to keeps the synchronous queue-only behavior.
+  writer(record: Base | null): void | Promise<void> {
     this.replace(record);
   }
 
