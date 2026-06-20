@@ -2231,49 +2231,68 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ? records
       : ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[]);
 
-    // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
-    // return` (collection_association.rb#remove_records): if any record's
-    // before_remove halts, the entire operation aborts and nothing is deleted.
-    for (const record of modelRecords) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true))
-        return [];
-    }
     // Persisted children are nullified via update_all (Rails delete_records
     // else-branch), bypassing validations/callbacks. New-record children have
     // no DB row — skip the DB call.
     const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
-    if (persistedRecords.length > 0) {
-      const nullUpdates = this._buildNullifyUpdates();
-      // Mirror Rails delete_records else-branch: scope to the specific records via
-      // composite_query_constraints_list (persistence.rb:234). Single-column: use
-      // `where({col: ids})`; composite: use `where(cols, tuples)` (OR-of-AND) to
-      // avoid the cartesian-product that `AND col1 IN (...) AND col2 IN (...)` produces.
-      const queryCols = compositeQueryConstraintsList.call(
-        (this as any)._modelClass as typeof Base,
-      );
-      const readCol = (r: Base, col: string) => (r as any)._readAttribute(col);
-      let scope = this.scope();
-      if (queryCols.length === 1) {
-        scope = scope.where({
-          [queryCols[0]]: persistedRecords.map((r) => readCol(r, queryCols[0])),
-        });
-      } else {
-        const tuples = persistedRecords.map((r) => queryCols.map((col) => readCol(r, col)));
-        scope = scope.where(queryCols, tuples);
-      }
-      await scope.updateAll(nullUpdates);
-      for (const record of persistedRecords) {
-        for (const [col, val] of Object.entries(nullUpdates)) {
-          record._writeAttribute(col, val);
+
+    // Mirror Rails remove_records (collection_association.rb#remove_records): the
+    // before_remove loop, DB update, in-memory target removal, and after_remove
+    // callbacks form one unit — all run inside the transaction when there are
+    // persisted records, so before_remove side-effects participate in rollback.
+    let aborted = false;
+    const removeRecords = async () => {
+      // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
+      // return`: if any record's before_remove halts, the entire operation aborts
+      // and nothing is deleted (the transaction commits with no work done).
+      for (const record of modelRecords) {
+        if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true)) {
+          aborted = true;
+          return;
         }
       }
+      if (persistedRecords.length > 0) {
+        const nullUpdates = this._buildNullifyUpdates();
+        // Mirror Rails delete_records else-branch: scope to the specific records via
+        // composite_query_constraints_list (persistence.rb:234). Single-column: use
+        // `where({col: ids})`; composite: use `where(cols, tuples)` (OR-of-AND) to
+        // avoid the cartesian-product that `AND col1 IN (...) AND col2 IN (...)` produces.
+        const queryCols = compositeQueryConstraintsList.call(
+          (this as any)._modelClass as typeof Base,
+        );
+        const readCol = (r: Base, col: string) => (r as any)._readAttribute(col);
+        let scope = this.scope();
+        if (queryCols.length === 1) {
+          scope = scope.where({
+            [queryCols[0]]: persistedRecords.map((r) => readCol(r, queryCols[0])),
+          });
+        } else {
+          const tuples = persistedRecords.map((r) => queryCols.map((col) => readCol(r, col)));
+          scope = scope.where(queryCols, tuples);
+        }
+        await scope.updateAll(nullUpdates);
+        for (const record of persistedRecords) {
+          for (const [col, val] of Object.entries(nullUpdates)) {
+            record._writeAttribute(col, val);
+          }
+        }
+      }
+      // Remove from target first, then fire after_remove for all records.
+      this._removeFromTarget(modelRecords as Base[]);
+      for (const record of modelRecords) {
+        fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+      }
+    };
+
+    // Rails delete_or_destroy wraps remove_records in a transaction only when
+    // there are existing (persisted) records; new-record-only deletes run outside
+    // any transaction.
+    if (persistedRecords.length > 0) {
+      await this.transaction(removeRecords);
+    } else {
+      await removeRecords();
     }
-    // Mirror Rails remove_records: remove from target first, then fire after_remove
-    // for all records (collection_association.rb#remove_records).
-    this._removeFromTarget(modelRecords as Base[]);
-    for (const record of modelRecords) {
-      fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
-    }
+    if (aborted) return [];
     return modelRecords as Base[];
   }
 
