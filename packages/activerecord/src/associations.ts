@@ -1684,10 +1684,7 @@ function _inlineOwnerKey(
   if (options.primaryKey !== undefined) {
     return primaryKey;
   }
-  if (
-    !Array.isArray(primaryKey) &&
-    (options.queryConstraints || hasQueryConstraints.call(ctor as any))
-  ) {
+  if (options.queryConstraints || hasQueryConstraints.call(ctor as any)) {
     return queryConstraintsList.call(ctor as any) ?? primaryKey;
   }
   // Mirror reflection.rb:597-600 active_record_primary_key composite_primary_key?
