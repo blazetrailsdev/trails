@@ -479,7 +479,7 @@ function directInstantiate(
   // — mirrors the non-STI Base._instantiate path. Building via `new klass(row)`
   // instead ran every column through the user cast, which rejects raw DB values.
   for (const [key, value] of Object.entries(row)) {
-    record._attributes.writeFromDatabase(key, value, columnTypes?.[key] as never);
+    record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
   }
   narrowToProjectedColumns(klass, record, row);
   record._newRecord = false;

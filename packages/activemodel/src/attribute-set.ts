@@ -61,7 +61,16 @@ export class AttributeSet {
     return this.getAttribute(name).value;
   }
 
-  writeFromDatabase(name: string, value: unknown, type?: import("./type/value.js").Type): void {
+  writeFromDatabase(
+    name: string,
+    value: unknown,
+    // Structural duck type (not the abstract `Type`): callers thread result-set
+    // column types whose only contract on this path is `deserialize`, and
+    // `Attribute.fromDatabase` only calls `type.deserialize` here. Widening to
+    // the structural interface lets call sites pass the column type without an
+    // `as never` cast.
+    type?: { deserialize(value: unknown): unknown },
+  ): void {
     this.assertNotFrozen();
     const existing = this.attributes.get(name);
     if (existing) {
@@ -73,10 +82,11 @@ export class AttributeSet {
       // falling back to the identity `value` type. Mirrors
       // ActiveModel::AttributeSet::Builder#build_from_database casting unknown
       // keys via `types[name]`.
-      this.attributes.set(
-        name,
-        Attribute.fromDatabase(name, value, type ?? typeRegistry.lookup("value")),
-      );
+      // `fromDatabase` is typed for the full `Type`, but only `deserialize` is
+      // exercised for an unknown column — one localized cast here keeps the
+      // public param structural and the call sites cast-free.
+      const colType = (type as import("./type/value.js").Type) ?? typeRegistry.lookup("value");
+      this.attributes.set(name, Attribute.fromDatabase(name, value, colType));
     }
   }
 

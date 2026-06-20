@@ -2504,7 +2504,7 @@ export class Base extends Model {
     // Rails' `instantiate(record, column_types)` slice in find_by_sql /
     // JoinDependency#instantiate.
     for (const [key, value] of Object.entries(row)) {
-      record._attributes.writeFromDatabase(key, value, columnTypes?.[key] as never);
+      record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
     }
     // A SELECT that projects only a subset of columns yields a row with just
     // those keys, so hasAttribute() must reflect what was loaded rather than
