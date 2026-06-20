@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations, association } from "./associations.js";
 import { Notifications } from "@blazetrails/activesupport";
@@ -2709,6 +2709,12 @@ describe("counterCacheColumn memo invalidation on target re-registration", () =>
     }
     return Shelf;
   };
+
+  afterAll(async () => {
+    const { modelRegistry } = await import("./associations.js");
+    modelRegistry.delete("FooBook");
+    modelRegistry.delete("Shelf");
+  });
 
   it("recomputes the counter cache column after the target class is re-registered", async () => {
     const { modelRegistry } = await import("./associations.js");
