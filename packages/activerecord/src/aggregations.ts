@@ -203,16 +203,19 @@ function writerMethod(
 // ---------------------------------------------------------------------------
 
 /**
- * Shallow-copy the aggregation cache into the duped record.
+ * Give the dup an independent shallow copy of the source's aggregation cache.
  * Cached value objects are frozen so sharing references is safe.
  *
- * Mirrors: ActiveRecord::Aggregations#initialize_dup
+ * Mirrors: ActiveRecord::Aggregations#initialize_dup — Rails copies the source's
+ * `@aggregation_cache` because Ruby's `Object#dup` has already shared the ivar
+ * onto the new record before `initialize_dup` runs. Trails builds the dup via a
+ * fresh `new ctor({})` (see persistence.ts `dup`), so the dup starts with an
+ * empty cache and we must copy from `other` (the source) explicitly rather than
+ * from `this`.
  */
-export function initializeDup(this: Base, _other: unknown): void {
-  const self = this as any;
-  if (self._aggregationCache) {
-    self._aggregationCache = new Map(self._aggregationCache as Map<string, unknown>);
-  }
+export function initializeDup(this: Base, other: unknown): void {
+  const src = (other as { _aggregationCache?: Map<string, unknown> })?._aggregationCache;
+  if (src) (this as { _aggregationCache?: Map<string, unknown> })._aggregationCache = new Map(src);
 }
 
 /**
