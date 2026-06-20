@@ -670,7 +670,7 @@ export class Builder implements InsertBuilder {
       }
       return `INTO ${tableName} DEFAULT VALUES`;
     }
-    const columnsList = keys.map((k) => this.quoteColumn(k)).join(", ");
+    const columnsList = keys.map((k) => this.quoteColumn(k)).join(",");
     const compiledValues = this._visitor().compile(this.valuesList());
     return `INTO ${tableName} (${columnsList}) ${compiledValues}`;
   }
@@ -716,7 +716,7 @@ export class Builder implements InsertBuilder {
       // ordinary column lists are quoted.
       const rawCols = index.columns as unknown as string | string[];
       const cols = Array.isArray(rawCols)
-        ? rawCols.map((c) => this.quoteColumn(c)).join(", ")
+        ? rawCols.map((c) => this.quoteColumn(c)).join(",")
         : rawCols;
       return index.where ? `(${cols}) WHERE ${index.where}` : `(${cols})`;
     }
@@ -724,7 +724,7 @@ export class Builder implements InsertBuilder {
       return `(${this._insertAll
         .primaryKeys()
         .map((c) => this.quoteColumn(c))
-        .join(", ")})`;
+        .join(",")})`;
     }
     return "";
   }
@@ -749,7 +749,7 @@ export class Builder implements InsertBuilder {
     for (const col of this._insertAll.updateTimestampColumnsInModel()) {
       if (!updatable.includes(col)) {
         // Rails emits the timestamp column name raw here — only quoted_table_name
-        // is quoted (insert_all.rb:282): `#{column_name}=(CASE WHEN (...) THEN
+        // is quoted (insert_all.rb:284): `#{column_name}=(CASE WHEN (...) THEN
         // #{model.quoted_table_name}.#{column_name} ELSE ...)`.
         parts.push(
           `${col}=(CASE WHEN (${conditions}) THEN ${tableName}.${col} ELSE ${nowValue} END)`,
