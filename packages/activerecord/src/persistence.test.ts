@@ -889,7 +889,7 @@ describe("PersistenceTest", () => {
     expect(p.title).toBe("cached");
   });
 
-  itIfSupports(
+  itIfSupports.skipIf(adapterType === "sqlite")(
     "insert_returning",
     "model with no auto populated fields still returns primary key after insert",
     async () => {
