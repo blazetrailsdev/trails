@@ -528,15 +528,14 @@ describe("AdapterTest", () => {
   // i.e. on MySQL and SQLite (SQLite defaults prepared_statements: true), excluding
   // only PostgreSQL. The extractor cannot evaluate the runtime `!prepared_statements`,
   // so its railsGate over-excludes SQLite; gate to Rails' real condition regardless.
-  it.skipIf(adapterType === "postgres")("update prepared statement", (ctx) => {
-    ctx.skip();
-    // BLOCKED: binds-inlining
-    // ROOT-CAUSE: trails inlines string literals into INSERT SQL rather than binding
-    // them as prepared-statement parameters, so an embedded null byte (\x00) truncates
-    // the SQL at the C-string boundary ("unrecognized token: 'my "). Rails gates this
-    // test off precisely for SQLite-without-prepared-statements; reproducing it requires
-    // the write path to round-trip binds through a prepared statement.
-    // SCOPE: ~8 LOC test once INSERT binds are prepared; affects ~1 test
+  it.skipIf(adapterType === "postgres")("update prepared statement", async () => {
+    const b = await Book.create({ name: "my \x00 book" });
+    await b.reload();
+    expect(b.name).toBe("my \x00 book");
+
+    await b.update({ name: "my other \x00 book" });
+    await b.reload();
+    expect(b.name).toBe("my other \x00 book");
   });
 
   it.skip("create record with pk as zero", () => {

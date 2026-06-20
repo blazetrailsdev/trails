@@ -677,6 +677,14 @@ function _dispatchAssociationAttrs(
   }
 }
 
+// Column types whose database value is a plain string the driver can bind as
+// an untyped parameter without losing an implicit cast. Used by the write path
+// to decide which values to bind (vs inline) so null-byte strings round-trip.
+const BINDABLE_STRING_TYPES = new Set(["string", "text", "immutable_string"]);
+function isBindableStringColumn(typeName: string | undefined): boolean {
+  return typeName !== undefined && BINDABLE_STRING_TYPES.has(typeName);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
@@ -3029,6 +3037,7 @@ export class Base extends Model {
     const values: unknown[] = columns.map((k) => attrs[k]);
 
     let sql: string;
+    let insertBinds: unknown[] = [];
     if (columns.length === 0) {
       const emptyValue = ctor.connection.emptyInsertStatementValue();
       sql = `INSERT INTO ${ctor.connection.quoteTableName(table.name)} ${emptyValue}`;
@@ -3038,11 +3047,25 @@ export class Base extends Model {
         const def = ctor._attributeDefinitions.get(c);
         const isArray = def?.type?.name === "array";
         const raw = values[i];
-        const val = isArray ? arelSql(quoteSqlValue(raw, true)) : raw;
+        // Bind string/text-column values as prepared-statement parameters
+        // (matching Rails' type_casted_binds) instead of inlining them, so a
+        // value containing a null byte (\x00) round-trips rather than truncating
+        // the inlined SQL at the C-string boundary. Scoped to string/text
+        // columns because an untyped bound parameter coerces cleanly there;
+        // other types stay inline so the visitor's `quote()` can both finish
+        // serializing intermediate objects (binary/json) and carry the implicit
+        // cast that custom-OID columns (hstore, enum) need. Arrays keep their
+        // bespoke inline quoting.
+        const val =
+          !isArray && isBindableStringColumn(def?.type?.name) && typeof raw === "string"
+            ? new Nodes.BindParam(raw)
+            : isArray
+              ? arelSql(quoteSqlValue(raw, true))
+              : raw;
         return [table.get(c), val];
       });
       im.insert(insertValues);
-      sql = ctor.connection.toSql(im);
+      [sql, insertBinds] = ctor.connection.toSqlAndBinds(im);
     }
     // A custom-named serial/identity PK (e.g. `owner_id`) needs its column name
     // threaded through so the adapter emits `RETURNING <pk>` and the DB-generated
@@ -3055,7 +3078,14 @@ export class Base extends Model {
         ? [insertPk]
         : undefined;
     this._pendingOperation = ctor.connection
-      .execInsert(sql, `${ctor.name} Create`, [], namedReturning?.[0], undefined, namedReturning)
+      .execInsert(
+        sql,
+        `${ctor.name} Create`,
+        insertBinds,
+        namedReturning?.[0],
+        undefined,
+        namedReturning,
+      )
       .then((rawId) => {
         // Adapters with RETURNING support (PG) may return a Result-like object
         // instead of the bare id — extract via adapter.lastInsertedId when available.
@@ -3152,7 +3182,17 @@ export class Base extends Model {
         const val = dbValues[key];
         const def = ctor._attributeDefinitions.get(key);
         const isArray = def?.type?.name === "array";
-        return [table.get(key), isArray ? arelSql(quoteSqlValue(val, true)) : val];
+        // Bind string/text-column SET values as prepared-statement parameters
+        // (see _performInsert) so null-byte values survive; other types stay
+        // inline.
+        return [
+          table.get(key),
+          !isArray && isBindableStringColumn(def?.type?.name) && typeof val === "string"
+            ? new Nodes.BindParam(val)
+            : isArray
+              ? arelSql(quoteSqlValue(val, true))
+              : val,
+        ];
       },
     );
 
