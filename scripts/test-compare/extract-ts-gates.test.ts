@@ -64,6 +64,12 @@ describe("gates.ts pure helpers", () => {
       features: ["insert_returning"],
       source: ["test"],
     });
+    // Positive form, no `!` (skipIf(adapterSupports("x")) — runs where the
+    // feature is absent) collects the same feature: polarity is not inspected.
+    expect(gateFromGuardExpr('adapterSupports("insert_conflict_target")', false)).toEqual({
+      features: ["insert_conflict_target"],
+      source: ["test"],
+    });
     // Negation is ignored (mirrors Ruby `skip unless a? && !b?` listing both):
     // multiple calls in one compound expression union into the feature set.
     expect(
