@@ -5418,7 +5418,11 @@ describe("EagerAssociationTest", () => {
 describe("EagerAssociationTest", () => {
   const { companies } = useHandlerFixtures(["companies"]);
   beforeAll(async () => {
-    await defineSchema(canonicalSchema, { dropExisting: true });
+    // Partial schema (companies only): `getModelColumns` now projects DB-only
+    // columns for the eager SELECT, so Company's virtual `metadata` attribute no
+    // longer leaks into the projection and the full-`canonicalSchema` workaround
+    // is unnecessary.
+    await defineSchema({ companies: canonicalSchema.companies }, { dropExisting: true });
   });
   registerModel(Company);
   registerModel(Firm);
