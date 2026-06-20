@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "./errors.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 
 let adapter: AbstractSQLite3Adapter;
 
@@ -58,6 +59,20 @@ describe("AdapterPreventWritesTest", () => {
     ).rejects.toThrow(ReadOnlyError);
   });
 
+  // Rails defines two variants of this test in the same class: one for PostgreSQL
+  // (raises StatementInvalid on encoding errors before the write-prevention check) and
+  // one for all other adapters (assert_nothing_raised). This first occurrence is the
+  // PostgreSQL variant; it requires a live PG connection to exercise.
+  it.skip("doesnt error when a select query has encoding errors", () => {
+    // BLOCKED: relation — preventingWrites guard not wired into all query paths
+    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
+    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in adapter-prevent-writes.test.ts and base-prevent-writes.test.ts
+    // PostgreSQL raises StatementInvalid on encoding errors regardless of write-prevention;
+    // requires PostgreSQLAdapter — not exercisable with SQLite3Adapter.
+  });
+
+  // Non-PostgreSQL variant (Rails' `else` branch): the extractor records it as
+  // unconditional, so this stays ungated to pair with that variant.
   it("doesnt error when a select query has encoding errors", async () => {
     await adapter.withPreventedWrites(async () => {
       // SQLite returns invalid bytes as-is rather than failing
@@ -74,17 +89,21 @@ describe("AdapterPreventWritesTest", () => {
     });
   });
 
-  it("doesnt error when a read query with a cte is called while preventing writes", async () => {
-    await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
+  itIfSupports(
+    "common_table_expressions",
+    "doesnt error when a read query with a cte is called while preventing writes",
+    async () => {
+      await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
 
-    await adapter.withPreventedWrites(async () => {
-      const result = await adapter.execute(`
+      await adapter.withPreventedWrites(async () => {
+        const result = await adapter.execute(`
         WITH matching AS (SELECT * FROM "subscribers" WHERE "nick" = 'test')
         SELECT * FROM matching
       `);
-      expect(result).toHaveLength(1);
-    });
-  });
+        expect(result).toHaveLength(1);
+      });
+    },
+  );
 
   it("doesnt error when a select query starting with a slash star comment is called while preventing writes", async () => {
     await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
@@ -153,17 +172,5 @@ describe("AdapterPreventWritesTest", () => {
         adapter.executeMutation(`-- SELECT\nINSERT INTO "subscribers" ("nick") VALUES ('test')`),
       ),
     ).rejects.toThrow(ReadOnlyError);
-  });
-
-  // Rails defines two variants of this test in the same class: one for PostgreSQL
-  // (raises StatementInvalid on encoding errors before the write-prevention check) and
-  // one for all other adapters (assert_nothing_raised). This second occurrence is the
-  // PostgreSQL variant; it requires a live PG connection to exercise.
-  it.skip("doesnt error when a select query has encoding errors", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
-    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in adapter-prevent-writes.test.ts and base-prevent-writes.test.ts
-    // PostgreSQL raises StatementInvalid on encoding errors regardless of write-prevention;
-    // requires PostgreSQLAdapter — not exercisable with SQLite3Adapter.
   });
 });

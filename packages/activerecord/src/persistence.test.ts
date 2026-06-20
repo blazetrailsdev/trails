@@ -15,6 +15,8 @@ function isTemporalDatetime(v: unknown): boolean {
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, RecordNotFound, RecordInvalid } from "./index.js";
+import { adapterType } from "./test-adapter.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -564,7 +566,7 @@ describe("PersistenceTest", () => {
     });
   });
 
-  it("fills auto populated columns on creation", async () => {
+  it.skipIf(adapterType !== "postgres")("fills auto populated columns on creation", async () => {
     class Item extends Base {
       static {
         this.attribute("label", "string");
@@ -887,10 +889,14 @@ describe("PersistenceTest", () => {
     expect(p.title).toBe("cached");
   });
 
-  it("model with no auto populated fields still returns primary key after insert", async () => {
-    const p = await Post.create({ title: "pk-test" });
-    expect(p.id).toBeTruthy();
-  });
+  itIfSupports(
+    "insert_returning",
+    "model with no auto populated fields still returns primary key after insert",
+    async () => {
+      const p = await Post.create({ title: "pk-test" });
+      expect(p.id).toBeTruthy();
+    },
+  );
 
   it("increment with touch an attribute updates timestamps", async () => {
     class CountPost extends Base {
@@ -988,7 +994,7 @@ describe("PersistenceTest", () => {
   it("populates autoincremented id pk regardless of its position in columns list", () => {
     expect(true).toBe(true);
   });
-  it("fills auto populated columns on creation", async () => {
+  it.skipIf(adapterType !== "sqlite")("fills auto populated columns on creation", async () => {
     class DefaultRecord extends Base {
       static {
         this.attribute("name", "string");
@@ -1044,12 +1050,15 @@ describe("PersistenceTest", () => {
     const p = (await Post.create({ views: 5 })) as any;
     expect(p.isPersisted()).toBe(true);
   });
-  it("create model with uuid pk populates id", () => {
+  it.skipIf(adapterType !== "postgres")("create model with uuid pk populates id", () => {
     expect(true).toBe(true);
   });
-  it("create model with custom named uuid pk populates id", () => {
-    expect(true).toBe(true);
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "create model with custom named uuid pk populates id",
+    () => {
+      expect(true).toBe(true);
+    },
+  );
   it("create through factory with block", async () => {
     class Post extends Base {
       static {
@@ -1155,7 +1164,7 @@ describe("PersistenceTest", () => {
     });
   });
 
-  it("fills auto populated columns on creation", async () => {
+  it.skipIf(adapterType !== "mysql")("fills auto populated columns on creation", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
