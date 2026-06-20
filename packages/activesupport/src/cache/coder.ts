@@ -30,7 +30,7 @@
 // entry.ts imports `coder` from here; `LazyEntry` extends `Entry` lazily (see
 // lazyEntryClass) so this cyclic import is never dereferenced at module-eval.
 import { Entry } from "./entry.js";
-import { DeserializationError } from "./index.js";
+import { DeserializationError } from "./deserialization-error.js";
 
 const PREFIX = "~#";
 const UNDEF = "~#u";

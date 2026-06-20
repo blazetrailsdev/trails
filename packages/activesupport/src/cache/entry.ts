@@ -1,5 +1,5 @@
 import { deflate, inflate } from "../gzip.js";
-import { DeserializationError } from "./index.js";
+import { DeserializationError } from "./deserialization-error.js";
 import { coder } from "./coder.js";
 
 /** @internal */
