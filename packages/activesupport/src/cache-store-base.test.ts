@@ -70,12 +70,12 @@ describe("CacheBehaviorTest", () => {
 
   it("fetch with cached nil", () => {
     cache.write("foo", null);
-    let called = false;
+    let calls = 0;
     cache.fetch("foo", () => {
-      called = true;
+      calls++;
       return "bar";
     });
-    expect(called).toBe(false);
+    expect(calls).toBe(0);
   });
 
   it("delete", () => {
