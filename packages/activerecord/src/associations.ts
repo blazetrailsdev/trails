@@ -1195,6 +1195,28 @@ export async function loadBelongsTo(
 }
 
 /**
+ * Resolve a foreign association's (has_one / has_many / through) owner foreign
+ * key from the *rich* reflection, which derives it from the class that
+ * *declared* the association (`reflection.active_record`), not the owner
+ * instance's class. For an STI subclass owner — e.g. a `SpecialPost` row whose
+ * `has_many :special_comments` is declared on `Post` — this yields `post_id`,
+ * not `special_post_id`. Mirrors Rails `reflection.foreign_key`. Returns
+ * `undefined` for an unregistered association so callers keep their fallback.
+ */
+function ownerReflectionForeignKey(
+  ctor: typeof Base,
+  assocName: string,
+): string | string[] | undefined {
+  return (
+    (
+      ctor as unknown as {
+        _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+      }
+    )._reflectOnAssociation?.(assocName)?.foreignKey ?? undefined
+  );
+}
+
+/**
  * Load a has_one association.
  */
 export async function loadHasOne(
@@ -1248,10 +1270,13 @@ export async function loadHasOne(
   }
 
   // Resolve FK columns (may be array for CPK; `:as` swaps to the
-  // polymorphic FK column).
+  // polymorphic FK column). Prefer the rich reflection's foreign key so an STI
+  // subclass owner uses the declaring class's column (see
+  // `ownerReflectionForeignKey`).
   const foreignKey = options.as
     ? (options.foreignKey ?? `${underscore(options.as)}_id`)
     : (options.foreignKey ??
+      ownerReflectionForeignKey(ctor, assocName) ??
       (options.queryConstraints
         ? options.queryConstraints
         : Array.isArray(primaryKey)
@@ -1374,7 +1399,9 @@ export function buildHasOne(
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
   const foreignKey = options.as
     ? (options.foreignKey ?? `${underscore(options.as)}_id`)
-    : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
+    : (options.foreignKey ??
+      ownerReflectionForeignKey(ctor, _assocName) ??
+      `${underscore(ctor.name)}_id`);
 
   if (options.as) {
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
@@ -1505,10 +1532,13 @@ export async function loadHasMany(
   }
 
   // Resolve FK columns (may be array for CPK; `:as` swaps to the
-  // polymorphic FK column).
+  // polymorphic FK column). Prefer the rich reflection's foreign key so an STI
+  // subclass owner uses the declaring class's column (see
+  // `ownerReflectionForeignKey`).
   const foreignKey = options.as
     ? (options.foreignKey ?? `${underscore(options.as)}_id`)
     : (options.foreignKey ??
+      ownerReflectionForeignKey(ctor, assocName) ??
       (options.queryConstraints
         ? options.queryConstraints
         : Array.isArray(primaryKey)
@@ -2381,7 +2411,13 @@ export function buildThroughAssociation(
     throughAttrs[polyFk] = record._readAttribute(ownerPk);
     throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
   } else {
-    const ownerFkOption = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    // The through (join) record's owner FK comes from the *through* reflection,
+    // derived from the class that declared it — not the STI subclass owner's
+    // name. Mirrors Rails `through_reflection.foreign_key`.
+    const ownerFkOption =
+      throughAssoc.options.foreignKey ??
+      ownerReflectionForeignKey(ctor, throughAssoc.name) ??
+      `${underscore(ctor.name)}_id`;
     const ownerPkOption = throughAssoc.options.primaryKey ?? ctor.primaryKey;
     if (Array.isArray(ownerFkOption) || Array.isArray(ownerPkOption)) {
       throw new ConfigurationError(
@@ -2978,7 +3014,9 @@ export async function setHasOne(
   const asName = options.as;
   const foreignKey = asName
     ? (options.foreignKey ?? `${underscore(asName)}_id`)
-    : (options.foreignKey ?? `${underscore(ctor.name)}_id`);
+    : (options.foreignKey ??
+      ownerReflectionForeignKey(ctor, assocName) ??
+      `${underscore(ctor.name)}_id`);
   const typeCol = asName ? `${underscore(asName)}_type` : null;
   // Rails writes `owner.class.polymorphic_name` (the STI base class name) to
   // the `as:` type column, so STI subclass owners store their base type.

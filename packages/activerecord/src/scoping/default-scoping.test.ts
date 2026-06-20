@@ -42,13 +42,16 @@ import {
   AuditLog,
 } from "../test-helpers/models/developer.js";
 import { Mentor } from "../test-helpers/models/mentor.js";
+import { buildHasOne, setHasOne } from "../associations.js";
 import {
   Comment,
   SpecialComment,
+  VerySpecialComment,
   CommentWithDefaultScopeReferencesAssociation,
 } from "../test-helpers/models/comment.js";
 import {
   Post,
+  SpecialPost,
   SpecialPostWithDefaultScope,
   ConditionalStiPost,
   SubConditionalStiPost,
@@ -67,8 +70,10 @@ registerModel(DeveloperWithIncludes);
 registerModel(Mentor);
 registerModel(Comment);
 registerModel(SpecialComment);
+registerModel(VerySpecialComment);
 registerModel(CommentWithDefaultScopeReferencesAssociation);
 registerModel(Post);
+registerModel(SpecialPost);
 registerModel(SpecialPostWithDefaultScope);
 registerModel(ConditionalStiPost);
 registerModel(SubConditionalStiPost);
@@ -914,6 +919,39 @@ describe("DefaultScopingTest", () => {
       await post.specialComments.push(pushed);
       expect(pushed._readAttribute("post_id")).toBe(post.id);
       expect(pushed.isNewRecord()).toBe(false);
+    });
+  });
+
+  // Singular sibling of the STI write-path fix: the has_one read (loadHasOne),
+  // build (buildHasOne), and assign (setHasOne) paths on an STI subclass owner
+  // must derive the foreign key from the class that *declared* the association
+  // (`Post` → `post_id`), not the owner instance's class (`SpecialPost` →
+  // `special_post_id`). Mirrors Rails using `reflection.foreign_key`.
+  it("sti has_one read build and assign paths use the declaring-class foreign key", async () => {
+    const post = posts("thinking") as any;
+    expect(post.constructor.name).toBe("SpecialPost");
+
+    await (Comment as any).unscoped(async () => {
+      // loadHasOne reads via comments.post_id, not the nonexistent
+      // special_post_id. Use a fresh STI owner so no cached/assigned target
+      // masks the DB read.
+      const reader = (await SpecialPost.create({ title: "sti reader", body: "x" })) as any;
+      const comment = await Comment.create({
+        type: "VerySpecialComment",
+        body: "sti has_one comment",
+        post_id: reader.id,
+      });
+      const loaded = await reader.loadHasOne("verySpecialComment");
+      expect(loaded.id).toBe(comment.id);
+
+      // setHasOne writes the declaring-class FK onto a freshly assigned target.
+      const assigned = new VerySpecialComment({ body: "assigned sti has_one" });
+      await setHasOne(post, "verySpecialComment", assigned);
+      expect(assigned._readAttribute("post_id")).toBe(post.id);
+
+      // buildHasOne sets the declaring-class FK on the built target.
+      const built = buildHasOne(post, "verySpecialComment", {}, { body: "built sti has_one" });
+      expect(built._readAttribute("post_id")).toBe(post.id);
     });
   });
 
