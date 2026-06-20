@@ -238,6 +238,30 @@ describe("AssociationProxyTest", () => {
     expect(david.firstPosts.loaded).toBe(true);
   });
 
+  it("last! works on loaded associations", async () => {
+    const david = authors("david") as any;
+    const expected = await david.firstPosts.last();
+    await david.firstPosts.reload();
+    const sqls = await captureSql(async () => {
+      const last = await david.firstPosts.lastBang();
+      expect(last.id).toBe(expected!.id);
+    });
+    expect(sqls).toHaveLength(0);
+    expect(david.firstPosts.loaded).toBe(true);
+  });
+
+  it("take! works on loaded associations", async () => {
+    const david = authors("david") as any;
+    const expected = await david.firstPosts.take();
+    await david.firstPosts.reload();
+    const sqls = await captureSql(async () => {
+      const taken = await david.firstPosts.takeBang();
+      expect(taken.id).toBe(expected!.id);
+    });
+    expect(sqls).toHaveLength(0);
+    expect(david.firstPosts.loaded).toBe(true);
+  });
+
   it("size differentiates between new and persisted in memory records when loaded records are empty", async () => {
     const member = members("blarpy_winkup") as any;
     expect(await member.favoriteMemberships.isEmpty()).toBe(true);

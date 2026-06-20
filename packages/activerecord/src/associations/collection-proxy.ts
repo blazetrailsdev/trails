@@ -2518,6 +2518,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#last!
+   */
+  override async lastBang(): Promise<T> {
+    const record = await this.last();
+    if (!record) {
+      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
+    }
+    return record;
+  }
+
+  /**
    * Return the first n records (or first record if n omitted).
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#take
@@ -2530,6 +2541,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const records = this._targetLoaded ? this._target : await this.toArray();
     if (n === undefined) return records[0] ?? null;
     return records.slice(0, n);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#take!
+   */
+  override async takeBang(): Promise<T> {
+    const record = await this.take();
+    if (!record) {
+      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
+    }
+    return record;
   }
 
   /**
