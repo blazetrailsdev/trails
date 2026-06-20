@@ -22,7 +22,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-import { itIfSupports } from "./test-helpers/supports.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
