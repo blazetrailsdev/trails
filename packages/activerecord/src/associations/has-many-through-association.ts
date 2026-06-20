@@ -385,7 +385,10 @@ function buildHabtmThroughRecord(assoc: HasManyThroughAssociation, record: Base)
     throughAssocDef.options.className ?? `${ctor.name}::HABTM_${camelize(assocDef.name)}`;
   const throughModel = resolveAssocClass(assoc.owner, throughName, throughClassName);
   const ownerPk = throughAssocDef.options.primaryKey ?? ctor.primaryKey ?? "id";
-  const ownerFk = throughAssocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const ownerFk =
+    throughAssocDef.options.foreignKey ??
+    ctor._reflectOnAssociation?.(throughName)?.foreignKey ??
+    `${underscore(ctor.name)}_id`;
   const pkValue = (assoc.owner as any)._readAttribute?.(ownerPk) ?? (assoc.owner as any)[ownerPk];
   // The HABTM JoinModel (createHabtmJoinModel in associations.ts) declares
   // two belongsTo entries on `_associations`: "leftSide" (owner-side) and a

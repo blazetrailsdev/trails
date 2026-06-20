@@ -2263,7 +2263,13 @@ export async function loadHabtm(
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveAssocClass(record, assocName, className);
   const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName, options);
-  const ownerFk = singleFk(options.foreignKey, `${underscore(ctor.name)}_id`);
+  // Prefer the rich reflection's foreignKey (derived from the class that
+  // *declared* the HABTM, not the STI subclass owner) before the owner-class
+  // fallback — mirrors Rails `reflection.foreign_key`.
+  const ownerFk = singleFk(
+    options.foreignKey ?? ctor._reflectOnAssociation?.(assocName)?.foreignKey,
+    `${underscore(ctor.name)}_id`,
+  );
   const targetFk = habtmTargetFk(assocName, options as { className?: unknown });
   const ownerPkCol = habtmOwnerPk(options, ctor);
   const pkValue = record._readAttribute(ownerPkCol);
@@ -2498,7 +2504,11 @@ export async function createThroughAssociation(
       const sourceAsName = sourceAssocDef?.options?.as;
       const targetFk = sourceAsName
         ? (sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
-        : (sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`);
+        : (sourceAssocDef?.options?.foreignKey ??
+          (sourceAssocDef
+            ? throughCtor._reflectOnAssociation?.(sourceAssocDef.name)?.foreignKey
+            : undefined) ??
+          `${underscore(throughCtor.name)}_id`);
       if (Array.isArray(targetFk)) {
         throw new ConfigurationError(
           "createThroughAssociation does not support composite foreign keys",

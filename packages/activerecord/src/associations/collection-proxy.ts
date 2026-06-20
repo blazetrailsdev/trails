@@ -1751,7 +1751,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else if (throughAssoc.options.queryConstraints) {
       ownerFk = throughAssoc.options.queryConstraints;
     } else {
-      const derivedFk = `${underscore(ctor.name)}_id`;
+      // Prefer the rich reflection's scalar foreignKey, derived from the class
+      // that *declared* the through association (`reflection.active_record`),
+      // not the STI subclass owner instance — mirrors Rails
+      // `reflection.foreign_key`. For a `SpecialPost` owner whose
+      // `has_many :readers` is declared on `Post` this yields `post_id`, not
+      // `special_post_id`. A composite reflection FK falls through to the
+      // query-constraint derivation below (unchanged).
+      const reflFk = ctor._reflectOnAssociation?.(throughAssoc.name)?.foreignKey;
+      const derivedFk = typeof reflFk === "string" ? reflFk : `${underscore(ctor.name)}_id`;
       const constraints = ownerHasQueryConstraints.call(ctor as any)
         ? ownerQueryConstraintsList.call(ctor as any)
         : null;
