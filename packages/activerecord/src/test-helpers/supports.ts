@@ -121,8 +121,14 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // (abstract_mysql_adapter.rb:148; abstract default false)
   optimizer_hints: ["mysql"] as readonly Backend[],
   // `supports_transaction_isolation?`: PostgreSQL + MySQL + SQLite (sqlite3_adapter.rb:147).
-  // The Rails test (transaction_isolation_test.rb:20) adds a separate
-  // !current_adapter?(:SQLite3Adapter) guard — express via itIfSupports.skipIf(adapterType === "sqlite").
+  // The Rails test (transaction_isolation_test.rb:20) ANDs this with
+  // !current_adapter?(:SQLite3Adapter). The test:compare Ruby extractor drops the
+  // adapter half of such mixed adapter+feature conditions (extract-ruby-tests.rb:462),
+  // so the canonical railsGate is feature-only `transaction_isolation`. Match it
+  // with a bare itIfSupports("transaction_isolation") where the body is adapter-
+  // agnostic; only add .skipIf(adapterType === "sqlite") when a subtest genuinely
+  // must not run on SQLite (a real body need, not gate-matching) — note that doing
+  // so re-introduces an adapter restriction the extractor will flag as wrong-gate.
   transaction_isolation: ALL,
 };
 
