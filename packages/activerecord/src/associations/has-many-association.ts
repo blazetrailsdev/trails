@@ -291,9 +291,10 @@ function deleteCount(assoc: HasManyAssociation, method: string, scope: any): Pro
 /**
  * Restrict an association scope to the given records via their query-constraint
  * columns. Mirrors Rails' `scope.where(query_constraints => values)` from
- * `HasManyAssociation#delete_records`. Single-column PKs use a `WHERE id IN (...)`;
- * composite keys AND a per-column `IN` (an over-approximation only reachable for
- * the rare composite-PK non-through has_many, which trails does not bulk-delete).
+ * `HasManyAssociation#delete_records` (has_many_association.rb:132–135).
+ * Single-column PKs use `WHERE id IN (...)`; composite keys use the tuple form
+ * `where(cols, tuples)` (OR-of-AND) to avoid the cartesian product that
+ * `AND col1 IN (...) AND col2 IN (...)` would produce.
  * @internal
  */
 function scopeForRecords(scope: any, queryConstraints: string[], records: Base[]): any {
@@ -301,10 +302,12 @@ function scopeForRecords(scope: any, queryConstraints: string[], records: Base[]
     typeof (r as any)._readAttribute === "function"
       ? (r as any)._readAttribute(col)
       : (r as any)[col];
-  for (const col of queryConstraints) {
-    scope = scope.where({ [col]: records.map((r) => readCol(r, col)) });
+  if (queryConstraints.length === 1) {
+    const col = queryConstraints[0];
+    return scope.where({ [col]: records.map((r) => readCol(r, col)) });
   }
-  return scope;
+  const tuples = records.map((r) => queryConstraints.map((col) => readCol(r, col)));
+  return scope.where(queryConstraints, tuples);
 }
 
 /** @internal */
