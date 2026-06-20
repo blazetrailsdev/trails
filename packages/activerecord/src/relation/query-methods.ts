@@ -1470,10 +1470,19 @@ function addTreeToJoinDependency(
   for (const [assocName, subtree] of Object.entries(tree)) {
     const node = jd.addAssociation(assocName, parentContext);
     if (!node) {
+      const fromModelClass = (parentContext?.fromModel as any) ?? (jd as any)._baseModel;
       // Use current parent model name in the error (not always the root model).
-      const onModel = parentContext
-        ? ((parentContext.fromModel as any)?.name ?? modelName)
-        : modelName;
+      const onModel = fromModelClass?.name ?? modelName;
+      // Rails' JoinDependency#find_reflection raises ConfigurationError when the
+      // association does not exist on the model (join_dependency.rb). A null node
+      // for a *real* association is a join capability gap, which keeps the
+      // ArgumentError fallback below.
+      const exists = (fromModelClass?._associations ?? []).some((a: any) => a.name === assocName);
+      if (!exists) {
+        throw new ConfigurationError(
+          `Can't join '${onModel}' to association named '${assocName}'; perhaps you misspelled it?`,
+        );
+      }
       throw argumentError(
         `Association named '${assocName}' was not found on ${onModel}; perhaps you misspelled it?`,
       );
