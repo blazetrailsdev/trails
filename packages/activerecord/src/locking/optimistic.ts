@@ -282,6 +282,14 @@ export function _clearLockingColumn(this: InstanceLockingHost): void {
 
 /**
  * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic#initialize_dup
+ */
+export function initializeDup(this: InstanceLockingHost, _other: unknown): void {
+  if (this.constructor.lockingEnabled) _clearLockingColumn.call(this);
+}
+
+/**
+ * @internal
  * Mirrors: ActiveRecord::Locking::Optimistic#_query_constraints_hash
  */
 export function _queryConstraintsHash(

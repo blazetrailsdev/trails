@@ -4089,6 +4089,14 @@ include(Base, TouchLater.InstanceMethods);
 include(Base, _Aggregations.InstanceMethods);
 // Aggregations#reload must override Persistence#reload (include() won't replace).
 (Base.prototype as any).reload = _Aggregations.reload;
+// Compose the initialize_dup chain. Ruby builds it via module super-calls
+// (Core → Aggregations → Locking::Optimistic → Timestamp); trails has no super
+// chain across mixins, so invoke each module's hook explicitly in that order.
+(Base.prototype as any).initializeDup = function (this: Base, other: unknown): void {
+  _Aggregations.initializeDup.call(this, other);
+  LockingOptimistic.initializeDup.call(this as any, other);
+  Timestamp.initializeDup.call(this as any, other);
+};
 include(Base, _AttributeAssignment.InstanceMethods);
 include(Base, AutosaveAssociation);
 include(Base, _NestedAttributes.InstanceMethods);

@@ -3,7 +3,7 @@
  * Topic/Car/Movie models + handler `topics`/`cars` fixtures and the canonical
  * `parrots_pirates` table, test names verbatim from the Ruby methods.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -27,6 +27,17 @@ describe("DupTest", () => {
   // Mirrors Rails `fixtures :topics, :cars`.
   useHandlerFixtures(["topics", "cars"], { schema: canonicalSchema });
 
+  beforeAll(async () => {
+    // Car declares `attribute :wheels_owned_at`, so its cold-cache `load_schema`
+    // synthesizes a minimal columns_hash (just the declared attr) and never
+    // re-reflects the real `cars` columns — leaving `lock_version` without an
+    // attribute accessor and `locking_enabled?` false. Register and warm it so
+    // the optimistic-locking column is real (mirrors locking_test.rb's setup).
+    registerModel("Car", Car);
+    Car.resetColumnInformation();
+    await Car.loadSchema();
+  });
+
   it("dup", () => {
     const topic = new Topic({});
     topic.freeze();
@@ -39,9 +50,7 @@ describe("DupTest", () => {
     expect(duped.isReadonly()).toBe(false);
   });
 
-  // BLOCKED (dup-initialize-dup-convergence): `dup` rebuilds via `new ctor`,
-  // not Ruby's ivar-copying `Object#dup`, so `@readonly` is not carried over.
-  it.skip("is readonly", async () => {
+  it("is readonly", async () => {
     const topic = await Topic.first();
     topic!.readonlyBang();
     const duped = topic!.dup();
@@ -81,9 +90,7 @@ describe("DupTest", () => {
     expect(duped.author_name).toBe("Aaron");
   });
 
-  // BLOCKED (dup-initialize-dup-convergence): `dup` skips the `initialize_dup`
-  // chain, so the duplicate's dirty `changes` snapshot diverges from Rails.
-  it.skip("dup with changes", async () => {
+  it("dup with changes", async () => {
     const dbtopic = await Topic.first();
     const topic = new Topic({});
 
@@ -123,9 +130,7 @@ describe("DupTest", () => {
     expect(duped.author_name).toBe("meow");
   });
 
-  // BLOCKED (dup-initialize-dup-convergence): `dup` never calls
-  // `Timestamp#initialize_dup`, so created_at/updated_at survive the dup.
-  it.skip("dup timestamps are cleared", async () => {
+  it("dup timestamps are cleared", async () => {
     const topic = await Topic.first();
     expect(topic!.updated_at).not.toBeNull();
     expect(topic!.created_at).not.toBeNull();
@@ -139,9 +144,7 @@ describe("DupTest", () => {
     expect(newTopic.created_at).not.toBeNull();
   });
 
-  // BLOCKED (dup-initialize-dup-convergence): `dup` never calls
-  // `Locking::Optimistic#initialize_dup`, so lock_version is not reset to 0.
-  it.skip("dup locking column is cleared", async () => {
+  it("dup locking column is cleared", async () => {
     const car = await Car.first();
     await car!.touch();
     expect(car!.lock_version).not.toBe(0);
