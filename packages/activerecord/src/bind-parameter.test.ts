@@ -249,14 +249,15 @@ describe("BindParameterTest", () => {
   // DEVIATION (tracked): Rails asserts the SQL string literal IS cached
   // (bind_parameter_test.rb:100-107, `assert_includes`): `sanitize_sql` bakes the
   // value into an `Arel::Nodes::SqlLiteral`, leaving `collector.preparable = true`
-  // (no unpreparable node), so a no-bind-but-preparable SELECT is pooled. trails
-  // infers preparability from bind presence (see the note in
-  // database-statements.ts `selectAll`), and this query inlines to zero binds —
-  // indistinguishable from the genuinely-non-preparable IN-clause array above —
-  // so it is NOT pooled. Asserting `not.toContain` here would ratify that
-  // inversion, so the case stays skipped pending the collector.preparable
-  // threading that converges it to Rails' `assert_includes`. Tracked by RFC 0016
-  // story `thread-collector-preparable-for-statement-cache`.
+  // (no unpreparable node), so a no-bind-but-preparable SELECT is pooled. The
+  // `collector.preparable` threading (Composite default-true, SqlLiteral
+  // non-preparable, `compileWithBinds` 4-tuple, `opts.preparable` into selectAll)
+  // is now restored, but un-skipping this case ALSO needs `where("col = ?", val)`
+  // to route through `BoundSqlLiteral` (preparable) instead of a plain
+  // `SqlLiteral` (non-preparable). That `build_where_clause` → `BoundSqlLiteral`
+  // wiring is deferred to the `converge-build-where-clause-bound-sql-literal`
+  // story (see the NOTE in relation/query-methods.ts), so this case stays skipped
+  // until that lands and is un-skipped there.
   it.skip("statement cache with sql string literal", () => {});
 
   it("too many binds", async () => {
