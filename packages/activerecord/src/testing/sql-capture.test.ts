@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { captureSql } from "./sql-capture.js";
+import { captureSql, captureLogOutput } from "./sql-capture.js";
 
 // Emit the three query shapes captureSql distinguishes: a normal load, a
 // SCHEMA-tagged introspection query, and a cached statement.
@@ -24,5 +24,19 @@ describe("captureSql", () => {
   it("drops SCHEMA and cached queries when includeSchema is false", async () => {
     // Mirrors Rails' capture_sql(include_schema: false).
     expect(await captureSql(emitTrio, { includeSchema: false })).toEqual(["LOAD"]);
+  });
+});
+
+describe("captureLogOutput", () => {
+  it("accumulates the name + sql of each event, like Rails' StringIO logger", async () => {
+    const output = await captureLogOutput(() => {
+      Notifications.instrument(
+        "sql.active_record",
+        { sql: 'INSERT INTO "books"', name: "Book Bulk Insert" },
+        () => {},
+      );
+    });
+    expect(output).toContain("Book Bulk Insert");
+    expect(output).toContain('INSERT INTO "books"');
   });
 });
