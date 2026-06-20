@@ -20,6 +20,18 @@ export interface CacheLogger {
 
 export type StoreOptions = Record<string, unknown>;
 
+/**
+ * Mirrors Ruby `Array#extract_options!`: mutably pops a trailing plain-object
+ * options hash off the args array, returning it (or undefined). @internal
+ */
+function extractOptions(args: unknown[]): StoreOptions | undefined {
+  const last = args[args.length - 1];
+  if (last != null && typeof last === "object" && !Array.isArray(last)) {
+    return args.pop() as StoreOptions;
+  }
+  return undefined;
+}
+
 /** Mirrors Rails Cache::Store::WriteOptions (cache.rb:1064). @internal */
 export class WriteOptions {
   constructor(private _opts: StoreOptions) {}
@@ -152,9 +164,10 @@ export abstract class Store {
     }
   }
 
-  readMulti(...names: string[]): Record<string, unknown> {
+  readMulti(...names: [...string[], StoreOptions] | string[]): Record<string, unknown> {
+    const options = extractOptions(names as unknown[]);
     if (names.length === 0) return {};
-    return this.readMultiEntries(names, this.mergedOptions(undefined));
+    return this.readMultiEntries(names as string[], this.mergedOptions(options));
   }
 
   writeMulti(hash: Record<string, unknown>, options?: StoreOptions): Record<string, unknown> {
