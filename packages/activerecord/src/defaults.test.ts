@@ -19,6 +19,8 @@ import {
   supportsDefaultExpression,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
+import { describeIfPg } from "./adapters/postgresql/test-helper.js";
+import { describeIfSqlite } from "./adapters/sqlite3/test-helper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { itIfSupports } from "./test-helpers/supports.js";
@@ -417,7 +419,7 @@ describe("DefaultStringsTest", () => {
   });
 });
 
-describe("PostgresqlDefaultExpressionTest", () => {
+describeIfPg("PostgresqlDefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
     // BLOCKED: schema — schema dumper does not reflect PostgreSQL expression defaults (CURRENT_DATE / CURRENT_TIMESTAMP).
     // ROOT-CAUSE: dump_table_schema path does not preserve expression-default lambdas for PG.
@@ -425,7 +427,7 @@ describe("PostgresqlDefaultExpressionTest", () => {
   });
 });
 
-describe("Sqlite3DefaultExpressionTest", () => {
+describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
     // BLOCKED: schema — schema dumper does not reflect SQLite expression defaults (CURRENT_DATE, CURRENT_TIMESTAMP, ABS(RANDOM())).
     // ROOT-CAUSE: dump_table_schema path does not preserve expression-default lambdas for SQLite.

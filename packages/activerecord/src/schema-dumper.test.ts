@@ -940,14 +940,19 @@ describe("SchemaDumperTest", () => {
       });
     },
   );
-  it.skip("timestamps schema dump before rails 7", () => {
+  it.skipIf(adapterType !== "postgres")("timestamps schema dump before rails 7", (ctx) => {
+    ctx.skip();
     // BLOCKED: needs Migration version compatibility (Migration[6.1]).
     // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
   });
-  it.skip("timestamps schema dump before rails 7 with timestamptz setting", () => {
-    // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
-    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "timestamps schema dump before rails 7 with timestamptz setting",
+    (ctx) => {
+      ctx.skip();
+      // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
+      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    },
+  );
   it.skipIf(adapterType !== "postgres")(
     "schema dump when changing datetime type for an existing app",
     async () => {
@@ -997,14 +1002,22 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("created_at");
   });
 
-  it.skip("schema dump with correct timestamp types via add column before rails 7", () => {
-    // BLOCKED: needs Migration version compatibility (Migration[6.1]).
-    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
-  });
-  it.skip("schema dump with correct timestamp types via add column before rails 7 with timestamptz setting", () => {
-    // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
-    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump with correct timestamp types via add column before rails 7",
+    (ctx) => {
+      ctx.skip();
+      // BLOCKED: needs Migration version compatibility (Migration[6.1]).
+      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    },
+  );
+  it.skipIf(adapterType !== "postgres")(
+    "schema dump with correct timestamp types via add column before rails 7 with timestamptz setting",
+    (ctx) => {
+      ctx.skip();
+      // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
+      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    },
+  );
 
   it("schema dump with correct timestamp types via add column with type as string", async () => {
     await ctx.createTable("posts", {}, (t) => {
@@ -1047,7 +1060,8 @@ describe("SchemaDumperDefaultsTest", () => {
     expect(output).toMatch(/text.*"text_with_default".*default: "John"/);
   });
 
-  it.skip("schema dump with column infinity default", () => {
+  it.skipIf(adapterType !== "postgres")("schema dump with column infinity default", (ctx) => {
+    ctx.skip();
     // BLOCKED: PG default-introspection path — float defaults arrive as the bare
     // string "Infinity"/"NaN" (no ::cast), and datetime/date defaults are already
     // rendered as the Ruby literal `::Float::INFINITY` via the OID type's

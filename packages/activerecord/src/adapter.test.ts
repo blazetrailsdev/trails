@@ -523,7 +523,9 @@ describe("AdapterTest", () => {
     },
   );
 
-  it.skip("update prepared statement", () => {
+  // Rails gates this on current_adapter?(:Mysql2) (adapter_test.rb).
+  it.skipIf(adapterType !== "mysql")("update prepared statement", (ctx) => {
+    ctx.skip();
     // BLOCKED: binds-inlining
     // ROOT-CAUSE: trails inlines string literals into INSERT SQL rather than binding
     // them as prepared-statement parameters, so an embedded null byte (\x00) truncates
