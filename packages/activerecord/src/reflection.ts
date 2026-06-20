@@ -818,7 +818,6 @@ export class AssociationReflection extends MacroReflection {
     if (!primaryQueryConstraints) return foreignKey;
 
     const ownerPk = this.activeRecord.primaryKey;
-    const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
 
     if (primaryQueryConstraints.length > 2) {
       throw new ArgumentError(
@@ -829,7 +828,12 @@ export class AssociationReflection extends MacroReflection {
       );
     }
 
-    if (ownerPkStr && !primaryQueryConstraints.includes(ownerPkStr)) {
+    // Rails compares `owner_pk` against the constraints list unconditionally.
+    // When the owner has a composite PK, `owner_pk` is an array — never an
+    // element of the string-valued constraints list — so the guard always
+    // raises rather than being silently skipped.
+    const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
+    if (!ownerPkStr || !primaryQueryConstraints.includes(ownerPkStr)) {
       throw new ArgumentError(
         `The query constraints on the \`${this.activeRecord.name}\` model does not include the primary ` +
           `key so Active Record is unable to derive the foreign key constraints for ` +

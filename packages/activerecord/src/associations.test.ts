@@ -2566,6 +2566,38 @@ describe("AssociationsTest", () => {
     }
   });
 
+  it("query constraints that dont include a composite primary key raise", async () => {
+    // Rails runs the primary-key-inclusion guard unconditionally: when the
+    // owner has a composite PK, `owner_pk` is an array that is never an element
+    // of the string-valued constraints list, so the guard always raises rather
+    // than silently exempting composite-PK owners.
+    const originalList = (ShardedBlogPost as any)._queryConstraintsList;
+    const originalPk = (ShardedBlogPost as any)._primaryKey;
+    try {
+      (ShardedBlogPost as any)._primaryKey = ["blog_id", "id"];
+      (ShardedBlogPost as any)._queryConstraintsList = ["blog_id", "id"];
+      (ShardedBlogPost as any)._hasQueryConstraints = true;
+      if (!reflectOnAssociation(ShardedBlogPost, "commentsWithCompositePkOwner")) {
+        (ShardedBlogPost as any).hasMany("commentsWithCompositePkOwner", {
+          primaryKey: ["blog_id", "id"],
+          className: "ShardedComment",
+        });
+      }
+      const blogPost = shardedBlogPosts("great_post_blog_one");
+      let error: unknown;
+      try {
+        await association(blogPost, "commentsWithCompositePkOwner").toArray();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ArgumentError);
+      expect((error as Error).message).toContain("does not include the primary key");
+    } finally {
+      (ShardedBlogPost as any)._queryConstraintsList = originalList;
+      (ShardedBlogPost as any)._primaryKey = originalPk;
+    }
+  });
+
   it("nullify composite has many through association", async () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
     expect((await association(blogPost, "tags").toArray()).length).toBeGreaterThan(0);
