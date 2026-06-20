@@ -51,7 +51,6 @@ describe("HotCompatibilityTest", () => {
     try {
       // warm cache
       await klass.create();
-      await klass.loadSchema();
 
       // we have 3 columns
       expect(klass.columns().length).toBe(3);
@@ -76,7 +75,6 @@ describe("HotCompatibilityTest", () => {
     const { klass, adapter } = await setupHotCompatibility();
     try {
       const record = await klass.create({ foo: "foo" });
-      await klass.loadSchema();
       expect(klass.columns().length).toBe(3);
       await new MigrationContext(adapter).removeColumn("hot_compatibilities", "bar");
       expect(klass.columns().length).toBe(3);
