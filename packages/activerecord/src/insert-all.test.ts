@@ -1259,12 +1259,15 @@ describe("InsertAllTest", () => {
     },
   );
 
-  // Rails gates this on current_adapter?(:Mysql2) (insert_all_test.rb).
-  // The handler suite suffixes MYSQL_TEST_URL with a per-worker slot DB
-  // (test-setup-worker-db.ts), so connectionDbConfig().database names the
-  // real database `books` lives in — exactly what Rails qualifies with.
+  // Rails gates this on current_adapter?(:Mysql2) (insert_all_test.rb) and
+  // qualifies the table with `Book.connection_db_config.database`. Under the
+  // handler suite the per-worker slot DB is suffixed onto MYSQL_TEST_URL
+  // (test-setup-worker-db.ts) but does not surface on the db_config hash, so
+  // we read the live `SELECT database()` via currentDatabase() — the same
+  // database `books` lives in, which is exactly what Rails qualifies with.
   it.skipIf(adapterType !== "mysql")("insert all when table name contains database", async () => {
-    const databaseName = Book.connectionDbConfig().database;
+    const conn = Book.connection as unknown as { currentDatabase(): Promise<string> };
+    const databaseName = await conn.currentDatabase();
     Book.tableName = `${databaseName}.books`;
 
     let raised: unknown;
