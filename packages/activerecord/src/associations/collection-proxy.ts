@@ -1758,11 +1758,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // `has_many :readers` is declared on `Post` this yields `post_id`, not
       // `special_post_id`. A composite reflection FK falls through to the
       // query-constraint derivation below (unchanged).
-      const reflFk = (
-        ctor as typeof Base & {
-          _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
-        }
-      )._reflectOnAssociation?.(throughAssoc.name)?.foreignKey;
+      const reflFk = ctor._reflectOnAssociation?.(throughAssoc.name)?.foreignKey;
       const derivedFk = typeof reflFk === "string" ? reflFk : `${underscore(ctor.name)}_id`;
       const constraints = ownerHasQueryConstraints.call(ctor as any)
         ? ownerQueryConstraintsList.call(ctor as any)
