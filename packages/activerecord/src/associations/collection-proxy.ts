@@ -1868,12 +1868,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // cannot collapse to a scalar and we raise CompositePrimaryKeyMismatchError.
     const ownerPkOption = throughAssoc.options.primaryKey;
     if (Array.isArray(ownerPkOption) && !ownerPkOption.includes("id")) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, this._assocName, ownerPkOption, idCol);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: this._assocName,
+        primaryKey: ownerPkOption,
+        foreignKey: idCol,
+      });
     }
     const resolvedPkOption = Array.isArray(ownerPkOption) ? "id" : ownerPkOption;
     const ctorPk = ctor.primaryKey;
     if (Array.isArray(ctorPk) && !ctorPk.includes("id")) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, this._assocName, ctorPk, idCol);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: this._assocName,
+        primaryKey: ctorPk,
+        foreignKey: idCol,
+      });
     }
     const resolvedCtorPk = Array.isArray(ctorPk) ? "id" : ctorPk;
     const polyPk = resolvedPkOption ?? resolvedCtorPk;

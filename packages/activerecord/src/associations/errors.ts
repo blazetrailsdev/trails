@@ -200,32 +200,57 @@ export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends Thr
   }
 }
 
+/**
+ * Reflection-shaped object that `CompositePrimaryKeyMismatchError` derives its
+ * message from. Mirrors the slice of `AbstractReflection` Rails' error reads:
+ * `active_record` (the owner class, whose `name` builds the message), `name`,
+ * the resolved primary key, and the foreign key. `activeRecord` may be the
+ * class itself or its name string so callers can pass either the real
+ * reflection's class or a bare owner name.
+ */
+export interface CompositePrimaryKeyMismatchReflection {
+  activeRecord?: { name?: string } | string | null;
+  name?: string;
+  primaryKey?: string | string[];
+  foreignKey?: string | string[];
+}
+
+function formatKey(key: string | string[]): string {
+  return Array.isArray(key) ? `[${key.map((k) => `"${k}"`).join(", ")}]` : key;
+}
+
+/**
+ * Mirrors Rails' `CompositePrimaryKeyMismatchError` (associations/errors.rb:182):
+ * stores the reflection via `attr_reader :reflection` and derives the message
+ * from it inside the constructor. We accept a reflection-shaped object carrying
+ * the already-resolved primary/foreign keys (each raise site computes the pair
+ * it is checking) rather than the flat string args we used before.
+ */
 export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
-  constructor(
-    owner?: string,
-    association?: string,
-    primaryKey?: string | string[],
-    foreignKey?: string | string[],
-  ) {
+  readonly reflection: CompositePrimaryKeyMismatchReflection | null;
+
+  constructor(reflection?: CompositePrimaryKeyMismatchReflection | null) {
     let message: string;
     if (
-      owner !== undefined &&
-      association !== undefined &&
-      primaryKey !== undefined &&
-      foreignKey !== undefined
+      reflection &&
+      reflection.activeRecord != null &&
+      reflection.name !== undefined &&
+      reflection.primaryKey !== undefined &&
+      reflection.foreignKey !== undefined
     ) {
-      const pk = Array.isArray(primaryKey)
-        ? `[${primaryKey.map((k) => `"${k}"`).join(", ")}]`
-        : primaryKey;
-      const fk = Array.isArray(foreignKey)
-        ? `[${foreignKey.map((k) => `"${k}"`).join(", ")}]`
-        : foreignKey;
-      message = `Association ${owner}#${association} primary key ${pk} doesn't match with foreign key ${fk}. Please specify query_constraints, or primary_key and foreign_key values.`;
+      const owner =
+        typeof reflection.activeRecord === "string"
+          ? reflection.activeRecord
+          : reflection.activeRecord.name;
+      const pk = formatKey(reflection.primaryKey);
+      const fk = formatKey(reflection.foreignKey);
+      message = `Association ${owner}#${reflection.name} primary key ${pk} doesn't match with foreign key ${fk}. Please specify query_constraints, or primary_key and foreign_key values.`;
     } else {
       message = "Association primary key doesn't match with foreign key.";
     }
     super(message);
     this.name = "CompositePrimaryKeyMismatchError";
+    this.reflection = reflection ?? null;
   }
 }
 

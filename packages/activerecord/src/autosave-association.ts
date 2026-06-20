@@ -490,7 +490,12 @@ async function _insertCollectionRecordFallback(
   const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
   if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
     if (primaryKey.length !== foreignKey.length) {
-      throw new CompositePrimaryKeyMismatchError(ctor.name, assoc.name, primaryKey, foreignKey);
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assoc.name,
+        primaryKey,
+        foreignKey,
+      });
     }
     primaryKey.forEach((pk: string, i: number) => {
       const pkValue = record._readAttribute(pk);
@@ -500,7 +505,12 @@ async function _insertCollectionRecordFallback(
     const pkValue = record._readAttribute(primaryKey);
     if (pkValue != null) child._writeAttribute(foreignKey, pkValue);
   } else {
-    throw new CompositePrimaryKeyMismatchError(ctor.name, assoc.name, primaryKey, foreignKey);
+    throw new CompositePrimaryKeyMismatchError({
+      activeRecord: ctor.name,
+      name: assoc.name,
+      primaryKey,
+      foreignKey,
+    });
   }
   return !!(await child.save({ validate: false }));
 }
@@ -581,12 +591,12 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     }
     if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
       if (primaryKey.length !== foreignKey.length) {
-        throw new CompositePrimaryKeyMismatchError(
-          (record.constructor as typeof Base).name,
-          assoc.name,
+        throw new CompositePrimaryKeyMismatchError({
+          activeRecord: (record.constructor as typeof Base).name,
+          name: assoc.name,
           primaryKey,
           foreignKey,
-        );
+        });
       }
       primaryKey.forEach((pk: string, i: number) => {
         const pkValue = record._readAttribute(pk);
@@ -596,12 +606,12 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
       const pkValue = record._readAttribute(primaryKey);
       if (pkValue != null) childRecord._writeAttribute(foreignKey, pkValue);
     } else {
-      throw new CompositePrimaryKeyMismatchError(
-        (record.constructor as typeof Base).name,
-        assoc.name,
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: (record.constructor as typeof Base).name,
+        name: assoc.name,
         primaryKey,
         foreignKey,
-      );
+      });
     }
     // Mirrors Rails save_has_one_association:496: set_inverse_instance fires
     // after FK assignment, before save (autosave_association.rb:497).

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   AssociationNotFoundError,
+  CompositePrimaryKeyMismatchError,
   HasManyThroughAssociationNotFoundError,
   InverseOfAssociationNotFoundError,
 } from "./errors.js";
@@ -70,5 +71,29 @@ describe("AssociationErrors", () => {
   it("InverseOfAssociationNotFoundError.associatedClass defaults to null", () => {
     const err = new InverseOfAssociationNotFoundError("posts", "author");
     expect(err.associatedClass).toBeNull();
+  });
+
+  it("CompositePrimaryKeyMismatchError exposes the reflection and derives its message from it", () => {
+    // Rails parity: activerecord/lib/active_record/associations/errors.rb
+    // CompositePrimaryKeyMismatchError has `attr_reader :reflection` and
+    // builds its message from the reflection's active_record / name /
+    // primary key / foreign key inside the constructor.
+    const reflection = {
+      activeRecord: { name: "CpkBrokenBook" },
+      name: "order",
+      primaryKey: ["shop_id", "status"],
+      foreignKey: "order_id",
+    };
+    const err = new CompositePrimaryKeyMismatchError(reflection);
+    expect(err.reflection).toBe(reflection);
+    expect(err.message).toBe(
+      `Association CpkBrokenBook#order primary key ["shop_id", "status"] doesn't match with foreign key order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
+  });
+
+  it("CompositePrimaryKeyMismatchError falls back to the generic message and null reflection", () => {
+    const err = new CompositePrimaryKeyMismatchError();
+    expect(err.reflection).toBeNull();
+    expect(err.message).toBe("Association primary key doesn't match with foreign key.");
   });
 });
