@@ -55,6 +55,7 @@ import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Company, LargeClient } from "./test-helpers/models/company.js";
+import { AutoId } from "./test-helpers/models/auto-id.js";
 
 for (const klass of [
   CanonicalTopic,
@@ -73,6 +74,7 @@ for (const klass of [
   Minivan,
   Company,
   LargeClient,
+  AutoId,
 ]) {
   registerModel(klass);
 }
@@ -98,6 +100,33 @@ describe("PersistenceTest", () => {
     // revert is interrupted. `repairWorkerSchema` only restores *missing*
     // canonical columns, so it would not undo a leftover extra `foo`.
     await defineSchema({ topics: canonicalSchema.topics }, { dropExisting: true });
+  });
+
+  // Rails has no `auto_id_tests` fixture file, so the table is created from the
+  // canonical schema directly (mirroring the `boolean.test.ts` pattern) rather
+  // than via a fixture set. `loadSchema` warms the cache so the synchronous
+  // `columns()` reflection resolves (Rails loads columns lazily).
+  beforeAll(async () => {
+    await defineSchema({ auto_id_tests: canonicalSchema.auto_id_tests });
+    await AutoId.loadSchema();
+  });
+
+  it("test_populates_autoincremented_id_pk_regardless_of_its_position_in_columns_list", async () => {
+    const autoPopulatedColumnNames = AutoId.columns()
+      .filter((c: { isAutoPopulated(): boolean }) => c.isAutoPopulated())
+      .map((c: { name: string }) => c.name);
+
+    // It's important we test a scenario where tables has more than one auto populated column
+    // and the first column is not the primary key. Otherwise it will be a regular test not asserting this special case.
+    expect(autoPopulatedColumnNames.length).toBeGreaterThan(1);
+    expect(autoPopulatedColumnNames[0]).not.toBe(AutoId.primaryKey);
+
+    const record = await AutoId.createBang();
+    const lastId = (await AutoId.last())!.id;
+
+    expect(lastId).not.toBeNull();
+    expect(lastId).toBeGreaterThan(0);
+    expect(lastId).toBe(record.id);
   });
 
   it("create", async () => {
