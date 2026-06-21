@@ -173,6 +173,18 @@ describe("DupTest", () => {
     expect(Topic.afterInitializeCalled).toBe(true);
   });
 
+  it("dup runs after_initialize against the duped attributes", async () => {
+    // Rails Core#initialize_dup sets @attributes before _run_initialize_callbacks,
+    // so the dup's after_initialize observes the duped attribute set. Topic's
+    // set_email_address hook writes a default only when author_email_address is
+    // unset on the (new) record — with the duped attributes in place, its write
+    // lands on the dup. The third fixture topic has no author_email_address.
+    const topic = await Topic.find(3);
+    expect(topic.author_email_address).toBeFalsy();
+    const duped = topic.dup();
+    expect(duped.author_email_address).toBe("test@test.com");
+  });
+
   it("dup validity is independent", async () => {
     await repairValidations(Topic, async () => {
       Topic.validates("title", { presence: true });

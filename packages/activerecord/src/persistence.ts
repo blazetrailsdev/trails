@@ -6,7 +6,11 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { sanitizeForMassAssignment, SerializeCastValue } from "@blazetrails/activemodel";
+import {
+  sanitizeForMassAssignment,
+  SerializeCastValue,
+  runAfterCallbacksOnProto,
+} from "@blazetrails/activemodel";
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ActiveRecordError,
@@ -23,7 +27,12 @@ import {
 } from "./multiparameter-attribute-assignment.js";
 import { assignAssociationIfMatch } from "./attribute-assignment.js";
 import { clearAutosaveState } from "./autosave-association.js";
-import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
+import {
+  getStiBase,
+  getInheritanceColumn,
+  isStiSubclass,
+  initializeInternalsCallback,
+} from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import {
   performValidations,
@@ -1276,24 +1285,42 @@ interface DupRecord {
  * reinstate-vs-defaults pass to populate the tracker — the same `changed?`
  * predicate Rails computes per-attribute.
  *
- * `new ctor({})` runs the constructor so `after_initialize` fires on the dup
- * (Rails runs `_run_initialize_callbacks` in `Core#initialize_dup`). One known
- * ordering divergence, pre-existing and unchanged here: Rails sets the duped
- * attributes BEFORE `_run_initialize_callbacks`, so a Rails `after_initialize`
- * sees the full duped set, whereas trails fires it during `new ctor({})` against
- * the empty bag and swaps `_attributes` in afterward. Ruby's `Object#dup` also
- * copies `@readonly` and runs the `initialize_dup` chain, so carry `@readonly`
- * over and invoke the composed hook (aggregations cache + locking/timestamp
- * clear) — which nulls the timestamp and locking columns back to their defaults
- * before the dirty pass, so they are not reported as changed
+ * Rails' `Core#initialize_dup` sets the duped attributes BEFORE
+ * `_run_initialize_callbacks`, so an `after_initialize` hook on the dup observes
+ * the full duped attribute set. We reproduce that order: `after_initialize` is
+ * suppressed during `new ctor({})` (via `_suppressInitializeCallback`), we swap
+ * in the duped `_attributes`, run the `initialize_dup` chain and dirty pass, then
+ * re-thread the internals callback (STI `ensure_proper_type`, which the
+ * suppressed branch skips) and finally dispatch `after_initialize` manually — so
+ * the hook reads the duped values, not the empty construction bag. Ruby's
+ * `Object#dup` also copies `@readonly` and runs the `initialize_dup` chain, so
+ * carry `@readonly` over and invoke the composed hook (aggregations cache +
+ * locking/timestamp clear) — which nulls the timestamp and locking columns back
+ * to their defaults before the dirty pass, so they are not reported as changed
  * (test_dup_timestamps_are_cleared / _locking_column_is_not_dirty).
  */
 export function dup<T extends DupRecord>(this: T): T {
   const ctor = this.constructor as typeof this.constructor & {
     primaryKey: string | string[];
     _defaultAttributes?: () => DupAttributeSet & { snapshotValues(): Map<string, unknown> };
+    _suppressInitializeCallback?: boolean;
   };
-  const duped = new ctor({}) as T;
+  // Suppress `after_initialize` during construction so it fires AFTER the duped
+  // attributes are in place (Rails sets `@attributes` before
+  // `_run_initialize_callbacks` in `Core#initialize_dup`).
+  const hadOwnSuppress = Object.prototype.hasOwnProperty.call(ctor, "_suppressInitializeCallback");
+  const prevSuppress = ctor._suppressInitializeCallback;
+  ctor._suppressInitializeCallback = true;
+  let duped: T;
+  try {
+    duped = new ctor({}) as T;
+  } finally {
+    if (hadOwnSuppress) {
+      ctor._suppressInitializeCallback = prevSuppress;
+    } else {
+      delete ctor._suppressInitializeCallback;
+    }
+  }
   // ActiveRecord::Core#init_attributes: deep_dup + reset(primary_key).
   const base = this._attributes.deepDup();
   const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
@@ -1319,6 +1346,11 @@ export function dup<T extends DupRecord>(this: T): T {
     // Re-mark attributes that differ from their schema defaults as changed.
     duped._dirty.reinstateNewRecordChanges(dupedAttrs, defaultAttributes().snapshotValues());
   }
+  // Re-thread the internals callback the suppressed constructor branch skips:
+  // STI `ensure_proper_type` re-asserts the inheritance column on the duped
+  // attribute set. Then dispatch `after_initialize` against the duped attrs.
+  initializeInternalsCallback.call(duped as unknown as import("./base.js").Base);
+  runAfterCallbacksOnProto(ctor.prototype, "initialize", duped, { strict: "sync" });
   return duped;
 }
 
