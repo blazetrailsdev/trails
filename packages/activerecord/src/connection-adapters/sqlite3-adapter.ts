@@ -1532,6 +1532,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         // Rails' SQLite foreign_keys options hash carries on_delete/on_update/
         // deferrable/column/primary_key but no :name (we synthesize one for the
         // dump), so a name lookup is sliced out (matches) rather than compared.
+        // It also has no :validate, so validate is left unstored (value still
+        // defaults to true).
         new ForeignKeyDefinition(
           tableName,
           toTable,
@@ -1541,7 +1543,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           onDelete,
           onUpdate,
           deferrable,
-          true,
+          undefined,
           ["column", "primaryKey", "onDelete", "onUpdate", "deferrable"],
         ),
       );

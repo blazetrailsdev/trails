@@ -158,6 +158,14 @@ export class ForeignKeyDefinition {
   readonly onUpdate?: ReferentialAction;
   readonly deferrable?: "immediate" | "deferred" | false;
   readonly validate: boolean;
+  /**
+   * Whether `:validate` was stored on the options hash (Rails introspection
+   * sets it only on PostgreSQL; mysql/sqlite leave it absent). Mirrors the
+   * `options.fetch(:validate, validate)` fallback in `defined_for?`: when the
+   * definition did not store `validate`, a `validate` lookup is ignored.
+   * @internal
+   */
+  readonly storesValidate: boolean;
 
   /**
    * Which generic option keys this FK actually carries, mirroring Rails'
@@ -178,7 +186,7 @@ export class ForeignKeyDefinition {
     onDelete?: ReferentialAction,
     onUpdate?: ReferentialAction,
     deferrable?: "immediate" | "deferred" | false,
-    validate: boolean = true,
+    validate?: boolean,
     storedOptionKeys?: Iterable<ForeignKeyStoredOptionKey>,
   ) {
     this.fromTable = fromTable;
@@ -189,7 +197,12 @@ export class ForeignKeyDefinition {
     this.onDelete = onDelete;
     this.onUpdate = onUpdate;
     this.deferrable = deferrable;
-    this.validate = validate;
+    // Rails reads `validate?` off `options.fetch(:validate, true)`, so the value
+    // defaults to true; storesValidate records whether `:validate` was actually
+    // on the options hash (PG introspection sets it; mysql/sqlite/DSL-without-it
+    // leave it absent), driving the fetch-fallback in isDefinedFor.
+    this.storesValidate = validate !== undefined;
+    this.validate = validate ?? true;
     // Default: every generic key is stored, matching the DB-introspection paths
     // (pg/mysql/sqlite `foreignKeys`) whose options hash always carries
     // column/name/primaryKey/onDelete/onUpdate/deferrable — present even when
@@ -240,7 +253,13 @@ export class ForeignKeyDefinition {
     const stored = (key: ForeignKeyStoredOptionKey): boolean => this.storedOptionKeys.has(key);
     return (
       (options.toTable === undefined || options.toTable.toString() === this.toTable) &&
-      (options.validate === undefined || options.validate === this.validate) &&
+      // Mirrors `validate.nil? || validate == self.options.fetch(:validate, validate)`:
+      // when `:validate` was not stored on the definition (mysql/sqlite
+      // introspection, or an add/DSL path that didn't pass it), the fetch falls
+      // back to the lookup value, so the comparison is trivially true.
+      (options.validate === undefined ||
+        !this.storesValidate ||
+        options.validate === this.validate) &&
       // Generic key compare, mirroring defined_for?'s `options.all?` over the
       // remaining stored option keys (column, name, primary_key, on_delete, …).
       (options.column === undefined ||

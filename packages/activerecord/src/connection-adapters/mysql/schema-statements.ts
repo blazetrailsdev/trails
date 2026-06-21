@@ -791,7 +791,8 @@ export async function foreignKeys(
     results.push(
       // Rails' MySQL foreign_keys options hash carries name/on_update/on_delete/
       // column/primary_key but no :deferrable, so a deferrable lookup is sliced
-      // out (matches) rather than compared against the unset field.
+      // out (matches) rather than compared against the unset field. It also has
+      // no :validate, so validate is left unstored (value still defaults true).
       new ForeignKeyDefinition(
         tableName,
         toTable,
@@ -801,7 +802,7 @@ export async function foreignKeys(
         onDelete,
         onUpdate,
         undefined,
-        true,
+        undefined,
         ["column", "name", "primaryKey", "onDelete", "onUpdate"],
       ),
     );
