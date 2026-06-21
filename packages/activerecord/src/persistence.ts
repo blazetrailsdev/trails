@@ -1431,7 +1431,24 @@ export function becomes<
   T extends BecomesRecord,
   K extends new (attrs: Record<string, unknown>) => BecomesRecord,
 >(this: T, klass: K): InstanceType<K> {
-  const instance = new klass({}) as InstanceType<K>;
+  // Rails: `became = klass.allocate` — construct the exact target class,
+  // bypassing `new`'s STI dispatch so becomes(base) is never re-resolved to
+  // the subclass named by the inheritance column's default
+  // (persistence_test.rb#test_becomes_default_sti_subclass).
+  // Store the class itself, not a boolean: the constructor only skips dispatch
+  // when `new.target` *is* this class, so an inherited static never suppresses
+  // a nested `new <subclass>()`.
+  const ctor = klass as unknown as { _suppressStiNewDispatch?: unknown };
+  const hadOwn = Object.prototype.hasOwnProperty.call(ctor, "_suppressStiNewDispatch");
+  const prev = ctor._suppressStiNewDispatch;
+  ctor._suppressStiNewDispatch = klass;
+  let instance: InstanceType<K>;
+  try {
+    instance = new klass({}) as InstanceType<K>;
+  } finally {
+    if (hadOwn) ctor._suppressStiNewDispatch = prev;
+    else delete ctor._suppressStiNewDispatch;
+  }
   const target = instance as unknown as BecomesRecord;
   // Mirrors Rails: `@attributes.reverse_merge!(becoming.@attributes)` — the new
   // class's default attributes fill in any keys this record is missing (e.g.
