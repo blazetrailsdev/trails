@@ -691,10 +691,7 @@ function _reinstateConstructorDirtiness(
   ctor: { _defaultAttributes?: () => { snapshotValues(): Map<string, unknown> } },
 ): void {
   if (typeof ctor._defaultAttributes !== "function") return;
-  record._dirty.reinstateNewRecordChanges(
-    record._attributes,
-    ctor._defaultAttributes().snapshotValues(),
-  );
+  record._dirty.reinstateNewRecordChanges(record._attributes);
 }
 
 /** @internal */

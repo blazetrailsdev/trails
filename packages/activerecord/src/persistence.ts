@@ -1250,7 +1250,7 @@ interface DupRecord {
   _readonly: boolean;
   _dirty: {
     snapshot(attrs: unknown): void;
-    reinstateNewRecordChanges(attrs: unknown, defaultSnap: Map<string, unknown>): void;
+    reinstateNewRecordChanges(attrs: unknown, skipNames?: ReadonlySet<string>): void;
   };
   isPersisted(): boolean;
   initializeDup(other: unknown): void;
@@ -1348,7 +1348,7 @@ export function dup<T extends DupRecord>(this: T): T {
   duped._dirty.snapshot(dupedAttrs);
   if (defaultAttributes) {
     // Re-mark attributes that differ from their schema defaults as changed.
-    duped._dirty.reinstateNewRecordChanges(dupedAttrs, defaultAttributes().snapshotValues());
+    duped._dirty.reinstateNewRecordChanges(dupedAttrs);
   }
   // Dispatch `after_initialize` against the duped attributes. Mirrors Rails
   // Core#initialize_dup, which runs `_run_initialize_callbacks` only — it does
