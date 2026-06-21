@@ -889,7 +889,9 @@ describe("PersistenceTest", () => {
     expect(p.title).toBe("cached");
   });
 
-  itIfSupports.skipIf(adapterType === "sqlite")(
+  // Rails gates this `features=[insert_returning]` (no adapter restriction); SQLite
+  // ≥ 3.35 supports RETURNING, so run it generically wherever the feature holds.
+  itIfSupports(
     "insert_returning",
     "model with no auto populated fields still returns primary key after insert",
     async () => {

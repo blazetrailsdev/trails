@@ -34,24 +34,28 @@ describe("TransactionIsolationUnsupportedTest", () => {
 
 // Rails: TransactionIsolationTest (joining/nested subtests).
 // Rails guards the full class with `supports_transaction_isolation? &&
-// !current_adapter?(:SQLite3Adapter)`. The test:compare Ruby extractor now
-// captures both halves of that compound trailing-`if` — feature
-// `transaction_isolation` plus a SQLite exclusion — so the canonical railsGate is
-// `adapters:[mysql,postgresql] + features:[transaction_isolation]`. We mirror it
-// with `itIfSupports.skipIf(adapterType === "sqlite")`.
+// !current_adapter?(:SQLite3Adapter)`. The test:compare Ruby extractor drops the
+// adapter half of that compound condition, so the canonical railsGate is the
+// feature-only `transaction_isolation`. These two subtests assert that requesting
+// an isolation level while joining/nesting raises — which holds on every backend
+// (on trails' SQLite, where isolation is unsupported, the request raises the same
+// TransactionIsolationError), so a bare `itIfSupports("transaction_isolation")`
+// matches the gate without an adapter restriction.
 //
 // The four isolation-LEVEL subtests below (read uncommitted/committed/repeatable
-// read/serializable) are NOT framework-only — they need real cross-connection PG
-// semantics, so they stay in the PG-bodied describeIfPg block and remain a
-// tracked wrong-gate in gate-wrong-gate-body-convergence (a generic-body rewrite
-// is required before their gate can drop the adapter restriction).
+// read/serializable) are NOT framework-only — they need real cross-connection
+// semantics over two independent physical connections, so they stay in the
+// PG-bodied describeIfPg block and remain a tracked wrong-gate (sub-story
+// transaction-isolation-level-generic-dual-connection: a generic-body rewrite
+// plus SQLite isolation support is required before their gate can drop the
+// adapter restriction).
 describe("TransactionIsolationTest", () => {
   setupHandlerSuite();
   beforeAll(async () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
   });
 
-  itIfSupports.skipIf(adapterType === "sqlite")(
+  itIfSupports(
     "transaction_isolation",
     "setting isolation when joining a transaction raises an error",
     async () => {
@@ -68,7 +72,7 @@ describe("TransactionIsolationTest", () => {
     },
   );
 
-  itIfSupports.skipIf(adapterType === "sqlite")(
+  itIfSupports(
     "transaction_isolation",
     "setting isolation when starting a nested transaction raises error",
     async () => {
