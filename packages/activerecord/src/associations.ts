@@ -967,7 +967,7 @@ async function _loadSingularThroughViaDisableJoinsScope(
 ): Promise<Base | null> {
   const built = await _buildDisableJoinsScopeRelation(record, reflection, options);
   if (built == null) return null;
-  return (await (built.rel as { first: () => Promise<Base | null> }).first()) ?? null;
+  return (built.rel as { first: () => Promise<Base | null> }).first();
 }
 
 /**
