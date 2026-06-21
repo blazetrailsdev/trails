@@ -1126,7 +1126,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
     const column = options.column ?? `${underscore(singularize(toTbl))}_id`;
     const pk = options.primaryKey ?? "id";
-    const name = options.name ?? `fk_rails_${fromTbl}_${column}`;
+    const name = this.foreignKeyName(fromTable, { name: options.name, column });
 
     const qi = (s: string) => this.pg.quoteIdentifier(s);
     const qualifiedFrom = fromSchema ? `${qi(fromSchema)}.${qi(fromTbl)}` : qi(fromTbl);
