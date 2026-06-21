@@ -115,6 +115,39 @@ export interface ForeignKeyLookupOptions {
   deferrable?: "immediate" | "deferred" | false;
 }
 
+/**
+ * The generic (sliceable) option keys Rails' `defined_for?` matches via
+ * `options.slice(*self.options.keys)`. `to_table`/`validate` are handled
+ * separately and are never sliced.
+ */
+export type ForeignKeyStoredOptionKey =
+  | "column"
+  | "name"
+  | "primaryKey"
+  | "onDelete"
+  | "onUpdate"
+  | "deferrable";
+
+/**
+ * The stored-option-key set produced by Rails' `foreign_key_options`: it always
+ * fills in `:column` and `:name`, and carries `:primary_key`/`:on_delete`/
+ * `:on_update`/`:deferrable` only when the caller explicitly passed them. Used
+ * by every `add_foreign_key`-style construction path (DSL + abstract/PG
+ * `addForeignKey`) so `isDefinedFor` slices a defaulted key (e.g. primaryKey
+ * "id") out rather than mismatching it.
+ * @internal
+ */
+export function foreignKeyOptionsStoredKeys(
+  options: Pick<AddForeignKeyOptions, "primaryKey" | "onDelete" | "onUpdate" | "deferrable">,
+): ForeignKeyStoredOptionKey[] {
+  const keys: ForeignKeyStoredOptionKey[] = ["column", "name"];
+  if (options.primaryKey !== undefined) keys.push("primaryKey");
+  if (options.onDelete !== undefined) keys.push("onDelete");
+  if (options.onUpdate !== undefined) keys.push("onUpdate");
+  if (options.deferrable !== undefined) keys.push("deferrable");
+  return keys;
+}
+
 export class ForeignKeyDefinition {
   readonly fromTable: string;
   readonly toTable: string;
@@ -126,6 +159,16 @@ export class ForeignKeyDefinition {
   readonly deferrable?: "immediate" | "deferred" | false;
   readonly validate: boolean;
 
+  /**
+   * Which generic option keys this FK actually carries, mirroring Rails'
+   * `self.options.keys`. `isDefinedFor` slices lookup keys to this set so a
+   * key the definition never stored is ignored (matches), per
+   * `options.slice(*self.options.keys)`. Rails reads this off the raw options
+   * hash; trails has no such hash, so we record the key set explicitly.
+   * @internal
+   */
+  readonly storedOptionKeys: ReadonlySet<ForeignKeyStoredOptionKey>;
+
   constructor(
     fromTable: string,
     toTable: string,
@@ -136,6 +179,7 @@ export class ForeignKeyDefinition {
     onUpdate?: ReferentialAction,
     deferrable?: "immediate" | "deferred" | false,
     validate: boolean = true,
+    storedOptionKeys?: Iterable<ForeignKeyStoredOptionKey>,
   ) {
     this.fromTable = fromTable;
     this.toTable = toTable;
@@ -146,6 +190,15 @@ export class ForeignKeyDefinition {
     this.onUpdate = onUpdate;
     this.deferrable = deferrable;
     this.validate = validate;
+    // Default: every generic key is stored, matching the DB-introspection paths
+    // (pg/mysql/sqlite `foreignKeys`) whose options hash always carries
+    // column/name/primaryKey/onDelete/onUpdate/deferrable — present even when
+    // nil, so an unset action still compares as `Array(nil) => []`. When a
+    // caller knows exactly which keys were explicitly set (e.g. the hand-built
+    // DSL path), it passes `storedOptionKeys` to slice the comparison.
+    this.storedOptionKeys = new Set(
+      storedOptionKeys ?? ["column", "name", "primaryKey", "onDelete", "onUpdate", "deferrable"],
+    );
   }
 
   get isCustomPrimaryKey(): boolean {
@@ -181,17 +234,31 @@ export class ForeignKeyDefinition {
       const bb = toArray(b);
       return aa.length === bb.length && aa.every((v, i) => v === bb[i]);
     };
+    // Rails opens defined_for? with `options = options.slice(*self.options.keys)`,
+    // dropping any lookup key the definition never stored before the generic
+    // compare. A sliced-out key is therefore ignored (matches).
+    const stored = (key: ForeignKeyStoredOptionKey): boolean => this.storedOptionKeys.has(key);
     return (
       (options.toTable === undefined || options.toTable.toString() === this.toTable) &&
-      (options.column === undefined || optionEqual(options.column, this.column)) &&
-      (options.name === undefined || options.name === this.name) &&
       (options.validate === undefined || options.validate === this.validate) &&
       // Generic key compare, mirroring defined_for?'s `options.all?` over the
-      // remaining stored option keys (primary_key, on_delete, on_update, …).
-      (options.primaryKey === undefined || optionEqual(options.primaryKey, this.primaryKey)) &&
-      (options.onDelete === undefined || optionEqual(options.onDelete, this.onDelete)) &&
-      (options.onUpdate === undefined || optionEqual(options.onUpdate, this.onUpdate)) &&
-      (options.deferrable === undefined || optionEqual(options.deferrable, this.deferrable))
+      // remaining stored option keys (column, name, primary_key, on_delete, …).
+      (options.column === undefined ||
+        !stored("column") ||
+        optionEqual(options.column, this.column)) &&
+      (options.name === undefined || !stored("name") || options.name === this.name) &&
+      (options.primaryKey === undefined ||
+        !stored("primaryKey") ||
+        optionEqual(options.primaryKey, this.primaryKey)) &&
+      (options.onDelete === undefined ||
+        !stored("onDelete") ||
+        optionEqual(options.onDelete, this.onDelete)) &&
+      (options.onUpdate === undefined ||
+        !stored("onUpdate") ||
+        optionEqual(options.onUpdate, this.onUpdate)) &&
+      (options.deferrable === undefined ||
+        !stored("deferrable") ||
+        optionEqual(options.deferrable, this.deferrable))
     );
   }
 }
@@ -950,6 +1017,10 @@ export class TableDefinition {
       options.onUpdate,
       options.deferrable,
       options.validate,
+      // Mirror Rails' foreign_key_options stored-key set so a key we defaulted
+      // (e.g. primaryKey "id") is sliced out by isDefinedFor rather than
+      // mismatching.
+      foreignKeyOptionsStoredKeys(options),
     );
   }
 

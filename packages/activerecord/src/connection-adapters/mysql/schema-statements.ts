@@ -789,7 +789,21 @@ export async function foreignKeys(
         ? (first.primary_key as string)
         : group.map((r) => r.primary_key as string);
     results.push(
-      new ForeignKeyDefinition(tableName, toTable, column, primaryKey, fkName, onDelete, onUpdate),
+      // Rails' MySQL foreign_keys options hash carries name/on_update/on_delete/
+      // column/primary_key but no :deferrable, so a deferrable lookup is sliced
+      // out (matches) rather than compared against the unset field.
+      new ForeignKeyDefinition(
+        tableName,
+        toTable,
+        column,
+        primaryKey,
+        fkName,
+        onDelete,
+        onUpdate,
+        undefined,
+        true,
+        ["column", "name", "primaryKey", "onDelete", "onUpdate"],
+      ),
     );
   }
   return results;
