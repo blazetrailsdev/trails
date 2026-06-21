@@ -793,12 +793,23 @@ async function establishWithConfig(
   // living in the path — e.g. the per-worker slot DB `rails_js_test_2` that
   // test-setup-worker-db.ts suffixes on — natively via the URL fallback
   // (url-config.ts), so `connectionDbConfig().database` is no longer undefined.
+  //
+  // The raw `url` is stripped from the config override before it reaches
+  // UrlConfig — Rails' build_db_config_from_hash deletes :url from the hash so
+  // the URL lives only on `@url`, and `configuration_hash` carries the parsed
+  // discrete fields (database/host/port/...) rather than the verbatim string.
+  // This matches the resolver path (database-configurations.ts:246) and the
+  // "url removed from hash" parity test.
   const env = DatabaseConfigurations.currentEnv();
-  const dbConfig =
-    dbConfigOverride ??
-    (url
-      ? new UrlConfig(env, "primary", url, { adapter: adapterName, ...config })
-      : new HashConfig(env, "primary", { adapter: adapterName, url, ...config }));
+  let dbConfig: DatabaseConfig;
+  if (dbConfigOverride) {
+    dbConfig = dbConfigOverride;
+  } else if (url) {
+    const { url: _droppedUrl, ...configWithoutUrl } = config ?? {};
+    dbConfig = new UrlConfig(env, "primary", url, { adapter: adapterName, ...configWithoutUrl });
+  } else {
+    dbConfig = new HashConfig(env, "primary", { adapter: adapterName, url, ...config });
+  }
 
   // Mirror Rails: establish_connection makes the receiver its own connection
   // class so it gets an independent pool entry under its own name instead of
