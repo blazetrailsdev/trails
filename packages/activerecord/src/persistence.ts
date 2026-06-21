@@ -27,7 +27,13 @@ import {
 } from "./multiparameter-attribute-assignment.js";
 import { assignAssociationIfMatch } from "./attribute-assignment.js";
 import { clearAutosaveState } from "./autosave-association.js";
-import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
+import {
+  getStiBase,
+  getInheritanceColumn,
+  isStiSubclass,
+  isDescendsFromActiveRecord,
+  stiName,
+} from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import {
   performValidations,
@@ -1405,7 +1411,7 @@ export function clone<T extends CloneRecord>(this: T): T {
 }
 
 interface BecomesRecord {
-  _attributes: unknown;
+  _attributes: { reverseMergeBang(target: unknown): unknown };
   _newRecord: boolean;
   _destroyed: boolean;
   _dirty: { snapshot(attrs: unknown): void };
@@ -1427,6 +1433,11 @@ export function becomes<
 >(this: T, klass: K): InstanceType<K> {
   const instance = new klass({}) as InstanceType<K>;
   const target = instance as unknown as BecomesRecord;
+  // Mirrors Rails: `@attributes.reverse_merge!(becoming.@attributes)` — the new
+  // class's default attributes fill in any keys this record is missing (e.g.
+  // attributes declared only on the target subclass), then both objects share
+  // this record's (now merged) attribute set.
+  this._attributes.reverseMergeBang(target._attributes);
   target._attributes = this._attributes;
   target._newRecord = this._newRecord;
   target._destroyed = this._destroyed;
@@ -1458,8 +1469,12 @@ export function becomesBang<
   const base = getStiBase(klass);
   const inheritanceCol = getInheritanceColumn(base);
   if (inheritanceCol) {
-    const value = isStiSubclass(klass) ? klass.name : null;
-    (instance as unknown as { _attributes: { set(k: string, v: unknown): void } })._attributes.set(
+    // Mirrors Rails: `became.public_send("#{inheritance_column}=", sti_type)` —
+    // route through the public writer so the change is dirty-tracked and a
+    // subsequent partial UPDATE actually persists the new STI type.
+    // `sti_type` is `nil` for an STI base class (descends_from_active_record?).
+    const value = isDescendsFromActiveRecord(klass) ? null : stiName(klass);
+    (instance as unknown as { writeAttribute(name: string, value: unknown): void }).writeAttribute(
       inheritanceCol,
       value,
     );
