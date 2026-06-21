@@ -553,47 +553,52 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
   });
 
   it("should accept update only option", () => {
-    const { Pirate } = makeModels({ updateOnly: true });
+    const { Pirate } = makeModels();
+    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
     const configs = (Pirate as any)._nestedAttributeConfigs;
-    const shipConfig = configs.find((c: any) => c.associationName === "ship");
+    const shipConfig = configs.find((c: any) => c.associationName === "updateOnlyShip");
     expect(shipConfig.options.updateOnly).toBe(true);
   });
 
   it("should create new model when nothing is there and update only is true", async () => {
-    const { Ship, Pirate } = makeModels({ updateOnly: true });
+    const { Ship, Pirate } = makeModels();
+    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "ship", [{ name: "Brand New" }]);
+    assignNestedAttributes(pirate, "updateOnlyShip", [{ name: "Brand New" }]);
     await pirate.save();
     const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
     expect(ships.length).toBe(1);
   });
 
   it("should update existing when update only is true and no id is given", async () => {
-    const { Ship, Pirate } = makeModels({ updateOnly: true });
+    const { Ship, Pirate } = makeModels();
+    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     const ship = await Ship.create({ name: "Existing", pirate_id: pirate.id });
     // With updateOnly and no id, it should still create a new record (since our impl doesn't have updateOnly logic yet)
-    assignNestedAttributes(pirate, "ship", [{ name: "UpdatedNoId" }]);
+    assignNestedAttributes(pirate, "updateOnlyShip", [{ name: "UpdatedNoId" }]);
     await pirate.save();
     const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
     expect(ships.length).toBeGreaterThanOrEqual(1);
   });
 
   it("should update existing when update only is true and id is given", async () => {
-    const { Ship, Pirate } = makeModels({ updateOnly: true });
+    const { Ship, Pirate } = makeModels();
+    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     const ship = await Ship.create({ name: "Existing", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ id: ship.id, name: "UpdatedWithId" }]);
+    assignNestedAttributes(pirate, "updateOnlyShip", [{ id: ship.id, name: "UpdatedWithId" }]);
     await pirate.save();
     const updated = await Ship.find(ship.id!);
     expect(updated.name).toBe("UpdatedWithId");
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
-    const { Ship, Pirate } = makeModels({ updateOnly: true, allowDestroy: true });
+    const { Ship, Pirate } = makeModels();
+    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true, allowDestroy: true });
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     const ship = await Ship.create({ name: "ToDestroy", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ id: ship.id, _destroy: true }]);
+    assignNestedAttributes(pirate, "updateOnlyShip", [{ id: ship.id, _destroy: true }]);
     await pirate.save();
     const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
     expect(ships.length).toBe(0);
