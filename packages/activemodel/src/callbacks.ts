@@ -242,15 +242,20 @@ const VALID_ON_VALUES = new Set(["create", "update", "destroy"]);
  *
  * Mirrors ActiveModel::Callbacks#_define_after_model_callback, which does
  * `options[:if] = Array(options[:if]) + [Conditionals::Value.new { |v| v != false }]`
- * for every after callback defined via define_model_callbacks. The validation
- * event is excluded: ActiveModel::Validations::Callbacks registers
- * before/after_validation via a plain define_callbacks with no such conditional,
- * so after_validation runs even when validations fail.
+ * for every after callback defined via define_model_callbacks. Events that Rails
+ * registers via a plain define_callbacks (no such conditional) are excluded:
+ *   - validation: ActiveModel::Validations::Callbacks (validations/callbacks.rb)
+ *     — after_validation runs even when validations fail.
+ *   - commit / rollback: ActiveRecord::Transactions (transactions.rb:11,
+ *     `define_callbacks :commit, :rollback, ...`) — after_commit/after_rollback
+ *     get no value conditional.
  *
  * Returns a fresh array (never mutates the caller's `if` array).
  *
  * @internal
  */
+const PLAIN_DEFINE_CALLBACKS_EVENTS = new Set(["validation", "commit", "rollback"]);
+
 function _buildAfterModelIfConditions(
   timing: CallbackTiming,
   event: string,
@@ -262,7 +267,7 @@ function _buildAfterModelIfConditions(
   const userIfs = (
     userIf === undefined ? [] : Array.isArray(userIf) ? [...userIf] : [userIf]
   ) as Array<(target: object, value?: unknown) => boolean>;
-  if (timing !== "after" || event === "validation") {
+  if (timing !== "after" || PLAIN_DEFINE_CALLBACKS_EVENTS.has(event)) {
     return userIf as
       | ((target: object, value?: unknown) => boolean)
       | Array<(target: object, value?: unknown) => boolean>
