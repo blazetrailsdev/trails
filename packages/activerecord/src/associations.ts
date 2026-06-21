@@ -907,12 +907,16 @@ export function ownerHasUnresolvedThroughKey(
   });
 }
 
-async function _loadThroughViaDisableJoinsScope(
+// Returns the built relation BOXED in `{ rel }`. The relation is a
+// thenable (Relation#then is a `toArray` shortcut), so returning it bare
+// across this async boundary would let `Promise.resolve` adopt it and
+// unwrap to a records array. The box defeats that — callers read `.rel`.
+async function _buildDisableJoinsScopeRelation(
   record: Base,
   reflection: ReflectionLike | null | undefined,
   options?: AssociationOptions,
-): Promise<Base[]> {
-  if (!reflection || ownerHasUnresolvedThroughKey(record, reflection)) return [];
+): Promise<{ rel: unknown } | null> {
+  if (!reflection || ownerHasUnresolvedThroughKey(record, reflection)) return null;
   // Lazy-import to avoid an eager cycle: DJAS imports
   // DisableJoinsAssociationRelation → relation.ts → associations.ts.
   const { DisableJoinsAssociationScope } =
@@ -931,7 +935,39 @@ async function _loadThroughViaDisableJoinsScope(
   // Skipping when equal avoids double-application since DJAS already
   // consumed the reflection's scope via constraints.
   rel = applyAssociationScope(rel as never, options?.scope, record, reflection.scope);
-  return (rel as { toArray: () => Promise<Base[]> }).toArray();
+  return { rel };
+}
+
+async function _loadThroughViaDisableJoinsScope(
+  record: Base,
+  reflection: ReflectionLike | null | undefined,
+  options?: AssociationOptions,
+): Promise<Base[]> {
+  const built = await _buildDisableJoinsScopeRelation(record, reflection, options);
+  if (built == null) return [];
+  return (built.rel as { toArray: () => Promise<Base[]> }).toArray();
+}
+
+/**
+ * Singular (has_one/belongs_to) load through the disable_joins scope.
+ *
+ * Rails' `SingularAssociation#find_target` (singular_association.rb:47)
+ * routes the `disable_joins` branch through `scope.first` →
+ * `Relation#first` → `ordered_relation`, which adds `ORDER BY` primary
+ * key. So unlike the plural collection load (and unlike the normal
+ * non-disable-joins singular branch, which takes an unordered
+ * `Array#first`), the disable_joins singular load is ORDERED. Calling
+ * `rel.first()` (vs. `toArray()[0]`) preserves that: DJAR#first runs
+ * `findNthWithLimit`, applying ORDER BY pk inside the connection shim.
+ */
+async function _loadSingularThroughViaDisableJoinsScope(
+  record: Base,
+  reflection: ReflectionLike | null | undefined,
+  options?: AssociationOptions,
+): Promise<Base | null> {
+  const built = await _buildDisableJoinsScopeRelation(record, reflection, options);
+  if (built == null) return null;
+  return (await (built.rel as { first: () => Promise<Base | null> }).first()) ?? null;
 }
 
 /**
@@ -1249,8 +1285,7 @@ export async function loadHasOne(
     const ctorEarly = record.constructor as typeof Base;
     const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
     if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
-      const records = await _loadThroughViaDisableJoinsScope(record, reflEarly, options);
-      return records[0] ?? null;
+      return _loadSingularThroughViaDisableJoinsScope(record, reflEarly, options);
     }
     if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
       return loadHasOneThrough(record, assocName, options);
