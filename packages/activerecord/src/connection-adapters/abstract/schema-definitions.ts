@@ -162,11 +162,18 @@ export class ForeignKeyDefinition {
       validate?: boolean;
     } = {},
   ): boolean {
-    const columnToString = (c: string | string[]): string => (Array.isArray(c) ? c.join(",") : c);
+    // Rails compares element-wise after to_s:
+    // Array(self.options[k]).map(&:to_s) == Array(v).map(&:to_s)
+    const toArray = (c: string | string[]): string[] =>
+      Array.isArray(c) ? c.map(String) : [String(c)];
+    const columnsEqual = (a: string | string[], b: string | string[]): boolean => {
+      const aa = toArray(a);
+      const bb = toArray(b);
+      return aa.length === bb.length && aa.every((v, i) => v === bb[i]);
+    };
     return (
       (options.toTable === undefined || options.toTable.toString() === this.toTable) &&
-      (options.column === undefined ||
-        columnToString(options.column) === columnToString(this.column)) &&
+      (options.column === undefined || columnsEqual(options.column, this.column)) &&
       (options.name === undefined || options.name === this.name) &&
       (options.validate === undefined || options.validate === this.validate)
     );
