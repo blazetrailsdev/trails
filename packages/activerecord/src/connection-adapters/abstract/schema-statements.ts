@@ -1259,16 +1259,14 @@ export class SchemaStatements {
 
   async foreignKeyExists(
     fromTable: string,
-    toTableOrOptions?: string | { column?: string; name?: string },
+    toTable?: string | { toTable?: string; column?: string; name?: string },
+    options: { column?: string; name?: string } = {},
   ): Promise<boolean> {
-    const fks = await this.foreignKeys(fromTable);
-    if (typeof toTableOrOptions === "string") {
-      return fks.some((fk) => fk.toTable === toTableOrOptions);
-    }
-    if (toTableOrOptions?.column) {
-      return fks.some((fk) => fk.column === toTableOrOptions.column);
-    }
-    return fks.length > 0;
+    const lookup =
+      typeof toTable === "string" || toTable == null
+        ? { toTable: toTable ?? undefined, ...options }
+        : toTable;
+    return (await this.foreignKeyFor(fromTable, lookup)) !== undefined;
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {

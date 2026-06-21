@@ -1142,52 +1142,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     await this.pg.exec(sql);
   }
 
-  override async foreignKeyExists(fromTable: string, toTable: string): Promise<boolean> {
-    const { schema: fromSchema, table: fromTbl } = this.pg.parseSchemaQualifiedName(fromTable);
-    const { schema: toSchema, table: toTbl } = this.pg.parseSchemaQualifiedName(toTable);
-
-    let fromSchemaCondition: string;
-    let toSchemaCondition: string;
-    const binds: unknown[] = [fromTbl];
-    let idx = 1;
-
-    if (fromSchema) {
-      idx++;
-      fromSchemaCondition = `tc.table_schema = $${idx}`;
-      binds.push(fromSchema);
-    } else {
-      fromSchemaCondition = `tc.table_schema = ANY(current_schemas(false))`;
-    }
-
-    binds.push(toTbl);
-    idx = binds.length;
-
-    if (toSchema) {
-      binds.push(toSchema);
-      toSchemaCondition = `tc2.table_schema = $${binds.length}`;
-    } else {
-      toSchemaCondition = `tc2.table_schema = ANY(current_schemas(false))`;
-    }
-
-    const rows = await this.pg.schemaQuery(
-      `SELECT COUNT(*) AS count
-       FROM information_schema.table_constraints tc
-       JOIN information_schema.referential_constraints rc
-         ON tc.constraint_name = rc.constraint_name
-         AND tc.constraint_schema = rc.constraint_schema
-       JOIN information_schema.table_constraints tc2
-         ON rc.unique_constraint_name = tc2.constraint_name
-         AND rc.unique_constraint_schema = tc2.constraint_schema
-       WHERE tc.constraint_type = 'FOREIGN KEY'
-         AND tc.table_name = $1
-         AND ${fromSchemaCondition}
-         AND tc2.table_name = $${idx}
-         AND ${toSchemaCondition}`,
-      binds,
-    );
-    return Number(rows[0].count) > 0;
-  }
-
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     const scope = this.pg.quotedScope(tableName);
     const rows = await this.pg.schemaQuery(
