@@ -1249,7 +1249,7 @@ export class Base extends Model {
           url?: string;
           database?: string;
           host?: string;
-          port?: number;
+          port?: number | string;
           username?: string;
           password?: string;
           [key: string]: unknown;

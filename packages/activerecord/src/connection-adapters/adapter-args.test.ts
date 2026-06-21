@@ -74,6 +74,43 @@ describe("buildAdapterArg", () => {
       ).toEqual(["postgres://h/db"]);
     });
 
+    it("forwards URL plus adapter options under connectionString for postgresql", () => {
+      const [config] = buildAdapterArg("postgresql", {
+        adapter: "postgresql",
+        url: "postgres://h/db",
+        advisoryLocks: false,
+      }) as [Record<string, unknown>];
+      expect(config).toEqual({ connectionString: "postgres://h/db", advisoryLocks: false });
+    });
+
+    it("forwards URL plus adapter options under uri for mysql", () => {
+      const [config] = buildAdapterArg("mysql2", {
+        adapter: "mysql2",
+        url: "mysql://h/db",
+        advisoryLocks: false,
+      }) as [Record<string, unknown>];
+      expect(config).toEqual({ uri: "mysql://h/db", advisoryLocks: false });
+    });
+
+    it("remaps username to user when forwarding a URL with extra keys", () => {
+      const [config] = buildAdapterArg("mysql2", {
+        adapter: "mysql2",
+        url: "mysql://h/db",
+        username: "alice",
+      }) as [Record<string, unknown>];
+      expect(config).toEqual({ uri: "mysql://h/db", user: "alice" });
+    });
+
+    it("keeps an explicit user over username when forwarding a URL", () => {
+      const [config] = buildAdapterArg("postgresql", {
+        adapter: "postgresql",
+        url: "postgres://h/db",
+        username: "alice",
+        user: "bob",
+      }) as [Record<string, unknown>];
+      expect(config).toEqual({ connectionString: "postgres://h/db", user: "bob" });
+    });
+
     it("returns [config] hash when keyword config is given", () => {
       const [config] = buildAdapterArg("mysql2", {
         adapter: "mysql2",

@@ -380,6 +380,13 @@ export interface DatabaseAdapter {
   supportsAdvisoryLocks?(): boolean;
 
   /**
+   * Whether advisory locking is actually enabled for this connection —
+   * `supportsAdvisoryLocks?()` combined with the `:advisory_locks` config flag.
+   * Mirrors AbstractAdapter#advisory_locks_enabled?.
+   */
+  isAdvisoryLocksEnabled?(): boolean;
+
+  /**
    * Acquire an advisory lock. Returns true if the lock was obtained.
    * Optional — only implemented by adapters that support advisory locks.
    */

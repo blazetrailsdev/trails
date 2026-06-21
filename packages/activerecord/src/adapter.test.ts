@@ -27,6 +27,8 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
+import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
+import { runWithoutConnection } from "./test-helpers/connection-helper.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Author, AuthorAddress } from "./test-helpers/models/author.js";
@@ -1483,42 +1485,25 @@ describeIfMysql("AdapterTest", () => {
 });
 
 describe("AdvisoryLocksEnabledTest", () => {
-  // Rails leases the active connection generically (`lease_connection`) and
-  // probes `advisory_locks_enabled?`; `supports_advisory_locks?` is true on
-  // both PostgreSQL and MySQL, so the gate is feature-only. Build the active
-  // adapter type with the `:advisory_locks` config flag rather than hardcoding
-  // Mysql2Adapter, exercising the option on whichever backend is running.
-  async function makeActiveAdapter(
-    opts: { advisoryLocks?: boolean } = {},
-  ): Promise<AbstractAdapter> {
-    if (adapterType === "postgres") {
-      const { PostgreSQLAdapter, PG_TEST_URL } =
-        await import("./adapters/postgresql/test-helper.js");
-      return new PostgreSQLAdapter({ connectionString: PG_TEST_URL, ...opts });
-    }
-    return new Mysql2Adapter({ uri: MYSQL_TEST_URL, ...opts });
-  }
+  // Literal port of Rails' AdvisoryLocksEnabledTest (adapter_test.rb): lease
+  // the *global* connection and probe `advisory_locks_enabled?`, then toggle
+  // the `:advisory_locks` config via establish_connection inside
+  // `run_without_connection` so the worker's pool is restored afterward.
+  // `supports_advisory_locks?` is true on PostgreSQL + MySQL, so the gate is
+  // feature-only.
+  beforeAll(async () => {
+    await establishFromTestConfig();
+  });
 
   itIfSupports("advisory_locks", "advisory locks enabled?", async () => {
-    const base = await makeActiveAdapter();
-    try {
-      expect(base.isAdvisoryLocksEnabled()).toBe(true);
-    } finally {
-      await base.close();
-    }
+    expect(Base.leaseConnection().isAdvisoryLocksEnabled!()).toBe(true);
 
-    const disabled = await makeActiveAdapter({ advisoryLocks: false });
-    try {
-      expect(disabled.isAdvisoryLocksEnabled()).toBe(false);
-    } finally {
-      await disabled.close();
-    }
+    await runWithoutConnection(async (origConnection) => {
+      await Base.establishConnection({ ...origConnection, advisoryLocks: false });
+      expect(Base.leaseConnection().isAdvisoryLocksEnabled!()).toBe(false);
 
-    const enabled = await makeActiveAdapter({ advisoryLocks: true });
-    try {
-      expect(enabled.isAdvisoryLocksEnabled()).toBe(true);
-    } finally {
-      await enabled.close();
-    }
+      await Base.establishConnection({ ...origConnection, advisoryLocks: true });
+      expect(Base.leaseConnection().isAdvisoryLocksEnabled!()).toBe(true);
+    });
   });
 });

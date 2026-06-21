@@ -428,7 +428,7 @@ export function adapterClass(this: typeof Base): Promise<new (...args: any[]) =>
   >;
 }
 
-export function removeConnection(this: typeof Base): void {
+export function removeConnection(this: typeof Base): DatabaseConfig | undefined {
   const name = connectionSpecificationName.call(this);
   if (
     this.connectionHandler.retrieveConnectionPool(name, {
@@ -438,7 +438,7 @@ export function removeConnection(this: typeof Base): void {
   ) {
     (this as any)._connectionSpecificationName = undefined;
   }
-  this.connectionHandler.removeConnectionPool(name, {
+  return this.connectionHandler.removeConnectionPool(name, {
     role: coreCurrentRole.call(this as any),
     shard: coreCurrentShard.call(this as any),
   });
@@ -637,7 +637,7 @@ export async function establishConnection(
         url?: string;
         database?: string;
         host?: string;
-        port?: number;
+        port?: number | string;
         username?: string;
         password?: string;
         [key: string]: unknown;

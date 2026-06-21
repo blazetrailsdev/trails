@@ -310,8 +310,18 @@ describe("ConnectionHandlingTest", () => {
 
   it("remove_connection removes the pool", () => {
     expect(Base.connectionPool()).toBeTruthy();
-    Base.removeConnection();
+    // Mirrors Rails `remove_connection`: returns the removed pool's db_config.
+    const removed = Base.removeConnection();
+    expect(removed?.adapter).toBe("sqlite3");
+    expect(removed?.configurationHash.database).toBe("test.db");
     expect(() => Base.connectionPool()).toThrow(/No database connection/);
+    // Re-establish for other tests
+    setupConnection();
+  });
+
+  it("remove_connection returns undefined when no pool exists", () => {
+    Base.removeConnection();
+    expect(Base.removeConnection()).toBeUndefined();
     // Re-establish for other tests
     setupConnection();
   });

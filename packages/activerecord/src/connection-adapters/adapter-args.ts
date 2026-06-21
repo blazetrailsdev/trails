@@ -141,7 +141,23 @@ export function buildAdapterArg(
     return Object.keys(options).length > 0 ? [filename, options] : [filename];
   }
   if (url && database === undefined) {
-    return [url];
+    // A bare URL string is the simplest connection arg, but when the config
+    // also carries adapter options (e.g. `advisory_locks`, `prepared_statements`)
+    // those must reach the adapter too — Rails' UrlConfig merges the parsed URL
+    // with the rest of the configuration hash. Forward the URL under the
+    // adapter-specific connection key alongside the remaining options instead
+    // of dropping them. Pure-URL configs (no extra keys) keep the `[url]` form.
+    const { adapter: _ua, url: _uu, username, ...urlRest } = configuration;
+    if (username === undefined && Object.keys(urlRest).length === 0) {
+      return [url];
+    }
+    // Apply the same `username` → `user` remap the discrete-field branch does,
+    // so callers passing `username` alongside a URL still reach the driver.
+    if (username !== undefined && urlRest.user === undefined) {
+      urlRest.user = username;
+    }
+    const urlKey = normalized === "postgresql" ? "connectionString" : "uri";
+    return [{ ...urlRest, [urlKey]: url }];
   }
   const { adapter: _a, url: _u, username, ...rest } = configuration;
   const adapterConfig: Record<string, unknown> = { ...rest };
