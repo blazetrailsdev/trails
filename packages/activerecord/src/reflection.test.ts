@@ -21,6 +21,7 @@ import {
   AssociationReflection,
   registerModel,
   modelRegistry,
+  association,
   composedOf,
 } from "./index.js";
 import { Associations, resolveAssocClass } from "./associations.js";
@@ -2333,37 +2334,77 @@ describe("ReflectionTest", () => {
     const firmRef = reflectOnAssociation(MyAppBusinessFirm, "clientsOfFirm");
     expect(firmRef!.klass).toBe(MyAppBusinessClient);
     expect(firmRef!.className).toBe("Client");
+    expect(firmRef!.tableName).toBe("companies");
 
     // Fully qualified class_name resolves absolutely
     const acctFirmRef = reflectOnAssociation(MyAppBillingAccount, "firm");
     expect(acctFirmRef!.klass).toBe(MyAppBusinessFirm);
     expect(acctFirmRef!.className).toBe("MyApplication::Business::Firm");
+    expect(acctFirmRef!.tableName).toBe("companies");
 
     // Fully qualified billing firm
     const qualRef = reflectOnAssociation(MyAppBillingAccount, "qualifiedBillingFirm");
     expect(qualRef!.klass).toBe(MyAppBillingFirm);
     expect(qualRef!.className).toBe("MyApplication::Billing::Firm");
+    expect(qualRef!.tableName).toBe("companies");
 
     // Unqualified "Firm" resolves namespace-relative from MyApplication::Billing::Account
     const unqualRef = reflectOnAssociation(MyAppBillingAccount, "unqualifiedBillingFirm");
     expect(unqualRef!.klass).toBe(MyAppBillingFirm);
     expect(unqualRef!.className).toBe("Firm");
+    expect(unqualRef!.tableName).toBe("companies");
 
     // Fully qualified, nested
     const nestedQualRef = reflectOnAssociation(MyAppBillingAccount, "nestedQualifiedBillingFirm");
     expect(nestedQualRef!.klass).toBe(MyAppBillingNestedFirm);
     expect(nestedQualRef!.className).toBe("MyApplication::Billing::Nested::Firm");
+    expect(nestedQualRef!.tableName).toBe("companies");
 
     // Partially qualified "Nested::Firm" resolves namespace-relative
     const nestedRef = reflectOnAssociation(MyAppBillingAccount, "nestedUnqualifiedBillingFirm");
     expect(nestedRef!.klass).toBe(MyAppBillingNestedFirm);
     expect(nestedRef!.className).toBe("Nested::Firm");
+    expect(nestedRef!.tableName).toBe("companies");
 
     // Runtime: resolveAssocClass uses the reflection layer for namespace-aware
     // resolution — verifies the actual loading path, not only ref.klass
     expect(resolveAssocClass(MyAppBusinessFirm, "clientsOfFirm", "Client")).toBe(
       MyAppBusinessClient,
     );
+  });
+
+  it("leading-:: className resolves absolutely and builds", () => {
+    // Rails' company_in_module fixture has no `::`-prefixed association, so the
+    // real-fixture test above cannot exercise the leading-`::` (absolute) branch
+    // of computeClass nor the CollectionProxy build path. Guard both here with a
+    // small dedicated model registered under a qualified key.
+    class AbsBizClient extends Base {
+      static moduleName = "MyApplication::Absolute";
+      static _demodulizedName = "Client";
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class AbsBizFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        // Leading "::" forces top-level resolution, bypassing the namespace walk.
+        this.hasMany("clients", { className: "::MyApplication::Absolute::Client" });
+      }
+    }
+    registerModel(AbsBizClient);
+
+    const ref = reflectOnAssociation(AbsBizFirm, "clients");
+    expect(ref!.klass).toBe(AbsBizClient);
+
+    // CollectionProxy build path: proxy.model and proxy.build() use the resolved
+    // class, catching regressions where ref.klass resolves but the build/load
+    // path hits the wrong target.
+    const firm = AbsBizFirm.new({ name: "Acme" });
+    const proxy = association<InstanceType<typeof AbsBizClient>>(firm, "clients");
+    expect((proxy as any).model).toBe(AbsBizClient);
+    const built = proxy.build({ name: "Acme Client" });
+    expect(built).toBeInstanceOf(AbsBizClient);
   });
 
   it("has and belongs to many reflection", () => {
