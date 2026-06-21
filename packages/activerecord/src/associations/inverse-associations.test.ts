@@ -6,6 +6,8 @@ import {
   Base,
   association,
   registerModel,
+  registerSubclass,
+  enableSti,
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
 } from "../index.js";
@@ -33,7 +35,9 @@ import { AdminAccount } from "../test-helpers/models/admin/account.js";
 import { AdminUser } from "../test-helpers/models/admin/user.js";
 import { User } from "../test-helpers/models/user.js";
 import { Room } from "../test-helpers/models/room.js";
-import { Company } from "../test-helpers/models/company.js";
+import { Company, Firm } from "../test-helpers/models/company.js";
+import { Project } from "../test-helpers/models/project.js";
+import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { SpecialContract } from "../test-helpers/models/contract.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
@@ -302,8 +306,18 @@ describe("AutomaticInverseFindingTests", () => {
 });
 
 describe("InverseAssociationTests", () => {
+  useHandlerFixtures({
+    companies: [Company, {}],
+    developers: [Developer, {}],
+    projects: [Project, {}],
+  });
+
   beforeAll(() => {
-    [Human, Face, Interest, Club, Sponsor].forEach((m) => registerModel(m));
+    [Human, Face, Interest, Club, Sponsor, Company, Firm, Developer, Project, AuditLog].forEach(
+      (m) => registerModel(m),
+    );
+    enableSti(Company);
+    registerSubclass(Firm);
   });
 
   it("should allow for inverse of options in associations", () => {
@@ -359,9 +373,14 @@ describe("InverseAssociationTests", () => {
     expect(superHumanRef.inverseOf()).toBeNull();
   });
 
-  it.skip("this inverse stuff", () => {
-    // Tracked: story inverse-hasone-through-inverse-of. Needs Firm/Project/
-    // Developer canonical models + has_one :through inverse_of (lead_developer).
+  it("this inverse stuff", async () => {
+    const firm = await Firm.create({ name: "Adequate Holdings" });
+    await Project.create({ name: "Project 1", firm });
+    await Developer.create({ name: "Gorbypuff", firm });
+
+    const newProject = (await (Project as any).last()) as Project;
+    expect((Project as any).reflectOnAssociation("leadDeveloper").inverseOf()).toBeTruthy();
+    expect(await (newProject as any).loadHasOne("leadDeveloper")).toBeTruthy();
   });
 });
 
