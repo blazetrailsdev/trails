@@ -32,6 +32,7 @@ import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 // to the non-existent `topic2s`. Block 1 aliases it back to a local `Topic`.
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
+import { Account } from "./test-helpers/models/account.js";
 // Registers the Reply STI subclasses so Topic#destroy can resolve its
 // `replies`/`uniqueReplies` associations (mirrors `require "models/reply"`).
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
@@ -39,6 +40,7 @@ import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers
 for (const klass of [
   CanonicalTopic,
   Minimalistic,
+  Account,
   ClothingItem,
   Reply,
   SillyReply,
@@ -53,8 +55,8 @@ for (const klass of [
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics, clothingItems } = useHandlerFixtures(
-    ["topics", "minimalistics", "clothingItems"],
+  const { topics, accounts, clothingItems } = useHandlerFixtures(
+    ["topics", "minimalistics", "accounts", "clothingItems"],
     { schema: canonicalSchema },
   );
 
@@ -128,35 +130,55 @@ describe("PersistenceTest", () => {
   });
 
   it("increment attribute", async () => {
-    const t = topics("first");
-    expect(t.replies_count).toBe(1);
-    await t.incrementBang("replies_count");
-    await t.reload();
-    expect(t.replies_count).toBe(2);
+    const a = accounts("signals37");
+    expect(a.credit_limit).toBe(50);
+
+    await a.incrementBang("credit_limit");
+    await a.reload();
+    expect(a.credit_limit).toBe(51);
+
+    await a.increment("credit_limit").incrementBang("credit_limit");
+    await a.reload();
+    expect(a.credit_limit).toBe(53);
   });
 
   it("increment attribute by", async () => {
-    const t = topics("first");
-    expect(t.replies_count).toBe(1);
-    await t.incrementBang("replies_count", 5);
-    await t.reload();
-    expect(t.replies_count).toBe(6);
+    const a = accounts("signals37");
+    expect(a.credit_limit).toBe(50);
+
+    await a.incrementBang("credit_limit", 5);
+    await a.reload();
+    expect(a.credit_limit).toBe(55);
+
+    await a.increment("credit_limit", 1).incrementBang("credit_limit", 3);
+    await a.reload();
+    expect(a.credit_limit).toBe(59);
   });
 
   it("decrement attribute", async () => {
-    const t = topics("first");
-    expect(t.replies_count).toBe(1);
-    await t.decrementBang("replies_count");
-    await t.reload();
-    expect(t.replies_count).toBe(0);
+    const a = accounts("signals37");
+    expect(a.credit_limit).toBe(50);
+
+    await a.decrementBang("credit_limit");
+    await a.reload();
+    expect(a.credit_limit).toBe(49);
+
+    await a.decrement("credit_limit").decrementBang("credit_limit");
+    await a.reload();
+    expect(a.credit_limit).toBe(47);
   });
 
   it("decrement attribute by", async () => {
-    const t = topics("first");
-    expect(t.replies_count).toBe(1);
-    await t.decrementBang("replies_count", 3);
-    await t.reload();
-    expect(t.replies_count).toBe(-2);
+    const a = accounts("signals37");
+    expect(a.credit_limit).toBe(50);
+
+    await a.decrementBang("credit_limit", 5);
+    await a.reload();
+    expect(a.credit_limit).toBe(45);
+
+    await a.decrement("credit_limit", 1).decrementBang("credit_limit", 3);
+    await a.reload();
+    expect(a.credit_limit).toBe(41);
   });
 
   it("save with duping of destroyed object", async () => {
