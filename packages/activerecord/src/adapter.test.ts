@@ -26,6 +26,7 @@ import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Author, AuthorAddress } from "./test-helpers/models/author.js";
@@ -1481,23 +1482,39 @@ describeIfMysql("AdapterTest", () => {
   });
 });
 
-describeIfMysql("AdvisoryLocksEnabledTest", () => {
-  it("advisory locks enabled?", async () => {
-    const base = new Mysql2Adapter(MYSQL_TEST_URL);
+describe("AdvisoryLocksEnabledTest", () => {
+  // Rails leases the active connection generically (`lease_connection`) and
+  // probes `advisory_locks_enabled?`; `supports_advisory_locks?` is true on
+  // both PostgreSQL and MySQL, so the gate is feature-only. Build the active
+  // adapter type with the `:advisory_locks` config flag rather than hardcoding
+  // Mysql2Adapter, exercising the option on whichever backend is running.
+  async function makeActiveAdapter(
+    opts: { advisoryLocks?: boolean } = {},
+  ): Promise<AbstractAdapter> {
+    if (adapterType === "postgres") {
+      const { PostgreSQLAdapter, PG_TEST_URL } =
+        await import("./adapters/postgresql/test-helper.js");
+      return new PostgreSQLAdapter({ connectionString: PG_TEST_URL, ...opts });
+    }
+    return new Mysql2Adapter({ uri: MYSQL_TEST_URL, ...opts });
+  }
+
+  itIfSupports("advisory_locks", "advisory locks enabled?", async () => {
+    const base = await makeActiveAdapter();
     try {
       expect(base.isAdvisoryLocksEnabled()).toBe(true);
     } finally {
       await base.close();
     }
 
-    const disabled = new Mysql2Adapter({ uri: MYSQL_TEST_URL, advisoryLocks: false });
+    const disabled = await makeActiveAdapter({ advisoryLocks: false });
     try {
       expect(disabled.isAdvisoryLocksEnabled()).toBe(false);
     } finally {
       await disabled.close();
     }
 
-    const enabled = new Mysql2Adapter({ uri: MYSQL_TEST_URL, advisoryLocks: true });
+    const enabled = await makeActiveAdapter({ advisoryLocks: true });
     try {
       expect(enabled.isAdvisoryLocksEnabled()).toBe(true);
     } finally {
