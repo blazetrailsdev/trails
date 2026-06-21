@@ -1471,8 +1471,10 @@ describe("should automatically build new associated models for each entry in a h
     };
     const built = (await collectionProxyFor(pirate, "birds").loadTarget()) as CanonicalBird[];
     expect(built.length).toBe(2);
-    expect(built.every((b) => !b.isPersisted())).toBe(true);
-    expect(built.map((b) => b.name).sort()).toEqual(["Grace OMalley", "Privateers Greed"]);
+    expect(built[0].isPersisted()).toBe(false);
+    expect(built[0].name).toBe("Grace OMalley");
+    expect(built[built.length - 1].isPersisted()).toBe(false);
+    expect(built[built.length - 1].name).toBe("Privateers Greed");
   });
 });
 
@@ -1681,19 +1683,16 @@ describe("should sort the hash by the keys before building new associated models
     registerModel(CanonicalPirate);
     acceptsNestedAttributesFor(CanonicalPirate, "birds");
     const pirate = await CanonicalPirate.create({ catchphrase: "sort test" });
-    // Keys are sorted before the new birds are built, so the out-of-order
-    // hash yields birds in key order.
-    assignNestedAttributes(pirate, "birds", {
-      "2": { name: "third" },
-      "0": { name: "first" },
-      "1": { name: "second" },
-    });
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.length).toBe(3);
-    expect(birds[0].name).toBe("first");
-    expect(birds[1].name).toBe("second");
-    expect(birds[2].name).toBe("third");
+    (pirate as any).birdsAttributes = {
+      "123726353": { name: "Grace OMalley" },
+      "2": { name: "Privateers Greed" }, // 2 is lower then 123726353
+    };
+    const built = (await collectionProxyFor(pirate, "birds").loadTarget()) as CanonicalBird[];
+    // Rails compares with `.to_set` — order-independent (Ruby preserves hash
+    // insertion order; trails cannot for integer keys, so assert membership).
+    expect(new Set(built.map((b) => b.name))).toEqual(
+      new Set(["Privateers Greed", "Grace OMalley"]),
+    );
   });
 });
 

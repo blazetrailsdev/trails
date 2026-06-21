@@ -162,9 +162,9 @@ export function assignNestedAttributes(
   if (Array.isArray(attributesArray)) {
     attrs = attributesArray;
   } else {
-    // Sort by keys before converting to array (Rails sorts hash keys)
-    const sortedKeys = Object.keys(attributesArray).sort();
-    attrs = sortedKeys.map((k) => attributesArray[k]);
+    // Rails takes `attributes_collection.values` in insertion order — no
+    // sort (nested_attributes.rb:499-506).
+    attrs = Object.values(attributesArray);
   }
 
   // Rails raises TooManyRecords synchronously from
@@ -619,7 +619,10 @@ export function assignNestedAttributesForCollectionAssociation(
     if (keys.includes("id")) {
       attrs = [attributesCollection as unknown as Record<string, unknown>];
     } else {
-      attrs = keys.sort().map((k) => (attributesCollection as any)[k]);
+      // Rails takes `attributes_collection.values` in insertion order — no
+      // sort (nested_attributes.rb:499-506). Object.values preserves the same
+      // ordering trails can observe.
+      attrs = keys.map((k) => (attributesCollection as any)[k]);
     }
   }
 
