@@ -581,10 +581,15 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   override first(n: number): Promise<T[]>;
   override async first(limit?: number): Promise<T | T[] | null> {
     if (this._chainWalker) {
-      const limitVal = limit ?? 1;
-      const limited = Relation.prototype.limit.call(this, limitVal) as Relation<T>;
-      const records = await limited.toArray();
-      return limit === undefined ? (records[0] ?? null) : records;
+      // Rails: disable_joins routes `first` through Relation#first →
+      // ordered_relation, which adds ORDER BY primary key. findNthWithLimit
+      // applies that ordering (and the with_connection shim) before the
+      // LIMIT — a bare limit().toArray() would emit an unordered LIMIT and
+      // pick an arbitrary row when the scope has no explicit order.
+      const rows = await (
+        this as unknown as { findNthWithLimit: (i: number, l: number) => Promise<T[]> }
+      ).findNthWithLimit(0, limit ?? 1);
+      return limit === undefined ? (rows[0] ?? null) : rows;
     }
     const records = await this.toArray();
     return limit === undefined ? (records[0] ?? null) : records.slice(0, limit);

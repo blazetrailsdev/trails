@@ -121,6 +121,12 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     for (const nj of noJoins) {
       expect(nj).not.toMatch(/INNER JOIN/i);
     }
+    // Rails SingularAssociation#find_target routes the disable_joins branch
+    // through scope.first -> Relation#first -> ordered_relation, so the
+    // singular target load is ORDER BY pk LIMIT 1 (unlike the unordered
+    // collection / normal-singular path). The second no-joins query is the
+    // organizations target load.
+    expect(noJoins[1]).toMatch(/ORDER BY.+organizations.+id.+ASC.+LIMIT 1/i);
   });
 
   it("nil on disable joins through", async () => {
