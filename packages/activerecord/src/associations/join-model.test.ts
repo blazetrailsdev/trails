@@ -409,12 +409,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(String((first as any).readAttribute("post_id"))).toBe(String(posts("thinking").id));
   });
 
-  // DEFERRED (tracked: join-model-create-through-sets-owner-fk): trails'
-  // create-through-has_many builds the join record but leaves the owner foreign
-  // key (categorizations.category_id) null, so the created Ernie never appears
-  // back through the association. Un-skip once create-through populates the
-  // owner key.
-  it.skip("create through has many with piggyback", async () => {
+  it("create through has many with piggyback", async () => {
     const category = await Category.find(categories("sti_test").id);
     const ernie = await (category as any).authorsWithSelect.create({ name: "Ernie" });
     // assert_nothing_raised { ... category.authors_with_select.detect { |a| a.name == "Ernie" } }
@@ -760,13 +755,7 @@ describe("AssociationsJoinModelTest", () => {
     await (vertex1 as any).sinks.push(vertex5);
   });
 
-  // DEFERRED (tracked: join-model-create-through-sets-owner-fk): Book.references
-  // is a has_many :through citations with a belongs_to source (referenceOf).
-  // `book_awdr.references << book` creates no citation row (debug: zero
-  // citations with book1_id == awdr after push), so references.size stays 0.
-  // Same create-through-doesn't-persist-join root cause as the piggyback skip.
-  // Un-skip once create-through populates the join record.
-  it.skip("delete associate when deleting from has many through with nonstandard id", async () => {
+  it("delete associate when deleting from has many through with nonstandard id", async () => {
     const bookAwdr = await Book.find(books("awdr").id);
     const count = await (bookAwdr as any).references.count();
     const referencesBefore = ((await (bookAwdr as any).references.toArray()) as Base[]).map(
