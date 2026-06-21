@@ -1085,8 +1085,11 @@ describe("TestNestedAttributesInGeneral", () => {
     registerModel(CpkCar);
     registerModel(CpkCarReview);
     // A bare subclass: it inherits the has_many reflection (and its composite
-    // foreign key) from CpkCar. The FK must derive from the reflection owner
-    // (CpkCar), not the subclass's `ctor.name`.
+    // foreign key) from CpkCar. This is an integration check that composite-FK
+    // nested builds thread each FK column through an inherited reflection. The
+    // composite path never reaches the `${underscore(ctor.name)}_id` fallback,
+    // so the subclass name doesn't enter FK resolution here — the FK comes from
+    // the reflection owner's `activeRecordPrimaryKey` (CpkCar's `[make, model]`).
     class CpkSportsCar extends CpkCar {
       static _demodulizedName = "SportsCar";
     }

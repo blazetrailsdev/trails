@@ -248,10 +248,13 @@ async function processNestedAttributes(record: Base): Promise<void> {
     // Foreign-key attributes anchoring a built has_many/has_one child back to
     // this owner. A composite FK reads each owner PK column named by the
     // reflection's `activeRecordPrimaryKey`, paired positionally with the FK
-    // columns; a single FK uses the scalar owner id.
+    // columns; a single FK uses the scalar owner id. When the composite FK came
+    // from an explicit array `foreignKey` option but the reflection is absent,
+    // fall back to the owner class's own primary key (Rails' default for
+    // `active_record_primary_key`) so the columns never resolve to undefined.
     const childForeignKeyAttributes = (): Record<string, unknown> => {
       if (!compositeFkColumns) return { [foreignKey]: record.id };
-      const ownerPk = reflection?.activeRecordPrimaryKey;
+      const ownerPk = reflection?.activeRecordPrimaryKey ?? (ctor as any).primaryKey;
       const ownerPkColumns = Array.isArray(ownerPk) ? ownerPk : [ownerPk];
       const out: Record<string, unknown> = {};
       compositeFkColumns.forEach((col, i) => {
