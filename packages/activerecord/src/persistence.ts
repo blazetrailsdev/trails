@@ -741,11 +741,11 @@ export async function save<T extends SaveRecord>(
   }
 }
 
-/** Mirrors: ActiveRecord::Base#save! */
+/** Mirrors: ActiveRecord::Base#save! — `create_or_update(**options) || raise`. */
 export async function saveBang<
   T extends SaveRecord & { save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean> },
->(this: T): Promise<true> {
-  const result = await this.save();
+>(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true> {
+  const result = await this.save(options);
   if (!result) {
     raiseValidationError(this);
   }

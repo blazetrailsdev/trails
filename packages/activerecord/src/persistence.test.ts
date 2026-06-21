@@ -452,7 +452,7 @@ describe("PersistenceTest", () => {
     const updatedAt = parrot.updated_at;
 
     parrot.name = "Barb";
-    await parrot.save({ touch: false });
+    await parrot.saveBang({ touch: false });
     expect(parrot.created_at).toEqual(createdAt);
     expect(parrot.updated_at).toEqual(updatedAt);
   });

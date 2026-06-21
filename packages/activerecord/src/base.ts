@@ -3910,7 +3910,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   ): Promise<this>;
   toggleBang(attribute: string): Promise<boolean>;
   save(options?: { validate?: boolean; touch?: boolean }): Promise<boolean>;
-  saveBang(): Promise<true>;
+  saveBang(options?: { validate?: boolean; touch?: boolean }): Promise<true>;
   destroy(): Promise<this | false>;
   destroyBang(): Promise<this>;
   update(attrs: Record<string, unknown>): Promise<boolean>;
