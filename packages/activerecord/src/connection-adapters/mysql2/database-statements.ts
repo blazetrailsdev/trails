@@ -41,12 +41,22 @@ export interface Mysql2RawResult {
 
 /**
  * node-mysql2 field-type codes (a subset of mysql2/lib/constants/types.js) for
- * the numeric families whose driver value would otherwise come back as a raw
- * string (decimals) or untyped number. We map these to a trails sql_type string
- * so `lookupCastType` builds the faithful `Type` — `DECIMAL`/`NEWDECIMAL` →
- * `BigDecimal`, `FLOAT`/`DOUBLE`/integers → number. Other families are left
- * unmapped so the driver value passes through unchanged (matching Rails'
- * `Mysql2Adapter#cast_result`, which relies on the gem's driver-level casting).
+ * the numeric families. We map these to a trails sql_type string so
+ * `lookupCastType` builds the faithful `Type` — `DECIMAL`/`NEWDECIMAL` →
+ * `BigDecimal`, `FLOAT`/`DOUBLE`/integers → number.
+ *
+ * Only `DECIMAL`/`NEWDECIMAL` fixes an actual divergence: node-mysql2 with
+ * `decimalNumbers:false` returns decimals as raw strings, whereas the Ruby
+ * mysql2 gem yields `BigDecimal`. The integer (1/2/3/8/9/13) and float (4/5)
+ * codes are deliberately included for column_types parity even though they are
+ * no-ops over values node-mysql2 already returns as JS numbers — the story's
+ * acceptance criteria asks for the faithful numeric `Type` on every extra
+ * numeric select, and this mirrors the PostgreSQL adapter's `cast_result`, which
+ * reports a `Type` for every column via its OID map. The per-column
+ * `lookupCastType` is a cheap type-map lookup. Non-numeric families (string,
+ * blob, date/time) are intentionally absent so their driver value passes through
+ * unchanged — matching Rails' `Mysql2Adapter#cast_result`, which builds no
+ * column_types at all and relies on the gem's driver-level casting.
  * @internal
  */
 const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
@@ -85,6 +95,9 @@ export function buildColumnTypes(
     if (sqlType == null) continue;
     // Honor a decimal column's scale so cast truncates to the right places
     // (precision 65 is MySQL's DECIMAL maximum — the scale is what matters).
+    // `decimals === 0` (a `DECIMAL(n,0)`) is intentionally left to the bare
+    // `decimal` lookup: it still builds a BigDecimal, just without an explicit
+    // scale, so no truncation is needed.
     if (sqlType === "decimal" && typeof f.decimals === "number" && f.decimals > 0) {
       sqlType = `decimal(65,${f.decimals})`;
     }
