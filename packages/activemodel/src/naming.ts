@@ -352,10 +352,9 @@ export class ModelName {
    */
   compare(other: unknown): -1 | 0 | 1 {
     if (other instanceof ModelName) {
-      // Single string compare over the full constant path — matches
-      // Rails' `String#<=>` on `@name` (e.g. "Admin::Other" < "Blog::Post"
-      // by first segment, regardless of bare-name ordering). We join
-      // with `/` (not `::`) to keep Ruby syntax out of TS code.
+      // Single string compare over the full `::`-qualified constant path —
+      // matches Rails' `String#<=>` on `@name` (e.g. "Admin::Other" <
+      // "Blog::Post" by first segment, regardless of bare-name ordering).
       const l = ModelName._qualified(this);
       const r = ModelName._qualified(other);
       if (l === r) return 0;
