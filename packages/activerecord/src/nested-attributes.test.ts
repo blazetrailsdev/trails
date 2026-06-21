@@ -29,6 +29,8 @@ import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
 import { Ship as CanonicalShip } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
+import { Category } from "./test-helpers/models/category.js";
+import { Categorization } from "./test-helpers/models/categorization.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
@@ -669,6 +671,21 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const reloaded = await CpkBook.find([1, 1]);
     expect((reloaded as any).shop_id).toBe(7);
     expect((reloaded as any).order_id).toBe(orderId);
+  });
+
+  it("should increment the target counter cache when the nested belongs_to is created", async () => {
+    registerModel(Category);
+    registerModel(Categorization);
+    acceptsNestedAttributesFor(Categorization, "category");
+
+    const categorization = await Categorization.create({});
+    assignNestedAttributes(categorization, "category", [{ name: "General" }]);
+    await categorization.save();
+
+    const category = (await Category.findBy({ name: "General" })) as any;
+    expect(category).not.toBeNull();
+    expect((categorization as any).category_id).toBe(category.id);
+    expect(category.categorizations_count).toBe(1);
   });
 
   it("should not build a new record if there is no id and destroy is truthy", async () => {
