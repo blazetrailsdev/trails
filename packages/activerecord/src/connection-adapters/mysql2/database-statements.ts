@@ -4,14 +4,29 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements (module)
  */
 
+import type { Type } from "@blazetrails/activemodel";
 import type mysql from "mysql2/promise";
 import { NotImplementedError } from "../../errors.js";
-import { Result } from "../../result.js";
+import { Result, type ColumnTypes } from "../../result.js";
 import { combineMultiStatements } from "../mysql/database-statements.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   preparedStatements?: boolean;
+}
+
+/**
+ * Field descriptor metadata we keep from node-mysql2's `FieldPacket` so the
+ * adapter can report `column_types`. node-mysql2 exposes a numeric `type` (and,
+ * for prepared statements, `columnType`) field-type code plus `decimals` for
+ * the scale of a `DECIMAL`/`NEWDECIMAL` column.
+ * @internal
+ */
+export interface Mysql2FieldDescriptor {
+  name: string;
+  type?: number;
+  columnType?: number;
+  decimals?: number;
 }
 
 /** @internal */
@@ -20,8 +35,79 @@ export interface Mysql2RawResult {
   // feeding `cast_result` from `result.to_a`. Positional rows keep duplicate
   // column names (`SELECT 1 AS a, 2 AS a`) that hash-keyed rows would collapse.
   rows: unknown[][] | null;
-  fields: Array<{ name: string }>;
+  fields: Mysql2FieldDescriptor[];
   affectedRows: number;
+}
+
+/**
+ * node-mysql2 field-type codes (a subset of mysql2/lib/constants/types.js) for
+ * the numeric families. We map these to a trails sql_type string so
+ * `lookupCastType` builds the faithful `Type` — `DECIMAL`/`NEWDECIMAL` →
+ * `BigDecimal`, `FLOAT`/`DOUBLE`/integers → number.
+ *
+ * Only `DECIMAL`/`NEWDECIMAL` fixes an actual divergence: node-mysql2 with
+ * `decimalNumbers:false` returns decimals as raw strings, whereas the Ruby
+ * mysql2 gem yields `BigDecimal`. The integer (1/2/3/8/9/13) and float (4/5)
+ * codes are deliberately included for column_types parity even though they are
+ * no-ops over values node-mysql2 already returns as JS numbers — the story's
+ * acceptance criteria asks for the faithful numeric `Type` on every extra
+ * numeric select, and this mirrors the PostgreSQL adapter's `cast_result`, which
+ * reports a `Type` for every column via its OID map. The per-column
+ * `lookupCastType` is a cheap type-map lookup. Non-numeric families (string,
+ * blob, date/time) are intentionally absent so their driver value passes through
+ * unchanged — matching Rails' `Mysql2Adapter#cast_result`, which builds no
+ * column_types at all and relies on the gem's driver-level casting.
+ * @internal
+ */
+const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
+  0: "decimal", // DECIMAL
+  246: "decimal", // NEWDECIMAL
+  4: "float", // FLOAT
+  5: "double", // DOUBLE
+  1: "tinyint", // TINY
+  2: "smallint", // SHORT
+  9: "mediumint", // INT24
+  3: "int", // LONG
+  8: "bigint", // LONGLONG
+  13: "year", // YEAR
+};
+
+/**
+ * Build a `Result` `column_types` map from node-mysql2 field descriptors,
+ * mapping the numeric field-type codes to trails `Type` instances via the
+ * adapter's `lookupCastType`. Returns `null` when no field carries a mapped
+ * numeric type, so a plain string/blob result allocates nothing and falls back
+ * to the driver value. Keyed by both positional index and column name, mirroring
+ * the PostgreSQL adapter's `cast_result` (which Rails' `column_types` slicing
+ * reads by name in `JoinDependency#instantiate`).
+ * @internal
+ */
+export function buildColumnTypes(
+  fields: ReadonlyArray<Mysql2FieldDescriptor>,
+  lookupCastType: (sqlType: string) => Type,
+): ColumnTypes | null {
+  let columnTypes: Record<string | number, Type> | null = null;
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    const code = f.columnType ?? f.type;
+    if (code == null) continue;
+    let sqlType = MYSQL_NUMERIC_FIELD_SQL_TYPE[code];
+    if (sqlType == null) continue;
+    // Honor a decimal column's scale so cast truncates to the right places
+    // (precision 65 is MySQL's DECIMAL maximum — the scale is what matters).
+    // `decimals === 0` (a `DECIMAL(n,0)`) is intentionally left to the bare
+    // `decimal` lookup: it still builds a BigDecimal, just without an explicit
+    // scale, so no truncation is needed.
+    if (sqlType === "decimal" && typeof f.decimals === "number" && f.decimals > 0) {
+      sqlType = `decimal(65,${f.decimals})`;
+    }
+    const type = lookupCastType(sqlType);
+    columnTypes ??= {};
+    columnTypes[i] = type;
+    // Guard a column literally named "1" from colliding with integer index 1.
+    if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
+  }
+  return columnTypes;
 }
 
 /** @internal */
@@ -172,11 +258,11 @@ export async function performQuery(
 
   const { result, fields } = unwrapMultiResult(rawResult, rawFields);
   let rows: unknown[][] | null = null;
-  let fieldList: Array<{ name: string }> = [];
+  let fieldList: Mysql2FieldDescriptor[] = [];
   let affectedRows = 0;
   if (Array.isArray(result)) {
     rows = result as unknown[][];
-    fieldList = (fields ?? []) as Array<{ name: string }>;
+    fieldList = (fields ?? []) as unknown as Mysql2FieldDescriptor[];
     affectedRows = rows.length;
   } else {
     affectedRows = result.affectedRows ?? 0;
@@ -199,14 +285,22 @@ export async function performQuery(
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#cast_result
  * @internal
  */
-export function castResult(rawResult: Mysql2RawResult): Result {
+export function castResult(
+  this: { lookupCastType(sqlType: string): Type },
+  rawResult: Mysql2RawResult,
+): Result {
   if (rawResult.rows == null) return Result.empty();
 
   // Rows are already positional (array-mode), mirroring Rails' `result.to_a`,
   // so build the Result directly from `result.fields` + rows — no row[col]
   // re-keying, which would collapse duplicate column names.
   const columns = rawResult.fields.map((f) => f.name);
-  const result = columns.length === 0 ? Result.empty() : new Result(columns, rawResult.rows);
+  if (columns.length === 0) {
+    freeRawResult(rawResult);
+    return Result.empty();
+  }
+  const columnTypes = buildColumnTypes(rawResult.fields, (t) => this.lookupCastType(t));
+  const result = new Result(columns, rawResult.rows, columnTypes);
   freeRawResult(rawResult);
   return result;
 }

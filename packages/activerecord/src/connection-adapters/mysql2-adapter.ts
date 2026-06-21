@@ -32,9 +32,11 @@ import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
+  buildColumnTypes,
   castResult as mysql2CastResult,
   performQuery as mysql2PerformQuery,
   unwrapMultiResult,
+  type Mysql2FieldDescriptor,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import { typeCastedBinds, transactionIsolationLevels } from "./abstract/database-statements.js";
@@ -520,8 +522,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           // duplicate column names and keeps the column set when zero rows
           // matched (the field descriptors are present whenever a SELECT
           // projected columns).
-          const names = (fields ?? []).map((f) => f.name);
-          return names.length === 0 ? Result.empty() : new Result(names, result as unknown[][]);
+          const fieldList = (fields ?? []) as unknown as Mysql2FieldDescriptor[];
+          const names = fieldList.map((f) => f.name);
+          if (names.length === 0) return Result.empty();
+          // Report column_types from the field descriptors (numeric/decimal
+          // families) so extra/computed select columns deserialize to the
+          // faithful trails type — a BigDecimal for NEWDECIMAL rather than the
+          // raw "1.1" driver string. Mirrors the PostgreSQL adapter's
+          // cast_result; node-mysql2 (decimalNumbers:false) has no driver-level
+          // BigDecimal cast, so the adapter reports the type map itself.
+          const columnTypes = buildColumnTypes(fieldList, (t) => this.lookupCastType(t));
+          return new Result(names, result as unknown[][], columnTypes);
         });
       } catch (e: any) {
         const translated =

@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import "../index.js";
 import { StatementInvalid } from "../index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -263,7 +264,15 @@ describe("SelectTest", () => {
     // true. JS has no cross-type `===` for BigDecimal vs number, so we assert the
     // same numeric equality (the value is now a typed numeric, not the raw "1.1"
     // string it was before extra-select columns were cast by column type).
-    expect(Number(post.readAttribute("foo"))).toBe(1.1);
+    const foo = post.readAttribute("foo");
+    expect(Number(foo)).toBe(1.1);
+    // On PG (`numeric`) and MySQL (`NEWDECIMAL`) the column_types map casts the
+    // extra select to a BigDecimal — asserting that here pins the type fidelity
+    // the bare `Number(...)` coercion above would otherwise mask (the raw mysql2
+    // driver string "1.1" also numeric-equals 1.1).
+    const adapterName = (Post.connection as unknown as { adapterName: string }).adapterName;
+    const expectsBigDecimal = adapterName === "postgres" || adapterName === "mysql";
+    expect(foo instanceof BigDecimal).toBe(expectsBigDecimal);
   });
 
   it("aliased select using as with joins and includes", async () => {
