@@ -405,17 +405,18 @@ function isSqlLiteral(value: unknown): value is { value: string } {
 
 /**
  * Mirrors: PostgreSQL::Quoting#encode_array. Recursively type-casts the array
- * values and joins them into a PG literal string: `{v1,v2,...}`.
+ * values, then joins them via the OID encoder — whose delimiter is type-correct
+ * (`;` for box[]) rather than a hardcoded comma.
  * @internal
  */
 function encodeArray(this: QuotingDispatchHost, arrayData: ArrayData): string {
   const values = typeCastArray.call(this, arrayData.values);
-  // Rails force-encodes the encoder output to the first string's encoding;
-  // JS strings are UTF-16 so this is a no-op (see the helper). Routing through
-  // the OID encoder (not a hardcoded `,`) keeps the delimiter type-correct —
-  // `;` for box[] — so there is one serialization path matching Rails.
+  const result = arrayData.encoder.encode(values);
+  // Rails then force-encodes the result to the first string's encoding; JS
+  // strings are UTF-16 so this is a no-op (see the helper) and `result` is
+  // returned unchanged. Called in Rails' order for parity.
   determineEncodingOfStringsInArray(values);
-  return arrayData.encoder.encode(values);
+  return result;
 }
 
 /**
