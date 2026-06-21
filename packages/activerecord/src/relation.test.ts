@@ -1686,7 +1686,7 @@ describe("Relation#arel build_arel convergence", () => {
 // `test:compare` matches it to Ruby's `RelationTest` in relation_test.rb.
 describe("RelationTest", () => {
   const { authors } = useHandlerFixtures(
-    ["authors", "posts", "comments", "ratings", "categorizations"],
+    ["authors", "posts", "comments", "ratings", "categorizations", "categories"],
     {
       schema: canonicalSchema,
     },
@@ -1767,13 +1767,11 @@ describe("RelationTest", () => {
     );
   });
 
-  // Skipped pending RFC 0030 story converge-cross-model-merge-join-aliasing: a
-  // cross-model `merge` that joins an already-joined table must alias the child
-  // INNER JOIN (`authors_categorizations`). Trails emits a duplicate unaliased
-  // `authors` join because alias assignment is baked in at JoinDependency
-  // construction (addAssociation) with a per-dep tracker, not deferred to
-  // emission with a shared AliasTracker as Rails does (build_joins).
-  it.skip("relation merging with merged symbol joins is aliased", async () => {
+  // A cross-model `merge` that joins an already-joined table aliases the child
+  // INNER JOIN (`authors_categorizations`) via a shared AliasTracker re-aligned
+  // across the merged JoinDependencies (Rails build_joins). See
+  // relation/merged-join-alias-tracker.ts.
+  it("relation merging with merged symbol joins is aliased", async () => {
     const categorizationsWithAuthors = CanonCategorization.joins("author");
     const queries = await captureSql(async () => {
       await CanonPost.joins("author", "categorizations")
@@ -1796,10 +1794,10 @@ describe("RelationTest", () => {
     expect(queries.some((sql) => aliasPattern.test(sql))).toBe(true);
   });
 
-  // Skipped pending RFC 0030 story converge-cross-model-merge-join-aliasing
-  // (same unaliased cross-model merge join; raises `ambiguous column name:
-  // authors.id` at runtime). See the sibling `is aliased` test above.
-  it.skip("relation with merged joins aliased works", async () => {
+  // The same cross-model merge join, now aliased, no longer raises
+  // `ambiguous column name: authors.id` at runtime. See the sibling
+  // `is aliased` test above.
+  it("relation with merged joins aliased works", async () => {
     const categorizationsWithAuthors = CanonCategorization.joins("author");
     const postsWithJoinsAndMerges = CanonPost.joins("author", "categorizations")
       .merge(CanonAuthor.select("id"))

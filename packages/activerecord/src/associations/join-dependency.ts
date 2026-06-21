@@ -729,7 +729,21 @@ export class JoinDependency {
       const parentTableName = (parent.baseKlass as any)?.tableName ?? parent.table;
       newName = this._aliasTracker.aliasNameFor(child.reflection.aliasCandidate(parentTableName));
     }
+    this._rebindChildAlias(child, newName);
+  }
+
+  /**
+   * Re-point `child` to the SQL alias `newName`: rebuild its arelTable, JOIN
+   * left side, and ON predicate (and its children's ON predicates that
+   * referenced its old table) so the SELECT projection and JOIN clause name the
+   * same table. No-op when `child` already carries `newName`. Shared by the
+   * referenced-table aliasing (`_applyReferencedAlias`) and the shared-tracker
+   * re-aliasing (`realiasAgainstSharedTracker`).
+   * @internal
+   */
+  private _rebindChildAlias(child: JoinPart, newName: string): void {
     if (newName === child.effectiveSqlName) return;
+    const tableName = child.tableName;
     const aliased =
       newName === tableName ? new Table(tableName) : new Table(tableName, { as: newName });
 
@@ -758,6 +772,39 @@ export class JoinDependency {
 
     child.arelTable = aliased;
     child.effectiveSqlName = newName;
+    this._aliasesCache = undefined;
+  }
+
+  /**
+   * Re-resolve every association join in this dependency against a shared
+   * `AliasTracker`, aliasing any table the tracker already claims to the
+   * reflection's `alias_candidate(parent_table)` (`authors_categorizations`).
+   *
+   * Rails shares one `alias_tracker` across all join dependencies in
+   * `build_joins`, so a `merge` that brings an association join onto a table the
+   * outer relation already joins is aliased. trails builds each cross-klass
+   * merged dependency with its own tracker at merge time (seeded only with its
+   * own base), so the duplicate join is never detected as a collision. This
+   * walks the dependency parent→child (so a parent's alias is settled before its
+   * children rebind onto it) and applies `aliased_table_for` semantics via
+   * `aliasNameForTable`, mirroring Rails' lazy per-node aliasing in
+   * `make_constraints`.
+   */
+  realiasAgainstSharedTracker(tracker: AliasTracker): void {
+    this._aliasTracker = tracker;
+    const visit = (parent: JoinPart): void => {
+      for (const child of parent.children) {
+        if (child instanceof JoinAssociation) {
+          const parentTableName = (parent.baseKlass as any)?.tableName ?? (parent as any).table;
+          const alias = tracker.aliasNameForTable(child.tableName, () =>
+            child.reflection.aliasCandidate(parentTableName),
+          );
+          this._rebindChildAlias(child, alias ?? child.tableName);
+        }
+        visit(child);
+      }
+    };
+    visit(this._joinRoot);
     this._aliasesCache = undefined;
   }
 

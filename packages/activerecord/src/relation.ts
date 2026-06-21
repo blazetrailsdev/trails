@@ -34,6 +34,10 @@ import {
   _cacheSingularTarget,
 } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
+import {
+  buildMergedJoinAliasTracker,
+  seedTrackerFromJdNodes,
+} from "./relation/merged-join-alias-tracker.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import {
   underscore as _toUnderscore,
@@ -3269,6 +3273,12 @@ export class Relation<T extends Base> {
     // needing AliasTracker self-join aliasing). Emitted as InnerJoin so they
     // produce the canonical `*_<owner>_join` aliases (mirrors Rails joins_values
     // → named_join with InnerJoin type).
+    // One AliasTracker shared with the cross-klass merged dependencies, mirroring
+    // Rails' single `build_joins` alias_tracker. The same-relation join buckets
+    // (named inner joins, left-outer joins, raw join clauses) seed it with the
+    // tables they emit; a merged dependency joining a table already claimed here
+    // is then re-aliased to its `alias_candidate` (`authors_categorizations`).
+    const sharedTracker = buildMergedJoinAliasTracker(this as any);
     if (this._namedInnerJoins.length > 0) {
       const jd = QueryMethodBangs.constructJoinDependency.call(
         this as any,
@@ -3284,18 +3294,25 @@ export class Relation<T extends Base> {
       const stashedLeft = leftOuterJd ? [leftOuterJd] : [];
       for (const node of jd.joinConstraints(stashedLeft, undefined, this._aliasableReferences()))
         manager.appendJoinNode(node);
+      seedTrackerFromJdNodes(sharedTracker, jd);
+      if (leftOuterJd) seedTrackerFromJdNodes(sharedTracker, leftOuterJd);
     } else if (leftOuterJd) {
       for (const node of leftOuterJd.joinConstraints([], undefined, this._aliasableReferences()))
         manager.appendJoinNode(node);
+      seedTrackerFromJdNodes(sharedTracker, leftOuterJd);
     }
-    // Cross-klass merged JoinDependencies (Rails merge_joins): already built
-    // against the source relation's klass, so emit their constraints directly.
+    // Cross-klass merged JoinDependencies (Rails merge_joins): built against the
+    // source relation's klass with their own tracker, so re-alias their joins
+    // against the shared tracker before emitting (a join onto an already-joined
+    // table becomes `authors_categorizations`).
     for (const jd of this._namedInnerJoinDeps) {
+      jd.realiasAgainstSharedTracker(sharedTracker);
       for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
     }
     // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
     // already built against the source relation's klass with OuterJoin type.
     for (const jd of this._leftOuterJoinDeps) {
+      jd.realiasAgainstSharedTracker(sharedTracker);
       for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
     }
     for (const node of joinNodes) manager.appendJoinNode(node);
