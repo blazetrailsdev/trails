@@ -344,7 +344,7 @@ describe("NameWithAnonymousClassTest", () => {
 describe("ModelName deeply-nested namespace", () => {
   it("multi-segment namespace array produces full prefix on derived fields", () => {
     const name = new ModelName("Post", { namespace: ["Admin", "Blog"] });
-    expect(name.name).toBe("Post");
+    expect(name.name).toBe("Admin::Blog::Post");
     expect(Array.from(name.namespace ?? [])).toEqual(["Admin", "Blog"]);
     expect(name.singular).toBe("admin_blog_post");
     expect(name.plural).toBe("admin_blog_posts");
@@ -529,12 +529,13 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     expect(adminPost.compare(blogPost)).toBe(-1);
     expect(blogPost.compare(blogPost2)).toBe(0);
 
-    // String coercion still yields just the bare name (user-enforced:
-    // no Ruby "::" in TS output). Callers that need namespace-aware
-    // identity use `.equals` / `.namespace`.
-    expect(String(blogPost)).toBe("Post");
-    expect(String(adminPost)).toBe("Post");
-    expect(blogPost.equals("Post")).toBe(true);
+    // String coercion yields the full qualified constant path, matching
+    // Rails' `@name` (`"Blog::Post"`). A bare-name string is therefore not
+    // equal to a namespaced model.
+    expect(String(blogPost)).toBe("Blog::Post");
+    expect(String(adminPost)).toBe("Admin::Post");
+    expect(blogPost.equals("Post")).toBe(false);
+    expect(blogPost.equals("Blog::Post")).toBe(true);
   });
 
   it("compare sorts by full qualified path, not bare name first", () => {

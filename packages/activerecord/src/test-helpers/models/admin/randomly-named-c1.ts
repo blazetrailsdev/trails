@@ -3,8 +3,12 @@ import { Base } from "../../../base.js";
 
 export class AdminClassNameThatDoesNotFollowCONVENTIONS1 extends Base {
   static _tableName = "randomly_named_table2";
+  static moduleName = "Admin";
+  static _demodulizedName = "ClassNameThatDoesNotFollowCONVENTIONS1";
 }
 
 export class AdminClassNameThatDoesNotFollowCONVENTIONS2 extends Base {
   static _tableName = "randomly_named_table3";
+  static moduleName = "Admin";
+  static _demodulizedName = "ClassNameThatDoesNotFollowCONVENTIONS2";
 }
