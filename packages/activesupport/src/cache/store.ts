@@ -418,7 +418,9 @@ export abstract class Store {
 
     const expiresAt = call.expiresAt as number | undefined;
     if (expiresAt != null) {
-      call.expiresIn = expiresAt - Date.now();
+      // expiresAt is epoch-ms; expiresIn is in seconds (mirrors Rails' Time
+      // arithmetic, where `expires_at - Time.now` yields seconds).
+      call.expiresIn = (expiresAt - Date.now()) / 1000;
       delete call.expiresAt;
     }
 
@@ -493,13 +495,26 @@ export abstract class Store {
     return options?.version != null ? String(options.version) : undefined;
   }
 
+  /**
+   * Mirrors Rails `Cache::Store#handle_expired_entry` (cache.rb). When a
+   * positive `race_condition_ttl` is set, a stale entry is bumped back into the
+   * cache for a brief window (so concurrent readers get the stale value) while
+   * the caller recalculates; otherwise the expired entry is deleted. Rails
+   * `race_condition_ttl` is in seconds, our `expiresAt` is in epoch-ms.
+   */
   protected handleExpiredEntry(
     entry: Entry | null,
     key: string,
     options: StoreOptions,
   ): Entry | null {
     if (entry && entry.isExpired()) {
-      this.deleteEntry(key, options);
+      const raceTtl = typeof options.raceConditionTtl === "number" ? options.raceConditionTtl : 0;
+      if (raceTtl > 0 && Date.now() - (entry.expiresAt ?? 0) <= raceTtl * 1000) {
+        entry.expiresAt = Date.now() + raceTtl * 1000;
+        this.writeEntry(key, entry, { ...options, expiresIn: raceTtl * 2 });
+      } else {
+        this.deleteEntry(key, options);
+      }
       return null;
     }
     return entry;

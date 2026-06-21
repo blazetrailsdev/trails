@@ -1,7 +1,7 @@
 export { DeserializationError } from "./deserialization-error.js";
 
 export interface CacheOptions {
-  expiresIn?: number; // milliseconds TTL (relative)
+  expiresIn?: number; // seconds TTL (relative; mirrors Rails second-unit Entry)
   expiresAt?: number; // epoch-ms absolute expiry; converted to expiresIn by mergedOptions
   expire_in?: number; // alias for expiresIn (mirrors Rails OPTION_ALIASES)
   expired_in?: number; // alias for expiresIn (mirrors Rails OPTION_ALIASES)
@@ -9,7 +9,7 @@ export interface CacheOptions {
   compress?: boolean;
   compressThreshold?: number;
   unlessExist?: boolean;
-  raceConditionTtl?: number; // milliseconds
+  raceConditionTtl?: number; // seconds
   [key: string]: unknown; // open hash (Rails); flows into the Store base's StoreOptions
 }
 

@@ -10,7 +10,7 @@ describe("MemoryStoreTest", () => {
   let store: MemoryStore;
 
   beforeEach(() => {
-    store = new MemoryStore({ expiresIn: 60_000 });
+    store = new MemoryStore({ expiresIn: 60 });
   });
 
   it("read and write", () => {
@@ -97,7 +97,7 @@ describe("MemoryStoreTest", () => {
   });
 
   it("expiry: entry not readable after expiresIn", async () => {
-    store.write("tmp", "value", { expiresIn: 10 });
+    store.write("tmp", "value", { expiresIn: 0.01 });
     await new Promise((r) => setTimeout(r, 20));
     expect(store.read("tmp")).toBeNull();
   });
@@ -138,15 +138,15 @@ describe("MemoryStoreTest", () => {
   });
 
   it("namespaced write with unlessExist", () => {
-    const ns = new MemoryStore({ namespace: "foo", expiresIn: 60_000 });
+    const ns = new MemoryStore({ namespace: "foo", expiresIn: 60 });
     expect(ns.write("1", "aaaaaaaaaa")).toBe(true);
     expect(ns.write("1", "aaaaaaaaaa", { unlessExist: true })).toBe(false);
   });
 
   it("write expired value with unlessExist allows overwrite", async () => {
-    store.write("1", "aaaa", { expiresIn: 10 });
+    store.write("1", "aaaa", { expiresIn: 0.01 });
     await new Promise((r) => setTimeout(r, 20));
-    expect(store.write("1", "bbbb", { expiresIn: 100, unlessExist: true })).toBe(true);
+    expect(store.write("1", "bbbb", { expiresIn: 0.1, unlessExist: true })).toBe(true);
   });
 
   it("cache is not mutated on read", () => {
