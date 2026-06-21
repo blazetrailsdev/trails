@@ -478,6 +478,68 @@ describe("PersistenceTest", () => {
     expect(sql).toMatch(/WHERE .*clothing_type/);
     expect(sql).toMatch(/WHERE .*color/);
   });
+
+  it("save uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    clothingItem.description = "Lovely green t-shirt";
+    const sqls = await captureSql(async () => {
+      await clothingItem.save();
+    });
+    const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("reload uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    const sqls = await captureSql(async () => {
+      await clothingItem.reload();
+    });
+    const sql = sqls.find((s) => /^SELECT/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("update attribute uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    const sqls = await captureSql(async () => {
+      await clothingItem.updateAttribute("description", "Lovely green t-shirt");
+    });
+    const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("it is possible to update parts of the query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    clothingItem.color = "blue";
+    clothingItem.description = "Now it's a blue t-shirt";
+    const sqls = await captureSql(async () => {
+      await clothingItem.save();
+    });
+    const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+
+    const found = await ClothingItem.findBy({ id: clothingItem.id });
+    expect((found as any).color).toBe("blue");
+  });
 });
 
 // ==========================================================================
@@ -962,19 +1024,6 @@ describe("PersistenceTest", () => {
     expect(d.isPersisted()).toBe(true);
     expect(d.id).not.toBe(p.id);
   });
-
-  it("save uses query constraints config", async () => {
-    const p = await Post.create({ title: "save-qc" });
-    p.title = "saved-qc";
-    await p.save();
-    expect(p.title).toBe("saved-qc");
-  });
-
-  it("reload uses query constraints config", async () => {
-    const p = await Post.create({ title: "reload-qc" });
-    await p.reload();
-    expect(p.title).toBe("reload-qc");
-  });
 });
 
 // ==========================================================================
@@ -1125,15 +1174,6 @@ describe("PersistenceTest", () => {
     expect(true).toBe(true);
   });
   it("reset column information resets children", () => {
-    expect(true).toBe(true);
-  });
-  it("reload uses query constraints config", () => {
-    expect(true).toBe(true);
-  });
-  it("update attribute uses query constraints config", () => {
-    expect(true).toBe(true);
-  });
-  it("it is possible to update parts of the query constraints config", () => {
     expect(true).toBe(true);
   });
 });
