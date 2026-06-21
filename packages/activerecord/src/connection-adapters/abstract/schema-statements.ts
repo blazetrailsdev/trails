@@ -1441,15 +1441,9 @@ export class SchemaStatements {
     }
 
     if (!result.name) {
-      const unqualifiedFrom = (fromTable.split(".").at(-1) ?? fromTable).replace(/\./g, "_");
-      const cols = Array.isArray(result.column) ? result.column : [result.column];
-      const fullName = `fk_rails_${unqualifiedFrom}_${(cols as string[]).join("_")}`;
-      if (fullName.length > this.maxIndexNameSize()) {
-        const hex = getCrypto().createHash("sha256").update(fullName).digest("hex").slice(0, 10);
-        result.name = `fk_rails_${hex}`;
-      } else {
-        result.name = fullName;
-      }
+      result.name = this.foreignKeyName(fromTable, {
+        column: result.column as string | string[],
+      });
     }
 
     return result;

@@ -686,7 +686,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         const lines: string[] = [];
         await adapter.createSchemaDumper(adapter).foreignKeys("wagons", lines);
         const output = lines.join("\n");
-        // FK name "fk_rails_wagons_train_id" is not a 10-hex pattern so it's exported;
+        // Default FK name is the Rails fk_rails_<10-hex> hash, which matches the
+        // schema-dumper ignore pattern, so the name is omitted from the dump;
         // match just the table arguments, allowing optional trailing options.
         expect(output).toMatch(/addForeignKey\("wagons", "my_schema\.trains"/);
       } finally {
