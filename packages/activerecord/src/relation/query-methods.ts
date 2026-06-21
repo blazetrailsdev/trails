@@ -2697,7 +2697,14 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     // duplicate join onto the same table to its alias_candidate (Rails
     // build_joins:1896). The where-hash keys resolve to the same aliased name
     // (`joinTableAliasFor`), so the WHERE and JOIN stay in sync.
-    for (const node of jd.joinConstraints([], aliases, (this as any)._aliasableReferences()))
+    //
+    // Do NOT thread `aliases` into the JD's own joinConstraints (mirror
+    // _applyJoinsToManager, which passes `undefined`): the JD aliases against its
+    // own per-dep tracker, then `seedTrackerFromJdNodes` is the sole claim of its
+    // tables into the shared tracker. Passing the shared tracker here too would
+    // double-count an aliased table — `_applyReferencedAlias` would bump it once,
+    // and the seed would bump the same effective alias again.
+    for (const node of jd.joinConstraints([], undefined, (this as any)._aliasableReferences()))
       arel.source.right.push(node);
     seedTrackerFromJdNodes(sharedTracker, jd);
   }
