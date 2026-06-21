@@ -328,7 +328,6 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     opts: {
       allowDestroy?: boolean;
       rejectIf?: (attrs: Record<string, unknown>) => boolean;
-      updateOnly?: boolean;
     } = {},
   ) {
     registerModel(CanonicalPirate);
