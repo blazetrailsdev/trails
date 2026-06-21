@@ -200,7 +200,7 @@ describe("PersistenceTest", () => {
   it("becomes", async () => {
     const t = topics("first");
     expect(t.becomes(Reply)).toBeInstanceOf(Reply);
-    expect(t.becomes(Reply).title).toBe(t.title);
+    expect(t.becomes(Reply).title).toBe("The First Topic");
   });
 
   it("class level update without ids", async () => {
