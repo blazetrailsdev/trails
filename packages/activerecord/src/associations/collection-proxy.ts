@@ -2226,13 +2226,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this._removeFromTarget(removed);
       return removed;
     }
-    // Rails `delete(*records)` flattens its arguments, so `delete([a, b])` and
-    // `delete(a, b)` behave identically. Mirror that before coercing/finding.
-    const flatRecords = records.flat();
-    // Coerce id args via the scoped `find` (Rails delete_or_destroy).
-    const modelRecords = flatRecords.every((r) => typeof r === "object")
-      ? (flatRecords as T[])
-      : ([await this.find(...(flatRecords as unknown[]))].flat().filter(Boolean) as T[]);
+    // Mirror Rails CollectionAssociation#delete → delete_or_destroy
+    // (collection_association.rb): coerce Integer/String args via the scoped
+    // `find` *first*, then flatten. Rails only treats a bare Integer/String
+    // top-level arg as an id (`records.any? { |r| r.is_a?(Integer) || r.is_a?(String) }`),
+    // never one nested in an array — so an id passed as an array (`delete([1, 2])`)
+    // skips `find` and is left to the type check, exactly as Rails does. Flattening
+    // only after `find` makes `delete([a, b])` and `delete(a, b)` behave identically
+    // for the model-object form the proxy callers use; `flat(Infinity)` matches
+    // Ruby's deep `Array#flatten`.
+    const coerced = records.some((r) => typeof r !== "object")
+      ? ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[])
+      : records;
+    const modelRecords = (coerced as unknown[]).flat(Infinity) as T[];
 
     // Persisted children are nullified via update_all (Rails delete_records
     // else-branch), bypassing validations/callbacks. New-record children have
