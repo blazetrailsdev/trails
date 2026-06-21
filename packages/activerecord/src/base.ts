@@ -457,8 +457,12 @@ async function performClassUpdate(
 
   if (Array.isArray(idOrAttrs)) {
     if (idOrAttrs.some((i) => i instanceof Base)) {
+      // Rails raises the *array*-specific message here (distinct from the
+      // single-instance message below), pointing at `pluck(:id)`/`map(&:id)`.
       throw argumentError(
-        "You are passing an instance of ActiveRecord::Base to `update`. Please pass the id of the object by calling `.id`.",
+        `You are passing an array of ActiveRecord::Base instances to \`${
+          bang ? "update!" : "update"
+        }\`. Please pass the ids of the objects by calling \`pluck(:id)\` or \`map(&:id)\`.`,
       );
     }
     // Mirror destroy's CPK detection: on a composite-PK model, a flat
@@ -502,7 +506,11 @@ async function performClassUpdate(
     // hash to the same slot.
     const stableIdKey = (id: unknown): string =>
       Array.isArray(id) ? id.map((part) => String(part)).join("\x1f") : String(id);
-    const found = (await this.find(idOrAttrs as unknown[])) as
+    // Rails finds per-id, so a duplicated id (e.g. update([1, 1, 2], …)) just
+    // re-finds the same record. Our batched `find` rejects duplicate ids, so
+    // dedup first; the byKey reorder below restores the requested duplicates.
+    const uniqueIds = [...new Map(idOrAttrs.map((id) => [stableIdKey(id), id])).values()];
+    const found = (await this.find(uniqueIds)) as
       | InstanceType<typeof Base>
       | InstanceType<typeof Base>[];
     const foundArr = Array.isArray(found) ? found : [found];
@@ -525,7 +533,9 @@ async function performClassUpdate(
 
   if (idOrAttrs instanceof Base) {
     throw argumentError(
-      "You are passing an instance of ActiveRecord::Base to `update`. Please pass the id of the object by calling `.id`.",
+      `You are passing an instance of ActiveRecord::Base to \`${
+        bang ? "update!" : "update"
+      }\`. Please pass the id of the object by calling \`.id\`.`,
     );
   }
 

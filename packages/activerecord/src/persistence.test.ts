@@ -54,7 +54,7 @@ import { Parrot } from "./test-helpers/models/parrot.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
-import { Company, LargeClient } from "./test-helpers/models/company.js";
+import { Company, LargeClient, Client } from "./test-helpers/models/company.js";
 import { AutoId } from "./test-helpers/models/auto-id.js";
 
 for (const klass of [
@@ -74,6 +74,7 @@ for (const klass of [
   Minivan,
   Company,
   LargeClient,
+  Client,
   AutoId,
 ]) {
   registerModel(klass);
@@ -610,152 +611,106 @@ describe("PersistenceTest", () => {
 // PersistenceTest (continued) — more persistence_test.rb coverage
 // ==========================================================================
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      items: { label: "string" },
-      posts: { title: "string", body: "string" },
-      cm_items: { title: "string" },
-    });
+  const Topic = CanonicalTopic;
+  const { topics } = useHandlerFixtures(["topics", "companies"], {
+    schema: canonicalSchema,
   });
 
   it("build", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = Post.new({ title: "built" });
-    expect((post as any).title).toBe("built");
-    expect((post as any).isNewRecord()).toBe(true);
+    const topic = Topic.build({ title: "New Topic" });
+    expect(topic.title).toBe("New Topic");
+    expect(topic.isPersisted()).toBe(false);
   });
 
   it("build many", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const posts = [{ title: "a" }, { title: "b" }].map((attrs) => Post.new(attrs));
-    expect(posts.length).toBe(2);
-    expect(posts.every((p) => (p as any).isNewRecord())).toBe(true);
+    const built = Topic.build([{ title: "first" }, { title: "second" }]);
+    expect(built.map((t) => t.title)).toEqual(["first", "second"]);
+    built.forEach((t) => expect(t.isPersisted()).toBe(false));
   });
 
   it("save null string attributes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: null })) as any;
-    expect(post.id).toBeDefined();
+    const topic = await Topic.find(1);
+    topic.assignAttributes({ title: "null", author_name: "null" });
+    await topic.saveBang();
+    await topic.reload();
+    expect(topic.title).toBe("null");
+    expect(topic.author_name).toBe("null");
   });
 
   it("save nil string attributes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: undefined })) as any;
-    expect(post.id).toBeDefined();
+    const topic = await Topic.find(1);
+    (topic as any).title = null;
+    await topic.saveBang();
+    await topic.reload();
+    expect(topic.title).toBeNull();
   });
 
   it("create many", async () => {
-    class CmItem extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const items = [
-      await CmItem.create({ title: "a" }),
-      await CmItem.create({ title: "b" }),
-      await CmItem.create({ title: "c" }),
-    ];
-    expect(items.length).toBe(3);
-    expect(items.every((p: Base) => p.id)).toBe(true);
+    const created = await Topic.create([{ title: "first" }, { title: "second" }]);
+    expect(created).toHaveLength(2);
+    expect(created[0].title).toBe("first");
   });
 
   it("delete many", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p1 = (await Post.create({ title: "a" })) as any;
-    const p2 = (await Post.create({ title: "b" })) as any;
-    await Post.delete(p1.id);
-    await Post.delete(p2.id);
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
+    const originalCount = (await Topic.count()) as number;
+    await Topic.delete([1, 2]);
+    expect(await Topic.count()).toBe(originalCount - 2);
   });
 
   it("update many with duplicated ids", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = (await Post.create({ title: "original" })) as any;
-    await Post.update(p.id, { title: "updated" });
-    const found = (await Post.find(p.id)) as any;
-    expect(found.title).toBe("updated");
+    const updated = await Topic.update(
+      [1, 1, 2],
+      [{ title: "1 duplicated" }, { title: "1 updated" }, { title: "2 updated" }],
+    );
+    expect(updated.map((t) => t.id)).toEqual([1, 1, 2]);
+    expect((await Topic.find(1)).title).toBe("1 updated");
+    expect((await Topic.find(2)).title).toBe("2 updated");
   });
 
   it("update many with invalid id", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await expect(Post.find(99999)).rejects.toThrow();
+    await expect(
+      Topic.update([1, 2, 99999], [{ title: "1 updated" }, { title: "2 updated" }, {}]),
+    ).rejects.toThrow(RecordNotFound);
+    expect((await Topic.find(1)).title).not.toBe("1 updated");
+    expect((await Topic.find(2)).title).not.toBe("2 updated");
   });
 
   it("update many with active record base object", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = (await Post.create({ title: "original" })) as any;
-    await p.update({ title: "updated" });
-    expect(p.title).toBe("updated");
+    await expect((Topic as any).update(topics("first"), { title: "1 updated" })).rejects.toThrow(
+      "You are passing an instance of ActiveRecord::Base to `update`. " +
+        "Please pass the id of the object by calling `.id`.",
+    );
+    expect((await Topic.find(1)).title).not.toBe("1 updated");
   });
 
   it("update many with array of active record base objects", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p1 = (await Post.create({ title: "a" })) as any;
-    const p2 = (await Post.create({ title: "b" })) as any;
-    await p1.update({ title: "a2" });
-    await p2.update({ title: "b2" });
-    expect(p1.title).toBe("a2");
-    expect(p2.title).toBe("b2");
+    await expect(
+      (Topic as any).update([topics("first"), topics("second")], { title: "updated" }),
+    ).rejects.toThrow(
+      "You are passing an array of ActiveRecord::Base instances to `update`. " +
+        "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
+    );
+    expect((await Topic.find(1)).title).not.toBe("updated");
+    expect((await Topic.find(2)).title).not.toBe("updated");
   });
 
   it("becomes includes errors", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = Post.new({}) as any;
-    expect(p.errors).toBeDefined();
+    const company = new Company({ name: null });
+    expect(company.isValid()).toBe(false);
+    const originalErrors = company.errors;
+    const client = company.becomes(Client);
+    expect(client.errors.attributeNames).toEqual(originalErrors.attributeNames);
   });
 
   it("create columns not equal attributes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const p = (await Post.create({ title: "t" })) as any;
-    expect(p.id).toBeDefined();
+    const topic = Topic._instantiate({
+      title: "Another New Topic",
+      does_not_exist: "test",
+    });
+    const duped = topic.dup(); // reset @new_record
+    await duped.saveBang();
+    expect(duped.isPersisted()).toBe(true);
+    expect((await Topic.find(duped.id)).title).toBe("Another New Topic");
   });
 });
 
