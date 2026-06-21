@@ -14,7 +14,8 @@ function isTemporalDatetime(v: unknown): boolean {
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, RecordNotFound, RecordInvalid, registerModel } from "./index.js";
+import { throwAbort } from "@blazetrails/activesupport";
+import { Base, RecordNotFound, RecordInvalid, RecordNotSaved, registerModel } from "./index.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -207,6 +208,27 @@ describe("PersistenceTest", () => {
     const t = topics("first");
     expect(t.becomes(Reply)).toBeInstanceOf(Reply);
     expect(t.becomes(Reply).title).toBe("The First Topic");
+  });
+
+  it("update attribute for aborted callback!", async () => {
+    // Rails uses an anonymous `Class.new(Topic)` whose `self.name` is forced to
+    // "Topic" so the STI type column stays "Topic" and the reload resolves back
+    // to the base class. A `before_update { throw :abort }` halts the update, so
+    // `update_attribute!` must raise RecordNotSaved.
+    class Klass extends Topic {
+      static name = "Topic";
+      static {
+        this.beforeUpdate(() => throwAbort());
+      }
+    }
+    const t = await Klass.create({ title: "New Topic", authorName: "Not David" });
+
+    await expect((t as any).updateAttributeBang("title", "super_title")).rejects.toThrow(
+      RecordNotSaved,
+    );
+
+    const tReloaded = await Topic.find((t as any).id);
+    expect((tReloaded as any).title).toBe("New Topic");
   });
 
   it("class level update without ids", async () => {
