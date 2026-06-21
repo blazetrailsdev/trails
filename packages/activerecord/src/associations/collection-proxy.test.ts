@@ -453,14 +453,23 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
     const built = proxy.build({ title: "p", body: "p" });
     expect(built.isNewRecord()).toBe(true);
 
+    // Spy on the real DB boundary: `CollectionProxy#transaction` delegates to
+    // `reflection.klass.transaction` (collection_association.rb:395 wraps
+    // remove_records in `transaction { ... }` where `transaction` is the
+    // reflection class method), so `Post.transaction` is what `deleteOrDestroy`
+    // opens when persisted records exist. Restored in `finally` because it is
+    // shared static state on the canonical model.
     let opened = false;
-    const realTransaction = proxy.transaction.bind(proxy);
-    proxy.transaction = (fn: any) => {
+    const realTransaction = (Post as any).transaction.bind(Post);
+    (Post as any).transaction = (fn: any, options: any) => {
       opened = true;
-      return realTransaction(fn);
+      return realTransaction(fn, options);
     };
-
-    await proxy.delete(built);
+    try {
+      await proxy.delete(built);
+    } finally {
+      (Post as any).transaction = realTransaction;
+    }
 
     // Rails delete_or_destroy only wraps remove_records when persisted records
     // exist; a new-record-only delete runs outside any transaction.
