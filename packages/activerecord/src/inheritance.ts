@@ -172,12 +172,36 @@ export function setBaseClass(modelClass: typeof Base): void {
 }
 
 /**
+ * The fully-qualified Rails constant name for `modelClass`. JS class names
+ * carry no module path, so a namespaced model declares its `::`-joined Ruby
+ * module path via `static moduleName` (`"ClothingItem"`, `"Admin"`). Because
+ * trails flattens namespaced classes to collision-free JS names (Rails'
+ * `Admin::User` is `class AdminUser`, since a bare `User` already exists), the
+ * bare component is the model's `_demodulizedName` (`"User"`) when present,
+ * falling back to the JS `name`. Rails' `self.name` for such a model is
+ * `"ClothingItem::Used"` — the value STI/polymorphic `type` columns store.
+ */
+export function qualifiedName(modelClass: typeof Base): string {
+  const klass = modelClass as typeof Base & { moduleName?: string; _demodulizedName?: string };
+  if (!klass.moduleName) return modelClass.name;
+  return `${klass.moduleName}::${klass._demodulizedName ?? modelClass.name}`;
+}
+
+/**
+ * The namespace segments for `modelClass` — `moduleName.split("::")` or `[]`.
+ */
+export function namespaceSegments(modelClass: typeof Base): string[] {
+  const moduleName = (modelClass as typeof Base & { moduleName?: string }).moduleName;
+  return moduleName ? moduleName.split("::") : [];
+}
+
+/**
  * Return the STI name for this class (used as the type column value).
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_name
  */
 export function stiName(modelClass: typeof Base): string {
-  return modelClass.name;
+  return qualifiedName(modelClass);
 }
 
 /**
@@ -186,7 +210,7 @@ export function stiName(modelClass: typeof Base): string {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name
  */
 export function polymorphicName(modelClass: typeof Base): string {
-  return baseClass.call(modelClass).name;
+  return qualifiedName(baseClass.call(modelClass));
 }
 
 /**
@@ -824,11 +848,12 @@ function castStiValueFromAttrs(
  * receiver as-is".
  *
  * A subtree class matches when either its `stiName` equals `typeName` (the
- * common case), or the global registry maps `typeName` to that exact in-subtree
- * class. The second arm resolves Ruby-qualified STI names like
- * `"ClothingItem::Used"` (whose `stiName` is the unqualified `"ClothingItemUsed"`)
- * registered via `registerModel`, without ambiguity: a registry entry pointing
- * at a class in *another* tree is never `=== klass` here, so it is ignored.
+ * common case — now including Ruby-qualified names like `"ClothingItem::Used"`,
+ * which `stiName` derives from the model's `moduleName`), or the global registry
+ * maps `typeName` to that exact in-subtree class. The second arm survives for
+ * namespaced models still registered by Ruby name via `registerModel` (e.g.
+ * `company_in_module`), without ambiguity: a registry entry pointing at a class
+ * in *another* tree is never `=== klass` here, so it is ignored.
  *
  * @internal
  */

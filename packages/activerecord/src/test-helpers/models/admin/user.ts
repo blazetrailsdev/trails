@@ -19,6 +19,8 @@ class Coder {
 
 export class AdminUser extends Base {
   static _tableName = "admin_users";
+  static moduleName = "Admin";
+  static _demodulizedName = "User";
 
   static {
     this.belongsTo("account", { className: "AdminAccount" });

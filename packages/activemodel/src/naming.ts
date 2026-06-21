@@ -168,7 +168,10 @@ export class ModelName {
       );
     }
 
-    this.name = name;
+    // Rails `@name = name || klass.name` keeps the fully-qualified constant
+    // path (`"Admin::User"`). JS class names carry no `::`, so reconstruct the
+    // qualified name from the namespace segments plus the bare name.
+    this.name = segments.length > 0 ? [...segments, name].join("::") : name;
     this.namespace = segments.length > 0 ? Object.freeze([...segments]) : null;
 
     const bareUnderscored = underscore(name);
@@ -316,14 +319,9 @@ export class ModelName {
   /**
    * Mirrors Rails `to_s` / `to_str` delegated to `@name`
    * (naming.rb:131-152). Rails' `@name` is the full constant path
-   * (`"Blog::Post"`). TS has no `::` constant syntax and we
-   * deliberately reject `::` at the input boundary (see constructor),
-   * so `toString` returns the bare identifier (`"Post"`). Two
-   * instances with the same bare name but different namespaces will
-   * coerce to the same string — callers that care about namespaced
-   * identity should use `.equals(other)` / `.compare(other)` (which
-   * compare the full name + namespace identity) or read `.namespace`
-   * directly.
+   * (`"Blog::Post"`). TS class names carry no `::`, so we reconstruct the
+   * qualified path from the namespace segments in the constructor; `toString`
+   * returns that full path (`"Blog::Post"`) to match Rails.
    */
   toString(): string {
     return this.name;
@@ -371,7 +369,9 @@ export class ModelName {
   }
 
   private static _qualified(mn: ModelName): string {
-    return [...(mn.namespace ?? []), mn.name].join("/");
+    // `name` is already the full `::`-qualified constant path, so it doubles as
+    // the single-string sort key Rails' `String#<=>` compares.
+    return mn.name;
   }
 
   /**

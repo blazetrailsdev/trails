@@ -19,6 +19,8 @@ class Coder {
 
 export class AdminUserJson extends Base {
   static _tableName = "admin_user_jsons";
+  static moduleName = "Admin";
+  static _demodulizedName = "UserJSON";
 
   static {
     this.belongsTo("account", { className: "AdminAccount" });

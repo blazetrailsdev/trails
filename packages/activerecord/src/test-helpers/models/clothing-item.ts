@@ -2,7 +2,6 @@
 import { Base } from "../../base.js";
 import { queryConstraints } from "../../persistence.js";
 import { registerSubclass } from "../../inheritance.js";
-import { registerModel } from "../../associations.js";
 
 export class ClothingItem extends Base {
   declare clothing_type: string;
@@ -16,9 +15,18 @@ export class ClothingItem extends Base {
   }
 }
 
-export class ClothingItemUsed extends ClothingItem {}
+// Rails nests these as `ClothingItem::Used` / `ClothingItem::Sized`, so the STI
+// `type` column stores the qualified constant path. `moduleName` carries the
+// Ruby module so `sti_name` resolves to `"ClothingItem::Used"`.
+export class ClothingItemUsed extends ClothingItem {
+  static moduleName = "ClothingItem";
+  static _demodulizedName = "Used";
+}
 
 export class ClothingItemSized extends ClothingItem {
+  static moduleName = "ClothingItem";
+  static _demodulizedName = "Sized";
+
   static {
     queryConstraints.call(this, "clothing_type", "color", "size");
   }
@@ -28,10 +36,3 @@ export class ClothingItemSized extends ClothingItem {
 for (const klass of [ClothingItemUsed, ClothingItemSized]) {
   registerSubclass(klass);
 }
-
-// Rails nests these as `ClothingItem::Used` / `ClothingItem::Sized`, so the STI
-// `type` column stores the qualified constant path. Register those Ruby names so
-// the row-path resolver's global fallback maps them to the TS classes (whose
-// `sti_name` is the unqualified JS class name).
-registerModel("ClothingItem::Used", ClothingItemUsed);
-registerModel("ClothingItem::Sized", ClothingItemSized);
