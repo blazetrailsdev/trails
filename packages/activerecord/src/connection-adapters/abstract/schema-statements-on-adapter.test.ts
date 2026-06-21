@@ -42,14 +42,16 @@ class StubAdapter extends AbstractAdapter {
  */
 class CapturingAdapter extends AbstractAdapter {
   lastSql = "";
+  lastParams: unknown[] = [];
   constructor(private readonly dialect: "sqlite" | "postgres" | "mysql") {
     super();
   }
   get adapterName() {
     return this.dialect as any;
   }
-  execute(sql: string) {
+  execute(sql: string, params?: unknown[]) {
     this.lastSql = sql;
+    this.lastParams = params ?? [];
     return Promise.resolve([] as Record<string, unknown>[]);
   }
   executeMutation(_sql: string) {
@@ -66,6 +68,34 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.lastSql).toContain("c.relkind IN ('r', 'p')");
     expect(stub.lastSql).not.toContain("pg_tables");
     expect(stub.lastSql).not.toContain("'public'");
+  });
+
+  it("columns() postgres fallback scopes table_schema to an explicit schema.table", async () => {
+    const stub = new CapturingAdapter("postgres");
+    await stub.columns("myschema.things");
+    expect(stub.lastSql).toContain("c.table_schema = $3");
+    expect(stub.lastSql).not.toContain("current_schemas(false)");
+    // bare name for table_name match ($1), qualified name for to_regclass ($2),
+    // schema bound as $3.
+    expect(stub.lastParams).toEqual(["things", "myschema.things", "myschema"]);
+  });
+
+  it("columns() postgres fallback falls back to current_schemas for an unqualified name", async () => {
+    const stub = new CapturingAdapter("postgres");
+    await stub.columns("things");
+    expect(stub.lastSql).toContain("c.table_schema = ANY (current_schemas(false))");
+    expect(stub.lastParams).toEqual(["things", "things"]);
+  });
+
+  it("columnExists() postgres fallback scopes table_schema to an explicit schema.table", async () => {
+    // columnExists delegates to columns(), so the schema.table qualification is
+    // resolved there: bare name ($1), qualified name for to_regclass ($2),
+    // schema bound as $3.
+    const stub = new CapturingAdapter("postgres");
+    await stub.columnExists("myschema.things", "name");
+    expect(stub.lastSql).toContain("c.table_schema = $3");
+    expect(stub.lastSql).not.toContain("current_schemas(false)");
+    expect(stub.lastParams).toEqual(["things", "myschema.things", "myschema"]);
   });
 
   it("tables() sqlite/mysql fallback arms are unchanged", async () => {

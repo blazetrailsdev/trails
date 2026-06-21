@@ -38,6 +38,7 @@ import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
+import { Utils as PgUtils } from "../postgresql/utils.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
@@ -531,7 +532,8 @@ export class SchemaStatements {
   async columnExists(tableName: string, columnName: string): Promise<boolean> {
     // Rails' column_exists? loads the table's columns and matches the name in
     // Ruby (schema_statements.rb), never interpolating the column name into SQL —
-    // so an arbitrary value (quotes/operators) simply matches nothing.
+    // so an arbitrary value (quotes/operators) simply matches nothing. The
+    // schema.table qualification is honored by columns() below.
     const cols = await this.columns(tableName);
     return cols.some((c) => c.name === columnName);
   }
@@ -951,6 +953,19 @@ export class SchemaStatements {
         });
       }
       case "postgres": {
+        // Mirror Rails quoted_scope: split a schema.table argument so
+        // table_schema is scoped to the explicit schema when given (else
+        // ANY (current_schemas(false))); table_name matches the bare name while
+        // to_regclass resolves the fully-qualified name for the PK lookup.
+        const pgName = PgUtils.extractSchemaQualifiedName(tableName);
+        const params: string[] = [pgName.identifier, pgName.toString()];
+        let schemaClause: string;
+        if (pgName.schema) {
+          params.push(pgName.schema);
+          schemaClause = `$${params.length}`;
+        } else {
+          schemaClause = "ANY (current_schemas(false))";
+        }
         const rows = await this.adapter.execute(
           `SELECT c.column_name, c.data_type, c.udt_name, c.character_maximum_length, c.numeric_precision, c.numeric_scale, c.is_nullable, c.column_default,
             CASE WHEN pk.attname IS NOT NULL THEN true ELSE false END AS is_primary_key
@@ -959,11 +974,11 @@ export class SchemaStatements {
             SELECT a.attname
             FROM pg_index i
             JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-            WHERE i.indrelid = to_regclass($1) AND i.indisprimary
+            WHERE i.indrelid = to_regclass($2) AND i.indisprimary
           ) pk ON pk.attname = c.column_name
-          WHERE c.table_schema = ANY (current_schemas(false)) AND c.table_name = $1
+          WHERE c.table_schema = ${schemaClause} AND c.table_name = $1
           ORDER BY c.ordinal_position`,
-          [tableName],
+          params,
         );
         return rows.map((row: any) => {
           let sqlType: string = row.data_type;
