@@ -11,23 +11,57 @@ import {
 
 describe("CallbacksTest", () => {
   it("after callbacks are not executed if the block returns false", () => {
-    const log: string[] = [];
-    class Person extends Model {
+    // Faithful port of Rails ModelCallbacks (callbacks_test.rb:6-87): an
+    // around_create returning false, an after_create returning false, and a
+    // final after_create, with `create` running run_callbacks(:create) whose
+    // block returns @valid. With valid: false the block returns false, and
+    // ActiveModel's after-model-callback `v != false` conditional skips both
+    // after_create callbacks — exercising the block-return mechanism the test
+    // name describes, not a throw :abort.
+    class CallbackValidator {
+      aroundCreate(model: any, proceed: () => void) {
+        model.callbacks.push("before_around_create");
+        proceed();
+        model.callbacks.push("after_around_create");
+        return false;
+      }
+    }
+    class ModelCallbacks extends Model {
+      callbacks: string[] = [];
+      valid: boolean;
       static {
-        this.attribute("name", "string");
-        this.beforeValidation((_r: any) => {
-          log.push("before");
-          throwAbort();
+        this.defineModelCallbacks("create");
+        this.beforeCreate((m: any) => {
+          m.callbacks.push("before_create");
         });
-        this.afterValidation((_r: any) => {
-          log.push("after");
+        this.aroundCreate(new CallbackValidator());
+        this.afterCreate((m: any) => {
+          m.callbacks.push("after_create");
+          return false;
+        });
+        this.afterCreate((m: any) => {
+          m.callbacks.push("final_callback");
+        });
+      }
+      constructor(options: { valid?: boolean } = {}) {
+        super();
+        this.valid = options.valid ?? true;
+      }
+      create() {
+        return this.runCallbacks("create", () => {
+          this.callbacks.push("create");
+          return this.valid;
         });
       }
     }
-    const p = new Person({ name: "Alice" });
-    p.isValid();
-    expect(log).toContain("before");
-    expect(log).not.toContain("after");
+    const model = new ModelCallbacks({ valid: false });
+    model.create();
+    expect(model.callbacks).toEqual([
+      "before_create",
+      "before_around_create",
+      "create",
+      "after_around_create",
+    ]);
   });
 
   it("only selects which types of callbacks should be created from an array list", () => {

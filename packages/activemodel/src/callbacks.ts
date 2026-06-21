@@ -236,6 +236,46 @@ const VALID_ON_VALUES = new Set(["create", "update", "destroy"]);
  *
  * @internal
  */
+/**
+ * Build the `:if` conditions for a registered callback, prepending ActiveModel's
+ * after-model-callback conditional (`v != false`) when applicable.
+ *
+ * Mirrors ActiveModel::Callbacks#_define_after_model_callback, which does
+ * `options[:if] = Array(options[:if]) + [Conditionals::Value.new { |v| v != false }]`
+ * for every after callback defined via define_model_callbacks. Events that Rails
+ * registers via a plain define_callbacks (no such conditional) are excluded:
+ *   - validation: ActiveModel::Validations::Callbacks (validations/callbacks.rb)
+ *     — after_validation runs even when validations fail.
+ *   - commit / rollback: ActiveRecord::Transactions (transactions.rb:11,
+ *     `define_callbacks :commit, :rollback, ...`) — after_commit/after_rollback
+ *     get no value conditional.
+ *
+ * Returns a fresh array (never mutates the caller's `if` array).
+ *
+ * @internal
+ */
+const PLAIN_DEFINE_CALLBACKS_EVENTS = new Set(["validation", "commit", "rollback"]);
+
+function _buildAfterModelIfConditions(
+  timing: CallbackTiming,
+  event: string,
+  userIf: CallbackConditions["if"] | undefined,
+):
+  | ((target: object, value?: unknown) => boolean)
+  | Array<(target: object, value?: unknown) => boolean>
+  | undefined {
+  const userIfs = (
+    userIf === undefined ? [] : Array.isArray(userIf) ? [...userIf] : [userIf]
+  ) as Array<(target: object, value?: unknown) => boolean>;
+  if (timing !== "after" || PLAIN_DEFINE_CALLBACKS_EVENTS.has(event)) {
+    return userIf as
+      | ((target: object, value?: unknown) => boolean)
+      | Array<(target: object, value?: unknown) => boolean>
+      | undefined;
+  }
+  return [...userIfs, (_target: object, value?: unknown) => value !== false];
+}
+
 export function _registerCallbackOnProto(
   proto: object,
   timing: CallbackTiming,
@@ -270,12 +310,21 @@ export function _registerCallbackOnProto(
   const resolved: AnyCallback = isObj
     ? _resolveCallbackObject(fn as unknown as ASCallbackObject, timing, event)
     : (fn as AnyCallback);
+  // Mirrors ActiveModel::Callbacks#_define_after_model_callback: every after
+  // callback registered through define_model_callbacks gets an extra `:if`
+  // condition `v != false`, so a run_callbacks block returning false skips the
+  // after callbacks (callbacks_test.rb "after callbacks are not executed if the
+  // block returns false"). The `value` arg is env.value, threaded by the engine.
+  // ActiveModel::Validations::Callbacks defines before/after_validation via a
+  // plain define_callbacks (validations/callbacks.rb) WITHOUT this conditional,
+  // so after_validation must keep running even when validations fail — exclude it.
+  const ifConditions = _buildAfterModelIfConditions(timing, event, conditions?.if);
   const entry = new Callback(
     event,
     resolved,
     timing,
     {
-      if: conditions?.if as ((t: object) => boolean) | undefined,
+      if: ifConditions,
       unless: conditions?.unless as ((t: object) => boolean) | undefined,
     },
     chain.config,

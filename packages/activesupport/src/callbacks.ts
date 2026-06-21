@@ -28,7 +28,11 @@ export function isAbortSignal(e: unknown): boolean {
   return e === ABORT;
 }
 
-export type CallbackCondition<T extends object = object> = (target: T) => boolean;
+// Mirrors Rails conditions, which receive `(target, value)` — `value` is the
+// callback chain's `env.value` (the run_callbacks block's return). Most
+// conditions only look at `target`; ActiveModel's after-model-callback
+// conditional (`v != false`, define_model_callbacks) reads `value`.
+export type CallbackCondition<T extends object = object> = (target: T, value?: unknown) => boolean;
 
 export interface CallbackOptions<T extends object = object> {
   if?: CallbackCondition<T> | CallbackCondition<T>[];
@@ -147,14 +151,14 @@ export class Value {
     return this.block(value);
   }
 
-  static check(options: CallbackOptions, target: object): boolean {
+  static check(options: CallbackOptions, target: object, value?: unknown): boolean {
     if (options.if) {
       const conditions = Array.isArray(options.if) ? options.if : [options.if];
-      if (!conditions.every((cond) => cond(target))) return false;
+      if (!conditions.every((cond) => cond(target, value))) return false;
     }
     if (options.unless) {
       const conditions = Array.isArray(options.unless) ? options.unless : [options.unless];
-      if (conditions.some((cond) => cond(target))) return false;
+      if (conditions.some((cond) => cond(target, value))) return false;
     }
     return true;
   }
@@ -902,7 +906,7 @@ export class CallbackChain {
             // Rails scopes `catch(:abort)` to the default terminator). An async
             // before rejecting with the sentinel halts; real errors propagate.
             if (!isAbortSignal(e) || terminatorFn === false) throw e;
-            return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+            return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
           }
           for (const rem of remaining) {
             if (!Value.check(rem.options, target)) continue;
@@ -923,16 +927,16 @@ export class CallbackChain {
               }
             } catch (e) {
               if (!isAbortSignal(e) || terminatorFn === false) throw e;
-              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
             }
             try {
               if (isThenable(remVal)) await remVal;
             } catch (e) {
               if (!isAbortSignal(e) || terminatorFn === false) throw e;
-              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
             }
             if (remSyncHalt)
-              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
           }
           return this._runAroundAndAfter(
             arounds,
@@ -956,7 +960,7 @@ export class CallbackChain {
       }
     }
 
-    if (halted) return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+    if (halted) return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
     return this._runAroundAndAfter(arounds, afters, target, block, skipAfterIfTerminated, opts);
   }
 
@@ -966,11 +970,17 @@ export class CallbackChain {
     skipIfTerminated: boolean,
     target: object,
     opts?: RunCallbacksOptions,
+    // env.value (the run_callbacks block's return). After conditions read it —
+    // ActiveModel's after-model-callback conditional skips when value === false.
+    // Halted callers pass `false` (Rails sets env.value to false on halt); the
+    // normal path passes the block's actual return, which may legitimately be
+    // `undefined` (Rails nil — `nil != false` is true, so after callbacks run).
+    value?: unknown,
   ): boolean | Promise<boolean> {
     if (halted && skipIfTerminated) return false;
     for (let i = afters.length - 1; i >= 0; i--) {
       const entry = afters[i];
-      if (!Value.check(entry.options, target)) continue;
+      if (!Value.check(entry.options, target, value)) continue;
       const result = (entry.filter as AfterCallback).call(target, target);
       if (isThenable(result)) {
         if (opts?.strict === "sync") {
@@ -982,7 +992,7 @@ export class CallbackChain {
         return (async () => {
           await result;
           for (const rem of remaining) {
-            if (!Value.check(rem.options, target)) continue;
+            if (!Value.check(rem.options, target, value)) continue;
             await (rem.filter as AfterCallback).call(target, target);
           }
           return !halted;
@@ -1001,13 +1011,25 @@ export class CallbackChain {
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
     let blockExecuted = false;
+    // env.value — the block's return. Threaded into _runAfters so ActiveModel's
+    // after-model-callback conditional (`v != false`) can skip after callbacks
+    // when the block returned false, mirroring Rails callbacks.rb's
+    // `env.value = !env.halted && (!block_given? || yield)`.
+    let blockValue: unknown;
     const trackedBlock = (): void | Promise<void> => {
       // Track invocation, not successful completion: in Rails an around that
       // rescues an exception raised by yield still runs the outer invoke_after
       // (callbacks.rb#run_callbacks). Setting the flag here means a block
       // rejection caught by an around no longer looks like "around did not yield".
       blockExecuted = true;
-      return block?.() as void | Promise<void>;
+      const r = block?.();
+      if (isThenable(r)) {
+        return Promise.resolve(r).then((v) => {
+          blockValue = v;
+        });
+      }
+      blockValue = r;
+      return r as void | Promise<void>;
     };
 
     let chain: () => void | Promise<void> = trackedBlock;
@@ -1106,7 +1128,14 @@ export class CallbackChain {
       // Rails AS::Callbacks compiles arounds wrapping (befores + block + afters)
       // as a single continuation: a non-yielding around skips the afters too.
       if (!blockExecuted) return false;
-      const afterResult = this._runAfters(afters, false, skipAfterIfTerminated, target, opts);
+      const afterResult = this._runAfters(
+        afters,
+        false,
+        skipAfterIfTerminated,
+        target,
+        opts,
+        blockValue,
+      );
       if (isThenable(afterResult)) return Promise.resolve(afterResult).then(() => blockExecuted);
       return blockExecuted;
     };
