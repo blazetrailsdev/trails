@@ -1347,7 +1347,7 @@ export function dup<T extends DupRecord>(this: T): T {
   // the hook fires (this is what Topic#set_email_address keys off of).
   duped._dirty.snapshot(dupedAttrs);
   if (defaultAttributes) {
-    // Re-mark attributes that differ from their schema defaults as changed.
+    // Re-mark attributes that differ from their database column default as changed.
     duped._dirty.reinstateNewRecordChanges(dupedAttrs);
   }
   // Dispatch `after_initialize` against the duped attributes. Mirrors Rails
