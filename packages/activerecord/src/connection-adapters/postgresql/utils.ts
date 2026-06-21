@@ -46,14 +46,16 @@ export class Name {
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Utils {
   export function extractSchemaQualifiedName(name: string): Name {
+    // Mirrors Rails `schema, table = string.scan(...)`: destructure the first
+    // two scanned parts as schema, table and ignore any beyond the second.
     const parts = splitQuotedIdentifier(name);
-    if (parts.length === 0) {
-      return new Name(null, "");
+    let schema: string | null = parts[0] ?? null;
+    let table = parts[1] ?? null;
+    if (table == null) {
+      table = schema;
+      schema = null;
     }
-    if (parts.length === 2) {
-      return new Name(parts[0], parts[1]);
-    }
-    return new Name(null, parts[0]);
+    return new Name(schema, table ?? "");
   }
 }
 
