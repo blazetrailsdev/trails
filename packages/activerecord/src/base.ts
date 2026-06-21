@@ -103,6 +103,7 @@ import {
 } from "./association-cache.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import * as ConnectionHandling from "./connection-handling.js";
+import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import * as ModelSchema from "./model-schema.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import {
@@ -1234,6 +1235,9 @@ export class Base extends Model {
    * Accepts:
    * - A URL string: `Base.establishConnection("postgres://localhost/mydb")`
    * - A config object: `Base.establishConnection({ adapter: "postgresql", url: "..." })`
+   * - A `DatabaseConfig` instance: `Base.establishConnection(db_config)` (e.g.
+   *   the object captured by `removeConnection`), mirroring Rails'
+   *   `establish_connection(db_config)`.
    * - No arguments: loads from `config/database.json` for NODE_ENV, or DATABASE_URL
    *
    * Creates a ConnectionPool managed by the ConnectionHandler, mirroring how
@@ -1244,6 +1248,7 @@ export class Base extends Model {
   static async establishConnection(
     config?:
       | string
+      | DatabaseConfig
       | {
           adapter?: string;
           url?: string;

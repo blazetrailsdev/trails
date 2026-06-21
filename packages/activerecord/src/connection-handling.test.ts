@@ -812,3 +812,33 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
     expect(Post.connectionPool().activeConnection).toBeNull();
   });
 });
+
+describe("establish_connection accepts a DatabaseConfig", () => {
+  afterEach(() => {
+    Base.connectionHandler.clearAllConnectionsBang();
+  });
+
+  // Mirrors Rails `establish_connection(db_config)` (the faithful
+  // `run_without_connection` restore): the object captured by
+  // `remove_connection` can be handed straight back to `establish_connection`,
+  // and the pool stores that same object as its db_config.
+  it("re-establishes the connection from the captured DatabaseConfig object", async () => {
+    const config = new HashConfig("test", "primary", {
+      adapter: "sqlite3",
+      database: ":memory:",
+      pool: 5,
+      reapingFrequency: null,
+    });
+    Base.connectionHandler.establishConnection(config, { owner: "Base" });
+
+    const captured = Base.removeConnection()!;
+    expect(captured).toBeInstanceOf(HashConfig);
+
+    await Base.establishConnection(captured);
+
+    const restored = Base.connectionDbConfig();
+    expect(restored).toBe(captured);
+    expect(restored.adapter).toBe("sqlite3");
+    expect(restored.configurationHash.database).toBe(":memory:");
+  });
+});
