@@ -260,10 +260,16 @@ export async function _createRecord(this: any): Promise<boolean> {
     // correctly includes attrs the user set to a non-default value — e.g. an
     // hstore column with a DB default of "" that was assigned {key: null}.
     // Running this after the insert would leave the dirty set empty at column-
-    // selection time and wrongly drop such columns. PK is skipped: it's null
-    // pre-insert and tracked via _writeAttribute(pk, insertedId) in _performInsert.
+    // selection time and wrongly drop such columns. Only a *null* PK column is
+    // skipped: that's the auto-populated key, tracked via
+    // _writeAttribute(pk, insertedId) in _performInsert. A user-assigned
+    // (non-null) PK column — e.g. a composite key — must stay dirty so it's
+    // inserted; otherwise the row is written with a missing key and
+    // find/destroy by that key raises RecordNotFound.
     const _pk = ctor.primaryKey;
-    const _pkSet = new Set(Array.isArray(_pk) ? _pk : [_pk]);
+    const _pkSet = new Set(
+      (Array.isArray(_pk) ? _pk : [_pk]).filter((n) => this._readAttribute?.(n) == null),
+    );
     this._dirty.reinstateNewRecordChanges(
       this._attributes,
       ctor._defaultAttributes().snapshotValues(),
