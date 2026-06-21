@@ -767,7 +767,10 @@ function _canRouteThroughViaDisableJoinsAssociationScope(
 
 /**
  * Rails' `klass.scope_for_association` — returns the association-aware base
- * relation for the target model, merging any current scope.
+ * relation for the target model. Unlike `all()`, this deliberately drops the
+ * enclosing `current_scope`: when a current_scope is active it returns
+ * `default_scoped` off a fresh relation (named.rb:36-42), so only default
+ * scopes apply to association reads, never the caller's `.scoping` block.
  * `scopeForAssociation` is wired onto Base via `extend()` but its `this:
  * NamedHost` constraint doesn't fully overlap `typeof Base` statically, so
  * the call site needs a structural cast. Centralising it here avoids
@@ -1683,7 +1686,7 @@ export async function loadHasMany(
       for (let i = 0; i < foreignKey.length; i++) {
         conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
       }
-      rel = targetModel.all().where(conditions);
+      rel = _scopeForAssociation(targetModel).where(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
       const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
@@ -1696,10 +1699,12 @@ export async function loadHasMany(
       for (let i = 0; i < fkCols.length; i++) {
         conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
       }
-      rel = targetModel.all().where(conditions);
+      rel = _scopeForAssociation(targetModel).where(conditions);
     } else {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      rel = targetModel.all().where({ [foreignKey]: record._readAttribute(ownerKey as string) });
+      rel = _scopeForAssociation(targetModel).where({
+        [foreignKey]: record._readAttribute(ownerKey as string),
+      });
     }
     rel = applyAssociationScope(rel, options.scope, record);
   }

@@ -2682,6 +2682,27 @@ describe("AssociationsTest", () => {
     expect((agreement as any)?.signature).toBe("only");
   });
 
+  // The inline (no-reflection) fallback must build from
+  // `scope_for_association` (default scopes only), not the enclosing scoping
+  // block's class `current_scope`. Inside `CpkOrderAgreement.where("1=0")
+  // .scoping`, a `.all()`-based fallback would inherit `1=0` and return 0
+  // agreements; Rails (and the converged reflection path) keep current_scope
+  // off association reads, so both agreements still load.
+  it("has many loads via inline fallback ignoring enclosing current_scope", async () => {
+    const order = await CpkOrder.create({ shop_id: 1 });
+    const [, orderId] = order.id as [number, number];
+    await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
+    await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
+    await (CpkOrderAgreement as any).where("1=0").scoping(async () => {
+      const agreements = await loadHasMany(order, "freshAgreements", {
+        className: "CpkOrderAgreement",
+        foreignKey: "order_id",
+      });
+      expect(agreements).toHaveLength(2);
+      expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
+    });
+  });
+
   // Exercises loadHasMany's inline (no-reflection) fallback for a POLYMORPHIC
   // (`as`) association on a query_constraints owner. The owner key must resolve
   // to the owner's query_constraints list (`[blog_id, id]`, mirroring
