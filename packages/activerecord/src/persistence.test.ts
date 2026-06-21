@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 
 // All datetime columns now return Temporal.Instant across all adapters.
 function epochMs(v: unknown): number {
