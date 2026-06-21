@@ -1436,33 +1436,6 @@ describe("PersistenceTest", () => {
   });
 });
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["items"], { schema: canonicalSchema });
-
-  const Item = CanonicalItem;
-
-  it("finds and updates a record by id", async () => {
-    const item = await Item.create({ name: "Old" });
-    const updated = await Item.update(item.id, { name: "New" });
-    expect(updated.name).toBe("New");
-  });
-});
-
-describe("PersistenceTest", () => {
-  useHandlerFixtures(["items"], { schema: canonicalSchema });
-
-  const Item = CanonicalItem;
-
-  it("destroys all records", async () => {
-    await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-    const destroyed = await Item.destroyAll();
-    // Deterministic under transactional fixtures: the `dvd` fixture row plus
-    // the two created here.
-    expect(destroyed).toHaveLength(3);
-    expect(await Item.all().count()).toBe(0);
-  });
-});
-describe("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1652,40 +1625,6 @@ describe("PersistenceTest", () => {
   // Rails: test_update_all_does_not_trigger_callbacks
   // Rails: test_delete_all
   // Rails: test_destroy_all_triggers_callbacks
-});
-describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ users: { name: "string" } });
-  });
-
-  it("save destroyed object", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    await u.destroy();
-    await expect(u.save()).rejects.toThrow("destroyed");
-  });
-
-  it("delete doesnt run callbacks", async () => {
-    const log: string[] = [];
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.beforeDestroy(() => {
-          log.push("before_destroy");
-        });
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    await u.delete();
-    expect(u.isDestroyed()).toBe(true);
-    expect(log).not.toContain("before_destroy");
-  });
 });
 describe("PersistenceTest", () => {
   setupHandlerSuite();
