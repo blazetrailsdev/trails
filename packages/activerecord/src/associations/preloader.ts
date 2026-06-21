@@ -63,9 +63,16 @@ export class Preloader {
 
   isEmpty(): boolean {
     if (this.associations == null) return true;
-    // A Relation's length is unknown until it is materialized (in `call()`),
-    // so it is never treated as empty here. Rails materializes it inside
-    // `empty?`; we defer the query to `call()` but keep the same query count.
+    // Rails' `empty?` reads `records.length`, which materializes a Relation
+    // synchronously — so an *empty* relation returns `true` there. We can't
+    // run that query synchronously, so a not-yet-materialized Relation is
+    // always reported non-empty and the materializing query is deferred to
+    // `call()`. The observable query count is unchanged: Rails materializes in
+    // `empty?` then `Batch` rejects the now-empty preloader (1 query, no
+    // preload); we materialize in `call()` and the 0-record branch issues no
+    // preload (1 query). The deviation is only the boolean a caller would see
+    // from `isEmpty()` alone on an empty relation — no current caller gates on
+    // that without also calling `call()`.
     if (isRelation(this.records)) return false;
     return this.records.length === 0;
   }
