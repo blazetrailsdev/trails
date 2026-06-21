@@ -144,9 +144,19 @@ export class HasManyAssociation extends CollectionAssociation {
       // Rails: records.each(&:destroy!).
       for (const record of records) await (record as any).destroyBang();
       // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
-      // In trails the owner's counter is decremented through the child's belongs_to
-      // inverse on destroy (CounterCache#destroy_row), so updating here too would
-      // double-count — equivalent to the Rails inverse_updates_counter_cache? guard.
+      // The destroy callbacks decrement the owner's counter through the child's
+      // belongs_to inverse (CounterCache#destroy_row) only when that inverse points
+      // at THIS reflection's counter column; otherwise (e.g. a has_many `counter_cache:`
+      // distinct from the inverse's) decrement here so we don't silently skip it.
+      const ctor = this.owner.constructor as typeof Base & {
+        _reflectOnAssociation?: (
+          n: string,
+        ) => { inverseWhichUpdatesCounterCache?: () => unknown } | undefined;
+      };
+      const refl = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
+      if (!(refl as any).inverseWhichUpdatesCounterCache?.()) {
+        await updateCounter(this, -records.length);
+      }
       return records.length;
     }
     // delete_all / nullify (Rails delete_records else-branch). Reached only via the
