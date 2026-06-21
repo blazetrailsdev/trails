@@ -556,7 +556,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("has many callbacks for destroy on parent", async () => {
     const firm = await Firm.create({ name: "Firm" });
-    const client = await association(firm, "clients").create({ name: "Client" });
+    const client = await firm.clients.create({ name: "Client" });
     await firm.destroy();
 
     expect(firm.log).toEqual([`before_remove${client.id}`, `after_remove${client.id}`]);
