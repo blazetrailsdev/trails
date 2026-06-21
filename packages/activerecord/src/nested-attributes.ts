@@ -221,6 +221,11 @@ async function processNestedAttributes(record: Base): Promise<void> {
     // derives the owner from the association reflection's `active_record` (the
     // class that *declared* the association), not the runtime instance's class,
     // so a subclass instance still resolves to the declaring model's FK.
+    // The composite (array) reflection FK case stays on the convention path:
+    // the downstream child build uses `foreignKey` as a single string key, so a
+    // CPK has-many can't be threaded here anyway (CPK nested attrs flow through
+    // their own queryConstraints path). The `ctor.name` deviation for an
+    // owner-less CPK subclass is pre-existing and out of scope for this story.
     const reflection = (ctor as any).reflectOnAssociation?.(assocName);
     const reflectionFk = reflection?.foreignKey;
     const foreignKey =
