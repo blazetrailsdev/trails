@@ -12,6 +12,19 @@ import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { quoteTableName as canonicalQuoteTableName } from "./test-helpers/quote-regex.js";
+// Aliased to avoid clobbering the bespoke in-function `class Post` / `class Comment`
+// declarations elsewhere in this file (esbuild would otherwise rename those and
+// break their table-name inference).
+import { Post as CanonPost } from "./test-helpers/models/post.js";
+import {
+  Comment as CanonComment,
+  SpecialComment as CanonSpecialComment,
+} from "./test-helpers/models/comment.js";
+import { Rating as CanonRating } from "./test-helpers/models/rating.js";
+import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -1349,12 +1362,6 @@ describe("RelationTest", () => {
     expect(sql).toContain("title");
   });
 
-  it("relation merging with merged joins as strings", () => {
-    const Post = makePost();
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
-  });
-
   it("relation merging keeps joining order", () => {
     const Post = makePost();
     const r1 = Post.where({ title: "a" });
@@ -1698,5 +1705,47 @@ describe("Relation#arel build_arel convergence", () => {
     expect(() => Gadget.where({ widget_id: Widget.eagerLoad("gadgets").limit(5) }).toSql()).toThrow(
       /not supported/,
     );
+  });
+});
+
+// Canonical-model coverage for RelationTest cross-model merge — kept in a
+// dedicated describe so it can run on the canonical schema/fixtures (the legacy
+// RelationTest block above uses bespoke handler tables). Same describe name so
+// `test:compare` matches it to Ruby's `RelationTest` in relation_test.rb.
+describe("RelationTest", () => {
+  const { authors } = useHandlerFixtures(["authors", "posts", "comments", "ratings"], {
+    schema: canonicalSchema,
+  });
+
+  beforeAll(() => {
+    registerModel(CanonAuthor);
+    registerModel(CanonPost);
+    registerModel(CanonComment);
+    registerModel(CanonSpecialComment);
+    registerModel(CanonRating);
+  });
+
+  // Mirrors Rails Merger#merge_joins (merger.rb): a cross-model merge partitions
+  // the source relation's joins_values into `associations` (a cross-klass
+  // InnerJoin JoinDependency) and `others` (raw SQL strings / Arel nodes),
+  // threaded together via `relation.joins!(join_dependency, *others)` so the raw
+  // `others` join clause survives alongside the association join.
+  it("relation merging with merged joins as strings", async () => {
+    const joinString = `LEFT OUTER JOIN ${canonicalQuoteTableName("ratings")} ON ${canonicalQuoteTableName(
+      "comments",
+    )}.id = ${canonicalQuoteTableName("ratings")}.comment_id`;
+    const specialCommentsWithRatings = CanonSpecialComment.joins(joinString);
+    const postsWithSpecialCommentsWithRatings = CanonPost.group("posts.id")
+      .joins("specialComments")
+      .merge(specialCommentsWithRatings);
+    const merged = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings);
+
+    // The raw `others` join clause from the cross-model source survives verbatim
+    // alongside the association join (special_comments → comments).
+    const sql = merged.toSql();
+    expect(sql).toContain(`INNER JOIN ${canonicalQuoteTableName("comments")}`);
+    expect(sql).toContain(joinString);
+
+    expect(await merged.count()).toEqual({ 2: 1, 4: 3, 5: 1 });
   });
 });
