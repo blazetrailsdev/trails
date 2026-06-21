@@ -22,16 +22,21 @@ import type { DatabaseConfigOptions } from "../database-configurations/database-
  *   ensure
  *     ActiveRecord::Base.establish_connection(original_connection)
  *   end
+ *
+ * Like Rails, this assumes there is a connection to remove — `removeConnection`
+ * returns `undefined` only when no pool exists, which mirrors Rails returning
+ * `nil` and then raising in the `ensure` (`establish_connection(nil)`). We
+ * restore via `configurationHash` rather than the `DatabaseConfig` object
+ * because trails' `establishConnection` takes a config hash, not a config
+ * object; for the single-connection case this is equivalent.
  */
 export async function runWithoutConnection<T>(
   fn: (configHash: DatabaseConfigOptions) => Promise<T> | T,
 ): Promise<T> {
-  const originalConnection = Base.removeConnection();
+  const originalConnection = Base.removeConnection()!;
   try {
-    return await fn(originalConnection?.configurationHash ?? {});
+    return await fn(originalConnection.configurationHash);
   } finally {
-    if (originalConnection) {
-      await Base.establishConnection(originalConnection.configurationHash);
-    }
+    await Base.establishConnection(originalConnection.configurationHash);
   }
 }
