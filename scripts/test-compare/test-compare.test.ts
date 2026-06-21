@@ -28,9 +28,10 @@ describe("parseMinExtra", () => {
     expect(parseMinExtra(["--min-extra=0"])).toBe(0);
   });
 
-  it("throws on non-numeric or negative values", () => {
+  it("throws on non-numeric, negative, or empty values", () => {
     expect(() => parseMinExtra(["--min-extra=abc"])).toThrow(/non-negative number/);
     expect(() => parseMinExtra(["--min-extra=-3"])).toThrow(/non-negative number/);
+    expect(() => parseMinExtra(["--min-extra="])).toThrow(/non-negative number/);
   });
 });
 

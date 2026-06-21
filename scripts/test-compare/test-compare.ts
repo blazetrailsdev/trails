@@ -199,7 +199,10 @@ interface TsTestInfo {
 export function parseMinExtra(args: string[]): number {
   const arg = args.find((a) => a.startsWith("--min-extra="));
   if (!arg) return 0;
-  const n = Number(arg.slice("--min-extra=".length));
+  const raw = arg.slice("--min-extra=".length);
+  // Number("") is 0, so reject the empty form explicitly — the flag implies an
+  // explicit N (--min-extra=5), not a bare --min-extra=.
+  const n = raw === "" ? NaN : Number(raw);
   if (!Number.isFinite(n) || n < 0) {
     throw new Error("--min-extra requires a non-negative number (e.g. --min-extra=5)");
   }
