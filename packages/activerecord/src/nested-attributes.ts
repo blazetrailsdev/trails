@@ -217,12 +217,24 @@ async function processNestedAttributes(record: Base): Promise<void> {
     await (targetModel as any).ensureSchemaLoaded();
 
     // belongs_to keeps the FK on the owner, conventionally `${assoc_name}_id`;
-    // has_one/has_many keep it on the child, conventionally `${owner}_id`.
+    // has_one/has_many keep it on the child, conventionally `${owner}_id`. Rails
+    // derives the owner from the association reflection's `active_record` (the
+    // class that *declared* the association), not the runtime instance's class,
+    // so a subclass instance still resolves to the declaring model's FK.
+    // The composite (array) reflection FK case stays on the convention path:
+    // the downstream child build uses `foreignKey` as a single string key, so a
+    // CPK has-many can't be threaded here anyway (CPK nested attrs flow through
+    // their own queryConstraints path). The `ctor.name` deviation for an
+    // owner-less CPK subclass is pre-existing and out of scope for this story.
+    const reflection = (ctor as any).reflectOnAssociation?.(assocName);
+    const reflectionFk = reflection?.foreignKey;
     const foreignKey =
       assocDef.options.foreignKey ??
-      (assocDef.type === "belongsTo"
-        ? `${underscore(assocName)}_id`
-        : `${underscore(ctor.name)}_id`);
+      (typeof reflectionFk === "string"
+        ? reflectionFk
+        : assocDef.type === "belongsTo"
+          ? `${underscore(assocName)}_id`
+          : `${underscore(ctor.name)}_id`);
 
     // limit-check already fired in assignNestedAttributes (Rails
     // raises synchronously at assign time).
