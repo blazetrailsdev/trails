@@ -17,6 +17,7 @@ import {
   registerWithSuperclass,
 } from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
+import { loadSchema as loadSchemaSync } from "./model-schema.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup } from "./type.js";
 
@@ -138,6 +139,42 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   const cacheHost = isStiSubclass(this) ? (getStiBase(this) as AnyClass) : this;
 
   if (!cacheHost._cachedDefaultAttributes) {
+    // Rails builds `_default_attributes` inside `load_schema!`, so the
+    // optimistic-locking column (default 0) is reflected into every new record
+    // at class load — `Model.new.lock_version == 0` in memory before any save
+    // (Locking::Optimistic, optimistic.rb). trails reflects lazily, so a model
+    // that explicitly configured a custom locking column (`set_locking_column`)
+    // but never declared it via `attribute()` would build its default-attribute
+    // cache before the column was reflected, leaving `Model.new.<lockingColumn>`
+    // nil until the first DB interaction triggered reflection. Force a sync
+    // schema load here so the build below seeds the column (its LockingType
+    // deserializes null → 0). Gated on an *own* `_lockingColumn` property so it
+    // fires only for classes that called `set_locking_column` — never for the
+    // inherited "lock_version" default, which would reflect every model and
+    // widen the blast radius. Best-effort: table-less/abstract classes can't
+    // reflect, so swallow the resulting error.
+    const lockCol = cacheHost._lockingColumn;
+    if (
+      lockCol &&
+      Object.prototype.hasOwnProperty.call(cacheHost, "_lockingColumn") &&
+      !cacheHost._attributeDefinitions.has(lockCol)
+    ) {
+      const wasLoaded = cacheHost._schemaLoaded;
+      try {
+        loadSchemaSync.call(cacheHost);
+      } catch {
+        // table-less / abstract class — nothing to reflect.
+      }
+      // On a cold schema cache, sync `loadSchema` finds nothing to reflect yet
+      // marks the model loaded (its cache-miss fallback). That would suppress
+      // the real async reflection on the first query. If the locking column
+      // still isn't present, the cache was cold — undo the premature mark so
+      // the normal lazy reflection path still runs (restoring prior behavior).
+      if (!wasLoaded && !cacheHost._attributeDefinitions.has(lockCol)) {
+        cacheHost._schemaLoaded = false;
+      }
+    }
+
     // Register cacheHost with its superclass so resetDefaultAttributes()
     // cascades here when the superclass gains new attribute declarations.
     registerWithSuperclass(cacheHost);
