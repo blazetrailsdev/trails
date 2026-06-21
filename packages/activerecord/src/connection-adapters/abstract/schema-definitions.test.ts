@@ -81,6 +81,13 @@ describe("ForeignKeyDefinition#defined_for?", () => {
     expect(fk().isDefinedFor({ deferrable: "immediate" })).toBe(false);
   });
 
+  it("treats an unset stored option as Array(nil) => [], not a 'undefined' string", () => {
+    const noActions = new ForeignKeyDefinition("astronauts", "rockets", "rocket_id", "id", "fk_x");
+    expect(noActions.onDelete).toBeUndefined();
+    // [] vs ["cascade"] => false, mirroring Array(nil).map(&:to_s) == ["cascade"]
+    expect(noActions.isDefinedFor({ onDelete: "cascade" })).toBe(false);
+  });
+
   it("compares composite primary keys element-wise", () => {
     const composite = new ForeignKeyDefinition(
       "astronauts",

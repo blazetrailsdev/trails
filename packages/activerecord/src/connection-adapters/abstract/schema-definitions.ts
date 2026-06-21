@@ -172,7 +172,10 @@ export class ForeignKeyDefinition {
   isDefinedFor(options: ForeignKeyLookupOptions = {}): boolean {
     // Rails compares element-wise after to_s:
     // Array(self.options[k]).map(&:to_s) == Array(v).map(&:to_s)
-    const toArray = (c: unknown): string[] => (Array.isArray(c) ? c.map(String) : [String(c)]);
+    // A nil stored option becomes `Array(nil) => []`, so normalize
+    // undefined/null to an empty array rather than `["undefined"]`.
+    const toArray = (c: unknown): string[] =>
+      c === undefined || c === null ? [] : Array.isArray(c) ? c.map(String) : [String(c)];
     const optionEqual = (a: unknown, b: unknown): boolean => {
       const aa = toArray(a);
       const bb = toArray(b);
