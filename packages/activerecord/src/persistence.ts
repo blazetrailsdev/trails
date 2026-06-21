@@ -443,6 +443,11 @@ export async function incrementBang<T extends CounterBangRecord>(
   by: number = 1,
   options: { touch?: TouchOption } = {},
 ) {
+  // Rails' `increment!(attribute, ...)` requires the attribute; a bare
+  // `increment!` raises ArgumentError (Ruby's missing-required-argument).
+  if (attribute === undefined) {
+    throw new Error("wrong number of arguments (given 0, expected 1..3)");
+  }
   this.increment(attribute, by);
   // Rails: `change = public_send(attribute) - public_send(:"#{attribute}_in_database")`
   // — persist the delta between the (already-incremented) in-memory value and
@@ -736,11 +741,11 @@ export async function save<T extends SaveRecord>(
   }
 }
 
-/** Mirrors: ActiveRecord::Base#save! */
+/** Mirrors: ActiveRecord::Base#save! — `create_or_update(**options) || raise`. */
 export async function saveBang<
   T extends SaveRecord & { save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean> },
->(this: T): Promise<true> {
-  const result = await this.save();
+>(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true> {
+  const result = await this.save(options);
   if (!result) {
     raiseValidationError(this);
   }
