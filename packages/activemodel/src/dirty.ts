@@ -392,29 +392,31 @@ export class DirtyTracker {
 
   /**
    * After the Base constructor snapshots, re-mark attributes that differ from
-   * their schema defaults as dirty so they appear in `saved_changes` /
-   * `previous_changes` after INSERT.
+   * their database column default as dirty so they appear in `saved_changes` /
+   * `previous_changes` after INSERT (and so partial inserts persist them).
    *
    * Called only for new records, immediately before after_initialize.
    *
    * @internal
    */
-  reinstateNewRecordChanges(
-    attributes: AttributeSet,
-    defaultSnap: Map<string, unknown>,
-    skipNames?: ReadonlySet<string>,
-  ): void {
+  reinstateNewRecordChanges(attributes: AttributeSet, skipNames?: ReadonlySet<string>): void {
     for (const name of attributes.keys()) {
       if (skipNames?.has(name)) continue;
       const attr = attributes.getAttribute(name);
-      const currentVal = attr.value ?? null;
-      const rawDefault = defaultSnap.has(name) ? defaultSnap.get(name) : undefined;
-      const defaultVal: unknown =
-        rawDefault !== undefined ? (AttributeSet.resolveSnapshotValue(rawDefault) ?? null) : null;
-      if (attr.type.isChanged(defaultVal, currentVal, attr.valueBeforeTypeCast)) {
-        this._originalAttributes.set(name, rawDefault !== undefined ? rawDefault : null);
+      // Rails marks a new record's attribute dirty when it differs from the
+      // *database column default* (Attribute#original_value), not the model's
+      // declared default. A user-provided `attribute :x, default: ...` whose
+      // value equals the model default but differs from the column default is
+      // therefore still dirty, so under partial_inserts it is persisted rather
+      // than dropped (the DB would otherwise store its own column default).
+      // Attribute#changed? already compares value against original_value — for a
+      // UserProvidedDefault that original_value is the column default — so defer
+      // to it instead of comparing against the model-default snapshot.
+      if (attr.isChanged()) {
+        const wasValue = attr.originalValue ?? null;
+        this._originalAttributes.set(name, wasValue);
         this._originalHas.add(name);
-        this._changedAttributes.set(name, [defaultVal, currentVal]);
+        this._changedAttributes.set(name, [wasValue, attr.value ?? null]);
       }
     }
   }

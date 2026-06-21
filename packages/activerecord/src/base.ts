@@ -688,13 +688,10 @@ function _applyCompositePrimaryKey(
  */
 function _reinstateConstructorDirtiness(
   record: { _dirty: { reinstateNewRecordChanges: (...args: any[]) => void }; _attributes: unknown },
-  ctor: { _defaultAttributes?: () => { snapshotValues(): Map<string, unknown> } },
+  ctor: { _defaultAttributes?: () => unknown },
 ): void {
   if (typeof ctor._defaultAttributes !== "function") return;
-  record._dirty.reinstateNewRecordChanges(
-    record._attributes,
-    ctor._defaultAttributes().snapshotValues(),
-  );
+  record._dirty.reinstateNewRecordChanges(record._attributes);
 }
 
 /** @internal */
