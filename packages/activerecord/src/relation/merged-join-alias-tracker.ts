@@ -42,12 +42,19 @@ export function buildMergedJoinAliasTracker(host: MergedJoinAliasHost): AliasTra
   const tracker = new AliasTracker(aliasLength, undefined, manualJoins, connection);
   const ownerTable = host._modelClass.tableName;
   for (const c of host._joinClauses) {
-    // Mirror the collision branch of aliased_table_for: first use keeps the real
-    // name and claims it, repeats alias to `{plural_name}_{owner_table}`.
-    tracker.aliasNameForTable(
-      c.table,
-      () => `${pluralize(underscore(c.assoc ?? ""))}_${ownerTable}`,
-    );
+    if (c.assoc) {
+      // Association where-join (whereAssociated / associated): mirror the
+      // collision branch of aliased_table_for — first use keeps the real name
+      // and claims it, repeats alias to `{plural_name}_{owner_table}`.
+      tracker.aliasNameForTable(c.table, () => `${pluralize(underscore(c.assoc!))}_${ownerTable}`);
+    } else if ((tracker.aliases.get(c.table) ?? 0) === 0) {
+      // Raw two-arg `joins(table, on)` clause (no reflection): Rails emits these
+      // verbatim and only seeds their table into the alias_tracker so a later
+      // association/merged join onto the same table collides — the raw join
+      // itself is never aliased. Claim the table without an alias candidate
+      // (the assoc-less candidate would be the malformed `_owner_table`).
+      tracker.aliases.set(c.table, 1);
+    }
   }
   return tracker;
 }
@@ -56,6 +63,14 @@ export function buildMergedJoinAliasTracker(host: MergedJoinAliasHost): AliasTra
  * Claim every join `jd` emits into `tracker`, mirroring `aliased_table_for`: the
  * real table never rises above count 1 (first use keeps its name), while a
  * collision under an alias name is counted so the next `_N` is correct.
+ *
+ * Reads `tracker.aliases` directly (the same pattern as `_unifiedJoinAliasTracker`)
+ * rather than the private `_getCount`: this only force-claims tables `jd` actually
+ * emits, and for the real-table branch of `aliased_table_for` only the 0-vs-nonzero
+ * distinction matters (real tables never take the numeric suffix). A table present
+ * only in the seeded manual joins (`_joinValues`) is left untouched here, so the
+ * realias path still resolves it through `_getCount` → `initialCountFor` and is
+ * not undercounted.
  */
 export function seedTrackerFromJdNodes(tracker: AliasTracker, jd: JoinDependency): void {
   for (const node of jd.nodes) {
