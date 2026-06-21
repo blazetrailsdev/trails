@@ -982,14 +982,26 @@ describe("InverseBelongsToTests", () => {
     });
   });
 
-  it.skip("unscope does not set inverse when incorrect", () => {
-    // Tracked: story inverse-relation-or-unscope-guard. Needs relation
-    // .or()/.unscope() inversable? guard semantics.
+  it("unscope does not set inverse when incorrect", async () => {
+    const interest = interests("trainspotting");
+    const human = (await loadBelongsTo(interest, "human", { inverseOf: "interests" }))!;
+    const createdHuman = await Human.create({ name: "wrong human" });
+    const foundInterest = await (createdHuman as any).interests
+      .or((human as any).interests)
+      .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
+    const foundHuman = await loadBelongsTo(foundInterest, "human", { inverseOf: "interests" });
+    expect((foundHuman as any).id).toBe((human as any).id);
   });
 
-  it.skip("or does not set inverse when incorrect", () => {
-    // Tracked: story inverse-relation-or-unscope-guard. Needs relation
-    // .or()/.unscope() inversable? guard semantics.
+  it("or does not set inverse when incorrect", async () => {
+    const interest = interests("trainspotting");
+    const human = (await loadBelongsTo(interest, "human", { inverseOf: "interests" }))!;
+    const createdHuman = await Human.create({ name: "wrong human" });
+    const foundInterest = await (createdHuman as any).interests
+      .unscope("where")
+      .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
+    const foundHuman = await loadBelongsTo(foundInterest, "human", { inverseOf: "interests" });
+    expect((foundHuman as any).id).toBe((human as any).id);
   });
 
   it("child instance should be shared with replaced via accessor parent", async () => {
