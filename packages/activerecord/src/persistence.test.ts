@@ -1467,78 +1467,41 @@ describe("PersistenceTest", () => {
   });
 });
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  useHandlerFixtures(["topics", "posts", "authors"], { schema: canonicalSchema });
+  const Topic = CanonicalTopic;
+  const Post = CanonicalPost;
 
-  class Post extends Base {
-    static {
-      this.attribute("title", "string");
-      this.attribute("body", "string");
-    }
-  }
-
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", body: "string" },
-      requireds: { name: "string" },
-      trackeds: { name: "string" },
-    });
-  });
-
-  // -- save --
-
+  // Rails: test_save_destroyed_object
   it("save destroyed object", async () => {
-    const p = await Post.create({ title: "Hello", body: "World" });
-    await p.destroy();
-    await expect(p.save()).rejects.toThrow("Cannot save a destroyed");
+    const topic = await Topic.create({ title: "New Topic" });
+    await topic.destroyBang();
+    await expect(topic.saveBang()).rejects.toThrow("Failed to save the record");
   });
 
-  // -- create / create! --
-
-  // -- update / update! --
-
-  // -- destroy / destroy! / delete --
-
-  it("destroy", async () => {
-    const p = await Post.create({ title: "Test", body: "Body" });
-    const result = await p.destroy();
-    expect(result).toBe(p);
-  });
-
+  // Rails: test_delete_doesnt_run_callbacks
   it("delete doesnt run callbacks", async () => {
-    const log: string[] = [];
-
-    class Tracked extends Base {
-      static {
-        this.attribute("name", "string");
-        this.beforeDestroy(() => {
-          log.push("before_destroy");
-        });
-        this.afterDestroy(() => {
-          log.push("after_destroy");
-        });
-      }
-    }
-
-    const t = await Tracked.create({ name: "test" });
-    await t.delete();
-
-    // Callbacks should NOT have run
-    expect(log).toEqual([]);
-    // Record should be marked destroyed
-    expect(t.isDestroyed()).toBe(true);
-    // Record should be gone from DB
-    await expect(Tracked.find(t.id)).rejects.toThrow("not found");
+    await (await Topic.find(1)).delete();
+    expect(await Topic.find(2)).not.toBeNull();
   });
 
-  // -- record state --
+  // Rails: test_destroy
+  it("destroy", async () => {
+    const topic = await Topic.find(1);
+    expect(await topic.destroy()).toBe(topic);
+    expect(topic.isFrozen()).toBe(true);
+    await expect(Topic.find((topic as any).id)).rejects.toThrow(RecordNotFound);
+  });
 
-  // -- reload --
-
+  // Rails: test_find_via_reload
   it("find via reload", async () => {
-    const p = await Post.create({ title: "Hello", body: "World" });
-    await Post.delete(p.id);
-    await expect(p.reload()).rejects.toThrow("not found");
+    const post = Post.new();
+    expect(post.isNewRecord()).toBe(true);
+
+    (post as any).id = 1;
+    await post.reload();
+
+    expect((post as any).title).toBe("Welcome to the weblog");
+    expect(post.isNewRecord()).toBe(false);
   });
 });
 

@@ -686,11 +686,11 @@ export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
 ): Promise<boolean> {
+  // Mirrors ActiveRecord::Persistence#create_or_update — `return false if destroyed?`.
+  // `save` returns false (it does not raise) for a destroyed record; `save!`
+  // turns that false into RecordNotSaved("Failed to save the record").
   if (this._destroyed) {
-    throw new RecordNotSaved(
-      `Cannot save a destroyed ${this.constructor.name}`,
-      this as unknown as object,
-    );
+    return false;
   }
   if (this._readonly) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
@@ -747,7 +747,15 @@ export async function saveBang<
 >(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true> {
   const result = await this.save(options);
   if (!result) {
-    raiseValidationError(this);
+    // Mirrors Rails' two save! layers: ActiveRecord::Validations#save! raises
+    // RecordInvalid when validations failed (errors present); otherwise
+    // Persistence#save! raises RecordNotSaved("Failed to save the record")
+    // for a create_or_update that returned false (destroyed record, halted
+    // callback) without populating validation errors.
+    if ((this as unknown as { errors: { any: boolean } }).errors.any) {
+      raiseValidationError(this);
+    }
+    throw new RecordNotSaved("Failed to save the record", this as unknown as object);
   }
   return true;
 }
