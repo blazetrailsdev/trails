@@ -677,7 +677,8 @@ describe("PersistenceTest", () => {
 
   it("update many with active record base object", async () => {
     await expect((Topic as any).update(topics("first"), { title: "1 updated" })).rejects.toThrow(
-      /ActiveRecord::Base/,
+      "You are passing an instance of ActiveRecord::Base to `update`. " +
+        "Please pass the id of the object by calling `.id`.",
     );
     expect((await Topic.find(1)).title).not.toBe("1 updated");
   });
@@ -685,7 +686,10 @@ describe("PersistenceTest", () => {
   it("update many with array of active record base objects", async () => {
     await expect(
       (Topic as any).update([topics("first"), topics("second")], { title: "updated" }),
-    ).rejects.toThrow(/ActiveRecord::Base/);
+    ).rejects.toThrow(
+      "You are passing an array of ActiveRecord::Base instances to `update`. " +
+        "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
+    );
     expect((await Topic.find(1)).title).not.toBe("updated");
     expect((await Topic.find(2)).title).not.toBe("updated");
   });

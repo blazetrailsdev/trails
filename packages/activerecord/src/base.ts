@@ -457,8 +457,12 @@ async function performClassUpdate(
 
   if (Array.isArray(idOrAttrs)) {
     if (idOrAttrs.some((i) => i instanceof Base)) {
+      // Rails raises the *array*-specific message here (distinct from the
+      // single-instance message below), pointing at `pluck(:id)`/`map(&:id)`.
       throw argumentError(
-        "You are passing an instance of ActiveRecord::Base to `update`. Please pass the id of the object by calling `.id`.",
+        `You are passing an array of ActiveRecord::Base instances to \`${
+          bang ? "update!" : "update"
+        }\`. Please pass the ids of the objects by calling \`pluck(:id)\` or \`map(&:id)\`.`,
       );
     }
     // Mirror destroy's CPK detection: on a composite-PK model, a flat
@@ -529,7 +533,9 @@ async function performClassUpdate(
 
   if (idOrAttrs instanceof Base) {
     throw argumentError(
-      "You are passing an instance of ActiveRecord::Base to `update`. Please pass the id of the object by calling `.id`.",
+      `You are passing an instance of ActiveRecord::Base to \`${
+        bang ? "update!" : "update"
+      }\`. Please pass the id of the object by calling \`.id\`.`,
     );
   }
 
