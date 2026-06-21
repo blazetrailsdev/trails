@@ -5173,7 +5173,7 @@ describe("RelationTest", () => {
     const posts = await rel.toArray();
     const ids = posts.map((p) => p.id as number);
     // Must be sorted by id (insertion order), not alphabetically by title
-    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    expect(ids).toEqual([...ids].sort((a, b) => Number(a) - Number(b)));
   });
 
   it("reorder deduplication", () => {
