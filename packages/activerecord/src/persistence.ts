@@ -1229,10 +1229,26 @@ export async function reload<T extends ReloadRecord>(
 // dup / clone / becomes / becomes! — shape-preserving copies & class swaps.
 // ---------------------------------------------------------------------------
 
+interface DupAttribute {
+  name: string;
+  withValueFromUser(value: unknown): DupAttribute;
+}
+
+interface DupAttributeSet {
+  deepDup(): DupAttributeSet;
+  reset(name: string): void;
+  fetchValue(name: string): unknown;
+  map(fn: (attr: DupAttribute) => DupAttribute): DupAttributeSet;
+}
+
 interface DupRecord {
-  attributes: Record<string, unknown>;
+  _attributes: DupAttributeSet;
   _readonly: boolean;
-  assignAttributes(attrs: Record<string, unknown>): void;
+  _dirty: {
+    snapshot(attrs: unknown): void;
+    reinstateNewRecordChanges(attrs: unknown, defaultSnap: Map<string, unknown>): void;
+  };
+  isPersisted(): boolean;
   initializeDup(other: unknown): void;
   constructor: new (attrs: Record<string, unknown>) => unknown;
 }
@@ -1243,28 +1259,66 @@ interface DupRecord {
  * Mirrors: ActiveRecord::Inheritance#dup (Rails 7.2+ moved it from Core to
  * Inheritance; the behavior is: copy attributes minus primary key[s]).
  *
- * Rails' `Object#dup` produces a new_record whose attributes are dirty against
- * their column defaults — `Model.first.dup.changes` equals a fresh record with
- * the same attributes assigned. We replay that observable shape: construct an
- * empty record (so `after_initialize` fires on the dup) and then assign the
- * non-PK attributes through the user path, which tracks them as changes. Ruby's
- * `Object#dup` also copies `@readonly` and runs the `initialize_dup` chain, so
- * carry `@readonly` over and invoke the composed hook (aggregations cache +
- * locking/timestamp clear).
+ * Mirrors Rails' `init_attributes` faithfully. ActiveRecord::Core#init_attributes
+ * deep-dups the source attribute set and resets the primary key(s);
+ * ActiveModel::Dirty#init_attributes then, *for a persisted source only*,
+ * rebuilds each attribute as `_default_attributes.map { |a|
+ * a.with_value_from_user(attrs.fetch_value(a.name)) }` — i.e. `FromUser`-over-
+ * default. We reproduce both branches exactly: an unsaved source keeps the
+ * deep-dup'd attributes; a persisted source is rebuilt from defaults via
+ * `withValueFromUser`. The rebuild matters beyond `changes`: a duped persisted
+ * attribute's `*_before_type_cast` must be the cast user value (Rails carries
+ * the fetched value), not the raw DB representation — e.g. a boolean stored as
+ * `0` reads back `false` on the dup.
+ *
+ * trails' dirty tracking is snapshot-based (not derived from each attribute's
+ * `changed?`), so after building the attribute set we run a single
+ * reinstate-vs-defaults pass to populate the tracker — the same `changed?`
+ * predicate Rails computes per-attribute.
+ *
+ * `new ctor({})` runs the constructor so `after_initialize` fires on the dup
+ * (Rails runs `_run_initialize_callbacks` in `Core#initialize_dup`). One known
+ * ordering divergence, pre-existing and unchanged here: Rails sets the duped
+ * attributes BEFORE `_run_initialize_callbacks`, so a Rails `after_initialize`
+ * sees the full duped set, whereas trails fires it during `new ctor({})` against
+ * the empty bag and swaps `_attributes` in afterward. Ruby's `Object#dup` also
+ * copies `@readonly` and runs the `initialize_dup` chain, so carry `@readonly`
+ * over and invoke the composed hook (aggregations cache + locking/timestamp
+ * clear) — which nulls the timestamp and locking columns back to their defaults
+ * before the dirty pass, so they are not reported as changed
+ * (test_dup_timestamps_are_cleared / _locking_column_is_not_dirty).
  */
 export function dup<T extends DupRecord>(this: T): T {
   const ctor = this.constructor as typeof this.constructor & {
     primaryKey: string | string[];
+    _defaultAttributes?: () => DupAttributeSet & { snapshotValues(): Map<string, unknown> };
   };
-  const attrs = { ...this.attributes };
+  const duped = new ctor({}) as T;
+  // ActiveRecord::Core#init_attributes: deep_dup + reset(primary_key).
+  const base = this._attributes.deepDup();
   const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
   for (const col of pkCols) {
-    delete attrs[col];
+    if (col != null) base.reset(col);
   }
-  const duped = new ctor({}) as T;
-  duped.assignAttributes(attrs);
+  // ActiveModel::Dirty#init_attributes: a persisted source is rebuilt from the
+  // class defaults so each attribute is FromUser-over-default (dirty vs default
+  // and carrying the user value before type cast); an unsaved source keeps the
+  // deep-dup'd attributes as-is.
+  const defaultAttributes = ctor._defaultAttributes?.bind(ctor);
+  const dupedAttrs =
+    this.isPersisted() && defaultAttributes
+      ? defaultAttributes().map((attr) => attr.withValueFromUser(base.fetchValue(attr.name)))
+      : base;
+  (duped as { _attributes: DupAttributeSet })._attributes = dupedAttrs;
   duped._readonly = this._readonly;
   duped.initializeDup(this);
+  // Always rebind the dirty tracker to the duped attribute set: the baseline
+  // from `new ctor({})` is stale against the swapped-in `_attributes`.
+  duped._dirty.snapshot(dupedAttrs);
+  if (defaultAttributes) {
+    // Re-mark attributes that differ from their schema defaults as changed.
+    duped._dirty.reinstateNewRecordChanges(dupedAttrs, defaultAttributes().snapshotValues());
+  }
   return duped;
 }
 

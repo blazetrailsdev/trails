@@ -2806,6 +2806,10 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     const { Topic } = makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
     (topic as any)._newRecord = false;
+    // A new record is dirty against its defaults (Rails parity); persisting
+    // clears that. Mark the constructed-as-persisted record clean so "original"
+    // is the pre-TX baseline, not a construction-time change.
+    (topic as any).changesApplied();
 
     rememberTransactionRecordState.call(topic as any);
     (topic as any).writeAttribute("title", "changed-during-tx");
@@ -2835,6 +2839,7 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
     const { Topic } = makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
     (topic as any)._newRecord = false;
+    (topic as any).changesApplied();
 
     rememberTransactionRecordState.call(topic as any);
     (topic as any).writeAttribute("title", "tx-edit");
@@ -2859,6 +2864,7 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
     const { Topic } = makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
     (topic as any)._newRecord = false;
+    (topic as any).changesApplied();
 
     rememberTransactionRecordState.call(topic as any);
     // No attribute writes during TX

@@ -689,7 +689,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it("EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen adds no errors for unchanged attrs", async () => {
     const Post = makeEncryptedPost(await freshAdapter());
     new Post();
-    const post = new Post({ title: "hello" });
+    // A new record built by assignment is dirty against defaults (Rails parity),
+    // so an assigned `title` IS a changed encrypted attr. Use a record with no
+    // assignment to exercise the genuinely-unchanged path.
+    const post = new Post({});
     const errored: Array<[string, string]> = [];
     const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
       errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },

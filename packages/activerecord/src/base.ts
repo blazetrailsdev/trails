@@ -663,6 +663,40 @@ function _applyCompositePrimaryKey(
   }
 }
 
+/**
+ * Re-mark constructor-assigned attributes as dirty against their schema
+ * defaults, so `new Model(attrs).changes` matches Rails — a new record built
+ * by assignment is dirty against column defaults (`Topic.new(title: "x")` →
+ * `{ title: [nil, "x"] }`, `Topic.new` → `{}`). The Model constructor snapshots
+ * a clean baseline; this restores the new-record dirtiness Rails gets for free
+ * because assignment produces `FromUser`-over-default attributes whose
+ * `changed?` is true. Reuses the same `reinstateNewRecordChanges` pass the
+ * create path runs (callbacks.ts `_createRecord`), but keeps the primary key in
+ * scope: an explicitly assigned `id` IS dirty at construction in Rails.
+ *
+ * Called only from the `!wasSuppressed` constructor branches (where the inline
+ * `after_initialize` fires), so the dirty state is established before
+ * `after_initialize` — matching Rails, where `assign_attributes` runs before
+ * `_run_initialize_callbacks` and `changed?` is already true inside the hook.
+ * Found-record reconstruction is the only path that constructs with callbacks
+ * suppressed, and it always does so with an EMPTY attribute bag (`new this()` in
+ * `_instantiate` / `directInstantiate`) before populating via `writeFromDatabase`
+ * + `changesApplied`. So no new-record-with-values construction ever reaches the
+ * suppressed branch, and skipping the pass there loses no dirtiness.
+ *
+ * @internal
+ */
+function _reinstateConstructorDirtiness(
+  record: { _dirty: { reinstateNewRecordChanges: (...args: any[]) => void }; _attributes: unknown },
+  ctor: { _defaultAttributes?: () => { snapshotValues(): Map<string, unknown> } },
+): void {
+  if (typeof ctor._defaultAttributes !== "function") return;
+  record._dirty.reinstateNewRecordChanges(
+    record._attributes,
+    ctor._defaultAttributes().snapshotValues(),
+  );
+}
+
 /** @internal */
 function _dispatchAssociationAttrs(
   record: Base,
@@ -2719,6 +2753,7 @@ export class Base extends Model {
           (this as any)._dirty.snapshot((this as any)._attributes);
           assocPending = null;
         }
+        _reinstateConstructorDirtiness(this as any, ctor as any);
         cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
       }
     } else {
@@ -2818,6 +2853,7 @@ export class Base extends Model {
           (this as any)._dirty.snapshot((this as any)._attributes);
           assocPending = null;
         }
+        _reinstateConstructorDirtiness(this as any, ctor2 as any);
         cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
       }
     }
