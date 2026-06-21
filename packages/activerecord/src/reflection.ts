@@ -12,6 +12,7 @@ import {
 import { Table } from "@blazetrails/arel";
 import { _correctNames } from "./associations.js";
 import { joinTableName } from "./migration/join-table.js";
+import { rubyInspectArray } from "./relation/ruby-inspect.js";
 
 import { modelRegistry } from "./associations.js";
 import {
@@ -855,7 +856,7 @@ export class AssociationReflection extends MacroReflection {
     throw new ArgumentError(
       `Active Record couldn't correctly interpret the query constraints ` +
         `for the \`${this.activeRecord.name}\` model. The query constraints on \`${this.activeRecord.name}\` are ` +
-        `\`${primaryQueryConstraints}\` and the foreign key is \`${foreignKey}\`. ` +
+        `\`${rubyInspectArray(primaryQueryConstraints)}\` and the foreign key is \`${foreignKey}\`. ` +
         `You need to explicitly set the query constraints for this association.`,
     );
   }

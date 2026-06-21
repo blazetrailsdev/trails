@@ -6,6 +6,7 @@ import type { CollectionProxy, AssociationProxy } from "./associations/collectio
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { ScopeRegistry } from "./scoping.js";
 import { delegateArrayMethod, delegateEnumerableMethod } from "./relation/delegation.js";
+import { rubyInspectArray } from "./relation/ruby-inspect.js";
 // Re-export the slot's setter so the package entry and other internal
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -1732,7 +1733,7 @@ function _inlineOwnerKey(
  * the scalar `id` alone. A plain (non-query_constraints) owner keeps the
  * scalar FK and the `_inlineOwnerKey`-resolved scalar key.
  */
-function _inlinePolymorphicKeys(
+export function _inlinePolymorphicKeys(
   ctor: typeof Base,
   options: AssociationOptions,
   primaryKey: string | string[],
@@ -1785,7 +1786,7 @@ function _inlinePolymorphicKeys(
       throw new ArgumentError(
         `Active Record couldn't correctly interpret the query constraints ` +
           `for the \`${ctor.name}\` model. The query constraints on \`${ctor.name}\` are ` +
-          `\`${qc}\` and the foreign key is \`${scalarFk}\`. ` +
+          `\`${rubyInspectArray(qc)}\` and the foreign key is \`${scalarFk}\`. ` +
           `You need to explicitly set the query constraints for this association.`,
       );
     }
