@@ -56,6 +56,9 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Company, LargeClient, Client } from "./test-helpers/models/company.js";
 import { AutoId } from "./test-helpers/models/auto-id.js";
+import { Person } from "./test-helpers/models/person.js";
+import { Car } from "./test-helpers/models/car.js";
+import { sql as arelSql } from "@blazetrails/arel";
 
 for (const klass of [
   CanonicalTopic,
@@ -76,6 +79,8 @@ for (const klass of [
   LargeClient,
   Client,
   AutoId,
+  Person,
+  Car,
 ]) {
   registerModel(klass);
 }
@@ -824,11 +829,6 @@ describe("PersistenceTest", () => {
     expect(p.title).toBe("built");
   });
 
-  it("create through factory with block", async () => {
-    const p = await Post.create({ title: "factory" });
-    expect(p.isPersisted()).toBe(true);
-  });
-
   it("update sti type", async () => {
     const p = await Post.create({ title: "sti" });
     p.title = "updated-sti";
@@ -953,51 +953,61 @@ describe("PersistenceTest", () => {
 // PersistenceTest3 — additional missing tests from persistence_test.rb
 // ==========================================================================
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      default_records: { name: "string" },
-      posts: { title: "string", views: "integer", updated_at: "string" },
-    });
+  const Topic = CanonicalTopic;
+  const { topics, people } = useHandlerFixtures(["topics", "people", "cars"], {
+    schema: canonicalSchema,
   });
 
   it("decrement with touch an attribute updates timestamps", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("views", "integer");
-        this.attribute("updated_at", "string");
-      }
-    }
-    const p = (await Post.create({ views: 5 })) as any;
-    expect(p.isPersisted()).toBe(true);
+    const topic = topics("first");
+    expect(topic.replies_count).toBe(1);
+    const previouslyUpdatedAt = topic.updated_at;
+    const previouslyWrittenOn = topic.written_on;
+    await topic.decrementBang("replies_count", 1, { touch: "written_on" });
+    await topic.reload();
+    expect(topic.replies_count).toBe(0);
+    expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
+    expect(epochMs(topic.written_on)).toBeGreaterThan(epochMs(previouslyWrittenOn));
   });
+
   it("create through factory with block", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({ title: "factory" });
-    expect((p as any).isPersisted()).toBe(true);
+    const topic = await CanonicalTopic.create({ title: "New Topic" }, (t: any) => {
+      t.author_name = "David";
+    });
+    expect(topic.title).toBe("New Topic");
+    expect(topic.author_name).toBe("David");
   });
+
   it("create many through factory with block", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({ title: "factory2" });
-    expect((p as any).isPersisted()).toBe(true);
+    const created = await CanonicalTopic.create(
+      [{ title: "first" }, { title: "second" }],
+      (t: any) => {
+        t.author_name = "David";
+      },
+    );
+    expect(created.length).toBe(2);
+    const topic1 = await CanonicalTopic.find(created[0].id);
+    const topic2 = await CanonicalTopic.find(created[1].id);
+    expect(topic1.title).toBe("first");
+    expect(topic1.author_name).toBe("David");
+    expect(topic2.title).toBe("second");
+    expect(topic2.author_name).toBe("David");
   });
+
   it("update all with custom sql as value", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "old" });
-    expect(await Post.count()).toBeGreaterThan(0);
+    const person = people("michael") as any;
+    await person.updateBang({ cars_count: 0 });
+
+    // Rails' heredoc has no surrounding parens — its Arel UPDATE visitor
+    // parenthesizes a scalar-subquery assignment value. trails' `updateAll`
+    // renders a bare `SqlLiteral` value verbatim, so SQLite rejects an
+    // unparenthesized `SET cars_count = select ...`. The parens here stand in
+    // for that missing convergence (tracked: updateall-parenthesize-subquery-value).
+    await Person.updateAll({
+      cars_count: arelSql("(select count(*) from cars where cars.person_id = people.id)"),
+    });
+    await person.reload();
+    expect(person.cars_count).toBe(1);
   });
 });
 
