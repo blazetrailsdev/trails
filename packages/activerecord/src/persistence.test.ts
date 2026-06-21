@@ -106,8 +106,10 @@ describe("PersistenceTest", () => {
   it("delete all", async () => {
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
-    expect(await Topic.count()).toBeGreaterThan(0);
-    await Topic.all().deleteAll();
+    const before = (await Topic.count()) as number;
+    expect(before).toBeGreaterThan(0);
+    // Rails test_delete_all asserts delete_all returns the deleted count.
+    expect(await Topic.all().deleteAll()).toBe(before);
     expect(await Topic.count()).toBe(0);
   });
 
