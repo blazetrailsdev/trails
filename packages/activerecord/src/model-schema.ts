@@ -520,6 +520,15 @@ export const _inheritanceColumn = realInheritanceColumn;
  * `column.isAutoPopulated`, which only the reflected Column objects implement; the
  * synthesized column-hash fallback (used before the schema cache is warm) holds
  * plain shapes, so skip those — they carry no auto-increment metadata.
+ *
+ * Rails inlines this as the `auto_populated_columns` block inside
+ * `_returning_columns_for_insert` (model_schema.rb:437-444). trails splits it out
+ * because, unlike Rails' full-RETURNING-row read-back, its adapters surface a
+ * single generated value: only these auto-populated columns can be named in an
+ * explicit RETURNING clause and mapped, while the PK fallback drives just the
+ * scalar write-back.
+ *
+ * @internal
  */
 export function _autoPopulatedColumnsForInsert(
   this: SchemaHost,
@@ -544,10 +553,10 @@ export function _returningColumnsForInsert(
   // PK fallback. Restrict to columns that actually exist on the table: Rails
   // reflects `primary_key` as nil for a table without that column (e.g. an
   // id-less HABTM join table whose model still defaults `primary_key` to "id"),
-  // so `Array(primary_key)` is empty there. Without this filter we would emit
-  // an explicit `RETURNING "id"` against a table with no `id`, which PG rejects
-  // outright (the auto-append path tolerates it via a savepoint retry, but an
-  // explicit RETURNING does not).
+  // so `Array(primary_key)` is empty there. This list is NOT emitted as an
+  // explicit RETURNING clause (only `_autoPopulatedColumnsForInsert` is); it
+  // drives the scalar write-back loop, so the filter keeps that loop from
+  // writing a phantom `id` attribute into an id-less model.
   const colNames = new Set(cols.map((c) => c.name));
   const pk = this.primaryKey;
   const pkArr = Array.isArray(pk) ? pk : pk ? [pk] : [];
