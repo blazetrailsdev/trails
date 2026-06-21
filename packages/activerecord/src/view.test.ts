@@ -255,24 +255,28 @@ describe("UpdateableViewTest", () => {
     expect((book as any).name).toBe("AWDwR");
   });
 
-  // MySQL skip: the updatable view reports its NOT-NULL `id` with default "0"
-  // (via SHOW FULL FIELDS) and NO_AUTO_VALUE_ON_ZERO keeps id=0 in
-  // attributesForCreate, so the INSERT stores literal 0 instead of letting the
-  // underlying books table auto-assign. PG/Trilogy are unaffected.
-  itIfSupports.skipIf(adapterType === "mysql" || adapterType === "sqlite")(
-    "views",
-    "insert record",
-    async () => {
-      await PrintedBook.createBang({ name: "Rails in Action", status: 0, format: "paperback" });
-      const newBook = await PrintedBook.last();
-      expect((newBook as any).name).toBe("Rails in Action");
-    },
-  );
+  // Rails gates this `features=[views]` (runs on mysql + postgresql; SQLite views
+  // do not support DML). Match that static gate with `skipIf(sqlite)` and skip
+  // MySQL at runtime via ctx.skip so the extracted gate stays `mysql,postgresql|
+  // views` without a false green:
+  //   BLOCKED (MySQL): the updatable view reports its NOT-NULL `id` with default
+  //   "0" (via SHOW FULL FIELDS) and NO_AUTO_VALUE_ON_ZERO keeps id=0 in
+  //   attributesForCreate, so the INSERT stores literal 0 instead of letting the
+  //   underlying books table auto-assign. PG/Trilogy are unaffected.
+  //   Sub-story: view-insert-mysql-no-auto-value-on-zero.
+  itIfSupports.skipIf(adapterType === "sqlite")("views", "insert record", async (ctx) => {
+    ctx.skip(adapterType === "mysql");
+    await PrintedBook.createBang({ name: "Rails in Action", status: 0, format: "paperback" });
+    const newBook = await PrintedBook.last();
+    expect((newBook as any).name).toBe("Rails in Action");
+  });
 
-  // Rails: only runs on PostgreSQL (and SQLite) with supports_insert_returning?.
-  // The outer UpdateableViewTest block already excludes SQLite, leaving PG only.
+  // Rails gates this `features=[insert_returning,views]` (runs on mysql +
+  // postgresql; SQLite excluded by the outer view block). Carry both features so
+  // the extracted gate is `mysql,postgresql|insert_returning,views`; at runtime
+  // MySQL (mysql:8, not MariaDB) lacks insert_returning, so itIfSupports skips it.
   itIfSupports.skipIf(adapterType === "sqlite")(
-    "insert_returning",
+    "insert_returning,views",
     "insert record populates primary key",
     async () => {
       const book = await PrintedBook.createBang({

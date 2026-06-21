@@ -1028,76 +1028,81 @@ describe("InsertAllTest", () => {
   // supports_partitioned_indexes? → PostgreSQL >= 11 only. The canonical
   // `measurements` partitioned table (postgresql_specific_schema.rb:186-198) has
   // no partition DSL in our defineSchema, so it is built via raw PG DDL below.
-  it.skipIf(adapterType !== "postgres")("upsert all works with partitioned indexes", async () => {
-    // supports_partitioned_indexes? is PostgreSQL >= 11; every PG lane we run
-    // (CI uses postgres:17) clears that, so the adapterType gate above suffices.
-    const conn = Base.connection as any;
+  itIfSupports(
+    "insert_conflict_target,insert_on_duplicate_update,partitioned_indexes",
+    "upsert all works with partitioned indexes",
+    async () => {
+      // supports_partitioned_indexes? is PostgreSQL >= 11; every PG lane we run
+      // (CI uses postgres:17) clears that, and the conjunction's other two features
+      // (insert_conflict_target, insert_on_duplicate_update) keep the runtime to PG.
+      const conn = Base.connection as any;
 
-    await conn.executeMutation('DROP TABLE IF EXISTS "measurements" CASCADE');
-    await conn.executeMutation(
-      'CREATE TABLE "measurements" (' +
-        '"city_id" character varying NOT NULL, ' +
-        '"logdate" date NOT NULL, ' +
-        '"peaktemp" integer, ' +
-        '"unitsales" integer' +
-        ") PARTITION BY LIST (city_id)",
-    );
-    await conn.executeMutation(
-      'CREATE UNIQUE INDEX "index_measurements_on_logdate_and_city_id" ' +
-        'ON "measurements" ("logdate", "city_id")',
-    );
-    await conn.executeMutation(
-      'CREATE TABLE "measurements_toronto" PARTITION OF "measurements" FOR VALUES IN (1)',
-    );
-    await conn.executeMutation(
-      'CREATE TABLE "measurements_concepcion" PARTITION OF "measurements" FOR VALUES IN (2)',
-    );
-    conn.schemaCache?.clear();
+      await conn.executeMutation('DROP TABLE IF EXISTS "measurements" CASCADE');
+      await conn.executeMutation(
+        'CREATE TABLE "measurements" (' +
+          '"city_id" character varying NOT NULL, ' +
+          '"logdate" date NOT NULL, ' +
+          '"peaktemp" integer, ' +
+          '"unitsales" integer' +
+          ") PARTITION BY LIST (city_id)",
+      );
+      await conn.executeMutation(
+        'CREATE UNIQUE INDEX "index_measurements_on_logdate_and_city_id" ' +
+          'ON "measurements" ("logdate", "city_id")',
+      );
+      await conn.executeMutation(
+        'CREATE TABLE "measurements_toronto" PARTITION OF "measurements" FOR VALUES IN (1)',
+      );
+      await conn.executeMutation(
+        'CREATE TABLE "measurements_concepcion" PARTITION OF "measurements" FOR VALUES IN (2)',
+      );
+      conn.schemaCache?.clear();
 
-    // Rails uses the empty `models/measurement.rb` and introspects the
-    // partitioned table's columns + (absent) primary key. Our PK introspection
-    // still defaults a no-PK table to "id", so the columns and `primaryKey = ""`
-    // (no PK, mirroring the partitioned table) are declared here instead — the
-    // alternative the story sanctions over DB introspection.
-    class Measurement extends Base {
-      static {
-        this.primaryKey = "";
-        this.attribute("city_id", "string");
-        this.attribute("logdate", "date");
-        this.attribute("peaktemp", "integer");
-        this.attribute("unitsales", "integer");
+      // Rails uses the empty `models/measurement.rb` and introspects the
+      // partitioned table's columns + (absent) primary key. Our PK introspection
+      // still defaults a no-PK table to "id", so the columns and `primaryKey = ""`
+      // (no PK, mirroring the partitioned table) are declared here instead — the
+      // alternative the story sanctions over DB introspection.
+      class Measurement extends Base {
+        static {
+          this.primaryKey = "";
+          this.attribute("city_id", "string");
+          this.attribute("logdate", "date");
+          this.attribute("peaktemp", "integer");
+          this.attribute("unitsales", "integer");
+        }
       }
-    }
 
-    const today = Temporal.Now.plainDateISO();
-    const oneDayAgo = today.subtract({ days: 1 });
-    const twoDaysAgo = today.subtract({ days: 2 });
-    const threeDaysAgo = today.subtract({ days: 3 });
+      const today = Temporal.Now.plainDateISO();
+      const oneDayAgo = today.subtract({ days: 1 });
+      const twoDaysAgo = today.subtract({ days: 2 });
+      const threeDaysAgo = today.subtract({ days: 3 });
 
-    await Measurement.upsertAll(
-      [
-        { city_id: "1", logdate: oneDayAgo, peaktemp: 1, unitsales: 1 },
-        { city_id: "2", logdate: twoDaysAgo, peaktemp: 2, unitsales: 2 },
-        { city_id: "2", logdate: threeDaysAgo, peaktemp: 0, unitsales: 0 },
-      ],
-      { uniqueBy: ["logdate", "city_id"] },
-    );
+      await Measurement.upsertAll(
+        [
+          { city_id: "1", logdate: oneDayAgo, peaktemp: 1, unitsales: 1 },
+          { city_id: "2", logdate: twoDaysAgo, peaktemp: 2, unitsales: 2 },
+          { city_id: "2", logdate: threeDaysAgo, peaktemp: 0, unitsales: 0 },
+        ],
+        { uniqueBy: ["logdate", "city_id"] },
+      );
 
-    const torontoRows = (
-      await Measurement.where({ city_id: 1 }).pluck("logdate", "peaktemp", "unitsales")
-    ).map((r: any) => [String(r[0]), r[1], r[2]]);
-    expect(torontoRows).toEqual([[oneDayAgo.toString(), 1, 1]]);
+      const torontoRows = (
+        await Measurement.where({ city_id: 1 }).pluck("logdate", "peaktemp", "unitsales")
+      ).map((r: any) => [String(r[0]), r[1], r[2]]);
+      expect(torontoRows).toEqual([[oneDayAgo.toString(), 1, 1]]);
 
-    const concepcionRows = (
-      await Measurement.where({ city_id: 2 }).pluck("logdate", "peaktemp", "unitsales")
-    ).map((r: any) => [String(r[0]), r[1], r[2]]);
-    expect(concepcionRows).toEqual([
-      [twoDaysAgo.toString(), 2, 2],
-      [threeDaysAgo.toString(), 0, 0],
-    ]);
+      const concepcionRows = (
+        await Measurement.where({ city_id: 2 }).pluck("logdate", "peaktemp", "unitsales")
+      ).map((r: any) => [String(r[0]), r[1], r[2]]);
+      expect(concepcionRows).toEqual([
+        [twoDaysAgo.toString(), 2, 2],
+        [threeDaysAgo.toString(), 0, 0],
+      ]);
 
-    await conn.executeMutation('DROP TABLE IF EXISTS "measurements" CASCADE');
-  });
+      await conn.executeMutation('DROP TABLE IF EXISTS "measurements" CASCADE');
+    },
+  );
 
   // trails-only regression (no Rails counterpart): guards insert_all.rb:61 —
   // `primary_keys` reads the schema cache, so a model whose configured
