@@ -1,14 +1,24 @@
 // vendor/rails/activerecord/test/models/company_in_module.rb
 // Ruby modules flattened to prefixed exports (TypeScript namespaces banned by lint rule).
+// Each class carries its Ruby module path via `static moduleName` (+ the bare
+// `_demodulizedName` when the flattened JS name differs), so `registerModel`
+// derives the `::`-qualified registry key — the one cross-namespace `className`
+// resolution looks up — instead of a hand-maintained `registerModel(name, …)` call.
 import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
 import { Company } from "./company.js";
 
 // MyApplication::Business::Company < ::Company
-export class MyAppBusinessCompany extends Company {}
+export class MyAppBusinessCompany extends Company {
+  static moduleName = "MyApplication::Business";
+  static _demodulizedName = "Company";
+}
 
 // MyApplication::Business::Firm
 export class MyAppBusinessFirm extends MyAppBusinessCompany {
+  static moduleName = "MyApplication::Business";
+  static _demodulizedName = "Firm";
+
   static {
     // foreignKey explicit throughout: JS class name MyAppBusinessFirm would derive
     // my_app_business_firm_id, but Rails demodulizes MyApplication::Business::Firm → firm_id.
@@ -42,6 +52,9 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
 
 // MyApplication::Business::Client
 export class MyAppBusinessClient extends MyAppBusinessCompany {
+  static moduleName = "MyApplication::Business";
+  static _demodulizedName = "Client";
+
   static {
     this.belongsTo("firm", { foreignKey: "client_of" });
     this.belongsTo("firmWithOtherName", { className: "Firm", foreignKey: "client_of" });
@@ -49,10 +62,16 @@ export class MyAppBusinessClient extends MyAppBusinessCompany {
 }
 
 // MyApplication::Business::Client::Contact
-export class MyAppBusinessClientContact extends Base {}
+export class MyAppBusinessClientContact extends Base {
+  static moduleName = "MyApplication::Business::Client";
+  static _demodulizedName = "Contact";
+}
 
 // MyApplication::Business::Developer
 export class MyAppBusinessDeveloper extends Base {
+  static moduleName = "MyApplication::Business";
+  static _demodulizedName = "Developer";
+
   static {
     this._tableName = "developers";
     this.hasAndBelongsToMany("projects");
@@ -62,6 +81,9 @@ export class MyAppBusinessDeveloper extends Base {
 
 // MyApplication::Business::Project
 export class MyAppBusinessProject extends Base {
+  static moduleName = "MyApplication::Business";
+  static _demodulizedName = "Project";
+
   static {
     this._tableName = "projects";
     this.hasAndBelongsToMany("developers");
@@ -69,33 +91,54 @@ export class MyAppBusinessProject extends Base {
 }
 
 // MyApplication::Business::Prefixed::Company
-export class MyAppBusinessPrefixedCompany extends Base {}
+export class MyAppBusinessPrefixedCompany extends Base {
+  static moduleName = "MyApplication::Business::Prefixed";
+  static _demodulizedName = "Company";
+}
 
 // MyApplication::Business::Prefixed::Firm
 export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
+  static moduleName = "MyApplication::Business::Prefixed";
+  static _demodulizedName = "Firm";
+
   static {
     this._tableName = "companies";
   }
 }
 
 // MyApplication::Business::Prefixed::Nested::Company
-export class MyAppBusinessPrefixedNestedCompany extends Base {}
+export class MyAppBusinessPrefixedNestedCompany extends Base {
+  static moduleName = "MyApplication::Business::Prefixed::Nested";
+  static _demodulizedName = "Company";
+}
 
 // MyApplication::Business::Suffixed::Company
-export class MyAppBusinessSuffixedCompany extends Base {}
+export class MyAppBusinessSuffixedCompany extends Base {
+  static moduleName = "MyApplication::Business::Suffixed";
+  static _demodulizedName = "Company";
+}
 
 // MyApplication::Business::Suffixed::Firm
 export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
+  static moduleName = "MyApplication::Business::Suffixed";
+  static _demodulizedName = "Firm";
+
   static {
     this._tableName = "companies";
   }
 }
 
 // MyApplication::Business::Suffixed::Nested::Company
-export class MyAppBusinessSuffixedNestedCompany extends Base {}
+export class MyAppBusinessSuffixedNestedCompany extends Base {
+  static moduleName = "MyApplication::Business::Suffixed::Nested";
+  static _demodulizedName = "Company";
+}
 
 // MyApplication::Billing::Firm
 export class MyAppBillingFirm extends Base {
+  static moduleName = "MyApplication::Billing";
+  static _demodulizedName = "Firm";
+
   static {
     this._tableName = "companies";
   }
@@ -103,6 +146,9 @@ export class MyAppBillingFirm extends Base {
 
 // MyApplication::Billing::Nested::Firm
 export class MyAppBillingNestedFirm extends Base {
+  static moduleName = "MyApplication::Billing::Nested";
+  static _demodulizedName = "Firm";
+
   static {
     this._tableName = "companies";
   }
@@ -110,6 +156,9 @@ export class MyAppBillingNestedFirm extends Base {
 
 // MyApplication::Billing::Account
 export class MyAppBillingAccount extends Base {
+  static moduleName = "MyApplication::Billing";
+  static _demodulizedName = "Account";
+
   static {
     this._tableName = "accounts";
     const opts = { foreignKey: "firm_id" };
@@ -140,25 +189,25 @@ export class MyAppBillingAccount extends Base {
   }
 }
 
-// Register Ruby-module-qualified names so cross-namespace className resolution works.
-registerModel("MyApplication::Business::Company", MyAppBusinessCompany);
-registerModel("MyApplication::Business::Firm", MyAppBusinessFirm);
-registerModel("MyApplication::Business::Client", MyAppBusinessClient);
-registerModel("MyApplication::Business::Client::Contact", MyAppBusinessClientContact);
-registerModel("MyApplication::Business::Developer", MyAppBusinessDeveloper);
-registerModel("MyApplication::Business::Project", MyAppBusinessProject);
-registerModel("MyApplication::Business::Prefixed::Company", MyAppBusinessPrefixedCompany);
-registerModel("MyApplication::Business::Prefixed::Firm", MyAppBusinessPrefixedFirm);
-registerModel(
-  "MyApplication::Business::Prefixed::Nested::Company",
+// Register each model: `registerModel` derives the `::`-qualified registry key
+// from the class's own `moduleName`, so cross-namespace className resolution
+// works without hand-written `registerModel("Ruby::Name", …)` strings.
+for (const klass of [
+  MyAppBusinessCompany,
+  MyAppBusinessFirm,
+  MyAppBusinessClient,
+  MyAppBusinessClientContact,
+  MyAppBusinessDeveloper,
+  MyAppBusinessProject,
+  MyAppBusinessPrefixedCompany,
+  MyAppBusinessPrefixedFirm,
   MyAppBusinessPrefixedNestedCompany,
-);
-registerModel("MyApplication::Business::Suffixed::Company", MyAppBusinessSuffixedCompany);
-registerModel("MyApplication::Business::Suffixed::Firm", MyAppBusinessSuffixedFirm);
-registerModel(
-  "MyApplication::Business::Suffixed::Nested::Company",
+  MyAppBusinessSuffixedCompany,
+  MyAppBusinessSuffixedFirm,
   MyAppBusinessSuffixedNestedCompany,
-);
-registerModel("MyApplication::Billing::Firm", MyAppBillingFirm);
-registerModel("MyApplication::Billing::Nested::Firm", MyAppBillingNestedFirm);
-registerModel("MyApplication::Billing::Account", MyAppBillingAccount);
+  MyAppBillingFirm,
+  MyAppBillingNestedFirm,
+  MyAppBillingAccount,
+]) {
+  registerModel(klass);
+}

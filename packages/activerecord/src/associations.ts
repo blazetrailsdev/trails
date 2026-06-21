@@ -7,6 +7,7 @@ import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { ScopeRegistry } from "./scoping.js";
 import { delegateArrayMethod, delegateEnumerableMethod } from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
+import { qualifiedName } from "./inheritance.js";
 // Re-export the slot's setter so the package entry and other internal
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -262,6 +263,16 @@ export function registerModel(
   } else {
     modelRegistry.set(nameOrModel.name, nameOrModel);
     nameOrModel._modelsByName.set(nameOrModel.name, nameOrModel);
+    // A namespaced model carries its Ruby module path via `static moduleName`;
+    // derive the `::`-qualified registry key from it (e.g.
+    // "MyApplication::Billing::Firm") so cross-namespace `className` resolution
+    // finds the flattened JS class without a hand-written `registerModel(name, …)`
+    // call. `qualifiedName` returns the bare `.name` for non-namespaced models,
+    // so the extra registration only happens when it actually differs.
+    const qualified = qualifiedName(nameOrModel);
+    if (qualified !== nameOrModel.name) {
+      registerModel(qualified, nameOrModel);
+    }
     flushPendingCounterCacheColumns(nameOrModel);
   }
 }
