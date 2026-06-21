@@ -728,11 +728,12 @@ describe("HasManyAssociationsTest", () => {
     expect(await HmTagging.findBy({ id: first.id })).toBeNull();
   });
 
-  it("deleting updates counter cache with dependent destroy via association layer", async () => {
-    // Same Rails behavior as above, but routed through the OO
-    // CollectionAssociation#delete → HasManyAssociation#delete_records path
-    // (`association(...).delete`) rather than the CollectionProxy fast-path, to
-    // cover the `unless reflection.inverse_updates_counter_cache?` guard there.
+  // Same Rails behavior as the test above, but routed through the OO
+  // CollectionAssociation#delete → HasManyAssociation#delete_records path
+  // (`association(...).delete`) rather than the CollectionProxy fast-path, to
+  // cover the `unless reflection.inverse_updates_counter_cache?` guard there.
+  // Verbatim Rails name (one Rails test, two trails code paths).
+  it("deleting updates counter cache with dependent destroy", async () => {
     const post = posts("welcome");
     const startCount = (post as any).tags_count as number;
     await post.updateColumns({ taggings_with_destroy_count: startCount });
