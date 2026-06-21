@@ -1671,3 +1671,34 @@ export const TEST_SCHEMA: Schema = {
     primaryKey: ["as"],
   },
 };
+
+/**
+ * Mirror of vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb
+ * — tables that only exist on PostgreSQL. They use PG-only column types (here,
+ * `uuid` primary keys with a `gen_random_uuid()` default), which `defineSchema`
+ * rejects on SQLite/MySQL, so this schema must only ever be applied on the
+ * postgres adapter.
+ *
+ * Rails picks `gen_random_uuid()` when pgcrypto is available and falls back to
+ * `uuid_generate_v4()` (uuid-ossp) otherwise; `gen_random_uuid()` is built into
+ * PostgreSQL 13+ and needs no extension, so we use it unconditionally.
+ */
+export const POSTGRESQL_SPECIFIC_SCHEMA: Schema = {
+  // create_table :chat_messages, id: :uuid, force: true, **uuid_default
+  chat_messages: {
+    columns: {
+      id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
+      content: "text",
+    },
+    primaryKey: ["id"],
+  },
+  // create_table :chat_messages_custom_pk, id: false, force: true do |t|
+  //   t.uuid :message_id, primary_key: true, default: "uuid_generate_v4()"
+  chat_messages_custom_pk: {
+    columns: {
+      message_id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
+      content: "text",
+    },
+    primaryKey: ["message_id"],
+  },
+};
