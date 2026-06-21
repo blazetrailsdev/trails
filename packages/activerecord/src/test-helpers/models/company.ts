@@ -47,9 +47,17 @@ export class Company extends AbstractCompany {
 export class SpecialCo extends Company {}
 
 // Ruby: module Namespaced; class Company < ::Company; end; ...
-export class NamespacedCompany extends Company {}
+// `moduleName` carries the Ruby module so `registerModel` derives the qualified
+// "Namespaced::*" registry key for cross-namespace className resolution.
+export class NamespacedCompany extends Company {
+  static moduleName = "Namespaced";
+  static _demodulizedName = "Company";
+}
 
 export class NamespacedFirm extends Company {
+  static moduleName = "Namespaced";
+  static _demodulizedName = "Firm";
+
   static {
     // foreignKey explicit: JS class name NamespacedFirm would derive namespaced_firm_id,
     // but Rails demodulizes Namespaced::Firm → firm_id.
@@ -57,7 +65,10 @@ export class NamespacedFirm extends Company {
   }
 }
 
-export class NamespacedClient extends Company {}
+export class NamespacedClient extends Company {
+  static moduleName = "Namespaced";
+  static _demodulizedName = "Client";
+}
 
 export class Firm extends Company {
   _log: string[] = [];
@@ -417,10 +428,12 @@ export class NewlyContractedCompany extends Company {
   }
 }
 
-// Register Ruby-module-qualified names so cross-namespace className resolution works.
-registerModel("Namespaced::Company", NamespacedCompany);
-registerModel("Namespaced::Firm", NamespacedFirm);
-registerModel("Namespaced::Client", NamespacedClient);
+// `registerModel` derives the qualified "Namespaced::*" registry key from each
+// class's own `moduleName`, so cross-namespace className resolution works
+// without hand-written `registerModel("Ruby::Name", …)` strings.
+for (const klass of [NamespacedCompany, NamespacedFirm, NamespacedClient]) {
+  registerModel(klass);
+}
 
 // Track the STI subtree so registry-safe subclass resolution (STI dispatch at
 // `new`, `descendants`) can find these classes through Company's own subtree
