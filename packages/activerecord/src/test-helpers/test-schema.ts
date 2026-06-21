@@ -122,12 +122,19 @@ export const TEST_SCHEMA: Schema = {
     favorite_author_id: "integer",
   },
 
+  // Mirrors Rails `create_table :auto_id_tests, id: false` with columns
+  // declared `value`, `published_at`, then `t.primary_key :auto_id` LAST. The
+  // PK position matters: persistence_test
+  // `test_populates_autoincremented_id_pk_regardless_of_its_position_in_columns_list`
+  // asserts the first auto-populated column is `published_at`, not the PK.
   auto_id_tests: {
     columns: {
-      auto_id: "integer",
       value: "integer",
-      // Rails default: CURRENT_TIMESTAMP — see note at top of file.
-      published_at: "datetime",
+      // Rails: `t.timestamp :published_at, default: -> { "CURRENT_TIMESTAMP" }`.
+      // precision: null emits a bare DATETIME (no MySQL precision-6 upgrade),
+      // required to pair with the CURRENT_TIMESTAMP function default.
+      published_at: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" },
+      auto_id: "integer",
     },
     primaryKey: ["auto_id"],
   },

@@ -698,16 +698,16 @@ async function _defineSchemaImpl(
     await ss.dropTable(table, { ifExists: true });
     issuedDdl = true;
     const createOpts: { id?: boolean | { type: string }; primaryKey?: string | string[] } = {};
+    // A single-column integer PK is emitted INLINE at its declared offset in the
+    // column loop (below) rather than via createTable's string-`primaryKey`
+    // option, which always hoists the PK column first. Inline emission lets the
+    // PK sit at its Rails-declared position — e.g. `auto_id_tests` declares
+    // `t.primary_key :auto_id` LAST, so the reflected column order must keep it
+    // last (Rails persistence_test `test_populates_autoincremented_id_pk_...`).
+    // `id: false` suppresses the auto-generated `id` column.
     if (pk === false) createOpts.id = false;
     else if (serialPkName !== null) {
-      createOpts.primaryKey = serialPkName;
-      // Preserve the declared INTEGER width across adapters. The default
-      // `primary_key` type widens to BIGINT on MySQL, which breaks integer FK
-      // references (e.g. fk_test_has_fk.fk_id → fk_test_has_pk.pk_id, errno 150).
-      // PG `serial`/`bigserial` → INT4/INT8 serial; MySQL `integer`/`bigint` and
-      // SQLite `integer` → auto-increment. (`integer` does NOT auto-increment on
-      // PG, hence the per-adapter split.)
-      createOpts.id = { type: serialIdType(columns[serialPkName], adapter.adapterName) };
+      createOpts.id = false;
     } else if (Array.isArray(pk)) {
       createOpts.primaryKey = pk;
       createOpts.id = false;
@@ -715,9 +715,19 @@ async function _defineSchemaImpl(
     const compositePkCols = Array.isArray(pk) && serialPkName === null ? new Set(pk) : null;
     await ss.createTable(table, createOpts, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
-        // The serial PK column is emitted by createTable's string-`primaryKey`
-        // path; emitting it again here would duplicate the column.
-        if (colName === serialPkName) continue;
+        // Emit the single-column integer PK inline at its declared offset.
+        // Preserve the declared INTEGER width across adapters. The default
+        // `primary_key` type widens to BIGINT on MySQL, which breaks integer FK
+        // references (e.g. fk_test_has_fk.fk_id → fk_test_has_pk.pk_id, errno 150).
+        // PG `serial`/`bigserial` → INT4/INT8 serial; MySQL `integer`/`bigint` and
+        // SQLite `integer` → auto-increment. (`integer` does NOT auto-increment on
+        // PG, hence the per-adapter split.)
+        if (colName === serialPkName) {
+          t.column(colName, serialIdType(columns[colName], adapter.adapterName), {
+            primaryKey: true,
+          });
+          continue;
+        }
         const primitive: AnyPrimitiveColumnSpec = typeof spec === "string" ? spec : spec.type;
         const isArray = typeof spec === "object" && spec.array === true;
         if (PG_ONLY_TYPES.has(primitive) && adapter.adapterName !== "postgres") {

@@ -18,6 +18,7 @@ import {
   dataSourceSql as sqliteDataSourceSql,
   extractValueFromDefault as sqliteExtractValueFromDefault,
   indexes as sqliteIndexes,
+  isColumnTheRowid,
 } from "./sqlite3/schema-statements.js";
 import {
   indexNameForRemoveFrom,
@@ -1872,7 +1873,19 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       pk: number;
     }>;
 
-    const collationMap = await this._parseCollationsFromTableSql(tableName);
+    // Enrich the PRAGMA rows with COLLATE + AUTOINCREMENT via the same
+    // `table_structure_with_collation` pass Rails uses. We read only
+    // collation/auto_increment here; defaultFunction is still derived from the
+    // raw PRAGMA `dflt_value` below, so the method's GENERATED `dflt_value`
+    // override does not affect this path.
+    const enriched = await this.tableStructureWithCollation(tableName, rows);
+    const collationMap = new Map<string, string>();
+    const autoIncrementCols = new Set<string>();
+    for (const e of enriched) {
+      const name = String(e["name"]);
+      if (e["collation"] != null) collationMap.set(name, String(e["collation"]));
+      if (e["auto_increment"]) autoIncrementCols.add(name);
+    }
 
     return rows.map((r) => {
       const sqlType = r.type || "";
@@ -1911,10 +1924,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(rawDflt)
           ? rawDflt
           : null;
+      // Reflect rowid (INTEGER single-column PK aliases the rowid) and
+      // AUTOINCREMENT so `Column#auto_populated?` reports auto-increment columns
+      // — mirrors Rails SQLite3Adapter#new_column_from_field. The PK's position
+      // in the column list is irrelevant (`t.primary_key :auto_id` declared last
+      // still aliases the rowid).
+      const rowid = isColumnTheRowid(r as unknown as Record<string, unknown>, rows);
       return new Sqlite3Column(r.name, defaultValue, meta, r.notnull === 0, {
         primaryKey: r.pk > 0,
         collation: collationMap.get(r.name) ?? null,
         defaultFunction,
+        autoIncrement: autoIncrementCols.has(r.name),
+        rowid,
       });
     });
   }
@@ -1922,15 +1943,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // Mirrors: SQLite3Adapter#table_structure_with_collation
   private async _parseCollationsFromTableSql(tableName: string): Promise<Map<string, string>> {
     const result = new Map<string, string>();
-    const createSql = await this._getCreateTableSql(tableName);
-    if (!createSql) return result;
-
-    const COLLATE_REGEX = /.*"(\w+)".*\bCOLLATE\s+"(\w+)".*/i;
-    const body = createSql.replace(/\);*\s*$/, "").replace(/^[^(]*\(/, "");
-    const parts = body.split(/,(?=\s*(?:"|\bCONSTRAINT\b))/i);
-    for (const part of parts) {
-      const m = COLLATE_REGEX.exec(part);
-      if (m) result.set(m[1], m[2]);
+    const enriched = await this.tableStructureWithCollation(
+      tableName,
+      await this.tableInfo(tableName),
+    );
+    for (const e of enriched) {
+      if (e["collation"] != null) result.set(String(e["name"]), String(e["collation"]));
     }
     return result;
   }
@@ -2324,11 +2342,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const body = row.sql.replace(/\);\s*$/, "").replace(/^[^(]*\(/, "");
     const names = columnNames ?? [];
     let splitter: RegExp;
+    // Rails' table_structure_sql anchors on a single `\s` before each column
+    // name; we widen it to `\s*` so hand-written multi-line CREATE TABLE
+    // (`,\n    "col"`) still splits — the newline+indent would otherwise defeat
+    // the single-`\s` lookahead. Still safe: the lookahead requires a quoted
+    // column name or CONSTRAINT.
     if (names.length > 0) {
       const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
-      splitter = new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${escaped})"))`, "i");
+      splitter = new RegExp(`,(?=\\s*(?:CONSTRAINT|"(?:${escaped})"))`, "i");
     } else {
-      splitter = /,(?=\s(?:CONSTRAINT|"))/;
+      splitter = /,(?=\s*(?:CONSTRAINT|"))/;
     }
     return body.split(splitter).map((s) => s.trim());
   }
