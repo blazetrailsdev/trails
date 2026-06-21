@@ -337,11 +337,7 @@ describe("PersistenceTest", () => {
   });
 
   it("save uses query constraints config", async () => {
-    const clothingItem = await ClothingItem.create({
-      clothing_type: "t-shirt",
-      color: "green",
-      description: "Cool green t-shirt",
-    });
+    const clothingItem = clothingItems("green_t_shirt");
     clothingItem.description = "Lovely green t-shirt";
     const sqls = await captureSql(async () => {
       await clothingItem.save();
@@ -352,11 +348,7 @@ describe("PersistenceTest", () => {
   });
 
   it("reload uses query constraints config", async () => {
-    const clothingItem = await ClothingItem.create({
-      clothing_type: "t-shirt",
-      color: "green",
-      description: "Cool green t-shirt",
-    });
+    const clothingItem = clothingItems("green_t_shirt");
     const sqls = await captureSql(async () => {
       await clothingItem.reload();
     });
@@ -366,11 +358,7 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute uses query constraints config", async () => {
-    const clothingItem = await ClothingItem.create({
-      clothing_type: "t-shirt",
-      color: "green",
-      description: "Cool green t-shirt",
-    });
+    const clothingItem = clothingItems("green_t_shirt");
     const sqls = await captureSql(async () => {
       await clothingItem.updateAttribute("description", "Lovely green t-shirt");
     });
@@ -380,11 +368,7 @@ describe("PersistenceTest", () => {
   });
 
   it("it is possible to update parts of the query constraints config", async () => {
-    const clothingItem = await ClothingItem.create({
-      clothing_type: "t-shirt",
-      color: "green",
-      description: "Cool green t-shirt",
-    });
+    const clothingItem = clothingItems("green_t_shirt");
     clothingItem.color = "blue";
     clothingItem.description = "Now it's a blue t-shirt";
     const sqls = await captureSql(async () => {
