@@ -54,9 +54,15 @@ export class ArrayHandler {
         hasNull = true;
       } else if (item instanceof Range) {
         ranges.push(item);
-      } else if (typeof item === "object" && item !== null && "id" in item) {
+      } else if (
+        typeof item === "object" &&
+        item !== null &&
+        "id" in item &&
+        !isPlainObject(item)
+      ) {
         // Rails: `x.is_a?(Base) ? x.id : x` — flatten AR records to their PK.
-        // Duck-typed on `id` presence to avoid a circular import on Base.
+        // Duck-typed on `id` presence to avoid a circular import on Base, but a
+        // bare object literal (a Ruby Hash) is NOT a Base and must not be deref'd.
         scalarValues.push((item as { id: unknown }).id);
       } else {
         scalarValues.push(item);
@@ -98,4 +104,12 @@ export class ArrayHandler {
 
 function groupedOr(left: Nodes.Node, right: Nodes.Node): Nodes.Grouping {
   return new Nodes.Grouping(new Nodes.Or(left, right));
+}
+
+// A bare object literal stands in for a Ruby Hash, which is not an AR record and
+// must not be dereferenced to its `id`. Mirrors predicate-builder.ts's helper.
+function isPlainObject(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }

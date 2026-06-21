@@ -262,8 +262,8 @@ export class PredicateBuilder {
         hasNull = true;
       } else if (item instanceof Range) {
         ranges.push(item);
-      } else if (typeof item === "object" && item !== null && "id" in item) {
-        scalarValues.push((item as any).id);
+      } else if (respondsToId(item)) {
+        scalarValues.push((item as { id: unknown }).id);
       } else if (typeof item === "object" || typeof item === "function") {
         nonScalarValues.push(item);
       } else {
@@ -595,10 +595,12 @@ export class PredicateBuilder {
 }
 
 // Rails: `value.respond_to?(:id)`. In Ruby only Active Record records (and things
-// defining #id) respond, since Object#id was removed in 1.9. The TS mirror: an
-// object that carries an `id` property — matching the array handler's record detection.
+// defining #id) respond, since Object#id was removed in 1.9 — a bare `Hash` does
+// NOT respond_to?(:id), so `where(col: { id: 5 })` routes `{ id: 5 }` to a handler
+// rather than dereferencing to `5`. The TS mirror: an object that carries an `id`
+// property but is not a plain object literal (those stand in for Ruby Hashes).
 function respondsToId(value: unknown): value is { id: unknown } {
-  return value != null && typeof value === "object" && "id" in value;
+  return value != null && typeof value === "object" && "id" in value && !isPlainObject(value);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
