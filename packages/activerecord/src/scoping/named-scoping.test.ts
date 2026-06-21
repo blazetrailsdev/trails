@@ -37,7 +37,7 @@ registerModel(Author);
 registerModel(Developer);
 
 const ids = (rows: any[]) => rows.map((r) => r.id);
-const sortedIds = (rows: any[]) => ids(rows).sort((a, b) => a - b);
+const sortedIds = (rows: any[]) => ids(rows).sort((a, b) => Number(a) - Number(b));
 // Rails capture_sql(include_schema: false): drop introspection queries so the
 // query counts match Rails' assert_queries_count.
 const capSql = (fn: () => unknown) =>
