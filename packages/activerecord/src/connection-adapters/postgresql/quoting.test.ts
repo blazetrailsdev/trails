@@ -60,6 +60,15 @@ describe("PostgreSQL quoting", () => {
     expect(quote(boxArray)).toBe("'{(1,1),(0,0);(2,2),(1,1)}'");
   });
 
+  it("encodes unbounded range bounds as empty, matching Ruby nil interpolation", () => {
+    // Rails builds the literal with string interpolation, where a nil bound
+    // (unbounded end) renders as "". `${null}` would emit "null" and PG rejects
+    // e.g. `[2020-01-01,null)` for a tsrange.
+    expect(typeCast(new Range("2020-01-01", null, true))).toBe("[2020-01-01,)");
+    expect(typeCast(new Range(null, "2020-12-31", false))).toBe("[,2020-12-31]");
+    expect(quote(new Range("2020-01-01", null, true))).toBe("'[2020-01-01,)'");
+  });
+
   it("serializes defaults for any PostgreSQL column, not only array columns", () => {
     const column = { sqlType: "integer", array: false };
     const typeMap = {
