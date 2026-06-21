@@ -147,9 +147,14 @@ export function buildAdapterArg(
     // with the rest of the configuration hash. Forward the URL under the
     // adapter-specific connection key alongside the remaining options instead
     // of dropping them. Pure-URL configs (no extra keys) keep the `[url]` form.
-    const { adapter: _ua, url: _uu, ...urlRest } = configuration;
-    if (Object.keys(urlRest).length === 0) {
+    const { adapter: _ua, url: _uu, username, ...urlRest } = configuration;
+    if (username === undefined && Object.keys(urlRest).length === 0) {
       return [url];
+    }
+    // Apply the same `username` → `user` remap the discrete-field branch does,
+    // so callers passing `username` alongside a URL still reach the driver.
+    if (username !== undefined && urlRest.user === undefined) {
+      urlRest.user = username;
     }
     const urlKey = normalized === "postgresql" ? "connectionString" : "uri";
     return [{ ...urlRest, [urlKey]: url }];
