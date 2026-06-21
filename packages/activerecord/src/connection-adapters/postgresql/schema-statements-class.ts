@@ -1121,8 +1121,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         return;
       }
     }
-    // Rails PostgreSQL does not override add_foreign_key: run foreign_key_options
-    // then schema_creation.accept(AlterTable + ForeignKeyDefinition). The PG
+    // Rails PG `add_foreign_key` is `assert_valid_deferrable(deferrable); super`,
+    // and the abstract `super` runs foreign_key_options then
+    // schema_creation.accept(AlterTable + ForeignKeyDefinition). We replicate
+    // that abstract body here (rather than delegating to our own `super`, which
+    // still hand-defaults the FK name and would recurse through the
+    // self-delegation guard — tracked by
+    // abstract-add-foreign-key-converge-to-foreign-key-options). The PG
     // schema_creation (visitAlterTable/visitForeignKeyDefinition) emits the
     // deferrable / NOT VALID / action / schema-qualified-name decoration, so no
     // bespoke inline SQL is needed here.
