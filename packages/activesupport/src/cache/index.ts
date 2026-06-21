@@ -10,6 +10,7 @@ export interface CacheOptions {
   compressThreshold?: number;
   unlessExist?: boolean;
   raceConditionTtl?: number; // milliseconds
+  [key: string]: unknown; // open hash (Rails); flows into the Store base's StoreOptions
 }
 
 export interface CacheStore {
@@ -23,7 +24,7 @@ export interface CacheStore {
   cleanup(): void;
   readMulti(...keys: [...string[], CacheOptions] | string[]): Record<string, unknown>;
   writeMulti(hash: Record<string, unknown>, options?: CacheOptions): void;
-  deleteMulti(...keys: string[]): number;
+  deleteMulti(names: string[], options?: CacheOptions): number;
   deleteMatched(pattern: string | RegExp): void;
   increment(key: string, amount?: number, options?: CacheOptions): number | null;
   decrement(key: string, amount?: number, options?: CacheOptions): number | null;

@@ -1,15 +1,35 @@
 import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
+import { Entry } from "./entry.js";
+import { Store, type WriteOptions } from "./store.js";
 import { type CacheEntry, namespaceKey, isExpired, extractCacheOptions } from "./entry-record.js";
 
-export class MemoryStore implements CacheStore {
+export class MemoryStore extends Store implements CacheStore {
   private store: Map<string, CacheEntry> = new Map();
   private namespace?: string;
   private sizeLimit: number;
 
   constructor(options?: { sizeLimit?: number; namespace?: string; expiresIn?: number }) {
+    super(options ?? {});
     this.namespace = options?.namespace;
     this.sizeLimit = options?.sizeLimit ?? Infinity;
+  }
+
+  // Abstract entry hooks of the instrumented Store base, backed by the same Map.
+  protected readEntry(key: string, _options: Record<string, unknown>): Entry | null {
+    const entry = this.getEntry(key);
+    return entry ? new Entry(coder.load(entry.encodedValue)) : null;
+  }
+  protected writeEntry(key: string, entry: Entry, _options: Record<string, unknown>): boolean {
+    this.store.set(key, {
+      encodedValue: coder.dump(entry.value),
+      expiresAt: entry.expiresAt,
+      accessedAt: Date.now(),
+    });
+    return true;
+  }
+  protected deleteEntry(key: string, _options: Record<string, unknown>): boolean {
+    return this.store.delete(key);
   }
 
   private resolveKey(key: string, options?: CacheOptions): string {
@@ -29,7 +49,7 @@ export class MemoryStore implements CacheStore {
 
   // Mirrors Rails cache.rb handle_expired_entry: bump expiresAt within the race window so
   // concurrent readers get stale; delete beyond it.
-  private handleExpiredEntry(
+  private bumpOrDeleteExpired(
     resolvedKey: string,
     entry: CacheEntry,
     raceConditionTtl: number,
@@ -41,17 +61,26 @@ export class MemoryStore implements CacheStore {
     }
   }
 
-  read(key: string, options?: CacheOptions): unknown {
+  override read(key: string, options?: CacheOptions): unknown {
     const rk = this.resolveKey(key, options);
-    const entry = this.getEntry(rk);
-    if (!entry) return null;
-    entry.accessedAt = Date.now();
-    return coder.load(entry.encodedValue);
+    return this.instrument("read", rk, options, (payload) => {
+      const entry = this.getEntry(rk);
+      if (!entry) {
+        payload.hit = false;
+        return null;
+      }
+      entry.accessedAt = Date.now();
+      payload.hit = true;
+      return coder.load(entry.encodedValue);
+    });
   }
 
-  write(key: string, value: unknown, options?: CacheOptions): boolean {
+  override write(key: string, value: unknown, options?: CacheOptions): boolean {
     const rk = this.resolveKey(key, options);
+    return this.instrument("write", rk, options, () => this.storeEntry(rk, value, options));
+  }
 
+  private storeEntry(rk: string, value: unknown, options?: CacheOptions): boolean {
     if (options?.unlessExist) {
       const existing = this.getEntry(rk);
       if (existing !== undefined) return false;
@@ -72,23 +101,23 @@ export class MemoryStore implements CacheStore {
     return true;
   }
 
-  delete(key: string, options?: CacheOptions): boolean {
+  override delete(key: string, options?: CacheOptions): boolean {
     const rk = this.resolveKey(key, options);
-    return this.store.delete(rk);
+    return this.instrument("delete", rk, options, () => this.store.delete(rk));
   }
 
-  exist(key: string, options?: CacheOptions): boolean {
+  override exist(key: string, options?: CacheOptions): boolean {
     const rk = this.resolveKey(key, options);
-    return this.getEntry(rk) !== undefined;
+    return this.instrument("exist?", rk, undefined, () => this.getEntry(rk) !== undefined);
   }
 
-  fetch(
+  override fetch(
     key: string,
-    optionsOrFallback?: CacheOptions | (() => unknown),
-    maybeFallback?: () => unknown,
+    optionsOrFallback?: CacheOptions | ((key: string, opts: WriteOptions) => unknown),
+    maybeFallback?: (key: string, opts: WriteOptions) => unknown,
   ): unknown {
     let options: CacheOptions | undefined;
-    let fallback: (() => unknown) | undefined;
+    let fallback: ((key: string, opts: WriteOptions) => unknown) | undefined;
 
     if (typeof optionsOrFallback === "function") {
       fallback = optionsOrFallback;
@@ -107,8 +136,8 @@ export class MemoryStore implements CacheStore {
         return coder.load(raw.encodedValue);
       }
       // Always call handleExpiredEntry on the block path (cache.rb:453); it decides bump-vs-delete.
-      if (raw) this.handleExpiredEntry(rk, raw, options?.raceConditionTtl ?? 0);
-      const value = fallback();
+      if (raw) this.bumpOrDeleteExpired(rk, raw, options?.raceConditionTtl ?? 0);
+      const value = (fallback as () => unknown)();
       this.write(key, value, options);
       return value;
     }
@@ -117,11 +146,11 @@ export class MemoryStore implements CacheStore {
     return this.read(key, options);
   }
 
-  clear(): void {
+  override clear(): void {
     this.store.clear();
   }
 
-  cleanup(): void {
+  override cleanup(): void {
     for (const [key, entry] of this.store.entries()) {
       if (isExpired(entry)) {
         this.store.delete(key);
@@ -129,39 +158,76 @@ export class MemoryStore implements CacheStore {
     }
   }
 
-  readMulti(...keys: [...string[], CacheOptions] | string[]): Record<string, unknown> {
+  override readMulti(...keys: [...string[], CacheOptions] | string[]): Record<string, unknown> {
     const options = extractCacheOptions<CacheOptions>(keys as unknown[]);
-    const result: Record<string, unknown> = {};
-    for (const key of keys as string[]) {
-      const val = this.read(key, options);
-      if (val !== null) result[key] = val;
-    }
-    return result;
+    const names = keys as string[];
+    const rkeys = names.map((n) => this.resolveKey(n, options));
+    return this.instrumentMulti("read_multi", rkeys, options, (payload) => {
+      const result: Record<string, unknown> = {};
+      for (const name of names) {
+        const rk = this.resolveKey(name, options);
+        const entry = this.getEntry(rk);
+        if (entry) {
+          entry.accessedAt = Date.now();
+          result[name] = coder.load(entry.encodedValue);
+        }
+      }
+      payload.hits = Object.keys(result).map((n) => this.resolveKey(n, options));
+      return result;
+    });
   }
 
-  writeMulti(hash: Record<string, unknown>, options?: CacheOptions): void {
-    for (const [key, value] of Object.entries(hash)) {
-      this.write(key, value, options);
+  override writeMulti(
+    hash: Record<string, unknown>,
+    options?: CacheOptions,
+  ): Record<string, unknown> {
+    if (Object.keys(hash).length === 0) return hash;
+    const normalizedHash: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(hash)) {
+      normalizedHash[this.resolveKey(name, options)] = value;
     }
+    return this.instrumentMulti("write_multi", normalizedHash, options, () => {
+      for (const [name, value] of Object.entries(hash)) {
+        this.storeEntry(this.resolveKey(name, options), value, options);
+      }
+      return normalizedHash;
+    });
   }
 
-  deleteMulti(...keys: string[]): number {
-    let count = 0;
-    for (const key of keys) {
-      if (this.delete(key)) count++;
-    }
-    return count;
+  override deleteMulti(names: string[], options?: CacheOptions): number {
+    const rkeys = names.map((k) => this.resolveKey(k, options));
+    return this.instrumentMulti("delete_multi", rkeys, options, () => {
+      let count = 0;
+      for (const rk of rkeys) {
+        if (this.store.delete(rk)) count++;
+      }
+      return count;
+    });
   }
 
-  deleteMatched(pattern: string | RegExp): void {
+  override deleteMatched(pattern: string | RegExp): void {
     const re = typeof pattern === "string" ? new RegExp(pattern) : pattern;
     for (const key of this.store.keys()) {
       if (re.test(key)) this.store.delete(key);
     }
   }
 
-  increment(key: string, amount = 1, options?: CacheOptions): number | null {
-    const rk = this.resolveKey(key, options);
+  // Rails MemoryStore instruments increment/decrement with the raw, unnormalized
+  // name (memory_store.rb:149,167) — unlike FileStore, which uses the normalized
+  // key (file_store.rb:62-64).
+  override increment(key: string, amount = 1, options?: CacheOptions): number | null {
+    return this.instrument("increment", key, { amount }, () =>
+      this.modifyValue(this.resolveKey(key, options), amount),
+    );
+  }
+
+  override decrement(key: string, amount = 1, options?: CacheOptions): number | null {
+    return this.instrument("decrement", key, { amount }, () =>
+      this.modifyValue(this.resolveKey(key, options), -amount),
+    );
+  }
+
+  private modifyValue(rk: string, amount: number): number | null {
     const entry = this.getEntry(rk);
     if (!entry) return null;
     const current = Number(coder.load(entry.encodedValue));
@@ -170,10 +236,6 @@ export class MemoryStore implements CacheStore {
     entry.encodedValue = coder.dump(next);
     entry.accessedAt = Date.now();
     return next;
-  }
-
-  decrement(key: string, amount = 1, options?: CacheOptions): number | null {
-    return this.increment(key, -amount, options);
   }
 
   prune(targetSize: number, maxTime?: number): void {

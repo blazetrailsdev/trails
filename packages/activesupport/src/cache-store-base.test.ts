@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Store, WriteOptions } from "./cache/store.js";
+import { MemoryStore } from "./cache/memory-store.js";
 import { Entry } from "./cache/entry.js";
 import { Notifications } from "./notifications.js";
 import type { Event } from "./notifications/instrumenter.js";
@@ -171,10 +172,15 @@ describe("CacheStoreNamespaceTest", () => {
   });
 });
 
-describe("CacheInstrumentationBehavior", () => {
-  let cache: TestStore;
+// Rails instrumentation behaviors run against both the TestStore fixture and the
+// real production MemoryStore (proving the concrete store is instrumented).
+describe.each([
+  ["TestStore", () => new TestStore()],
+  ["MemoryStore", () => new MemoryStore()],
+] as const)("CacheInstrumentationBehavior (%s)", (storeName, makeStore) => {
+  let cache: Store;
   beforeEach(() => {
-    cache = new TestStore();
+    cache = makeStore();
   });
 
   function withInstrumentation(operation: string, block: () => void): Event[] {
@@ -194,7 +200,7 @@ describe("CacheInstrumentationBehavior", () => {
     expect(events.map((e) => e.name)).toEqual(["cache_read.active_support"]);
     expect(events[0].payload.key).toBe(normalizedKey("1"));
     expect(events[0].payload.hit).toBe(true);
-    expect(events[0].payload.store).toBe("TestStore");
+    expect(events[0].payload.store).toBe(storeName);
   });
 
   it("test_write_instrumentation", () => {
@@ -203,7 +209,7 @@ describe("CacheInstrumentationBehavior", () => {
     });
     expect(events.map((e) => e.name)).toEqual(["cache_write.active_support"]);
     expect(events[0].payload.key).toBe(normalizedKey("1"));
-    expect(events[0].payload.store).toBe("TestStore");
+    expect(events[0].payload.store).toBe(storeName);
   });
 
   it("test_delete_instrumentation", () => {
@@ -213,7 +219,7 @@ describe("CacheInstrumentationBehavior", () => {
     });
     expect(events.map((e) => e.name)).toEqual(["cache_delete.active_support"]);
     expect(events[0].payload.key).toBe(normalizedKey("1", options));
-    expect(events[0].payload.store).toBe("TestStore");
+    expect(events[0].payload.store).toBe(storeName);
     expect(events[0].payload.namespace).toBe("foo");
   });
 
@@ -263,7 +269,7 @@ describe("CacheInstrumentationBehavior", () => {
       normalizedKey("b", options),
       normalizedKey("a", options),
     ]);
-    expect(events[0].payload.store).toBe("TestStore");
+    expect(events[0].payload.store).toBe(storeName);
   });
 
   it("test_read_multi_instrumentation", () => {
@@ -274,7 +280,7 @@ describe("CacheInstrumentationBehavior", () => {
     expect(events.map((e) => e.name)).toEqual(["cache_read_multi.active_support"]);
     expect(events[0].payload.key).toEqual([normalizedKey("a"), normalizedKey("b")]);
     expect(events[0].payload.hits).toEqual([normalizedKey("b")]);
-    expect(events[0].payload.store).toBe("TestStore");
+    expect(events[0].payload.store).toBe(storeName);
   });
 
   it("test_instrumentation_with_fetch_multi_as_super_operation", () => {
@@ -286,8 +292,54 @@ describe("CacheInstrumentationBehavior", () => {
     expect(events[0].payload.super_operation).toBe("fetch_multi");
     expect(events[0].payload.key).toEqual([normalizedKey("a"), normalizedKey("b")]);
     expect(events[0].payload.hits).toEqual([normalizedKey("b")]);
-    expect(events[0].payload.store).toBe("TestStore");
+    expect(events[0].payload.store).toBe(storeName);
   });
+
+  it("exist? fires cache_exist?.active_support with the normalized key", () => {
+    cache.write("1", "aaaaaaaaaa");
+    const events = withInstrumentation("exist?", () => {
+      cache.exist("1");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_exist?.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1"));
+  });
+
+  it("test_increment_instrumentation", () => {
+    cache.write("1", 0);
+    const events = withInstrumentation("increment", () => {
+      cache.increment("1");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_increment.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1"));
+    expect(events[0].payload.store).toBe(storeName);
+  });
+
+  it("test_decrement_instrumentation", () => {
+    cache.write("1", 0);
+    const events = withInstrumentation("decrement", () => {
+      cache.decrement("1");
+    });
+    expect(events.map((e) => e.name)).toEqual(["cache_decrement.active_support"]);
+    expect(events[0].payload.key).toBe(normalizedKey("1"));
+    expect(events[0].payload.store).toBe(storeName);
+  });
+});
+
+// Base-fetch generate/fetch_hit cases; TestStore-only (MemoryStore keeps its own fetch).
+describe("CacheInstrumentationBehavior fetch sub-events", () => {
+  let cache: TestStore;
+  beforeEach(() => {
+    cache = new TestStore();
+  });
+
+  function withInstrumentation(operation: string, block: () => void): Event[] {
+    return Notifications.collectEvents(`cache_${operation}.active_support`, block);
+  }
+
+  const normalizedKey = (key: string, options?: Record<string, unknown>) =>
+    (
+      cache as unknown as { normalizeKey(k: unknown, o?: Record<string, unknown>): string }
+    ).normalizeKey(key, options);
 
   it("fetchMulti extracts a trailing options hash before instrumenting", () => {
     const events = withInstrumentation("read_multi", () => {
@@ -299,18 +351,6 @@ describe("CacheInstrumentationBehavior", () => {
     // The options hash must not be treated as a cache name.
     expect(cache.read("a", opts)).toBe("aa");
     expect(cache.read("[object Object]")).toBeNull();
-  });
-
-  // Cache::Store has no Rails instrumentation test for exist?/fetch (no public
-  // behavior beyond the wrapped read), so these cover the remaining wrapped
-  // operations our port adds: the exist? event, and fetch's read/fetch_hit/generate.
-  it("exist? fires cache_exist?.active_support with the normalized key", () => {
-    cache.write("1", "aaaaaaaaaa");
-    const events = withInstrumentation("exist?", () => {
-      cache.exist("1");
-    });
-    expect(events.map((e) => e.name)).toEqual(["cache_exist?.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey("1"));
   });
 
   it("fetch miss fires cache_read (super_operation fetch) then cache_generate", () => {
@@ -334,25 +374,5 @@ describe("CacheInstrumentationBehavior", () => {
     });
     expect(events.map((e) => e.name)).toEqual(["cache_fetch_hit.active_support"]);
     expect(events[0].payload.key).toBe("1");
-  });
-
-  it("test_increment_instrumentation", () => {
-    cache.write("1", 0);
-    const events = withInstrumentation("increment", () => {
-      cache.increment("1");
-    });
-    expect(events.map((e) => e.name)).toEqual(["cache_increment.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey("1"));
-    expect(events[0].payload.store).toBe("TestStore");
-  });
-
-  it("test_decrement_instrumentation", () => {
-    cache.write("1", 0);
-    const events = withInstrumentation("decrement", () => {
-      cache.decrement("1");
-    });
-    expect(events.map((e) => e.name)).toEqual(["cache_decrement.active_support"]);
-    expect(events[0].payload.key).toBe(normalizedKey("1"));
-    expect(events[0].payload.store).toBe("TestStore");
   });
 });

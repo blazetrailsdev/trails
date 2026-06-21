@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "../memory-store.js";
+import { Notifications } from "../../notifications.js";
 
 describe("MemoryStoreTest", () => {
   let store: MemoryStore;
@@ -47,6 +48,20 @@ describe("MemoryStoreTest", () => {
     store.write("key", "original", { unlessExist: true });
     store.write("key", "overwrite", { unlessExist: true });
     expect(store.read("key")).toBe("original");
+  });
+});
+
+describe("MemoryStore increment instrumentation", () => {
+  it("instruments with the raw, unnormalized name under a namespace", () => {
+    // Rails MemoryStore#increment passes `name` (not the normalized key) to
+    // instrument (memory_store.rb:149); FileStore passes the normalized key.
+    const store = new MemoryStore({ namespace: "ns" });
+    store.write("counter", 0);
+    const events = Notifications.collectEvents("cache_increment.active_support", () => {
+      store.increment("counter");
+    });
+    expect(events[0].payload.key).toBe("counter");
+    expect(store.read("counter")).toBe(1);
   });
 });
 
