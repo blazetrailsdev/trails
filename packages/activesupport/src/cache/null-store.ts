@@ -1,51 +1,92 @@
 import type { CacheOptions, CacheStore } from "./index.js";
+import { Entry } from "./entry.js";
+import { Store, type WriteOptions } from "./store.js";
 
-export class NullStore implements CacheStore {
-  read(_key: string, _options?: CacheOptions): null {
+export class NullStore extends Store implements CacheStore {
+  // Abstract entry hooks of the instrumented Store base; a NullStore never persists.
+  protected readEntry(_key: string, _options: Record<string, unknown>): Entry | null {
     return null;
   }
-
-  write(_key: string, _value: unknown, _options?: CacheOptions): boolean {
+  protected writeEntry(_key: string, _entry: Entry, _options: Record<string, unknown>): boolean {
     return true;
   }
-
-  delete(_key: string): boolean {
+  protected deleteEntry(_key: string, _options: Record<string, unknown>): boolean {
     return false;
   }
 
-  exist(_key: string): boolean {
-    return false;
+  override read(key: string, options?: CacheOptions): null {
+    const rk = this.resolveKey(key, options);
+    return this.instrument("read", rk, options, (payload) => {
+      payload.hit = false;
+      return null;
+    });
   }
 
-  fetch(
+  override write(key: string, _value: unknown, options?: CacheOptions): boolean {
+    const rk = this.resolveKey(key, options);
+    return this.instrument("write", rk, options, () => true);
+  }
+
+  override delete(key: string, options?: CacheOptions): boolean {
+    const rk = this.resolveKey(key, options);
+    return this.instrument("delete", rk, options, () => false);
+  }
+
+  override exist(key: string, options?: CacheOptions): boolean {
+    const rk = this.resolveKey(key, options);
+    return this.instrument("exist?", rk, undefined, () => false);
+  }
+
+  override fetch(
     key: string,
-    optionsOrFallback?: CacheOptions | (() => unknown),
-    _maybeFallback?: () => unknown,
+    optionsOrFallback?: CacheOptions | ((key: string, opts: WriteOptions) => unknown),
+    maybeFallback?: (key: string, opts: WriteOptions) => unknown,
   ): unknown {
-    return null;
+    let options: CacheOptions | undefined;
+    let fallback: ((key: string, opts: WriteOptions) => unknown) | undefined;
+    if (typeof optionsOrFallback === "function") {
+      fallback = optionsOrFallback;
+    } else {
+      options = optionsOrFallback;
+      fallback = maybeFallback;
+    }
+    const rk = this.resolveKey(key, options);
+    this.instrument("read", rk, options, (payload) => {
+      payload.hit = false;
+      return null;
+    });
+    return fallback ? (fallback as () => unknown)() : null;
   }
 
-  clear(): void {}
+  override clear(): void {}
 
-  cleanup(): void {}
+  override cleanup(): void {}
 
-  readMulti(..._keys: string[]): Record<string, unknown> {
+  override readMulti(..._keys: [...string[], CacheOptions] | string[]): Record<string, unknown> {
     return {};
   }
 
-  writeMulti(_hash: Record<string, unknown>, _options?: CacheOptions): void {}
+  override writeMulti(_hash: Record<string, unknown>): Record<string, unknown> {
+    return {};
+  }
 
-  deleteMulti(...keys: string[]): number {
+  override deleteMulti(_names: string[], _options?: CacheOptions): number {
     return 0;
   }
 
-  deleteMatched(_pattern: string | RegExp): void {}
+  override deleteMatched(_pattern: string | RegExp): void {}
 
-  increment(_key: string, _amount = 1, _options?: CacheOptions): null {
-    return null;
+  override increment(key: string, amount = 1, options?: CacheOptions): null {
+    const rk = this.resolveKey(key, options);
+    return this.instrument("increment", rk, { amount }, () => null);
   }
 
-  decrement(_key: string, _amount = 1, _options?: CacheOptions): null {
-    return null;
+  override decrement(key: string, amount = 1, options?: CacheOptions): null {
+    const rk = this.resolveKey(key, options);
+    return this.instrument("decrement", rk, { amount }, () => null);
+  }
+
+  private resolveKey(key: string, options?: CacheOptions): string {
+    return this.normalizeKey(String(key), options);
   }
 }
