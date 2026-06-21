@@ -30,6 +30,7 @@ import {
   type ColumnOptions,
   type IdHashOptions,
   type SchemaStatementsLike,
+  type ForeignKeyLookupOptions,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
@@ -1253,8 +1254,8 @@ export class SchemaStatements {
 
   async foreignKeyExists(
     fromTable: string,
-    toTable?: string | { toTable?: string; column?: string; name?: string },
-    options: { column?: string; name?: string } = {},
+    toTable?: string | ForeignKeyLookupOptions,
+    options: Omit<ForeignKeyLookupOptions, "toTable"> = {},
   ): Promise<boolean> {
     const lookup =
       typeof toTable === "string" || toTable == null
@@ -2150,7 +2151,7 @@ export class SchemaStatements {
   /** @internal */
   async foreignKeyFor(
     fromTable: string,
-    options: { toTable?: string; column?: string; name?: string } = {},
+    options: ForeignKeyLookupOptions = {},
   ): Promise<ForeignKeyDefinition | undefined> {
     if (!this.isUseForeignKeys()) return undefined;
     const fks = await this.foreignKeys(fromTable);
@@ -2160,7 +2161,7 @@ export class SchemaStatements {
   /** @internal */
   async foreignKeyForBang(
     fromTable: string,
-    options: { toTable?: string; column?: string; name?: string } = {},
+    options: ForeignKeyLookupOptions = {},
   ): Promise<ForeignKeyDefinition> {
     const fk = await this.foreignKeyFor(fromTable, options);
     if (!fk) {

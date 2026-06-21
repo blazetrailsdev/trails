@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   IndexDefinition,
+  ForeignKeyDefinition,
   ReferenceDefinition,
   TableDefinition,
   Table,
@@ -43,6 +44,54 @@ describe("IndexDefinition#defined_for?", () => {
     expect(idx.isDefinedFor([], { column: "a" })).toBe(true);
     expect(idx.isDefinedFor("", { column: "a" })).toBe(true);
     expect(idx.isDefinedFor([], { column: "b" })).toBe(false);
+  });
+});
+
+describe("ForeignKeyDefinition#defined_for?", () => {
+  const fk = (): ForeignKeyDefinition =>
+    new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      "rocket_id",
+      "pk",
+      "fk_rails_abc",
+      "cascade",
+      "restrict",
+      "deferred",
+    );
+
+  it("matches to_table, column, name, and validate explicitly", () => {
+    expect(fk().isDefinedFor({ toTable: "rockets" })).toBe(true);
+    expect(fk().isDefinedFor({ toTable: "stars" })).toBe(false);
+    expect(fk().isDefinedFor({ column: "rocket_id" })).toBe(true);
+    expect(fk().isDefinedFor({ column: "wrong_id" })).toBe(false);
+    expect(fk().isDefinedFor({ name: "fk_rails_abc" })).toBe(true);
+    expect(fk().isDefinedFor({ name: "nope" })).toBe(false);
+  });
+
+  it("generically compares remaining option keys with to_s coercion", () => {
+    // Mirrors defined_for?'s `options.all? { ... to_s == to_s }`.
+    expect(fk().isDefinedFor({ primaryKey: "pk" })).toBe(true);
+    expect(fk().isDefinedFor({ primaryKey: "id" })).toBe(false);
+    expect(fk().isDefinedFor({ onDelete: "cascade" })).toBe(true);
+    expect(fk().isDefinedFor({ onDelete: "nullify" })).toBe(false);
+    expect(fk().isDefinedFor({ onUpdate: "restrict" })).toBe(true);
+    expect(fk().isDefinedFor({ onUpdate: "cascade" })).toBe(false);
+    expect(fk().isDefinedFor({ deferrable: "deferred" })).toBe(true);
+    expect(fk().isDefinedFor({ deferrable: "immediate" })).toBe(false);
+  });
+
+  it("compares composite primary keys element-wise", () => {
+    const composite = new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      ["rocket_tenant_id", "rocket_id"],
+      ["tenant_id", "id"],
+      "fk_rails_xyz",
+    );
+    expect(composite.isDefinedFor({ primaryKey: ["tenant_id", "id"] })).toBe(true);
+    expect(composite.isDefinedFor({ primaryKey: ["id", "tenant_id"] })).toBe(false);
+    expect(composite.isDefinedFor({ primaryKey: "id" })).toBe(false);
   });
 });
 
