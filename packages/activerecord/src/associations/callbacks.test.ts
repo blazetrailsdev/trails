@@ -487,7 +487,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("has many callbacks for save on parent", async () => {
     const log: string[] = [];
-    const { Author } = makeAuthorWithCallbacks({
+    const { Author, Post } = makeAuthorWithCallbacks({
       beforeAdd: (_owner: any, record: any) => {
         log.push("before_adding" + (record.id ?? "<new>"));
       },
@@ -500,7 +500,9 @@ describe("AssociationCallbacksTest", () => {
     proxy.build({ title: "Call me back!", body: "Body" });
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
     expect(await author.save()).toBe(true);
-    expect((await proxy.toArray()).length).toBe(1);
+    // Re-query the DB (not the in-memory proxy target) so this asserts the
+    // built post was actually persisted — mirrors Rails' `.count`.
+    expect((await (Post as any).all().toArray()).length).toBe(1);
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
   });
 
