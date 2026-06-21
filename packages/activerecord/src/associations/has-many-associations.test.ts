@@ -6658,7 +6658,7 @@ describe("HasManyAssociationsTest", () => {
     }
     expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
     expect(error?.message).toBe(
-      `Association CpkBrokenOrder#books primary key ["shop_id", "status"] doesn't match with foreign key cpk_broken_order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+      `Association CpkBrokenOrder#books primary key ["shop_id", "status"] doesn't match with foreign key broken_order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
     );
   });
   it("composite primary key malformed association owner class", () => {
@@ -6672,7 +6672,7 @@ describe("HasManyAssociationsTest", () => {
     }
     expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
     expect(error?.message).toBe(
-      `Association CpkBrokenOrderWithNonCpkBooks#books primary key ["shop_id", "status"] doesn't match with foreign key cpk_broken_order_with_non_cpk_books_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+      `Association CpkBrokenOrderWithNonCpkBooks#books primary key ["shop_id", "status"] doesn't match with foreign key broken_order_with_non_cpk_books_id. Please specify query_constraints, or primary_key and foreign_key values.`,
     );
   });
   it("ids reader on preloaded association with composite primary key", async () => {

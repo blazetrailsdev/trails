@@ -21,7 +21,7 @@ import { Interest } from "../test-helpers/models/interest.js";
 import { Zine } from "../test-helpers/models/zine.js";
 import { MixedCaseMonkey } from "../test-helpers/models/mixed-case-monkey.js";
 import { Car } from "../test-helpers/models/car.js";
-import { CpkCar, CpkCarReview } from "../test-helpers/models/cpk.js";
+import { CpkCar, CpkCarReview, CpkAuthor, CpkBook, CpkOrder } from "../test-helpers/models/cpk.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Rating } from "../test-helpers/models/rating.js";
@@ -481,11 +481,16 @@ describe("InverseHasManyTests", () => {
     // authors before posts: a `ref("authors", …)` in the posts fixtures resolves
     // to a CRC32 fallback id unless the authors set is already loaded, which
     // would orphan every post's `author_id`.
-    ["humans", "interests", "authors", "posts", "comments"],
+    ["humans", "interests", "authors", "posts", "comments", "cpkAuthors", "cpkOrders", "cpkBooks"],
     { schema: canonicalSchema },
   );
-  beforeAll(() => {
-    [Human, Interest, Post, SpecialPost, Author, Comment].forEach((m) => registerModel(m));
+  beforeAll(async () => {
+    [Human, Interest, Post, SpecialPost, Author, Comment, CpkAuthor, CpkBook, CpkOrder].forEach(
+      (m) => registerModel(m),
+    );
+    await (CpkAuthor as any).loadSchema();
+    await (CpkBook as any).loadSchema();
+    await (CpkOrder as any).loadSchema();
   });
 
   it("parent instance should be shared with every child on find", async () => {
@@ -695,9 +700,13 @@ describe("InverseHasManyTests", () => {
     }
   });
 
-  it.skip("inverse should be set on composite primary key child", () => {
-    // Tracked: story inverse-cpk-build-composite-pk-child. Needs Cpk::Author /
-    // Cpk::Book / Cpk::Order canonical models + composite-PK build inverse.
+  it("inverse should be set on composite primary key child", async () => {
+    const author = new CpkAuthor({ name: "John" });
+    const book = association(author, "books").build({ id: [null, 1], title: "The Rails Way" });
+    new CpkOrder({ book, status: "paid" });
+    await (author as any).saveBang();
+
+    expect((book as any).association("order").isLoaded()).toBe(true);
   });
 
   it("raise record not found error when invalid ids are passed", async () => {
