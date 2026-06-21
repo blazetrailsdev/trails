@@ -1,5 +1,5 @@
 export default {
-  "*.{js,jsx,ts,tsx}": (files) => {
+  "*.{js,jsx,mjs,cjs,ts,tsx}": (files) => {
     const lintable = files.filter((f) => !f.includes("__fixtures__"));
     const cmds = [];
     if (lintable.length > 0) cmds.push(`eslint --fix ${lintable.join(" ")}`);
