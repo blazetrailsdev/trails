@@ -532,6 +532,21 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
   if (mc.partialInserts) {
     const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;
     candidates = changed ?? attributeNames;
+    // Rails Locking::Optimistic#_create_record: attribute_names |= [locking_column]
+    // forces the lock column into the INSERT even when it equals its default and
+    // is therefore "unchanged" under partial_inserts. Without this, the in-memory
+    // lock value (0) and the DB value diverge and every later
+    // `WHERE locking_column = ?` matches zero rows → StaleObjectError. Guard on a
+    // non-null in-memory value: a NULL lock attribute with no schema default must
+    // fall through to the DB default (e.g. custom `version` column) rather than
+    // INSERT a NOT NULL violation.
+    if (
+      mc.lockingEnabled &&
+      this._readAttribute?.(mc.lockingColumn) != null &&
+      !candidates.includes(mc.lockingColumn)
+    ) {
+      candidates = [...candidates, mc.lockingColumn];
+    }
   } else {
     candidates = attributeNames.filter((name) => {
       const col = mc.columnForAttribute?.(name);
