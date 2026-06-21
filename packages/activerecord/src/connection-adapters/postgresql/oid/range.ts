@@ -233,8 +233,3 @@ function inspect(value: unknown): string {
     throw new TypeError("Range inspect: JS Date is not accepted — use a Temporal type");
   return String(value);
 }
-
-/** @internal */
-function unquote(value: string): string {
-  return unquoteRangeBound(value);
-}
