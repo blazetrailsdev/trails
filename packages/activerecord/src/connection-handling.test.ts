@@ -257,6 +257,18 @@ describe("ConnectionHandlingTest", () => {
     expect(config.adapter).toBe("sqlite3");
   });
 
+  // Rails' build_db_config_from_hash deletes :url before constructing the
+  // UrlConfig, so configuration_hash carries the parsed discrete fields and
+  // never the verbatim URL string. establish_connection({ adapter, url })
+  // must mirror that shape, matching the resolver's "url removed from hash".
+  it("establish_connection with a url stores a UrlConfig with discrete fields", async () => {
+    await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
+    const config = Base.connectionDbConfig();
+    expect(config.adapter).toBe("sqlite3");
+    expect(config.database).toBe("db/discrete.sqlite3");
+    expect(config.configurationHash).not.toHaveProperty("url");
+  });
+
   it("is_connected?", () => {
     const pool = Base.connectionPool();
     pool.leaseConnection();
