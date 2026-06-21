@@ -11,7 +11,7 @@ export class Subscription extends Base {
   declare book_id: number;
   declare subscriber_id: string;
 
-  // Rails: self.automatically_invert_plural_associations = true — not yet implemented in TS
+  static automaticallyInvertPluralAssociations = true;
 
   static {
     this.belongsTo("subscriber", { counterCache: "books_count" });
