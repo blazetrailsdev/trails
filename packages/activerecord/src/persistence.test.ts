@@ -425,6 +425,15 @@ describe("PersistenceTest", () => {
     );
   });
 
+  // Rails: `assert_equal Developer.all.to_a, Developer.update(salary: 1_000_000)`
+  // — the non-bang class-level update returns every record in scope even
+  // though the salary inclusion validation (50_000..200_000) rejects 1_000_000.
+  it("returns object even if validations failed", async () => {
+    const all = await CanonicalDeveloper.all().toArray();
+    const result = await CanonicalDeveloper.update({ salary: 1_000_000 });
+    expect(result.map((d) => d.id)).toEqual(all.map((d) => d.id));
+  });
+
   it("class level update is affected by scoping", async () => {
     const topicData: Record<number, { content: string }> = {
       1: { content: "1 updated" },
