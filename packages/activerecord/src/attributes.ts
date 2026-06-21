@@ -151,25 +151,33 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     // deserializes null → 0). Gated on an *own* `_lockingColumn` property so it
     // fires only for classes that called `set_locking_column` — never for the
     // inherited "lock_version" default, which would reflect every model and
-    // widen the blast radius. Best-effort: table-less/abstract classes can't
-    // reflect, so swallow the resulting error.
-    const lockCol = cacheHost._lockingColumn;
-    if (
-      lockCol &&
-      Object.prototype.hasOwnProperty.call(cacheHost, "_lockingColumn") &&
-      !cacheHost._attributeDefinitions.has(lockCol)
-    ) {
+    // widen the blast radius. The own-property check spans both `this` and the
+    // STI base: `set_locking_column` writes `_lockingColumn` onto whichever
+    // class it was called on, which may be an STI subclass (own on `this`) or
+    // the STI base (own on `cacheHost`); checking only one would miss the other.
+    // `_lockingColumn` resolves through the prototype chain so it picks up a
+    // base-configured column on a subclass. Best-effort: table-less/abstract
+    // classes can't reflect, so swallow the resulting error.
+    const lockCol = this._lockingColumn;
+    const lockColConfigured =
+      Object.prototype.hasOwnProperty.call(this, "_lockingColumn") ||
+      Object.prototype.hasOwnProperty.call(cacheHost, "_lockingColumn");
+    if (lockCol && lockColConfigured && !cacheHost._attributeDefinitions.has(lockCol)) {
       const wasLoaded = cacheHost._schemaLoaded;
       try {
         loadSchemaSync.call(cacheHost);
       } catch {
         // table-less / abstract class — nothing to reflect.
       }
-      // On a cold schema cache, sync `loadSchema` finds nothing to reflect yet
-      // marks the model loaded (its cache-miss fallback). That would suppress
-      // the real async reflection on the first query. If the locking column
-      // still isn't present, the cache was cold — undo the premature mark so
-      // the normal lazy reflection path still runs (restoring prior behavior).
+      // On a cold schema cache, sync `loadSchema` reflects nothing yet marks the
+      // model loaded via its cache-miss fallback (model-schema.ts) — which would
+      // suppress the real async reflection on the first query. If the locking
+      // column is still absent, the cache was cold: undo only that premature
+      // `_schemaLoaded` mark. Any defs borrowed from a same-table sibling or
+      // `_columnsHash` synthesized from existing defs are left in place; those
+      // are the same reflections the later async load reproduces (idempotent),
+      // so re-opening the load path is sufficient — we are not trying to scrub
+      // every byte sync reflection touched, only to un-terminate the load.
       if (!wasLoaded && !cacheHost._attributeDefinitions.has(lockCol)) {
         cacheHost._schemaLoaded = false;
       }
