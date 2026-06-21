@@ -26,16 +26,17 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
-// Imported under an alias: a top-level `Topic` binding would make esbuild
-// rename the bespoke in-function `class Topic` declarations in the later
-// (still-bespoke) describe blocks to `Topic2`, so their tables would resolve
-// to the non-existent `topic2s`. Block 1 aliases it back to a local `Topic`.
+// Imported under an alias: a top-level `Topic`/`Item` binding would make
+// esbuild rename the bespoke in-function `class Topic`/`class Item`
+// declarations in the later (still-bespoke) describe blocks to `Topic2`/`Item2`,
+// so their name-derived tables would resolve to the non-existent
+// `topic2s`/`item2s`. Each converted block rebinds the alias to a local `const`.
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 // Registers the Reply STI subclasses so Topic#destroy can resolve its
 // `replies`/`uniqueReplies` associations (mirrors `require "models/reply"`).
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
-import { Item } from "./test-helpers/models/item.js";
+import { Item as CanonicalItem } from "./test-helpers/models/item.js";
 
 for (const klass of [
   CanonicalTopic,
@@ -45,7 +46,7 @@ for (const klass of [
   SillyReply,
   UniqueReply,
   SillyUniqueReply,
-  Item,
+  CanonicalItem,
 ]) {
   registerModel(klass);
 }
@@ -2300,6 +2301,8 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   useHandlerFixtures(["items"], { schema: canonicalSchema });
 
+  const Item = CanonicalItem;
+
   it("destroyBy destroys matching records with callbacks", async () => {
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -2348,6 +2351,8 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   useHandlerFixtures(["items"], { schema: canonicalSchema });
 
+  const Item = CanonicalItem;
+
   it("finds and updates a record by id", async () => {
     const item = await Item.create({ name: "Old" });
     const updated = await Item.update(item.id, { name: "New" });
@@ -2357,6 +2362,8 @@ describe("PersistenceTest", () => {
 
 describe("PersistenceTest", () => {
   useHandlerFixtures(["items"], { schema: canonicalSchema });
+
+  const Item = CanonicalItem;
 
   it("destroys all records", async () => {
     await Item.create({ name: "A" });
