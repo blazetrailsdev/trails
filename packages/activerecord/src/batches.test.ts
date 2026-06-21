@@ -361,7 +361,7 @@ describe("EachTest", () => {
     for await (const record of Post.all().findEach({ batchSize: 2 })) {
       ids.push((record as any).id);
     }
-    const sorted = [...ids].sort((a, b) => a - b);
+    const sorted = [...ids].sort((a, b) => Number(a) - Number(b));
     expect(ids).toEqual(sorted);
   });
 
