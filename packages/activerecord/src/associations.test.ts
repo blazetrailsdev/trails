@@ -585,12 +585,18 @@ describe("PreloaderTest", () => {
   it("preload makes correct number of queries on relation", async () => {
     const author = await Author.create({ name: "David" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    let posts: any[];
-    const sqls = await captureSql(async () => {
-      posts = await Post.where({ id: post.id }).includes("comments").toArray();
-    });
-    expect(posts!).toHaveLength(1);
-    expect(posts![0]._preloadedAssociations.has("comments")).toBe(true);
+    const relation = Post.where({ id: post.id });
+    let preloader: Preloader;
+    const sqls = await captureSql(
+      async () => {
+        preloader = new Preloader({ records: relation, associations: "comments" });
+        await preloader.call();
+      },
+      { includeSchema: false },
+    );
+    const preloaded = (relation as any)._records;
+    expect(preloaded).toHaveLength(1);
+    expect(preloaded[0]._preloadedAssociations.has("comments")).toBe(true);
     expect(sqls).toHaveLength(2);
   });
 
