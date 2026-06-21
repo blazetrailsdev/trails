@@ -13,10 +13,10 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 const TEST_SCHEMA: Schema = {
   topics: {
     title: "string",
-    replies_count: "integer",
-    views_count: "integer",
-    unique_replies_count: "integer",
-    num_replies: "integer",
+    replies_count: { type: "integer", default: 0 },
+    views_count: { type: "integer", default: 0 },
+    unique_replies_count: { type: "integer", default: 0 },
+    num_replies: { type: "integer", default: 0 },
     updated_at: "string",
     written_on: "datetime",
   },
@@ -30,7 +30,7 @@ const TEST_SCHEMA: Schema = {
   },
   containers: {
     name: "string",
-    items_count: "integer",
+    items_count: { type: "integer", default: 0 },
   },
   items: {
     name: "string",
@@ -38,7 +38,7 @@ const TEST_SCHEMA: Schema = {
   },
   parents: {
     name: "string",
-    children_count: "integer",
+    children_count: { type: "integer", default: 0 },
   },
   children: {
     name: "string",
@@ -46,9 +46,9 @@ const TEST_SCHEMA: Schema = {
   },
   posts: {
     title: "string",
-    comments_count: "integer",
-    taggings_count: "integer",
-    tags_count: "integer",
+    comments_count: { type: "integer", default: 0 },
+    taggings_count: { type: "integer", default: 0 },
+    tags_count: { type: "integer", default: 0 },
     writer_id: "integer",
   },
   comments: {
@@ -57,8 +57,8 @@ const TEST_SCHEMA: Schema = {
   },
   authors: {
     name: "string",
-    posts_count: "integer",
-    num_books: "integer",
+    posts_count: { type: "integer", default: 0 },
+    num_books: { type: "integer", default: 0 },
   },
   books: {
     title: "string",
@@ -66,8 +66,8 @@ const TEST_SCHEMA: Schema = {
   },
   cars: {
     name: "string",
-    num_engines: "integer",
-    engines_count: "integer",
+    num_engines: { type: "integer", default: 0 },
+    engines_count: { type: "integer", default: 0 },
     person_id: "integer",
   },
   engines: {
@@ -85,13 +85,13 @@ const TEST_SCHEMA: Schema = {
   categories: {
     name: "string",
     parent_id: "integer",
-    children_count: "integer",
+    children_count: { type: "integer", default: 0 },
   },
   cpk_orders: {
     columns: {
       shop_id: "integer",
       id: "integer",
-      items_count: "integer",
+      items_count: { type: "integer", default: 0 },
       books_count: { type: "integer", default: 0 },
     },
     primaryKey: ["shop_id", "id"],
@@ -109,14 +109,14 @@ const TEST_SCHEMA: Schema = {
   subscriptions: { subscriber_id: "integer", book_id: "integer" },
   friend_people: {
     name: "string",
-    friends_too_count: "integer",
+    friends_too_count: { type: "integer", default: 0 },
   },
   friendships: {
     friend_id: "integer",
   },
   people: {
     name: "string",
-    cars_count: "integer",
+    cars_count: { type: "integer", default: 0 },
   },
   legacy_posts: {
     title: "string",
@@ -260,13 +260,17 @@ describe("CounterCacheTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("views_count", "integer", { default: 5 });
+        this.attribute("replies_count", "integer", { default: 0 });
       }
     }
+    // Rails decrements replies_count on a fixture topic; seed a starting count
+    // via updateCounters (a direct UPDATE, so it is unaffected by partial
+    // inserts) and assert the -1 difference.
     const topic = await Topic.create({ title: "Test" });
-    await Topic.decrementCounter("views_count", topic.id);
+    await Topic.updateCounters(topic.id, { replies_count: 5 });
+    await Topic.decrementCounter("replies_count", topic.id);
     const reloaded = await Topic.find(topic.id);
-    expect(reloaded.views_count).toBe(4);
+    expect(reloaded.replies_count).toBe(4);
   });
 
   // Rails: test_decrement_counter_by_specific_amount
@@ -274,13 +278,14 @@ describe("CounterCacheTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("views_count", "integer", { default: 10 });
+        this.attribute("replies_count", "integer", { default: 0 });
       }
     }
     const topic = await Topic.create({ title: "Test" });
-    await Topic.decrementCounter("views_count", topic.id, 3);
+    await Topic.updateCounters(topic.id, { replies_count: 10 });
+    await Topic.decrementCounter("replies_count", topic.id, 2);
     const reloaded = await Topic.find(topic.id);
-    expect(reloaded.views_count).toBe(7);
+    expect(reloaded.replies_count).toBe(8);
   });
 
   // Rails: test_update_other_counters_on_parent_destroy
@@ -657,10 +662,11 @@ describe("CounterCacheTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 10 });
+        this.attribute("replies_count", "integer", { default: 0 });
       }
     }
-    const t = await Topic.create({ title: "test", replies_count: 10 });
+    const t = await Topic.create({ title: "test" });
+    await Topic.updateCounters(t.id, { replies_count: 10 });
     await Topic.decrementCounter("replies_count", t.id, 3);
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(7);
@@ -1254,10 +1260,11 @@ describe("CounterCacheTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 5 });
+        this.attribute("replies_count", "integer", { default: 0 });
       }
     }
-    const t = await Topic.create({ title: "test", replies_count: 5 });
+    const t = await Topic.create({ title: "test" });
+    await Topic.updateCounters(t.id, { replies_count: 5 });
     await Topic.decrementCounter("replies_count", t.id);
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(4);
@@ -1473,11 +1480,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("id", "integer");
-        this.attribute("items_count", "integer", { default: 10 });
+        this.attribute("items_count", "integer", { default: 0 });
         this.primaryKey = ["shop_id", "id"];
       }
     }
-    const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
+    await CpkOrder.create({ shop_id: 1, id: 1 });
+    await CpkOrder.updateCounters([1, 1], { items_count: 10 });
     await CpkOrder.decrementCounter("items_count", [1, 1]);
     const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(reloaded.items_count).toBe(9);
@@ -1829,10 +1837,11 @@ describe("CounterCacheTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 10 });
+        this.attribute("replies_count", "integer", { default: 0 });
       }
     }
-    const t = await Topic.create({ title: "test", replies_count: 10 });
+    const t = await Topic.create({ title: "test" });
+    await Topic.updateCounters(t.id, { replies_count: 10 });
     await Topic.decrementCounter("replies_count", t.id);
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(9);
@@ -1871,11 +1880,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("id", "integer");
-        this.attribute("items_count", "integer", { default: 10 });
+        this.attribute("items_count", "integer", { default: 0 });
         this.primaryKey = ["shop_id", "id"];
       }
     }
-    const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
+    await CpkOrder.create({ shop_id: 1, id: 1 });
+    await CpkOrder.updateCounters([1, 1], { items_count: 10 });
     await CpkOrder.updateCounters([1, 1], { items_count: -3 });
     const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(reloaded.items_count).toBe(7);
@@ -2200,16 +2210,16 @@ describe("CounterCacheTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 5 });
+        this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
       }
     }
     const originalTime = new Date("2020-01-01");
     const t = await Topic.create({
       title: "test",
-      replies_count: 5,
       updated_at: originalTime,
     });
+    await Topic.updateCounters(t.id, { replies_count: 5 });
     await Topic.decrementCounter("replies_count", t.id, 1, { touch: true });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(4);
@@ -2340,11 +2350,12 @@ describe("CounterCacheTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 5 });
+        this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("written_on", "datetime");
       }
     }
-    const t = await Topic.create({ title: "test", replies_count: 5 });
+    const t = await Topic.create({ title: "test" });
+    await Topic.updateCounters(t.id, { replies_count: 5 });
     await Topic.decrementCounter("replies_count", t.id, 1, { touch: "written_on" });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(4);
@@ -2484,12 +2495,13 @@ describe("CounterCacheTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 5 });
+        this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
         this.attribute("written_on", "datetime");
       }
     }
-    const t = await Topic.create({ title: "test", replies_count: 5 });
+    const t = await Topic.create({ title: "test" });
+    await Topic.updateCounters(t.id, { replies_count: 5 });
     await Topic.decrementCounter("replies_count", t.id, 1, { touch: ["updated_at", "written_on"] });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(4);
