@@ -1529,6 +1529,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       const name = namesByColumn.get(column) ?? `fk_${bare}_${nameKey}`;
       const deferrable = deferrableByKey.get(`${toTable},${column},${primaryKey}`);
       results.push(
+        // Rails' SQLite foreign_keys options hash carries on_delete/on_update/
+        // deferrable/column/primary_key but no :name (we synthesize one for the
+        // dump), so a name lookup is sliced out (matches) rather than compared.
         new ForeignKeyDefinition(
           tableName,
           toTable,
@@ -1538,6 +1541,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           onDelete,
           onUpdate,
           deferrable,
+          true,
+          ["column", "primaryKey", "onDelete", "onUpdate", "deferrable"],
         ),
       );
     }

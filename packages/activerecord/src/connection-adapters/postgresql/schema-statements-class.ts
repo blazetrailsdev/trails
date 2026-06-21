@@ -9,6 +9,7 @@ import {
   CheckConstraintDefinition,
   ColumnDefinition,
   ForeignKeyDefinition,
+  foreignKeyOptionsStoredKeys,
   TableDefinition as AbstractTableDefinition,
   type ColumnOptions,
   type ColumnType,
@@ -1142,6 +1143,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       fkOptions.onUpdate as ReferentialAction | undefined,
       fkOptions.deferrable as "immediate" | "deferred" | undefined,
       fkOptions.validate as boolean | undefined,
+      // Mirror Rails' foreign_key_options stored-key set for consistency with
+      // the DSL path; this FK only builds SQL and is never queried via
+      // isDefinedFor.
+      foreignKeyOptionsStoredKeys(options),
     );
     const at = this.pg.createAlterTable(fromTable);
     at.addForeignKey(fkDef);

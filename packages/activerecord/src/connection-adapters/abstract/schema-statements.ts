@@ -23,6 +23,7 @@ import {
   ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
   ForeignKeyDefinition,
+  foreignKeyOptionsStoredKeys,
   CheckConstraintDefinition,
   type AddForeignKeyOptions,
   type AddIndexOptions,
@@ -657,6 +658,10 @@ export class SchemaStatements {
       opts.onUpdate as ForeignKeyDefinition["onUpdate"],
       opts.deferrable as ForeignKeyDefinition["deferrable"],
       opts.validate as boolean | undefined,
+      // Mirror Rails' foreign_key_options stored-key set (column/name always,
+      // others when explicitly passed) for consistency with the DSL path; this
+      // FK only builds SQL and is never queried via isDefinedFor.
+      foreignKeyOptionsStoredKeys(options),
     );
     at.addForeignKey(fkDef);
     await this.adapter.executeMutation(this.schemaCreation.accept(at));

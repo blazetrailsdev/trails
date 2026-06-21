@@ -122,6 +122,41 @@ describe("ForeignKeyDefinition#defined_for?", () => {
     expect(withPk.isDefinedFor({ primaryKey: "uuid" })).toBe(true);
     expect(withPk.isDefinedFor({ primaryKey: "wrong" })).toBe(false);
   });
+
+  it("respects adapter-specific stored option keys (mysql lacks deferrable, sqlite lacks name)", () => {
+    // Rails' MySQL foreign_keys options hash has no :deferrable, so that key is
+    // sliced out of the compare and matches regardless.
+    const mysqlFk = new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      "rocket_id",
+      "id",
+      "fk_rails_abc",
+      undefined,
+      undefined,
+      undefined,
+      true,
+      ["column", "name", "primaryKey", "onDelete", "onUpdate"],
+    );
+    expect(mysqlFk.isDefinedFor({ deferrable: "deferred" })).toBe(true);
+    expect(mysqlFk.isDefinedFor({ name: "wrong" })).toBe(false);
+    // Rails' SQLite foreign_keys options hash has no :name (we synthesize one),
+    // so a name lookup is sliced out and matches.
+    const sqliteFk = new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      "rocket_id",
+      "id",
+      "fk_synth_name",
+      undefined,
+      undefined,
+      undefined,
+      true,
+      ["column", "primaryKey", "onDelete", "onUpdate", "deferrable"],
+    );
+    expect(sqliteFk.isDefinedFor({ name: "anything" })).toBe(true);
+    expect(sqliteFk.isDefinedFor({ column: "wrong" })).toBe(false);
+  });
 });
 
 describe("ReferenceDefinition helpers", () => {

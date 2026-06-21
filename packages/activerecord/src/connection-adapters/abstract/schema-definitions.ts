@@ -128,6 +128,26 @@ export type ForeignKeyStoredOptionKey =
   | "onUpdate"
   | "deferrable";
 
+/**
+ * The stored-option-key set produced by Rails' `foreign_key_options`: it always
+ * fills in `:column` and `:name`, and carries `:primary_key`/`:on_delete`/
+ * `:on_update`/`:deferrable` only when the caller explicitly passed them. Used
+ * by every `add_foreign_key`-style construction path (DSL + abstract/PG
+ * `addForeignKey`) so `isDefinedFor` slices a defaulted key (e.g. primaryKey
+ * "id") out rather than mismatching it.
+ * @internal
+ */
+export function foreignKeyOptionsStoredKeys(
+  options: Pick<AddForeignKeyOptions, "primaryKey" | "onDelete" | "onUpdate" | "deferrable">,
+): ForeignKeyStoredOptionKey[] {
+  const keys: ForeignKeyStoredOptionKey[] = ["column", "name"];
+  if (options.primaryKey !== undefined) keys.push("primaryKey");
+  if (options.onDelete !== undefined) keys.push("onDelete");
+  if (options.onUpdate !== undefined) keys.push("onUpdate");
+  if (options.deferrable !== undefined) keys.push("deferrable");
+  return keys;
+}
+
 export class ForeignKeyDefinition {
   readonly fromTable: string;
   readonly toTable: string;
@@ -987,16 +1007,6 @@ export class TableDefinition {
   ): ForeignKeyDefinition {
     const pk = options.primaryKey ?? "id";
     const col = options.column ?? `${singularize(toTable.split(".").at(-1) ?? toTable)}_${pk}`;
-    // Mirror Rails' foreign_key_options: it always fills in :column and :name,
-    // so those are always stored. :primary_key and the action keys are stored
-    // only when the caller explicitly passed them, so a lookup on a key we
-    // defaulted (e.g. primaryKey "id") is sliced out by isDefinedFor rather
-    // than mismatching.
-    const storedOptionKeys: ForeignKeyStoredOptionKey[] = ["column", "name"];
-    if (options.primaryKey !== undefined) storedOptionKeys.push("primaryKey");
-    if (options.onDelete !== undefined) storedOptionKeys.push("onDelete");
-    if (options.onUpdate !== undefined) storedOptionKeys.push("onUpdate");
-    if (options.deferrable !== undefined) storedOptionKeys.push("deferrable");
     return new ForeignKeyDefinition(
       this.tableName,
       toTable,
@@ -1007,7 +1017,10 @@ export class TableDefinition {
       options.onUpdate,
       options.deferrable,
       options.validate,
-      storedOptionKeys,
+      // Mirror Rails' foreign_key_options stored-key set so a key we defaulted
+      // (e.g. primaryKey "id") is sliced out by isDefinedFor rather than
+      // mismatching.
+      foreignKeyOptionsStoredKeys(options),
     );
   }
 
