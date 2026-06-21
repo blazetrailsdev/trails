@@ -17,7 +17,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
-import { MultiRange, Range } from "./oid/range.js";
+import { Range } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Visitors as ArelVisitors } from "@blazetrails/arel";
 
@@ -145,9 +145,6 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
   if (value instanceof Range) {
     return quoteString(value.toString());
   }
-  if (value instanceof MultiRange) {
-    return quoteString(encodeMultirange(value));
-  }
   // Mirrors: PostgreSQL::Quoting#quote raises IntegerOutOf64BitRange for
   // integers exceeding the 64-bit signed range. Covers both bigint and
   // integer number values — JS integers beyond MAX_SAFE_INTEGER lose
@@ -236,9 +233,6 @@ export function typeCast(this: QuotingDispatchHost | void, value: unknown): unkn
   }
   if (value instanceof Range) {
     return value.toString();
-  }
-  if (value instanceof MultiRange) {
-    return encodeMultirange(value);
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
     if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
@@ -395,11 +389,6 @@ export function encodeRange(this: QuotingDispatchHost, range: Range): string {
   const begin = typeCastRangeValue.call(this, range.begin);
   const end = typeCastRangeValue.call(this, range.end);
   return `[${begin},${end}${range.excludeEnd ? ")" : "]"}`;
-}
-
-/** @internal */
-function encodeMultirange(value: MultiRange): string {
-  return `{${value.ranges.map((r) => r.toString()).join(",")}}`;
 }
 
 function isSqlLiteral(value: unknown): value is { value: string } {

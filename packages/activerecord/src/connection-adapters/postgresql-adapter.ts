@@ -647,7 +647,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._connectionConfigured = true;
     // Mirrors Rails' configure_connection, which ends with reload_type_map →
     // initialize_type_map → load_additional_types: an eager full load of every
-    // array/range/multirange/enum/domain type once per physical connection.
+    // array/range/enum/domain type once per physical connection.
     // Aliasing every scalar OID up front means targeted loadAdditionalTypes
     // misses (columns(), getOidType) always find their element/range subtype in
     // the store — no deferral path needed.

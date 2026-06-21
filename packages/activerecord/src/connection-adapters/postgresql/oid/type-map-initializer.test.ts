@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Array as OidArray } from "./array.js";
 import { Enum } from "./enum.js";
-import { RangeType, MultiRangeType } from "./range.js";
+import { RangeType } from "./range.js";
 import { TypeMapInitializer, type TypeMap } from "./type-map-initializer.js";
 import { Vector } from "./vector.js";
 
@@ -85,61 +85,6 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     expect((range.subtype as { metadata?: { scale?: number } }).metadata?.scale).toBe(4);
   });
 
-  it("registers multirange types with the underlying range subtype", () => {
-    const store = new TestStore();
-    store.registerType(23, integerSubtype);
-    // Synthetic rows supply typelem=3904 (fast path); real PG has typelem=0.
-    new TypeMapInitializer(store).run([
-      row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
-      row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 }),
-    ]);
-
-    expect(store.lookup(3904)).toBeInstanceOf(RangeType);
-    const multiRange = store.lookup(4451) as MultiRangeType;
-    expect(multiRange).toBeInstanceOf(MultiRangeType);
-    expect(multiRange.subtype).toBe((store.lookup(3904) as RangeType).subtype);
-    expect(multiRange.name).toBe("int4multirange");
-  });
-
-  it("registers multirange types when typelem is 0 (real PG shape)", () => {
-    const store = new TestStore();
-    store.registerType(23, integerSubtype);
-    // Real PG 14+ sets typelem=0 for multirange rows; range OID is found
-    // by iterating the store for a RangeType matching the naming convention.
-    new TypeMapInitializer(store).run([
-      row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
-      row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 0 }),
-    ]);
-
-    const multiRange = store.lookup(4451) as MultiRangeType;
-    expect(multiRange).toBeInstanceOf(MultiRangeType);
-    expect(multiRange.subtype).toBe((store.lookup(3904) as RangeType).subtype);
-    expect(multiRange.name).toBe("int4multirange");
-  });
-
-  it("skips multirange registration when range OID is not in the store", () => {
-    const store = new TestStore();
-    store.registerType(23, integerSubtype);
-    // Process only the multirange row (no range row in the batch). Mirrors
-    // Rails' register_with_subtype: a miss is skipped silently. The eager full
-    // load registers the range before its multirange in the same pass, so this
-    // miss never happens in practice.
-    new TypeMapInitializer(store).run([
-      row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 }),
-    ]);
-    expect(store.lookup(4451)).not.toBeInstanceOf(MultiRangeType);
-
-    // When the range and multirange rows arrive together (the eager-load
-    // shape), the range registers first and the multirange resolves it.
-    new TypeMapInitializer(store).run([
-      row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
-      row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 }),
-    ]);
-    const multiRange = store.lookup(4451) as MultiRangeType;
-    expect(multiRange).toBeInstanceOf(MultiRangeType);
-    expect(multiRange.name).toBe("int4multirange");
-  });
-
   it("skips array registration when element OID is not in the store", () => {
     const store = new TestStore();
     // The base type map keys scalar types by name (e.g. "numeric"), not by OID.
@@ -159,12 +104,6 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
       row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),
     ]);
     expect(store.lookup(1231)).toBeInstanceOf(OidArray);
-  });
-
-  it("queryConditionsForKnownTypeTypes includes multirange typtype m", () => {
-    const store = new TestStore();
-    const initializer = new TypeMapInitializer(store);
-    expect(initializer.queryConditionsForKnownTypeTypes()).toContain("'m'");
   });
 
   it("builds query condition fragments", () => {
