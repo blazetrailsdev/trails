@@ -26,15 +26,17 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
-// Imported under an alias: a top-level `Topic` binding would make esbuild
-// rename the bespoke in-function `class Topic` declarations in the later
-// (still-bespoke) describe blocks to `Topic2`, so their tables would resolve
-// to the non-existent `topic2s`. Block 1 aliases it back to a local `Topic`.
+// Imported under an alias: a top-level `Topic`/`Item` binding would make
+// esbuild rename the bespoke in-function `class Topic`/`class Item`
+// declarations in the later (still-bespoke) describe blocks to `Topic2`/`Item2`,
+// so their name-derived tables would resolve to the non-existent
+// `topic2s`/`item2s`. Each converted block rebinds the alias to a local `const`.
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 // Registers the Reply STI subclasses so Topic#destroy can resolve its
 // `replies`/`uniqueReplies` associations (mirrors `require "models/reply"`).
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
+import { Item as CanonicalItem } from "./test-helpers/models/item.js";
 
 for (const klass of [
   CanonicalTopic,
@@ -44,6 +46,7 @@ for (const klass of [
   SillyReply,
   UniqueReply,
   SillyUniqueReply,
+  CanonicalItem,
 ]) {
   registerModel(klass);
 }
@@ -2296,41 +2299,29 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { name: "string" } });
-  });
+  useHandlerFixtures(["items"], { schema: canonicalSchema });
+
+  const Item = CanonicalItem;
 
   it("destroyBy destroys matching records with callbacks", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     await Item.create({ name: "A" });
 
     const destroyed = await Item.destroyBy({ name: "A" });
     expect(destroyed).toHaveLength(2);
-    expect(await Item.all().count()).toBe(1);
+    expect(await Item.where({ name: "A" }).count()).toBe(0);
+    expect(await Item.where({ name: "B" }).count()).toBe(1);
   });
 
   it("deleteBy deletes matching records without callbacks", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
 
     const count = await Item.deleteBy({ name: "A" });
     expect(count).toBe(1);
-    expect(await Item.all().count()).toBe(1);
+    expect(await Item.where({ name: "A" }).count()).toBe(0);
+    expect(await Item.where({ name: "B" }).count()).toBe(1);
   });
 });
 
@@ -2358,19 +2349,11 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { name: "string" } });
-  });
+  useHandlerFixtures(["items"], { schema: canonicalSchema });
+
+  const Item = CanonicalItem;
 
   it("finds and updates a record by id", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-
     const item = await Item.create({ name: "Old" });
     const updated = await Item.update(item.id, { name: "New" });
     expect(updated.name).toBe("New");
@@ -2378,23 +2361,17 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { name: "string" } });
-  });
+  useHandlerFixtures(["items"], { schema: canonicalSchema });
+
+  const Item = CanonicalItem;
 
   it("destroys all records", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     const destroyed = await Item.destroyAll();
-    expect(destroyed).toHaveLength(2);
+    // Deterministic under transactional fixtures: the `dvd` fixture row plus
+    // the two created here.
+    expect(destroyed).toHaveLength(3);
     expect(await Item.all().count()).toBe(0);
   });
 });
