@@ -1732,6 +1732,9 @@ function _inlineOwnerKey(
  * query_constraints list (e.g. `[blog_id, id]`) like AssociationScope, not
  * the scalar `id` alone. A plain (non-query_constraints) owner keeps the
  * scalar FK and the `_inlineOwnerKey`-resolved scalar key.
+ *
+ * @internal trails-only inline fallback helper (no Rails public counterpart);
+ * exported solely so its underivable-query_constraints raise can be unit-tested.
  */
 export function _inlinePolymorphicKeys(
   ctor: typeof Base,
