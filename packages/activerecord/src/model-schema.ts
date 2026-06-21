@@ -525,17 +525,24 @@ export function _returningColumnsForInsert(
   // column-hash fallback (used before the schema cache is warm) holds plain
   // shapes, so skip those — they carry no auto-increment metadata and the PK
   // fallback below covers them.
-  const autoPopulated = columns
-    .call(this)
+  const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
+  const autoPopulated = cols
     .filter(
-      (c: { name: string; isAutoPopulated?: unknown }) =>
-        typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
+      (c) => typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
     )
-    .map((c: { name: string }) => c.name);
+    .map((c) => c.name);
   if (autoPopulated.length > 0) return autoPopulated;
+  // PK fallback. Restrict to columns that actually exist on the table: Rails
+  // reflects `primary_key` as nil for a table without that column (e.g. an
+  // id-less HABTM join table whose model still defaults `primary_key` to "id"),
+  // so `Array(primary_key)` is empty there. Without this filter we would emit
+  // an explicit `RETURNING "id"` against a table with no `id`, which PG rejects
+  // outright (the auto-append path tolerates it via a savepoint retry, but an
+  // explicit RETURNING does not).
+  const colNames = new Set(cols.map((c) => c.name));
   const pk = this.primaryKey;
-  if (Array.isArray(pk)) return pk;
-  return pk ? [pk] : [];
+  const pkArr = Array.isArray(pk) ? pk : pk ? [pk] : [];
+  return pkArr.filter((p) => colNames.has(p));
 }
 
 export function resetSequenceName(this: SchemaHost): void {
