@@ -88,6 +88,33 @@ describe("ForeignKeyDefinition#defined_for?", () => {
     expect(noActions.isDefinedFor({ onDelete: "cascade" })).toBe(false);
   });
 
+  it("ignores a validate lookup when the definition did not store :validate", () => {
+    // mysql/sqlite introspection (and add/DSL paths that didn't pass validate)
+    // leave :validate absent. Rails' `options.fetch(:validate, validate)` then
+    // falls back to the lookup value, so any validate lookup matches.
+    const noValidate = new ForeignKeyDefinition("astronauts", "rockets", "rocket_id", "id", "fk_x");
+    expect(noValidate.storesValidate).toBe(false);
+    expect(noValidate.isDefinedFor({ validate: false })).toBe(true);
+    expect(noValidate.isDefinedFor({ validate: true })).toBe(true);
+  });
+
+  it("compares validate when the definition stored :validate (PG introspection)", () => {
+    const stored = new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      "rocket_id",
+      "id",
+      "fk_x",
+      undefined,
+      undefined,
+      undefined,
+      false,
+    );
+    expect(stored.storesValidate).toBe(true);
+    expect(stored.isDefinedFor({ validate: false })).toBe(true);
+    expect(stored.isDefinedFor({ validate: true })).toBe(false);
+  });
+
   it("compares composite primary keys element-wise", () => {
     const composite = new ForeignKeyDefinition(
       "astronauts",
