@@ -25,6 +25,8 @@ import {
 } from "./test-helpers/models/comment.js";
 import { Rating as CanonRating } from "./test-helpers/models/rating.js";
 import { Author as CanonAuthor } from "./test-helpers/models/author.js";
+import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
+import { captureSql } from "./testing/sql-capture.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -1308,36 +1310,6 @@ describe("RelationTest", () => {
     expect(merged.toSql()).toContain("SELECT");
   });
 
-  it("relation merging with merged joins as symbols", () => {
-    const Post = makePost();
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
-  });
-
-  it("relation merging with merged symbol joins keeps inner joins", () => {
-    const Post = makePost();
-    const sql = Post.all().toSql();
-    expect(sql).toContain("FROM");
-  });
-
-  it("relation merging with merged symbol joins has correct size and count", async () => {
-    const Post = makePost();
-    await Post.create({ title: "a" });
-    const count = await Post.count();
-    expect(count).toBe(1);
-  });
-
-  it("relation merging with merged symbol joins is aliased", () => {
-    const Post = makePost();
-    const sql = Post.select("title").toSql();
-    expect(sql).toContain("title");
-  });
-
-  it("relation with merged joins aliased works", () => {
-    const Post = makePost();
-    expect(() => Post.all().toSql()).not.toThrow();
-  });
-
   it("relation merging with joins as join dependency pick proper parent", () => {
     const Post = makePost();
     const sql = Post.all().toSql();
@@ -1713,9 +1685,12 @@ describe("Relation#arel build_arel convergence", () => {
 // RelationTest block above uses bespoke handler tables). Same describe name so
 // `test:compare` matches it to Ruby's `RelationTest` in relation_test.rb.
 describe("RelationTest", () => {
-  const { authors } = useHandlerFixtures(["authors", "posts", "comments", "ratings"], {
-    schema: canonicalSchema,
-  });
+  const { authors } = useHandlerFixtures(
+    ["authors", "posts", "comments", "ratings", "categorizations"],
+    {
+      schema: canonicalSchema,
+    },
+  );
 
   beforeAll(() => {
     registerModel(CanonAuthor);
@@ -1723,6 +1698,7 @@ describe("RelationTest", () => {
     registerModel(CanonComment);
     registerModel(CanonSpecialComment);
     registerModel(CanonRating);
+    registerModel(CanonCategorization);
   });
 
   // Mirrors Rails Merger#merge_joins (merger.rb): a cross-model merge partitions
@@ -1747,5 +1723,97 @@ describe("RelationTest", () => {
     expect(sql).toContain(joinString);
 
     expect(await merged.count()).toEqual({ 2: 1, 4: 3, 5: 1 });
+  });
+
+  it("relation merging with merged joins as symbols", async () => {
+    const specialCommentsWithRatings = CanonSpecialComment.joins("ratings");
+    const postsWithSpecialCommentsWithRatings = CanonPost.group("posts.id")
+      .joins("specialComments")
+      .merge(specialCommentsWithRatings);
+    const merged = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings);
+
+    expect(await merged.count()).toEqual({ 4: 2 });
+  });
+
+  it("relation merging with merged symbol joins keeps inner joins", async () => {
+    const queries = await captureSql(async () => {
+      await CanonAuthor.joins("posts").merge(CanonPost.joins("comments")).toArray();
+    });
+
+    const nbInnerJoin = queries.reduce(
+      (sum, sql) => sum + (sql.match(/INNER\s+JOIN/gi)?.length ?? 0),
+      0,
+    );
+    expect(nbInnerJoin).toBe(2);
+    expect(queries.some((sql) => /LEFT\s+(OUTER)?\s+JOIN/i.test(sql))).toBe(false);
+  });
+
+  it("relation merging with merged symbol joins has correct size and count", async () => {
+    // Has one entry per comment
+    const mergedAuthorsWithCommentedPostsRelation = CanonAuthor.joins("posts").merge(
+      CanonPost.joins("comments"),
+    );
+
+    const postIdsWithAuthor = await CanonPost.joins("author").pluck("id");
+    const manualCommentsOnPostThatHaveAuthor = await CanonComment.where({
+      post_id: postIdsWithAuthor,
+    }).pluck("id");
+
+    expect(await mergedAuthorsWithCommentedPostsRelation.count()).toBe(
+      manualCommentsOnPostThatHaveAuthor.length,
+    );
+    expect((await mergedAuthorsWithCommentedPostsRelation.toArray()).length).toBe(
+      manualCommentsOnPostThatHaveAuthor.length,
+    );
+  });
+
+  // Skipped pending RFC 0030 story converge-cross-model-merge-join-aliasing: a
+  // cross-model `merge` that joins an already-joined table must alias the child
+  // INNER JOIN (`authors_categorizations`). Trails emits a duplicate unaliased
+  // `authors` join because alias assignment is baked in at JoinDependency
+  // construction (addAssociation) with a per-dep tracker, not deferred to
+  // emission with a shared AliasTracker as Rails does (build_joins).
+  it.skip("relation merging with merged symbol joins is aliased", async () => {
+    const categorizationsWithAuthors = CanonCategorization.joins("author");
+    const queries = await captureSql(async () => {
+      await CanonPost.joins("author", "categorizations")
+        .merge(CanonAuthor.select("id"))
+        .merge(categorizationsWithAuthors)
+        .toArray();
+    });
+
+    const nbInnerJoin = queries.reduce(
+      (sum, sql) => sum + (sql.match(/INNER\s+JOIN/gi)?.length ?? 0),
+      0,
+    );
+    expect(nbInnerJoin).toBe(3);
+
+    // using `\W` as the column separator
+    const aliasPattern = new RegExp(
+      `INNER\\s+JOIN\\s+${canonicalQuoteTableName("authors")}\\s+\\Wauthors_categorizations\\W`,
+      "i",
+    );
+    expect(queries.some((sql) => aliasPattern.test(sql))).toBe(true);
+  });
+
+  // Skipped pending RFC 0030 story converge-cross-model-merge-join-aliasing
+  // (same unaliased cross-model merge join; raises `ambiguous column name:
+  // authors.id` at runtime). See the sibling `is aliased` test above.
+  it.skip("relation with merged joins aliased works", async () => {
+    const categorizationsWithAuthors = CanonCategorization.joins("author");
+    const postsWithJoinsAndMerges = CanonPost.joins("author", "categorizations")
+      .merge(CanonAuthor.select("id"))
+      .merge(categorizationsWithAuthors);
+
+    const authorWithPosts = await CanonAuthor.joins("posts").pluck("id");
+    const categorizationsWithAuthor = await CanonCategorization.joins("author").pluck("id");
+    const postsWithAuthorAndCategorizations = await CanonPost.joins("categorizations")
+      .where({ author_id: authorWithPosts, categorizations: { id: categorizationsWithAuthor } })
+      .pluck("id");
+
+    expect(await postsWithJoinsAndMerges.count()).toBe(postsWithAuthorAndCategorizations.length);
+    expect((await postsWithJoinsAndMerges.toArray()).length).toBe(
+      postsWithAuthorAndCategorizations.length,
+    );
   });
 });
