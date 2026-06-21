@@ -635,36 +635,30 @@ export class SchemaStatements {
         return;
       }
     }
-    // Delegate to adapter-specific FK implementation when the adapter
-    // overrides both addForeignKey and checkConstraints (signals full FK
-    // support, e.g. SQLite's table-rebuild path). The double-gate prevents
-    // self-delegation now that SchemaStatements is mixed into AbstractAdapter.
-    const adapter = this.adapter as any;
-    if (
-      typeof adapter.addForeignKey === "function" &&
-      adapter.addForeignKey !== SchemaStatements.prototype.addForeignKey &&
-      typeof adapter.checkConstraints === "function" &&
-      adapter.checkConstraints !== SchemaStatements.prototype.checkConstraints
-    ) {
-      return adapter.addForeignKey(fromTable, toTable, options);
-    }
-    const pk = options.primaryKey ?? "id";
-    const column = options.column ?? this.foreignKeyColumnFor(toTable, pk);
-    const name = options.name ?? `fk_${fromTable}_${column}`;
+    // Rails: options = foreign_key_options(from_table, to_table, options)
+    //        at = create_alter_table from_table
+    //        at.add_foreign_key to_table, options
+    //        execute schema_creation.accept(at)
+    // foreign_key_options supplies the default column and the SHA256
+    // `fk_rails_<hex>` name (via foreign_key_name) when not given. Adapters
+    // override addForeignKey on the class and call super for this body, so
+    // there is no self-delegation here — the override already shadows the
+    // mixed-in method on the prototype.
+    const opts = this.foreignKeyOptions(fromTable, toTable, options as Record<string, unknown>);
+    const at = this.createAlterTable(fromTable);
     const fkDef = new ForeignKeyDefinition(
       fromTable,
       toTable,
-      column,
-      pk,
-      name,
-      options.onDelete,
-      options.onUpdate,
-      options.deferrable,
-      options.validate,
+      opts.column as string | string[],
+      (opts.primaryKey as string | string[] | undefined) ?? "id",
+      opts.name as string,
+      opts.onDelete as ForeignKeyDefinition["onDelete"],
+      opts.onUpdate as ForeignKeyDefinition["onUpdate"],
+      opts.deferrable as ForeignKeyDefinition["deferrable"],
+      opts.validate as boolean | undefined,
     );
-    await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(fromTable)} ADD ${this.schemaCreation.accept(fkDef)}`,
-    );
+    at.addForeignKey(fkDef);
+    await this.adapter.executeMutation(this.schemaCreation.accept(at));
   }
 
   async removeForeignKey(
@@ -1447,9 +1441,10 @@ export class SchemaStatements {
         );
       }
     } else {
+      // Rails (schema_statements.rb:1254): the scalar branch always derives the
+      // default column from the literal "id", independent of :primary_key.
       if (!result.column) {
-        const pk = typeof result.primaryKey === "string" ? result.primaryKey : "id";
-        result.column = this.foreignKeyColumnFor(toTable, pk);
+        result.column = this.foreignKeyColumnFor(toTable, "id");
       }
     }
 

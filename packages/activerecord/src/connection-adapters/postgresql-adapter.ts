@@ -69,8 +69,9 @@ import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-
 import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
-import type { SchemaStatements, JoinTableOptions } from "./abstract/schema-statements.js";
+import type { JoinTableOptions } from "./abstract/schema-statements.js";
 import {
+  SchemaStatements,
   indexNameForRemoveFrom,
   indexExistsForRemoveFrom,
   canRemoveIndexByName,
@@ -3817,7 +3818,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
-    await this.pgSchemaStatements().addForeignKey(fromTable, toTable, options);
+    // Rails: PostgreSQL::SchemaStatements#add_foreign_key is just
+    //   assert_valid_deferrable(options[:deferrable]); super
+    this.assertValidDeferrable(options.deferrable);
+    await SchemaStatements.prototype.addForeignKey.call(this, fromTable, toTable, options);
   }
 
   async foreignKeyExists(
