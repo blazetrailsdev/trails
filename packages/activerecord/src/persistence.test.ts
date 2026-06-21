@@ -13,7 +13,7 @@ function isTemporalDatetime(v: unknown): boolean {
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { Base, RecordNotFound, RecordInvalid, RecordNotSaved, registerModel } from "./index.js";
 import { itIfSupports } from "./test-helpers/supports.js";
@@ -71,6 +71,19 @@ describe("PersistenceTest", () => {
     ["topics", "minimalistics", "accounts", "clothingItems"],
     { schema: canonicalSchema },
   );
+
+  afterAll(async () => {
+    // `becomes default sti subclass` and `reset column information resets
+    // children` run reverted DDL on the shared canonical `topics` table
+    // (`change_column_default :topics, :type` / `add_column :topics, :foo`).
+    // Each reverts in its own `finally`, but a `dropExisting` canonical rebuild
+    // here is the belt-and-suspenders shield (mirrors locking/dirty.test.ts):
+    // it guarantees no `type`-default or `foo`-column drift escapes this file
+    // into a sibling reading `topics` on the same per-worker DB, even if a
+    // revert is interrupted. `repairWorkerSchema` only restores *missing*
+    // canonical columns, so it would not undo a leftover extra `foo`.
+    await defineSchema({ topics: canonicalSchema.topics }, { dropExisting: true });
+  });
 
   it("create", async () => {
     const topic = new Topic();
@@ -229,6 +242,48 @@ describe("PersistenceTest", () => {
 
     const tReloaded = await Topic.find((t as any).id);
     expect((tReloaded as any).title).toBe("New Topic");
+  });
+
+  it("becomes default sti subclass", async () => {
+    const adapter = Topic.leaseConnection() as any;
+    const originalType = (Topic as any).columnsHash()["type"].default;
+    try {
+      await adapter.changeColumnDefault("topics", "type", { from: originalType, to: "Reply" });
+      Topic.resetColumnInformation();
+
+      const reply = topics("second");
+      expect(reply).toBeInstanceOf(Reply);
+
+      const topic = reply.becomes(Topic);
+      expect(topic).toBeInstanceOf(Topic);
+    } finally {
+      await adapter.changeColumnDefault("topics", "type", { from: "Reply", to: originalType });
+      Topic.resetColumnInformation();
+    }
+  });
+
+  it("reset column information resets children", async () => {
+    const adapter = Topic.leaseConnection() as any;
+    class Child extends Topic {}
+    new Child(); // force schema to load
+
+    try {
+      await adapter.addColumn("topics", "foo", "string");
+      Topic.resetColumnInformation();
+      // trails reflects columns from the DB asynchronously; Rails' synchronous
+      // schema_cache reload is mirrored by re-warming the cache here so the new
+      // `foo` column is reflected before the child redefines its accessors.
+      await (Topic as any).loadSchema();
+
+      // this should redefine attribute methods
+      const child = new Child();
+      expect("foo" in child).toBe(true);
+      expect(typeof (child as any).fooChanged).toBe("function");
+      expect((new Child({ foo: "bar" }) as any).foo).toBe("bar");
+    } finally {
+      await adapter.removeColumn("topics", "foo");
+      Topic.resetColumnInformation();
+    }
   });
 
   it("class level update without ids", async () => {
