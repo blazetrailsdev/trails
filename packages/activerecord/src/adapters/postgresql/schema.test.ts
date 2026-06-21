@@ -187,6 +187,19 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(colNames).toContain("name");
     });
 
+    it("column exists honors search path", async () => {
+      // Regression for columns-pg-honor-search-path (RFC 0023): columnExists
+      // must resolve the column list through the active search_path, not a
+      // hardcoded table_schema = 'public'. A table living only on a non-public
+      // schema that is on the search_path passes tableExists, so columnExists
+      // must stay consistent and report its columns too.
+      await adapter.setSchemaSearchPath(SCHEMA_NAME);
+      expect(await adapter.tableExists(TABLE_NAME)).toBe(true);
+      expect(await adapter.columnExists(TABLE_NAME, "name")).toBe(true);
+      expect(await adapter.columnExists(TABLE_NAME, "email")).toBe(true);
+      expect(await adapter.columnExists(TABLE_NAME, "nonexistent")).toBe(false);
+    });
+
     it("schema names", async () => {
       const names = await adapter.schemaNames();
       expect(names).toContain("public");

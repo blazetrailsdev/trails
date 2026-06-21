@@ -529,7 +529,7 @@ export class SchemaStatements {
         return rows.some((row: any) => row.name === columnName);
       case "postgres":
         rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '${tableName}' AND column_name = '${columnName}' LIMIT 1`,
+          `SELECT 1 FROM information_schema.columns WHERE table_schema = ANY (current_schemas(false)) AND table_name = '${tableName}' AND column_name = '${columnName}' LIMIT 1`,
         );
         return rows.length > 0;
       case "mysql":
@@ -965,7 +965,7 @@ export class SchemaStatements {
             JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
             WHERE i.indrelid = to_regclass($1) AND i.indisprimary
           ) pk ON pk.attname = c.column_name
-          WHERE c.table_schema = 'public' AND c.table_name = $1
+          WHERE c.table_schema = ANY (current_schemas(false)) AND c.table_name = $1
           ORDER BY c.ordinal_position`,
           [tableName],
         );
