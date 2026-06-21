@@ -1428,9 +1428,10 @@ export class SchemaStatements {
         );
       }
     } else {
+      // Rails (schema_statements.rb:1254): the scalar branch always derives the
+      // default column from the literal "id", independent of :primary_key.
       if (!result.column) {
-        const pk = typeof result.primaryKey === "string" ? result.primaryKey : "id";
-        result.column = this.foreignKeyColumnFor(toTable, pk);
+        result.column = this.foreignKeyColumnFor(toTable, "id");
       }
     }
 
