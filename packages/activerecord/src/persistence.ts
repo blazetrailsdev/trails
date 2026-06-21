@@ -686,14 +686,15 @@ export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
 ): Promise<boolean> {
-  // Mirrors ActiveRecord::Persistence#create_or_update — `return false if destroyed?`.
-  // `save` returns false (it does not raise) for a destroyed record; `save!`
-  // turns that false into RecordNotSaved("Failed to save the record").
-  if (this._destroyed) {
-    return false;
-  }
+  // Mirrors ActiveRecord::Persistence#create_or_update: readonly raises first,
+  // then `return false if destroyed?`. `save` returns false (it does not raise)
+  // for a destroyed record; `save!` turns that false into
+  // RecordNotSaved("Failed to save the record").
   if (this._readonly) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
+  }
+  if (this._destroyed) {
+    return false;
   }
   // Reflect the schema before validations/INSERT touch attribute defs.
   await (
