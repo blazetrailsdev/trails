@@ -3142,13 +3142,23 @@ export class Base extends Model {
     // auto-populates on INSERT (the auto-increment PK, a custom-named
     // serial/identity PK like `owner_id`, a non-PK auto-increment `id`, and
     // DB-computed defaults), falling back to the PK when the adapter reports
-    // none. Each is threaded into `RETURNING` so the generated value reads back
-    // into the right attribute by position.
+    // none.
     const returningColumns: string[] = (ctor as any)._returningColumnsForInsert(ctor.connection);
+    // Only emit an EXPLICIT `RETURNING` clause for genuinely auto-populated
+    // columns (e.g. a non-PK auto-increment `id`, or a custom-named serial PK).
+    // The PK-fallback case must NOT name an explicit multi-column RETURNING:
+    // trails' scalar adapters surface a single value (PG's executeMutation
+    // returns only the first RETURNING column; SQLite/MySQL return the generated
+    // rowid/insertId), which we can't map to a multi-column list. Letting the
+    // adapter use its default id read-back (PG auto-appends `RETURNING id`,
+    // tolerant of id-less tables via a savepoint retry; SQLite/MySQL return the
+    // generated id) yields the DB-generated id, which the scalar write-back below
+    // assigns to the first unset column.
+    const autoPopulated: string[] = (ctor as any)._autoPopulatedColumnsForInsert(ctor.connection);
     // Mirrors Rails `_insert_record`, which passes `primary_key || false` as the
     // pk arg: `false` opts the adapter out of any pk-derived RETURNING for a
     // key-less table, while a scalar pk is the fallback column when no explicit
-    // `returning` list is given. The explicit `returning` below takes precedence.
+    // `returning` list is given.
     const insertPk = Array.isArray(ctor.primaryKey) ? undefined : ctor.primaryKey || false;
     this._pendingOperation = ctor.connection
       .execInsert(
@@ -3157,7 +3167,7 @@ export class Base extends Model {
         insertBinds,
         insertPk,
         undefined,
-        returningColumns.length > 0 ? returningColumns : undefined,
+        autoPopulated.length > 0 ? autoPopulated : undefined,
       )
       .then((rawId) => {
         // Adapters with RETURNING support (PG) return a Result-like object whose
@@ -3183,26 +3193,23 @@ export class Base extends Model {
             this._writeAttribute(column, type?.deserialize ? type.deserialize(value) : value);
           }
         };
-        if (fullRow) {
-          // Mirrors Rails _create_record: zip the full RETURNING row back into the
-          // auto-populated columns by position. A key-less table yields empty
-          // `returningColumns`, so this is a no-op (matching Rails' empty zip).
-          returningColumns.forEach((column, i) => {
+        if (fullRow && autoPopulated.length > 0) {
+          // Adapter returned the full RETURNING row for the explicitly-named
+          // auto-populated columns — zip back by position (mirrors Rails
+          // _create_record's `returning_columns.zip(returning_values)`).
+          autoPopulated.forEach((column, i) => {
             if (fullRow[i] !== undefined) writeBack(column, fullRow[i]);
           });
         } else if (insertedId != null) {
-          // Adapters that surface only the single generated id (MySQL, SQLite via
-          // executeMutation, which never emits a RETURNING row unlike Rails'
-          // SQLite 3.35+ adapter) can't be zipped positionally. Rails always zips
-          // `returning_columns` against `returning_values` by position, writing
-          // the lone `last_inserted_id` into `returning_columns[0]`
+          // Scalar-id adapters (PG's executeMutation, MySQL, SQLite) surface a
+          // single generated value. Rails zips `returning_values` by position and
+          // writes the lone `last_inserted_id` into `returning_columns[0]`
           // (persistence.rb:931, database_statements.rb:723). We instead write it
-          // into the first still-unset column, because `returningColumns` may list
-          // several columns whose auto-increment member is NOT first (e.g. a
-          // composite PK [shop_id, id]). This relies on every column ahead of the
-          // auto-increment member already being assigned — true for the
-          // PK-fallback composite case (non-auto PK members must be supplied) and
-          // the single-auto-`id` case, the only shapes that reach this branch.
+          // into the first still-unset column of `returningColumns`, because that
+          // list may be the PK fallback whose auto-increment member is NOT first
+          // (e.g. a composite PK [shop_id, id] where shop_id is supplied). Every
+          // column ahead of the auto-increment member is already assigned, so the
+          // first unset one is the DB-generated column.
           for (const column of returningColumns) {
             const current = this._readAttribute(column);
             if (current == null || current === false) {

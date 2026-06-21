@@ -514,24 +514,33 @@ export function realInheritanceColumn(this: SchemaHost, value: string | null): v
 
 export const _inheritanceColumn = realInheritanceColumn;
 
-export function _returningColumnsForInsert(
+/**
+ * The columns the DB auto-populates on INSERT (auto-increment / serial / identity
+ * columns and DB-computed defaults). `returnValueAfterInsert` calls
+ * `column.isAutoPopulated`, which only the reflected Column objects implement; the
+ * synthesized column-hash fallback (used before the schema cache is warm) holds
+ * plain shapes, so skip those — they carry no auto-increment metadata.
+ */
+export function _autoPopulatedColumnsForInsert(
   this: SchemaHost,
   connection: { returnValueAfterInsert?(column: { name: string }): boolean },
 ): string[] {
-  // Mirrors Rails: columns the adapter populates server-side on INSERT (the
-  // auto-increment PK, DB-computed defaults, …). Falls back to the PK when the
-  // adapter reports none. `returnValueAfterInsert` calls `column.isAutoPopulated`,
-  // which only the reflected Column objects implement; the synthesized
-  // column-hash fallback (used before the schema cache is warm) holds plain
-  // shapes, so skip those — they carry no auto-increment metadata and the PK
-  // fallback below covers them.
-  const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
-  const autoPopulated = cols
+  return (columns.call(this) as { name: string; isAutoPopulated?: unknown }[])
     .filter(
       (c) => typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
     )
     .map((c) => c.name);
+}
+
+export function _returningColumnsForInsert(
+  this: SchemaHost,
+  connection: { returnValueAfterInsert?(column: { name: string }): boolean },
+): string[] {
+  // Mirrors Rails _returning_columns_for_insert: the auto-populated columns, or
+  // the PK when the adapter reports none.
+  const autoPopulated = _autoPopulatedColumnsForInsert.call(this, connection);
   if (autoPopulated.length > 0) return autoPopulated;
+  const cols = columns.call(this) as { name: string }[];
   // PK fallback. Restrict to columns that actually exist on the table: Rails
   // reflects `primary_key` as nil for a table without that column (e.g. an
   // id-less HABTM join table whose model still defaults `primary_key` to "id"),
@@ -1458,6 +1467,7 @@ export const ClassMethods = {
   columnForAttribute,
   symbolColumnToString,
   resetColumnInformation,
+  _autoPopulatedColumnsForInsert,
   _returningColumnsForInsert,
   loadSchemaFromAdapter,
 };
