@@ -478,6 +478,68 @@ describe("PersistenceTest", () => {
     expect(sql).toMatch(/WHERE .*clothing_type/);
     expect(sql).toMatch(/WHERE .*color/);
   });
+
+  it("save uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    clothingItem.description = "Lovely green t-shirt";
+    const sqls = await captureSql(async () => {
+      await clothingItem.save();
+    });
+    const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("reload uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    const sqls = await captureSql(async () => {
+      await clothingItem.reload();
+    });
+    const sql = sqls.find((s) => /^SELECT/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("update attribute uses query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    const sqls = await captureSql(async () => {
+      await clothingItem.updateAttribute("description", "Lovely green t-shirt");
+    });
+    const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("it is possible to update parts of the query constraints config", async () => {
+    const clothingItem = await ClothingItem.create({
+      clothing_type: "t-shirt",
+      color: "green",
+      description: "Cool green t-shirt",
+    });
+    clothingItem.color = "blue";
+    clothingItem.description = "Now it's a blue t-shirt";
+    const sqls = await captureSql(async () => {
+      await clothingItem.save();
+    });
+    const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+
+    const found = await ClothingItem.findBy({ id: clothingItem.id });
+    expect((found as any).color).toBe("blue");
+  });
 });
 
 // ==========================================================================
