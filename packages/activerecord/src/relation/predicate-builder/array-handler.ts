@@ -1,6 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
 import type { PredicateBuilder } from "../predicate-builder.js";
 import { Range } from "../../connection-adapters/postgresql/oid/range.js";
+import { isBaseInstance } from "./is-base-instance.js";
 
 /**
  * Sentinel used when no scalar values exist in an array condition.
@@ -54,16 +55,12 @@ export class ArrayHandler {
         hasNull = true;
       } else if (item instanceof Range) {
         ranges.push(item);
-      } else if (
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        !isPlainObject(item)
-      ) {
+      } else if (isBaseInstance(item)) {
         // Rails: `x.is_a?(Base) ? x.id : x` — flatten AR records to their PK.
-        // Duck-typed on `id` presence to avoid a circular import on Base, but a
-        // bare object literal (a Ruby Hash) is NOT a Base and must not be deref'd.
-        scalarValues.push((item as { id: unknown }).id);
+        // Only genuine Base instances deref; an arbitrary non-Base object that
+        // happens to carry an `id` (or a bare Ruby-Hash object literal) is left
+        // intact, matching `is_a?(Base)` being false for both.
+        scalarValues.push(item.id);
       } else {
         scalarValues.push(item);
       }
@@ -104,12 +101,4 @@ export class ArrayHandler {
 
 function groupedOr(left: Nodes.Node, right: Nodes.Node): Nodes.Grouping {
   return new Nodes.Grouping(new Nodes.Or(left, right));
-}
-
-// A bare object literal stands in for a Ruby Hash, which is not an AR record and
-// must not be dereferenced to its `id`. Mirrors predicate-builder.ts's helper.
-function isPlainObject(value: unknown): boolean {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
 }

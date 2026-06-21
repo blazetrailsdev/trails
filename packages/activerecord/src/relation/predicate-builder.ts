@@ -2,6 +2,7 @@ import { Table, Nodes, sql as arelSql } from "@blazetrails/arel";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
+import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
 import { RangeHandler } from "./predicate-builder/range-handler.js";
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
@@ -262,8 +263,10 @@ export class PredicateBuilder {
         hasNull = true;
       } else if (item instanceof Range) {
         ranges.push(item);
-      } else if (respondsToId(item)) {
-        scalarValues.push((item as { id: unknown }).id);
+      } else if (isBaseInstance(item)) {
+        // Rails ArrayHandler: `x.is_a?(Base) ? x.id : x` — only genuine AR
+        // records deref to their PK; a non-Base object carrying an `id` does not.
+        scalarValues.push(item.id);
       } else if (typeof item === "object" || typeof item === "function") {
         nonScalarValues.push(item);
       } else {
