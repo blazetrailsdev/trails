@@ -228,12 +228,16 @@ async function processNestedAttributes(record: Base): Promise<void> {
     const reflection = (ctor as any).reflectOnAssociation?.(assocName);
     const reflectionFk = reflection?.foreignKey;
     const optionFk = assocDef.options.foreignKey;
+    // Rails always resolves the FK through `reflection.foreign_key`, so prefer
+    // the (already option-aware) reflection FK and fall back to the raw option
+    // only when the reflection yields no array. The belongsTo create branch
+    // below uses the same precedence.
     const isCollectionLike = assocDef.type !== "belongsTo";
     const compositeFkColumns: string[] | null = isCollectionLike
-      ? Array.isArray(optionFk)
-        ? (optionFk as unknown[]).map(String)
-        : Array.isArray(reflectionFk)
-          ? (reflectionFk as unknown[]).map(String)
+      ? Array.isArray(reflectionFk)
+        ? (reflectionFk as unknown[]).map(String)
+        : Array.isArray(optionFk)
+          ? (optionFk as unknown[]).map(String)
           : null
       : null;
     const foreignKey =
@@ -329,7 +333,13 @@ async function processNestedAttributes(record: Base): Promise<void> {
         // to a CPK target writes every FK column (not a single coerced
         // `created.id`).
         const created = await (targetModel as any).create(childAttrs);
-        if (created != null) {
+        // Only thread the FK when the target actually persisted. `create`
+        // returns an *unsaved* record on validation failure; Rails' autosave
+        // (`save_belongs_to_association`) aborts rather than committing a nil FK
+        // onto the owner. `isPersisted()` is also the correct CPK guard — the
+        // old `created.id != null` check was always truthy for a composite PK
+        // (an array), so an invalid CPK target would have written nils.
+        if (created != null && created.isPersisted()) {
           const belongsToFkColumns = Array.isArray(reflectionFk)
             ? (reflectionFk as unknown[]).map(String)
             : Array.isArray(optionFk)
