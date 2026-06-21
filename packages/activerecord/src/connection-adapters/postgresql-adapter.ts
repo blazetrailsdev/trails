@@ -4454,16 +4454,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // when `:where` is a bare column name, quote it as an identifier
   // (`WHERE "deleted"` for a boolean column) rather than emitting it verbatim.
   // Anything with spaces, quotes, or operators (e.g. `state = 'active'`) is an
-  // expression and passes through unchanged. The `/^\w+$/` guard also keeps
-  // such values out of columnExists, whose SQL interpolates the name unescaped;
-  // Rails' parameterized column_exists? simply returns false for those.
+  // expression and passes through unchanged — columnExists now binds its
+  // identifier values and safely returns false for such input, so no extra
+  // call-site identifier guard is needed.
   async addIndexOptions(
     tableName: string,
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<[AbstractIndexDefinition, string | undefined, boolean]> {
     const opts = { ...options };
-    if (typeof opts.where === "string" && /^\w+$/.test(opts.where)) {
+    if (typeof opts.where === "string") {
       const ss = this.pgSchemaStatements();
       if ((await ss.tableExists(tableName)) && (await ss.columnExists(tableName, opts.where))) {
         opts.where = this.quoteColumnName(opts.where);

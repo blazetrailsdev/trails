@@ -77,6 +77,35 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(mysql.lastSql).toContain("information_schema.tables");
   });
 
+  it("tableExists quotes the table name as a literal and scopes postgres to current_schemas", async () => {
+    const pg = new CapturingAdapter("postgres");
+    await pg.tableExists("things");
+    expect(pg.lastSql).toContain("current_schemas(false)");
+    expect(pg.lastSql).not.toContain("'public'");
+    // The name is embedded as an escaped string literal (Rails' quote()), not raw.
+    expect(pg.lastSql).toContain("table_name = 'things'");
+
+    const mysql = new CapturingAdapter("mysql");
+    await mysql.tableExists("things");
+    expect(mysql.lastSql).toContain("table_name = 'things'");
+  });
+
+  it("tableExists escapes a table name containing a quote instead of breaking SQL", async () => {
+    const pg = new CapturingAdapter("postgres");
+    await pg.tableExists("ab'c");
+    expect(pg.lastSql).toContain("table_name = 'ab''c'");
+  });
+
+  it("columnExists returns false for a value containing quotes instead of erroring", async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.createTable("gadgets", { id: false }, (t) => {
+      t.string("state");
+    });
+    expect(await adapter.columnExists("gadgets", "state")).toBe(true);
+    expect(await adapter.columnExists("gadgets", "state = 'active'")).toBe(false);
+    await adapter.dropTable("gadgets");
+  });
+
   it("createTable is callable directly on the adapter", async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("things", (t) => {

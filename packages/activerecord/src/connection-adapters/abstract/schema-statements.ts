@@ -500,21 +500,28 @@ export class SchemaStatements {
   }
 
   async tableExists(tableName: string): Promise<boolean> {
+    // Rails' data_source_exists? embeds the table name via quote() — an escaped
+    // SQL string literal, not raw interpolation (data_source_sql, schema_statements.rb).
+    // A value containing quotes/operators is escaped to a literal that matches
+    // nothing and returns false instead of producing broken SQL.
+    const quoted = this.adapter.quote(tableName);
     let rows: Record<string, unknown>[];
     switch (this.adapterName) {
       case "sqlite":
         rows = await this.adapter.execute(
-          `SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`,
+          `SELECT name FROM sqlite_master WHERE type='table' AND name=${quoted}`,
         );
         break;
       case "postgres":
+        // Rails' PG data_source_sql scopes to ANY (current_schemas(false))
+        // (the active search_path), not a hardcoded 'public'.
         rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${tableName}' LIMIT 1`,
+          `SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = ${quoted} LIMIT 1`,
         );
         break;
       case "mysql":
         rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '${tableName}' LIMIT 1`,
+          `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ${quoted} LIMIT 1`,
         );
         break;
     }
@@ -522,22 +529,11 @@ export class SchemaStatements {
   }
 
   async columnExists(tableName: string, columnName: string): Promise<boolean> {
-    let rows: Record<string, unknown>[];
-    switch (this.adapterName) {
-      case "sqlite":
-        rows = await this.adapter.execute(`PRAGMA table_info("${tableName}")`);
-        return rows.some((row: any) => row.name === columnName);
-      case "postgres":
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.columns WHERE table_schema = ANY (current_schemas(false)) AND table_name = '${tableName}' AND column_name = '${columnName}' LIMIT 1`,
-        );
-        return rows.length > 0;
-      case "mysql":
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '${tableName}' AND column_name = '${columnName}' LIMIT 1`,
-        );
-        return rows.length > 0;
-    }
+    // Rails' column_exists? loads the table's columns and matches the name in
+    // Ruby (schema_statements.rb), never interpolating the column name into SQL —
+    // so an arbitrary value (quotes/operators) simply matches nothing.
+    const cols = await this.columns(tableName);
+    return cols.some((c) => c.name === columnName);
   }
 
   async changeColumnDefault(
