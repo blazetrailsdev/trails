@@ -100,6 +100,28 @@ describe("ForeignKeyDefinition#defined_for?", () => {
     expect(composite.isDefinedFor({ primaryKey: ["id", "tenant_id"] })).toBe(false);
     expect(composite.isDefinedFor({ primaryKey: "id" })).toBe(false);
   });
+
+  it("slices out lookup keys the definition does not store", () => {
+    // Mirrors `options = options.slice(*self.options.keys)`: a key the FK never
+    // carried is dropped before the generic compare, so it is ignored.
+    const fkDef = new TableDefinition("astronauts").newForeignKeyDefinition("rockets");
+    // primaryKey/onDelete/onUpdate/deferrable were not passed, so they are not
+    // stored — a lookup on them is sliced out and matches.
+    expect(fkDef.isDefinedFor({ primaryKey: "wrong" })).toBe(true);
+    expect(fkDef.isDefinedFor({ onDelete: "cascade" })).toBe(true);
+    expect(fkDef.isDefinedFor({ onUpdate: "cascade" })).toBe(true);
+    expect(fkDef.isDefinedFor({ deferrable: "deferred" })).toBe(true);
+    // column and name are always stored (Rails foreign_key_options fills them),
+    // so they still compare.
+    expect(fkDef.isDefinedFor({ column: "rocket_id" })).toBe(true);
+    expect(fkDef.isDefinedFor({ column: "wrong_id" })).toBe(false);
+    // An explicitly-set key is stored and compared.
+    const withPk = new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
+      primaryKey: "uuid",
+    });
+    expect(withPk.isDefinedFor({ primaryKey: "uuid" })).toBe(true);
+    expect(withPk.isDefinedFor({ primaryKey: "wrong" })).toBe(false);
+  });
 });
 
 describe("ReferenceDefinition helpers", () => {
