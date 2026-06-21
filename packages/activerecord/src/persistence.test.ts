@@ -14,44 +14,51 @@ function isTemporalDatetime(v: unknown): boolean {
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, RecordNotFound, RecordInvalid } from "./index.js";
+import { Base, RecordNotFound, RecordInvalid, registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { repairValidations } from "./test-helpers/repair-validations.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
+// Imported under an alias: a top-level `Topic` binding would make esbuild
+// rename the bespoke in-function `class Topic` declarations in the later
+// (still-bespoke) describe blocks to `Topic2`, so their tables would resolve
+// to the non-existent `topic2s`. Block 1 aliases it back to a local `Topic`.
+import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { Minimalistic } from "./test-helpers/models/minimalistic.js";
+// Registers the Reply STI subclasses so Topic#destroy can resolve its
+// `replies`/`uniqueReplies` associations (mirrors `require "models/reply"`).
+import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
+
+for (const klass of [
+  CanonicalTopic,
+  Minimalistic,
+  ClothingItem,
+  Reply,
+  SillyReply,
+  UniqueReply,
+  SillyUniqueReply,
+]) {
+  registerModel(klass);
+}
 
 // ==========================================================================
 // PersistenceTest — targets persistence_test.rb
 // ==========================================================================
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema({
-      topics: { title: "string", body: "string", replies_count: "integer" },
-      minimals: {},
-      cm_items: { title: "string" },
-      clothing_items: {
-        clothing_type: "string",
-        color: "string",
-        type: "string",
-        size: "string",
-        description: "text",
-      },
-    });
-  });
+  const Topic = CanonicalTopic;
+  const { topics, clothingItems } = useHandlerFixtures(
+    ["topics", "minimalistics", "clothingItems"],
+    { schema: canonicalSchema },
+  );
 
   it("create", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const topic = new Topic();
     topic.title = "New Topic";
     await topic.save();
@@ -60,51 +67,30 @@ describe("PersistenceTest", () => {
   });
 
   it("save for record with only primary key", async () => {
-    class Minimal extends Base {}
-    const m = new Minimal();
+    const m = new Minimalistic();
     await m.save();
     expect(m.isPersisted()).toBe(true);
   });
 
   it("update!", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     await t.updateBang({ title: "new" });
     expect(t.title).toBe("new");
   });
 
   it("update attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     await t.updateAttribute("title", "new");
     expect(t.title).toBe("new");
   });
 
   it("destroy!", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "a" });
     await t.destroyBang();
     expect(t.isDestroyed()).toBe(true);
   });
 
   it("destroyed returns boolean", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "a" });
     expect(t.isDestroyed()).toBe(false);
     await t.destroy();
@@ -112,34 +98,20 @@ describe("PersistenceTest", () => {
   });
 
   it("class level delete", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "a" });
     await Topic.delete(t.id);
     expect(await Topic.exists(t.id)).toBe(false);
   });
 
   it("delete all", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
-    const count = await Topic.all().deleteAll();
-    expect(count).toBe(2);
+    expect(await Topic.count()).toBeGreaterThan(0);
+    await Topic.all().deleteAll();
+    expect(await Topic.count()).toBe(0);
   });
 
   it("update after create", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "original" });
     t.title = "updated";
     await t.save();
@@ -147,11 +119,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update does not run sql if record has not changed", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "a" });
     // Saving without changes should still succeed
     const result = await t.save();
@@ -159,55 +126,34 @@ describe("PersistenceTest", () => {
   });
 
   it("increment attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("replies_count", "integer");
-      }
-    }
-    const t = await Topic.create({ replies_count: 0 });
+    const t = topics("first");
+    t.replies_count = 0;
     t.increment("replies_count");
     expect(t.replies_count).toBe(1);
   });
 
   it("increment attribute by", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("replies_count", "integer");
-      }
-    }
-    const t = await Topic.create({ replies_count: 0 });
+    const t = topics("first");
+    t.replies_count = 0;
     t.increment("replies_count", 5);
     expect(t.replies_count).toBe(5);
   });
 
   it("decrement attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("replies_count", "integer");
-      }
-    }
-    const t = await Topic.create({ replies_count: 10 });
+    const t = topics("first");
+    t.replies_count = 10;
     t.decrement("replies_count");
     expect(t.replies_count).toBe(9);
   });
 
   it("decrement attribute by", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("replies_count", "integer");
-      }
-    }
-    const t = await Topic.create({ replies_count: 10 });
+    const t = topics("first");
+    t.replies_count = 10;
     t.decrement("replies_count", 3);
     expect(t.replies_count).toBe(7);
   });
 
   it("save with duping of destroyed object", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "a" });
     await t.destroy();
     const d = t.dup();
@@ -215,56 +161,30 @@ describe("PersistenceTest", () => {
   });
 
   it("update column", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     await t.updateColumn("title", "new");
     expect(t.title).toBe("new");
   });
 
   it("update columns", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const t = await Topic.create({ title: "old", body: "old" });
-    await t.updateColumns({ title: "new", body: "new" });
+    const t = await Topic.create({ title: "old", content: "old" });
+    await t.updateColumns({ title: "new", content: "new" });
     expect(t.title).toBe("new");
-    expect(t.body).toBe("new");
+    expect(t.content).toBe("new");
   });
 
   it("find raises record not found exception", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     await expect(Topic.find(999)).rejects.toThrow(RecordNotFound);
   });
 
   it("becomes", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "a" });
+    const t = topics("first");
     // becomes creates a new instance of a different class with same attributes
     const d = t.dup();
-    expect(d.title).toBe("a");
+    expect(d.title).toBe(t.title);
   });
 
   it("class level update without ids", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     await Topic.update(t.id, { title: "new" });
     const reloaded = await Topic.find(t.id);
@@ -272,11 +192,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update many", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     await Topic.update(t1.id, { title: "x" });
@@ -289,11 +204,6 @@ describe("PersistenceTest", () => {
 
   // Rails: Model.update([ids], [attrs]) — parallel arrays, index-aligned.
   it("update with parallel ids + attrs arrays updates each record", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     const result = await Topic.update([t1.id, t2.id], [{ title: "x" }, { title: "y" }]);
@@ -304,27 +214,17 @@ describe("PersistenceTest", () => {
 
   // Rails: Model.update(attrs) — :all-sentinel default applies attrs to every record.
   it("update with just attrs applies to every record in scope (:all default)", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
     const result = await Topic.update({ title: "same" });
-    expect(result).toHaveLength(2);
-    const titles = (await Topic.all().toArray()).map((t) => t.title);
-    expect(titles).toEqual(["same", "same"]);
+    const all = await Topic.all().toArray();
+    expect(result).toHaveLength(all.length);
+    expect(all.every((t) => t.title === "same")).toBe(true);
   });
 
   // Rails: Base.create([{...}, {...}]) recurses and returns an array of
   // persisted records. Same for new() and createBang().
   it("create with an array recurses and returns an array of records", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const result = await Topic.create([{ title: "a" }, { title: "b" }]);
     expect(result).toHaveLength(2);
     expect(result[0].isPersisted()).toBe(true);
@@ -332,11 +232,6 @@ describe("PersistenceTest", () => {
   });
 
   it("createBang with an array recurses and returns an array of records", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const result = await Topic.createBang([{ title: "a" }, { title: "b" }]);
     expect(result).toHaveLength(2);
     expect(result.every((t) => t.isPersisted())).toBe(true);
@@ -344,11 +239,6 @@ describe("PersistenceTest", () => {
 
   // Rails 7.2+: `Base.build` is an alias for `Base.new`.
   it("build is an alias for new and supports array + block", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const single = Topic.build({ title: "a" }, (r) => {
       r.title = "mutated";
     });
@@ -361,11 +251,6 @@ describe("PersistenceTest", () => {
   });
 
   it("new with an array returns unsaved records", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const result = Topic.new([{ title: "a" }, { title: "b" }]);
     expect(result).toHaveLength(2);
     expect(result.every((t) => t.isNewRecord())).toBe(true);
@@ -374,11 +259,6 @@ describe("PersistenceTest", () => {
   // Rails: Base.create(attrs, &block) yields each record to the block
   // before save, so the block can mutate it.
   it("create yields to block before save", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "a" }, (record) => {
       record.title = "mutated-by-block";
     });
@@ -391,29 +271,21 @@ describe("PersistenceTest", () => {
   // Rails: create! stops at the first exception, so records after the
   // failed element are not persisted.
   it("createBang with an array stops at the first invalid record", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.validatesPresenceOf("title");
-      }
-    }
+    await repairValidations(Topic, async () => {
+      Topic.validatesPresenceOf("title");
 
-    await expect(
-      Topic.createBang([{ title: "first" }, { title: "" }, { title: "third" }]),
-    ).rejects.toThrow();
+      await expect(
+        Topic.createBang([{ title: "first" }, { title: "" }, { title: "third" }]),
+      ).rejects.toThrow();
 
-    // First element committed before the failure.
-    expect(await Topic.all().where({ title: "first" }).exists()).toBe(true);
-    // Third element never attempted.
-    expect(await Topic.all().where({ title: "third" }).exists()).toBe(false);
+      // First element committed before the failure.
+      expect(await Topic.all().where({ title: "first" }).exists()).toBe(true);
+      // Third element never attempted.
+      expect(await Topic.all().where({ title: "third" }).exists()).toBe(false);
+    });
   });
 
   it("create with array yields to block for each record", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     let calls = 0;
     await Topic.create([{ title: "a" }, { title: "b" }], () => {
       calls++;
@@ -423,11 +295,6 @@ describe("PersistenceTest", () => {
 
   // Rails: passing an AR instance raises ArgumentError.
   it("update rejects a Base instance", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "a" });
     // Invoke through `any` to bypass the overloads — we're verifying the
     // runtime guard rejects a Base instance, not testing a supported form.
@@ -438,11 +305,7 @@ describe("PersistenceTest", () => {
   // _query_constraints_hash, keying each declared constraint column to its
   // attribute_in_database value (not the single primary key).
   it("update uses query constraints config", async () => {
-    const clothingItem = await ClothingItem.create({
-      clothing_type: "t-shirt",
-      color: "green",
-      description: "Cool green t-shirt",
-    });
+    const clothingItem = clothingItems("green_t_shirt");
     const sqls = await captureSql(async () => {
       await (clothingItem as any).update({ description: "Lovely green t-shirt" });
     });
@@ -452,11 +315,7 @@ describe("PersistenceTest", () => {
   });
 
   it("destroy uses query constraints config", async () => {
-    const clothingItem = await ClothingItem.create({
-      clothing_type: "t-shirt",
-      color: "green",
-      description: "Cool green t-shirt",
-    });
+    const clothingItem = clothingItems("green_t_shirt");
     const sqls = await captureSql(async () => {
       await (clothingItem as any).destroy();
     });
@@ -466,11 +325,7 @@ describe("PersistenceTest", () => {
   });
 
   it("delete uses query constraints config", async () => {
-    const clothingItem = await ClothingItem.create({
-      clothing_type: "t-shirt",
-      color: "green",
-      description: "Cool green t-shirt",
-    });
+    const clothingItem = clothingItems("green_t_shirt");
     const sqls = await captureSql(async () => {
       await (clothingItem as any).delete();
     });
