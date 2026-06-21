@@ -533,18 +533,16 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
     const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;
     candidates = changed ?? attributeNames;
     // Rails Locking::Optimistic#_create_record: attribute_names |= [locking_column]
-    // forces the lock column into the INSERT even when it equals its default and
-    // is therefore "unchanged" under partial_inserts. Without this, the in-memory
-    // lock value (0) and the DB value diverge and every later
-    // `WHERE locking_column = ?` matches zero rows → StaleObjectError. Guard on a
-    // non-null in-memory value: a NULL lock attribute with no schema default must
-    // fall through to the DB default (e.g. custom `version` column) rather than
-    // INSERT a NOT NULL violation.
-    if (
-      mc.lockingEnabled &&
-      this._readAttribute?.(mc.lockingColumn) != null &&
-      !candidates.includes(mc.lockingColumn)
-    ) {
+    // — "We always want to persist the locking version, even if we don't detect
+    // a change from the default, since the database might have no default."
+    // Without this, the lock column drops from the INSERT when it equals its
+    // default and is therefore "unchanged" under partial_inserts, so the
+    // in-memory value (0) and the DB value diverge and every later
+    // `WHERE locking_column = ?` matches zero rows → StaleObjectError. The
+    // unconditional union is safe even with no DB default because the locking
+    // column's type is hookAttributeType-wrapped and serializes nil→0
+    // (LockingType.serialize), so it inserts an explicit 0, never NULL.
+    if (mc.lockingEnabled && !candidates.includes(mc.lockingColumn)) {
       candidates = [...candidates, mc.lockingColumn];
     }
   } else {
