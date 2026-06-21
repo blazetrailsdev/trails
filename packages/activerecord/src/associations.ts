@@ -58,6 +58,7 @@ export async function initializeAssociations(): Promise<void> {
   ]);
 }
 import { ConfigurationError, NameError, Rollback } from "./errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "./core.js";
 import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
 import {
@@ -1735,17 +1736,51 @@ function _inlinePolymorphicKeys(
     (options.queryConstraints || hasQueryConstraints.call(ctor as any))
   ) {
     const qc = options.queryConstraints ?? queryConstraintsList.call(ctor as any);
-    // Mirror deriveFkQueryConstraints' 2-attribute case: replace the owner-PK
-    // slot in the query_constraints list with the polymorphic `${as}_id` FK.
-    // Lists of a different shape (>2 attrs, no scalar PK, FK already present)
-    // are Rails ArgumentError cases with no valid config; fall through to the
-    // scalar collapse below rather than reproducing every Rails raise branch.
-    const ownerPk = ctor.primaryKey;
-    const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
-    if (qc && qc.length === 2 && ownerPkStr && qc.includes(ownerPkStr) && !qc.includes(scalarFk)) {
+    // Mirror deriveFkQueryConstraints (reflection.ts) faithfully — including its
+    // ArgumentError raises for the underivable query_constraints shapes: a list
+    // with >2 attributes, a list missing the owner's scalar primary key (or a
+    // composite owner PK), and a list whose keys can't be interpreted against
+    // the owner PK. The inline (no-reflection) path is no excuse to silently
+    // scalar-collapse those configs.
+    if (qc) {
+      const ownerPk = ctor.primaryKey;
+
+      if (qc.length > 2) {
+        throw new ArgumentError(
+          `The query constraints list on the \`${ctor.name}\` model has more than 2 ` +
+            `attributes. Active Record is unable to derive the query constraints ` +
+            `for the association. You need to explicitly define the query constraints ` +
+            `for this association.`,
+        );
+      }
+
+      const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
+      if (!ownerPkStr || !qc.includes(ownerPkStr)) {
+        throw new ArgumentError(
+          `The query constraints on the \`${ctor.name}\` model does not include the primary ` +
+            `key so Active Record is unable to derive the foreign key constraints for ` +
+            `the association. You need to explicitly define the query constraints for this ` +
+            `association.`,
+        );
+      }
+
+      if (qc.includes(scalarFk)) {
+        return { fkCols: [scalarFk], ownerKeyCols: [ownerPkStr] };
+      }
+
       const [firstKey, lastKey] = qc;
-      const fkCols = firstKey === ownerPkStr ? [scalarFk, lastKey] : [firstKey, scalarFk];
-      return { fkCols, ownerKeyCols: qc };
+      if (firstKey === ownerPkStr) {
+        return { fkCols: [scalarFk, lastKey], ownerKeyCols: qc };
+      } else if (lastKey === ownerPkStr) {
+        return { fkCols: [firstKey, scalarFk], ownerKeyCols: qc };
+      }
+
+      throw new ArgumentError(
+        `Active Record couldn't correctly interpret the query constraints ` +
+          `for the \`${ctor.name}\` model. The query constraints on \`${ctor.name}\` are ` +
+          `\`${qc}\` and the foreign key is \`${scalarFk}\`. ` +
+          `You need to explicitly set the query constraints for this association.`,
+      );
     }
   }
   // Scalar path — identical to the pre-fix inline behavior

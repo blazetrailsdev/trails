@@ -2764,6 +2764,25 @@ describe("AssociationsTest", () => {
     expect(rows.map((r) => (r as any).title)).toEqual(["match"]);
   });
 
+  // The inline (no-reflection) polymorphic fallback mirrors
+  // `deriveFkQueryConstraints` faithfully — including its ArgumentError raise
+  // for an underivable query_constraints shape. A >2-attribute list
+  // (`[blog_id, revision, id]` on `ShardedBlogPostWithRevision`) cannot be
+  // derived, so the inline path must raise rather than silently scalar-keying.
+  it("has many inline polymorphic fallback raises for underivable query constraints", async () => {
+    const post = await ShardedBlogPostWithRevision.create({
+      blog_id: 1,
+      revision: 1,
+      title: "Parent",
+    });
+    await expect(
+      loadHasMany(post, "freshChildren", {
+        className: "ShardedBlogPostWithRevision",
+        as: "parent",
+      }),
+    ).rejects.toThrow(ArgumentError);
+  });
+
   it("delete single composite has many through join row", async () => {
     // Covers the composite-aware delete on a has_many :through: the join lookup
     // must AND across both [blog_id, blog_post_id] columns so only the owning
