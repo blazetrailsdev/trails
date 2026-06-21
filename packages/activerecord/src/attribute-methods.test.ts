@@ -1786,9 +1786,11 @@ describe("AttributeMethodsTest", () => {
 
   describe("dirty tracking", () => {
     it("new record starts without changes tracked", () => {
-      const p = new Person({ name: "Alice" });
-      // In this implementation, new records don't track initial assignment as "changed"
-      expect(p.changed).toBe(false);
+      // Rails parity: a new record built by assignment is dirty against its
+      // column defaults — an unassigned record is clean, but assigning a value
+      // that differs from the default marks it changed.
+      expect(new Person({}).changed).toBe(false);
+      expect(new Person({ name: "Alice" }).changed).toBe(true);
     });
 
     it("clears changes after save", async () => {
