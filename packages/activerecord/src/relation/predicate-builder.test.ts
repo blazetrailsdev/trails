@@ -194,6 +194,27 @@ describe("PredicateBuilderTest", () => {
       expect(compile(node)).toMatch(/BETWEEN 18 AND 65/);
     });
 
+    // No verbatim Rails test exists for the plain-object-not-a-record case (it is
+    // an unusual call shape not exercised by Rails' ported predicate_builder tests).
+    // These regressions pin the convergence: in Ruby a bare Hash does not
+    // `respond_to?(:id)` (Object#id was removed in 1.9), so `where(col: { id: 5 })`
+    // routes the Hash to a handler rather than dereferencing it to `5`.
+    it("does not dereference a plain object literal to its id", () => {
+      const builder = new PredicateBuilder(table);
+      const node = builder.build(table.get("title"), { id: 5 });
+      const [sql, binds] = new Visitors.ToSql().compileWithBinds(node);
+      expect(sql).toContain('"posts"."title" = ?');
+      // The whole object is bound, not the dereferenced `5`.
+      expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
+    });
+
+    it("does not dereference a plain object literal inside an array", () => {
+      const builder = new PredicateBuilder(table);
+      const node = builder.build(table.get("title"), [{ id: 5 }]);
+      const [, binds] = new Visitors.ToSql().compileWithBinds(node);
+      expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
+    });
+
     it("handles exclusive ranges", () => {
       const builder = new PredicateBuilder(table);
       const [node] = builder.buildFromHash({ age: new Range(18, 65, true) });
@@ -231,6 +252,16 @@ describe("PredicateBuilderTest", () => {
       const sql = compile(node);
       expect(sql).toMatch(/< 18/);
       expect(sql).toMatch(/>= 65/);
+    });
+
+    it("does not dereference a plain object literal to its id when negated", () => {
+      const builder = new PredicateBuilder(table);
+      const node = builder.buildNegated(table.get("title"), { id: 5 });
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain('"posts"."title" !=');
+      // The whole object is compared, not the dereferenced `5`.
+      expect(sql).not.toMatch(/!=\s*5\b/);
+      expect(sql).toContain('{"id":5}');
     });
   });
 
