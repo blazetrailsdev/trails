@@ -12,11 +12,7 @@ import { ExecutorHooks } from "./connection-adapters/abstract/connection-pool.js
 import { Base as _Base } from "./base.js";
 ExecutorHooks.setConnectionHandlerResolver(() => _Base.connectionHandler);
 export { Relation, Range } from "./relation.js";
-export {
-  RangeType,
-  MultiRange,
-  MultiRangeType,
-} from "./connection-adapters/postgresql/oid/range.js";
+export { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 export { IPAddr } from "./connection-adapters/postgresql/oid/cidr.js";
 export type { LoadedRelation } from "./relation.js";
 export { QueryAttribute } from "./relation/query-attribute.js";

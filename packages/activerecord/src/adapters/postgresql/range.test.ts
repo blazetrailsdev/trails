@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } 
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
-import { MultiRange, Base } from "../../index.js";
+import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone, TimeZone, setZone, resetZone, BigDecimal } from "@blazetrails/activesupport";
@@ -20,7 +20,7 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// The `postgresql_ranges` table uses the PG-specific range / multirange
+// The `postgresql_ranges` table uses the PG-specific range
 // types (int4range, int8range, numrange, tsrange, tstzrange, daterange,
 // plus user-defined floatrange/stringrange), which aren't expressible via
 // defineSchema. The table is created via raw DDL below; defineSchema(
@@ -60,8 +60,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         int4_range int4range,
         int8_range int8range,
         float_range floatrange,
-        string_range stringrange,
-        int4_multirange int4multirange
+        string_range stringrange
       )
     `);
     await adapter.loadAdditionalTypes();
@@ -326,58 +325,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.dropTable("range_migration_test", { ifExists: true });
       }
     });
-    it("multirange int4", async () => {
-      const rows = await adapter.execute(`SELECT '{[1,5),[10,20)}'::int4multirange as r`);
-      const raw = rows[0].r as string;
-      expect(raw).toContain("[1,5)");
-    });
-    it("multirange int8", async () => {
-      const rows = await adapter.execute(`SELECT '{[10,100),[200,300)}'::int8multirange as r`);
-      const raw = rows[0].r as string;
-      expect(raw).toContain("[10,100)");
-    });
-    it("multirange num", async () => {
-      const rows = await adapter.execute(`SELECT '{[0.1,0.5),[0.7,1.0)}'::nummultirange as r`);
-      const raw = rows[0].r as string;
-      expect(raw).toContain("0.1");
-    });
-    it("multirange ts", async () => {
-      const rows = await adapter.execute(
-        `SELECT '{["2010-01-01","2011-01-01")}'::tsmultirange as r`,
-      );
-      const raw = rows[0].r as string;
-      expect(raw).toContain("2010-01-01");
-    });
-    it("multirange tstz", async () => {
-      const rows = await adapter.execute(
-        `SELECT '{["2010-01-01 00:00:00+00","2011-01-01 00:00:00+00")}'::tstzmultirange as r`,
-      );
-      const raw = rows[0].r as string;
-      expect(raw).toContain("2010-01-01");
-    });
-    it("multirange date", async () => {
-      const rows = await adapter.execute(
-        `SELECT '{[2012-01-01,2012-06-01),[2012-09-01,2013-01-01)}'::datemultirange as r`,
-      );
-      const raw = rows[0].r as string;
-      expect(raw).toContain("2012-01-01");
-    });
-
-    it("multirange ORM round-trip", async () => {
-      const mr = new MultiRange([new Range(1, 5, true), new Range(10, 20, true)]);
-      const r = await PostgresqlRanges.create({ int4_multirange: mr });
-      await r.reload();
-      const result = r.int4_multirange as MultiRange;
-      expect(result).toBeInstanceOf(MultiRange);
-      expect(result.ranges).toHaveLength(2);
-      expect(result.ranges[0].begin).toBe(1);
-      expect(result.ranges[0].end).toBe(5);
-      expect(result.ranges[0].excludeEnd).toBe(true);
-      expect(result.ranges[1].begin).toBe(10);
-      expect(result.ranges[1].end).toBe(20);
-      expect(result.ranges[1].excludeEnd).toBe(true);
-    });
-
     it("range intersection", async () => {
       const rows = await adapter.execute(`SELECT int4range(1,10) * int4range(5,15) as r`);
       const range = parseRange(rows[0].r as string, toInt)!;

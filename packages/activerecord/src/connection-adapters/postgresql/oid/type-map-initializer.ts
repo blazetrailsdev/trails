@@ -6,7 +6,7 @@
 
 import { Array as OidArray } from "./array.js";
 import { Enum } from "./enum.js";
-import { RangeType, MultiRangeType, type RangeSubtype } from "./range.js";
+import { RangeType, type RangeSubtype } from "./range.js";
 import { Vector } from "./vector.js";
 
 export interface TypeMap {
@@ -50,7 +50,6 @@ export class TypeMapInitializer {
     const nodes = records.filter((row) => !this.storeHas(toInt(row.oid)));
     const mapped = extract(nodes, (row) => this.storeHas(row.typname));
     const ranges = extract(nodes, (row) => row.typtype === "r");
-    const multiranges = extract(nodes, (row) => row.typtype === "m");
     const enums = extract(nodes, (row) => row.typtype === "e");
     const domains = extract(nodes, (row) => row.typtype === "d");
     const arrays = extract(nodes, (row) => row.typinput === "array_in");
@@ -61,7 +60,6 @@ export class TypeMapInitializer {
     domains.forEach((row) => this.registerDomainType(row));
     arrays.forEach((row) => this.registerArrayType(row));
     ranges.forEach((row) => this.registerRangeType(row));
-    multiranges.forEach((row) => this.registerMultirangeType(row));
     composites.forEach((row) => this.registerCompositeType(row));
   }
 
@@ -78,7 +76,7 @@ export class TypeMapInitializer {
   }
 
   queryConditionsForKnownTypeTypes(): string {
-    return "WHERE\n  t.typtype IN ('r', 'e', 'd', 'm')\n";
+    return "WHERE\n  t.typtype IN ('r', 'e', 'd')\n";
   }
 
   queryConditionsForArrayTypes(): string {
@@ -104,44 +102,6 @@ export class TypeMapInitializer {
       // silently routing through cast.
       (subtype) => new RangeType(subtype as unknown as RangeSubtype, row.typname),
     );
-  }
-
-  private registerMultirangeType(row: PgTypeRow): void {
-    // Real PG 14+ has typelem=0 for multirange rows in pg_type — the range
-    // OID is not stored there. Synthetic test rows may supply a non-zero
-    // typelem for convenience, and that fast path still works. When typelem=0
-    // (the real-PG case), fall back to iterating the type map for a RangeType
-    // whose typname matches the naming convention ("int4multirange" → "int4range").
-    if (!this.store.lookup) {
-      throw new Error(
-        `TypeMap store must implement lookup() to register subtype-based OID ${row.oid}`,
-      );
-    }
-    let rangeOid = toInt(row.typelem ?? 0);
-    if (rangeOid === 0) {
-      const rangeName = row.typname.replace("multirange", "range");
-      for (const key of this.storeKeys()) {
-        if (typeof key === "number") {
-          const candidate = this.storeLookup(key);
-          if (candidate instanceof RangeType && candidate.name === rangeName) {
-            rangeOid = key;
-            break;
-          }
-        }
-      }
-    }
-    if (rangeOid !== 0 && this.storeHas(rangeOid)) {
-      this.register(row.oid, (_oid: number | string, ...args: unknown[]) => {
-        const rangeType = this.storeLookup(rangeOid, ...args);
-        const subtype =
-          rangeType instanceof RangeType ? rangeType.subtype : (rangeType as RangeSubtype);
-        return new MultiRangeType(subtype, row.typname);
-      });
-    }
-    // A miss (range OID 0 or not yet registered) is skipped silently, mirroring
-    // Rails' register_with_subtype. The eager full load run by configureConnection
-    // registers the range row before its multirange in the same pass, so the
-    // store is already populated by the time this runs.
   }
 
   private registerEnumType(row: PgTypeRow): void {
