@@ -788,6 +788,12 @@ describe("InverseHasManyTests", () => {
       const human = (await Human.first())!;
       const interests = await loadHasMany(human, "interests", { inverseOf: "human" });
       expect(interests.length).toBeGreaterThan(0);
+
+      const preloaded = (await (Human as any).includes("interests").first())!;
+      expect(preloaded.association("interests").target.length).toBeGreaterThan(0);
+
+      const joined = (await (Human as any).joins("interests").includes("interests").first())!;
+      expect(joined.association("interests").target.length).toBeGreaterThan(0);
     } finally {
       (Interest as any).resetCallbacks("find");
     }

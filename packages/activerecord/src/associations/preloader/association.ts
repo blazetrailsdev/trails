@@ -160,7 +160,15 @@ export class Association {
 
     if (!rawRecords) {
       const lq = this.loaderQuery();
-      rawRecords = await lq.loadRecordsForKeys([...this.ownersByKey.keys()]);
+      // Wire the inverse inside the instantiation block (mirrors Rails'
+      // `Preloader::Association#records_for` passing `set_inverse_instance` as
+      // the `find_by_sql` block) so it lands BEFORE the child's find/initialize
+      // callbacks fire. In the batch path the shared query already ran the block
+      // (see `LoaderRecords#records`); the loop below re-runs setInverse
+      // idempotently for already-loaded owners.
+      rawRecords = await lq.loadRecordsForKeys([...this.ownersByKey.keys()], (record) =>
+        this.setInverse(record),
+      );
     }
 
     for (const record of rawRecords) {
@@ -442,7 +450,10 @@ export class LoaderQuery {
     return this.scope?.toSql?.() ?? "";
   }
 
-  async loadRecordsForKeys(keys: unknown[]): Promise<Base[]> {
+  async loadRecordsForKeys(
+    keys: unknown[],
+    instantiateBlock?: (record: Base) => void,
+  ): Promise<Base[]> {
     if (keys.length === 0) return [];
 
     if (Array.isArray(this.associationKeyName)) {
@@ -462,10 +473,14 @@ export class LoaderQuery {
       for (const [k, v] of Object.entries(conditions)) {
         whereObj[k] = [...v];
       }
-      return this.scope.where(whereObj).toArray();
+      const rel = this.scope.where(whereObj);
+      if (instantiateBlock) rel._instantiateBlock = instantiateBlock;
+      return rel.toArray();
     }
 
-    return this.scope.where({ [this.associationKeyName]: keys }).toArray();
+    const rel = this.scope.where({ [this.associationKeyName]: keys });
+    if (instantiateBlock) rel._instantiateBlock = instantiateBlock;
+    return rel.toArray();
   }
 
   recordsFor(loaders: Association[]): Promise<Base[]> {
@@ -515,7 +530,15 @@ export class LoaderRecords {
       keysToLoad.delete(key);
     }
 
-    const loaded = await this.loaderQuery.loadRecordsForKeys([...keysToLoad]);
+    // Shared query across loaders: resolve each record's owning loader inside
+    // the instantiation block so the inverse is wired before find/initialize
+    // callbacks. setInverse is a no-op for a loader whose ownersByKey lacks the
+    // record's key, so wiring every loader leaves only the matching one active.
+    const loaded = await this.loaderQuery.loadRecordsForKeys([...keysToLoad], (record) => {
+      for (const loader of this.loaders) {
+        loader.setInverse(record);
+      }
+    });
 
     return [...loaded, ...Array.from(alreadyLoadedByKey.values()).flat()];
   }

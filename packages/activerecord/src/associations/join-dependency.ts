@@ -1221,10 +1221,19 @@ export class JoinDependency {
       for (let i = 0; i < node.columns.length; i++) {
         attrs[node.columns[i]] = row[aliases.columnAlias(node, node.columns[i])!];
       }
-      model = (node.baseKlass as any)._instantiate(attrs);
-      if (strictLoadingValue && typeof model.strictLoadingBang === "function") {
-        model.strictLoadingBang();
-      }
+      // Apply strict-loading and wire the inverse inside the instantiation
+      // block so both land BEFORE the child's find/initialize callbacks fire.
+      // Mirrors Rails' `construct_model`, whose `node.instantiate` block runs
+      // `m.strict_loading! if strict_loading_value` then
+      // `other.set_inverse_instance(m)`. For a cache hit the inverse was already
+      // wired when the model was first built; `_wireAssociationProxy` re-applies
+      // it idempotently below.
+      model = (node.baseKlass as any)._instantiate(attrs, (built: any) => {
+        if (strictLoadingValue && typeof built.strictLoadingBang === "function") {
+          built.strictLoadingBang();
+        }
+        this._setInverseBeforeCallbacks(record, node, built);
+      });
       if (id != null) nodeCache.set(id, model);
     }
 
@@ -1247,6 +1256,25 @@ export class JoinDependency {
       model.strictLoadingBang();
     }
     return model;
+  }
+
+  /**
+   * @internal
+   * Wire only the inverse target on a freshly instantiated eager-loaded child,
+   * routed as the `_instantiate` block so it runs before the child's
+   * find/initialize callbacks. Pushing the child into the parent's proxy target
+   * still happens in `_wireAssociationProxy` after instantiation.
+   */
+  private _setInverseBeforeCallbacks(parent: any, node: JoinPart, child: any): void {
+    if (typeof parent.association !== "function") return;
+    try {
+      const proxy = parent.association(node.immediateAssocName);
+      if (proxy && typeof proxy.setInverseInstance === "function") {
+        proxy.setInverseInstance(child);
+      }
+    } catch (e) {
+      if (!(e instanceof AssociationNotFoundError)) throw e;
+    }
   }
 
   /**
