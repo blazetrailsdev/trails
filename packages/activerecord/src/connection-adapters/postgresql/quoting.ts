@@ -140,10 +140,12 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
     return quoteString(String(value));
   }
   if (value instanceof ArrayData) {
-    return quoteString(value.toString());
+    // Rails: `quote(encode_array(value))` — one serialization path, the
+    // encoder's delimiter (`;` for box[]), with per-element type_cast.
+    return quoteString(encodeArray.call(this as QuotingDispatchHost, value));
   }
   if (value instanceof Range) {
-    return quoteString(value.toString());
+    return quoteString(encodeRange.call(this as QuotingDispatchHost, value));
   }
   // Mirrors: PostgreSQL::Quoting#quote raises IntegerOutOf64BitRange for
   // integers exceeding the 64-bit signed range. Covers both bigint and
@@ -229,10 +231,11 @@ export function typeCast(this: QuotingDispatchHost | void, value: unknown): unkn
     return value.toString();
   }
   if (value instanceof ArrayData) {
-    return value.toString();
+    // Rails: `when OID::Array::Data then encode_array(value)`.
+    return encodeArray.call(this as QuotingDispatchHost, value);
   }
   if (value instanceof Range) {
-    return value.toString();
+    return encodeRange.call(this as QuotingDispatchHost, value);
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
     if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
@@ -386,9 +389,20 @@ export function quotedDate(
  * @internal
  */
 export function encodeRange(this: QuotingDispatchHost, range: Range): string {
-  const begin = typeCastRangeValue.call(this, range.begin);
-  const end = typeCastRangeValue.call(this, range.end);
+  const begin = rangeBoundLiteral(typeCastRangeValue.call(this, range.begin));
+  const end = rangeBoundLiteral(typeCastRangeValue.call(this, range.end));
   return `[${begin},${end}${range.excludeEnd ? ")" : "]"}`;
+}
+
+/**
+ * Rails builds the range literal with Ruby string interpolation, where a `nil`
+ * bound (an unbounded/infinite end whose `type_cast` yields `nil`) renders as
+ * the empty string. JS `${null}`/`${undefined}` would emit the literal text
+ * "null"/"undefined" and PG rejects e.g. `[2020-01-01,null)` for a tsrange, so
+ * collapse those to "" to match Ruby.
+ */
+function rangeBoundLiteral(value: unknown): string {
+  return value == null ? "" : String(value);
 }
 
 function isSqlLiteral(value: unknown): value is { value: string } {
@@ -402,26 +416,18 @@ function isSqlLiteral(value: unknown): value is { value: string } {
 
 /**
  * Mirrors: PostgreSQL::Quoting#encode_array. Recursively type-casts the array
- * values and joins them into a PG literal string: `{v1,v2,...}`.
+ * values, then joins them via the OID encoder — whose delimiter is type-correct
+ * (`;` for box[]) rather than a hardcoded comma.
  * @internal
  */
 function encodeArray(this: QuotingDispatchHost, arrayData: ArrayData): string {
   const values = typeCastArray.call(this, arrayData.values);
-  return formatArray(values);
-}
-
-function formatArray(values: unknown[]): string {
-  const items = values.map((v) => {
-    if (Array.isArray(v)) return formatArray(v);
-    if (v == null) return "NULL";
-    const s = String(v);
-    // Empty strings, NULL-like strings, and strings containing PG array
-    // special chars must be double-quoted to survive round-trip.
-    if (s.length === 0 || /^null$/i.test(s) || /[{},"\\]|\s/.test(s))
-      return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-    return s;
-  });
-  return `{${items.join(",")}}`;
+  const result = arrayData.encoder.encode(values);
+  // Rails then force-encodes the result to the first string's encoding; JS
+  // strings are UTF-16 so this is a no-op (see the helper) and `result` is
+  // returned unchanged. Called in Rails' order for parity.
+  determineEncodingOfStringsInArray(values);
+  return result;
 }
 
 /**
