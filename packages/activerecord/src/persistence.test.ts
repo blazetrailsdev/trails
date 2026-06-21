@@ -129,30 +129,34 @@ describe("PersistenceTest", () => {
 
   it("increment attribute", async () => {
     const t = topics("first");
-    t.replies_count = 0;
-    t.increment("replies_count");
     expect(t.replies_count).toBe(1);
+    await t.incrementBang("replies_count");
+    await t.reload();
+    expect(t.replies_count).toBe(2);
   });
 
   it("increment attribute by", async () => {
     const t = topics("first");
-    t.replies_count = 0;
-    t.increment("replies_count", 5);
-    expect(t.replies_count).toBe(5);
+    expect(t.replies_count).toBe(1);
+    await t.incrementBang("replies_count", 5);
+    await t.reload();
+    expect(t.replies_count).toBe(6);
   });
 
   it("decrement attribute", async () => {
     const t = topics("first");
-    t.replies_count = 10;
-    t.decrement("replies_count");
-    expect(t.replies_count).toBe(9);
+    expect(t.replies_count).toBe(1);
+    await t.decrementBang("replies_count");
+    await t.reload();
+    expect(t.replies_count).toBe(0);
   });
 
   it("decrement attribute by", async () => {
     const t = topics("first");
-    t.replies_count = 10;
-    t.decrement("replies_count", 3);
-    expect(t.replies_count).toBe(7);
+    expect(t.replies_count).toBe(1);
+    await t.decrementBang("replies_count", 3);
+    await t.reload();
+    expect(t.replies_count).toBe(-2);
   });
 
   it("save with duping of destroyed object", async () => {
