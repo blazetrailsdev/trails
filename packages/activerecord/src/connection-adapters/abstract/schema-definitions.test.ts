@@ -162,7 +162,8 @@ describe("ForeignKeyDefinition#defined_for?", () => {
       undefined,
       undefined,
       undefined,
-      true,
+      // Rails' MySQL foreign_keys options hash has no :validate.
+      undefined,
       ["column", "name", "primaryKey", "onDelete", "onUpdate"],
     );
     expect(mysqlFk.isDefinedFor({ deferrable: "deferred" })).toBe(true);
@@ -178,7 +179,8 @@ describe("ForeignKeyDefinition#defined_for?", () => {
       undefined,
       undefined,
       undefined,
-      true,
+      // Rails' SQLite foreign_keys options hash has no :validate.
+      undefined,
       ["column", "primaryKey", "onDelete", "onUpdate", "deferrable"],
     );
     expect(sqliteFk.isDefinedFor({ name: "anything" })).toBe(true);
