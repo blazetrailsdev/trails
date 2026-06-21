@@ -21,7 +21,8 @@
  *
  * Usage:
  *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json]
- *     [--incomplete] [--gates] [--package activesupport]
+ *     [--incomplete] [--gates] [--sort-extra] [--min-extra=N]
+ *     [--package activesupport]
  *
  *   --incomplete  In the per-file table, hide files that are fully complete
  *                 (every Ruby test matched in the convention TS file, no
@@ -33,6 +34,12 @@
  *                 missing-gate / wrong-gate / over-gated). Advisory: does not
  *                 affect the matched/skipped/percent counts. Always emitted to
  *                 the JSON artifact regardless of this flag.
+ *   --sort-extra  Sort the per-file table by the "Extra" column (TS tests in
+ *                 the convention file that matched no Rails test) descending,
+ *                 surfacing files that have ballooned with bespoke/non-Rails
+ *                 tests — a fidelity smell.
+ *   --min-extra=N In the per-file table, only show files whose Extra count is
+ *                 >= N. Combine with --sort-extra to triage the worst offenders.
  */
 
 import * as fs from "fs";
@@ -145,6 +152,10 @@ interface ConventionFileResult {
   wrongDescribe: number;
   misplaced: number;
   missing: number;
+  // TS tests in the convention file that matched no Rails test in this Rails
+  // file (the per-file form of the global "extra (TS only)" concept). A large
+  // count flags a file ballooned with bespoke/non-Rails tests — a fidelity smell.
+  extra: number;
   missingTests?: string[];
   misplacedTests?: MisplacedTest[];
   wrongDescribeTests?: WrongDescribeTest[];
@@ -162,6 +173,7 @@ interface ConventionPackageResult {
   totalWrongDescribe: number;
   totalMisplaced: number;
   totalGateMismatch: number;
+  totalExtra: number;
   percent: number;
   files: ConventionFileResult[];
 }
@@ -196,6 +208,13 @@ function main() {
   const jsonOutput = args.includes("--json");
   const showIncomplete = args.includes("--incomplete");
   const showGates = args.includes("--gates");
+  const sortExtra = args.includes("--sort-extra");
+  const minExtraArg = args.find((a) => a.startsWith("--min-extra="));
+  const minExtra = minExtraArg ? Number(minExtraArg.slice("--min-extra=".length)) : 0;
+  if (minExtraArg && (!Number.isFinite(minExtra) || minExtra < 0)) {
+    console.error("--min-extra requires a non-negative number (e.g. --min-extra=5)");
+    process.exit(1);
+  }
 
   if (filterPkg && !PACKAGES.includes(filterPkg)) {
     const suggestions = new SpellChecker({ dictionary: PACKAGES }).correct(filterPkg);
@@ -317,6 +336,7 @@ function main() {
     let totalWrongDescribe = 0;
     let totalMisplaced = 0;
     let totalGateMismatch = 0;
+    let totalExtra = 0;
     let tsMapped = 0;
     let tsUnmapped = 0;
 
@@ -540,6 +560,10 @@ function main() {
         }
       }
 
+      // TS tests in the convention file that no Rails test consumed.
+      const extra = tsTests.length - consumedTs.size;
+      totalExtra += extra;
+
       fileResults.push({
         rubyFile: file.file,
         conventionTsFile: conventionTs,
@@ -550,6 +574,7 @@ function main() {
         wrongDescribe,
         misplaced,
         missing: file.testCases.length - excludedCount - matched - misplaced,
+        extra,
         ...(showMissing ? { missingTests } : {}),
         ...(misplacedTests.length > 0 ? { misplacedTests } : {}),
         ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
@@ -558,6 +583,7 @@ function main() {
     }
 
     fileResults.sort((a, b) => {
+      if (sortExtra && a.extra !== b.extra) return b.extra - a.extra;
       if (a.misplaced !== b.misplaced) return b.misplaced - a.misplaced;
       if (a.tsFileExists !== b.tsFileExists) return a.tsFileExists ? -1 : 1;
       return b.matched - b.matchedSkipped - (a.matched - a.matchedSkipped);
@@ -577,6 +603,7 @@ function main() {
       totalWrongDescribe,
       totalMisplaced,
       totalGateMismatch,
+      totalExtra,
       percent,
       files: fileResults,
     });
@@ -601,6 +628,7 @@ function main() {
   let grandWrongDescribe = 0;
   let grandMisplaced = 0;
   let grandGateMismatch = 0;
+  let grandExtra = 0;
   let grandFiles = 0;
   let grandMapped = 0;
 
@@ -611,6 +639,7 @@ function main() {
     grandWrongDescribe += pkg.totalWrongDescribe;
     grandMisplaced += pkg.totalMisplaced;
     grandGateMismatch += pkg.totalGateMismatch;
+    grandExtra += pkg.totalExtra;
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
 
@@ -621,6 +650,7 @@ function main() {
     if (pkg.totalGateMismatch > 0) {
       details.push(`${pkg.totalGateMismatch} gate-mismatch${showGates ? "" : " (see --gates)"}`);
     }
+    if (pkg.totalExtra > 0) details.push(`${pkg.totalExtra} extra (TS only)`);
     const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
     console.log(`\n${"=".repeat(90)}`);
     console.log(
@@ -693,19 +723,20 @@ function main() {
     }
 
     console.log(
-      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
+      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Extra".padStart(5)} ${"Tot".padStart(4)}`,
     );
     console.log(
-      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
+      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(5)} ${"-".repeat(4)}`,
     );
 
     for (const f of pkg.files) {
       const fileImplemented = f.matched - f.matchedSkipped;
       const isComplete = fileImplemented === f.rubyTestCount && f.wrongDescribe === 0;
       if (showIncomplete && isComplete && f.tsFileExists) continue;
+      if (f.extra < minExtra) continue;
       const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
       console.log(
-        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
+        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.extra).padStart(5)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
 
       if (showMissing && f.missingTests && f.missingTests.length > 0) {
@@ -724,6 +755,7 @@ function main() {
   if (grandGateMismatch > 0) {
     grandDetails.push(`${grandGateMismatch} gate-mismatch${showGates ? "" : " (see --gates)"}`);
   }
+  if (grandExtra > 0) grandDetails.push(`${grandExtra} extra (TS only)`);
   const grandDetailStr = grandDetails.length > 0 ? ` (${grandDetails.join(", ")})` : "";
   console.log(`\n${"=".repeat(90)}`);
   console.log(
