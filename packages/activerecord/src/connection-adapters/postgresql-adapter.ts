@@ -124,6 +124,7 @@ import {
   type ColumnOptions,
   type ColumnType,
   type ReferentialAction,
+  type ForeignKeyLookupOptions,
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
@@ -3826,8 +3827,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   async foreignKeyExists(
     fromTable: string,
-    toTable?: string | { toTable?: string; column?: string; name?: string },
-    options: { column?: string; name?: string } = {},
+    toTable?: string | ForeignKeyLookupOptions,
+    options: Omit<ForeignKeyLookupOptions, "toTable"> = {},
   ): Promise<boolean> {
     return this.pgSchemaStatements().foreignKeyExists(fromTable, toTable, options);
   }

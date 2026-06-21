@@ -100,6 +100,21 @@ export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
   toTable?: string;
 }
 
+/**
+ * Lookup options accepted by ForeignKeyDefinition#isDefinedFor / foreignKeyFor,
+ * mirroring the keyword args Rails `defined_for?` matches generically.
+ */
+export interface ForeignKeyLookupOptions {
+  toTable?: string;
+  column?: string | string[];
+  name?: string;
+  validate?: boolean;
+  primaryKey?: string | string[];
+  onDelete?: ReferentialAction;
+  onUpdate?: ReferentialAction;
+  deferrable?: "immediate" | "deferred" | false;
+}
+
 export class ForeignKeyDefinition {
   readonly fromTable: string;
   readonly toTable: string;
@@ -154,28 +169,29 @@ export class ForeignKeyDefinition {
     return !/^fk_rails_[0-9a-f]{10}$/.test(this.name);
   }
 
-  isDefinedFor(
-    options: {
-      toTable?: string;
-      column?: string | string[];
-      name?: string;
-      validate?: boolean;
-    } = {},
-  ): boolean {
+  isDefinedFor(options: ForeignKeyLookupOptions = {}): boolean {
     // Rails compares element-wise after to_s:
     // Array(self.options[k]).map(&:to_s) == Array(v).map(&:to_s)
-    const toArray = (c: string | string[]): string[] =>
-      Array.isArray(c) ? c.map(String) : [String(c)];
-    const columnsEqual = (a: string | string[], b: string | string[]): boolean => {
+    // A nil stored option becomes `Array(nil) => []`, so normalize
+    // undefined/null to an empty array rather than `["undefined"]`.
+    const toArray = (c: unknown): string[] =>
+      c === undefined || c === null ? [] : Array.isArray(c) ? c.map(String) : [String(c)];
+    const optionEqual = (a: unknown, b: unknown): boolean => {
       const aa = toArray(a);
       const bb = toArray(b);
       return aa.length === bb.length && aa.every((v, i) => v === bb[i]);
     };
     return (
       (options.toTable === undefined || options.toTable.toString() === this.toTable) &&
-      (options.column === undefined || columnsEqual(options.column, this.column)) &&
+      (options.column === undefined || optionEqual(options.column, this.column)) &&
       (options.name === undefined || options.name === this.name) &&
-      (options.validate === undefined || options.validate === this.validate)
+      (options.validate === undefined || options.validate === this.validate) &&
+      // Generic key compare, mirroring defined_for?'s `options.all?` over the
+      // remaining stored option keys (primary_key, on_delete, on_update, …).
+      (options.primaryKey === undefined || optionEqual(options.primaryKey, this.primaryKey)) &&
+      (options.onDelete === undefined || optionEqual(options.onDelete, this.onDelete)) &&
+      (options.onUpdate === undefined || optionEqual(options.onUpdate, this.onUpdate)) &&
+      (options.deferrable === undefined || optionEqual(options.deferrable, this.deferrable))
     );
   }
 }
