@@ -37,6 +37,7 @@ import { Company } from "../test-helpers/models/company.js";
 import { SpecialContract } from "../test-helpers/models/contract.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
+import { Subscriber } from "../test-helpers/models/subscriber.js";
 
 /**
  * Rails' `with_has_many_inversing(model = ActiveRecord::Base)` toggles
@@ -88,9 +89,12 @@ async function withAutomaticScopeInversing(
 }
 
 describe("AutomaticInverseFindingTests", () => {
-  const { books } = useHandlerFixtures(["ratings", "comments", "cars", "bulbs", "books"], {
-    schema: canonicalSchema,
-  });
+  const { books } = useHandlerFixtures(
+    ["ratings", "comments", "cars", "bulbs", "books", "subscriptions", "subscribers"],
+    {
+      schema: canonicalSchema,
+    },
+  );
   beforeAll(() => {
     [
       MixedCaseMonkey,
@@ -111,6 +115,7 @@ describe("AutomaticInverseFindingTests", () => {
       SpecialContract,
       Book,
       Subscription,
+      Subscriber,
       CpkCar,
       CpkCarReview,
     ].forEach((m) => registerModel(m));
@@ -269,10 +274,18 @@ describe("AutomaticInverseFindingTests", () => {
     expect((rating as any).comment.body).toBe((comment as any).body);
   });
 
-  it.skip("belongs to should find inverse has many automatically", () => {
-    // Tracked: story inverse-hmt-build-through-plural-invert. Needs
-    // Subscription.automaticallyInvertPluralAssociations + has_many-:through
-    // build (book.subscribers.new round-trip).
+  it("belongs to should find inverse has many automatically", async () => {
+    expect((Subscription as any).automaticallyInvertPluralAssociations).toBe(true);
+
+    const book = await Book.createBang({});
+    const subscriber = (book as any).subscribers.new({ nick: "Nickname" });
+
+    await subscriber.saveBang();
+
+    const reloaded = await book.reload();
+    const subscribers = await (reloaded as any).subscribers.toArray();
+    expect(subscribers.map((s: any) => s.nick)).toEqual([subscriber.nick]);
+    expect(await (reloaded as any).subscribers.count()).toBe(1);
   });
 
   it("polymorphic and has many through relationships should not have inverses", () => {
