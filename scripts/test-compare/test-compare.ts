@@ -142,7 +142,7 @@ interface GateMismatch {
   tsGate?: TestGate;
 }
 
-interface ConventionFileResult {
+export interface ConventionFileResult {
   rubyFile: string;
   conventionTsFile: string;
   tsFileExists: boolean;
@@ -189,6 +189,41 @@ interface TsTestInfo {
 }
 
 // ---------------------------------------------------------------------------
+// Flag helpers (pure — unit-tested in test-compare.test.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse `--min-extra=N` from argv. Returns 0 when the flag is absent. Throws
+ * on a non-numeric or negative value so the caller can surface a usage error.
+ */
+export function parseMinExtra(args: string[]): number {
+  const arg = args.find((a) => a.startsWith("--min-extra="));
+  if (!arg) return 0;
+  const n = Number(arg.slice("--min-extra=".length));
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error("--min-extra requires a non-negative number (e.g. --min-extra=5)");
+  }
+  return n;
+}
+
+/**
+ * Ordering for the per-file table. With `sortExtra`, files with the most
+ * TS-only "extra" tests float to the top (bloat triage); otherwise the default
+ * misplaced-first / exists / net-matched ordering applies. Used as the
+ * `Array.prototype.sort` comparator over each package's file results.
+ */
+export function compareFileResults(
+  a: ConventionFileResult,
+  b: ConventionFileResult,
+  sortExtra: boolean,
+): number {
+  if (sortExtra && a.extra !== b.extra) return b.extra - a.extra;
+  if (a.misplaced !== b.misplaced) return b.misplaced - a.misplaced;
+  if (a.tsFileExists !== b.tsFileExists) return a.tsFileExists ? -1 : 1;
+  return b.matched - b.matchedSkipped - (a.matched - a.matchedSkipped);
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -209,10 +244,11 @@ function main() {
   const showIncomplete = args.includes("--incomplete");
   const showGates = args.includes("--gates");
   const sortExtra = args.includes("--sort-extra");
-  const minExtraArg = args.find((a) => a.startsWith("--min-extra="));
-  const minExtra = minExtraArg ? Number(minExtraArg.slice("--min-extra=".length)) : 0;
-  if (minExtraArg && (!Number.isFinite(minExtra) || minExtra < 0)) {
-    console.error("--min-extra requires a non-negative number (e.g. --min-extra=5)");
+  let minExtra = 0;
+  try {
+    minExtra = parseMinExtra(args);
+  } catch (e) {
+    console.error((e as Error).message);
     process.exit(1);
   }
 
@@ -582,12 +618,7 @@ function main() {
       });
     }
 
-    fileResults.sort((a, b) => {
-      if (sortExtra && a.extra !== b.extra) return b.extra - a.extra;
-      if (a.misplaced !== b.misplaced) return b.misplaced - a.misplaced;
-      if (a.tsFileExists !== b.tsFileExists) return a.tsFileExists ? -1 : 1;
-      return b.matched - b.matchedSkipped - (a.matched - a.matchedSkipped);
-    });
+    fileResults.sort((a, b) => compareFileResults(a, b, sortExtra));
 
     const implemented = totalMatched - totalMatchedSkipped;
     const percent = totalRuby > 0 ? Math.round((implemented / totalRuby) * 1000) / 10 : 0;
@@ -804,4 +835,4 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
   return path.basename(fullPath);
 }
 
-main();
+if (require.main === module) main();
