@@ -2957,8 +2957,29 @@ export class Relation<T extends Base> {
    */
   async explain(...options: ExplainOption[]): Promise<string> {
     validateExplainOptions(options);
-    const { queries } = await ExplainRegistry.collectingQueries(() => this.toArray());
+    // Rails: `exec_explain(collecting_queries_for_explain { exec_queries })`.
+    // Collect over the always-executing exec_queries path, NOT the cache-aware
+    // `toArray()` — an already-loaded (or `.none()`-short-circuited) relation
+    // would otherwise collect zero queries and fall back to explaining
+    // `_toSql()`, whose Arel double-quoted identifiers diverge from the real
+    // adapter-quoted SQL the driver ran (backticks on MySQL).
+    const { queries } = await ExplainRegistry.collectingQueries(() =>
+      this._execQueriesForExplain(),
+    );
     return this.execExplain(queries, options);
+  }
+
+  /**
+   * Always-executing query path used by `explain` — mirrors Rails
+   * `exec_queries`. Re-runs the SELECT (and any eager-load / preload queries)
+   * regardless of the load cache, so `collecting_queries_for_explain` captures
+   * the real adapter-quoted SQL emitted via `sql.active_record`. A `.none()`
+   * relation runs nothing (Rails yields empty EXPLAIN output for it).
+   * @internal
+   */
+  private async _execQueriesForExplain(): Promise<void> {
+    if (this._isNone) return;
+    await this._withQueryConnection(() => this._toArrayInner());
   }
 
   /**
@@ -2978,17 +2999,13 @@ export class Relation<T extends Base> {
     if (typeof adapter?.explain !== "function") {
       return "EXPLAIN not supported by this adapter";
     }
-    // If no queries were collected (e.g. the relation was already
-    // loaded, or `.none()` short-circuited), fall back to explaining
-    // `toSql()` directly so `Relation#explain` never returns a blank
-    // string. Matches Rails' behavior of always producing output even
-    // for degenerate cases.
-    const fallbackSql = queries.length === 0 ? this._toSql() : null;
-    const effective: [string, unknown[]][] =
-      queries.length > 0 ? queries : [[fallbackSql!, this._lastSelectBinds]];
+    // No `_toSql()` fallback: collecting over the always-executing
+    // exec_queries path means a real relation always yields at least one
+    // captured query (with adapter-quoted SQL — backticks on MySQL), and a
+    // query-less relation (`.none()`) yields empty output, matching Rails.
     const clause = this.buildExplainClause(adapter, options);
     const parts: string[] = [];
-    for (const [sql, binds] of effective) {
+    for (const [sql, binds] of queries) {
       let msg = `${clause} ${sql}`;
       if (binds.length > 0) msg += ` ${this._renderExplainBinds(adapter, binds)}`;
       const plan = await adapter.explain(sql, binds, options);
