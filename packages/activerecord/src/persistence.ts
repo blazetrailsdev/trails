@@ -388,6 +388,7 @@ type TouchOption = boolean | string | string[];
 /** Class-level updateCounters + dirty-tracking needed by incrementBang. */
 interface CounterBangRecord extends AttributeIO {
   id: unknown;
+  attributeInDatabase(name: string): unknown;
   clearAttributeChange(name: string): void;
   constructor: {
     updateCounters(
@@ -443,7 +444,14 @@ export async function incrementBang<T extends CounterBangRecord>(
   options: { touch?: TouchOption } = {},
 ) {
   this.increment(attribute, by);
-  await this.constructor.updateCounters(this.id, { [attribute]: by }, { touch: options.touch });
+  // Rails: `change = public_send(attribute) - public_send(:"#{attribute}_in_database")`
+  // — persist the delta between the (already-incremented) in-memory value and
+  // the value last loaded from the DB, not the raw `by`. They coincide for a
+  // bare `increment!`, but Rails' chained `increment(x).increment!(x)` form
+  // relies on the prior in-memory `increment` being folded into the delta.
+  const change =
+    Number(this.readAttribute(attribute)) - (Number(this.attributeInDatabase(attribute)) || 0);
+  await this.constructor.updateCounters(this.id, { [attribute]: change }, { touch: options.touch });
   // Rails: `public_send(:"clear_#{attribute}_change")` — the in-memory
   // increment is now durably persisted, so the attribute should no longer
   // appear dirty (otherwise a later save() would re-persist it). Use the
