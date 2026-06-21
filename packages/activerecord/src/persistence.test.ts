@@ -39,6 +39,11 @@ import { Account } from "./test-helpers/models/account.js";
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Item as CanonicalItem } from "./test-helpers/models/item.js";
 import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
+import { Parrot } from "./test-helpers/models/parrot.js";
+// `Post` is imported under an alias for the same esbuild-rename reason as
+// `Topic`/`Item`: bespoke in-function `class Post` declarations still exist in
+// the not-yet-converted blocks.
+import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 
 for (const klass of [
   CanonicalTopic,
@@ -51,6 +56,8 @@ for (const klass of [
   SillyUniqueReply,
   CanonicalItem,
   CanonicalDeveloper,
+  Parrot,
+  CanonicalPost,
 ]) {
   registerModel(klass);
 }
@@ -405,71 +412,62 @@ describe("PersistenceTest", () => {
 // More PersistenceTest
 // ==========================================================================
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      topics: { title: "string", updated_at: "datetime" },
-      counters: { count: "integer" },
-    });
+  const Topic = CanonicalTopic;
+  const Post = CanonicalPost;
+  const { topics } = useHandlerFixtures(["topics", "developers", "parrots", "posts"], {
+    schema: canonicalSchema,
   });
 
+  // Rails: `Developer.update!(salary: 1_000_000)` — the class-level bang
+  // update touches every Developer, and the salary inclusion validation
+  // (50_000..200_000) rejects 1_000_000.
   it("raises error when validations failed", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.validatesPresenceOf("title");
-      }
-    }
-    await expect(Topic.createBang({ title: "" })).rejects.toThrow();
+    await expect(CanonicalDeveloper.updateBang({ salary: 1_000_000 })).rejects.toThrow(
+      RecordInvalid,
+    );
   });
 
   it("class level update is affected by scoping", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "old" });
-    await Topic.update(t.id, { title: "new" });
-    const found = await Topic.find(t.id);
-    expect(found.title).toBe("new");
+    const topicData: Record<number, { content: string }> = {
+      1: { content: "1 updated" },
+      2: { content: "2 updated" },
+    };
+
+    await expect(
+      Topic.where("1=0").scoping(async () => Topic.update([1, 2], [topicData[1], topicData[2]])),
+    ).rejects.toThrow(RecordNotFound);
+
+    expect((await Topic.find(1)).content).not.toBe("1 updated");
+    expect((await Topic.find(2)).content).not.toBe("2 updated");
   });
 
   it("save touch false", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "a" });
-    t.title = "b";
-    await t.save({ touch: false });
-    expect(t.title).toBe("b");
+    const parrot = await Parrot.createBang({
+      name: "Bob",
+      created_at: instant("2003-07-15T14:28:11.223Z"),
+      updated_at: instant("2003-07-15T14:28:11.223Z"),
+    });
+
+    const createdAt = parrot.created_at;
+    const updatedAt = parrot.updated_at;
+
+    parrot.name = "Barb";
+    await parrot.saveBang({ touch: false });
+    expect(parrot.created_at).toEqual(createdAt);
+    expect(parrot.updated_at).toEqual(updatedAt);
   });
 
-  it("increment with no arg", () => {
-    class Counter extends Base {
-      static {
-        this.attribute("count", "integer", { default: 0 });
-      }
-    }
-    const c = new Counter();
-    c.increment("count");
-    expect(c.count).toBe(1);
+  it("increment with no arg", async () => {
+    const topic = topics("first");
+    await expect((topic as any).incrementBang()).rejects.toThrow();
   });
 
   it("reload removes custom selects", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "a" });
-    t.title = "modified";
-    await t.reload();
-    expect(t.title).toBe("a");
+    const post = await Post.select("posts.*, 1 as wibble").lastBang();
+
+    expect(Number(post.readAttribute("wibble"))).toBe(1);
+    await post.reload();
+    expect(post.readAttribute("wibble")).toBeNull();
   });
 });
 
