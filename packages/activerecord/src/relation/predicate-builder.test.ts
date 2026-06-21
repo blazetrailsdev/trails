@@ -215,6 +215,22 @@ describe("PredicateBuilderTest", () => {
       expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
     });
 
+    // No verbatim Rails test exists for this shape either: Ruby's ArrayHandler
+    // derefs only `x.is_a?(Base)`, so a non-Base class instance carrying an
+    // `id` is left intact. This pins that convergence — a class instance that
+    // is not an AR record must NOT be flattened to its `id` inside an array.
+    it("does not dereference a non-Base object carrying an id inside an array", () => {
+      class NotARecord {
+        constructor(public id: number) {}
+      }
+      const builder = new PredicateBuilder(table);
+      const node = builder.build(table.get("id"), [new NotARecord(5), new NotARecord(7)]);
+      const sql = new Visitors.ToSql().compile(node);
+      // The objects flow into HomogeneousIn untouched — they are NOT flattened
+      // to `IN (5, 7)` the way a real AR record would be.
+      expect(sql).not.toMatch(/IN \(5, 7\)/);
+    });
+
     it("handles exclusive ranges", () => {
       const builder = new PredicateBuilder(table);
       const [node] = builder.buildFromHash({ age: new Range(18, 65, true) });
@@ -262,6 +278,21 @@ describe("PredicateBuilderTest", () => {
       // The whole object is compared, not the dereferenced `5`.
       expect(sql).not.toMatch(/!=\s*5\b/);
       expect(sql).toContain('{"id":5}');
+    });
+
+    // Mirror of the positive ArrayHandler convergence on the negated per-element
+    // path: non-Base objects carrying an `id` are not collapsed into a
+    // `NOT IN (5, 7)` PK list the way real AR records would be.
+    it("does not dereference non-Base objects carrying an id inside a negated array", () => {
+      class NotARecord {
+        constructor(public id: number) {}
+      }
+      const builder = new PredicateBuilder(table);
+      const [node] = builder.buildNegatedFromHash({
+        id: [new NotARecord(5), new NotARecord(7)],
+      });
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).not.toMatch(/NOT IN \(5, 7\)/);
     });
   });
 
