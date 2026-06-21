@@ -143,7 +143,9 @@ export class ForeignKeyDefinition {
    * Which generic option keys this FK actually carries, mirroring Rails'
    * `self.options.keys`. `isDefinedFor` slices lookup keys to this set so a
    * key the definition never stored is ignored (matches), per
-   * `options.slice(*self.options.keys)`.
+   * `options.slice(*self.options.keys)`. Rails reads this off the raw options
+   * hash; trails has no such hash, so we record the key set explicitly.
+   * @internal
    */
   readonly storedOptionKeys: ReadonlySet<ForeignKeyStoredOptionKey>;
 
