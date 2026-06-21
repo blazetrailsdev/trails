@@ -3038,7 +3038,11 @@ export class Base extends Model {
     // before the column was reflected (e.g. a model `new`'d before its first
     // schema load) has no locking attribute; seed it here — once reflection has
     // certainly run for the INSERT — to its reflected default rather than
-    // writing an explicit NULL into a NOT NULL lock column.
+    // writing an explicit NULL into a NOT NULL lock column. The INSERT value
+    // reads straight from `_attributes.valuesForDatabase()` below (there is no
+    // insert-path `_lockValueForDatabase` override — that exists only on the
+    // UPDATE/destroy WHERE-clause paths, optimistic.ts:226,302), so this seed is
+    // what actually carries the 0 into the row, not just in-memory state.
     if (ctor.lockingEnabled) {
       const lockCol = ctor.lockingColumn;
       const lockDef = ctor._attributeDefinitions.get(lockCol);

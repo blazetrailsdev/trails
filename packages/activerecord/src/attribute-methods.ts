@@ -547,6 +547,14 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
     // the column is not declared via `attribute()` (e.g. PersonalLegacyThing's
     // schema-sourced `version`). The union therefore always carries 0, never an
     // explicit NULL.
+    //
+    // Layering note: Rails performs this union in Locking::Optimistic#_create_record
+    // (independent of partial_inserts), a separate layer from Dirty's
+    // attribute_names_for_partial_inserts (dirty.rb:249). We fold it into the
+    // partial branch here intentionally: the non-partial `else` branch already
+    // retains the locking column because it is not auto_populated_on_insert?, so
+    // unioning there would be a no-op. Keep both branches in mind before editing
+    // the `else` filter so the column is never silently dropped from a create.
     if (mc.lockingEnabled && !candidates.includes(mc.lockingColumn)) {
       candidates = [...candidates, mc.lockingColumn];
     }
