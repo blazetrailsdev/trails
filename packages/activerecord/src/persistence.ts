@@ -1276,12 +1276,17 @@ interface DupRecord {
  * reinstate-vs-defaults pass to populate the tracker — the same `changed?`
  * predicate Rails computes per-attribute.
  *
- * `new ctor({})` fires `after_initialize` on the dup (Rails' `_run_initialize_
- * callbacks`). Ruby's `Object#dup` also copies `@readonly` and runs the
- * `initialize_dup` chain, so carry `@readonly` over and invoke the composed hook
- * (aggregations cache + locking/timestamp clear) — which nulls the timestamp and
- * locking columns back to their defaults before the dirty pass, so they are not
- * reported as changed (test_dup_timestamps_are_cleared / _locking_column_is_not_dirty).
+ * `new ctor({})` runs the constructor so `after_initialize` fires on the dup
+ * (Rails runs `_run_initialize_callbacks` in `Core#initialize_dup`). One known
+ * ordering divergence, pre-existing and unchanged here: Rails sets the duped
+ * attributes BEFORE `_run_initialize_callbacks`, so a Rails `after_initialize`
+ * sees the full duped set, whereas trails fires it during `new ctor({})` against
+ * the empty bag and swaps `_attributes` in afterward. Ruby's `Object#dup` also
+ * copies `@readonly` and runs the `initialize_dup` chain, so carry `@readonly`
+ * over and invoke the composed hook (aggregations cache + locking/timestamp
+ * clear) — which nulls the timestamp and locking columns back to their defaults
+ * before the dirty pass, so they are not reported as changed
+ * (test_dup_timestamps_are_cleared / _locking_column_is_not_dirty).
  */
 export function dup<T extends DupRecord>(this: T): T {
   const ctor = this.constructor as typeof this.constructor & {
@@ -1307,10 +1312,11 @@ export function dup<T extends DupRecord>(this: T): T {
   (duped as { _attributes: DupAttributeSet })._attributes = dupedAttrs;
   duped._readonly = this._readonly;
   duped.initializeDup(this);
+  // Always rebind the dirty tracker to the duped attribute set: the baseline
+  // from `new ctor({})` is stale against the swapped-in `_attributes`.
+  duped._dirty.snapshot(dupedAttrs);
   if (defaultAttributes) {
-    // Rebind the dirty tracker to the duped attribute set, then re-mark
-    // attributes that differ from their schema defaults as changed.
-    duped._dirty.snapshot(dupedAttrs);
+    // Re-mark attributes that differ from their schema defaults as changed.
     duped._dirty.reinstateNewRecordChanges(dupedAttrs, defaultAttributes().snapshotValues());
   }
   return duped;
