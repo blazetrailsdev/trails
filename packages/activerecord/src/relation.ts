@@ -2975,11 +2975,24 @@ export class Relation<T extends Base> {
    * regardless of the load cache, so `collecting_queries_for_explain` captures
    * the real adapter-quoted SQL emitted via `sql.active_record`. A `.none()`
    * relation runs nothing (Rails yields empty EXPLAIN output for it).
+   *
+   * Rails' `ExplainProxy` calls `exec_queries` directly, bypassing the
+   * `@records ||= exec_queries` assignment in `#records`, so `.explain` does
+   * NOT mark the relation loaded. `_toArrayInner` ends in `loadRecords`, which
+   * sets `_loaded`/`_records`, so snapshot and restore that state around the
+   * call to keep `.explain` side-effect-free on the load cache.
    * @internal
    */
   private async _execQueriesForExplain(): Promise<void> {
     if (this._isNone) return;
-    await this._withQueryConnection(() => this._toArrayInner());
+    const wasLoaded = this._loaded;
+    const priorRecords = this._records;
+    try {
+      await this._withQueryConnection(() => this._toArrayInner());
+    } finally {
+      this._loaded = wasLoaded;
+      this._records = priorRecords;
+    }
   }
 
   /**

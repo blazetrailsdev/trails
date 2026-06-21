@@ -187,6 +187,16 @@ describe("ExplainTest", () => {
     expect(ExplainRegistry.queries).toEqual([]);
   });
 
+  it("does not load the relation as a side effect", async () => {
+    // Rails' ExplainProxy calls `exec_queries` directly, bypassing the
+    // `@records ||= exec_queries` in `#records`, so `.explain` leaves the
+    // relation un-loaded (`loaded? == false`; next access re-queries). Mirror
+    // that: explain must not flip `isLoaded` or cache `_records`.
+    const relation = Car.where({ name: "honda" });
+    await relation.explain();
+    expect(relation.isLoaded).toBe(false);
+  });
+
   it("yields empty output for a query-less relation", async () => {
     // Rails collects over the always-executing `exec_queries`; a `.none()`
     // relation runs no SELECT, so `collecting_queries_for_explain` captures
