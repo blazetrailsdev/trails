@@ -12,12 +12,12 @@ import { Nodes } from "@blazetrails/arel";
  */
 export class RelationHandler {
   call(attribute: Nodes.Attribute, value: any): Nodes.Node {
-    const relation = this.ensureSingleColumnSelect(attribute, this.applyJoinDependency(value));
+    const relation = this.injectPrimaryKeySelect(attribute, this.applyJoinDependency(value));
     return attribute.in(relation.toArel());
   }
 
   callNegated(attribute: Nodes.Attribute, value: any): Nodes.Node {
-    const relation = this.ensureSingleColumnSelect(attribute, this.applyJoinDependency(value));
+    const relation = this.injectPrimaryKeySelect(attribute, this.applyJoinDependency(value));
     return attribute.notIn(relation.toArel());
   }
 
@@ -37,36 +37,24 @@ export class RelationHandler {
       : value;
   }
 
-  private ensureSingleColumnSelect(attribute: Nodes.Attribute, value: any): any {
-    let relation = value;
-
-    if (relation.selectValues.length === 0) {
-      const model = relation._modelClass;
-      const pk = model?.primaryKey ?? "id";
-      if (Array.isArray(pk)) {
-        throw new Error(`Cannot map composite primary key ${pk.join(", ")} to ${attribute.name}`);
-      }
-      // Select the table-qualified primary key, mirroring Rails
-      // `value.select(value.arel_table[value.primary_key])`. Now that the
-      // subquery's arel carries joins (build_arel convergence), a bare `id`
-      // projection is ambiguous when the relation joins another table.
-      relation = relation.select(model.arelTable.get(pk));
-    } else if (relation.selectValues.length === 1) {
-      const selectValue = relation.selectValues[0];
-      if (typeof selectValue === "string") {
-        const trimmed = selectValue.trim();
-        if (trimmed === "*" || /\.\*$/.test(trimmed) || trimmed.includes(",")) {
-          throw new Error(
-            `Expected subquery for ${attribute.name} to select a single column, but got ambiguous projection: ${trimmed}`,
-          );
-        }
-      }
-    } else {
-      throw new Error(
-        `Expected subquery for ${attribute.name} to select a single column, but it selects ${relation.selectValues.length} columns.`,
-      );
+  // Mirrors Rails: inject the table-qualified primary key select only when the
+  // subquery has no explicit projection; otherwise pass the relation through
+  // unchanged and let the database raise on a column-count mismatch. Rails has
+  // no single-column validation here.
+  private injectPrimaryKeySelect(attribute: Nodes.Attribute, value: any): any {
+    if (value.selectValues.length !== 0) {
+      return value;
     }
 
-    return relation;
+    const model = value._modelClass;
+    const pk = model?.primaryKey ?? "id";
+    if (Array.isArray(pk)) {
+      throw new Error(`Cannot map composite primary key ${pk.join(", ")} to ${attribute.name}`);
+    }
+    // Select the table-qualified primary key, mirroring Rails
+    // `value.select(value.arel_table[value.primary_key])`. Now that the
+    // subquery's arel carries joins (build_arel convergence), a bare `id`
+    // projection is ambiguous when the relation joins another table.
+    return value.select(model.arelTable.get(pk));
   }
 }
