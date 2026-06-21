@@ -14,12 +14,21 @@ import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Tag } from "../test-helpers/models/tag.js";
+import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
+import { Pet } from "../test-helpers/models/pet.js";
+import { Toy } from "../test-helpers/models/toy.js";
+import { Owner } from "../test-helpers/models/owner.js";
 
 registerModel(Author);
 registerModel(Post);
 registerModel(Comment);
 registerModel(Tagging);
 registerModel(Tag);
+registerModel(CpkAuthor);
+registerModel(CpkBook);
+registerModel(Pet);
+registerModel(Toy);
+registerModel(Owner);
 
 describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   useHandlerFixtures(["authors", "posts"], { schema: canonicalSchema });
@@ -475,5 +484,50 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
     // exist; a new-record-only delete runs outside any transaction.
     expect(opened).toBe(false);
     expect(proxy.target.length).toBe(0);
+  });
+});
+
+// RFC 0006 S1 — targetsByPrimaryKey() across non-default primary keys. The
+// token routes through `record.id` → `_getId` → `_readAttribute(primaryKey)`,
+// so a custom single-column PK and a composite PK must key correctly, and a
+// composite new record (an `id` array with null parts) must be skipped.
+// Canonical models: `CpkAuthor has_many :books` (CpkBook PK `[author_id, id]`)
+// for the composite case, and `Pet has_many :toys` (Toy PK `toy_id`) for the
+// custom single-column case. No bespoke tables.
+describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () => {
+  useHandlerFixtures(["cpkAuthors", "cpkBooks", "pets", "toys"], { schema: canonicalSchema });
+
+  it("keys loaded targets by their composite primary key", async () => {
+    const owner = await CpkAuthor.create({ name: "o" });
+    await CpkBook.create({ author_id: owner.id as number, id: 7, title: "a" });
+    await CpkBook.create({ author_id: owner.id as number, id: 9, title: "b" });
+    const proxy = association<CpkBook>(owner, "books") as any;
+    await proxy.load();
+    const byKey = proxy.targetsByPrimaryKey() as Map<string, CpkBook>;
+    expect(byKey.size).toBe(2);
+    // Distinct composite keys never collide, and every loaded book is a value.
+    expect(new Set(byKey.values())).toEqual(new Set(proxy.target as CpkBook[]));
+  });
+
+  it("keys loaded targets by a custom single-column primary key", async () => {
+    const owner = await Pet.create({ name: "o" });
+    const first = await Toy.create({ name: "aaa", pet_id: owner.id as number });
+    const second = await Toy.create({ name: "bbb", pet_id: owner.id as number });
+    const proxy = association<Toy>(owner, "toys") as any;
+    await proxy.load();
+    const byKey = proxy.targetsByPrimaryKey() as Map<string, Toy>;
+    expect(byKey.size).toBe(2);
+    expect(byKey.get(String(first.id))?.id).toBe(first.id);
+    expect(byKey.get(String(second.id))?.id).toBe(second.id);
+  });
+
+  it("skips a composite new record whose key parts are unassigned", async () => {
+    const owner = await CpkAuthor.create({ name: "o" });
+    await CpkBook.create({ author_id: owner.id as number, id: 7, title: "a" });
+    const proxy = association<CpkBook>(owner, "books") as any;
+    await proxy.load();
+    // `id` unassigned → null part in the composite key array.
+    (proxy.target as CpkBook[]).push(new CpkBook({ author_id: owner.id as number }));
+    expect((proxy.targetsByPrimaryKey() as Map<string, CpkBook>).size).toBe(1);
   });
 });
