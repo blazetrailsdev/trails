@@ -31,14 +31,27 @@ export class Range {
     this.excludeEnd = excludeEnd;
   }
 
+  // Serializes to PG's range literal, identical to PostgreSQL::Quoting#encode_range
+  // (vendor rails quoting.rb:210). Rails does NOT quote bounds containing special
+  // chars — type_cast_range_value interpolates each bound raw, and the surrounding
+  // `quote`/`Quoted` adds the single outer quoting + escaping. Bounds reaching here
+  // via RangeType#encodeLiteral are already subtype-serialized, so this shares the
+  // same `rangeBoundLiteral` helper as `encode_range`, keeping the predicate-literal
+  // and quote/typeCast literal paths in agreement.
   toString(): string {
-    const encode = (v: unknown): string => {
-      if (v === null || v === undefined || v === -Infinity || v === Infinity) return "";
-      const s = String(v);
-      return /[",\\\s[\]()]/.test(s) ? `"${s.replace(/\\/g, "\\\\").replace(/"/g, '""')}"` : s;
-    };
-    return `[${encode(this.begin)},${encode(this.end)}${this.excludeEnd ? ")" : "]"}`;
+    return `[${rangeBoundLiteral(this.begin)},${rangeBoundLiteral(this.end)}${this.excludeEnd ? ")" : "]"}`;
   }
+}
+
+/**
+ * Mirrors PostgreSQL::Quoting#type_cast_range_value's nil/infinity handling plus
+ * the raw interpolation in #encode_range: an unbounded/infinite bound renders as
+ * the empty string, everything else as its bare string form (no per-bound quoting).
+ * Shared by `Range#toString` and the adapter's `encodeRange`.
+ * @internal
+ */
+export function rangeBoundLiteral(value: unknown): string {
+  return value == null || isInfinity(value) ? "" : String(value);
 }
 
 export interface RangeSubtype {

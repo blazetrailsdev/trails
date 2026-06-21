@@ -17,7 +17,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
-import { Range } from "./oid/range.js";
+import { Range, rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Visitors as ArelVisitors } from "@blazetrails/arel";
 
@@ -392,17 +392,6 @@ export function encodeRange(this: QuotingDispatchHost, range: Range): string {
   const begin = rangeBoundLiteral(typeCastRangeValue.call(this, range.begin));
   const end = rangeBoundLiteral(typeCastRangeValue.call(this, range.end));
   return `[${begin},${end}${range.excludeEnd ? ")" : "]"}`;
-}
-
-/**
- * Rails builds the range literal with Ruby string interpolation, where a `nil`
- * bound (an unbounded/infinite end whose `type_cast` yields `nil`) renders as
- * the empty string. JS `${null}`/`${undefined}` would emit the literal text
- * "null"/"undefined" and PG rejects e.g. `[2020-01-01,null)` for a tsrange, so
- * collapse those to "" to match Ruby.
- */
-function rangeBoundLiteral(value: unknown): string {
-  return value == null ? "" : String(value);
 }
 
 function isSqlLiteral(value: unknown): value is { value: string } {
