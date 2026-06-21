@@ -4,63 +4,72 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Post } from "../test-helpers/models/post.js";
 
 registerModel(Project);
 registerModel(Developer);
 // Developer#before_create builds an `audit_logs` record, autosaved on create.
 registerModel(AuditLog);
+registerModel(Comment);
+// Comment#belongs_to :post has counter_cache: true, so creating a comment
+// resolves the canonical `Post` from the registry to bump its cached counter.
+registerModel(Post);
+
+let cbIdx = 0;
+
+// A throwaway Post subclass on the canonical `posts` table carrying the
+// has_many :comments add/remove callbacks under test (mirrors Rails'
+// `Class.new(Post)` + the `ProjectWithCallback` inline-subclass pattern below).
+function makePostWithCallbacks(callbacks: any) {
+  const idx = ++cbIdx;
+  class CbPost extends Base {
+    static {
+      this.tableName = "posts";
+      this.attribute("title", "string");
+      this.attribute("body", "text");
+      this.hasMany("comments", {
+        className: "Comment",
+        foreignKey: "post_id",
+        // Canonical `comments.post_id` is NOT NULL, so the default has_many
+        // delete strategy (nullify) would violate the constraint; destroy the
+        // row instead. Overridable by callers that pass their own `dependent`.
+        dependent: "destroy",
+        ...callbacks,
+      });
+    }
+  }
+  registerModel(`PostWithCallbacks${idx}`, CbPost);
+  return { Post: CbPost, Comment };
+}
+
+// Creates the canonical `posts`/`comments` tables on the handler connection.
+// Used by the bespoke-free has_many callback describes below.
+function setupPostCommentSuite(): void {
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
+  beforeAll(async () => {
+    await defineSchema(Base.connection, {
+      posts: canonicalSchema.posts,
+      comments: canonicalSchema.comments,
+    });
+  });
+}
 
 // ==========================================================================
 // AssociationCallbacksTest — targets associations/callbacks_test.rb
 // ==========================================================================
 describe("AssociationCallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-  let cbIdx = 0;
-  function makePostWithCallbacks(callbacks: any) {
-    const idx = ++cbIdx;
-    const commentName = `CBComment${idx}`;
-    const postName = `CBPost${idx}`;
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Comment.adapter = adapter;
-    Post.adapter = adapter;
-    Associations.hasMany.call(Post, "comments", {
-      className: commentName,
-      foreignKey: "post_id",
-      ...callbacks,
-    });
-    registerModel(commentName, Comment);
-    registerModel(postName, Post);
-    return { Post, Comment };
-  }
-
-  beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      comments: { body: "string", post_id: "integer" },
-      posts: { title: "string" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
+  setupPostCommentSuite();
 
   it("adding macro callbacks", async () => {
     const log: string[] = [];
@@ -69,7 +78,7 @@ describe("AssociationCallbacksTest", () => {
       log.push("macro:add:" + record.body);
     }
     const { Post, Comment } = makePostWithCallbacks({ afterAdd: onAdd });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Hello", post_id: post.id });
     await proxy.push(c);
@@ -86,7 +95,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after:" + record.body);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "World", post_id: post.id });
     await proxy.push(c);
@@ -100,7 +109,7 @@ describe("AssociationCallbacksTest", () => {
       log.push("macro:remove:" + record.body);
     }
     const { Post, Comment } = makePostWithCallbacks({ afterRemove: onRemove });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const c = await (Comment as any).create({ body: "ToRemove", post_id: post.id });
     const proxy = association(post, "comments");
     await proxy.delete(c);
@@ -117,7 +126,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after:remove:" + record.body);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const c = await (Comment as any).create({ body: "Bye", post_id: post.id });
     const proxy = association(post, "comments");
     await proxy.delete(c);
@@ -141,7 +150,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("ar1");
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Multi", post_id: post.id });
     await proxy.push(c);
@@ -156,47 +165,7 @@ describe("AssociationCallbacksTest", () => {
 });
 
 describe("AssociationCallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-  let cbIdx = 0;
-  function makePostWithCallbacks(callbacks: any) {
-    const idx = ++cbIdx;
-    const commentName = `CBComment${idx}`;
-    const postName = `CBPost${idx}`;
-    class Comment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Comment.adapter = adapter;
-    Post.adapter = adapter;
-    Associations.hasMany.call(Post, "comments", {
-      className: commentName,
-      foreignKey: "post_id",
-      ...callbacks,
-    });
-    registerModel(commentName, Comment);
-    registerModel(postName, Post);
-    return { Post, Comment };
-  }
-
-  beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      comments: { body: "string", post_id: "integer" },
-      posts: { title: "string" },
-      profiles: { bio: "string", user_id: "integer" },
-      users: { name: "string" },
-      clients: { name: "string", firm_id: "integer" },
-      firms: { name: "string" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
+  setupPostCommentSuite();
 
   it("add callback on has many", async () => {
     const log: string[] = [];
@@ -205,7 +174,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("added:" + (record.id ?? "<new>"));
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Hello", post_id: post.id });
     await proxy.push(c);
@@ -220,7 +189,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("removed:" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const c = await (Comment as any).create({ body: "Bye", post_id: post.id });
     const proxy = association(post, "comments");
     await proxy.delete(c);
@@ -238,7 +207,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after:" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Proc", post_id: post.id });
     await proxy.push(c);
@@ -253,7 +222,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("string_cb:" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Str", post_id: post.id });
     await proxy.push(c);
@@ -262,57 +231,21 @@ describe("AssociationCallbacksTest", () => {
 
   it("add callback on has one", async () => {
     const log: string[] = [];
-    const idx = ++cbIdx;
-    class Profile extends Base {
-      static {
-        this.attribute("bio", "string");
-        this.attribute("user_id", "integer");
-      }
-    }
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Profile.adapter = adapter;
-    User.adapter = adapter;
-    registerModel(`HOProfile${idx}`, Profile);
-    registerModel(`HOUser${idx}`, User);
-    Associations.hasMany.call(User, "profiles", {
-      className: `HOProfile${idx}`,
-      foreignKey: "user_id",
+    const { Post } = makePostWithCallbacks({
       afterAdd: (_owner: any, record: any) => {
         log.push("added:" + (record.id ?? "<new>"));
       },
     });
-    const user = await User.create({ name: "Alice" });
-    const proxy = association(user, "profiles");
-    const profile = proxy.build({ bio: "Hello" });
+    const post = await Post.create({ title: "Post", body: "Body" });
+    const proxy = association(post, "comments");
+    proxy.build({ body: "Hello" });
     expect(log.length).toBe(1);
     expect(log[0]).toBe("added:<new>");
   });
 
   it("remove callback on has one", async () => {
     const log: string[] = [];
-    const idx = ++cbIdx;
-    class Profile extends Base {
-      static {
-        this.attribute("bio", "string");
-        this.attribute("user_id", "integer");
-      }
-    }
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Profile.adapter = adapter;
-    User.adapter = adapter;
-    registerModel(`HORProfile${idx}`, Profile);
-    registerModel(`HORUser${idx}`, User);
-    Associations.hasMany.call(User, "profiles", {
-      className: `HORProfile${idx}`,
-      foreignKey: "user_id",
+    const { Post, Comment } = makePostWithCallbacks({
       beforeRemove: (_owner: any, record: any) => {
         log.push("removing:" + record.id);
       },
@@ -320,11 +253,11 @@ describe("AssociationCallbacksTest", () => {
         log.push("removed:" + record.id);
       },
     });
-    const user = await User.create({ name: "Bob" });
-    const profile = await Profile.create({ bio: "Hi", user_id: user.id });
-    const proxy = association(user, "profiles");
-    await proxy.delete(profile);
-    expect(log).toEqual(["removing:" + profile.id, "removed:" + profile.id]);
+    const post = await Post.create({ title: "Post", body: "Body" });
+    const comment = await (Comment as any).create({ body: "Hi", post_id: post.id });
+    const proxy = association(post, "comments");
+    await proxy.delete(comment);
+    expect(log).toEqual(["removing:" + comment.id, "removed:" + comment.id]);
   });
 
   it("add callback fires before save", async () => {
@@ -334,7 +267,7 @@ describe("AssociationCallbacksTest", () => {
         wasNew = record.isNewRecord();
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "New", post_id: post.id });
     await proxy.push(c);
@@ -348,7 +281,7 @@ describe("AssociationCallbacksTest", () => {
         wasNew = record.isNewRecord();
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Saved", post_id: post.id });
     await proxy.push(c);
@@ -359,7 +292,7 @@ describe("AssociationCallbacksTest", () => {
     const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: () => throwAbort(),
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Blocked", post_id: post.id });
     await proxy.push(c);
@@ -374,7 +307,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after:" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Confirm", post_id: post.id });
     await proxy.push(c);
@@ -390,7 +323,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("before_remove:" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const c = await (Comment as any).create({ body: "Del", post_id: post.id });
     const proxy = association(post, "comments");
     await proxy.delete(c);
@@ -404,7 +337,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after_remove:" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const c = await (Comment as any).create({ body: "Del", post_id: post.id });
     const proxy = association(post, "comments");
     await proxy.delete(c);
@@ -427,7 +360,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("ar:" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c1 = new (Comment as any)({ body: "C1", post_id: post.id });
     await proxy.push(c1);
@@ -450,7 +383,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after:" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = await proxy.create({ body: "Created" });
     expect(log[0]).toBe("before:<new>");
@@ -467,7 +400,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after:" + (record.id ?? "<new>"));
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     proxy.build({ body: "Built" });
     expect(log).toEqual(["before:<new>", "after:<new>"]);
@@ -477,7 +410,7 @@ describe("AssociationCallbacksTest", () => {
     const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: () => throwAbort(),
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = await proxy.create({ body: "Blocked" });
     expect(c.isNewRecord()).toBe(true);
@@ -487,7 +420,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("has many callbacks halt execution when abort is trown when adding to association", async () => {
     const { Post, Comment } = makePostWithCallbacks({ beforeAdd: () => throwAbort() });
-    const post = await Post.create({ title: "hello" });
+    const post = await Post.create({ title: "hello", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "abc", post_id: post.id });
     await proxy.push(c);
@@ -496,7 +429,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("has many callbacks halt execution when abort is trown when removing from association", async () => {
     const { Post, Comment } = makePostWithCallbacks({ beforeRemove: () => throwAbort() });
-    const post = await Post.create({ title: "hello" });
+    const post = await Post.create({ title: "hello", body: "Body" });
     const c = await (Comment as any).create({ body: "abc", post_id: post.id });
     const proxy = association(post, "comments");
     expect((await proxy.toArray()).length).toBe(1);
@@ -512,7 +445,7 @@ describe("AssociationCallbacksTest", () => {
         if (record.body === "keep") throwAbort();
       },
     });
-    const post = await Post.create({ title: "hello" });
+    const post = await Post.create({ title: "hello", body: "Body" });
     const c1 = await (Comment as any).create({ body: "removable", post_id: post.id });
     const c2 = await (Comment as any).create({ body: "keep", post_id: post.id });
     const proxy = association(post, "comments");
@@ -532,7 +465,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after_adding" + record.id);
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = await proxy.createBang({ body: "Hello" });
     expect(log).toEqual(["before_adding<new>", "after_adding" + c.id]);
@@ -548,7 +481,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after_adding" + (record.id ?? "<new>"));
       },
     });
-    const post = new (Post as any)({ title: "Jack" });
+    const post = new (Post as any)({ title: "Jack", body: "Body" });
     const proxy = association(post, "comments");
     proxy.build({ body: "Call me back!" });
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
@@ -568,7 +501,7 @@ describe("AssociationCallbacksTest", () => {
         log.push("after_remove" + record.id);
       },
     });
-    const post = await Post.create({ title: "Firm" });
+    const post = await Post.create({ title: "Firm", body: "Body" });
     const comment = await (Comment as any).create({ body: "Client", post_id: post.id });
     await post.destroy();
 
@@ -583,7 +516,7 @@ describe("AssociationCallbacksTest", () => {
         throw new Error("nope");
       },
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "blocked", post_id: post.id });
     try {
@@ -601,7 +534,7 @@ describe("AssociationCallbacksTest", () => {
     const { Post, Comment } = makePostWithCallbacks({
       afterAdd: () => throwAbort(),
     });
-    const post = await Post.create({ title: "Post" });
+    const post = await Post.create({ title: "Post", body: "Body" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "abc", post_id: post.id });
     await expect(proxy.push(c)).rejects.toBeDefined();
