@@ -154,9 +154,20 @@ export class ForeignKeyDefinition {
     return !/^fk_rails_[0-9a-f]{10}$/.test(this.name);
   }
 
-  isDefinedFor(options: { toTable?: string; validate?: boolean } = {}): boolean {
+  isDefinedFor(
+    options: {
+      toTable?: string;
+      column?: string | string[];
+      name?: string;
+      validate?: boolean;
+    } = {},
+  ): boolean {
+    const columnToString = (c: string | string[]): string => (Array.isArray(c) ? c.join(",") : c);
     return (
       (options.toTable === undefined || options.toTable.toString() === this.toTable) &&
+      (options.column === undefined ||
+        columnToString(options.column) === columnToString(this.column)) &&
+      (options.name === undefined || options.name === this.name) &&
       (options.validate === undefined || options.validate === this.validate)
     );
   }
@@ -1396,6 +1407,7 @@ export interface SchemaStatementsLike {
   foreignKeyExists?(
     tableName: string,
     toTableOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
   ): Promise<boolean>;
   addCheckConstraint?(
     tableName: string,

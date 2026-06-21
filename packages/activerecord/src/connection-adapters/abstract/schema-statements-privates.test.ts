@@ -4,6 +4,7 @@ import {
   canRemoveIndexByName,
   indexNameForRemoveFrom,
 } from "./schema-statements.js";
+import { ForeignKeyDefinition } from "./schema-definitions.js";
 
 function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
   return new SchemaStatements({
@@ -282,6 +283,20 @@ describe("SchemaStatements privates (PR 8)", () => {
     const ss = makeStatements();
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([]);
     expect(await ss.foreignKeyFor("users", { toTable: "orgs" })).toBeUndefined();
+  });
+
+  it("foreignKeyExists matches by toTable, column, and name", async () => {
+    const ss = makeStatements();
+    const fk = new ForeignKeyDefinition("users", "orgs", "org_id", "id", "fk_rails_abc");
+    vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
+
+    expect(await ss.foreignKeyExists("users", "orgs")).toBe(true);
+    expect(await ss.foreignKeyExists("users", "teams")).toBe(false);
+    expect(await ss.foreignKeyExists("users", { column: "org_id" })).toBe(true);
+    expect(await ss.foreignKeyExists("users", { column: "other_id" })).toBe(false);
+    expect(await ss.foreignKeyExists("users", { name: "fk_rails_abc" })).toBe(true);
+    expect(await ss.foreignKeyExists("users", { name: "nope" })).toBe(false);
+    expect(await ss.foreignKeyExists("users")).toBe(true);
   });
 
   it("foreignKeyForBang throws when not found", async () => {

@@ -3820,8 +3820,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.pgSchemaStatements().addForeignKey(fromTable, toTable, options);
   }
 
-  async foreignKeyExists(fromTable: string, toTable: string): Promise<boolean> {
-    return this.pgSchemaStatements().foreignKeyExists(fromTable, toTable);
+  async foreignKeyExists(
+    fromTable: string,
+    toTable?: string | { toTable?: string; column?: string; name?: string },
+    options: { column?: string; name?: string } = {},
+  ): Promise<boolean> {
+    return this.pgSchemaStatements().foreignKeyExists(fromTable, toTable, options);
   }
 
   // Mirrors: ReferentialIntegrity#disable_referential_integrity. Disables
