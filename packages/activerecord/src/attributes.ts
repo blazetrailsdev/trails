@@ -151,18 +151,18 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     // deserializes null → 0). Gated on an *own* `_lockingColumn` property so it
     // fires only for classes that called `set_locking_column` — never for the
     // inherited "lock_version" default, which would reflect every model and
-    // widen the blast radius. The own-property check spans both `this` and the
-    // STI base: `set_locking_column` writes `_lockingColumn` onto whichever
-    // class it was called on, which may be an STI subclass (own on `this`) or
-    // the STI base (own on `cacheHost`); checking only one would miss the other.
-    // `_lockingColumn` resolves through the prototype chain so it picks up a
-    // base-configured column on a subclass. Best-effort: table-less/abstract
-    // classes can't reflect, so swallow the resulting error.
-    const lockCol = this._lockingColumn;
-    const lockColConfigured =
-      Object.prototype.hasOwnProperty.call(this, "_lockingColumn") ||
-      Object.prototype.hasOwnProperty.call(cacheHost, "_lockingColumn");
-    if (lockCol && lockColConfigured && !cacheHost._attributeDefinitions.has(lockCol)) {
+    // widen the blast radius. The gate (and the load) target `cacheHost`: for a
+    // plain model that is `this`; for an STI subclass it is the base, which both
+    // owns the shared table reflection and is where Rails conventionally
+    // declares `locking_column` (no canonical model overrides it on a subclass,
+    // and `_default_attributes` is shared from the base anyway). Best-effort:
+    // table-less/abstract classes can't reflect, so swallow the resulting error.
+    const lockCol = cacheHost._lockingColumn;
+    if (
+      lockCol &&
+      Object.prototype.hasOwnProperty.call(cacheHost, "_lockingColumn") &&
+      !cacheHost._attributeDefinitions.has(lockCol)
+    ) {
       const wasLoaded = cacheHost._schemaLoaded;
       try {
         loadSchemaSync.call(cacheHost);
