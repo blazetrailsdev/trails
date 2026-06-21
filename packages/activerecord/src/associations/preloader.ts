@@ -1,14 +1,24 @@
 import type { Base } from "../base.js";
+import type { Relation } from "../relation.js";
 import type { Association } from "./preloader/association.js";
 import { Branch } from "./preloader/branch.js";
 import { Batch } from "./preloader/batch.js";
 
 export interface PreloaderOptions {
-  records: Base[];
+  records: Base[] | Relation<Base>;
   associations: any;
   scope?: any;
   availableRecords?: (Base | Base[])[];
   associateByDefault?: boolean;
+}
+
+/**
+ * Duck-type check for a Relation passed as `records`. Avoids a runtime import
+ * of Relation (which would create a require cycle through associations).
+ * @internal
+ */
+function isRelation(records: Base[] | Relation<Base>): records is Relation<Base> {
+  return !Array.isArray(records) && typeof (records as any).toArray === "function";
 }
 
 /**
@@ -23,7 +33,7 @@ export interface PreloaderOptions {
  * Mirrors: ActiveRecord::Associations::Preloader
  */
 export class Preloader {
-  readonly records: Base[];
+  readonly records: Base[] | Relation<Base>;
   readonly associations: any;
   readonly scope: any;
   readonly associateByDefault: boolean;
@@ -45,14 +55,25 @@ export class Preloader {
       associateByDefault: this.associateByDefault,
       scope: this.scope,
     });
-    this._tree.preloadedRecords = this.records;
+    // A Relation is materialized lazily in `call()`; an array is the final set.
+    if (!isRelation(this.records)) {
+      this._tree.preloadedRecords = this.records;
+    }
   }
 
   isEmpty(): boolean {
-    return this.associations == null || this.records.length === 0;
+    if (this.associations == null) return true;
+    // A Relation's length is unknown until it is materialized (in `call()`),
+    // so it is never treated as empty here. Rails materializes it inside
+    // `empty?`; we defer the query to `call()` but keep the same query count.
+    if (isRelation(this.records)) return false;
+    return this.records.length === 0;
   }
 
   async call(): Promise<Association[]> {
+    if (isRelation(this.records)) {
+      this._tree.preloadedRecords = await this.records.toArray();
+    }
     const batch = new Batch([this], this._availableRecords);
     await batch.call();
     return this.loaders;
