@@ -727,6 +727,26 @@ describe("HasManyAssociationsTest", () => {
     // dependent: :destroy removes the row.
     expect(await HmTagging.findBy({ id: first.id })).toBeNull();
   });
+
+  it("deleting updates counter cache with dependent destroy via association layer", async () => {
+    // Same Rails behavior as above, but routed through the OO
+    // CollectionAssociation#delete → HasManyAssociation#delete_records path
+    // (`association(...).delete`) rather than the CollectionProxy fast-path, to
+    // cover the `unless reflection.inverse_updates_counter_cache?` guard there.
+    const post = posts("welcome");
+    const startCount = (post as any).tags_count as number;
+    await post.updateColumns({ taggings_with_destroy_count: startCount });
+
+    const first = (await post.taggingsWithDestroy.first())!;
+    await (post as any).association("taggingsWithDestroy").delete(first);
+
+    await post.reload();
+    // The has_many counter (taggings_with_destroy_count) differs from the
+    // belongs_to inverse's (tags_count), so inverse_updates_counter_cache? is
+    // false and the destroy must still decrement it.
+    expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
+    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
+  });
 });
 
 describe("HasManyAssociationsTest", () => {
