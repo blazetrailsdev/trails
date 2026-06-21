@@ -27,12 +27,7 @@ import {
 } from "./multiparameter-attribute-assignment.js";
 import { assignAssociationIfMatch } from "./attribute-assignment.js";
 import { clearAutosaveState } from "./autosave-association.js";
-import {
-  getStiBase,
-  getInheritanceColumn,
-  isStiSubclass,
-  initializeInternalsCallback,
-} from "./inheritance.js";
+import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import {
   performValidations,
@@ -1290,9 +1285,10 @@ interface DupRecord {
  * the full duped attribute set. We reproduce that order: `after_initialize` is
  * suppressed during `new ctor({})` (via `_suppressInitializeCallback`), we swap
  * in the duped `_attributes`, run the `initialize_dup` chain and dirty pass, then
- * re-thread the internals callback (STI `ensure_proper_type`, which the
- * suppressed branch skips) and finally dispatch `after_initialize` manually — so
- * the hook reads the duped values, not the empty construction bag. Ruby's
+ * dispatch `after_initialize` manually — so the hook reads the duped values, not
+ * the empty construction bag. (Like Rails' `initialize_dup`, this runs only the
+ * initialize callbacks, not `ensure_proper_type`: the STI type column rides along
+ * in the deep-dup'd attributes.) Ruby's
  * `Object#dup` also copies `@readonly` and runs the `initialize_dup` chain, so
  * carry `@readonly` over and invoke the composed hook (aggregations cache +
  * locking/timestamp clear) — which nulls the timestamp and locking columns back
@@ -1346,10 +1342,11 @@ export function dup<T extends DupRecord>(this: T): T {
     // Re-mark attributes that differ from their schema defaults as changed.
     duped._dirty.reinstateNewRecordChanges(dupedAttrs, defaultAttributes().snapshotValues());
   }
-  // Re-thread the internals callback the suppressed constructor branch skips:
-  // STI `ensure_proper_type` re-asserts the inheritance column on the duped
-  // attribute set. Then dispatch `after_initialize` against the duped attrs.
-  initializeInternalsCallback.call(duped as unknown as import("./base.js").Base);
+  // Dispatch `after_initialize` against the duped attributes. Mirrors Rails
+  // Core#initialize_dup, which runs `_run_initialize_callbacks` only — it does
+  // NOT re-run `initialize_internals_callback`/`ensure_proper_type` (that lives
+  // in Core#initialize), so the STI type column is carried solely by the
+  // deep-dup'd `@attributes`, not re-asserted here.
   runAfterCallbacksOnProto(ctor.prototype, "initialize", duped, { strict: "sync" });
   return duped;
 }
