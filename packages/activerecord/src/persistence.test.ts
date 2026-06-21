@@ -15,7 +15,15 @@ function isTemporalDatetime(v: unknown): boolean {
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
-import { Base, RecordNotFound, RecordInvalid, RecordNotSaved, registerModel } from "./index.js";
+import {
+  Base,
+  RecordNotFound,
+  RecordInvalid,
+  RecordNotSaved,
+  RecordNotDestroyed,
+  ActiveRecordError,
+  registerModel,
+} from "./index.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -44,6 +52,9 @@ import { Parrot } from "./test-helpers/models/parrot.js";
 // `Topic`/`Item`: bespoke in-function `class Post` declarations still exist in
 // the not-yet-converted blocks.
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
+import { Minivan } from "./test-helpers/models/minivan.js";
+import { Company, LargeClient } from "./test-helpers/models/company.js";
 
 for (const klass of [
   CanonicalTopic,
@@ -58,6 +69,10 @@ for (const klass of [
   CanonicalDeveloper,
   Parrot,
   CanonicalPost,
+  CpkBook,
+  Minivan,
+  Company,
+  LargeClient,
 ]) {
   registerModel(klass);
 }
@@ -1656,4 +1671,146 @@ describe("PersistenceTest", () => {
   // Rails: test_update_all_does_not_trigger_callbacks
   // Rails: test_delete_all
   // Rails: test_destroy_all_triggers_callbacks
+});
+
+// ==========================================================================
+// PersistenceTest — composite primary key destroy (persistence_test.rb)
+// ==========================================================================
+describe("PersistenceTest", () => {
+  const { cpkBooks } = useHandlerFixtures(["cpkAuthors", "cpkBooks"], {
+    schema: canonicalSchema,
+  });
+
+  it("destroy with single composite primary key", async () => {
+    const book = cpkBooks("cpk_great_author_first_book");
+    const before = (await CpkBook.count()) as number;
+    const destroyed = (await CpkBook.destroy(book.id)) as CpkBook;
+    expect((await CpkBook.count()) as number).toBe(before - 1);
+    expect(destroyed.id).toEqual(book.id);
+  });
+
+  it("destroy with multiple composite primary keys", async () => {
+    const books = [
+      cpkBooks("cpk_great_author_first_book"),
+      cpkBooks("cpk_great_author_second_book"),
+    ];
+    const before = (await CpkBook.count()) as number;
+    const destroyed = (await CpkBook.destroy(books.map((b) => b.id))) as CpkBook[];
+    expect((await CpkBook.count()) as number).toBe(before - 2);
+    expect(destroyed.map((d) => d.id).sort()).toEqual(books.map((b) => b.id).sort());
+    expect(destroyed.every((d) => d.isFrozen())).toBe(true);
+  });
+
+  it("destroy with invalid ids for a model that expects composite keys", async () => {
+    const books = [
+      cpkBooks("cpk_great_author_first_book"),
+      cpkBooks("cpk_great_author_second_book"),
+    ];
+    const ids = books.map((b) => (b.id as unknown[])[0]);
+    await expect(CpkBook.destroy(ids)).rejects.toThrow(RecordNotFound);
+  });
+
+  it("destroy for a failed to destroy cpk record", async () => {
+    const book = cpkBooks("cpk_great_author_first_book");
+    book.failDestroy = true;
+    await expect(book.destroyBang()).rejects.toThrow(RecordNotDestroyed);
+  });
+});
+
+// ==========================================================================
+// PersistenceTest — becomes / STI type variants (persistence_test.rb)
+// ==========================================================================
+describe("PersistenceTest", () => {
+  const Topic = CanonicalTopic;
+  const { topics } = useHandlerFixtures(["topics", "companies"], { schema: canonicalSchema });
+
+  it("becomes after reload schema from cache", () => {
+    (Reply as any).defineAttributeMethods();
+    Reply.resetColumnInformation(); // mirrors Reply.serialize(:content) reload
+    const t = topics("first");
+    expect(t.becomes(Reply)).toBeInstanceOf(Reply);
+    expect(t.becomes(Reply).title).toBe("The First Topic");
+  });
+
+  it("becomes wont break mutation tracking", () => {
+    const topic = topics("first");
+    const reply = topic.becomes(Reply);
+
+    expect((topic as any).idInDatabase()).toBe(1);
+    expect((topic as any).attributesInDatabase).toEqual({});
+
+    expect((reply as any).idInDatabase()).toBe(1);
+    expect((reply as any).attributesInDatabase).toEqual({});
+  });
+
+  it("becomes initializes missing attributes", () => {
+    const company = new Company({ name: "GrowingCompany" });
+    const client = company.becomes(LargeClient);
+    expect((client as any).extraSize).toBe(50);
+  });
+
+  it("becomes keeps extra attributes", () => {
+    const client = new LargeClient({ name: "ShrinkingCompany" });
+    const company = client.becomes(Company);
+    expect((company as any).readAttribute("extraSize")).toBe(50);
+    expect((client as any).extraSize).toBe(50);
+  });
+
+  it("preserve original sti type", () => {
+    const reply = topics("second");
+    expect((reply as any).type).toBe("Reply");
+
+    const topic = reply.becomes(Topic);
+    expect((reply as any).type).toBe("Reply");
+
+    expect(topic).toBeInstanceOf(Topic);
+    expect((topic as any).type).toBe("Reply");
+  });
+
+  it("update sti subclass type", async () => {
+    expect(topics("first")).toBeInstanceOf(Topic);
+
+    const reply = topics("first").becomesBang(Reply);
+    expect(reply).toBeInstanceOf(Reply);
+    await (reply as any).saveBang();
+    expect(await Reply.find((reply as any).id)).toBeInstanceOf(Reply);
+  });
+});
+
+// ==========================================================================
+// PersistenceTest — readonly attributes + non-id primary keys (persistence_test.rb)
+// ==========================================================================
+describe("PersistenceTest", () => {
+  const { developers } = useHandlerFixtures(["developers", "minivans", "speedometers"], {
+    schema: canonicalSchema,
+  });
+
+  it("update attribute for readonly attribute", async () => {
+    const minivan = await Minivan.find("m1");
+    await expect(minivan.updateAttribute("color", "black")).rejects.toThrow(ActiveRecordError);
+  });
+
+  it("update columns with model having primary key other than id", async () => {
+    const minivan = await Minivan.find("m1");
+    const newName = "sebavan";
+    await minivan.updateColumns({ name: newName });
+    expect(minivan.name).toBe(newName);
+  });
+
+  it("update columns should not modify updated at", async () => {
+    void developers;
+    const developer = await CanonicalDeveloper.find(1);
+    const prevMonth = Temporal.Instant.from("2003-06-16T00:00:00Z");
+
+    await (developer as any).updateColumns({ updated_at: prevMonth });
+    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+
+    await (developer as any).updateColumns({ salary: 80000 });
+    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect((developer as any).salary).toBe(80000);
+
+    await (developer as any).reload();
+    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect((developer as any).salary).toBe(80000);
+  });
 });
