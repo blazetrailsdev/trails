@@ -2691,9 +2691,13 @@ export class Base extends Model {
     // `_suppressStiNewDispatch` lets `becomes` build the exact target class
     // (Rails uses `klass.allocate`, which bypasses `new`'s STI dispatch) so a
     // record becomes(Topic) yields a Topic even when `topics.type` defaults to
-    // a subclass (persistence_test.rb#test_becomes_default_sti_subclass).
+    // a subclass (persistence_test.rb#test_becomes_default_sti_subclass). It
+    // holds the suppressed class itself, not a boolean: statics inherit down the
+    // hierarchy, so the identity check confines suppression to that exact class
+    // and never leaks into a nested `new <subclass>()` during the window.
     if (
-      !(new.target as typeof Base & { _suppressStiNewDispatch?: boolean })?._suppressStiNewDispatch
+      (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
+        ?._suppressStiNewDispatch !== new.target
     ) {
       const stiTarget = subclassFromAttributesForNew(new.target, attrs);
       if (stiTarget && stiTarget !== new.target) {

@@ -1429,10 +1429,13 @@ export function becomes<
   // bypassing `new`'s STI dispatch so becomes(base) is never re-resolved to
   // the subclass named by the inheritance column's default
   // (persistence_test.rb#test_becomes_default_sti_subclass).
-  const ctor = klass as unknown as { _suppressStiNewDispatch?: boolean };
+  // Store the class itself, not a boolean: the constructor only skips dispatch
+  // when `new.target` *is* this class, so an inherited static never suppresses
+  // a nested `new <subclass>()`.
+  const ctor = klass as unknown as { _suppressStiNewDispatch?: unknown };
   const hadOwn = Object.prototype.hasOwnProperty.call(ctor, "_suppressStiNewDispatch");
   const prev = ctor._suppressStiNewDispatch;
-  ctor._suppressStiNewDispatch = true;
+  ctor._suppressStiNewDispatch = klass;
   let instance: InstanceType<K>;
   try {
     instance = new klass({}) as InstanceType<K>;
