@@ -2688,9 +2688,17 @@ export class Base extends Model {
     // Inheritance::ClassMethods#new). Resolution is registry-safe — scoped to
     // this class's descendants, never the ambiguous global name map — so it
     // runs after sanitize (the un-permitted params case raises above first).
-    const stiTarget = subclassFromAttributesForNew(new.target, attrs);
-    if (stiTarget && stiTarget !== new.target) {
-      return new stiTarget(attrs);
+    // `_suppressStiNewDispatch` lets `becomes` build the exact target class
+    // (Rails uses `klass.allocate`, which bypasses `new`'s STI dispatch) so a
+    // record becomes(Topic) yields a Topic even when `topics.type` defaults to
+    // a subclass (persistence_test.rb#test_becomes_default_sti_subclass).
+    if (
+      !(new.target as typeof Base & { _suppressStiNewDispatch?: boolean })?._suppressStiNewDispatch
+    ) {
+      const stiTarget = subclassFromAttributesForNew(new.target, attrs);
+      if (stiTarget && stiTarget !== new.target) {
+        return new stiTarget(attrs);
+      }
     }
     // Split out constructor-form association values (e.g. `new Owner({items:
     // [...]})`) so super() never sees them as plain attributes. Dispatched
