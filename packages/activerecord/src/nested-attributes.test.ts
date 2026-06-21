@@ -1698,17 +1698,16 @@ describe("should sort the hash by the keys before building new associated models
     registerModel(CanonicalPirate);
     acceptsNestedAttributesFor(CanonicalPirate, "birds");
     const pirate = await CanonicalPirate.create({ catchphrase: "sort test" });
-    // Keys are sorted by their numeric value before the new birds are built,
-    // so "2" sorts before "123726353" even though it is inserted later.
     (pirate as any).birdsAttributes = {
       "123726353": { name: "Grace OMalley" },
-      "2": { name: "Privateers Greed" },
+      "2": { name: "Privateers Greed" }, // 2 is lower then 123726353
     };
     const built = (await collectionProxyFor(pirate, "birds").loadTarget()) as CanonicalBird[];
-    expect([built[0].name, built[built.length - 1].name]).toEqual([
-      "Privateers Greed",
-      "Grace OMalley",
-    ]);
+    // Rails compares with `.to_set` — order-independent (Ruby preserves hash
+    // insertion order; trails cannot for integer keys, so assert membership).
+    expect(new Set(built.map((b) => b.name))).toEqual(
+      new Set(["Privateers Greed", "Grace OMalley"]),
+    );
   });
 });
 

@@ -28,17 +28,6 @@ export class TooManyRecords extends ActiveRecordError {
 }
 
 /**
- * Mirrors Ruby's `String#to_i`: parses the leading integer portion of a
- * string, returning 0 when no leading digits are present. Used to sort a
- * nested-attributes collection hash by the numeric value of its keys, matching
- * Rails' `attributes_collection.sort_by { |i, _| i.to_i }`.
- */
-function keyToInt(key: string): number {
-  const parsed = parseInt(key, 10);
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-/**
  * Returns whether the record is marked for destruction in the context of
  * nested attributes. Mirrors Rails' NestedAttributes instance method `_destroy`,
  * which delegates to `marked_for_destruction?`.
@@ -173,10 +162,9 @@ export function assignNestedAttributes(
   if (Array.isArray(attributesArray)) {
     attrs = attributesArray;
   } else {
-    // Sort by the numeric value of the keys before converting to array,
-    // matching Rails' `sort_by { |i, _| i.to_i }`.
-    const sortedKeys = Object.keys(attributesArray).sort((a, b) => keyToInt(a) - keyToInt(b));
-    attrs = sortedKeys.map((k) => attributesArray[k]);
+    // Rails takes `attributes_collection.values` in insertion order — no
+    // sort (nested_attributes.rb:499-506).
+    attrs = Object.values(attributesArray);
   }
 
   // Rails raises TooManyRecords synchronously from
@@ -619,9 +607,10 @@ export function assignNestedAttributesForCollectionAssociation(
     if (keys.includes("id")) {
       attrs = [attributesCollection as unknown as Record<string, unknown>];
     } else {
-      attrs = keys
-        .sort((a, b) => keyToInt(a) - keyToInt(b))
-        .map((k) => (attributesCollection as any)[k]);
+      // Rails takes `attributes_collection.values` in insertion order — no
+      // sort (nested_attributes.rb:499-506). Object.values preserves the same
+      // ordering trails can observe.
+      attrs = keys.map((k) => (attributesCollection as any)[k]);
     }
   }
 
