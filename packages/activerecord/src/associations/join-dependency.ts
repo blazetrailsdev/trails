@@ -1221,7 +1221,14 @@ export class JoinDependency {
       for (let i = 0; i < node.columns.length; i++) {
         attrs[node.columns[i]] = row[aliases.columnAlias(node, node.columns[i])!];
       }
-      model = (node.baseKlass as any)._instantiate(attrs);
+      // Wire the inverse inside the instantiation block so it lands BEFORE the
+      // child's find/initialize callbacks fire (Rails' eager `construct` yields
+      // `set_inverse_instance` per row). For a cache hit the inverse was already
+      // wired when the model was first built; `_wireAssociationProxy` re-applies
+      // it idempotently below.
+      model = (node.baseKlass as any)._instantiate(attrs, (built: any) =>
+        this._setInverseBeforeCallbacks(record, node, built),
+      );
       if (strictLoadingValue && typeof model.strictLoadingBang === "function") {
         model.strictLoadingBang();
       }
@@ -1254,6 +1261,25 @@ export class JoinDependency {
    * Wire a child model into the parent's association proxy.
    * Mirrors Rails' `construct_model` setting `other.target` and `other.loaded`.
    */
+  /**
+   * @internal
+   * Wire only the inverse target on a freshly instantiated eager-loaded child,
+   * routed as the `_instantiate` block so it runs before the child's
+   * find/initialize callbacks. Pushing the child into the parent's proxy target
+   * still happens in `_wireAssociationProxy` after instantiation.
+   */
+  private _setInverseBeforeCallbacks(parent: any, node: JoinPart, child: any): void {
+    if (typeof parent.association !== "function") return;
+    try {
+      const proxy = parent.association(node.immediateAssocName);
+      if (proxy && typeof proxy.setInverseInstance === "function") {
+        proxy.setInverseInstance(child);
+      }
+    } catch (e) {
+      if (!(e instanceof AssociationNotFoundError)) throw e;
+    }
+  }
+
   private _wireAssociationProxy(parent: any, node: JoinPart, child: any): void {
     if (typeof parent.association !== "function") return;
     try {
