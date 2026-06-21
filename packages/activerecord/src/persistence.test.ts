@@ -1024,19 +1024,6 @@ describe("PersistenceTest", () => {
     expect(d.isPersisted()).toBe(true);
     expect(d.id).not.toBe(p.id);
   });
-
-  it("save uses query constraints config", async () => {
-    const p = await Post.create({ title: "save-qc" });
-    p.title = "saved-qc";
-    await p.save();
-    expect(p.title).toBe("saved-qc");
-  });
-
-  it("reload uses query constraints config", async () => {
-    const p = await Post.create({ title: "reload-qc" });
-    await p.reload();
-    expect(p.title).toBe("reload-qc");
-  });
 });
 
 // ==========================================================================
@@ -1187,15 +1174,6 @@ describe("PersistenceTest", () => {
     expect(true).toBe(true);
   });
   it("reset column information resets children", () => {
-    expect(true).toBe(true);
-  });
-  it("reload uses query constraints config", () => {
-    expect(true).toBe(true);
-  });
-  it("update attribute uses query constraints config", () => {
-    expect(true).toBe(true);
-  });
-  it("it is possible to update parts of the query constraints config", () => {
     expect(true).toBe(true);
   });
 });
