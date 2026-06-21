@@ -39,7 +39,7 @@ import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 // declarations in the later (still-bespoke) describe blocks to `Topic2`/`Item2`,
 // so their name-derived tables would resolve to the non-existent
 // `topic2s`/`item2s`. Each converted block rebinds the alias to a local `const`.
-import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Account } from "./test-helpers/models/account.js";
 // Registers the Reply STI subclasses so Topic#destroy can resolve its
@@ -135,6 +135,12 @@ describe("PersistenceTest", () => {
     await topic.save();
     const reloaded = await Topic.find(topic.id);
     expect((reloaded as any).title).toBe("New Topic");
+  });
+
+  it("populates_non_primary_key_autoincremented_column", async () => {
+    const topic = await TitlePrimaryKeyTopic.createBang({ title: "title pk topic" });
+
+    expect(topic.attributes["id"]).not.toBeNull();
   });
 
   it("save for record with only primary key", async () => {

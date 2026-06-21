@@ -3138,66 +3138,50 @@ export class Base extends Model {
       im.insert(insertValues);
       [sql, insertBinds] = ctor.connection.toSqlAndBinds(im);
     }
-    // A custom-named serial/identity PK (e.g. `owner_id`) needs its column name
-    // threaded through so the adapter emits `RETURNING <pk>` and the DB-generated
-    // value reads back into the right attribute. The default `id` PK is read back
-    // via executeMutation's auto-appended `RETURNING id`, so leave it `undefined`.
-    // Mirrors Rails' _returning_columns_for_insert.
-    const insertPk = ctor.primaryKey;
-    const namedReturning =
-      !Array.isArray(insertPk) && typeof insertPk === "string" && insertPk && insertPk !== "id"
-        ? [insertPk]
-        : undefined;
+    // Mirrors Rails' _returning_columns_for_insert: the columns the DB
+    // auto-populates on INSERT (the auto-increment PK, a custom-named
+    // serial/identity PK like `owner_id`, a non-PK auto-increment `id`, and
+    // DB-computed defaults), falling back to the PK when the adapter reports
+    // none. Each is threaded into `RETURNING` so the generated value reads back
+    // into the right attribute by position.
+    const returningColumns: string[] = (ctor as any)._returningColumnsForInsert(ctor.connection);
     this._pendingOperation = ctor.connection
       .execInsert(
         sql,
         `${ctor.name} Create`,
         insertBinds,
-        namedReturning?.[0],
+        returningColumns[0],
         undefined,
-        namedReturning,
+        returningColumns.length > 0 ? returningColumns : undefined,
       )
       .then((rawId) => {
-        // Adapters with RETURNING support (PG) may return a Result-like object
-        // instead of the bare id — extract via adapter.lastInsertedId when available.
+        // Adapters with RETURNING support (PG) return a Result-like object whose
+        // first row carries every RETURNING column; those without (MySQL,
+        // SQLite < 3.35, and the executeMutation INSERT path) yield the bare
+        // generated id, which fills the single auto-populated column.
+        const isResult = rawId !== null && typeof rawId === "object" && "rows" in rawId;
         const insertedId =
-          rawId !== null &&
-          typeof rawId === "object" &&
-          "rows" in rawId &&
-          typeof (ctor.connection as any).lastInsertedId === "function"
+          isResult && typeof (ctor.connection as any).lastInsertedId === "function"
             ? (ctor.connection as any).lastInsertedId(rawId)
             : rawId;
-        if (!Array.isArray(ctor.primaryKey) && ctor.primaryKey != null && this.id === null) {
-          // This trails path writes the generated id back via a direct
-          // `_writeAttribute(pk, …)`, unlike Rails which routes write-back
-          // through `_returning_columns_for_insert` — that returns no columns
-          // for a key-less table, so its zip/each loop is simply empty. We get
-          // no such free safety here, so guard explicitly: `_writeAttribute(nil,
-          // …)` would otherwise raise MissingAttributeError via the Null
-          // attribute.
-          this._writeAttribute(ctor.primaryKey, insertedId);
-        } else if (
-          Array.isArray(ctor.primaryKey) &&
-          insertedId != null &&
-          (ctor.connection as any).supportsInsertReturning?.()
-        ) {
-          // For composite-PK models with IDENTITY columns on adapters that use
-          // RETURNING (PG with use_insert_returning? = true), write back the
-          // DB-generated value to the first null PK column.
-          //
-          // Rails does this via _returning_columns_for_insert + _create_record
-          // write-back using named RETURNING columns. Our executeMutation
-          // always appends `RETURNING id`, so this only works when the IDENTITY
-          // column in the composite PK is named "id". A proper follow-up should
-          // implement _returningColumnsForInsert and pass explicit returning:
-          // column names to execInsert so the result can be mapped by name.
-          for (const pkCol of ctor.primaryKey) {
-            if (this._readAttribute(pkCol) == null) {
-              this._attributes.set(pkCol, insertedId);
-              break;
-            }
-          }
+        let returningValues: unknown[] = [insertedId];
+        if (isResult) {
+          const rv = (ctor.connection as any).returningColumnValues?.(rawId);
+          if (rv != null && rv.length > 0 && rv[0] !== undefined) returningValues = rv;
         }
+        // Mirrors Rails _create_record: zip the returned values back into the
+        // auto-populated columns, writing only those still unset (nil/false).
+        // For a key-less table `returningColumns` is empty, so this is a no-op —
+        // matching Rails' empty zip rather than risking a MissingAttributeError.
+        returningColumns.forEach((column, i) => {
+          const value = returningValues[i];
+          if (value === undefined) return;
+          const current = this._readAttribute(column);
+          if (current == null || current === false) {
+            const type = (ctor as any).typeForAttribute?.(column);
+            this._writeAttribute(column, type?.deserialize ? type.deserialize(value) : value);
+          }
+        });
         // After INSERT, reset lock_version to a FromDatabase attribute carrying the
         // actual serialized value (e.g. 0). This mirrors Rails' behavior: during INSERT
         // @value_for_database is memoized to 0, so changes_applied! → forgetting_assignment

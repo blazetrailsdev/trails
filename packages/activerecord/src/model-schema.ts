@@ -520,10 +520,17 @@ export function _returningColumnsForInsert(
 ): string[] {
   // Mirrors Rails: columns the adapter populates server-side on INSERT (the
   // auto-increment PK, DB-computed defaults, …). Falls back to the PK when the
-  // adapter reports none.
+  // adapter reports none. `returnValueAfterInsert` calls `column.isAutoPopulated`,
+  // which only the reflected Column objects implement; the synthesized
+  // column-hash fallback (used before the schema cache is warm) holds plain
+  // shapes, so skip those — they carry no auto-increment metadata and the PK
+  // fallback below covers them.
   const autoPopulated = columns
     .call(this)
-    .filter((c: { name: string }) => connection.returnValueAfterInsert?.(c))
+    .filter(
+      (c: { name: string; isAutoPopulated?: unknown }) =>
+        typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
+    )
     .map((c: { name: string }) => c.name);
   if (autoPopulated.length > 0) return autoPopulated;
   const pk = this.primaryKey;
