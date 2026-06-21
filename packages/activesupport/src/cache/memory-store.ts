@@ -63,17 +63,25 @@ export class MemoryStore extends Store implements CacheStore {
     this.data.clear();
   }
 
+  // Mirrors Rails MemoryStore#cleanup (memory_store.rb): instrumented, deletes
+  // every expired entry.
   override cleanup(): void {
-    for (const [key, rec] of this.data) {
-      if (this.recordExpired(rec)) this.data.delete(key);
-    }
+    this.instrument("cleanup", null, { size: this.data.size }, () => {
+      for (const [key, rec] of this.data) {
+        if (this.recordExpired(rec)) this.data.delete(key);
+      }
+    });
   }
 
+  // Mirrors Rails MemoryStore#delete_matched (memory_store.rb): instrumented with
+  // the matcher.
   override deleteMatched(pattern: string | RegExp): void {
     const re = typeof pattern === "string" ? new RegExp(pattern) : pattern;
-    for (const key of this.data.keys()) {
-      if (re.test(key)) this.data.delete(key);
-    }
+    this.instrument("delete_matched", String(re), undefined, () => {
+      for (const key of this.data.keys()) {
+        if (re.test(key)) this.data.delete(key);
+      }
+    });
   }
 
   // Rails MemoryStore instruments increment/decrement with the raw, unnormalized
