@@ -228,16 +228,21 @@ export class ConnectionHandler {
     return pool != null && pool.isConnected();
   }
 
-  removeConnectionPool(connectionName: string, options?: { role?: string; shard?: string }): void {
+  removeConnectionPool(
+    connectionName: string,
+    options?: { role?: string; shard?: string },
+  ): DatabaseConfig | undefined {
     const role = options?.role ?? "writing";
     const shard = options?.shard ?? "default";
     const poolManager = this.getPoolManager(connectionName);
     if (poolManager) {
-      this.disconnectPoolFromPoolManager(poolManager, role, shard);
+      const dbConfig = this.disconnectPoolFromPoolManager(poolManager, role, shard);
       if (poolManager.roleNames.length === 0) {
         this._connectionNameToPoolManager.delete(connectionName);
       }
+      return dbConfig;
     }
+    return undefined;
   }
 
   retrieveConnectionPool(
@@ -309,11 +314,13 @@ export class ConnectionHandler {
     poolManager: PoolManager,
     role: string,
     shard: string,
-  ): void {
+  ): DatabaseConfig | undefined {
     const poolConfig = poolManager.removePoolConfig(role, shard);
     if (poolConfig) {
       poolConfig.disconnect();
+      return poolConfig.dbConfig;
     }
+    return undefined;
   }
 
   /** @internal */
