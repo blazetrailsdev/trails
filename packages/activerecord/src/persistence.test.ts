@@ -2362,7 +2362,9 @@ describe("PersistenceTest", () => {
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     const destroyed = await Item.destroyAll();
-    expect(destroyed.length).toBeGreaterThanOrEqual(2);
+    // Deterministic under transactional fixtures: the `dvd` fixture row plus
+    // the two created here.
+    expect(destroyed).toHaveLength(3);
     expect(await Item.all().count()).toBe(0);
   });
 });
