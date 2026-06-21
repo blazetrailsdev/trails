@@ -140,10 +140,12 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
     return quoteString(String(value));
   }
   if (value instanceof ArrayData) {
-    return quoteString(value.toString());
+    // Rails: `quote(encode_array(value))` — one serialization path, the
+    // encoder's delimiter (`;` for box[]), with per-element type_cast.
+    return quoteString(encodeArray.call(this as QuotingDispatchHost, value));
   }
   if (value instanceof Range) {
-    return quoteString(value.toString());
+    return quoteString(encodeRange.call(this as QuotingDispatchHost, value));
   }
   // Mirrors: PostgreSQL::Quoting#quote raises IntegerOutOf64BitRange for
   // integers exceeding the 64-bit signed range. Covers both bigint and
@@ -229,10 +231,11 @@ export function typeCast(this: QuotingDispatchHost | void, value: unknown): unkn
     return value.toString();
   }
   if (value instanceof ArrayData) {
-    return value.toString();
+    // Rails: `when OID::Array::Data then encode_array(value)`.
+    return encodeArray.call(this as QuotingDispatchHost, value);
   }
   if (value instanceof Range) {
-    return value.toString();
+    return encodeRange.call(this as QuotingDispatchHost, value);
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
     if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
@@ -407,21 +410,12 @@ function isSqlLiteral(value: unknown): value is { value: string } {
  */
 function encodeArray(this: QuotingDispatchHost, arrayData: ArrayData): string {
   const values = typeCastArray.call(this, arrayData.values);
-  return formatArray(values);
-}
-
-function formatArray(values: unknown[]): string {
-  const items = values.map((v) => {
-    if (Array.isArray(v)) return formatArray(v);
-    if (v == null) return "NULL";
-    const s = String(v);
-    // Empty strings, NULL-like strings, and strings containing PG array
-    // special chars must be double-quoted to survive round-trip.
-    if (s.length === 0 || /^null$/i.test(s) || /[{},"\\]|\s/.test(s))
-      return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-    return s;
-  });
-  return `{${items.join(",")}}`;
+  // Rails force-encodes the encoder output to the first string's encoding;
+  // JS strings are UTF-16 so this is a no-op (see the helper). Routing through
+  // the OID encoder (not a hardcoded `,`) keeps the delimiter type-correct —
+  // `;` for box[] — so there is one serialization path matching Rails.
+  determineEncodingOfStringsInArray(values);
+  return arrayData.encoder.encode(values);
 }
 
 /**

@@ -48,6 +48,18 @@ describe("PostgreSQL quoting", () => {
     expect(quote(Infinity)).toBe("'Infinity'");
   });
 
+  it("quotes arrays through the encoder's delimiter, not a hardcoded comma", () => {
+    // box[] uses a `;` element delimiter; routing quote/typeCast through
+    // encodeArray (which calls the OID encoder) keeps it type-correct rather
+    // than diverging on a hardcoded `,`.
+    const boxArray = new ArrayData(new OidArray(stringSubtype, ";"), [
+      "(1,1),(0,0)",
+      "(2,2),(1,1)",
+    ]);
+    expect(typeCast(boxArray)).toBe("{(1,1),(0,0);(2,2),(1,1)}");
+    expect(quote(boxArray)).toBe("'{(1,1),(0,0);(2,2),(1,1)}'");
+  });
+
   it("serializes defaults for any PostgreSQL column, not only array columns", () => {
     const column = { sqlType: "integer", array: false };
     const typeMap = {
