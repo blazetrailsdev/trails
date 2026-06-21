@@ -514,49 +514,29 @@ export function realInheritanceColumn(this: SchemaHost, value: string | null): v
 
 export const _inheritanceColumn = realInheritanceColumn;
 
-/**
- * The columns the DB auto-populates on INSERT (auto-increment / serial / identity
- * columns and DB-computed defaults). `returnValueAfterInsert` calls
- * `column.isAutoPopulated`, which only the reflected Column objects implement; the
- * synthesized column-hash fallback (used before the schema cache is warm) holds
- * plain shapes, so skip those — they carry no auto-increment metadata.
- *
- * Rails inlines this as the `auto_populated_columns` block inside
- * `_returning_columns_for_insert` (model_schema.rb:437-444). trails splits it out
- * because, unlike Rails' full-RETURNING-row read-back, its adapters surface a
- * single generated value: only these auto-populated columns can be named in an
- * explicit RETURNING clause and mapped, while the PK fallback drives just the
- * scalar write-back.
- *
- * @internal
- */
-export function _autoPopulatedColumnsForInsert(
-  this: SchemaHost,
-  connection: { returnValueAfterInsert?(column: { name: string }): boolean },
-): string[] {
-  return (columns.call(this) as { name: string; isAutoPopulated?: unknown }[])
-    .filter(
-      (c) => typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
-    )
-    .map((c) => c.name);
-}
-
 export function _returningColumnsForInsert(
   this: SchemaHost,
   connection: { returnValueAfterInsert?(column: { name: string }): boolean },
 ): string[] {
-  // Mirrors Rails _returning_columns_for_insert: the auto-populated columns, or
-  // the PK when the adapter reports none.
-  const autoPopulated = _autoPopulatedColumnsForInsert.call(this, connection);
+  // Mirrors Rails _returning_columns_for_insert: the columns the DB auto-populates
+  // on INSERT (auto-increment / serial / identity columns and DB-computed
+  // defaults), falling back to the PK when the adapter reports none.
+  // `returnValueAfterInsert` calls `column.isAutoPopulated`, which only the
+  // reflected Column objects implement; the synthesized column-hash fallback (used
+  // before the schema cache is warm) holds plain shapes, so skip those — they
+  // carry no auto-increment metadata and the PK fallback below covers them.
+  const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
+  const autoPopulated = cols
+    .filter(
+      (c) => typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
+    )
+    .map((c) => c.name);
   if (autoPopulated.length > 0) return autoPopulated;
-  const cols = columns.call(this) as { name: string }[];
   // PK fallback. Restrict to columns that actually exist on the table: Rails
   // reflects `primary_key` as nil for a table without that column (e.g. an
   // id-less HABTM join table whose model still defaults `primary_key` to "id"),
-  // so `Array(primary_key)` is empty there. This list is NOT emitted as an
-  // explicit RETURNING clause (only `_autoPopulatedColumnsForInsert` is); it
-  // drives the scalar write-back loop, so the filter keeps that loop from
-  // writing a phantom `id` attribute into an id-less model.
+  // so `Array(primary_key)` is empty there — which also keeps the scalar
+  // write-back from storing a phantom `id` attribute on an id-less model.
   const colNames = new Set(cols.map((c) => c.name));
   const pk = this.primaryKey;
   const pkArr = Array.isArray(pk) ? pk : pk ? [pk] : [];
@@ -1476,7 +1456,6 @@ export const ClassMethods = {
   columnForAttribute,
   symbolColumnToString,
   resetColumnInformation,
-  _autoPopulatedColumnsForInsert,
   _returningColumnsForInsert,
   loadSchemaFromAdapter,
 };

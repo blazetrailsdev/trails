@@ -3144,76 +3144,52 @@ export class Base extends Model {
     // DB-computed defaults), falling back to the PK when the adapter reports
     // none.
     const returningColumns: string[] = (ctor as any)._returningColumnsForInsert(ctor.connection);
-    // Only emit an EXPLICIT `RETURNING` clause for genuinely auto-populated
-    // columns (e.g. a non-PK auto-increment `id`, or a custom-named serial PK).
-    // The PK-fallback case must NOT name an explicit multi-column RETURNING:
-    // trails' scalar adapters surface a single value (PG's executeMutation
-    // returns only the first RETURNING column; SQLite/MySQL return the generated
-    // rowid/insertId), which we can't map to a multi-column list. Letting the
-    // adapter use its default id read-back (PG auto-appends `RETURNING id`,
-    // tolerant of id-less tables via a savepoint retry; SQLite/MySQL return the
-    // generated id) yields the DB-generated id, which the scalar write-back below
-    // assigns to the first unset column.
-    const autoPopulated: string[] = (ctor as any)._autoPopulatedColumnsForInsert(ctor.connection);
+    // Emit an EXPLICIT `RETURNING` clause only when there is exactly one column to
+    // read back. trails' scalar adapters surface a single generated value (PG's
+    // executeMutation returns only the first RETURNING column; SQLite/MySQL return
+    // the generated rowid/insertId), so a multi-column RETURNING can't be mapped.
+    // A single column — a custom-named serial PK (`pet_id`), a non-PK
+    // auto-increment `id`, or a plain `id` PK — is named so the right value reads
+    // back regardless of whether column reflection flagged it auto-populated (a
+    // custom-named PK has no `id` column for the adapter's default RETURNING to
+    // target). For the multi-column composite-PK case we omit it and rely on the
+    // adapter's default id read-back (PG auto-appends `RETURNING id`; SQLite/MySQL
+    // return the generated id), assigned to the first unset column below.
+    const explicitReturning = returningColumns.length === 1 ? returningColumns : undefined;
     // Mirrors Rails `_insert_record`, which passes `primary_key || false` as the
     // pk arg: `false` opts the adapter out of any pk-derived RETURNING for a
     // key-less table, while a scalar pk is the fallback column when no explicit
     // `returning` list is given.
     const insertPk = Array.isArray(ctor.primaryKey) ? undefined : ctor.primaryKey || false;
     this._pendingOperation = ctor.connection
-      .execInsert(
-        sql,
-        `${ctor.name} Create`,
-        insertBinds,
-        insertPk,
-        undefined,
-        autoPopulated.length > 0 ? autoPopulated : undefined,
-      )
+      .execInsert(sql, `${ctor.name} Create`, insertBinds, insertPk, undefined, explicitReturning)
       .then((rawId) => {
-        // Adapters with RETURNING support (PG) return a Result-like object whose
-        // first row carries every RETURNING column by position; those without
-        // (MySQL, SQLite via the executeMutation INSERT path) yield only the bare
-        // generated id.
+        // Adapters with RETURNING support (PG) return a Result-like object; those
+        // without (MySQL, SQLite via the executeMutation INSERT path) return the
+        // bare generated id. Either way `lastInsertedId` / the raw value yields the
+        // single generated value.
         const isResult = rawId !== null && typeof rawId === "object" && "rows" in rawId;
         const insertedId =
           isResult && typeof (ctor.connection as any).lastInsertedId === "function"
             ? (ctor.connection as any).lastInsertedId(rawId)
             : rawId;
-        let fullRow: unknown[] | undefined;
-        if (isResult) {
-          const rv = (ctor.connection as any).returningColumnValues?.(rawId);
-          if (rv != null && rv.length > 0 && rv[0] !== undefined) fullRow = rv;
-        }
-        const writeBack = (column: string, value: unknown): void => {
-          const current = this._readAttribute(column);
-          // Rails writes when `!_read_attribute(column)` — truthy for nil AND
-          // false (but not 0 / "").
-          if (current == null || current === false) {
-            const type = (ctor as any).typeForAttribute?.(column);
-            this._writeAttribute(column, type?.deserialize ? type.deserialize(value) : value);
-          }
-        };
-        if (fullRow && autoPopulated.length > 0) {
-          // Adapter returned the full RETURNING row for the explicitly-named
-          // auto-populated columns — zip back by position (mirrors Rails
-          // _create_record's `returning_columns.zip(returning_values)`).
-          autoPopulated.forEach((column, i) => {
-            if (fullRow[i] !== undefined) writeBack(column, fullRow[i]);
-          });
-        } else if (insertedId != null) {
-          // Scalar-id adapters (PG's executeMutation, MySQL, SQLite) surface a
-          // single generated value. Rails zips `returning_values` by position and
-          // writes the lone `last_inserted_id` into `returning_columns[0]`
-          // (persistence.rb:931, database_statements.rb:723). We instead write it
-          // into the first still-unset column of `returningColumns`, because that
-          // list may be the PK fallback whose auto-increment member is NOT first
-          // (e.g. a composite PK [shop_id, id] where shop_id is supplied). Every
-          // column ahead of the auto-increment member is already assigned, so the
-          // first unset one is the DB-generated column.
+        if (insertedId != null) {
+          // Write the generated value into the first still-unset column of
+          // `returningColumns`. Rails zips `returning_values` by position
+          // (persistence.rb:931); with a single value we target the first unset
+          // column, because the list may be the PK fallback whose auto-increment
+          // member is NOT first (e.g. a composite PK [shop_id, id] where shop_id is
+          // supplied). Every column ahead of the auto-increment member is already
+          // assigned, so the first unset one is the DB-generated column. The
+          // `!_read_attribute` guard is truthy for nil AND false (but not 0 / "").
           for (const column of returningColumns) {
             const current = this._readAttribute(column);
             if (current == null || current === false) {
-              writeBack(column, insertedId);
+              const type = (ctor as any).typeForAttribute?.(column);
+              this._writeAttribute(
+                column,
+                type?.deserialize ? type.deserialize(insertedId) : insertedId,
+              );
               break;
             }
           }
