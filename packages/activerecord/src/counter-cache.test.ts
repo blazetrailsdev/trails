@@ -1480,15 +1480,15 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("id", "integer");
-        this.attribute("items_count", "integer", { default: 0 });
+        this.attribute("books_count", "integer", { default: 0 });
         this.primaryKey = ["shop_id", "id"];
       }
     }
     await CpkOrder.create({ shop_id: 1, id: 1 });
-    await CpkOrder.updateCounters([1, 1], { items_count: 10 });
-    await CpkOrder.decrementCounter("items_count", [1, 1]);
+    await CpkOrder.updateCounters([1, 1], { books_count: 4 });
+    await CpkOrder.decrementCounter("books_count", [1, 1]);
     const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
-    expect(reloaded.items_count).toBe(9);
+    expect(reloaded.books_count).toBe(3);
   });
   it("reset counters by counter name", async () => {
     class Topic extends Base {
@@ -1842,9 +1842,9 @@ describe("CounterCacheTest", () => {
     }
     const t = await Topic.create({ title: "test" });
     await Topic.updateCounters(t.id, { replies_count: 10 });
-    await Topic.decrementCounter("replies_count", t.id);
+    await Topic.updateCounters(t.id, { replies_count: -3 });
     const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(9);
+    expect(reloaded.replies_count).toBe(7);
   });
   it("update counters of multiple records", async () => {
     class Topic extends Base {
@@ -1880,15 +1880,15 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("id", "integer");
-        this.attribute("items_count", "integer", { default: 0 });
+        this.attribute("books_count", "integer", { default: 0 });
         this.primaryKey = ["shop_id", "id"];
       }
     }
     await CpkOrder.create({ shop_id: 1, id: 1 });
-    await CpkOrder.updateCounters([1, 1], { items_count: 10 });
-    await CpkOrder.updateCounters([1, 1], { items_count: -3 });
+    await CpkOrder.updateCounters([1, 1], { books_count: 10 });
+    await CpkOrder.updateCounters([1, 1], { books_count: -3 });
     const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
-    expect(reloaded.items_count).toBe(7);
+    expect(reloaded.books_count).toBe(7);
   });
   it("reset the right counter if two have the same foreign key", async () => {
     // Rails: Friendship has both `belongs_to :friend` (no counter_cache) and
