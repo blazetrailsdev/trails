@@ -1900,6 +1900,36 @@ describe("PersistenceTest", () => {
     expect(await OrderItem.count()).toBe(1);
   });
 
+  // Guard for partial_inserts=true (Rails' test ambient; harness currently runs
+  // false via load_defaults 7.0). Under partial inserts the create path selects
+  // columns from changed_attribute_names_to_save; a user-assigned composite PK
+  // must survive into the INSERT so the row can be found/destroyed by that key.
+  // Pins the callbacks.ts null-only PK skip-set; flip-the-ambient or a refactor
+  // that drops it regresses this without a guard. Mirrors Rails _create_record
+  // writing a returning column back only when _read_attribute(column) is nil.
+  it("composite-PK key columns survive a partial insert", async () => {
+    class OrderItem extends Base {
+      static {
+        this._tableName = "order_items";
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("item_name", "string");
+        this.primaryKey = ["shop_id", "order_id"];
+      }
+    }
+    const prev = Base.partialInserts;
+    Base.partialInserts = true;
+    try {
+      await OrderItem.create({ shop_id: 1, order_id: 10, item_name: "A" });
+      const found = (await OrderItem.find([1, 10])) as OrderItem;
+      expect(found.item_name).toBe("A");
+      await found.destroy();
+      expect(await OrderItem.count()).toBe(0);
+    } finally {
+      Base.partialInserts = prev;
+    }
+  });
+
   it("create prefetched pk", async () => {
     class Topic extends Base {
       static {
