@@ -782,11 +782,15 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const jamis = developers("jamis");
     const activeRecord = projects("active_record");
     const actionController = projects("action_controller");
-    const davidIds = [...((await (david as any).projectIds) as number[])].sort((a, b) => a - b);
+    const davidIds = [...((await (david as any).projectIds) as number[])]
+      .map(Number)
+      .sort((a, b) => a - b);
     expect(davidIds).toEqual(
       [activeRecord.id, actionController.id].map(Number).sort((a, b) => a - b),
     );
-    expect(await (jamis as any).projectIds).toEqual([activeRecord.id]);
+    expect(((await (jamis as any).projectIds) as number[]).map(Number)).toEqual(
+      [activeRecord.id].map(Number),
+    );
   });
 
   it("get ids for loaded associations", async () => {
@@ -804,7 +808,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const actionController = projects("action_controller");
     const proxy = association<Project>(developer, "projects");
     expect(proxy.loaded).toBe(false);
-    const ids = [...((await (developer as any).projectIds) as number[])].sort((a, b) => a - b);
+    const ids = [...((await (developer as any).projectIds) as number[])]
+      .map(Number)
+      .sort((a, b) => a - b);
     expect(ids).toEqual([activeRecord.id, actionController.id].map(Number).sort((a, b) => a - b));
     expect(proxy.loaded).toBe(false);
   });
