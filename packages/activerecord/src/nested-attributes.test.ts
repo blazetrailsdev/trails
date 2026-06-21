@@ -24,7 +24,7 @@ import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
-import { CpkBook, CpkChapter, CpkOrder } from "./test-helpers/models/cpk.js";
+import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
 import { Ship as CanonicalShip } from "./test-helpers/models/ship.js";
@@ -1079,6 +1079,29 @@ describe("TestNestedAttributesInGeneral", () => {
     const reloaded = (await CpkBook.find([1, 2])) as any;
     expect(Number(await reloaded.chapters.count())).toBe(1);
     expect((await reloaded.chapters.first()).title).toBe("New title");
+  });
+
+  it("builds nested children on a bare CPK subclass with the declaring model's composite foreign key", async () => {
+    registerModel(CpkCar);
+    registerModel(CpkCarReview);
+    // A bare subclass: it inherits the has_many reflection (and its composite
+    // foreign key) from CpkCar. The FK must derive from the reflection owner
+    // (CpkCar), not the subclass's `ctor.name`.
+    class CpkSportsCar extends CpkCar {
+      static _demodulizedName = "SportsCar";
+    }
+    registerModel(CpkSportsCar);
+    acceptsNestedAttributesFor(CpkSportsCar, "carReviews");
+
+    const car = await CpkSportsCar.createBang({ make: "Honda", model: "Civic" });
+    assignNestedAttributes(car, "carReviews", [{ comment: "zippy", rating: 5 }]);
+    await car.save();
+
+    const reviews = await CpkCarReview.where({ car_make: "Honda", car_model: "Civic" }).toArray();
+    expect(reviews.length).toBe(1);
+    expect((reviews[0] as any).comment).toBe("zippy");
+    expect((reviews[0] as any).car_make).toBe("Honda");
+    expect((reviews[0] as any).car_model).toBe("Civic");
   });
 
   it("should build a new record if reject all blank does not return false", async () => {

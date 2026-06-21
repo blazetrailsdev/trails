@@ -220,21 +220,45 @@ async function processNestedAttributes(record: Base): Promise<void> {
     // has_one/has_many keep it on the child, conventionally `${owner}_id`. Rails
     // derives the owner from the association reflection's `active_record` (the
     // class that *declared* the association), not the runtime instance's class,
-    // so a subclass instance still resolves to the declaring model's FK.
-    // The composite (array) reflection FK case stays on the convention path:
-    // the downstream child build uses `foreignKey` as a single string key, so a
-    // CPK has-many can't be threaded here anyway (CPK nested attrs flow through
-    // their own queryConstraints path). The `ctor.name` deviation for an
-    // owner-less CPK subclass is pre-existing and out of scope for this story.
+    // so a subclass instance still resolves to the declaring model's FK — both
+    // for a single-column FK and a composite (array) FK from a CPK has_many/
+    // has_one. A composite reflection FK maps element-wise onto the declaring
+    // model's `activeRecordPrimaryKey`; only when the reflection yields no
+    // string/array FK do we fall back to the `${owner}_id` convention.
     const reflection = (ctor as any).reflectOnAssociation?.(assocName);
     const reflectionFk = reflection?.foreignKey;
+    const optionFk = assocDef.options.foreignKey;
+    const isCollectionLike = assocDef.type !== "belongsTo";
+    const compositeFkColumns: string[] | null = isCollectionLike
+      ? Array.isArray(optionFk)
+        ? (optionFk as unknown[]).map(String)
+        : Array.isArray(reflectionFk)
+          ? (reflectionFk as unknown[]).map(String)
+          : null
+      : null;
     const foreignKey =
-      assocDef.options.foreignKey ??
+      (typeof optionFk === "string" ? optionFk : undefined) ??
       (typeof reflectionFk === "string"
         ? reflectionFk
         : assocDef.type === "belongsTo"
           ? `${underscore(assocName)}_id`
           : `${underscore(ctor.name)}_id`);
+    const fkColumns = compositeFkColumns ?? [foreignKey];
+
+    // Foreign-key attributes anchoring a built has_many/has_one child back to
+    // this owner. A composite FK reads each owner PK column named by the
+    // reflection's `activeRecordPrimaryKey`, paired positionally with the FK
+    // columns; a single FK uses the scalar owner id.
+    const childForeignKeyAttributes = (): Record<string, unknown> => {
+      if (!compositeFkColumns) return { [foreignKey]: record.id };
+      const ownerPk = reflection?.activeRecordPrimaryKey;
+      const ownerPkColumns = Array.isArray(ownerPk) ? ownerPk : [ownerPk];
+      const out: Record<string, unknown> = {};
+      compositeFkColumns.forEach((col, i) => {
+        out[col] = (record as any)._readAttribute(ownerPkColumns[i]);
+      });
+      return out;
+    };
 
     // limit-check already fired in assignNestedAttributes (Rails
     // raises synchronously at assign time).
@@ -254,7 +278,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
     // matches `record.id.to_s == attributes["id"].to_s`), which maps to the
     // model's primary key even when it is named something other than `id`.
     knownAttrs.add(childPk);
-    knownAttrs.add(foreignKey);
+    for (const col of fkColumns) knownAttrs.add(col);
     knownAttrs.add("id");
 
     for (const attrs of attrsList) {
@@ -313,15 +337,13 @@ async function processNestedAttributes(record: Base): Promise<void> {
         // saving so presence validators that check the association object pass
         // without a DB round-trip — mirrors Rails' inverse_of auto-population.
         const inverseOf: string | undefined = assocDef.options.inverseOf;
+        const fkAttrs = childForeignKeyAttributes();
         if (inverseOf) {
-          await (targetModel as any).create(
-            { ...childAttrs, [foreignKey]: record.id },
-            (child: any) => {
-              _cacheSingularTarget(child, inverseOf, record);
-            },
-          );
+          await (targetModel as any).create({ ...childAttrs, ...fkAttrs }, (child: any) => {
+            _cacheSingularTarget(child, inverseOf, record);
+          });
         } else {
-          await (targetModel as any).create({ ...childAttrs, [foreignKey]: record.id });
+          await (targetModel as any).create({ ...childAttrs, ...fkAttrs });
         }
       }
     }
