@@ -362,6 +362,15 @@ async function processNestedAttributes(record: Base): Promise<void> {
             .where((ctor as any)._buildPkWhereNode(record.id));
           const conn = (ctor as any).connection;
           await conn.executeMutation(conn.toSql(um));
+
+          // The deferred FK write above bypasses the normal belongs_to
+          // assignment, so the counter-cache machinery never runs for the
+          // newly-anchored owner. Rails routes this through
+          // `BelongsToAssociation#replace_keys` + `save_belongs_to_association`,
+          // which bumps the target's counter via `update_counters`. Mirror that
+          // here: once the owner has gained its FK, increment the target's
+          // counter column when the reflection declares `counterCache`.
+          await (record.association(assocName) as any).incrementCounters?.();
         }
       } else {
         // For hasMany/hasOne, set FK on the child record.
