@@ -6,7 +6,7 @@ import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
-import type { DatabaseConfig } from "./database-configurations/database-config.js";
+import { DatabaseConfig } from "./database-configurations/database-config.js";
 import {
   resolve as resolveConnectionAdapter,
   resolveSync as resolveConnectionAdapterSync,
@@ -632,6 +632,7 @@ export async function establishConnection(
   modelClass: typeof Base,
   config?:
     | string
+    | DatabaseConfig
     | {
         adapter?: string;
         url?: string;
@@ -659,6 +660,12 @@ export async function establishConnection(
 
   if (config === undefined) {
     await autoConnect(modelClass);
+  } else if (config instanceof DatabaseConfig) {
+    // Mirrors Rails `establish_connection(db_config)`: resolve the adapter and
+    // connection args from the DatabaseConfig object and register the object
+    // itself as the pool's `db_config` (no re-parsing into a fresh hash). This
+    // is the faithful `run_without_connection` restore path.
+    await establishWithDbConfig(modelClass, config);
   } else {
     // Validate up front (mirrors Rails raising before the adapter is built)
     // but only mutate the process-wide zone once the connection is actually
@@ -698,11 +705,70 @@ function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc
   return raw;
 }
 
+/**
+ * Mirrors Rails `establish_connection(db_config)` where the argument is already
+ * a resolved `DatabaseConfig`. Derives the adapter name and connection URL from
+ * the object — exactly as {@link autoConnect} does for the config it looks up —
+ * and threads the object through {@link establishWithConfig} so the pool stores
+ * the captured config verbatim instead of rebuilding one from its hash.
+ */
+async function establishWithDbConfig(
+  modelClass: typeof Base,
+  dbConfig: DatabaseConfig,
+): Promise<void> {
+  const config = dbConfig.configuration as Record<string, unknown>;
+  const tz = validateConfigDefaultTimezone(config);
+
+  const { adapterName, connectUrl } = deriveAdapterAndUrl(dbConfig);
+  if (!adapterName) {
+    throw new AdapterNotSpecified(
+      `Database configuration for "${dbConfig.envName}" must include an adapter name or a URL.`,
+    );
+  }
+
+  await establishWithConfig(modelClass, adapterName, connectUrl, config, dbConfig);
+  if (tz) setDefaultTimezone(tz);
+}
+
+/**
+ * Derive the adapter name and the URL to forward to the adapter layer from a
+ * resolved DatabaseConfig. Shared by {@link autoConnect} (config looked up from
+ * `Base.configurations`) and {@link establishWithDbConfig} (config handed
+ * straight to `establish_connection`) so the two resolution paths can't drift.
+ *
+ * The original URL is always usable for adapter inference (e.g.
+ * `sqlite3:db/test.sqlite3` → "sqlite3"), even when the connection target
+ * should be built from a (possibly-mutated) configuration hash.
+ *
+ * `connectUrl` prefers the configuration hash over the raw URL string when an
+ * explicit `database` is set — Rails' `establish_connection` resolves from
+ * `configuration_hash`, not the raw URL, so callers that mutate `_database`
+ * (e.g. TestDatabases.create_and_load_schema appending a worker index) actually
+ * reconnect to the mutated DB. The URL is only forwarded to the adapter layer
+ * when the configuration carries no explicit `database` — i.e. for opaque
+ * adapter strings like `jdbc:` that buildUrlHash passes through without
+ * decomposing.
+ */
+function deriveAdapterAndUrl(dbConfig: DatabaseConfig): {
+  adapterName: string | undefined;
+  connectUrl: string;
+} {
+  const originalUrl =
+    (dbConfig instanceof UrlConfig ? dbConfig.url : undefined) ||
+    (dbConfig.configuration.url as string) ||
+    "";
+  const adapterName =
+    dbConfig.adapter || (originalUrl ? adapterNameFromUrl(originalUrl) : undefined);
+  const connectUrl = (dbConfig.configuration as { database?: string }).database ? "" : originalUrl;
+  return { adapterName, connectUrl };
+}
+
 async function establishWithConfig(
   modelClass: typeof Base,
   adapterName: string,
   url: string,
   config?: Record<string, unknown>,
+  dbConfigOverride?: DatabaseConfig,
 ): Promise<void> {
   const normalized = normalizeAdapterName(adapterName);
   // Pass the original adapter name to the registry so caller overrides
@@ -728,9 +794,11 @@ async function establishWithConfig(
   // test-setup-worker-db.ts suffixes on — natively via the URL fallback
   // (url-config.ts), so `connectionDbConfig().database` is no longer undefined.
   const env = DatabaseConfigurations.currentEnv();
-  const dbConfig = url
-    ? new UrlConfig(env, "primary", url, { adapter: adapterName, ...config })
-    : new HashConfig(env, "primary", { adapter: adapterName, url, ...config });
+  const dbConfig =
+    dbConfigOverride ??
+    (url
+      ? new UrlConfig(env, "primary", url, { adapter: adapterName, ...config })
+      : new HashConfig(env, "primary", { adapter: adapterName, url, ...config }));
 
   // Mirror Rails: establish_connection makes the receiver its own connection
   // class so it gets an independent pool entry under its own name instead of
@@ -785,13 +853,7 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
     );
   }
 
-  // The original URL is always usable for adapter inference (e.g.
-  // `sqlite3:db/test.sqlite3` → "sqlite3"), even when the connection
-  // target should be built from a (possibly-mutated) configuration hash.
-  const originalUrl =
-    (dbConfig instanceof UrlConfig ? dbConfig.url : undefined) || dbConfig.configuration.url || "";
-  const adapterName =
-    dbConfig.adapter || (originalUrl ? adapterNameFromUrl(originalUrl) : undefined);
+  const { adapterName, connectUrl } = deriveAdapterAndUrl(dbConfig);
   if (!adapterName) {
     throw new AdapterNotSpecified(
       `Database configuration for "${env}" must include an adapter name or a URL. ` +
@@ -799,16 +861,6 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
     );
   }
 
-  // Prefer the configuration hash over the original URL string when an
-  // explicit `database` is set — Rails' `establish_connection` resolves
-  // from configuration_hash, not the raw URL, so callers that mutate
-  // `_database` (e.g. TestDatabases.create_and_load_schema appending a
-  // worker index) actually reconnect to the mutated DB. The URL is only
-  // forwarded to the adapter layer when the configuration carries no
-  // explicit `database` — i.e. for opaque adapter strings like `jdbc:`
-  // that buildUrlHash passes through without decomposing.
-  const cfgDatabase = (dbConfig.configuration as { database?: string }).database;
-  const connectUrl = cfgDatabase ? "" : originalUrl;
   await establishWithConfig(
     modelClass,
     adapterName,
