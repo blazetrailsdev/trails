@@ -31,6 +31,10 @@ import { sanitizeLimit } from "../connection-adapters/abstract/database-statemen
 import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
+import {
+  buildMergedJoinAliasTracker,
+  seedTrackerFromJdNodes,
+} from "./merged-join-alias-tracker.js";
 import { foreignKey } from "@blazetrails/activesupport";
 
 /**
@@ -2678,6 +2682,10 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     for (const node of constraintNodes) arel.source.right.push(node);
   }
 
+  // One AliasTracker shared with the cross-klass merged dependencies, mirroring
+  // Rails' single `build_joins` alias_tracker (see _applyJoinsToManager). Use the
+  // tracker threaded in from `build_from` when present, else build a fresh one.
+  const sharedTracker = aliases ?? buildMergedJoinAliasTracker(this as any);
   // Named INNER joins routed through JoinDependency (nested-through chains that
   // need AliasTracker self-join aliasing). Emitted as a standalone JoinDependency
   // with InnerJoin type so it produces the canonical `*_<owner>_join` aliases
@@ -2691,18 +2699,22 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     // (`joinTableAliasFor`), so the WHERE and JOIN stay in sync.
     for (const node of jd.joinConstraints([], aliases, (this as any)._aliasableReferences()))
       arel.source.right.push(node);
+    seedTrackerFromJdNodes(sharedTracker, jd);
   }
 
-  // Cross-klass merged JoinDependencies (Rails merge_joins): already built
-  // against the source relation's klass, so emit their constraints directly.
+  // Cross-klass merged JoinDependencies (Rails merge_joins): built against the
+  // source relation's klass with their own tracker, so re-alias their joins
+  // against the shared tracker before emitting (`authors_categorizations`).
   for (const jd of this._namedInnerJoinDeps) {
-    for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
+    jd.realiasAgainstSharedTracker(sharedTracker);
+    for (const node of jd.joinConstraints([])) arel.source.right.push(node);
   }
 
   // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
   // built against the source relation's klass with OuterJoin type, emitted directly.
   for (const jd of this._leftOuterJoinDeps) {
-    for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
+    jd.realiasAgainstSharedTracker(sharedTracker);
+    for (const node of jd.joinConstraints([])) arel.source.right.push(node);
   }
 
   for (const node of joinNodes) arel.source.right.push(node);
