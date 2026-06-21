@@ -6,7 +6,11 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { sanitizeForMassAssignment, SerializeCastValue } from "@blazetrails/activemodel";
+import {
+  sanitizeForMassAssignment,
+  SerializeCastValue,
+  runAfterCallbacksOnProto,
+} from "@blazetrails/activemodel";
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ActiveRecordError,
@@ -1276,24 +1280,48 @@ interface DupRecord {
  * reinstate-vs-defaults pass to populate the tracker — the same `changed?`
  * predicate Rails computes per-attribute.
  *
- * `new ctor({})` runs the constructor so `after_initialize` fires on the dup
- * (Rails runs `_run_initialize_callbacks` in `Core#initialize_dup`). One known
- * ordering divergence, pre-existing and unchanged here: Rails sets the duped
- * attributes BEFORE `_run_initialize_callbacks`, so a Rails `after_initialize`
- * sees the full duped set, whereas trails fires it during `new ctor({})` against
- * the empty bag and swaps `_attributes` in afterward. Ruby's `Object#dup` also
- * copies `@readonly` and runs the `initialize_dup` chain, so carry `@readonly`
- * over and invoke the composed hook (aggregations cache + locking/timestamp
- * clear) — which nulls the timestamp and locking columns back to their defaults
- * before the dirty pass, so they are not reported as changed
- * (test_dup_timestamps_are_cleared / _locking_column_is_not_dirty).
+ * Rails' `Core#initialize_dup` sets the duped attributes BEFORE
+ * `_run_initialize_callbacks`, so an `after_initialize` hook on the dup observes
+ * the full duped attribute set. We reproduce that order: `after_initialize` is
+ * suppressed during `new ctor({})` (via `_suppressInitializeCallback`); we swap
+ * in the duped `_attributes`, run the dirty-vs-default pass, dispatch
+ * `after_initialize` manually, then run the `initialize_dup` chain — so the hook
+ * reads the duped values (with timestamp/locking columns still populated), not
+ * the empty construction bag. (Like Rails' `initialize_dup`, this runs only the
+ * initialize callbacks, not `ensure_proper_type`: the STI type column rides along
+ * in the deep-dup'd attributes.)
+ *
+ * The `initialize_dup` chain (aggregations cache copy + locking/timestamp clear)
+ * runs AFTER the hook because Rails' Timestamp/Locking modules `super` into
+ * `Core#initialize_dup` (firing the callbacks) and clear only as the stack
+ * unwinds (timestamp.rb:50-53, locking/optimistic.rb:72-75). Each clear rebinds
+ * its column's dirty baseline (`clear_attribute_change`), so the nulled timestamp
+ * and locking columns are not reported as changed even though the reinstate pass
+ * ran first (test_dup_timestamps_are_cleared / _locking_column_is_not_dirty).
+ * Ruby's `Object#dup` also copies `@readonly`, so carry that over too.
  */
 export function dup<T extends DupRecord>(this: T): T {
   const ctor = this.constructor as typeof this.constructor & {
     primaryKey: string | string[];
     _defaultAttributes?: () => DupAttributeSet & { snapshotValues(): Map<string, unknown> };
+    _suppressInitializeCallback?: boolean;
   };
-  const duped = new ctor({}) as T;
+  // Suppress `after_initialize` during construction so it fires AFTER the duped
+  // attributes are in place (Rails sets `@attributes` before
+  // `_run_initialize_callbacks` in `Core#initialize_dup`).
+  const hadOwnSuppress = Object.prototype.hasOwnProperty.call(ctor, "_suppressInitializeCallback");
+  const prevSuppress = ctor._suppressInitializeCallback;
+  ctor._suppressInitializeCallback = true;
+  let duped: T;
+  try {
+    duped = new ctor({}) as T;
+  } finally {
+    if (hadOwnSuppress) {
+      ctor._suppressInitializeCallback = prevSuppress;
+    } else {
+      delete ctor._suppressInitializeCallback;
+    }
+  }
   // ActiveRecord::Core#init_attributes: deep_dup + reset(primary_key).
   const base = this._attributes.deepDup();
   const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
@@ -1311,14 +1339,32 @@ export function dup<T extends DupRecord>(this: T): T {
       : base;
   (duped as { _attributes: DupAttributeSet })._attributes = dupedAttrs;
   duped._readonly = this._readonly;
-  duped.initializeDup(this);
-  // Always rebind the dirty tracker to the duped attribute set: the baseline
-  // from `new ctor({})` is stale against the swapped-in `_attributes`.
+  // Rebind the dirty tracker to the duped attribute set BEFORE the hook (the
+  // baseline from `new ctor({})` is stale against the swapped-in `_attributes`),
+  // so `will_save_change_to_*` inside `after_initialize` reflects the duped
+  // values — Rails' `Core#initialize_dup` runs `init_attributes` before
+  // `_run_initialize_callbacks`, so dirty-vs-default is already established when
+  // the hook fires (this is what Topic#set_email_address keys off of).
   duped._dirty.snapshot(dupedAttrs);
   if (defaultAttributes) {
     // Re-mark attributes that differ from their schema defaults as changed.
     duped._dirty.reinstateNewRecordChanges(dupedAttrs, defaultAttributes().snapshotValues());
   }
+  // Dispatch `after_initialize` against the duped attributes. Mirrors Rails
+  // Core#initialize_dup, which runs `_run_initialize_callbacks` only — it does
+  // NOT re-run `initialize_internals_callback`/`ensure_proper_type` (that lives
+  // in Core#initialize), so the STI type column is carried solely by the
+  // deep-dup'd `@attributes`, not re-asserted here.
+  runAfterCallbacksOnProto(ctor.prototype, "initialize", duped, { strict: "sync" });
+  // The Timestamp/Locking `initialize_dup` clears run AFTER the callbacks in
+  // Rails: their modules `super` into `Core#initialize_dup` (which fires the
+  // hook) and clear only as the stack unwinds. So the hook above observes the
+  // source's `created_at`/`updated_at`/`lock_version`; we null them out here.
+  // Each clear rebinds its column's dirty baseline (`clear_attribute_change`),
+  // so the cleared columns read back as nil/default and not-dirty regardless of
+  // the reinstate pass above (test_dup_timestamps_are_cleared /
+  // _locking_column_is_not_dirty).
+  duped.initializeDup(this);
   return duped;
 }
 
