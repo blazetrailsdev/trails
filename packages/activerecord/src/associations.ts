@@ -1157,7 +1157,12 @@ export async function loadBelongsTo(
     const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
     rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    result = await rel.first();
+    // Rails' normal singular-load path (`Association#find_target` via the
+    // statement cache) returns an array and calls `Array#first` — no ORDER BY
+    // in SQL. `take` (unordered LIMIT 1) is the closest equivalent; `first`
+    // would route through `ordered_relation` and add a spurious ORDER BY. See
+    // has_one_associations_test `test_has_one_does_not_use_order_by`.
+    result = await rel.take();
   } else {
     // Inline fallback: no reflection registered.
     if (Array.isArray(foreignKey)) {
@@ -1334,7 +1339,9 @@ export async function loadHasOne(
     const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
     rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    result = await rel.first();
+    // Unordered LIMIT 1: Rails' singular load returns an array and calls
+    // `Array#first`, emitting no ORDER BY. `take` matches; `first` would add one.
+    result = await rel.take();
   } else {
     // Inline fallback: no reflection registered.
     if (Array.isArray(foreignKey)) {
@@ -1373,7 +1380,7 @@ export async function loadHasOne(
         .all()
         .where({ [foreignKey]: record._readAttribute(ownerKey as string) });
       rel = applyAssociationScope(rel, options.scope, record);
-      result = await rel.first();
+      result = await rel.take();
     } else {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       result = await targetModel.findBy({

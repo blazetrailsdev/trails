@@ -216,6 +216,8 @@ interface FinderRelation {
   order(...args: any[]): any;
   reverseOrder(): any;
   toArray(): Promise<any[]>;
+  /** @internal Run a load inside `with_connection(prevent_permanent_checkout)`. */
+  _withQueryConnection<R>(run: () => Promise<R>): Promise<R>;
   /** @internal */
   findNthWithLimit(index: number, limit: number): Promise<any[]>;
   /** @internal */
@@ -332,15 +334,23 @@ export async function performFirst(this: FinderRelation, n?: number): Promise<an
     const records: any[] = (this as any)._records;
     return n !== undefined ? records.slice(0, n) : (records[0] ?? null);
   }
-  if (n !== undefined) {
-    const rel = this._clone();
-    rel._limitValue = n;
-    return rel.toArray();
-  }
-  const rel = this._clone();
-  rel._limitValue = 1;
-  const records = await rel.toArray();
-  return records[0] ?? null;
+  // Rails: Relation#first → find_nth(0) → find_nth_with_limit(0, 1), which runs
+  // through `ordered_relation` so an orderless relation is ordered by the
+  // implicit order column / primary key. Without this, `first` is non-
+  // deterministic on backends that don't return rows in insertion order (e.g.
+  // MySQL/MariaDB under a populated buffer pool).
+  //
+  // `orderedRelation` builds the ORDER BY via `order(...)`, which resolves the
+  // adapter's column-name matcher through the deprecated `.connection` getter.
+  // Run it inside `with_connection` (like toArray/count/pluck) so that read
+  // doesn't permanently lease a connection under
+  // `permanent_connection_checkout = :deprecated | :disallowed`.
+  return this._withQueryConnection(async () => {
+    const rel = orderedRelation(this._clone());
+    rel._limitValue = n ?? 1;
+    const records = await rel.toArray();
+    return n !== undefined ? records : (records[0] ?? null);
+  });
 }
 
 export async function performFirstBang(this: FinderRelation): Promise<any> {

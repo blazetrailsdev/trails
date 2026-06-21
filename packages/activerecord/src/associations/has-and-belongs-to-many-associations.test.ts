@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_and_belongs_to_many_associations_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { association } from "../associations.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
@@ -19,6 +19,8 @@ import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Post } from "../test-helpers/models/post.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
 import { Country } from "../test-helpers/models/country.js";
 import { Treaty } from "../test-helpers/models/treaty.js";
 import { Vertex } from "../test-helpers/models/vertex.js";
@@ -45,6 +47,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       "categories",
       "posts",
       "categoriesPosts",
+      "authors",
+      "categorizations",
       "tags",
       "taggings",
       "parrots",
@@ -67,6 +71,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       SpecialProject,
       Category,
       Post,
+      Author,
+      Categorization,
       Country,
       Treaty,
       Vertex,
@@ -845,9 +851,14 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await association<Project>(developer, "projects").size()).toBe(1);
   });
 
-  it.skip("dynamic find should respect association include", () => {
-    // BLOCKED: associations — eager loading
-    // ROOT-CAUSE: eager_load/includes declared on the association is not passed through when finding in the collection
+  it("dynamic find should respect association include", async () => {
+    // SQL error in sort clause if :include is not included
+    // due to Unknown column 'authors.id'
+    const category = await Category.find(1);
+    const post = await (association(category, "postsWithAuthorsSortedByAuthorId") as any).findBy({
+      title: "Welcome to the weblog",
+    });
+    expect(post).toBeTruthy();
   });
 
   it("count", async () => {
@@ -855,9 +866,18 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await association<Project>(david, "projects").count()).toBe(2);
   });
 
-  it.skip("association proxy transaction method starts transaction in association class", () => {
-    // BLOCKED: transactions
-    // ROOT-CAUSE: CollectionProxy#transaction delegates to the association class's connection — not yet wired
+  it("association proxy transaction method starts transaction in association class", async () => {
+    const category = await Category.first();
+    const proxy = association(category!, "posts") as any;
+    const spy = vi.spyOn(Post as any, "transaction");
+    try {
+      await proxy.transaction(async () => {
+        // nothing
+      });
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it("attributes are being set when initialized from habtm association with where clause", async () => {
@@ -981,9 +1001,35 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(ordered.map((p: Project) => p.name)).toEqual(["Alpha", "Bravo"]);
   });
 
-  it.skip("preloaded associations size", () => {
-    // BLOCKED: associations — eager loading
-    // ROOT-CAUSE: preloaded habtm collection does not expose a size that avoids a COUNT query
+  it("preloaded associations size", async () => {
+    const firstProjectDirect = await Project.first();
+    const preloadedProject = await Project.preload("salariedDevelopers").first();
+    expect(await association(preloadedProject!, "salariedDevelopers").size()).toBe(
+      await association(firstProjectDirect!, "salariedDevelopers").size(),
+    );
+
+    const includesProject = await Project.includes("salariedDevelopers")
+      .references("salariedDevelopers")
+      .first();
+    expect(await association(includesProject!, "salariedDevelopers").size()).toBe(
+      await association(preloadedProject!, "salariedDevelopers").size(),
+    );
+
+    // Nested HATBM
+    const developer = await Developer.first();
+    const firstProject = await association<Project>(developer!, "projects").first();
+    const preloadedDeveloper = await Developer.preload({
+      projects: "salariedDevelopers",
+    }).first();
+    const preloadedProjects = await association<Project>(preloadedDeveloper!, "projects").toArray();
+    const preloadedFirstProject = preloadedProjects.find(
+      (p: Project) => (p as any).id === (firstProject as any).id,
+    );
+
+    expect(association(preloadedFirstProject!, "salariedDevelopers").loaded).toBe(true);
+    expect(await association(preloadedFirstProject!, "salariedDevelopers").size()).toBe(
+      await association(firstProject!, "salariedDevelopers").size(),
+    );
   });
 
   it.skip("has and belongs to many is usable with belongs to required by default", () => {
