@@ -3145,12 +3145,17 @@ export class Base extends Model {
     // none. Each is threaded into `RETURNING` so the generated value reads back
     // into the right attribute by position.
     const returningColumns: string[] = (ctor as any)._returningColumnsForInsert(ctor.connection);
+    // Mirrors Rails `_insert_record`, which passes `primary_key || false` as the
+    // pk arg: `false` opts the adapter out of any pk-derived RETURNING for a
+    // key-less table, while a scalar pk is the fallback column when no explicit
+    // `returning` list is given. The explicit `returning` below takes precedence.
+    const insertPk = Array.isArray(ctor.primaryKey) ? undefined : ctor.primaryKey || false;
     this._pendingOperation = ctor.connection
       .execInsert(
         sql,
         `${ctor.name} Create`,
         insertBinds,
-        returningColumns[0],
+        insertPk,
         undefined,
         returningColumns.length > 0 ? returningColumns : undefined,
       )
