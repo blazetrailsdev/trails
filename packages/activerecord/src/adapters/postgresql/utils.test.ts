@@ -49,6 +49,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         '"schema"."table_name"': ["schema", "table_name"],
         '"even spaces".table': ["even spaces", "table"],
         'schema."table.name"': ["schema", "table.name"],
+        // Rails `schema, table = string.scan(...)` keeps only the first two
+        // scanned parts; a 3+ dotted input retains schema + table, not table only.
+        "database.schema.table": ["database", "schema"],
       };
       for (const [given, [expectedSchema, expectedName]] of Object.entries(cases)) {
         const result = extractSchemaQualifiedName(given);
