@@ -1887,33 +1887,37 @@ describe("PersistenceTest", () => {
 // Both Rails tests are guarded `if current_adapter?(:PostgreSQLAdapter)`; the
 // `chat_messages` / `chat_messages_custom_pk` tables live only in
 // postgresql_specific_schema.rb and use uuid PKs, which defineSchema rejects on
-// SQLite/MySQL — so the whole suite is scoped to the postgres adapter.
+// SQLite/MySQL — so the schema setup and both tests are gated to the postgres
+// adapter (the tests stay in a `PersistenceTest` describe to mirror Rails).
 // ==========================================================================
-const describePg = adapterType === "postgres" ? describe : describe.skip;
-describePg("PersistenceTest (postgres uuid pk)", () => {
+describe("PersistenceTest", () => {
   registerModel(ChatMessage);
   registerModel(ChatMessageCustomPk);
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
+    // uuid is a PG-only defineSchema type, so the schema is only applied on
+    // postgres; the tests below are individually gated to the same adapter.
+    if (adapterType !== "postgres") return;
     await defineSchema(POSTGRESQL_SPECIFIC_SCHEMA);
   });
 
-  it("test_create_model_with_uuid_pk_populates_id", async () => {
+  it.skipIf(adapterType !== "postgres")("create model with uuid pk populates id", async () => {
     const message = await ChatMessage.create({ content: "New Message" });
     expect((message as any).id).not.toBeNull();
-    expect((message as any).id).toBeDefined();
 
     const messageReloaded = await ChatMessage.find((message as any).id);
     expect((messageReloaded as any).content).toBe("New Message");
   });
 
-  it("test_create_model_with_custom_named_uuid_pk_populates_id", async () => {
-    const message = await ChatMessageCustomPk.create({ content: "New Message" });
-    expect((message as any).message_id).not.toBeNull();
-    expect((message as any).message_id).toBeDefined();
+  it.skipIf(adapterType !== "postgres")(
+    "create model with custom named uuid pk populates id",
+    async () => {
+      const message = await ChatMessageCustomPk.create({ content: "New Message" });
+      expect((message as any).message_id).not.toBeNull();
 
-    const messageReloaded = await ChatMessageCustomPk.find((message as any).message_id);
-    expect((messageReloaded as any).content).toBe("New Message");
-  });
+      const messageReloaded = await ChatMessageCustomPk.find((message as any).message_id);
+      expect((messageReloaded as any).content).toBe("New Message");
+    },
+  );
 });
