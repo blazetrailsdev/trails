@@ -7,6 +7,17 @@ import { Base } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import {
+  MyAppBusinessClient,
+  MyAppBusinessClientContact,
+  MyAppBusinessPrefixedCompany,
+  MyAppBusinessPrefixedNestedCompany,
+  MyAppBusinessPrefixedFirm,
+  MyAppBusinessSuffixedCompany,
+  MyAppBusinessSuffixedNestedCompany,
+  MyAppBusinessSuffixedFirm,
+  MyAppBillingAccount,
+} from "./test-helpers/models/company-in-module.js";
 
 describe("ModulesTest", () => {
   setupHandlerSuite();
@@ -36,13 +47,9 @@ describe("ModulesTest", () => {
   });
 
   it("table name", () => {
-    class Account extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(Account.tableName).toBeDefined();
-    expect(typeof Account.tableName).toBe("string");
+    expect(MyAppBillingAccount.tableName).toBe("accounts");
+    expect(MyAppBusinessClient.tableName).toBe("companies");
+    expect(MyAppBusinessClientContact.tableName).toBe("company_contacts");
   });
 
   it("assign ids", async () => {
@@ -60,42 +67,26 @@ describe("ModulesTest", () => {
   });
 
   it("module table name prefix", () => {
-    class Account extends Base {
-      static {
-        this._tableName = "billing_accounts";
-        this.attribute("name", "string");
-      }
-    }
-    expect(Account.tableName).toBe("billing_accounts");
+    expect(MyAppBusinessPrefixedCompany.tableName).toBe("prefixed_companies");
+    expect(MyAppBusinessPrefixedNestedCompany.tableName).toBe("prefixed_companies");
+    expect(MyAppBusinessPrefixedFirm.tableName).toBe("companies");
   });
 
-  it("module table name prefix with global prefix", () => {
-    class Account extends Base {
-      static {
-        this._tableName = "app_billing_accounts";
-        this.attribute("name", "string");
-      }
-    }
-    expect(Account.tableName).toBe("app_billing_accounts");
+  it.skip("module table name prefix with global prefix", () => {
+    // Mutates ActiveRecord::Base.table_name_prefix globally + reset_table_name;
+    // unsafe under shared-worker parallel fixtures. Tracked as follow-up story
+    // module-namespaced-table-name-global-prefix-suffix-reset.
   });
 
   it("module table name suffix", () => {
-    class Account extends Base {
-      static {
-        this._tableName = "accounts_archive";
-        this.attribute("name", "string");
-      }
-    }
-    expect(Account.tableName).toBe("accounts_archive");
+    expect(MyAppBusinessSuffixedCompany.tableName).toBe("companies_suffixed");
+    expect(MyAppBusinessSuffixedNestedCompany.tableName).toBe("companies_suffixed");
+    expect(MyAppBusinessSuffixedFirm.tableName).toBe("companies");
   });
 
-  it("module table name suffix with global suffix", () => {
-    class Account extends Base {
-      static {
-        this._tableName = "accounts_archive_v2";
-        this.attribute("name", "string");
-      }
-    }
-    expect(Account.tableName).toBe("accounts_archive_v2");
+  it.skip("module table name suffix with global suffix", () => {
+    // Mutates ActiveRecord::Base.table_name_suffix globally + reset_table_name;
+    // unsafe under shared-worker parallel fixtures. Tracked as follow-up story
+    // module-namespaced-table-name-global-prefix-suffix-reset.
   });
 });
