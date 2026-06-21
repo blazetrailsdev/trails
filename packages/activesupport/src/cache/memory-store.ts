@@ -212,14 +212,19 @@ export class MemoryStore extends Store implements CacheStore {
     }
   }
 
+  // Rails MemoryStore instruments increment/decrement with the raw, unnormalized
+  // name (memory_store.rb:149,167) — unlike FileStore, which uses the normalized
+  // key (file_store.rb:62-64).
   override increment(key: string, amount = 1, options?: CacheOptions): number | null {
-    const rk = this.resolveKey(key, options);
-    return this.instrument("increment", rk, { amount }, () => this.modifyValue(rk, amount));
+    return this.instrument("increment", key, { amount }, () =>
+      this.modifyValue(this.resolveKey(key, options), amount),
+    );
   }
 
   override decrement(key: string, amount = 1, options?: CacheOptions): number | null {
-    const rk = this.resolveKey(key, options);
-    return this.instrument("decrement", rk, { amount }, () => this.modifyValue(rk, -amount));
+    return this.instrument("decrement", key, { amount }, () =>
+      this.modifyValue(this.resolveKey(key, options), -amount),
+    );
   }
 
   private modifyValue(rk: string, amount: number): number | null {
