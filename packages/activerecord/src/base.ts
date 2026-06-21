@@ -502,7 +502,11 @@ async function performClassUpdate(
     // hash to the same slot.
     const stableIdKey = (id: unknown): string =>
       Array.isArray(id) ? id.map((part) => String(part)).join("\x1f") : String(id);
-    const found = (await this.find(idOrAttrs as unknown[])) as
+    // Rails finds per-id, so a duplicated id (e.g. update([1, 1, 2], …)) just
+    // re-finds the same record. Our batched `find` rejects duplicate ids, so
+    // dedup first; the byKey reorder below restores the requested duplicates.
+    const uniqueIds = [...new Map(idOrAttrs.map((id) => [stableIdKey(id), id])).values()];
+    const found = (await this.find(uniqueIds)) as
       | InstanceType<typeof Base>
       | InstanceType<typeof Base>[];
     const foundArr = Array.isArray(found) ? found : [found];
