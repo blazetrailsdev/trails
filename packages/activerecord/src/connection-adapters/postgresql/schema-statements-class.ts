@@ -1,6 +1,6 @@
 import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, Visitors } from "@blazetrails/arel";
-import { singularize, underscore, getCrypto } from "@blazetrails/activesupport";
+import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaStatements } from "../abstract/schema-statements.js";
 import {
   AlterTable,
@@ -1121,25 +1121,26 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         return;
       }
     }
-    const { schema: fromSchema, table: fromTbl } = this.pg.parseSchemaQualifiedName(fromTable);
-    const { schema: toSchema, table: toTbl } = this.pg.parseSchemaQualifiedName(toTable);
-
-    const column = options.column ?? `${underscore(singularize(toTbl))}_id`;
-    const pk = options.primaryKey ?? "id";
-    const name = this.foreignKeyName(fromTable, { name: options.name, column });
-
-    const qi = (s: string) => this.pg.quoteIdentifier(s);
-    const qualifiedFrom = fromSchema ? `${qi(fromSchema)}.${qi(fromTbl)}` : qi(fromTbl);
-    const qualifiedTo = toSchema ? `${qi(toSchema)}.${qi(toTbl)}` : qi(toTbl);
-    const sc = this.pg.schemaCreation;
-
-    let sql = `ALTER TABLE ${qualifiedFrom} ADD CONSTRAINT ${qi(name)} FOREIGN KEY (${qi(column)}) REFERENCES ${qualifiedTo} (${qi(pk)})`;
-    if (options.onDelete) sql += ` ${sc.actionSql("DELETE", options.onDelete)}`;
-    if (options.onUpdate) sql += ` ${sc.actionSql("UPDATE", options.onUpdate)}`;
-    sql += this.pg.deferrable(options.deferrable);
-    if (options.validate === false) sql += " NOT VALID";
-
-    await this.pg.exec(sql);
+    // Rails PostgreSQL does not override add_foreign_key: run foreign_key_options
+    // then schema_creation.accept(AlterTable + ForeignKeyDefinition). The PG
+    // schema_creation (visitAlterTable/visitForeignKeyDefinition) emits the
+    // deferrable / NOT VALID / action / schema-qualified-name decoration, so no
+    // bespoke inline SQL is needed here.
+    const fkOptions = this.foreignKeyOptions(fromTable, toTable, options);
+    const fkDef = new ForeignKeyDefinition(
+      fromTable,
+      toTable,
+      fkOptions.column as string | string[],
+      (fkOptions.primaryKey as string) ?? "id",
+      fkOptions.name as string,
+      fkOptions.onDelete as ReferentialAction | undefined,
+      fkOptions.onUpdate as ReferentialAction | undefined,
+      fkOptions.deferrable as "immediate" | "deferred" | undefined,
+      fkOptions.validate as boolean | undefined,
+    );
+    const at = this.pg.createAlterTable(fromTable);
+    at.addForeignKey(fkDef);
+    await this.pg.exec(this.pg.schemaCreation.accept(at));
   }
 
   override async foreignKeyExists(fromTable: string, toTable: string): Promise<boolean> {
