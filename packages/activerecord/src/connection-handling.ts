@@ -721,22 +721,16 @@ async function establishWithConfig(
     adapterArgs = [url];
   }
 
-  // Mirror Rails' UrlConfig: when establishing from a bare URL (the handler
-  // suite's PG/MySQL path), the database name lives in the URL — e.g. the
-  // per-worker slot DB `rails_js_test_2` that test-setup-worker-db.ts suffixes
-  // onto the path. Surface it on `db_config.database` so callers reading
-  // `connectionDbConfig().database` see the real database instead of undefined.
-  // An explicit `database` in `config` still wins (spread last).
-  const urlDatabase =
-    url && config?.database === undefined
-      ? new UrlConfig(DatabaseConfigurations.currentEnv(), "primary", url).database
-      : undefined;
-  const dbConfig = new HashConfig(DatabaseConfigurations.currentEnv(), "primary", {
-    adapter: adapterName,
-    url,
-    ...(urlDatabase !== undefined ? { database: urlDatabase } : {}),
-    ...config,
-  });
+  // Mirror Rails' db_config_handler (database_configurations.rb:65-70):
+  // `url ? UrlConfig.new(env, name, url, config) : HashConfig.new(...)`.
+  // A UrlConfig parses the URL into its hash and surfaces the database name
+  // living in the path — e.g. the per-worker slot DB `rails_js_test_2` that
+  // test-setup-worker-db.ts suffixes on — natively via the URL fallback
+  // (url-config.ts), so `connectionDbConfig().database` is no longer undefined.
+  const env = DatabaseConfigurations.currentEnv();
+  const dbConfig = url
+    ? new UrlConfig(env, "primary", url, { adapter: adapterName, ...config })
+    : new HashConfig(env, "primary", { adapter: adapterName, url, ...config });
 
   // Mirror Rails: establish_connection makes the receiver its own connection
   // class so it gets an independent pool entry under its own name instead of
