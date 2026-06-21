@@ -7735,25 +7735,16 @@ describe("HasManyAssociationsTest", () => {
 
   // Rails has_many_associations_test.rb:1294 test_deleting_models_with_composite_keys.
   // cpk_great_author has 2 books (cpk_books.yml); delete one, reload, assert 1
-  // remains. CpkAuthor#books is `dependent: :delete_all`, so the delete DELETEs
-  // the book row — its author_id is part of the composite PK and cannot be
-  // nullified.
-  //
-  // tracked-pending-convergence: Rails (:1299) calls the proxy
-  // `great_author.books.delete(books.first)`, but trails' `CollectionProxy#delete`
-  // for non-through associations unconditionally nullifies, ignoring `:dependent`
-  // (collection-proxy.ts:2254–2273), so it would fail the NOT-NULL composite-PK
-  // FK here. Until that is fixed (story
-  // 0023-surfaced-deviations/collection-proxy-delete-honor-dependent-non-through)
-  // we drive the dependent-aware association-layer path
-  // (CollectionAssociation#delete) directly.
+  // remains. CpkAuthor#books is `dependent: :delete_all`, so the proxy delete
+  // DELETEs the book row — its author_id is part of the composite PK and cannot
+  // be nullified.
   it("deleting models with composite keys", async () => {
     const greatAuthor = cpkAuthors("cpk_great_author") as any;
     const books = await greatAuthor.books.toArray();
 
     expect(books.length).toBe(2);
 
-    await greatAuthor.association("books").delete(books[0]);
+    await greatAuthor.books.delete(books[0]);
     await greatAuthor.reload();
 
     expect(await greatAuthor.books.size()).toBe(1);
@@ -7762,13 +7753,8 @@ describe("HasManyAssociationsTest", () => {
   // Rails has_many_associations_test.rb:1306 test_sharded_deleting_models.
   // great_post_blog_one has 3 comments (sharded_comments.yml); delete two and
   // assert the generated DELETE scopes by an OR-of-AND composite-key tuple form,
-  // then check the reloaded size.
-  //
-  // tracked-pending-convergence: as in the composite-key test above, Rails
-  // (:1315) calls the proxy `blog_post.delete_comments.delete(...)`; we route
-  // through the association layer until `CollectionProxy#delete` honors
-  // `:dependent` for non-through associations (story
-  // 0023-surfaced-deviations/collection-proxy-delete-honor-dependent-non-through).
+  // then check the reloaded size. delete_comments is `dependent: :delete_all`, so
+  // the proxy delete DELETEs the rows rather than nullifying the composite FK.
   it("sharded deleting models", async () => {
     const blogPost = shardedBlogPosts("great_post_blog_one") as any;
     const comments = await blogPost.deleteComments.toArray();
@@ -7778,7 +7764,7 @@ describe("HasManyAssociationsTest", () => {
     const commentsToDelete = [comments[0], comments[1]];
 
     const sqls = await captureSql(async () => {
-      await blogPost.association("deleteComments").delete(commentsToDelete);
+      await blogPost.deleteComments.delete(commentsToDelete);
     });
 
     // Mirror Rails' OR-of-AND tuple-form assertion (adapter-agnostic on the
