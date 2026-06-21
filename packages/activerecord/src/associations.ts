@@ -1640,7 +1640,7 @@ export async function loadHasMany(
       for (let i = 0; i < foreignKey.length; i++) {
         conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
       }
-      rel = targetModel.all().where(conditions);
+      rel = _scopeForAssociation(targetModel).where(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
       const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
@@ -1653,10 +1653,12 @@ export async function loadHasMany(
       for (let i = 0; i < fkCols.length; i++) {
         conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
       }
-      rel = targetModel.all().where(conditions);
+      rel = _scopeForAssociation(targetModel).where(conditions);
     } else {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      rel = targetModel.all().where({ [foreignKey]: record._readAttribute(ownerKey as string) });
+      rel = _scopeForAssociation(targetModel).where({
+        [foreignKey]: record._readAttribute(ownerKey as string),
+      });
     }
     rel = applyAssociationScope(rel, options.scope, record);
   }
