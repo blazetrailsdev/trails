@@ -270,11 +270,7 @@ export async function _createRecord(this: any): Promise<boolean> {
     const _pkSet = new Set(
       (Array.isArray(_pk) ? _pk : [_pk]).filter((n) => this._readAttribute?.(n) == null),
     );
-    this._dirty.reinstateNewRecordChanges(
-      this._attributes,
-      ctor._defaultAttributes().snapshotValues(),
-      _pkSet,
-    );
+    this._dirty.reinstateNewRecordChanges(this._attributes, _pkSet);
     await this._performInsert();
     if (this._pendingOperation) {
       await this._pendingOperation;
