@@ -3161,32 +3161,49 @@ export class Base extends Model {
       )
       .then((rawId) => {
         // Adapters with RETURNING support (PG) return a Result-like object whose
-        // first row carries every RETURNING column; those without (MySQL,
-        // SQLite < 3.35, and the executeMutation INSERT path) yield the bare
-        // generated id, which fills the single auto-populated column.
+        // first row carries every RETURNING column by position; those without
+        // (MySQL, SQLite via the executeMutation INSERT path) yield only the bare
+        // generated id.
         const isResult = rawId !== null && typeof rawId === "object" && "rows" in rawId;
         const insertedId =
           isResult && typeof (ctor.connection as any).lastInsertedId === "function"
             ? (ctor.connection as any).lastInsertedId(rawId)
             : rawId;
-        let returningValues: unknown[] = [insertedId];
+        let fullRow: unknown[] | undefined;
         if (isResult) {
           const rv = (ctor.connection as any).returningColumnValues?.(rawId);
-          if (rv != null && rv.length > 0 && rv[0] !== undefined) returningValues = rv;
+          if (rv != null && rv.length > 0 && rv[0] !== undefined) fullRow = rv;
         }
-        // Mirrors Rails _create_record: zip the returned values back into the
-        // auto-populated columns, writing only those still unset (nil/false).
-        // For a key-less table `returningColumns` is empty, so this is a no-op —
-        // matching Rails' empty zip rather than risking a MissingAttributeError.
-        returningColumns.forEach((column, i) => {
-          const value = returningValues[i];
-          if (value === undefined) return;
+        const writeBack = (column: string, value: unknown): void => {
           const current = this._readAttribute(column);
+          // Rails writes when `!_read_attribute(column)` — truthy for nil AND
+          // false (but not 0 / "").
           if (current == null || current === false) {
             const type = (ctor as any).typeForAttribute?.(column);
             this._writeAttribute(column, type?.deserialize ? type.deserialize(value) : value);
           }
-        });
+        };
+        if (fullRow) {
+          // Mirrors Rails _create_record: zip the full RETURNING row back into the
+          // auto-populated columns by position. A key-less table yields empty
+          // `returningColumns`, so this is a no-op (matching Rails' empty zip).
+          returningColumns.forEach((column, i) => {
+            if (fullRow[i] !== undefined) writeBack(column, fullRow[i]);
+          });
+        } else if (insertedId != null) {
+          // Adapters that surface only the single generated id (MySQL, SQLite via
+          // executeMutation) can't be zipped positionally — `returningColumns`
+          // may list several columns (e.g. a composite PK whose auto-increment
+          // member is not the first column). Fill the first still-unset column,
+          // which is the auto-populated one (the others are already assigned).
+          for (const column of returningColumns) {
+            const current = this._readAttribute(column);
+            if (current == null || current === false) {
+              writeBack(column, insertedId);
+              break;
+            }
+          }
+        }
         // After INSERT, reset lock_version to a FromDatabase attribute carrying the
         // actual serialized value (e.g. 0). This mirrors Rails' behavior: during INSERT
         // @value_for_database is memoized to 0, so changes_applied! → forgetting_assignment
