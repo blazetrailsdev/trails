@@ -135,7 +135,10 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
 // ---------------------------------------------------------------------------
 
 interface CachedSchemaSource {
-  schemaCache?: { getCachedPrimaryKeys?(table: string): string | string[] | null | undefined };
+  schemaCache?: {
+    getCachedPrimaryKeys?(table: string): string | string[] | null | undefined;
+    getCachedColumnsHash?(table: string): Record<string, unknown> | undefined;
+  };
 }
 
 interface PrimaryKeyHost {
@@ -189,8 +192,18 @@ export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | nul
   if (configured !== undefined) return configured;
   try {
     const table = this.tableName;
-    const cached = table ? cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(table) : undefined;
-    if (cached !== undefined) return cached;
+    if (table) {
+      const schemaCache = cachedSchemaCacheFor(this);
+      const cached = schemaCache?.getCachedPrimaryKeys?.(table);
+      if (cached !== undefined) return cached;
+      // The primary-key map may not be reflected yet even when columns are warm
+      // (e.g. an INSERT warms columnsHash to build the row before it asks for
+      // the returning columns). Rails' get_primary_key returns nil for an
+      // id-less data source; mirror that by reflecting null when the warm
+      // columns carry no "id" — instead of blindly assuming the convention.
+      const columnsHash = schemaCache?.getCachedColumnsHash?.(table);
+      if (columnsHash && !("id" in columnsHash)) return null;
+    }
   } catch {
     // No connection/schema configured — fall through to the convention.
   }

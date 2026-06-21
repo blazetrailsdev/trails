@@ -258,6 +258,21 @@ describe("PrimaryKeysTest", () => {
     expect(AnonDevelopersProjects.primaryKey).toBeNull();
   });
 
+  it("primary key returns nil for id-less table when only columns are warm", async () => {
+    class AnonDevelopersProjects2 extends Base {
+      static {
+        this._tableName = "developers_projects";
+      }
+    }
+    // An INSERT warms columnsHash to build the row before it asks for the
+    // returning columns, but does not separately reflect the primary-key map.
+    // getPrimaryKeyAttr must still reflect null (Rails get_primary_key → nil)
+    // rather than falling back to the "id" convention and emitting a bogus
+    // RETURNING "id" that PostgreSQL rejects (42703).
+    await (Base.connection as any).schemaCache.columnsHash(Base.connection, "developers_projects");
+    expect(AnonDevelopersProjects2.primaryKey).toBeNull();
+  });
+
   it("quoted primary key after set primary key", () => {
     // Rails: k.quoted_primary_key changes from '"id"' to '"foo"' when k.primary_key= is set
     // quotedPrimaryKey is in attribute-methods/primary-key.ts but not wired to the
