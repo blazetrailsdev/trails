@@ -38,6 +38,7 @@ import { Account } from "./test-helpers/models/account.js";
 // `replies`/`uniqueReplies` associations (mirrors `require "models/reply"`).
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Item as CanonicalItem } from "./test-helpers/models/item.js";
+import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
 
 for (const klass of [
   CanonicalTopic,
@@ -49,6 +50,7 @@ for (const klass of [
   UniqueReply,
   SillyUniqueReply,
   CanonicalItem,
+  CanonicalDeveloper,
 ]) {
   registerModel(klass);
 }
@@ -189,19 +191,6 @@ describe("PersistenceTest", () => {
     await t.destroy();
     const d = t.dup();
     expect(d.isNewRecord()).toBe(true);
-  });
-
-  it("update column", async () => {
-    const t = await Topic.create({ title: "old" });
-    await t.updateColumn("title", "new");
-    expect(t.title).toBe("new");
-  });
-
-  it("update columns", async () => {
-    const t = await Topic.create({ title: "old", content: "old" });
-    await t.updateColumns({ title: "new", content: "new" });
-    expect(t.title).toBe("new");
-    expect(t.content).toBe("new");
   });
 
   it("find raises record not found exception", async () => {
@@ -2145,96 +2134,6 @@ describe("PersistenceTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
-      users: { name: "string", age: "integer", email: "string" },
-      posts: { title: "string", created_at: "datetime", updated_at: "datetime" },
-    });
-  });
-
-  it("update column", async () => {
-    const log: string[] = [];
-
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.beforeSave(() => {
-          log.push("before_save");
-        });
-      }
-    }
-
-    const u = await User.create({ name: "Alice", age: 25 });
-    log.length = 0;
-
-    await u.updateColumn("age", 30);
-
-    expect(u.age).toBe(30);
-    expect(log).toHaveLength(0); // No callbacks fired
-  });
-
-  it("update columns", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("email", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-
-    const u = await User.create({ name: "Alice", email: "alice@example.com" });
-
-    // This would fail validation since name becomes empty, but updateColumns skips it
-    await u.updateColumns({ name: "", email: "new@example.com" });
-
-    expect(u.name).toBe("");
-    expect(u.email).toBe("new@example.com");
-  });
-
-  it("persists to database", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    const u = await User.create({ name: "Alice" });
-    await u.updateColumn("name", "Bob");
-
-    const reloaded = await User.find(u.id);
-    expect(reloaded.name).toBe("Bob");
-  });
-
-  it("update column should raise exception if new record", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    const u = new User({ name: "Alice" });
-    await expect(u.updateColumn("name", "Bob")).rejects.toThrow(
-      "Cannot update columns on a new or destroyed record",
-    );
-  });
-
-  it("update column should not leave the object dirty", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    const u = await User.create({ name: "Alice" });
-    await u.updateColumn("name", "Bob");
-    expect(u.changed).toBe(false);
-  });
-});
-
-describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
       users: { name: "string", email: "string" },
       posts: { title: "string", created_at: "datetime", updated_at: "datetime" },
     });
@@ -3123,112 +3022,82 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  class Topic extends Base {
-    static {
-      this.attribute("title", "string");
-      this.attribute("content", "string");
-      this.attribute("approved", "boolean", { default: false });
-    }
-  }
-
-  beforeAll(async () => {
-    await defineSchema({
-      topics: { title: "string", content: "string", approved: "boolean" },
-      validateds: { title: "string" },
-      trackeds: { title: "string" },
-    });
-  });
+  useHandlerFixtures(["topics", "developers"], { schema: canonicalSchema });
+  const Topic = CanonicalTopic;
 
   it("update column", async () => {
-    const topic = await Topic.create({ title: "Original" });
-    await topic.updateColumn("title", "Updated");
-    expect(topic.title).toBe("Updated");
-  });
+    const topic = await Topic.find(1);
+    await topic.updateColumn("approved", true);
+    expect(topic.approved).toBe(true);
+    await topic.reload();
+    expect(topic.approved).toBe(true);
 
-  it("update_column persists to the database", async () => {
-    const topic = await Topic.create({ title: "Original" });
-    await topic.updateColumn("title", "Updated");
-
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.title).toBe("Updated");
-  });
-
-  it("update_column does not run validations", async () => {
-    class Validated extends Base {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true });
-      }
-    }
-
-    const v = await Validated.create({ title: "Valid" });
-    // Would fail validation, but update_column skips it
-    await v.updateColumn("title", "");
-    expect(v.title).toBe("");
+    await topic.updateColumn("approved", false);
+    expect(topic.approved).toBe(false);
+    await topic.reload();
+    expect(topic.approved).toBe(false);
   });
 
   it("update column should not use setter method", async () => {
-    const log: string[] = [];
+    const dev = (await CanonicalDeveloper.find(1)) as any;
+    // Mirror Rails' `dev.instance_eval { def salary=(v); write_attribute(:salary, v * 2); end }`:
+    // a per-instance setter override that doubles the value. update_column must
+    // write the raw value straight to the column, never routing through it.
+    let setterCalled = false;
+    Object.defineProperty(dev, "salary", {
+      configurable: true,
+      get() {
+        return this.readAttribute("salary");
+      },
+      set(value: number) {
+        setterCalled = true;
+        this.writeAttribute("salary", value * 2);
+      },
+    });
 
-    class Tracked extends Base {
-      static {
-        this.attribute("title", "string");
-        this.beforeSave(() => {
-          log.push("before_save");
-        });
-        this.afterSave(() => {
-          log.push("after_save");
-        });
-        this.beforeUpdate(() => {
-          log.push("before_update");
-        });
-        this.afterUpdate(() => {
-          log.push("after_update");
-        });
-      }
-    }
+    await dev.updateColumn("salary", 80000);
+    expect(dev.salary).toBe(80000);
+    expect(setterCalled).toBe(false);
 
-    const t = await Tracked.create({ title: "Test" });
-    log.length = 0;
-
-    await t.updateColumn("title", "Changed");
-    expect(log).toEqual([]);
+    await dev.reload();
+    expect(dev.salary).toBe(80000);
   });
 
-  it("update columns", async () => {
-    const topic = await Topic.create({ title: "Original", content: "Body", approved: false });
-    await topic.updateColumns({ title: "New Title", approved: true });
-
-    expect(topic.title).toBe("New Title");
-    expect(topic.approved).toBe(true);
-    expect(topic.content).toBe("Body"); // unchanged
-  });
-
-  it("update columns should raise exception if new record", async () => {
-    const topic = new Topic({ title: "New" });
-    await expect(topic.updateColumns({ title: "Changed" })).rejects.toThrow(
-      "Cannot update columns on a new or destroyed record",
-    );
-  });
-
-  it("update_columns on a destroyed record raises", async () => {
-    const topic = await Topic.create({ title: "Doomed" });
-    await topic.destroy();
-    await expect(topic.updateColumns({ title: "Changed" })).rejects.toThrow(
+  it("update column should raise exception if new record", async () => {
+    const topic = new Topic();
+    await expect(topic.updateColumn("approved", false)).rejects.toThrow(
       "Cannot update columns on a new or destroyed record",
     );
   });
 
   it("update column should not leave the object dirty", async () => {
-    const topic = await Topic.create({ title: "Original" });
-    topic.title = "Dirty";
-    expect(topic.changed).toBe(true);
+    const topic = await Topic.find(1);
+    await topic.updateColumn("content", "--- Have a nice day\n...\n");
 
-    await topic.updateColumn("title", "Clean");
+    await topic.reload();
+    await topic.updateColumn("content", "--- You too\n...\n");
     expect(topic.changed).toBe(false);
+
+    await topic.reload();
+    await topic.updateColumn("content", "--- Have a nice day\n...\n");
+    expect(topic.changed).toBe(false);
+  });
+
+  it("update columns", async () => {
+    const topic = await Topic.find(1);
+    await topic.updateColumns({ approved: true, title: "Sebastian Topic" });
+    expect(topic.approved).toBe(true);
+    expect(topic.title).toBe("Sebastian Topic");
+    await topic.reload();
+    expect(topic.approved).toBe(true);
+    expect(topic.title).toBe("Sebastian Topic");
+  });
+
+  it("update columns should raise exception if new record", async () => {
+    const topic = new Topic();
+    await expect(topic.updateColumns({ approved: false })).rejects.toThrow(
+      "Cannot update columns on a new or destroyed record",
+    );
   });
 });
 
