@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, association, registerModel } from "../index.js";
+import { Base, association, registerModel, enableSti, registerSubclass } from "../index.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
@@ -15,8 +15,8 @@ import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Tag } from "../test-helpers/models/tag.js";
-import { Tagging } from "../test-helpers/models/tagging.js";
+import { Company, Firm, Client } from "../test-helpers/models/company.js";
+import { Account } from "../test-helpers/models/account.js";
 
 registerModel(Project);
 registerModel(Developer);
@@ -27,11 +27,6 @@ registerModel(AuditLog);
 // both canonical models so the throwaway owner's has_many :posts resolves.
 registerModel(Author);
 registerModel(Post);
-// Post has `dependent: :destroy` taggings/tags associations, so the
-// destroy-on-parent test cascades through them; register the models so the
-// (empty) cascade resolves.
-registerModel(Tag);
-registerModel(Tagging);
 
 let cbIdx = 0;
 
@@ -67,10 +62,6 @@ function setupAuthorPostSuite(): void {
     await defineSchema(Base.connection, {
       authors: canonicalSchema.authors,
       posts: canonicalSchema.posts,
-      // Post's `dependent: :destroy` taggings/tags cascade (exercised by the
-      // destroy-on-parent test) queries these tables, so they must exist.
-      taggings: canonicalSchema.taggings,
-      tags: canonicalSchema.tags,
     });
   });
 }
@@ -506,28 +497,6 @@ describe("AssociationCallbacksTest", () => {
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
   });
 
-  it("has many callbacks for destroy on parent", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      dependent: "destroy",
-      beforeRemove: (_owner: any, record: any) => {
-        log.push("before_remove" + record.id);
-      },
-      afterRemove: (_owner: any, record: any) => {
-        log.push("after_remove" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "Firm" });
-    const post = await (Post as any).create({
-      title: "Client",
-      body: "Body",
-      author_id: author.id,
-    });
-    await author.destroy();
-
-    expect(log).toEqual(["before_remove" + post.id, "after_remove" + post.id]);
-  });
-
   it("dont add if before callback raises exception", async () => {
     const log: string[] = [];
     const { Author, Post } = makeAuthorWithCallbacks({
@@ -558,6 +527,39 @@ describe("AssociationCallbacksTest", () => {
     const proxy = association(author, "posts");
     const p = new (Post as any)({ title: "abc", body: "Body", author_id: author.id });
     await expect(proxy.push(p)).rejects.toBeDefined();
+  });
+});
+
+// ==========================================================================
+// Destroy-on-parent uses the canonical Firm/Client (Company STI) models, whose
+// `clients` dependent:destroy has_many carries the before/after_remove logging
+// to `firm.log` — mirroring Rails' test_has_many_callbacks_for_destroy_on_parent
+// (associations/callbacks_test.rb:105-111).
+// ==========================================================================
+describe("AssociationCallbacksTest", () => {
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
+  beforeAll(async () => {
+    registerModel(Company);
+    registerModel(Firm);
+    registerModel(Client);
+    registerModel(Account);
+    enableSti(Company);
+    registerSubclass(Firm);
+    registerSubclass(Client);
+    await defineSchema(Base.connection, {
+      companies: canonicalSchema.companies,
+      // Firm#account is dependent:destroy, so firm.destroy queries `accounts`.
+      accounts: canonicalSchema.accounts,
+    });
+  });
+
+  it("has many callbacks for destroy on parent", async () => {
+    const firm = await Firm.create({ name: "Firm" });
+    const client = await association(firm, "clients").create({ name: "Client" });
+    await firm.destroy();
+
+    expect(firm.log).toEqual([`before_remove${client.id}`, `after_remove${client.id}`]);
   });
 });
 
