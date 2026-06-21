@@ -1668,6 +1668,21 @@ describe("Relation#arel build_arel convergence", () => {
     expect(sql).not.toMatch(/t\d+_r\d+/);
   });
 
+  // Rails' RelationHandler has no single-column validation: a subquery with an
+  // explicit projection (including `table.*` or multiple columns) passes
+  // straight to `attribute.in(value.arel)`, and the database — not trails —
+  // raises on any column-count mismatch. Regression guard for removing the
+  // bespoke `ensureSingleColumnSelect` throw.
+  it("where with a star-projection subquery passes the projection through unchanged", () => {
+    const sql = Widget.where({ id: Gadget.select("gadgets.*") }).toSql();
+    expect(sql).toMatch(/IN \(SELECT gadgets\.\*/);
+  });
+
+  it("where with a multi-column subquery passes the projection through unchanged", () => {
+    const sql = Widget.where({ id: Gadget.select("id, widget_id") }).toSql();
+    expect(sql).toMatch(/IN \(SELECT id, widget_id/);
+  });
+
   // Rails apply_join_dependency materializes distinct primary keys (executing a
   // query) when eager loading with a limit over a collection reflection. A
   // synchronous predicate builder can't run that query, and a pure-SQL
