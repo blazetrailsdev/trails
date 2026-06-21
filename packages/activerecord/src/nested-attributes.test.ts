@@ -1486,8 +1486,10 @@ describe("should automatically build new associated models for each entry in a h
     };
     const built = (await collectionProxyFor(pirate, "birds").loadTarget()) as CanonicalBird[];
     expect(built.length).toBe(2);
-    expect(built.every((b) => !b.isPersisted())).toBe(true);
-    expect(built.map((b) => b.name).sort()).toEqual(["Grace OMalley", "Privateers Greed"]);
+    expect(built[0].isPersisted()).toBe(false);
+    expect(built[0].name).toBe("Grace OMalley");
+    expect(built[built.length - 1].isPersisted()).toBe(false);
+    expect(built[built.length - 1].name).toBe("Privateers Greed");
   });
 });
 
@@ -1696,19 +1698,17 @@ describe("should sort the hash by the keys before building new associated models
     registerModel(CanonicalPirate);
     acceptsNestedAttributesFor(CanonicalPirate, "birds");
     const pirate = await CanonicalPirate.create({ catchphrase: "sort test" });
-    // Keys are sorted before the new birds are built, so the out-of-order
-    // hash yields birds in key order.
-    assignNestedAttributes(pirate, "birds", {
-      "2": { name: "third" },
-      "0": { name: "first" },
-      "1": { name: "second" },
-    });
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
-    expect(birds.length).toBe(3);
-    expect(birds[0].name).toBe("first");
-    expect(birds[1].name).toBe("second");
-    expect(birds[2].name).toBe("third");
+    // Keys are sorted by their numeric value before the new birds are built,
+    // so "2" sorts before "123726353" even though it is inserted later.
+    (pirate as any).birdsAttributes = {
+      "123726353": { name: "Grace OMalley" },
+      "2": { name: "Privateers Greed" },
+    };
+    const built = (await collectionProxyFor(pirate, "birds").loadTarget()) as CanonicalBird[];
+    expect([built[0].name, built[built.length - 1].name]).toEqual([
+      "Privateers Greed",
+      "Grace OMalley",
+    ]);
   });
 });
 
