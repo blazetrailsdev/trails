@@ -196,6 +196,83 @@ export function namespaceSegments(modelClass: typeof Base): string[] {
 }
 
 /**
+ * The chain of enclosing Ruby module-parent qualified names, innermost first.
+ * `"MyApplication::Business::Prefixed"` →
+ * `["MyApplication::Business::Prefixed", "MyApplication::Business", "MyApplication"]`.
+ * Mirrors Ruby's `Module#module_parents` (sans `Object`).
+ */
+export function moduleParentChain(moduleName: string | undefined): string[] {
+  if (!moduleName) return [];
+  const segs = moduleName.split("::");
+  const chain: string[] = [];
+  for (let i = segs.length; i > 0; i--) {
+    chain.push(segs.slice(0, i).join("::"));
+  }
+  return chain;
+}
+
+// Module-level table_name_prefix / table_name_suffix declarations, keyed by the
+// module's `::`-joined qualified name. Ruby declares these as `def
+// self.table_name_prefix` on a wrapping module; trails has no module objects, so
+// namespaced models register their wrapping module's prefix/suffix here.
+const moduleTableNamePrefixes = new Map<string, string>();
+const moduleTableNameSuffixes = new Map<string, string>();
+
+/** Register a module-level `table_name_prefix` (Ruby `def self.table_name_prefix`). */
+export function registerModuleTableNamePrefix(moduleName: string, prefix: string): void {
+  moduleTableNamePrefixes.set(moduleName, prefix);
+}
+
+/** Register a module-level `table_name_suffix` (Ruby `def self.table_name_suffix`). */
+export function registerModuleTableNameSuffix(moduleName: string, suffix: string): void {
+  moduleTableNameSuffixes.set(moduleName, suffix);
+}
+
+/**
+ * Walk `module_parents` innermost-out and return the first parent's
+ * decoration, or `undefined` when the walk reaches the top without a hit (the
+ * caller then falls back to `self.table_name_prefix`/`_suffix`). Mirrors the
+ * `module_parents.detect { |p| p.respond_to?(:table_name_prefix) }` walk in
+ * `ActiveRecord::ModelSchema::ClassMethods#full_table_name_{prefix,suffix}`
+ * (model_schema.rb:301-307).
+ *
+ * Two kinds of parent "respond to" the decorator and thus stop the walk:
+ * a module that registered one (`registered`), or an *AR-model-class* parent —
+ * every class responds via `Base`, returning its own (usually-global) value.
+ * The class case is why an outer `Prefixed`-style module does NOT bleed through
+ * a nearer AR-model parent: the class short-circuits the detect first.
+ */
+function lookupModuleDecoration(
+  moduleName: string | undefined,
+  registered: Map<string, string>,
+  classDecoration: (model: typeof Base) => string,
+): string | undefined {
+  for (const parent of moduleParentChain(moduleName)) {
+    const fromModule = registered.get(parent);
+    if (fromModule !== undefined) return fromModule;
+    const model = modelRegistry.get(parent);
+    if (model) return classDecoration(model);
+  }
+  return undefined;
+}
+
+export function lookupModuleTableNamePrefix(moduleName: string | undefined): string | undefined {
+  return lookupModuleDecoration(
+    moduleName,
+    moduleTableNamePrefixes,
+    (model) => (model as typeof Base & { _tableNamePrefix?: string })._tableNamePrefix ?? "",
+  );
+}
+
+export function lookupModuleTableNameSuffix(moduleName: string | undefined): string | undefined {
+  return lookupModuleDecoration(
+    moduleName,
+    moduleTableNameSuffixes,
+    (model) => (model as typeof Base & { _tableNameSuffix?: string })._tableNameSuffix ?? "",
+  );
+}
+
+/**
  * Return the STI name for this class (used as the type column value).
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_name

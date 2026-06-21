@@ -5,8 +5,14 @@
 // derives the `::`-qualified registry key — the one cross-namespace `className`
 // resolution looks up — instead of a hand-maintained `registerModel(name, …)` call.
 import { registerModel } from "../../associations.js";
+import { registerModuleTableNamePrefix, registerModuleTableNameSuffix } from "../../inheritance.js";
 import { Base } from "../../base.js";
 import { Company } from "./company.js";
+
+// module MyApplication::Business::Prefixed { def self.table_name_prefix; "prefixed_"; end }
+registerModuleTableNamePrefix("MyApplication::Business::Prefixed", "prefixed_");
+// module MyApplication::Business::Suffixed { def self.table_name_suffix; "_suffixed"; end }
+registerModuleTableNameSuffix("MyApplication::Business::Suffixed", "_suffixed");
 
 // MyApplication::Business::Company < ::Company
 export class MyAppBusinessCompany extends Company {
@@ -62,6 +68,8 @@ export class MyAppBusinessClient extends MyAppBusinessCompany {
 }
 
 // MyApplication::Business::Client::Contact
+// Nested under the AR model Client, so compute_table_name prepends the
+// singularized parent table → "company_contacts" (Client.table_name "companies").
 export class MyAppBusinessClientContact extends Base {
   static moduleName = "MyApplication::Business::Client";
   static _demodulizedName = "Contact";
@@ -73,7 +81,6 @@ export class MyAppBusinessDeveloper extends Base {
   static _demodulizedName = "Developer";
 
   static {
-    this._tableName = "developers";
     this.hasAndBelongsToMany("projects");
     this.validates("name", { length: { in: [3, 20] } });
   }
@@ -85,7 +92,6 @@ export class MyAppBusinessProject extends Base {
   static _demodulizedName = "Project";
 
   static {
-    this._tableName = "projects";
     this.hasAndBelongsToMany("developers");
   }
 }
@@ -155,12 +161,13 @@ export class MyAppBillingNestedFirm extends Base {
 }
 
 // MyApplication::Billing::Account
+// Billing is a plain module (not an AR model), so the table is the inferred
+// "accounts" with no contained prefix.
 export class MyAppBillingAccount extends Base {
   static moduleName = "MyApplication::Billing";
   static _demodulizedName = "Account";
 
   static {
-    this._tableName = "accounts";
     const opts = { foreignKey: "firm_id" };
     this.belongsTo("firm", { ...opts, className: "MyApplication::Business::Firm" });
     this.belongsTo("qualifiedBillingFirm", {

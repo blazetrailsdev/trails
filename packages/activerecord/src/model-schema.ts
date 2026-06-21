@@ -15,7 +15,12 @@ import {
   isBaseClass,
   baseClass,
   getAbstractClass,
+  qualifiedName,
+  lookupModuleTableNamePrefix,
+  lookupModuleTableNameSuffix,
 } from "./inheritance.js";
+import { singularize } from "@blazetrails/activesupport";
+import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
@@ -47,10 +52,39 @@ export function resolveTableName(this: typeof Base): string {
     const base = baseClass.call(this);
     if (base !== this) return resolveTableName.call(base);
   }
-  const prefix = (this as any)._tableNamePrefix ?? "";
-  const suffix = (this as any)._tableNameSuffix ?? "";
-  const inferred = pluralize(underscore(this.name));
-  return `${prefix}${inferred}${suffix}`;
+  const prefix = fullTableNamePrefix.call(this as any);
+  const suffix = fullTableNameSuffix.call(this as any);
+  const contained = containedTableNamePrefix.call(this as any);
+  const inferred = undecoratedTableName(qualifiedName(this as any));
+  return `${prefix}${contained}${inferred}${suffix}`;
+}
+
+/**
+ * Guesses the table name, but does not decorate it with prefix and suffix.
+ *
+ * @internal
+ */
+function undecoratedTableName(modelName: string): string {
+  const demodulized = modelName.split("::").pop() ?? modelName;
+  return pluralize(underscore(demodulized));
+}
+
+/**
+ * Rails `compute_table_name`'s nested-class arm: when the immediate
+ * `module_parent` is itself a concrete AR model, the table is prefixed with the
+ * singularized parent table name — `Client::Contact` → `company_contacts`.
+ * Mirrors model_schema.rb:608-612.
+ *
+ * Rails guards the `singularize` with `if module_parent.pluralize_table_names`
+ * (model_schema.rb:610). trails has no `pluralize_table_names` toggle — it is
+ * always on (Rails' default) — so the singularize is unconditional here.
+ */
+function containedTableNamePrefix(this: typeof Base): string {
+  const moduleName = (this as any).moduleName as string | undefined;
+  if (!moduleName) return "";
+  const parent = modelRegistry.get(moduleName);
+  if (!parent || getAbstractClass.call(parent as any)) return "";
+  return `${singularize(parent.tableName)}_`;
 }
 
 // ---------------------------------------------------------------------------
@@ -465,11 +499,13 @@ export function resetTableName(this: SchemaHost): string {
 }
 
 export function fullTableNamePrefix(this: SchemaHost): string {
-  return this._tableNamePrefix ?? "";
+  const moduleName = (this as any).moduleName as string | undefined;
+  return lookupModuleTableNamePrefix(moduleName) ?? this._tableNamePrefix ?? "";
 }
 
 export function fullTableNameSuffix(this: SchemaHost): string {
-  return this._tableNameSuffix ?? "";
+  const moduleName = (this as any).moduleName as string | undefined;
+  return lookupModuleTableNameSuffix(moduleName) ?? this._tableNameSuffix ?? "";
 }
 
 export function realInheritanceColumn(this: SchemaHost, value: string | null): void {
@@ -1441,12 +1477,6 @@ function isSchemaLoaded(this: SchemaHost): boolean {
 /** @internal */
 function loadSchemaBang(this: SchemaHost): void {
   loadSchema.call(this);
-}
-
-/** @internal */
-function undecoratedTableName(this: SchemaHost, modelName: string): string {
-  const base = modelName.split("::").pop() ?? modelName;
-  return pluralize(underscore(base));
 }
 
 /** @internal */
