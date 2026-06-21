@@ -3030,6 +3030,23 @@ export class Base extends Model {
       }
     }
 
+    // Initialize the locking column from its schema default so a new record's
+    // in-memory lock value is never nil at insert time. Rails reflects the
+    // column (default 0) into every new record's attributes at class load, so
+    // Locking::Optimistic#_create_record can union it unconditionally
+    // (optimistic.rb:78-82). trails loads schema lazily, so a record built
+    // before the column was reflected (e.g. a model `new`'d before its first
+    // schema load) has no locking attribute; seed it here — once reflection has
+    // certainly run for the INSERT — to its reflected default rather than
+    // writing an explicit NULL into a NOT NULL lock column.
+    if (ctor.lockingEnabled) {
+      const lockCol = ctor.lockingColumn;
+      const lockDef = ctor._attributeDefinitions.get(lockCol);
+      if (lockDef && this._readAttribute(lockCol) == null) {
+        this._writeAttribute(lockCol, lockDef.type.cast(lockDef.defaultValue));
+      }
+    }
+
     const attrs = this._attributes.valuesForDatabase();
     // Rails: attribute_names = attributes_for_create(self.attribute_names)
     const allNames = Object.keys(attrs).filter((k) => ctor._attributeDefinitions.has(k));
