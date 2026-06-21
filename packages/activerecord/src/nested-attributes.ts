@@ -321,15 +321,34 @@ async function processNestedAttributes(record: Base): Promise<void> {
         const existing = await (targetModel as any).find(pkValue);
         await existing.update(childAttrs);
       } else if (assocDef.type === "belongsTo") {
-        // For belongs_to, create the target and set FK on *this* record
+        // For belongs_to, create the target and set FK on *this* record. Rails
+        // sets the owner's FK columns from `reflection.foreign_key` zipped with
+        // `reflection.association_primary_key` (the *target* PK), regardless of
+        // single- or composite-key — see BelongsToAssociation#replace_keys /
+        // Association#set_owner_attributes. Thread the same here so a belongs_to
+        // to a CPK target writes every FK column (not a single coerced
+        // `created.id`).
         const created = await (targetModel as any).create(childAttrs);
-        if (created && created.id != null) {
-          // Use _writeAttribute + direct persistence to avoid re-triggering nested attributes
-          record._writeAttribute(foreignKey, created.id);
+        if (created != null) {
+          const belongsToFkColumns = Array.isArray(reflectionFk)
+            ? (reflectionFk as unknown[]).map(String)
+            : Array.isArray(optionFk)
+              ? (optionFk as unknown[]).map(String)
+              : [foreignKey];
+          const assocPk =
+            reflection?.associationPrimaryKey ?? (targetModel as any).primaryKey ?? "id";
+          const assocPkColumns = Array.isArray(assocPk) ? assocPk : [assocPk];
           const arelTable = (ctor as any).arelTable as Table;
+          // Use _writeAttribute + direct persistence to avoid re-triggering
+          // nested attributes.
+          const sets = belongsToFkColumns.map((col, i) => {
+            const value = created._readAttribute(assocPkColumns[i]);
+            record._writeAttribute(col, value);
+            return [arelTable.get(col), value] as [ReturnType<Table["get"]>, unknown];
+          });
           const um = new UpdateManager()
             .table(arelTable)
-            .set([[arelTable.get(foreignKey), created.id]])
+            .set(sets)
             .where((ctor as any)._buildPkWhereNode(record.id));
           const conn = (ctor as any).connection;
           await conn.executeMutation(conn.toSql(um));

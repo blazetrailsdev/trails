@@ -648,6 +648,29 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     expect(pirates[0].catchphrase).toBe("Arrr");
   });
 
+  it("should build a new belongs_to record with a composite foreign key", async () => {
+    // CpkBook belongs_to :order (CpkOrder, composite PK [shop_id, id]) with a
+    // composite foreign key [shop_id, order_id]. Creating the order via nested
+    // attributes must thread every FK column from the target's
+    // association_primary_key — not coerce a single `created.id` into one column.
+    registerModel(CpkOrder);
+    registerModel(CpkBook);
+    acceptsNestedAttributesFor(CpkBook, "order");
+
+    const book = await CpkBook.createBang({ author_id: 1, id: 1, title: "T" });
+    assignNestedAttributes(book, "order", [{ shop_id: 7, status: "open" }]);
+    await book.save();
+
+    const order = await CpkOrder.where({ shop_id: 7, status: "open" }).first();
+    const orderId = (order as any)._readAttribute("id");
+    expect((book as any).shop_id).toBe(7);
+    expect((book as any).order_id).toBe(orderId);
+
+    const reloaded = await CpkBook.find([1, 1]);
+    expect((reloaded as any).shop_id).toBe(7);
+    expect((reloaded as any).order_id).toBe(orderId);
+  });
+
   it("should not build a new record if there is no id and destroy is truthy", async () => {
     const { Ship, Pirate } = makeModels({ allowDestroy: true });
     const ship = await Ship.create({ name: "Black Pearl" });
