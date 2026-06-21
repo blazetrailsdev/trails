@@ -721,9 +721,20 @@ async function establishWithConfig(
     adapterArgs = [url];
   }
 
+  // Mirror Rails' UrlConfig: when establishing from a bare URL (the handler
+  // suite's PG/MySQL path), the database name lives in the URL — e.g. the
+  // per-worker slot DB `rails_js_test_2` that test-setup-worker-db.ts suffixes
+  // onto the path. Surface it on `db_config.database` so callers reading
+  // `connectionDbConfig().database` see the real database instead of undefined.
+  // An explicit `database` in `config` still wins (spread last).
+  const urlDatabase =
+    url && config?.database === undefined
+      ? new UrlConfig(DatabaseConfigurations.currentEnv(), "primary", url).database
+      : undefined;
   const dbConfig = new HashConfig(DatabaseConfigurations.currentEnv(), "primary", {
     adapter: adapterName,
     url,
+    ...(urlDatabase !== undefined ? { database: urlDatabase } : {}),
     ...config,
   });
 
