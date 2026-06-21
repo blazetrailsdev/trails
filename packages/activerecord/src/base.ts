@@ -3192,10 +3192,17 @@ export class Base extends Model {
           });
         } else if (insertedId != null) {
           // Adapters that surface only the single generated id (MySQL, SQLite via
-          // executeMutation) can't be zipped positionally — `returningColumns`
-          // may list several columns (e.g. a composite PK whose auto-increment
-          // member is not the first column). Fill the first still-unset column,
-          // which is the auto-populated one (the others are already assigned).
+          // executeMutation, which never emits a RETURNING row unlike Rails'
+          // SQLite 3.35+ adapter) can't be zipped positionally. Rails always zips
+          // `returning_columns` against `returning_values` by position, writing
+          // the lone `last_inserted_id` into `returning_columns[0]`
+          // (persistence.rb:931, database_statements.rb:723). We instead write it
+          // into the first still-unset column, because `returningColumns` may list
+          // several columns whose auto-increment member is NOT first (e.g. a
+          // composite PK [shop_id, id]). This relies on every column ahead of the
+          // auto-increment member already being assigned — true for the
+          // PK-fallback composite case (non-auto PK members must be supplied) and
+          // the single-auto-`id` case, the only shapes that reach this branch.
           for (const column of returningColumns) {
             const current = this._readAttribute(column);
             if (current == null || current === false) {
