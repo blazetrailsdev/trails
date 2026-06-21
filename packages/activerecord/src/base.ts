@@ -674,6 +674,16 @@ function _applyCompositePrimaryKey(
  * create path runs (callbacks.ts `_createRecord`), but keeps the primary key in
  * scope: an explicitly assigned `id` IS dirty at construction in Rails.
  *
+ * Called only from the `!wasSuppressed` constructor branches (where the inline
+ * `after_initialize` fires), so the dirty state is established before
+ * `after_initialize` — matching Rails, where `assign_attributes` runs before
+ * `_run_initialize_callbacks` and `changed?` is already true inside the hook.
+ * Found-record reconstruction is the only path that constructs with callbacks
+ * suppressed, and it always does so with an EMPTY attribute bag (`new this()` in
+ * `_instantiate` / `directInstantiate`) before populating via `writeFromDatabase`
+ * + `changesApplied`. So no new-record-with-values construction ever reaches the
+ * suppressed branch, and skipping the pass there loses no dirtiness.
+ *
  * @internal
  */
 function _reinstateConstructorDirtiness(
