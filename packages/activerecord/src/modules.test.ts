@@ -8,8 +8,12 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import {
+  MyAppBusinessCompany,
+  MyAppBusinessFirm,
   MyAppBusinessClient,
   MyAppBusinessClientContact,
+  MyAppBusinessDeveloper,
+  MyAppBusinessProject,
   MyAppBusinessPrefixedCompany,
   MyAppBusinessPrefixedNestedCompany,
   MyAppBusinessPrefixedFirm,
@@ -72,10 +76,33 @@ describe("ModulesTest", () => {
     expect(MyAppBusinessPrefixedFirm.tableName).toBe("companies");
   });
 
-  it.skip("module table name prefix with global prefix", () => {
-    // Mutates ActiveRecord::Base.table_name_prefix globally + reset_table_name;
-    // unsafe under shared-worker parallel fixtures. Tracked as follow-up story
-    // module-namespaced-table-name-global-prefix-suffix-reset.
+  it("module table name prefix with global prefix", () => {
+    // Mirrors Rails set/reset/assert/ensure. The mutation of the global
+    // Base.tableNamePrefix and the recompute via resetTableName run fully
+    // synchronously (no awaits), so no sibling test can observe the mutated
+    // global before the finally restores it.
+    const classes = [
+      MyAppBusinessCompany,
+      MyAppBusinessFirm,
+      MyAppBusinessClient,
+      MyAppBusinessClientContact,
+      MyAppBusinessDeveloper,
+      MyAppBusinessProject,
+      MyAppBusinessPrefixedCompany,
+      MyAppBusinessPrefixedNestedCompany,
+      MyAppBillingAccount,
+    ];
+    Base.tableNamePrefix = "global_";
+    try {
+      classes.forEach((klass) => klass.resetTableName());
+      expect(MyAppBusinessCompany.tableName).toBe("global_companies");
+      expect(MyAppBusinessPrefixedCompany.tableName).toBe("prefixed_companies");
+      expect(MyAppBusinessPrefixedNestedCompany.tableName).toBe("prefixed_companies");
+      expect(MyAppBusinessPrefixedFirm.tableName).toBe("companies");
+    } finally {
+      Base.tableNamePrefix = "";
+      classes.forEach((klass) => klass.resetTableName());
+    }
   });
 
   it("module table name suffix", () => {
@@ -84,9 +111,30 @@ describe("ModulesTest", () => {
     expect(MyAppBusinessSuffixedFirm.tableName).toBe("companies");
   });
 
-  it.skip("module table name suffix with global suffix", () => {
-    // Mutates ActiveRecord::Base.table_name_suffix globally + reset_table_name;
-    // unsafe under shared-worker parallel fixtures. Tracked as follow-up story
-    // module-namespaced-table-name-global-prefix-suffix-reset.
+  it("module table name suffix with global suffix", () => {
+    // Mirrors Rails set/reset/assert/ensure; see the prefix test above for why
+    // the synchronous mutate-and-restore is safe under shared-worker fixtures.
+    const classes = [
+      MyAppBusinessCompany,
+      MyAppBusinessFirm,
+      MyAppBusinessClient,
+      MyAppBusinessClientContact,
+      MyAppBusinessDeveloper,
+      MyAppBusinessProject,
+      MyAppBusinessSuffixedCompany,
+      MyAppBusinessSuffixedNestedCompany,
+      MyAppBillingAccount,
+    ];
+    Base.tableNameSuffix = "_global";
+    try {
+      classes.forEach((klass) => klass.resetTableName());
+      expect(MyAppBusinessCompany.tableName).toBe("companies_global");
+      expect(MyAppBusinessSuffixedCompany.tableName).toBe("companies_suffixed");
+      expect(MyAppBusinessSuffixedNestedCompany.tableName).toBe("companies_suffixed");
+      expect(MyAppBusinessSuffixedFirm.tableName).toBe("companies");
+    } finally {
+      Base.tableNameSuffix = "";
+      classes.forEach((klass) => klass.resetTableName());
+    }
   });
 });
