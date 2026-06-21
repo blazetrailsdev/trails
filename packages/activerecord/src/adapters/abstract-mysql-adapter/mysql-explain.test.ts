@@ -101,6 +101,22 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(plan).toMatch(/EXPLAIN.*for:/);
     });
 
+    // trails-only regression: an already-loaded relation must still re-execute
+    // through the always-executing exec_queries path (Rails
+    // `collecting_queries_for_explain { exec_queries }`), capturing the real
+    // backtick-quoted SQL via sql.active_record — NOT short-circuit on the load
+    // cache and fall back to `_toSql()`'s double-quoted identifiers (which MySQL
+    // reads as a string literal). Loading first, then asserting backticks (and
+    // the absence of double quotes), proves the capture path was used.
+    it("Relation#explain on MySQL re-executes an already-loaded relation", async () => {
+      const relation = Author.where({ id: authors("david").id });
+      await relation.toArray(); // prime the load cache
+      const plan = await relation.explain();
+      expect(plan).toContain("`authors`");
+      expect(plan).not.toMatch(/"authors"/);
+      expect(plan).toMatch(/EXPLAIN.*for:/);
+    });
+
     it("Relation#explain on MySQL captures preload queries", async () => {
       const plan = await Author.where({ id: authors("david").id })
         .preload("posts")

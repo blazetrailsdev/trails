@@ -187,13 +187,24 @@ describe("ExplainTest", () => {
     expect(ExplainRegistry.queries).toEqual([]);
   });
 
-  it("falls back to explaining toSql when no queries were collected", async () => {
-    // `none()` short-circuits before any SQL runs — collectingQueries
-    // captures nothing. The fallback should still produce a non-empty
-    // plan instead of a silent empty string.
+  it("does not load the relation as a side effect", async () => {
+    // Rails' ExplainProxy calls `exec_queries` directly, bypassing the
+    // `@records ||= exec_queries` in `#records`, so `.explain` leaves the
+    // relation un-loaded (`loaded? == false`; next access re-queries). Mirror
+    // that: explain must not flip `isLoaded` or cache `_records`.
+    const relation = Car.where({ name: "honda" });
+    await relation.explain();
+    expect(relation.isLoaded).toBe(false);
+  });
+
+  it("yields empty output for a query-less relation", async () => {
+    // Rails collects over the always-executing `exec_queries`; a `.none()`
+    // relation runs no SELECT, so `collecting_queries_for_explain` captures
+    // nothing and `exec_explain` yields empty output. We do NOT fall back to
+    // explaining `_toSql()`, which would emit Arel's double-quoted identifiers
+    // that diverge from the SQL the adapter actually executes.
     const plan = await Car.none().explain();
-    expect(plan.length).toBeGreaterThan(0);
-    expect(plan.toLowerCase()).toContain("select");
+    expect(plan).toBe("");
   });
 
   it("renders binds via adapter.typeCast + Ruby-inspect form", async () => {
