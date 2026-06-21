@@ -262,8 +262,15 @@ export async function _createRecord(this: any): Promise<boolean> {
     // Running this after the insert would leave the dirty set empty at column-
     // selection time and wrongly drop such columns. PK is skipped: it's null
     // pre-insert and tracked via _writeAttribute(pk, insertedId) in _performInsert.
+    // Only skip a PK column that is null in memory — the auto-populated key
+    // written post-insert via _writeAttribute(pk, insertedId). User-assigned
+    // (non-null) composite-PK columns must stay dirty so partial_inserts'
+    // attributesForCreate includes them; otherwise the row is written with a
+    // missing key and find/destroy by that key raises RecordNotFound.
     const _pk = ctor.primaryKey;
-    const _pkSet = new Set(Array.isArray(_pk) ? _pk : [_pk]);
+    const _pkSet = new Set(
+      (Array.isArray(_pk) ? _pk : [_pk]).filter((n) => this._readAttribute?.(n) == null),
+    );
     this._dirty.reinstateNewRecordChanges(
       this._attributes,
       ctor._defaultAttributes().snapshotValues(),
