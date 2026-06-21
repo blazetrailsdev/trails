@@ -1054,10 +1054,32 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(human.polymorphicFace.description).toBe((face as any).description);
   });
 
-  it.skip("eager loaded child instance should be shared with parent on find", () => {
-    // Tracked: story inverse-polymorphic-eager-load-preload. Polymorphic eager
-    // load via includes() throws EagerLoadPolymorphicError — preloading
-    // (separate queries per type, as Rails does) is not yet implemented.
+  it("eager loaded child instance should be shared with parent on find", async () => {
+    let face = (
+      await Face.where({ description: "confused" }).includes("human").toArray()
+    )[0] as any;
+    let human = (await loadBelongsTo(face, "polymorphicHuman", {
+      polymorphic: true,
+      inverseOf: "polymorphicFace",
+    })) as any;
+    expect(human.polymorphicFace.description).toBe(face.description);
+    face.description = "gormless";
+    expect(human.polymorphicFace.description).toBe(face.description);
+    human.polymorphicFace.description = "pleasing";
+    expect(human.polymorphicFace.description).toBe(face.description);
+
+    face = (
+      await Face.where({ description: "confused" }).includes("human").order("humans.id").toArray()
+    )[0] as any;
+    human = (await loadBelongsTo(face, "polymorphicHuman", {
+      polymorphic: true,
+      inverseOf: "polymorphicFace",
+    })) as any;
+    expect(human.polymorphicFace.description).toBe(face.description);
+    face.description = "gormless";
+    expect(human.polymorphicFace.description).toBe(face.description);
+    human.polymorphicFace.description = "pleasing";
+    expect(human.polymorphicFace.description).toBe(face.description);
   });
 
   it("child instance should be shared with replaced via accessor parent", async () => {
