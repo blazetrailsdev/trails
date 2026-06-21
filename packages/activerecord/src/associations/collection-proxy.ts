@@ -3,6 +3,7 @@ import { Relation } from "../relation.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
+import { rubyInspectArray } from "../relation/ruby-inspect.js";
 
 // Late-bound AssociationRelation constructor to break circular imports
 // (association-relation.ts extends Relation, which would otherwise
@@ -1887,7 +1888,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           throw new ConfigurationError(
             `Active Record couldn't correctly interpret the query constraints ` +
               `for the \`${ctor.name}\` model. The query constraints on \`${ctor.name}\` are ` +
-              `\`${constraints}\` and the foreign key is \`${derivedFk}\`. ` +
+              `\`${rubyInspectArray(constraints)}\` and the foreign key is \`${derivedFk}\`. ` +
               `You need to explicitly set the query constraints for this association.`,
           );
         }
