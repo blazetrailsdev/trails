@@ -2384,9 +2384,10 @@ function createHabtmJoinModel(
     },
     configurable: true,
   });
-  // `connectionPool`/`connectionSpecificationName` read the backing field
-  // directly, so delegating the field (not just the static accessor) is what
-  // actually routes the pool lookup to the owner's database.
+  // `connectionPool` resolves via `connectionSpecificationName`, which reads the
+  // `_connectionSpecificationName` backing field (own-property check + accessor).
+  // Delegating that field — not just the public static accessor — is what routes
+  // the pool lookup to the owner's database.
   Object.defineProperty(JoinModel, "_connectionSpecificationName", {
     get() {
       return lhsModel.connectionSpecificationName;
@@ -2429,6 +2430,21 @@ function createHabtmJoinModel(
       JoinModel,
     );
     Reflection.addReflection(JoinModel, assocDef.name, ref);
+  }
+
+  // Rails builds the join model's two `belongs_to` sides through the normal
+  // builder, so `belongs_to_required_by_default` (read here, while the owner's
+  // class body is still evaluating) makes them required — see
+  // Builder::BelongsTo#define_validations. We create the reflections directly
+  // above, so consult the flag explicitly and add the same FK presence checks.
+  if (
+    (JoinModel as unknown as { belongsToRequiredByDefault?: boolean }).belongsToRequiredByDefault
+  ) {
+    for (const fk of [ownerFk, targetFk]) {
+      (
+        JoinModel as unknown as { validatesPresenceOf(fk: string, opts: object): void }
+      ).validatesPresenceOf(fk, { message: "required" });
+    }
   }
 
   return JoinModel;
