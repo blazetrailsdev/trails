@@ -1696,7 +1696,7 @@ export function buildStoryContent(
   const body =
     opts.body != null
       ? `\n${opts.body.replace(/^\n+/, "").replace(/\n+$/, "")}\n`
-      : "\n## Context\n\n## Acceptance criteria\n";
+      : "\n## Context\n\n## Acceptance criteria\n\n## Definition of done\n\n## Verification\n";
   // Default to `draft` here, not `ready`: this pure generator has no view of the
   // parent RFC's status, and an unguarded `ready` would let a direct caller
   // produce an immediately-claimable story under a still-draft RFC. `newStory`
@@ -2100,6 +2100,14 @@ evidence (error messages, grep counts, CI failure rates).
 
 The full design. Subsections as needed.
 
+## Non-goals
+
+Deliberately descoped work, each with a one-line reason. This is where an
+RFC-level descoping decision lives canonically — don't leave it only in
+session memory or a story comment.
+
+- **Name:** what it is, why it's out of scope.
+
 ## Alternatives considered
 
 - **Name:** what it is, why it was not chosen.
@@ -2111,7 +2119,16 @@ Ordered phases, referencing story IDs for each phase.
 1. Phase 1 — story IDs
 2. Phase 2 — story IDs
 
+## Verification
+
+How we'll know the RFC worked — a concrete metric, count, or burndown target
+(e.g. "exclude list reaches zero entries", "test:compare delta ≥ +40"). State
+the number, not a vibe.
+
 ## Open questions
+
+<!-- Every question here must be resolved or explicitly deferred (to a named
+     follow-up RFC/story) before this RFC moves to \`status: active\`. -->
 
 1. **Question.** Options and recommendation.
 

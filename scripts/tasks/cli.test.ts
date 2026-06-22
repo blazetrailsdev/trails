@@ -1525,6 +1525,8 @@ describe("buildStoryContent", () => {
     expect(content).toContain(`claim: null`);
     expect(content).toContain(`## Context`);
     expect(content).toContain(`## Acceptance criteria`);
+    expect(content).toContain(`## Definition of done`);
+    expect(content).toContain(`## Verification`);
   });
 
   it("applies all flags", () => {
@@ -2195,8 +2197,10 @@ describe("buildRfcContent", () => {
       "## Summary",
       "## Motivation",
       "## Design",
+      "## Non-goals",
       "## Alternatives considered",
       "## Rollout",
+      "## Verification",
       "## Open questions",
       "## Stories",
       "## Changelog",
@@ -2206,14 +2210,23 @@ describe("buildRfcContent", () => {
     // The scaffold prose must stay byte-identical to the 0000-template README so a
     // freshly created RFC matches the canonical structure. The Stories/Changelog
     // sections deliberately differ (the table is regenerated on commit), so this
-    // pins only the three sections this story adds, plus their placeholder prose.
+    // pins the structural sections plus their placeholder prose.
     expect(content).toContain(
       "## Alternatives considered\n\n- **Name:** what it is, why it was not chosen.",
     );
     expect(content).toContain(
       "## Rollout\n\nOrdered phases, referencing story IDs for each phase.\n\n1. Phase 1 — story IDs\n2. Phase 2 — story IDs",
     );
-    expect(content).toContain("## Open questions\n\n1. **Question.** Options and recommendation.");
+    expect(content).toContain(
+      "## Non-goals\n\nDeliberately descoped work, each with a one-line reason. This is where an\nRFC-level descoping decision lives canonically — don't leave it only in\nsession memory or a story comment.\n\n- **Name:** what it is, why it's out of scope.",
+    );
+    expect(content).toContain(
+      '## Verification\n\nHow we\'ll know the RFC worked — a concrete metric, count, or burndown target\n(e.g. "exclude list reaches zero entries", "test:compare delta ≥ +40"). State\nthe number, not a vibe.',
+    );
+    // The open-questions note must sit between the heading and the first question.
+    expect(content).toContain(
+      "## Open questions\n\n<!-- Every question here must be resolved or explicitly deferred (to a named\n     follow-up RFC/story) before this RFC moves to `status: active`. -->\n\n1. **Question.** Options and recommendation.",
+    );
   });
 
   it("applies title, owner, packages, and clusters", () => {
