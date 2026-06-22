@@ -43,6 +43,7 @@ import {
   HasManyThroughOrderError,
   CompositePrimaryKeyMismatchError,
 } from "./errors.js";
+import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { getInheritanceColumn, findStiClass, stiEnabled, polymorphicName } from "../inheritance.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
@@ -1897,7 +1898,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // cannot collapse to a scalar and we raise CompositePrimaryKeyMismatchError.
     const ownerPkOption = throughAssoc.options.primaryKey;
     if (Array.isArray(ownerPkOption) && !ownerPkOption.includes("id")) {
-      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
+      // Route through the reflection's canonical checkValidityBang (Rails'
+      // single raise site) so the error carries the Rails-faithful message.
+      routeThroughCheckValidity(ctor, this._assocName);
+      // No reflection resolvable (polymorphic collapse) — minimal fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: this._assocName,
@@ -1908,7 +1912,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const resolvedPkOption = Array.isArray(ownerPkOption) ? "id" : ownerPkOption;
     const ctorPk = ctor.primaryKey;
     if (Array.isArray(ctorPk) && !ctorPk.includes("id")) {
-      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
+      // Route through the reflection's canonical checkValidityBang (Rails'
+      // single raise site) so the error carries the Rails-faithful message.
+      routeThroughCheckValidity(ctor, this._assocName);
+      // No reflection resolvable (polymorphic collapse) — minimal fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: this._assocName,

@@ -107,3 +107,31 @@ export function validateReflectionValidity(modelClass: typeof Base, assocName: s
     throw err;
   }
 }
+
+/**
+ * Route a composite PK/FK mismatch — detected on a trails-only guard path that
+ * never runs through `Association#initialize` (inline-fallback loaders, the
+ * autosave save-path, `AssociationScope#addConstraints`, and the
+ * collection-proxy polymorphic collapse) — through the reflection's canonical
+ * `checkValidityBang`, the single Rails raise site (reflection.rb:623,625).
+ *
+ * When a reflection is resolvable for `assocName`, this raises
+ * `CompositePrimaryKeyMismatchError` derived from the *real* reflection's
+ * `active_record_primary_key` / `association_primary_key` — the Rails-faithful
+ * message — rather than from the trails-computed join keys at the call site.
+ * (For polymorphic associations `checkValidityBang` is a no-op, since Rails
+ * never permits a composite key there; the caller's minimal guard then fires.)
+ *
+ * Returns normally only when no reflection can be resolved (the genuine
+ * no-reflection fallback paths — lower-level test helpers that define
+ * associations without going through `Reflection.create`). In that case the
+ * caller keeps its minimal trails-computed guard so the mismatch still surfaces
+ * loudly instead of generating broken SQL / `readAttribute(undefined)`.
+ *
+ * Callers invoke this only after their own length/shape guard has already
+ * detected a mismatch, so healthy associations never reach it — no regression
+ * risk for working paths.
+ */
+export function routeThroughCheckValidity(modelClass: typeof Base, assocName: string): void {
+  validateReflectionValidity(modelClass, assocName);
+}
