@@ -1447,25 +1447,30 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   /**
-   * The polymorphic `*_type` column a through chain must filter on. Rails'
-   * `AssociationReflection#type` is `options[:as] && "#{as}_type"` — only a
-   * polymorphic has_many/has_one `as:` source contributes a type column; a
-   * belongs_to `polymorphic:` source returns nil there (its type filter is
-   * carried by a PolymorphicReflection chain entry instead). Without this,
-   * `AssociationScope.nextChainScope` reads `undefined` for the through chain
-   * head and omits e.g. `taggings.taggable_type = 'Post'`, leaking rows whose
-   * FK collides across taggable types.
+   * The polymorphic `*_type` column a through chain must filter on. Rails
+   * delegates `:type` to `source_reflection` (reflection.rb:973-974), where
+   * `AssociationReflection#type` is set ONLY for an `as:` source — `@type =
+   * options[:foreign_type] || "#{options[:as]}_type" if options[:as]`
+   * (reflection.rb:519). A `polymorphic:` belongs_to source has `type == nil`
+   * there (it sets `foreign_type` instead, line 520) and carries its type
+   * filter via a PolymorphicReflection chain entry, so this returns null for
+   * it. Without this getter, `AssociationScope.nextChainScope` reads
+   * `undefined` for the through chain head and omits e.g.
+   * `taggings.taggable_type = 'Post'`, leaking rows whose FK collides across
+   * taggable types.
    *
-   * Mirrors Rails delegating `type` through to the source reflection.
+   * We cannot delegate to `source.type` verbatim because trails'
+   * `AssociationReflection#type` conflates Rails' distinct `type` /
+   * `foreign_type` (it returns `foreignType`, which is non-null for a
+   * `polymorphic:` belongs_to). Guarding on `options.as` reproduces Rails'
+   * as:-only semantics; nested-through sources delegate recursively, matching
+   * Rails' chained `delegate :type`.
    */
   get type(): string | null {
-    const src = this.sourceReflection as
-      | (AssociationReflection & { belongsTo(): boolean })
-      | ThroughReflection
-      | null;
+    const src = this.sourceReflection;
     if (!src) return null;
     if (src.isThroughReflection?.()) return (src as ThroughReflection).type;
-    if ((src as any).options?.as && !(src as any).belongsTo?.()) {
+    if ((src as AssociationReflection).options?.as) {
       return (src as AssociationReflection).type;
     }
     return null;
