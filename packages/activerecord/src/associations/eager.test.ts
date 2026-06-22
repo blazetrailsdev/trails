@@ -5784,7 +5784,7 @@ describe("EagerAssociationTest", () => {
 // composite-key preloading cases.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { shardedBlogs, shardedBlogPosts, shardedComments, shardedTags } = useHandlerFixtures(
+  const { shardedBlogs, shardedBlogPosts, shardedComments } = useHandlerFixtures(
     ["shardedBlogs", "shardedBlogPosts", "shardedComments", "shardedTags", "shardedBlogPostsTags"],
     { schema: canonicalSchema },
   );
