@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import { ScopeRegistry } from "../scoping.js";
@@ -135,6 +136,18 @@ export function defaultScope<T extends typeof Base>(
   fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
   optionsOrAllQueries?: { allQueries?: boolean } | boolean,
 ): void {
+  // Rails: `scope.is_a?(Relation) || !scope.respond_to?(:call)`. A trails
+  // Relation is a non-callable object, so the callable check alone covers both
+  // (an eager `Model.where(...)` relation included).
+  if (typeof fn !== "function") {
+    throw new ArgumentError(
+      "Support for calling #default_scope without a block is removed. For " +
+        "example instead of `default_scope where(color: 'red')`, please use " +
+        "`default_scope { where(color: 'red') }`. (Alternatively you can just " +
+        "redefine self.default_scope.)",
+    );
+  }
+
   const allQueries =
     typeof optionsOrAllQueries === "boolean"
       ? optionsOrAllQueries

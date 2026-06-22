@@ -1,6 +1,61 @@
-import type { Base } from "../base.js";
-import type { Relation } from "../relation.js";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { Base } from "../base.js";
+import { Relation } from "../relation.js";
 import { Default } from "./default.js";
+
+/**
+ * Mirrors `ActiveRecord::AttributeMethods::ClassMethods::RESTRICTED_CLASS_METHODS`
+ * (`%w(private public protected allocate new name superclass)`), plus `relation`:
+ * Rails reserves the private `AR::Base#relation`, which trails names
+ * `_buildUnscopedRelation`, so the public `relation` name stays reserved here.
+ */
+const RESTRICTED_CLASS_METHODS = new Set([
+  "private",
+  "public",
+  "protected",
+  "allocate",
+  "new",
+  "name",
+  "superclass",
+  "relation",
+]);
+
+// Own properties every class function carries (`Base.length`/`Base.prototype`);
+// they are not AR-defined methods, so — unlike Rails' `name` — they must not
+// count as dangerous. `name` stays dangerous via RESTRICTED_CLASS_METHODS.
+const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
+
+/**
+ * Mirrors `ActiveRecord::AttributeMethods::ClassMethods#dangerous_class_method?`:
+ * a name is dangerous if it is in `RESTRICTED_CLASS_METHODS` or if AR::Base (or
+ * one of its ancestor classes) defines a class method with that name that is not
+ * inherited from `Object`/`Function`. Class methods defined on subclasses
+ * (existing scopes, user class methods) and Kernel methods are not dangerous —
+ * the walk starts at `Base`, never the model subclass.
+ */
+function isDangerousClassMethod(name: string): boolean {
+  if (RESTRICTED_CLASS_METHODS.has(name)) return true;
+  if (INTRINSIC_FUNCTION_PROPS.has(name)) return false;
+  let klass: any = Base;
+  while (klass && klass !== Function.prototype && klass !== Object.prototype) {
+    if (Object.prototype.hasOwnProperty.call(klass, name)) return true;
+    klass = Object.getPrototypeOf(klass);
+  }
+  return false;
+}
+
+/**
+ * Mirrors `method_defined_within?(name, Relation)`: true when `Relation`
+ * defines an instance method with this name that is not inherited from `Object`.
+ */
+function isRelationInstanceMethod(name: string): boolean {
+  let proto: any = Relation.prototype;
+  while (proto && proto !== Object.prototype) {
+    if (Object.prototype.hasOwnProperty.call(proto, name)) return true;
+    proto = Object.getPrototypeOf(proto);
+  }
+  return false;
+}
 
 /**
  * Named scope handling — defines named scopes on model classes
@@ -21,6 +76,27 @@ export function scope<T extends typeof Base>(
   extension?: Record<string, (...args: any[]) => any>,
 ): void {
   const modelClass = this as any;
+
+  if (typeof fn !== "function") {
+    throw new ArgumentError("The scope body needs to be callable.");
+  }
+
+  if (isDangerousClassMethod(name)) {
+    throw new ArgumentError(
+      `You tried to define a scope named "${name}" on the model ` +
+        `"${modelClass.name}", but Active Record already defined a class ` +
+        `method with the same name.`,
+    );
+  }
+
+  if (isRelationInstanceMethod(name)) {
+    throw new ArgumentError(
+      `You tried to define a scope named "${name}" on the model ` +
+        `"${modelClass.name}", but ActiveRecord::Relation already defined an ` +
+        `instance method with the same name.`,
+    );
+  }
+
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_scopes")) {
     modelClass._scopes = new Map(modelClass._scopes);
   }
