@@ -660,21 +660,18 @@ export async function establishConnection(
 
   if (config === undefined) {
     await autoConnect(modelClass);
-  } else if (config instanceof DatabaseConfig) {
-    // Mirrors Rails `establish_connection(db_config)`: resolve the adapter and
-    // connection args from the DatabaseConfig object and register the object
-    // itself as the pool's `db_config` (no re-parsing into a fresh hash). This
-    // is the faithful `run_without_connection` restore path.
-    await establishWithDbConfig(modelClass, config);
   } else {
-    // Validate up front (mirrors Rails raising before the adapter is built)
-    // but only mutate the process-wide zone once the connection is actually
-    // established, so a failed resolve/connect can't leave the global in an
-    // intermediate value.
-    const tz = typeof config === "object" ? validateConfigDefaultTimezone(config) : null;
-    const resolved = resolveConfig(modelClass, config);
-    await establishWithConfig(modelClass, resolved.adapterName, resolved.url, resolved.config);
-    if (tz) setDefaultTimezone(tz);
+    // Mirrors Rails `establish_connection(config_or_env)`
+    // (connection_handling.rb:51-54): every input — string URL, hash, or an
+    // already-resolved DatabaseConfig (the `run_without_connection` restore
+    // path) — funnels through `resolve_config_for_connection`, which plants the
+    // connection_specification_name and then `configurations.resolve(...)` (a
+    // no-op that returns the object unchanged for a DatabaseConfig). The
+    // resolved object then goes to the handler verbatim, so the pool stores it
+    // as-is instead of rebuilding a fresh UrlConfig/HashConfig. tz validation
+    // and buildAdapterArg live inside establishWithDbConfig.
+    const dbConfig = resolveConfigForConnection.call(modelClass, config);
+    await establishWithDbConfig(modelClass, dbConfig);
   }
 }
 
@@ -878,35 +875,6 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
     connectUrl,
     dbConfig.configuration as Record<string, unknown>,
   );
-}
-
-function resolveConfig(
-  modelClass: typeof Base,
-  config: string | { adapter?: string; url?: string; database?: string; [key: string]: unknown },
-): { adapterName: string; url: string; config?: Record<string, unknown> } {
-  let url: string;
-  let adapterName: string | undefined;
-  let fullConfig: Record<string, unknown> | undefined;
-
-  if (typeof config === "string") {
-    url = config;
-  } else {
-    adapterName = config.adapter;
-    url = config.url || "";
-    fullConfig = config as Record<string, unknown>;
-  }
-
-  if (!adapterName && !url && !fullConfig?.database) {
-    throw new AdapterNotSpecified(
-      "Database configuration must include a url, database, or adapter name",
-    );
-  }
-
-  if (!adapterName) {
-    adapterName = adapterNameFromUrl(url || (fullConfig?.database as string) || "");
-  }
-
-  return { adapterName, url, config: fullConfig };
 }
 
 async function loadConfigFile(modelClass: typeof Base): Promise<RawConfigurations> {
