@@ -2516,23 +2516,30 @@ describe("BasicsTest", () => {
     }
   });
 
+  // Rails base_test.rb test_clear_cache!: the per-connection schema cache is
+  // populated on first columns() read, emptied by clear, then repopulated to
+  // an equal value. (Converged from an earlier ad-hoc-model form that relied on
+  // a cold cache synthesizing columns from declared attribute()s — RFC 0031.)
   it("clear cache!", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "text");
-      }
-    }
-    // Warm the columns hash cache
-    const before = Topic.columnsHash();
-    expect(Object.keys(before).length).toBeGreaterThan(0);
-    // Reset clears the cached schema info — the returned object is a new instance
-    Topic.resetColumnInformation();
-    const after = Topic.columnsHash();
-    expect(Object.keys(after).length).toBeGreaterThan(0);
-    expect(Object.keys(after)).toEqual(Object.keys(before));
-    // The cache was cleared and recomputed — different object reference
-    expect(after).not.toBe(before);
+    const conn = Base.connection;
+    // `schemaCache` is typed optional on DatabaseAdapter, but AbstractAdapter's
+    // getter always returns one for a connected adapter.
+    const cache = conn.schemaCache!;
+    // preheat cache
+    const c1 = await cache.columns(conn.pool, "posts");
+    expect(cache.size).not.toBe(0);
+
+    cache.clear();
+    expect(cache.size).toBe(0);
+
+    const c2 = await cache.columns(conn.pool, "posts");
+    expect(cache.size).not.toBe(0);
+    expect(c2).toEqual(c1);
+
+    // Restore the harness' always-warm invariant for the rest of the file:
+    // trails cannot re-warm synchronously on read the way Rails' cold-DB-hit
+    // does, and the warm-once guard won't fire again this suite.
+    await cache.addAll(conn.pool);
   });
   it.skip("marshal inspected round trip", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
@@ -2656,21 +2663,24 @@ describe("BasicsTest", () => {
     expect(User.columnNames()).not.toContain("age");
     expect(User.hasAttributeDefinition("age")).toBe(true);
   });
+  // Rails base_test.rb: ColumnNamesCachedDeveloper sets ignored_columns and
+  // asserts the ignored column is absent from column_names. column_names is
+  // DB-sourced (Rails model_schema.rb), so we ignore *real* `users` columns;
+  // re-assigning ignoredColumns invalidates the cached list. (Converged from an
+  // earlier ad-hoc form that ignored virtual attribute()s — RFC 0031.)
   it("when assigning new ignored columns it invalidates cache for column names", () => {
     class User extends Base {
       static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.attribute("hidden", "string");
+        this._tableName = "users";
       }
     }
-    expect(User.columnNames()).toContain("secret");
-    User.ignoredColumns = ["secret"];
-    expect(User.columnNames()).not.toContain("secret");
-    expect("secret" in User.prototype).toBe(false);
-    User.ignoredColumns = ["secret", "hidden"];
-    expect(User.columnNames()).not.toContain("hidden");
-    expect("hidden" in User.prototype).toBe(false);
+    expect(User.columnNames()).toContain("email");
+    User.ignoredColumns = ["email"];
+    expect(User.columnNames()).not.toContain("email");
+    expect("email" in User.prototype).toBe(false);
+    User.ignoredColumns = ["email", "created_at"];
+    expect(User.columnNames()).not.toContain("created_at");
+    expect("created_at" in User.prototype).toBe(false);
   });
   it("column names are quoted when using #from clause and model has ignored columns", () => {
     class User extends Base {

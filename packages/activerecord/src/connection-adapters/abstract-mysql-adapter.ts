@@ -736,6 +736,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       columnName,
       defaultOrChanges,
     );
+    // Clear before mutating (matching the other DDL methods) so a subsequent
+    // columnsHash() read re-reflects the new default rather than a stale entry.
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
   }
 

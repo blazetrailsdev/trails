@@ -1400,6 +1400,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     if (options?.default !== undefined) {
       sql += ` DEFAULT ${this.quoteDefault(options.default)}`;
     }
+    // Invalidate the cached reflection for this table, matching the abstract
+    // SchemaStatements#addColumn (which clears before mutating). Without this
+    // the SQLite override would leave a stale columns entry after an
+    // `ALTER TABLE … ADD COLUMN`.
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.executeMutation(sql);
   }
 
@@ -1426,6 +1431,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       typeof defaultOrChanges === "object" && defaultOrChanges !== null
         ? (defaultOrChanges as any).to
         : defaultOrChanges;
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.alterTable(tableName, (columns) => {
       if (columns[columnName]) {
         columns[columnName].dflt_value = newDefault === null ? null : this.quoteDefault(newDefault);

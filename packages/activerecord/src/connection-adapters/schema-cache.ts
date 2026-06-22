@@ -75,6 +75,14 @@ export class SchemaCache {
   private _dataSourceExists = new Map<string, boolean>();
   private _indexes = new Map<string, unknown[]>();
   private _version: string | number | null = null;
+  // When non-null, records the name of every table passed to
+  // `clearDataSourceCacheBang` — i.e. every table touched by DDL
+  // (`create_table` / `drop_table` / `add_column` / … all funnel through it).
+  // The AR test harness opens a recording window per test so teardown can
+  // re-reflect only the DDL-touched tables instead of clearing the whole
+  // cache (mirrors Rails' per-table `clear_data_source_cache!`). Off (null)
+  // by default so production paths never pay the bookkeeping.
+  private _touchedTables: Set<string> | null = null;
 
   static _loadFrom(filename: string): SchemaCache | null {
     try {
@@ -336,8 +344,32 @@ export class SchemaCache {
     );
   }
 
+  /**
+   * Begin (or reset) a recording window. Subsequent
+   * `clearDataSourceCacheBang` calls record their table name until
+   * {@link takeTouchedTables} is called. Test-harness only.
+   *
+   * @internal
+   */
+  recordTouchedTables(): void {
+    this._touchedTables = new Set();
+  }
+
+  /**
+   * Return the tables touched since the last {@link recordTouchedTables} and
+   * close the recording window. Test-harness only.
+   *
+   * @internal
+   */
+  takeTouchedTables(): Set<string> {
+    const touched = this._touchedTables ?? new Set<string>();
+    this._touchedTables = null;
+    return touched;
+  }
+
   // Rails: clear_data_source_cache!(_connection, name)
   clearDataSourceCacheBang(_connection: unknown, name: string): void {
+    this._touchedTables?.add(name);
     this._columns.delete(name);
     this._columnsHash.delete(name);
     this._primaryKeys.delete(name);

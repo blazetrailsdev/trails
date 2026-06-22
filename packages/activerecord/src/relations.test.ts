@@ -8,6 +8,7 @@ import {
   IrreversibleOrderError,
 } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { Minivan } from "./test-helpers/models/minivan.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { adapterType } from "./test-adapter.js";
@@ -4764,14 +4765,14 @@ describe("RelationTest", () => {
     expect(sql).toContain("m1");
   });
 
+  // Rails relations_test.rb test_do_not_double_quote_string_id_with_array:
+  // Minivan has a string primary key (minivan_id); querying it with an array
+  // must keep the string ids verbatim, not cast them to integer. (Converged
+  // from an earlier ad-hoc form that relied on a cold cache leaving `id`
+  // untyped — RFC 0031.)
   it("do not double quote string id with array", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where({ id: ["abc", "def"] }).toSql();
-    expect(sql).toContain("abc");
+    const sql = Minivan.where({ minivan_id: ["m1", "m2"] }).toSql();
+    expect(sql).toContain("m1");
   });
 
   it("two scopes with includes should not drop any include", () => {

@@ -560,6 +560,7 @@ export class SchemaStatements {
       typeof options === "object" && options !== null && "to" in (options as any)
         ? (options as any).to
         : options;
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const clause = this.adapter.quoteDefaultExpression(defaultVal);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET${clause || " DEFAULT NULL"}`,
