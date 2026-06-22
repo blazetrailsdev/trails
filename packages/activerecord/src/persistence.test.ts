@@ -737,8 +737,6 @@ describe("PersistenceTest", () => {
       posts: { title: "string", body: "string" },
       cb_posts: { title: "string" },
       special_posts: { title: "string", body: "string" },
-      count_posts: { count: { type: "integer", default: 0 } },
-      count_posts2: { count: { type: "integer", default: 5 } },
       ts_posts: { title: "string", created_at: "datetime" },
       timed_posts: { title: "string", updated_at: "datetime" },
     });
@@ -750,12 +748,6 @@ describe("PersistenceTest", () => {
       }
     }
     Post = PostClass;
-  });
-
-  it("delete", async () => {
-    const p = await Post.create({ title: "to-delete" });
-    await Post.delete(p.id);
-    await expect(Post.find(p.id)).rejects.toThrow();
   });
 
   it("delete new record", async () => {
@@ -774,10 +766,6 @@ describe("PersistenceTest", () => {
     await Post.where({ title: "update-all" }).updateAll({ title: "updated" });
     const found = await Post.where({ title: "updated" }).toArray();
     expect(found.length).toBe(1);
-  });
-
-  it("destroy raises record not found exception", async () => {
-    await expect(Post.find(9999999)).rejects.toThrow();
   });
 
   it("destroy record with associations", async () => {
@@ -827,12 +815,6 @@ describe("PersistenceTest", () => {
     const p = new Post({ title: "inst" });
     expect(p).toBeInstanceOf(Base);
     expect(p.isNewRecord()).toBe(true);
-  });
-
-  it("build through factory with block", () => {
-    const p = new Post({ title: "built" });
-    expect(p.isNewRecord()).toBe(true);
-    expect(p.title).toBe("built");
   });
 
   it("update sti type", async () => {
@@ -891,30 +873,6 @@ describe("PersistenceTest", () => {
     },
   );
 
-  it("increment with touch an attribute updates timestamps", async () => {
-    class CountPost extends Base {
-      static {
-        this.tableName = "count_posts";
-        this.attribute("count", "integer", { default: 0 });
-      }
-    }
-    const p = await CountPost.create({});
-    p.increment("count");
-    expect(p.count).toBe(1);
-  });
-
-  it("decrement with touch updates timestamps", async () => {
-    class CountPost2 extends Base {
-      static {
-        this.tableName = "count_posts2";
-        this.attribute("count", "integer", { default: 5 });
-      }
-    }
-    const p = await CountPost2.create({});
-    p.decrement("count");
-    expect(p.count).toBe(4);
-  });
-
   it("update columns with default scope", async () => {
     const p = await Post.create({ title: "scope-cols" });
     await p.updateColumns({ title: "updated-scope-cols" });
@@ -933,13 +891,6 @@ describe("PersistenceTest", () => {
     expect(p.isPersisted()).toBe(true);
   });
 
-  it("update attribute with one updated!", async () => {
-    const p = await Post.create({ title: "one" });
-    await p.updateAttribute("title", "two");
-    const found = await Post.find(p.id);
-    expect(found.title).toBe("two");
-  });
-
   it("becomes errors base", () => {
     const p = new Post({ title: "base" });
     expect(p).toBeInstanceOf(Base);
@@ -952,6 +903,74 @@ describe("PersistenceTest", () => {
     await d.save();
     expect(d.isPersisted()).toBe(true);
     expect(d.id).not.toBe(p.id);
+  });
+});
+
+// ==========================================================================
+// PersistenceTest — delete / destroy / update-all / increment-decrement
+// converted from the bespoke posts block to canonical Topic + fixtures.
+// ==========================================================================
+describe("PersistenceTest", () => {
+  const Topic = CanonicalTopic;
+  const { topics } = useHandlerFixtures(["topics"], { schema: canonicalSchema });
+
+  // Rails: test_delete
+  it("delete", async () => {
+    const topic = await Topic.find(1);
+    expect(await topic.delete()).toBe(topic);
+    expect(topic.isFrozen()).toBe(true);
+    await expect(Topic.find((topic as any).id)).rejects.toThrow(RecordNotFound);
+  });
+
+  // Rails: test_destroy_raises_record_not_found_exception
+  it("destroy raises record not found exception", async () => {
+    await expect(Topic.destroy(99999)).rejects.toThrow(RecordNotFound);
+  });
+
+  // Rails: test_increment_with_touch_an_attribute_updates_timestamps
+  it("increment with touch an attribute updates timestamps", async () => {
+    const topic = topics("first");
+    expect(topic.replies_count).toBe(1);
+    const previouslyUpdatedAt = topic.updated_at;
+    const previouslyWrittenOn = topic.written_on;
+    await topic.incrementBang("replies_count", 1, { touch: "written_on" });
+    await topic.reload();
+    expect(topic.replies_count).toBe(2);
+    expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
+    expect(epochMs(topic.written_on)).toBeGreaterThan(epochMs(previouslyWrittenOn));
+  });
+
+  // Rails: test_decrement_with_touch_updates_timestamps
+  it("decrement with touch updates timestamps", async () => {
+    const topic = topics("first");
+    expect(topic.replies_count).toBe(1);
+    const previouslyUpdatedAt = topic.updated_at;
+    await topic.decrementBang("replies_count", 1, { touch: true });
+    await topic.reload();
+    expect(topic.replies_count).toBe(0);
+    expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
+  });
+
+  // Rails: test_update_attribute_with_one_updated!
+  it("update attribute with one updated!", async () => {
+    const t = (await Topic.first())!;
+    await t.updateAttributeBang("title", "super_title");
+    expect(t.title).toBe("super_title");
+    expect(t.changed).toBe(false);
+    expect(t.attributeChanged("title")).toBe(false);
+    expect(t.attributeChange("title")).toBeNull();
+    await t.reload();
+    expect(t.title).toBe("super_title");
+  });
+
+  // Rails: test_build_through_factory_with_block
+  it("build through factory with block", () => {
+    const topic = Topic.build({ title: "New Topic" }, (t: any) => {
+      t.author_name = "David";
+    });
+    expect(topic.title).toBe("New Topic");
+    expect(topic.author_name).toBe("David");
+    expect(topic.isPersisted()).toBe(false);
   });
 });
 
