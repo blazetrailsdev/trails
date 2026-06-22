@@ -2,6 +2,7 @@ import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 import { rubyInspectArray } from "../ruby-inspect.js";
+import { DeferredDistinctPkIn, DeferredDistinctPkNotIn } from "./deferred-distinct-pk-in.js";
 
 /**
  * Handles Relation values in where conditions by converting them to
@@ -15,13 +16,38 @@ import { rubyInspectArray } from "../ruby-inspect.js";
  */
 export class RelationHandler {
   call(attribute: Nodes.Attribute, value: any): Nodes.Node {
+    const deferred = this.deferDistinctPkMaterialization(attribute, value, false);
+    if (deferred) return deferred;
     const relation = this.injectPrimaryKeySelect(attribute, this.applyJoinDependency(value));
     return attribute.in(relation.toArel());
   }
 
   callNegated(attribute: Nodes.Attribute, value: any): Nodes.Node {
+    const deferred = this.deferDistinctPkMaterialization(attribute, value, true);
+    if (deferred) return deferred;
     const relation = this.injectPrimaryKeySelect(attribute, this.applyJoinDependency(value));
     return attribute.notIn(relation.toArel());
+  }
+
+  // Rails routes an eager-loading subquery with a limit/offset over a collection
+  // reflection through `distinct_relation_for_primary_key`, which executes a
+  // query to materialize the limited DISTINCT primary keys (finder_methods.rb:463,
+  // schema_statements.rb:1429). trails' `.where()` is synchronous, so we cannot
+  // run that query here. Instead emit a deferred marker carrying the inner
+  // relation; the relation load pipeline materializes the ids and substitutes a
+  // literal `attribute.in([...ids])` before compile. Returns null when `value`
+  // is not this special case (the normal `IN (subquery)` path applies).
+  private deferDistinctPkMaterialization(
+    attribute: Nodes.Attribute,
+    value: any,
+    negated: boolean,
+  ): Nodes.Node | null {
+    if (typeof value?._isDeferredDistinctPkSubquery !== "function") return null;
+    if (!value._isDeferredDistinctPkSubquery()) return null;
+    const inlineSubquery = value._buildDeferredDistinctPkInlineSubquery();
+    return negated
+      ? new DeferredDistinctPkNotIn(attribute, inlineSubquery, value)
+      : new DeferredDistinctPkIn(attribute, inlineSubquery, value);
   }
 
   // Mirrors Rails `if value.eager_loading? value = value.send(:apply_join_dependency) end`

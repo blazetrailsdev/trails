@@ -127,6 +127,10 @@ import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import type { PrettyPrinter } from "./pretty-print.js";
 import { JoinDependency } from "./associations/join-dependency.js";
+import {
+  DeferredDistinctPkIn,
+  DeferredDistinctPkNotIn,
+} from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
 
@@ -2553,6 +2557,13 @@ export class Relation<T extends Base> {
       this._modelClass as unknown as { ensureSchemaLoaded(): Promise<void> }
     ).ensureSchemaLoaded();
 
+    // Rails materializes a `distinct_relation_for_primary_key` subquery value
+    // (an eager-loading relation with limit/offset over a collection reflection)
+    // into a literal id list inside `.where()`. trails' `.where()` is sync, so
+    // the materialization is deferred to here — run it before the contradiction
+    // check so an empty id set becomes an empty `IN` (no-query empty result).
+    await this._materializeDeferredDistinctPkPredicates();
+
     // Rails Relation#exec_main_query short-circuits a contradictory
     // where-clause (e.g. `where(id: [])`, which compiles to an empty `IN`)
     // to a frozen `[]` *before* issuing any SQL. Mirror that here so no
@@ -3453,6 +3464,10 @@ export class Relation<T extends Base> {
         }
       }
     }
+    // Resolve any deferred distinct-PK subquery markers to a literal id list
+    // before compiling the probe (Rails materializes at `.where()`-build time).
+    await rel._materializeDeferredDistinctPkPredicates();
+    if (rel._whereClause.isContradiction()) return false;
     // Mirrors Rails' `SELECT 1 AS one FROM ... LIMIT 1`: a dedicated
     // existence probe that never instantiates records (no after_find /
     // association loading) and doesn't go through count()'s limit
@@ -3581,6 +3596,10 @@ export class Relation<T extends Base> {
   private async _pluckInner(
     ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
+    // Resolve any deferred distinct-PK subquery markers to a literal id list
+    // before compiling, so pluck (like Rails) emits `pk IN (ids)` rather than
+    // the inline `IN (SELECT … LIMIT n)` MySQL rejects.
+    await this._materializeDeferredDistinctPkPredicates();
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
     // the eager values) and recurses, so the plucked columns can reference the
@@ -3732,6 +3751,7 @@ export class Relation<T extends Base> {
     if (Object.keys(updates).length === 0)
       throw new ArgumentError("Empty list of attributes to change");
     if (this._isNone) return 0;
+    await this._materializeDeferredDistinctPkPredicates();
 
     const table = this._modelClass.arelTable;
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
@@ -3816,6 +3836,7 @@ export class Relation<T extends Base> {
    */
   async deleteAll(): Promise<number> {
     if (this._isNone) return 0;
+    await this._materializeDeferredDistinctPkPredicates();
 
     // Mirrors Rails `INVALID_METHODS_FOR_DELETE_ALL = [:distinct, :with,
     // :with_recursive]`: `delete_all` cannot honor these clauses, so it raises
@@ -4531,6 +4552,105 @@ export class Relation<T extends Base> {
    */
   usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean {
     return reflections.every((r) => !r.isCollection());
+  }
+
+  /** Eager-load specs that `apply_join_dependency` would join (eager_load ∪ includes). */
+  private _deferredDistinctPkEagerSpecs(): AssociationSpec[] {
+    return [...new Set([...this._eagerLoadAssociations, ...this._includesAssociations])];
+  }
+
+  /**
+   * True when, used as a `where(x: <relation>)` subquery value, this relation
+   * matches Rails' `distinct_relation_for_primary_key` branch: it is
+   * eager-loading, has a limit/offset, and its eager reflections are NOT
+   * limitable (i.e. at least one is a collection). Rails materializes the
+   * limited DISTINCT primary keys for this case to avoid `IN (SELECT … LIMIT n)`
+   * (which MySQL rejects); trails defers that to relation load time.
+   *
+   * A grouped relation is excluded, mirroring Rails
+   * `apply_join_dependency(eager_loading: group_values.empty?)`
+   * (finder_methods.rb:457): a grouped subquery passes `eager_loading: false`,
+   * which skips the `distinct_relation_for_primary_key` materialization and
+   * builds the plain `IN (SELECT … GROUP BY …)` subquery instead.
+   * @internal
+   */
+  _isDeferredDistinctPkSubquery(): boolean {
+    if (this._groupColumns.length > 0) return false;
+    if (!this._eagerLoadingForSql()) return false;
+    if (this._limitValue === null && this._offsetValue === null) return false;
+    return !this._eagerReflectionsAreLimitable(this._deferredDistinctPkEagerSpecs());
+  }
+
+  /**
+   * Build the inline `SELECT DISTINCT <pk> … LIMIT n` subquery used as the
+   * synchronous display fallback (`toSql`) for a deferred marker. The load
+   * pipeline substitutes a materialized id list instead; this nested form is
+   * only rendered when SQL is requested without loading (valid on SQLite/
+   * PostgreSQL; MySQL rejects `LIMIT` inside `IN`, which is exactly why the
+   * load-time materialization exists).
+   * @internal
+   */
+  _buildDeferredDistinctPkInlineSubquery(): SelectManager {
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    const jd = new JoinDependency(this._modelClass);
+    this._addEagerSpecsToJoinDependency(
+      jd,
+      this._deferredDistinctPkEagerSpecs(),
+      this._aliasableReferences(),
+    );
+    return this._buildEagerIdSubquery(jd, basePk);
+  }
+
+  /**
+   * Execute the standalone `SELECT DISTINCT <pk> … LIMIT n` and collect the
+   * limited primary keys, mirroring Rails `distinct_relation_for_primary_key`
+   * (schema_statements.rb:1429). Runs inside the relation's own connection lease
+   * so it resolves the inner model's adapter independently of the outer query.
+   * @internal
+   */
+  async _materializeDistinctPkIds(): Promise<unknown[]> {
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    const jd = new JoinDependency(this._modelClass);
+    this._addEagerSpecsToJoinDependency(
+      jd,
+      this._deferredDistinctPkEagerSpecs(),
+      this._aliasableReferences(),
+    );
+    if (jd.nodes.length === 0) return [];
+    return this._withQueryConnection(() => this._materializeLimitedIds(jd, basePk));
+  }
+
+  /**
+   * Load-time hook for Rails' `distinct_relation_for_primary_key`
+   * materialization. Before the where clause is compiled, replace each deferred
+   * marker (recorded synchronously by `RelationHandler`) with a literal
+   * `attribute IN (...ids)` / `NOT IN (...ids)`. An empty id set yields an empty
+   * `IN`, which `WhereClause#isContradiction` short-circuits to a no-query empty
+   * result (Rails' `none!` semantics). Idempotent: substituted nodes are plain
+   * `In`/`NotIn`, so a re-load finds nothing to do.
+   *
+   * Substitution mutates `this._whereClause.predicates` in place and bakes the
+   * ids permanently, mirroring Rails, which fixes the materialized ids at
+   * `.where()`-build time. Consequence: reloading the SAME relation object after
+   * the underlying rows change reuses the first load's parent ids rather than
+   * re-querying — re-run the original `where(x: <subquery>)` for fresh ids.
+   * Called from every terminal that compiles the where clause (toArray, pluck,
+   * exists, the calculations, updateAll/deleteAll) so the literal id list — not
+   * the unportable inline `IN (SELECT … LIMIT n)` — reaches all of them.
+   * @internal
+   */
+  async _materializeDeferredDistinctPkPredicates(): Promise<void> {
+    const predicates = this._whereClause.predicates;
+    for (let i = 0; i < predicates.length; i++) {
+      const node = predicates[i];
+      const deferred =
+        node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn;
+      if (!deferred) continue;
+      const ids = await node.innerRelation._materializeDistinctPkIds();
+      const attribute = node.left as Nodes.Attribute;
+      predicates[i] =
+        node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
+    }
   }
 
   /**

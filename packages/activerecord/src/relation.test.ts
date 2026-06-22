@@ -1684,14 +1684,16 @@ describe("Relation#arel build_arel convergence", () => {
   });
 
   // Rails apply_join_dependency materializes distinct primary keys (executing a
-  // query) when eager loading with a limit over a collection reflection. A
-  // synchronous predicate builder can't run that query, and a pure-SQL
-  // approximation diverges from Rails' materialized-ID shape — so the
-  // combination is rejected explicitly rather than emitting non-parity SQL.
-  it("where with eager-loading limited collection relation subquery is rejected", () => {
-    expect(() => Gadget.where({ widget_id: Widget.eagerLoad("gadgets").limit(5) }).toSql()).toThrow(
-      /not supported/,
-    );
+  // query) when eager loading with a limit over a collection reflection. trails
+  // defers that query to relation load time; the synchronous `toSql()` display
+  // path cannot run it, so it renders the inline `IN (SELECT DISTINCT … LIMIT n)`
+  // fallback (valid on SQLite/PostgreSQL). The load path substitutes a literal
+  // id list instead — see the canonical RelationTest materialization tests.
+  it("where with eager-loading limited collection relation subquery renders the inline distinct subquery for sync toSql", () => {
+    const sql = Gadget.where({ widget_id: Widget.eagerLoad("gadgets").limit(5) }).toSql();
+    expect(sql).toMatch(/widget_id\W+IN \(SELECT DISTINCT ["`]widgets["`]\.["`]id["`]/);
+    expect(sql).toContain("LEFT OUTER JOIN");
+    expect(sql).toMatch(/LIMIT 5/);
   });
 });
 
@@ -1828,5 +1830,95 @@ describe("RelationTest", () => {
     expect((await postsWithJoinsAndMerges.toArray()).length).toBe(
       postsWithAuthorAndCategorizations.length,
     );
+  });
+
+  // Rails RelationHandler#call routes an eager-loading subquery that also has a
+  // limit/offset over a collection reflection through
+  // distinct_relation_for_primary_key (finder_methods.rb:463), which EXECUTES a
+  // `SELECT DISTINCT <pk> … LIMIT n` to materialize a literal id list rather than
+  // nesting `IN (SELECT … LIMIT n)` (MySQL rejects LIMIT inside IN). trails'
+  // `.where()` is synchronous, so the materialization is deferred to relation
+  // load time: the main query carries the literal `author_id IN (<ids>)`, never
+  // a LIMIT-bearing subquery, on every adapter.
+  it("where with eager-loading limited collection relation subquery materializes distinct primary keys at load time", async () => {
+    const subquery = CanonAuthor.eagerLoad("posts").order("id").limit(2);
+
+    let records: any[] = [];
+    const queries = await captureSql(async () => {
+      records = await CanonPost.where({ author_id: subquery }).order("id").toArray();
+    });
+
+    const limitedAuthorIds = await CanonAuthor.order("id").limit(2).pluck("id");
+    const expectedPostIds = await CanonPost.where({ author_id: limitedAuthorIds })
+      .order("id")
+      .pluck("id");
+    expect(records.map((p) => p.id)).toEqual(expectedPostIds);
+    expect(expectedPostIds.length).toBeGreaterThan(0);
+
+    // A standalone DISTINCT-pk materialization query ran (Rails
+    // distinct_relation_for_primary_key), carrying the LIMIT.
+    expect(queries.some((sql) => /SELECT\s+DISTINCT/i.test(sql) && /\bLIMIT\b/i.test(sql))).toBe(
+      true,
+    );
+    // The main Post query embeds the materialized ids as a literal IN list — no
+    // nested subquery, no LIMIT inside IN (the MySQL parity assertion).
+    const mainQuery = queries.find((sql) => /\bIN\b/i.test(sql) && /author_id/i.test(sql));
+    expect(mainQuery).toBeDefined();
+    expect(/IN\s*\(\s*SELECT/i.test(mainQuery!)).toBe(false);
+    for (const id of limitedAuthorIds) {
+      expect(mainQuery!).toContain(String(id));
+    }
+  });
+
+  // An empty materialized id set yields an empty `IN`, which the where clause
+  // short-circuits as a contradiction (Rails `none!`): an empty result with no
+  // main query issued and no error.
+  it("where with eager-loading limited collection relation subquery yielding no ids is empty", async () => {
+    const subquery = CanonAuthor.where({ id: -1 }).eagerLoad("posts").order("id").limit(2);
+
+    let records: any[] = [];
+    const queries = await captureSql(async () => {
+      records = await CanonPost.where({ author_id: subquery }).toArray();
+    });
+
+    expect(records).toEqual([]);
+    // No main Post SELECT was issued (contradiction short-circuit before SQL).
+    expect(queries.some((sql) => /author_id/i.test(sql) && /\bIN\b/i.test(sql))).toBe(false);
+  });
+
+  // The deferred materialization must fire for every terminal that compiles the
+  // where clause — not just toArray — or count/pluck/exists would render the
+  // inline LIMIT-in-IN subquery MySQL rejects. Rails materializes at
+  // `.where()`-build time, so all terminals see `pk IN (ids)`.
+  it("count, pluck, and exists over an eager-loading limited collection subquery materialize distinct primary keys", async () => {
+    const subquery = () => CanonAuthor.eagerLoad("posts").order("id").limit(2);
+    const limitedAuthorIds = await CanonAuthor.order("id").limit(2).pluck("id");
+    const expectedPostIds = await CanonPost.where({ author_id: limitedAuthorIds })
+      .order("id")
+      .pluck("id");
+
+    let count = 0;
+    const countQueries = await captureSql(async () => {
+      count = (await CanonPost.where({ author_id: subquery() }).count()) as number;
+    });
+    expect(count).toBe(expectedPostIds.length);
+    // No terminal renders the inline LIMIT-in-IN subquery MySQL rejects.
+    expect(countQueries.every((sql) => !/IN\s*\(\s*SELECT/i.test(sql))).toBe(true);
+
+    const pluckedIds = await CanonPost.where({ author_id: subquery() }).order("id").pluck("id");
+    expect(pluckedIds).toEqual(expectedPostIds);
+
+    expect(await CanonPost.where({ author_id: subquery() }).exists()).toBe(true);
+  });
+
+  // Rails `apply_join_dependency(eager_loading: group_values.empty?)`
+  // (finder_methods.rb:457): a grouped subquery passes `eager_loading: false`,
+  // skipping distinct_relation_for_primary_key — so a grouped eager+limit
+  // subquery is NOT deferred and builds the plain `IN (SELECT … GROUP BY …)`.
+  it("where with a grouped eager-loading limited subquery does not defer materialization", () => {
+    const subquery = CanonAuthor.eagerLoad("posts").group("authors.id").limit(2);
+    const sql = CanonPost.where({ author_id: subquery }).toSql();
+    expect(sql).toMatch(/IN \(SELECT/i);
+    expect(sql).toMatch(/GROUP BY/i);
   });
 });
