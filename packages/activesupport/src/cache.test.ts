@@ -337,6 +337,14 @@ describe("FileStoreTest", () => {
     expect(store.decrement("counter")).toBe(4);
   });
 
+  it("increment creates a missing key set to amount", () => {
+    // Rails FileStore#modify_value creates the key set to amount and returns
+    // amount on a missing entry (file_store.rb:230-231).
+    expect(store.increment("missing")).toBe(1);
+    expect(store.read("missing")).toBe(1);
+    expect(store.increment("other", 100)).toBe(100);
+  });
+
   it("readMulti returns present keys", () => {
     store.write("a", 1);
     store.write("b", 2);
