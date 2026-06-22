@@ -2663,39 +2663,62 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Rails `joined_includes_values = includes_values & joins_values`: an include
-   * that is ALSO present in `joins(...)` makes `eager_loading?` true, so it is
-   * satisfied by the existing INNER JOIN in a single query rather than a
-   * separate preload (e.g. `Post.includes(:comments).joins(:comments)`). We
-   * promote the intersecting string specs; `_buildEagerJoinManager` then skips
-   * re-emitting the eager OUTER JOIN for those tables (the named INNER JOIN
-   * already covers them) so the JoinDependency projection/instantiation reuses
-   * the existing join.
+   * String specs present in BOTH `includes(...)` and `joins(...)` — Rails'
+   * `joined_includes_values = includes_values & joins_values`.
    */
-  private _includesToPromoteFromJoins(): AssociationSpec[] {
+  private _joinedIncludesValues(): string[] {
     if (this._includesAssociations.length === 0) return [];
     if (this._namedInnerJoins.length === 0) return [];
     const joined = new Set(this._namedInnerJoins.filter((v): v is string => typeof v === "string"));
-    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
     return this._includesAssociations.filter(
-      (spec) => typeof spec === "string" && joined.has(spec) && !alreadyEagerLoaded.has(spec),
+      (spec): spec is string => typeof spec === "string" && joined.has(spec),
     );
   }
 
   /**
-   * Resolved table names for `joins(:assoc)` named inner joins. Used to dedup an
-   * eager-load JOIN against an association already INNER-joined via joins().
+   * Rails `eager_loading?` (relation.rb): a non-empty `joined_includes_values`
+   * makes the relation eager-load, and `apply_join_dependency` (finder_methods.rb)
+   * then builds the JoinDependency from `eager_load_values | includes_values` —
+   * i.e. ALL includes go into the join query, not just the intersecting one
+   * (e.g. `Post.includes(:comments, :author).joins(:comments)` join-loads both,
+   * with `author` as a deduped OUTER join). So once any include is also in
+   * `joins(...)`, promote every include — mirroring `_includesToPromoteFromReferences`.
+   * `_buildEagerJoinManager` then skips re-emitting the eager OUTER JOIN for the
+   * intersecting tables (the named INNER JOIN already covers them).
    */
-  private _namedInnerJoinTables(): Set<string> {
-    const tables = new Set<string>();
-    for (const v of this._namedInnerJoins) {
-      if (typeof v !== "string") continue;
-      const resolved = this._resolveAssociationJoin(v);
-      if (!resolved) continue;
-      const entries = Array.isArray(resolved) ? resolved : [resolved];
-      for (const e of entries) tables.add(e.table.toLowerCase());
-    }
-    return tables;
+  private _includesToPromoteFromJoins(): AssociationSpec[] {
+    if (this._joinedIncludesValues().length === 0) return [];
+    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
+    return this._includesAssociations.filter((spec) => !alreadyEagerLoaded.has(spec));
+  }
+
+  /**
+   * Resolved table names for the `includes ∩ joins` intersection — the tables
+   * whose eager-load OUTER JOIN is redundant because `joins(:assoc)` already
+   * emits an INNER JOIN to them. Scoped to the intersection (not every named
+   * inner join) so an eager table that merely coincides with an unrelated
+   * `joins(...)` table is not silently dropped. The intersecting association is
+   * the canonical (first) occurrence of its table in the eager JoinDependency,
+   * so it is emitted un-aliased and matches by bare table name here.
+   */
+  private _joinedIncludesTables(): Set<string> {
+    return new Set(this._resolveAssocTables(this._joinedIncludesValues()));
+  }
+
+  /**
+   * Resolve association-name join specs to their lowercased table names. An
+   * unresolved spec falls back to its own lowercased name (matching the inline
+   * resolution in `referencesEagerLoadedTables`).
+   */
+  private _resolveAssocTables(values: AssociationSpec[]): string[] {
+    return values
+      .filter((v): v is string => typeof v === "string")
+      .flatMap((v) => {
+        const resolved = this._resolveAssociationJoin(v);
+        if (!resolved) return [v.toLowerCase()];
+        const entries = Array.isArray(resolved) ? resolved : [resolved];
+        return entries.map((e) => e.table.toLowerCase());
+      });
   }
 
   /**
@@ -2726,20 +2749,11 @@ export class Relation<T extends Base> {
     // build_joins([]) processes left_outer_joins_values and extracts table names
     // from the resulting join nodes. We resolve via _resolveAssociationJoin to
     // get the actual table name (handles camelCase → snake_case mappings).
-    const resolveAssocTables = (values: AssociationSpec[]): string[] =>
-      values
-        .filter((v): v is string => typeof v === "string")
-        .flatMap((v) => {
-          const resolved = this._resolveAssociationJoin(v);
-          if (!resolved) return [v.toLowerCase()]; // fallback
-          const entries = Array.isArray(resolved) ? resolved : [resolved];
-          return entries.map((e) => e.table.toLowerCase());
-        });
-    const leftOuterTables = resolveAssocTables(this._leftOuterJoinsValues);
+    const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
     // _namedInnerJoins holds association names too (joins(:assoc) routed through
     // JoinDependency with InnerJoin). Resolve to table names so references to
     // those tables don't spuriously promote includes to eager_load.
-    const namedInnerTables = resolveAssocTables(this._namedInnerJoins);
+    const namedInnerTables = this._resolveAssocTables(this._namedInnerJoins);
     const joinedTables = new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
       ...leftOuterTables,
@@ -4724,15 +4738,15 @@ export class Relation<T extends Base> {
       selectCols.length > 0 ? [...this.arelColumns(selectCols), ...aliasNodes] : aliasNodes;
     const manager = table.project(...(projection as Parameters<typeof table.project>));
 
-    // Skip eager-load JOINs for tables already INNER-joined via `joins(:assoc)`
+    // Skip eager-load JOINs for tables in the `includes ∩ joins` intersection
     // (Rails joined_includes_values): `_applyJoinsToManager` emits the named
     // INNER JOIN, and the JoinDependency projection above reads its columns by
     // the same (unaliased) table name — so re-emitting the eager OUTER JOIN here
     // would duplicate the join.
-    const namedInnerTables = this._namedInnerJoinTables();
+    const joinedIncludesTables = this._joinedIncludesTables();
     for (const node of joinNodes) {
       const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
-      if (typeof joinedTable === "string" && namedInnerTables.has(joinedTable.toLowerCase())) {
+      if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
         continue;
       }
       manager.appendJoinNode(node);
