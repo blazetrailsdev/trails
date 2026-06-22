@@ -8,11 +8,20 @@ import { Time as TimeType } from "../../type/time.js";
 import {
   columnNameMatcher,
   columnNameWithOrderMatcher,
-  quote,
+  quote as quoteFn,
   quotedBinary,
   quoteDefaultExpression,
-  typeCast,
+  quotedDate,
+  quotedTime,
+  typeCast as typeCastFn,
 } from "./quoting.js";
+
+// `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
+// SQLite's quotedDate / quotedTime so date/time literals keep the 2000-01-01
+// prefix on times.
+const HOST = { quotedDate, quotedTime };
+const quote = (value: unknown): string => quoteFn.call(HOST, value);
+const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
 describe("SQLite3::Quoting", () => {
   describe("columnNameMatcher", () => {
@@ -172,7 +181,7 @@ describe("SQLite3::Quoting", () => {
 
     it("dispatches PlainTime through the host quotedTime override", () => {
       const host = { quotedTime: () => "DISPATCHED" };
-      expect(quote.call(host, Temporal.PlainTime.from("14:23:55"))).toBe("'DISPATCHED'");
+      expect(quoteFn.call(host, Temporal.PlainTime.from("14:23:55"))).toBe("'DISPATCHED'");
     });
   });
 

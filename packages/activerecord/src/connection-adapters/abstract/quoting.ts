@@ -24,8 +24,9 @@ import {
  * through, mirroring Rails where `quote` calls `self.quoted_date` /
  * `self.quoted_time` and `quote_table_name` calls `self.quote_column_name`.
  * Threading `this` lets an adapter override (e.g. PostgreSQL's BC-aware
- * `quotedDate`) flow into the inherited `quote`. Bare calls (`this === void`)
- * fall back to the module-level helpers below.
+ * `quotedDate`) flow into the inherited `quote`. A host receiver is required —
+ * every invocation goes through an adapter via `.call(this, value)`; a host
+ * that omits `quotedDate` / `quotedTime` falls back to the module-level helpers.
  */
 export interface QuotingDispatchHost {
   /** @internal */
@@ -87,7 +88,7 @@ export function quoteTableName(this: QuotingDispatchHost | void, name: string): 
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote
  */
-export function quote(this: QuotingDispatchHost | void, value: unknown): string {
+export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   // BigDecimals need to be put in a non-normalized (fixed, ".0"-bearing) form
@@ -130,7 +131,7 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#type_cast
  */
-export function typeCast(this: QuotingDispatchHost | void, value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (typeof value === "symbol") return value.description ?? String(value);
   if (value === true) return unquotedTrue();
   if (value === false) return unquotedFalse();
@@ -142,8 +143,7 @@ export function typeCast(this: QuotingDispatchHost | void, value: unknown): unkn
   // Rails dispatches `Type::Time::Value` through `self.quoted_time` and
   // `Date`/`Time` through `self.quoted_date` (abstract/quoting.rb:93-101), the
   // same self-dispatch `quote` uses. Thread `this` so adapter overrides — e.g.
-  // PostgreSQL's BC-suffixing `quotedDate` — flow into `type_cast` too; bare
-  // calls fall back to the module-level helpers.
+  // PostgreSQL's BC-suffixing `quotedDate` — flow into `type_cast` too.
   if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
   if (
     value instanceof Temporal.Instant ||
@@ -224,7 +224,11 @@ export function quoteTableNameForAssignment(table: string, attr: string): string
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#quote_default_expression
  */
-export function quoteDefaultExpression(value: unknown, _column?: unknown): string {
+export function quoteDefaultExpression(
+  this: QuotingDispatchHost | void,
+  value: unknown,
+  _column?: unknown,
+): string {
   if (value === undefined) return "";
   if (typeof value === "function") {
     const result = (value as () => unknown)();
@@ -235,7 +239,10 @@ export function quoteDefaultExpression(value: unknown, _column?: unknown): strin
     );
   }
   if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
-  return ` DEFAULT ${quote(value)}`;
+  // `quote` requires a host receiver; thread our own (the adapter-free
+  // ABSTRACT_SCHEMA_QUOTER / mysql schema-quoter bind `this` to the quoter
+  // object, an empty QuotingDispatchHost that falls back to module helpers).
+  return ` DEFAULT ${quote.call(this || {}, value)}`;
 }
 
 /**
@@ -351,26 +358,25 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
   );
 }
 
-/** @internal */
-export function dispatchQuotedDate(
-  host: QuotingDispatchHost | void,
-  value: TemporalDateLike,
-): string {
-  if (host && typeof host === "object" && typeof host.quotedDate === "function") {
+/**
+ * Dispatch through the host's `quotedDate` override if it defines one, else
+ * the module-level helper. A host receiver is required — there are no
+ * receiver-less callers (every invocation threads an adapter `this`).
+ * @internal
+ */
+export function dispatchQuotedDate(host: QuotingDispatchHost, value: TemporalDateLike): string {
+  if (typeof host.quotedDate === "function") {
     return host.quotedDate(value);
   }
   return quotedDate(value);
 }
 
 /** @internal */
-export function dispatchQuotedTime(
-  host: QuotingDispatchHost | void,
-  value: Temporal.PlainTime,
-): string {
-  if (host && typeof host === "object" && typeof host.quotedTime === "function") {
+export function dispatchQuotedTime(host: QuotingDispatchHost, value: Temporal.PlainTime): string {
+  if (typeof host.quotedTime === "function") {
     return host.quotedTime(value);
   }
-  return quotedTime(value);
+  return quotedTime.call(host, value);
 }
 
 /**
@@ -416,13 +422,12 @@ export function quotedDate(
  * Mirrors Rails' `quoted_time` (abstract/quoting.rb:203), which normalises the
  * date to 2000-01-01 then returns `quoted_date(value).sub(/\A\d\d\d\d-\d\d-\d\d /, "")`
  * — dispatching through `self.quoted_date`. We thread `this` the same way so an
- * adapter `quotedDate` override is honored here too; bare calls fall back to the
- * module helper.
+ * adapter `quotedDate` override is honored here too.
  *
  * @internal
  */
 export function quotedTime(
-  this: QuotingDispatchHost | void,
+  this: QuotingDispatchHost,
   value: Temporal.PlainTime | Temporal.PlainDateTime,
 ): string {
   const dt =

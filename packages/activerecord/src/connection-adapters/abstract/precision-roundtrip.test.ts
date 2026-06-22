@@ -15,8 +15,13 @@ import {
   formatPlainDateTimeForSqlMysql,
   formatPlainTimeForSqlMysql,
 } from "./sql-datetime.js";
-import { quote, typeCast } from "./quoting.js";
+import { quote as quoteFn, typeCast as typeCastFn } from "./quoting.js";
 import { temporalToBindString } from "./database-statements.js";
+
+// `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
+// an empty host so date/time values route through the abstract module helpers.
+const quote = (value: unknown): string => quoteFn.call({}, value);
+const typeCast = (value: unknown): unknown => typeCastFn.call({}, value);
 
 describe("formatInstantForSql", () => {
   it("formats a whole-second instant", () => {

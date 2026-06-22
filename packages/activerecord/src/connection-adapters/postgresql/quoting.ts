@@ -127,7 +127,7 @@ export function quotedBinary(value: Buffer | Uint8Array | string): string {
   return `'${escapeBytea(value)}'`;
 }
 
-export function quote(this: QuotingDispatchHost | void, value: unknown): string {
+export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (value instanceof XmlData) {
     return `xml ${quoteString(value.toString())}`;
   }
@@ -142,10 +142,10 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
   if (value instanceof ArrayData) {
     // Rails: `quote(encode_array(value))` — one serialization path, the
     // encoder's delimiter (`;` for box[]), with per-element type_cast.
-    return quoteString(encodeArray.call(this as QuotingDispatchHost, value));
+    return quoteString(encodeArray.call(this, value));
   }
   if (value instanceof Range) {
-    return quoteString(encodeRange.call(this as QuotingDispatchHost, value));
+    return quoteString(encodeRange.call(this, value));
   }
   // Mirrors: PostgreSQL::Quoting#quote raises IntegerOutOf64BitRange for
   // integers exceeding the 64-bit signed range. Covers both bigint and
@@ -165,6 +165,7 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
 }
 
 export function quoteDefaultExpression(
+  this: QuotingDispatchHost | void,
   value: unknown,
   column?: DefaultExpressionColumn | null,
   typeMap?: TypeMapLike | null,
@@ -208,10 +209,10 @@ export function quoteDefaultExpression(
       serialized = castType.serialize(value);
     }
   }
-  return ` DEFAULT ${quote(serialized)}`;
+  return ` DEFAULT ${quote.call(this || {}, serialized)}`;
 }
 
-export function typeCast(this: QuotingDispatchHost | void, value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof BinaryData) {
     // node-postgres binds Buffer as bytea natively (text-format hex literal).
     // Returning a Buffer over the existing Uint8Array preserves bytes
@@ -232,10 +233,10 @@ export function typeCast(this: QuotingDispatchHost | void, value: unknown): unkn
   }
   if (value instanceof ArrayData) {
     // Rails: `when OID::Array::Data then encode_array(value)`.
-    return encodeArray.call(this as QuotingDispatchHost, value);
+    return encodeArray.call(this, value);
   }
   if (value instanceof Range) {
-    return encodeRange.call(this as QuotingDispatchHost, value);
+    return encodeRange.call(this, value);
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
     if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);

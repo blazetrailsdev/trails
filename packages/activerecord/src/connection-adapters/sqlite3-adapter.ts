@@ -87,7 +87,7 @@ import {
   quotedDate as sqliteQuotedDate,
   quotedTime as sqliteQuotedTime,
 } from "./sqlite3/quoting.js";
-import { isSqlLiteral } from "./abstract/quoting.js";
+import { isSqlLiteral, type QuotingDispatchHost } from "./abstract/quoting.js";
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
@@ -132,13 +132,15 @@ export class SQLiteDateTimeType extends ARDateTimeType {
 // Mirrors Rails' `type_casted_binds`, which sends `value_for_database` to the
 // driver rather than the Attribute wrapper. Plain pre-cast values (the common
 // case) pass straight through.
-function _driverBind(value: unknown): unknown {
+function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
   // `valueForDatabase` is a getter on Attribute/QueryAttribute, so reading it
   // yields the unwrapped DB value directly.
   if (value && typeof value === "object" && "valueForDatabase" in value) {
     value = (value as { valueForDatabase: unknown }).valueForDatabase;
   }
-  return sqliteTypeCast(value);
+  // `.call(this)` so date/time dispatch lands on the adapter's quotedDate /
+  // quotedTime overrides (2000-01-01-prefixed times).
+  return sqliteTypeCast.call(this, value);
 }
 
 function _isSqliteMissingDbError(error: unknown): boolean {
@@ -347,7 +349,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // bind values through the visitor rather than inlining them, so the
     // `execute` path now receives non-empty bind arrays where it received
     // empty ones before.
-    const driverBinds = binds.map(_driverBind) as SqliteBinds;
+    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const stmt = await this._cachedStatement(sql);
@@ -456,7 +458,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
     };
-    const driverBinds = binds.map(_driverBind) as SqliteBinds;
+    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const stmt = await this._cachedStatement(sql);
@@ -604,7 +606,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<Result> {
     const processed = this.preprocessQuery(sql);
     await this.materializeTransactions();
-    const driverBinds = (binds ?? []).map(_driverBind) as SqliteBinds;
+    const driverBinds = (binds ?? []).map(_driverBind, this) as SqliteBinds;
     // Rails' SQLite `perform_query` pools the statement only when `prepare` is
     // true (`@statements[sql] ||= ...`) and otherwise prepares a fresh one. The
     // `exec_query` keyword defaults to `false` (database_statements.rb), so we
@@ -747,7 +749,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<string> {
     await this.ensureConnected();
     const explainStmt = await this.driver.prepare(`EXPLAIN QUERY PLAN ${sql}`);
-    const driverBinds = binds.map(_driverBind) as SqliteBinds;
+    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     const rows = (await explainStmt.all(driverBinds)) as Record<string, unknown>[];
     return rows.map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`).join("\n");
   }

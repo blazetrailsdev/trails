@@ -36,17 +36,17 @@ describe("quotedDate", () => {
 describe("quotedTime", () => {
   it("formats a Temporal.PlainTime stripping the date prefix", () => {
     const v = Temporal.PlainTime.from("14:23:55");
-    expect(quotedTime(v)).toBe("14:23:55");
+    expect(quotedTime.call({}, v)).toBe("14:23:55");
   });
 
   it("formats a Temporal.PlainDateTime stripping the date", () => {
     const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55.123456");
-    expect(quotedTime(v)).toBe("14:23:55.123456");
+    expect(quotedTime.call({}, v)).toBe("14:23:55.123456");
   });
 
   it("normalises the date component to 2000-01-01", () => {
     const v = Temporal.PlainDateTime.from("2099-12-31T09:00:00");
-    expect(quotedTime(v)).toBe("09:00:00");
+    expect(quotedTime.call({}, v)).toBe("09:00:00");
   });
 
   it("dispatches through this.quotedDate (mirrors Rails quoted_time → self.quoted_date)", () => {
@@ -73,12 +73,12 @@ describe("quote dispatches through quoted_date/quoted_time", () => {
 
   it("falls back to the module quoted_date helper without a host", () => {
     const v = Temporal.PlainDate.from("2026-04-26");
-    expect(quote(v)).toBe("'2026-04-26'");
+    expect(quote.call({}, v)).toBe("'2026-04-26'");
   });
 
   it("falls back to the module quoted_time helper for PlainTime without a host", () => {
     const v = Temporal.PlainTime.from("14:23:55");
-    expect(quote(v)).toBe("'14:23:55'");
+    expect(quote.call({}, v)).toBe("'14:23:55'");
   });
 });
 
@@ -97,12 +97,12 @@ describe("type_cast dispatches through quoted_date/quoted_time", () => {
 
   it("falls back to the module quoted_date helper without a host", () => {
     const v = Temporal.PlainDate.from("2026-04-26");
-    expect(typeCast(v)).toBe("2026-04-26");
+    expect(typeCast.call({}, v)).toBe("2026-04-26");
   });
 
   it("falls back to the module quoted_time helper for PlainTime without a host", () => {
     const v = Temporal.PlainTime.from("14:23:55");
-    expect(typeCast(v)).toBe("14:23:55");
+    expect(typeCast.call({}, v)).toBe("14:23:55");
   });
 });
 

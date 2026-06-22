@@ -68,8 +68,8 @@ export function quoteString(value: string): string {
  * quoter dispatch date/time literals back through `self.quoted_time` /
  * `self.quoted_date` — which SQLite overrides to keep a `2000-01-01` prefix on
  * times. We thread `this` (the adapter) so that dispatch lands on SQLite's
- * `quotedTime`; bare calls fall back to {@link SQLITE_QUOTING_HOST} so the
- * prefix is still applied.
+ * `quotedTime`. A host receiver is required — every invocation routes through
+ * an adapter via `.call(this, value)`.
  *
  * The boolean, symbol, string, and binary branches stay inline because our
  * abstract `quote` renders those through module-level helpers (TRUE/FALSE,
@@ -77,7 +77,7 @@ export function quoteString(value: string): string {
  * delegating would lose SQLite's overrides (1/0, `''`-only escaping, `x'..'`
  * hex). These are exactly the quoting primitives SQLite3::Quoting overrides.
  */
-export function quote(this: QuotingDispatchHost | void, value: unknown): string {
+export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   if (typeof value === "symbol") {
@@ -91,8 +91,7 @@ export function quote(this: QuotingDispatchHost | void, value: unknown): string 
   // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
   // BinaryData wraps raw bytes from serialize() (e.g. encryption ciphertext for binary columns).
   if (value instanceof BinaryData) return quotedBinary(value.bytes);
-  const host = this && typeof this === "object" ? this : SQLITE_QUOTING_HOST;
-  return abstractQuote.call(host, value);
+  return abstractQuote.call(this, value);
 }
 
 export function quoteTableNameForAssignment(_table: string, attr: string): string {
@@ -143,12 +142,6 @@ export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): 
   return quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
-/**
- * Default dispatch host for bare `quote(value)` calls (no adapter `this`), so
- * date/time literals still reach SQLite's `quotedDate` / `quotedTime` overrides.
- */
-const SQLITE_QUOTING_HOST: QuotingDispatchHost = { quotedDate, quotedTime };
-
 export function quotedBinary(value: Uint8Array | ArrayBuffer): string {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
   const hex = Array.from(bytes)
@@ -157,7 +150,7 @@ export function quotedBinary(value: Uint8Array | ArrayBuffer): string {
   return `x'${hex}'`;
 }
 
-export function quoteDefaultExpression(value: unknown): string {
+export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: unknown): string {
   if (value === undefined) return "";
   if (value === null) return "NULL";
   if (typeof value === "function") {
@@ -168,10 +161,12 @@ export function quoteDefaultExpression(value: unknown): string {
     if (/^\w+\(.*\)$/.test(str)) return `(${str})`;
     return str;
   }
-  return quote(value);
+  // `quote` requires a host receiver; thread our own so date/time defaults reach
+  // SQLite's quotedDate / quotedTime overrides (the adapter binds `this`).
+  return quote.call(this || { quotedDate, quotedTime }, value);
 }
 
-export function typeCast(this: QuotingDispatchHost | void, value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean") return value ? unquotedTrue() : unquotedFalse();
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -183,17 +178,15 @@ export function typeCast(this: QuotingDispatchHost | void, value: unknown): unkn
   if (typeof value === "symbol") return value.description ?? null;
   // Rails dispatches date/time through `self.quoted_time` / `self.quoted_date`
   // (abstract/quoting.rb:93-101) — which SQLite overrides to keep a `2000-01-01`
-  // prefix on times. Thread `this` so the dispatch lands on those overrides;
-  // bare calls fall back to SQLITE_QUOTING_HOST so the prefix is still applied.
-  const host = this && typeof this === "object" ? this : SQLITE_QUOTING_HOST;
-  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(host, value);
+  // prefix on times. Thread `this` so the dispatch lands on those overrides.
+  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
     value instanceof Temporal.ZonedDateTime
   ) {
-    return dispatchQuotedDate(host, value);
+    return dispatchQuotedDate(this, value);
   }
   if (value instanceof Date)
     throw new TypeError(
