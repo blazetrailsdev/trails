@@ -874,6 +874,12 @@ class ApiExtractor
   # `class_eval` string, and mattr/cattr document them as public "even if this
   # method is called with a private or protected access modifier" — so the
   # enclosing visibility is intentionally ignored.
+  #
+  # NOT modeled: class_attribute inside `class << self` (attribute.rb:106-108
+  # concats the delegators into `methods` unconditionally, so the instance
+  # reader/writer are always emitted and ignore the `instance_*:` options). No
+  # such call exists in the vendored lib, so the @in_sclass bucketing below is
+  # faithful in practice.
   def process_mattr(args, reader:, writer:, predicate:, class_attr:)
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
