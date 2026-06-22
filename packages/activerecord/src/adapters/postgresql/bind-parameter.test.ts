@@ -18,8 +18,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     // the PG adapter's quoting (`to_sql` parity), while at execution the `?` is
     // bound as a parameter so PG casts the value against the varchar `title`
     // column. A type-mismatched value (integer/float/boolean/decimal/rational)
-    // therefore returns no rows rather than raising 42883, matching Rails'
-    // `relation.to_a.size`.
+    // therefore returns no rows rather than raising 42883. Like Rails, the
+    // `match == 0` branch asserts `to_a` is empty and the matching branch
+    // asserts `count`.
     async function assertQuotedAs(expected: string, value: unknown, match = 0) {
       const relation = Post.where("title = ?", value);
       expect(relation.toSql()).toBe(`SELECT "posts".* FROM "posts" WHERE (title = ${expected})`);
