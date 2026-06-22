@@ -15,7 +15,7 @@ const fixtureText = readFileSync(FIXTURE, "utf8");
 describe("findCandidateCasts", () => {
   it("matches only `(expr as any).member` with a non-underscore member", () => {
     const members = findCandidateCasts(fixtureText).map((c) => c.member);
-    expect(members).toEqual(["id", "name"]);
+    expect(members).toEqual(["id", "name", "toFixed"]);
   });
 
   it("skips underscore (private) member reaches", () => {
@@ -29,29 +29,30 @@ describe("findCandidateCasts", () => {
   it("skips terminal casts with no member access", () => {
     expect(findCandidateCasts("const y = x as any;")).toEqual([]);
   });
-
-  it("returns spans covering exactly the ` as any` text", () => {
-    const text = "(thing as any).id";
-    const [span] = findCandidateCasts(text);
-    expect(text.slice(span.start, span.end)).toBe(" as any");
-  });
 });
 
 describe("removeCast", () => {
-  it("removes the cast while leaving the member access intact", () => {
+  it("drops the redundant parens when the inner expression is left-hand-side", () => {
     const text = "(thing as any).id";
     const [span] = findCandidateCasts(text);
-    expect(removeCast(text, span)).toBe("(thing).id");
+    expect(removeCast(text, span)).toBe("thing.id");
   });
 
-  it("removes only the targeted cast when applied end-to-start", () => {
+  it("keeps load-bearing parens for a non-left-hand-side inner expression", () => {
+    const text = "(a + b as any).toFixed";
+    const [span] = findCandidateCasts(text);
+    expect(removeCast(text, span)).toBe("(a + b).toFixed");
+  });
+
+  it("removes only the targeted casts when applied end-to-start", () => {
     const spans = findCandidateCasts(fixtureText).sort((a, b) => b.start - a.start);
     let out = fixtureText;
     for (const span of spans) {
       out = removeCast(out, span);
     }
-    expect(out).toContain("sink((thing).id);");
-    expect(out).toContain("sink((thing).name);");
+    expect(out).toContain("sink(thing.id);");
+    expect(out).toContain("sink(getThing().name);");
+    expect(out).toContain("sink((a + b).toFixed);");
     // Untouched scopes survive verbatim.
     expect(out).toContain("sink((thing as any)._privateField);");
     expect(out).toContain("sink((thing as any[]).length);");

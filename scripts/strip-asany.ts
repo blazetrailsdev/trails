@@ -37,12 +37,14 @@ const ROOT = resolve(SCRIPT_DIR, "..");
 const TSC_BIN = resolve(ROOT, "node_modules", ".bin", "tsc");
 const ROOT_TSCONFIG = resolve(ROOT, "tsconfig.json");
 
-/** A removable `as any` cast, expressed as the text span to delete. */
+/** A removable `as any` cast, expressed as a single text-span replacement. */
 export interface CastSpan {
-  /** Offset of the first char to delete (just after the inner expression). */
+  /** Offset of the first char to replace. */
   start: number;
-  /** Offset just past the last char to delete (end of the `any` keyword). */
+  /** Offset just past the last char to replace. */
   end: number;
+  /** Text to substitute for `[start, end)`. */
+  replacement: string;
   /** The property accessed off the cast, e.g. `id` in `(x as any).id`. */
   member: string;
 }
@@ -73,7 +75,22 @@ export function findCandidateCasts(text: string): CastSpan[] {
       ) {
         const member = paren.parent.name.text;
         if (!member.startsWith("_")) {
-          spans.push({ start: node.expression.getEnd(), end: node.end, member });
+          const inner = node.expression;
+          if (ts.isLeftHandSideExpression(inner)) {
+            // The inner expression binds at least as tightly as member
+            // access, so the wrapping parens are redundant too: rewrite
+            // `(foo.bar as any).baz` straight to `foo.bar.baz`.
+            spans.push({
+              start: paren.getStart(source),
+              end: paren.getEnd(),
+              replacement: inner.getText(source),
+              member,
+            });
+          } else {
+            // Parens are load-bearing (e.g. `(await x as any).y`); drop only
+            // the ` as any` text and leave the parens in place.
+            spans.push({ start: inner.getEnd(), end: node.end, replacement: "", member });
+          }
         }
       }
     }
@@ -84,9 +101,9 @@ export function findCandidateCasts(text: string): CastSpan[] {
   return spans;
 }
 
-/** Delete a single cast span from `text`, returning the new text. */
+/** Apply a single cast-span removal to `text`, returning the new text. */
 export function removeCast(text: string, span: CastSpan): string {
-  return text.slice(0, span.start) + text.slice(span.end);
+  return text.slice(0, span.start) + span.replacement + text.slice(span.end);
 }
 
 /** Whole-project typecheck. Returns true iff `tsc --build` exits cleanly. */
