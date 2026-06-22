@@ -5724,8 +5724,8 @@ describe("EagerAssociationTest", () => {
     await assertQueriesCount(2, false, async () => {
       sponsor = (await Sponsor.includes("thing").where({ id: sponsorId }).first()) as Sponsor;
     });
-    await assertNoQueries(false, () => {
-      const thing = sponsor.association("thing").target as Base;
+    await assertNoQueries(false, async () => {
+      const thing = (await sponsor.thing) as Base;
       expect(thing.id).toBe(grouchoId);
     });
   });
@@ -5750,7 +5750,7 @@ describe("EagerAssociationTest", () => {
   it("preloading with a polymorphic association and using the existential predicate but also using a select", async () => {
     const david = await Author.find(authors("david").id);
     const essay = (await (david as any).essays.includes("writer").first()) as Essay;
-    expect((essay.association("writer").target as Base).id).toBe(david.id);
+    expect(((await essay.writer) as Base).id).toBe(david.id);
 
     await expect(
       (david as any).essays.includes("writer").select("name").isAny(),
@@ -5760,7 +5760,7 @@ describe("EagerAssociationTest", () => {
   it("preloading with a polymorphic association and using the existential predicate", async () => {
     const david = await Author.find(authors("david").id);
     const essay = (await (david as any).essays.includes("writer").first()) as Essay;
-    expect((essay.association("writer").target as Base).id).toBe(david.id);
+    expect(((await essay.writer) as Base).id).toBe(david.id);
 
     await (david as any).essays.includes("writer").isAny();
     await (david as any).essays.includes("writer").exists();
