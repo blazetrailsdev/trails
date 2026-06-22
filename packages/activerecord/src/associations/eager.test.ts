@@ -4872,15 +4872,25 @@ describe("EagerAssociationTest", () => {
 
     const sqls = await captureSql(async () => {
       const loaded = (await posts.toArray()) as Base[];
-      const commentsCollection = loaded.map((p) =>
-        (p as any)._preloadedAssociations.get("comments"),
+      // Exercise the public reader (Rails: `posts.map(&:comments)`); the size
+      // is the post count (3), populated from the preload, not a fresh query.
+      const commentsCollection = await Promise.all(
+        loaded.map((p) => (p as any).comments.toArray() as Promise<Base[]>),
       );
       expect(commentsCollection.length).toBe(3);
+      expect(commentsCollection.flat()).toHaveLength(4);
     });
     const sql = sqls[sqls.length - 1];
 
+    // Rails (eager_test.rb:1698-1700) builds the pattern from `quote_table_name`,
+    // which is adapter-specific (double-quotes on sqlite/pg, backticks on mysql),
+    // so derive the quoting from the live adapter rather than hardcoding it.
+    const conn = Base.connection;
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const quotedBlogId = escape(conn.quoteTableName("sharded_comments.blog_id"));
+    const quotedBlogPostId = escape(conn.quoteTableName("sharded_comments.blog_post_id"));
     expect(sql).toMatch(
-      /WHERE "sharded_comments"\."blog_id" IN \(.+\) AND "sharded_comments"\."blog_post_id" IN \(.+\)/,
+      new RegExp(`WHERE ${quotedBlogId} IN \\(.+\\) AND ${quotedBlogPostId} IN \\(.+\\)`),
     );
   });
 });
