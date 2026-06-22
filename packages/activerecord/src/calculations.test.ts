@@ -5276,17 +5276,16 @@ describe("CalculationsTest", () => {
     expect(ids).toEqual(created.slice(3, 8));
   });
 
-  // Rails: test "column_names"
+  // columnNames() is DB-sourced (Rails model_schema.rb): it returns the real
+  // `users` columns, not just the declared attribute() subset. (Converged from
+  // an earlier cold-cache form asserting only the declared names — RFC 0031.)
   it("columnNames returns list of attribute names", () => {
     class User extends Base {
       static {
         this._tableName = "users";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("email", "string");
       }
     }
-    expect(User.columnNames()).toEqual(["id", "name", "email"]);
+    expect(User.columnNames()).toEqual(expect.arrayContaining(["id", "name", "email", "age"]));
   });
 
   // Rails: test "human_attribute_name"

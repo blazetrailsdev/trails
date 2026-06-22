@@ -847,6 +847,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
+    // Invalidate the cached reflection before mutating (matching the other DDL
+    // methods, e.g. addColumn) so a subsequent columnsHash()/columnDefaults read
+    // sees the new default rather than a stale (always-warm) entry. Safe to clear
+    // first: the column lookup below queries pg_catalog directly, not the cache.
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const quotedTable = this._qt(tableName);
     const quotedCol = this._qi(columnName);
     const defaultValue =

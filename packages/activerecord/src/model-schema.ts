@@ -437,6 +437,19 @@ export async function createTable(this: typeof Base): Promise<void> {
   await a.executeMutation(
     `CREATE TABLE IF NOT EXISTS ${a.quoteTableName(table)} (${colDefs.join(", ")})`,
   );
+
+  // This helper issues raw DROP/CREATE DDL instead of routing through
+  // SchemaStatements, so it must invalidate the schema cache itself —
+  // otherwise a previously-warmed entry (e.g. from the test harness'
+  // eager warm) survives and reports the old table shape to the next
+  // `columnsHash()` read. Mirrors SchemaStatements#createTable's
+  // `clear_data_source_cache!`.
+  (
+    a as {
+      schemaCache?: { clearDataSourceCacheBang(pool: unknown, name: string): void };
+      pool?: unknown;
+    }
+  ).schemaCache?.clearDataSourceCacheBang((a as { pool?: unknown }).pool ?? null, table);
 }
 
 // ---------------------------------------------------------------------------

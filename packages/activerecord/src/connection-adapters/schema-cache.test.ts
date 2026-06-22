@@ -348,6 +348,21 @@ describe("SchemaCacheTest", () => {
     expect(cache.isCached("users")).toBe(false);
   });
 
+  it("records touched tables between recordTouchedTables and takeTouchedTables", () => {
+    const cache = new SchemaCache();
+    // No recording window: clears are not tracked.
+    cache.clearDataSourceCacheBang(null, "before");
+    cache.recordTouchedTables();
+    cache.clearDataSourceCacheBang(null, "users");
+    cache.clearDataSourceCacheBang(null, "posts");
+    cache.clearDataSourceCacheBang(null, "users");
+    const touched = cache.takeTouchedTables();
+    expect([...touched].sort()).toEqual(["posts", "users"]);
+    // takeTouchedTables closes the window — subsequent clears are not tracked.
+    cache.clearDataSourceCacheBang(null, "after");
+    expect([...cache.takeTouchedTables()]).toEqual([]);
+  });
+
   it("#columns_hash? is populated by #columns_hash", async () => {
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer")]);

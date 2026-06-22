@@ -70,9 +70,9 @@ describe("withTransactionalFixtures", () => {
 // DDL executed inside an it() body populates the adapter's SchemaCache.
 // The outer-transaction rollback reverts the DDL at the DB level, but the
 // cache entries it produced would otherwise survive into the next test —
-// reporting columns that no longer exist. The helper's afterEach calls
-// schemaCache.clear() after rollback to keep that in-memory reflection in
-// sync with the rolled-back DB.
+// reporting columns that no longer exist. The helper's afterEach re-reflects
+// the DDL-touched tables after rollback (per-table, not a blanket clear) to
+// keep that in-memory reflection in sync with the rolled-back DB.
 describe("withTransactionalFixtures (schema-cache invalidation)", () => {
   let adapter: AbstractSQLite3Adapter;
 
@@ -215,9 +215,47 @@ describe("withTransactionalFixtures (raw adapter)", () => {
   });
 });
 
-// When `invalidateSchemaCache: false`, the helper skips `schemaCache.clear()`
-// in afterEach. Cached column reflection survives across tests — pay this
-// cost only when the file does pure DML.
+// Teardown re-reflects ONLY the DDL-touched tables (the `clear_data_source_cache!`
+// shape), so a warmed entry for an untouched table survives into the next test
+// instead of being wiped by a blanket clear.
+describe("withTransactionalFixtures (per-table re-reflection preserves untouched entries)", () => {
+  let adapter: AbstractSQLite3Adapter;
+
+  beforeAll(async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await defineSchema(adapter, {
+      pertable_touched: { name: "string" },
+      pertable_untouched: { name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await adapter.close();
+  });
+
+  withTransactionalFixtures(() => adapter);
+
+  it("touches one table via DDL while another stays warm", async () => {
+    // Warm both entries (raw adapters don't auto-warm; mimic Model.loadSchema).
+    adapter.schemaCache.setColumns("pertable_touched", await adapter.columns("pertable_touched"));
+    adapter.schemaCache.setColumns(
+      "pertable_untouched",
+      await adapter.columns("pertable_untouched"),
+    );
+    // DDL on one table records it as touched.
+    await adapter.addColumn("pertable_touched", "extra", "string");
+    expect(adapter.schemaCache.isColumnsHashCached(adapter.pool, "pertable_untouched")).toBe(true);
+  });
+
+  it("next test: touched table re-reflected (cold), untouched entry survives", () => {
+    expect(adapter.schemaCache.isColumnsHashCached(adapter.pool, "pertable_touched")).toBe(false);
+    expect(adapter.schemaCache.isColumnsHashCached(adapter.pool, "pertable_untouched")).toBe(true);
+  });
+});
+
+// When `invalidateSchemaCache: false`, the helper skips the per-table
+// re-reflection in afterEach. Cached column reflection survives across tests
+// — pay this cost only when the file does pure DML.
 describe("withTransactionalFixtures (invalidateSchemaCache: false)", () => {
   let adapter: AbstractSQLite3Adapter;
 
