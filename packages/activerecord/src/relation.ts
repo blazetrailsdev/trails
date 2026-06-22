@@ -2572,7 +2572,12 @@ export class Relation<T extends Base> {
     // matching includes to eager_load so the JOIN is present — otherwise
     // a raw where condition referring to that table would fail.
     // See ActiveRecord::Relation#references_eager_loaded_tables?
-    const promotedIncludes = this._includesToPromoteFromReferences();
+    const promotedIncludes = [
+      ...new Set([
+        ...this._includesToPromoteFromReferences(),
+        ...this._includesToPromoteFromJoins(),
+      ]),
+    ];
 
     let loadedRecords: T[];
     if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
@@ -2658,6 +2663,65 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * String specs present in BOTH `includes(...)` and `joins(...)` — Rails'
+   * `joined_includes_values = includes_values & joins_values`.
+   */
+  private _joinedIncludesValues(): string[] {
+    if (this._includesAssociations.length === 0) return [];
+    if (this._namedInnerJoins.length === 0) return [];
+    const joined = new Set(this._namedInnerJoins.filter((v): v is string => typeof v === "string"));
+    return this._includesAssociations.filter(
+      (spec): spec is string => typeof spec === "string" && joined.has(spec),
+    );
+  }
+
+  /**
+   * Rails `eager_loading?` (relation.rb): a non-empty `joined_includes_values`
+   * makes the relation eager-load, and `apply_join_dependency` (finder_methods.rb)
+   * then builds the JoinDependency from `eager_load_values | includes_values` —
+   * i.e. ALL includes go into the join query, not just the intersecting one
+   * (e.g. `Post.includes(:comments, :author).joins(:comments)` join-loads both,
+   * with `author` as a deduped OUTER join). So once any include is also in
+   * `joins(...)`, promote every include — mirroring `_includesToPromoteFromReferences`.
+   * `_buildEagerJoinManager` then skips re-emitting the eager OUTER JOIN for the
+   * intersecting tables (the named INNER JOIN already covers them).
+   */
+  private _includesToPromoteFromJoins(): AssociationSpec[] {
+    if (this._joinedIncludesValues().length === 0) return [];
+    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
+    return this._includesAssociations.filter((spec) => !alreadyEagerLoaded.has(spec));
+  }
+
+  /**
+   * Resolved table names for the `includes ∩ joins` intersection — the tables
+   * whose eager-load OUTER JOIN is redundant because `joins(:assoc)` already
+   * emits an INNER JOIN to them. Scoped to the intersection (not every named
+   * inner join) so an eager table that merely coincides with an unrelated
+   * `joins(...)` table is not silently dropped. The intersecting association is
+   * the canonical (first) occurrence of its table in the eager JoinDependency,
+   * so it is emitted un-aliased and matches by bare table name here.
+   */
+  private _joinedIncludesTables(): Set<string> {
+    return new Set(this._resolveAssocTables(this._joinedIncludesValues()));
+  }
+
+  /**
+   * Resolve association-name join specs to their lowercased table names. An
+   * unresolved spec falls back to its own lowercased name (matching the inline
+   * resolution in `referencesEagerLoadedTables`).
+   */
+  private _resolveAssocTables(values: AssociationSpec[]): string[] {
+    return values
+      .filter((v): v is string => typeof v === "string")
+      .flatMap((v) => {
+        const resolved = this._resolveAssociationJoin(v);
+        if (!resolved) return [v.toLowerCase()];
+        const entries = Array.isArray(resolved) ? resolved : [resolved];
+        return entries.map((e) => e.table.toLowerCase());
+      });
+  }
+
+  /**
    * Returns true when any references_values entry points to a table that is
    * not already joined — triggers promoting includes to eager_load.
    *
@@ -2685,20 +2749,11 @@ export class Relation<T extends Base> {
     // build_joins([]) processes left_outer_joins_values and extracts table names
     // from the resulting join nodes. We resolve via _resolveAssociationJoin to
     // get the actual table name (handles camelCase → snake_case mappings).
-    const resolveAssocTables = (values: AssociationSpec[]): string[] =>
-      values
-        .filter((v): v is string => typeof v === "string")
-        .flatMap((v) => {
-          const resolved = this._resolveAssociationJoin(v);
-          if (!resolved) return [v.toLowerCase()]; // fallback
-          const entries = Array.isArray(resolved) ? resolved : [resolved];
-          return entries.map((e) => e.table.toLowerCase());
-        });
-    const leftOuterTables = resolveAssocTables(this._leftOuterJoinsValues);
+    const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
     // _namedInnerJoins holds association names too (joins(:assoc) routed through
     // JoinDependency with InnerJoin). Resolve to table names so references to
     // those tables don't spuriously promote includes to eager_load.
-    const namedInnerTables = resolveAssocTables(this._namedInnerJoins);
+    const namedInnerTables = this._resolveAssocTables(this._namedInnerJoins);
     const joinedTables = new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
       ...leftOuterTables,
@@ -4696,7 +4751,17 @@ export class Relation<T extends Base> {
       selectCols.length > 0 ? [...this.arelColumns(selectCols), ...aliasNodes] : aliasNodes;
     const manager = table.project(...(projection as Parameters<typeof table.project>));
 
+    // Skip eager-load JOINs for tables in the `includes ∩ joins` intersection
+    // (Rails joined_includes_values): `_applyJoinsToManager` emits the named
+    // INNER JOIN, and the JoinDependency projection above reads its columns by
+    // the same (unaliased) table name — so re-emitting the eager OUTER JOIN here
+    // would duplicate the join.
+    const joinedIncludesTables = this._joinedIncludesTables();
     for (const node of joinNodes) {
+      const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
+      if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
+        continue;
+      }
       manager.appendJoinNode(node);
     }
 
@@ -4768,7 +4833,15 @@ export class Relation<T extends Base> {
     // aliased here too — this subquery can be built before `_buildEagerJoinManager`
     // (the limited-ids path), so it cannot rely on the nodes being pre-aliased.
     // Aliasing is deterministic and idempotent across repeated emits of the JD.
+    // Skip eager OUTER JOINs for `includes ∩ joins` tables — `_applyJoinsToManager`
+    // emits them as the named INNER JOIN below, so re-emitting here would produce
+    // a duplicate join (ambiguous-column error). Mirrors `_buildEagerJoinManager`.
+    const joinedIncludesTables = this._joinedIncludesTables();
     for (const node of jd.joinConstraints([], undefined, this._aliasableReferences())) {
+      const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
+      if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
+        continue;
+      }
       idSubquery.appendJoinNode(node);
     }
     this._applyJoinsToManager(idSubquery);
