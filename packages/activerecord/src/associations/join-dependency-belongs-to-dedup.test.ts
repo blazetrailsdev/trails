@@ -5,7 +5,7 @@ import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency cross-parent belongsTo dedup", () => {
-  let adapter: any;
+  let adapter: ReturnType<typeof createTestAdapter>;
 
   class Author extends Base {
     static {
@@ -25,8 +25,8 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
   beforeEach(() => {
     adapter = createTestAdapter();
     for (const m of [Author, Post]) {
-      (m as any).adapter = adapter;
-      (m as any)._associations = [];
+      m.adapter = adapter;
+      m._associations = [];
       registerModel(m);
     }
 
@@ -47,7 +47,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
 
     expect(parents).toHaveLength(3);
 
-    const authors = parents.map((p: any) => {
+    const authors = parents.map((p) => {
       const proxy = p.association("author");
       return proxy?.target;
     });

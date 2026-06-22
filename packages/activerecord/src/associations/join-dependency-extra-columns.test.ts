@@ -5,7 +5,7 @@ import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency extra columns in instantiate", () => {
-  let adapter: any;
+  let adapter: ReturnType<typeof createTestAdapter>;
 
   class Post extends Base {
     static {
@@ -25,8 +25,8 @@ describe("JoinDependency extra columns in instantiate", () => {
   beforeEach(() => {
     adapter = createTestAdapter();
     for (const m of [Post, Comment]) {
-      (m as any).adapter = adapter;
-      (m as any)._associations = [];
+      m.adapter = adapter;
+      m._associations = [];
       registerModel(m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
