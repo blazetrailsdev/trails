@@ -57,7 +57,7 @@ export class Preloader {
       scope: this.scope,
     });
     // An array is the final record set; a Relation is materialized lazily by
-    // `materialize()` (from `isEmpty()` or `call()`).
+    // `materialize()`, driven from the `isEmpty()` check in `Batch`.
     this._materialized = !isRelation(this.records);
     if (this._materialized) {
       this._tree.preloadedRecords = this.records as Base[];
@@ -69,9 +69,9 @@ export class Preloader {
    * `records.length` materializes a Relation. We can't run that query
    * synchronously (async I/O), so emptiness is async: it materializes the
    * Relation just as Rails does, then reads the final record count — so an
-   * *empty* Relation correctly reports `true`. The materializing query is
-   * shared with `call()` (single materialize per preloader), keeping the
-   * observable query count unchanged.
+   * *empty* Relation correctly reports `true`. `materialize()` runs the query
+   * once per preloader, so `Batch`'s reject-then-load keeps the observable
+   * query count unchanged.
    */
   async isEmpty(): Promise<boolean> {
     if (this.associations == null) return true;
@@ -90,7 +90,6 @@ export class Preloader {
   }
 
   async call(): Promise<Association[]> {
-    await this.materialize();
     const batch = new Batch([this], this._availableRecords);
     await batch.call();
     return this.loaders;
