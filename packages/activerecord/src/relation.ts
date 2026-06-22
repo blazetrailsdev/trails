@@ -3306,7 +3306,8 @@ export class Relation<T extends Base> {
       // a duplicate join onto the same table to its alias_candidate — mirroring
       // Rails build_joins → join_constraints(stashed, alias_tracker,
       // references_values). The where-hash keys resolve to the same aliased name
-      // (`joinTableAliasFor`), so the WHERE and JOIN stay in sync.
+      // (`associatedTable` aliases the resolved table to the key), so the WHERE
+      // and JOIN stay in sync.
       const stashedLeft = leftOuterJd ? [leftOuterJd] : [];
       for (const node of jd.joinConstraints(stashedLeft, undefined, this._aliasableReferences()))
         manager.appendJoinNode(node);

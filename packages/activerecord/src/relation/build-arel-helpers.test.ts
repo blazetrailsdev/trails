@@ -199,9 +199,9 @@ describe("Relation#offset float truncation", () => {
 // first-occurrence join referenced by a where-hash key is re-aliased to the
 // reference name (Rails make_constraints → aliased_table_for) AND the where-hash
 // key resolves to that same alias, so JOIN and WHERE stay in sync. Pins the SQL
-// shape so a future change that touches one side (joinTableAliasFor) but not the
-// other (_applyReferencedAlias) can't silently desync while behavioral counts
-// still match.
+// shape so a future change that touches one side (associatedTable aliasing) but
+// not the other (_applyReferencedAlias) can't silently desync while behavioral
+// counts still match.
 describe("where-hash key resolves to the referenced join alias", () => {
   class HaPet extends Base {
     static _tableName = "da_pets";
