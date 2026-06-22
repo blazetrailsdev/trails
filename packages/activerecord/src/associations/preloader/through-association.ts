@@ -533,6 +533,13 @@ function predicateReferencesTable(node: any, tableName: string): boolean {
 /**
  * True when a raw-SQL predicate node's text qualifies a column with `tableName.`.
  * Handles SqlLiteral / BoundSqlLiteral and a single Grouping wrapper.
+ *
+ * Heuristic: this scans the raw SQL for a `<table>.` qualifier token; it does
+ * NOT parse the SQL, so a qualifier appearing inside a string literal (e.g.
+ * `where("note = 'see memberships.x'")`) would be a false positive and relocate
+ * a source-table predicate onto the through query. No current scope hits this;
+ * raw-SQL through conditions are simple table-qualified comparisons. Arel/hash
+ * predicates take the precise `fetchAttribute` path above and never reach here.
  * @internal
  */
 function rawSqlReferencesTable(node: any, tableName: string): boolean {
