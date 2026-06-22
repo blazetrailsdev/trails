@@ -111,7 +111,7 @@ export function classifyDdl(sqlRaw: string): { op: DdlOp; table: string | null }
   const head = sql.slice(0, 16).toUpperCase();
 
   const unquote = (s: string | undefined): string | null =>
-    s ? s.replace(/^["'`]|["'`]$/g, "").replace(/^["'`]|["'`]$/g, "") : null;
+    s ? s.replace(/^["'`]|["'`]$/g, "") : null;
 
   let m: RegExpMatchArray | null;
   if (head.startsWith("CREATE TABLE") || head.startsWith("CREATE TEMPORARY")) {
@@ -127,7 +127,12 @@ export function classifyDdl(sqlRaw: string): { op: DdlOp; table: string | null }
     return { op: "ADD_INDEX", table: unquote(m?.[1]) };
   }
   if (head.startsWith("DROP INDEX")) {
+    // MySQL: `DROP INDEX name ON table` (has ON). PG/SQLite:
+    // `DROP INDEX [CONCURRENTLY] [IF EXISTS] name` (no ON) — fall back to the
+    // index name so PG/SQLite rows aren't all null.
     m = sql.match(/\bON\s+([^\s(;]+)/i);
+    if (m) return { op: "DROP_INDEX", table: unquote(m[1]) };
+    m = sql.match(/DROP\s+INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+EXISTS\s+)?([^\s(;,]+)/i);
     return { op: "DROP_INDEX", table: unquote(m?.[1]) };
   }
   if (head.startsWith("ALTER TABLE")) {
@@ -160,29 +165,63 @@ export function recordDdl(rec: DdlRecord): void {
   }
 }
 
+/**
+ * Classify every DDL statement in a SQL string. A single call can carry several
+ * statements: MariaDB's `executeBatch` runs `combineMultiStatements`, joining a
+ * batch into ONE `;`-separated string passed to `execute`, and PG's
+ * referential-integrity wrapper sends a combined `ALTER TABLE … DISABLE/ENABLE
+ * TRIGGER ALL` over every table. Splitting here counts each statement
+ * individually so MariaDB's batched DDL is comparable to PG's per-statement
+ * dispatch (best-effort split on `;` — batch DDL has no `;` inside literals).
+ */
+export function classifyStatements(sql: string): { op: DdlOp; table: string | null }[] {
+  if (!sql.includes(";")) {
+    const c = classifyDdl(sql);
+    return c ? [c] : [];
+  }
+  const out: { op: DdlOp; table: string | null }[] = [];
+  for (const part of sql.split(";")) {
+    if (part.trim() === "") continue;
+    const c = classifyDdl(part);
+    if (c) out.push(c);
+  }
+  return out;
+}
+
 /** Wrap one adapter primitive so DDL calls are timed and recorded. */
 function wrap(proto: Record<string, unknown>, method: string, sqlArgIndex: number): void {
   const orig = proto[method] as ((...args: unknown[]) => Promise<unknown>) | undefined;
   if (typeof orig !== "function") return;
   proto[method] = async function patched(this: unknown, ...args: unknown[]) {
     const arg = args[sqlArgIndex];
-    const c = typeof arg === "string" ? classifyDdl(arg) : null;
-    if (!c) {
+    // Fast reject: head-classify the whole string; non-DDL (SELECT/INSERT/…)
+    // bails before any split work. Only DDL strings pay the multi-statement split.
+    if (typeof arg !== "string" || classifyDdl(arg) === null) {
+      return orig.apply(this, args);
+    }
+    const classified = classifyStatements(arg);
+    if (classified.length === 0) {
       return orig.apply(this, args);
     }
     const adapterName = (this as { constructor: { name: string } }).constructor.name;
+    const sample = arg.trim().slice(0, 120);
     const t0 = performance.now();
     try {
       return await orig.apply(this, args);
     } finally {
-      recordDdl({
-        op: c.op,
-        table: c.table,
-        adapter: adapterName,
-        file: currentFile(),
-        ms: performance.now() - t0,
-        sql: (arg as string).trim().slice(0, 120),
-      });
+      // One round-trip's elapsed ms split evenly across its statements, so the
+      // total ms is preserved while per-statement counts stay accurate.
+      const per = (performance.now() - t0) / classified.length;
+      for (const c of classified) {
+        recordDdl({
+          op: c.op,
+          table: c.table,
+          adapter: adapterName,
+          file: currentFile(),
+          ms: per,
+          sql: sample,
+        });
+      }
     }
   };
 }

@@ -3,7 +3,7 @@
  * Pure string logic, no DB. See ddl-profile.ts.
  */
 import { describe, it, expect } from "vitest";
-import { classifyDdl } from "./ddl-profile.js";
+import { classifyDdl, classifyStatements } from "./ddl-profile.js";
 
 describe("classifyDdl", () => {
   it("classifies CREATE TABLE and extracts the table name", () => {
@@ -33,6 +33,12 @@ describe("classifyDdl", () => {
       op: "DROP_INDEX",
       table: "people",
     });
+    // PG/SQLite DROP INDEX has no ON clause — fall back to the index name.
+    expect(classifyDdl('DROP INDEX "idx_people_on_name"')).toEqual({
+      op: "DROP_INDEX",
+      table: "idx_people_on_name",
+    });
+    expect(classifyDdl("DROP INDEX CONCURRENTLY IF EXISTS my_idx")?.table).toBe("my_idx");
   });
 
   it("classifies plain ALTER TABLE as a schema change", () => {
@@ -71,5 +77,39 @@ describe("classifyDdl", () => {
 
   it("is case-insensitive on leading whitespace", () => {
     expect(classifyDdl('  create table "x" (a int)')?.op).toBe("CREATE_TABLE");
+  });
+});
+
+describe("classifyStatements", () => {
+  it("returns a single op for a lone statement", () => {
+    expect(classifyStatements('DROP TABLE "people"')).toEqual([
+      { op: "DROP_TABLE", table: "people" },
+    ]);
+  });
+
+  it("splits a ;-joined combined string into per-statement ops", () => {
+    // MariaDB combineMultiStatements / PG combined FK-toggle form.
+    const combined = 'TRUNCATE TABLE "people";TRUNCATE TABLE "posts";TRUNCATE TABLE "books"';
+    expect(classifyStatements(combined)).toEqual([
+      { op: "TRUNCATE", table: "people" },
+      { op: "TRUNCATE", table: "posts" },
+      { op: "TRUNCATE", table: "books" },
+    ]);
+  });
+
+  it("classifies each table of a combined referential-integrity toggle", () => {
+    const combined =
+      'ALTER TABLE "people" DISABLE TRIGGER ALL;ALTER TABLE "posts" DISABLE TRIGGER ALL';
+    expect(classifyStatements(combined)).toEqual([
+      { op: "REFERENTIAL_INTEGRITY", table: "people" },
+      { op: "REFERENTIAL_INTEGRITY", table: "posts" },
+    ]);
+  });
+
+  it("skips empty and non-DDL fragments", () => {
+    expect(classifyStatements('DROP TABLE "a";;SELECT 1;DROP TABLE "b";')).toEqual([
+      { op: "DROP_TABLE", table: "a" },
+      { op: "DROP_TABLE", table: "b" },
+    ]);
   });
 });
