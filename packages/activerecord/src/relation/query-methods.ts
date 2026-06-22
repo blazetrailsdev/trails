@@ -919,10 +919,7 @@ export function buildWhereClause(
           ? value.map((v) => this._castWhereValue(resolved, v))
           : this._castWhereValue(resolved, value);
     }
-    const block: ((tableName: string) => unknown) & {
-      aliasFor?: (assocName: string) => string | null;
-    } = (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName);
-    block.aliasFor = (assocName: string) => joinTableAliasFor.call(this, assocName);
+    const block = (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName);
     const parts = this.predicateBuilder.buildFromHash(normalized, block);
     return new WhereClause(parts);
   }
@@ -2390,34 +2387,6 @@ export function lookupTableKlassFromJoinDependencies(
     if (tableName === join.tableName) found = join.baseKlass;
   });
   return found;
-}
-
-/**
- * Resolve the SQL alias a where-hash key should use, mirroring Rails'
- * `make_constraints` aliasing the referenced join to the reference name (which
- * equals the association key) and building the WHERE against that alias.
- *
- * A where-hash key auto-adds itself to `references_values` (build_where_clause),
- * so a join named by that key is always re-aliased by `_applyReferencedAlias`:
- * to the referenced name on first use (`Pet.joins(:toys).where(toys: { … })` →
- * `JOIN da_toys toys … WHERE toys.…`), or to its alias_candidate when it is a
- * duplicate of a table already aliased to that name. Returns the key itself
- * (the reference name) whenever a join for it exists — the rename always lands
- * on that name for the first occurrence the WHERE binds to — and `null` when no
- * such join exists, so the key resolves to the base table.
- * @internal
- */
-export function joinTableAliasFor(this: QueryMethodsHost, assocName: string): string | null {
-  // Only aliasable references rename the join (manual bare-string `references(…)`
-  // promote includes to eager_load but never alias — `_aliasableReferences`).
-  if (!(this as any)._aliasableReferences().includes(assocName)) return null;
-  let alias: string | null = null;
-  eachJoinDependencies.call(this, undefined, (join: any) => {
-    if (join.immediateAssocName === assocName) {
-      alias = assocName;
-    }
-  });
-  return alias;
 }
 
 /** @internal */

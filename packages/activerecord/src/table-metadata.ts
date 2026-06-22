@@ -49,9 +49,7 @@ export class TableMetadata {
 
   associatedTable(
     tableName: string,
-    fallback?: ((name: string) => typeof Base | null) & {
-      aliasFor?: (assocName: string) => string | null;
-    },
+    fallback?: (name: string) => typeof Base | null,
   ): TableMetadata {
     const reflection = this._klass
       ? (reflectOnAssociation(this._klass, tableName) ??
@@ -74,26 +72,15 @@ export class TableMetadata {
     }
 
     if (associationKlass) {
+      // Mirrors Rails table_metadata.rb associated_table: always alias the
+      // resolved association table to the hash key when the names differ, for
+      // both the reflection and the join-dependency fallback branch. The
+      // where-hash key auto-adds itself to references_values (build_where_clause)
+      // as a SqlLiteral, so make_constraints re-aliases the join to that same
+      // name and WHERE/JOIN stay in sync.
       let arelTable = (associationKlass as any).arelTable;
-      // Only alias to the key when it was resolved as a real table name (the
-      // no-reflection join-dependency path). A reflection key may be a camelCase
-      // association name that differs from — and is not a valid alias of — the
-      // join's table, so the association's own table name is the correct SQL
-      // identifier. (Rails aliases the join to the association name and so
-      // aliases here too; trails does not alias the join, so we mirror the
-      // join's actual table name instead.)
-      if (!reflection && arelTable && arelTable.name !== tableName) {
+      if (arelTable && arelTable.name !== tableName) {
         arelTable = arelTable.alias(tableName);
-      } else if (reflection && arelTable && fallback?.aliasFor) {
-        // Reflection key: alias to the join's referenced name when the
-        // association is joined. `aliasFor` returns the reference name (the key)
-        // the join is re-aliased to (`da_toys AS toys` for `joins(:toys)`), so
-        // the WHERE binds to the same alias as the JOIN; null when no join
-        // exists, so the key resolves to the association's own table name.
-        const joinAlias = fallback.aliasFor(tableName);
-        if (joinAlias && joinAlias !== arelTable.name) {
-          arelTable = arelTable.alias(joinAlias);
-        }
       }
       return new TableMetadata(associationKlass, arelTable, reflection);
     }

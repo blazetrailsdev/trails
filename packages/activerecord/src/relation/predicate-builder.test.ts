@@ -409,14 +409,16 @@ describe("PredicateBuilderTest", () => {
       expect(sql).not.toContain('"posts"."authors"');
     });
 
-    it("expands a nested hash keyed by an association name that differs from the table to the underlying table", () => {
+    it("aliases a nested hash keyed by an association name that differs from the table to the association key", () => {
+      // Rails table_metadata.rb associated_table aliases the resolved table to
+      // the hash key whenever the names differ, so an association key that
+      // differs from its table (writer -> authors) emits "writer"."name".
       const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ writer: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
-      expect(sql).toContain('"authors"."name"');
+      expect(sql).toContain('"writer"."name"');
       expect(sql).toContain("= ?");
-      expect(sql).not.toContain('"writer"."name"');
     });
 
     it("negated form expands whereNot({authors: {name: 'Rails'}}) to NOT \"authors\".\"name\" = 'Rails'", () => {
