@@ -73,7 +73,7 @@ export class SingularAssociation extends Association {
    *                    the duration of the load, letting legitimate
    *                    lazy loads through.
    */
-  get reader(): Base | null {
+  get reader(): Base | null | Promise<Base | null> {
     if (this.loaded) return this.target;
 
     // An in-memory target (set via build / internal assignment paths
@@ -106,9 +106,11 @@ export class SingularAssociation extends Association {
           className: this.reflection.options?.className,
         });
       }
-      // Rails loads synchronously; Node.js requires async I/O. Return a
-      // Promise — sync access without await receives the Promise object.
-      return this.loadTarget() as unknown as Base | null;
+      // Rails loads synchronously; Node.js requires async I/O. The union
+      // return type now forces callers to `await` — TypeScript enforces it
+      // instead of the old `as unknown as Base | null` lie. The only cast
+      // narrows loadTarget's `Base | Base[] | null` to the singular shape.
+      return this.loadTarget() as Promise<Base | null>;
     }
     return this.target;
   }
