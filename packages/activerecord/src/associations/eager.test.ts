@@ -4820,24 +4820,29 @@ describe("EagerLoadingTooManyIdsTest", () => {
     registerModel(Book);
     const rows: { id: number; book2_id: number }[] = [];
     for (let i = 0; i < TOTAL; i++) rows.push({ id: i, book2_id: i * i });
-    for (let i = 0; i < rows.length; i += 5000) {
-      await Citation.insertAll(rows.slice(i, i + 5000));
+    // 2-column rows → ≤ 65535 placeholders/insert on MySQL/MariaDB at this chunk.
+    for (let i = 0; i < rows.length; i += 10_000) {
+      await Citation.insertAll(rows.slice(i, i + 10_000));
     }
-  }, 120_000);
+  }, 180_000);
 
   afterAll(async () => {
     await Base.connection.executeMutation("DELETE FROM citations");
-  });
+  }, 60_000);
 
+  // Generous per-test timeouts: instantiating the full 65536-row set is
+  // intrinsically slow on the MySQL-family DDL/insert lanes (~15s observed on
+  // MariaDB), well past the 5s default. The seeding cost is the point — the
+  // fixture must exceed the adapter's bind-parameter limit to force IN-splitting.
   it("preloading too many ids", async () => {
     expect((await Citation.preload("referenceOf").toArray()).length).toBe(await Citation.count());
-  }, 30_000);
+  }, 120_000);
 
   it("eager loading too many ids", async () => {
     expect(await Citation.all().eagerLoad("citations").offset(0).size()).toBe(
       await Citation.count(),
     );
-  });
+  }, 120_000);
 });
 
 // ==========================================================================
