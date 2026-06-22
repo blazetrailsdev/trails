@@ -3069,10 +3069,6 @@ export class Base extends Model {
 
   private _performInsert(): void {
     const ctor = this.constructor as typeof Base;
-    // Use the connection threaded by the enclosing `withQueryConnection` wrap
-    // (Rails' `with_connection` block parameter) rather than the deprecated
-    // `.connection` getter, so the INSERT doesn't flip the lease permanent.
-    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     // If suppressed, skip the actual insert but update record state
     if (_isSuppressed(ctor)) {
@@ -3081,6 +3077,13 @@ export class Base extends Model {
       this.changesApplied();
       return;
     }
+
+    // Use the connection threaded by the enclosing `withQueryConnection` wrap
+    // (Rails' `with_connection` block parameter) rather than the deprecated
+    // `.connection` getter, so the INSERT doesn't flip the lease permanent.
+    // Resolved after the suppression guard so a suppressed write on a
+    // connectionless model never touches `.connection` (Rails resolves lazily).
+    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     const table = ctor.arelTable;
 
@@ -3293,9 +3296,6 @@ export class Base extends Model {
 
   private _performUpdate(): void {
     const ctor = this.constructor as typeof Base;
-    // Thread the `withQueryConnection` connection rather than the deprecated
-    // `.connection` getter (see `_performInsert`).
-    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     // If suppressed, skip the actual update
     if (_isSuppressed(ctor)) {
@@ -3303,6 +3303,11 @@ export class Base extends Model {
       this.changesApplied();
       return;
     }
+
+    // Thread the `withQueryConnection` connection rather than the deprecated
+    // `.connection` getter (see `_performInsert`); resolved after the suppression
+    // guard so a suppressed write never touches `.connection`.
+    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     const table = ctor.arelTable;
 
@@ -3438,9 +3443,6 @@ export class Base extends Model {
    */
   private async _destroyRow(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
-    // Thread the `withQueryConnection` connection rather than the deprecated
-    // `.connection` getter (see `_performInsert`).
-    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     let didDelete = false;
     const destroyResult = await cbRunAll(ctor.prototype, "destroy", this, async () => {
@@ -3481,6 +3483,10 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
+        // Thread the `withQueryConnection` connection rather than the deprecated
+        // `.connection` getter (see `_performInsert`); resolved here, at the
+        // actual DELETE, so a connectionless model never touches `.connection`.
+        const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
         const [deleteSql, deleteBinds] = adapter.toSqlAndBinds(dm);
         const affected = await adapter.execDelete(deleteSql, `${ctor.name} Destroy`, deleteBinds);
         if (ctor.lockingEnabled && affected === 0) {
