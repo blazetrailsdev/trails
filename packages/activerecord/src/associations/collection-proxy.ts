@@ -1838,10 +1838,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       throughAssoc.options.foreignKey ??
       throughAssoc.options.queryConstraints ??
       `${underscore(ctor.name)}_id`;
-    const ownerPk: string | string[] =
-      reflection?.activeRecordPrimaryKey ?? throughAssoc.options.primaryKey ?? ctor.primaryKey;
-
     const fkCols = Array.isArray(ownerFk) ? ownerFk : [ownerFk];
+
+    let ownerPk: string | string[];
+    if (reflection?.activeRecordPrimaryKey !== undefined) {
+      ownerPk = reflection.activeRecordPrimaryKey;
+    } else if (throughAssoc.options.primaryKey !== undefined) {
+      ownerPk = throughAssoc.options.primaryKey;
+    } else if (
+      // Reflection-less fallback only: reproduce Reflection#activeRecordPrimaryKey's
+      // id-collapse (reflection.ts:1063-1065) — a scalar FK against a composite PK
+      // that includes "id" pairs with the scalar "id" column.
+      fkCols.length === 1 &&
+      Array.isArray(ctor.primaryKey) &&
+      ctor.primaryKey.includes("id")
+    ) {
+      ownerPk = "id";
+    } else {
+      ownerPk = ctor.primaryKey;
+    }
     const pkCols = Array.isArray(ownerPk) ? ownerPk : [ownerPk];
     if (fkCols.length !== pkCols.length) {
       throw new Error(
