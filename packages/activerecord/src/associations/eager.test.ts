@@ -31,6 +31,9 @@ import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { Project } from "../test-helpers/models/project.js";
+import { Sponsor } from "../test-helpers/models/sponsor.js";
+import { Member } from "../test-helpers/models/member.js";
+import { Essay } from "../test-helpers/models/essay.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -3458,7 +3461,7 @@ describe("EagerAssociationTest", () => {
     const parents = await EagerReordParent.all().includes("eagerReordChild").toArray();
     expect((parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.value).toBe("V");
   });
-  it.skip("preloading polymorphic with custom foreign type", () => {
+  it.skip("joins with includes should preload via joins", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
@@ -3823,16 +3826,6 @@ describe("EagerAssociationTest", () => {
     });
     expect(targets2).toHaveLength(1);
   });
-  it.skip("preloading with a polymorphic association and using the existential predicate but also using a select", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("preloading with a polymorphic association and using the existential predicate", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it.skip("preloading associations with string joins and order references", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
@@ -4101,16 +4094,6 @@ describe("EagerAssociationTest", () => {
     expect(posts[0]._readonly).toBe(true);
   });
 
-  it.skip("preloading a polymorphic association with references to the associated table", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("eager-loading a polymorphic association with references to the associated table", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("eager-loading with a polymorphic association won't work consistently", async () => {
     class EwcAuthor extends Base {
       static {
@@ -5715,6 +5698,108 @@ describe("EagerAssociationTest", () => {
     expect(firm.id).toBe(companies("first_firm").id);
     const clients = (await (firm as any).clients.toArray()) as Base[];
     expect(clients.map((c) => c.id)).toEqual([companies("first_client").id]);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Sponsor/Member polymorphic fixtures) — ports
+// the custom `foreign_type` preload case (Sponsor#thing reuses the
+// sponsorable_* columns via `foreign_type:`/`foreign_key:`).
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { sponsors, members } = useHandlerFixtures(["members", "sponsors"]);
+  beforeAll(async () => {
+    await defineSchema(
+      { members: canonicalSchema.members, sponsors: canonicalSchema.sponsors } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Sponsor);
+  registerModel(Member);
+
+  it("preloading polymorphic with custom foreign type", async () => {
+    const grouchoId = members("groucho").id;
+    const sponsorId = sponsors("moustache_club_sponsor_for_groucho").id;
+    let sponsor!: Sponsor;
+    await assertQueriesCount(2, false, async () => {
+      sponsor = (await Sponsor.includes("thing").where({ id: sponsorId }).first()) as Sponsor;
+    });
+    await assertNoQueries(false, () => {
+      const thing = sponsor.association("thing").target as Base;
+      expect(thing.id).toBe(grouchoId);
+    });
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Author/Essay polymorphic fixtures) — ports the
+// existential-predicate preload cases over Essay#writer (polymorphic belongs_to,
+// primary_key: name).
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { authors } = useHandlerFixtures(["authors", "essays"]);
+  beforeAll(async () => {
+    await defineSchema(
+      { authors: canonicalSchema.authors, essays: canonicalSchema.essays } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Author);
+  registerModel(Essay);
+
+  it("preloading with a polymorphic association and using the existential predicate but also using a select", async () => {
+    const david = await Author.find(authors("david").id);
+    const essay = (await (david as any).essays.includes("writer").first()) as Essay;
+    expect((essay.association("writer").target as Base).id).toBe(david.id);
+
+    await expect(
+      (david as any).essays.includes("writer").select("name").isAny(),
+    ).resolves.not.toThrow();
+  });
+
+  it("preloading with a polymorphic association and using the existential predicate", async () => {
+    const david = await Author.find(authors("david").id);
+    const essay = (await (david as any).essays.includes("writer").first()) as Essay;
+    expect((essay.association("writer").target as Base).id).toBe(david.id);
+
+    await (david as any).essays.includes("writer").isAny();
+    await (david as any).essays.includes("writer").exists();
+    await (david as any).essays.includes("owner").where("name IS NOT NULL").exists();
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Post/Tag/Tagging fixtures) — ports the
+// polymorphic has_many :through (`tags` through polymorphic `taggings`) cases
+// that reference the joined `tags` table via `references`/`eager_load`.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { posts } = useHandlerFixtures(["posts", "tags", "taggings"]);
+  beforeAll(async () => {
+    await defineSchema(
+      {
+        posts: canonicalSchema.posts,
+        tags: canonicalSchema.tags,
+        taggings: canonicalSchema.taggings,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Post);
+  registerModel(Tag);
+  registerModel(Tagging);
+
+  it("preloading a polymorphic association with references to the associated table", async () => {
+    const post = (await Post.includes("tags")
+      .references("tags")
+      .where("tags.name = ?", "General")
+      .first()) as Post;
+    expect(post.id).toBe(posts("welcome").id);
+  });
+
+  it("eager-loading a polymorphic association with references to the associated table", async () => {
+    const post = (await Post.eagerLoad("tags").where("tags.name = ?", "General").first()) as Post;
+    expect(post.id).toBe(posts("welcome").id);
   });
 });
 
