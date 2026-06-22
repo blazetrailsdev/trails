@@ -861,25 +861,58 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
+    # Class-level accessors are always generated; instance-level ones can be
+    # suppressed per Rails' `instance_accessor:`/`instance_reader:`/
+    # `instance_writer:`/`instance_predicate:` options. Honoring them keeps the
+    # manifest faithful — emitting instance methods Rails doesn't create would
+    # inject phantom misses into api:compare.
+    inst_default = option_bool(args, "instance_accessor") != false
+    inst_reader = reader && inst_default && option_bool(args, "instance_reader") != false
+    inst_writer = writer && inst_default && option_bool(args, "instance_writer") != false
+    inst_predicate = predicate && option_bool(args, "instance_predicate") != false
+
     vis = current_visibility
     leading_symbol_args(args).each do |name|
-      entries = []
-      entries << { name: name, params: [] } if reader
-      entries << { name: "#{name}=", params: [{ name: "value", kind: "required" }] } if writer
-      entries << { name: "#{name}?", params: [] } if predicate
-      entries.each do |e|
-        info = {
-          name: e[:name],
-          visibility: vis.to_s,
-          params: e[:params],
-          file: @current_file,
-          notes: "class_attribute",
-        }
-        target[:instanceMethods] << info
-        target[:classMethods] << info.dup
-      end
+      add_mattr_accessor(target, name, vis, "#{name}", reader, inst_reader, [])
+      add_mattr_accessor(target, name, vis, "#{name}=", writer, inst_writer,
+                         [{ name: "value", kind: "required" }])
+      add_mattr_accessor(target, name, vis, "#{name}?", predicate, inst_predicate, [])
     end
     maybe_update_module_file(fqn, target)
+  end
+
+  def add_mattr_accessor(target, _name, vis, method_name, on_class, on_instance, params)
+    return unless on_class || on_instance
+    info = {
+      name: method_name,
+      visibility: vis.to_s,
+      params: params,
+      file: @current_file,
+      notes: "class_attribute",
+    }
+    target[:classMethods] << info if on_class
+    target[:instanceMethods] << info.dup if on_instance
+  end
+
+  # Boolean value of a trailing-options-hash key (`instance_writer: false`),
+  # or nil when the key is absent or not a literal true/false.
+  def option_bool(args, key)
+    list = positional_arg_list(args)
+    return nil unless list.is_a?(Array)
+    list.each do |el|
+      next unless el.is_a?(Array) && el[0] == :bare_assoc_hash
+      (el[1] || []).each do |assoc|
+        next unless assoc.is_a?(Array) && assoc[0] == :assoc_new &&
+                    assoc[1].is_a?(Array) && assoc[1][0] == :@label &&
+                    assoc[1][1] == "#{key}:"
+        v = assoc[2]
+        if v.is_a?(Array) && v[0] == :var_ref && v[1].is_a?(Array) && v[1][0] == :@kw
+          return v[1][1] == "true"
+        end
+        return nil
+      end
+    end
+    nil
   end
 
   def process_scope(args)
