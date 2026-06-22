@@ -5228,7 +5228,7 @@ describe("EagerAssociationTest", () => {
       .where("posts.author_id = authors.id")
       .order("posts.id")
       .toArray();
-    const firstComments = (await (loaded[0] as any).comments.toArray()) as Base[];
+    const firstComments = loaded[0].association("comments").target as Base[];
     expect(firstComments).toHaveLength(2);
   });
 
