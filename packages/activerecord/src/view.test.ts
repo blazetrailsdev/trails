@@ -6,7 +6,7 @@
  * The UpdateableViewTest block is guarded to non-SQLite adapters because
  * SQLite does not support DML (INSERT/UPDATE/DELETE) through views.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
@@ -57,7 +57,12 @@ async function rebuildBooksTables(): Promise<void> {
 // ---------------------------------------------------------------------------
 // ViewWithPrimaryKeyTest
 // ---------------------------------------------------------------------------
-describe("ViewWithPrimaryKeyTest", () => {
+// Rails defines these tests in the `ViewBehavior` concern, which is mixed into
+// `ViewWithPrimaryKeyTest` — a class that sits under `if …supports_views?`. The
+// gate extractor now propagates that `views` feature gate to the module's tests,
+// so gate this suite the same way (all adapters support views, so it gates
+// nothing at runtime — it keeps the gate-fidelity match with Rails).
+describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
   const { books } = useHandlerFixtures(["books", "authors"], { schema: canonicalSchema });
 
   class Ebook extends Base {
@@ -77,29 +82,29 @@ describe("ViewWithPrimaryKeyTest", () => {
     await dropView("ebooks'");
   });
 
-  it("reading", async () => {
+  itIfSupports("views", "reading", async () => {
     const ebookRecords = await Ebook.all();
     expect(ebookRecords.map((b: any) => b.id)).toEqual([books("rfr").id]);
     expect(ebookRecords.map((b: any) => b.name)).toEqual(["Ruby for Rails"]);
   });
 
-  it("views", async () => {
+  itIfSupports("views", "views", async () => {
     expect(await conn().views()).toEqual([Ebook._tableName]);
   });
 
-  it("view exists", async () => {
+  itIfSupports("views", "view exists", async () => {
     expect(await conn().viewExists(Ebook._tableName)).toBe(true);
   });
 
-  it("table exists", async () => {
+  itIfSupports("views", "table exists", async () => {
     expect(await conn().tableExists(Ebook._tableName)).toBe(false);
   });
 
-  it("views ara valid data sources", async () => {
+  itIfSupports("views", "views ara valid data sources", async () => {
     expect(await conn().isDataSourceExists(Ebook._tableName)).toBe(true);
   });
 
-  it("column definitions", async () => {
+  itIfSupports("views", "column definitions", async () => {
     expect(Ebook.columns().map((c: any) => [c.name, c.type])).toEqual([
       ["id", "integer"],
       ["name", "string"],
@@ -108,7 +113,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     ]);
   });
 
-  it("attributes", async () => {
+  itIfSupports("views", "attributes", async () => {
     const ebook = await Ebook.first();
     expect((ebook as any).attributes).toEqual({
       id: 2,
@@ -118,7 +123,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     });
   });
 
-  it("does not assume id column as primary key", async () => {
+  itIfSupports("views", "does not assume id column as primary key", async () => {
     class Model extends Base {
       static override _tableName = "ebooks'";
     }
@@ -129,7 +134,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     expect(Model.primaryKey).toBeNull();
   });
 
-  it("does not dump view as table", async () => {
+  itIfSupports("views", "does not dump view as table", async () => {
     const schema = await dumpTableSchema(conn() as any, "ebooks'");
     // TS schema DSL: ctx.createTable("ebooks'", ...) — not the Ruby create_table form
     expect(schema).not.toMatch(/ctx\.createTable\("ebooks'"/);
@@ -165,9 +170,8 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
 
   // Rails defines these tests directly inside `ViewWithoutPrimaryKeyTest`, which
   // sits textually under `if supports_views?` — so they carry a `views` feature
-  // gate (vs the ViewBehavior-module tests above, which the extractor sees as
-  // unconditional). All adapters support views, so this gates nothing at runtime;
-  // it keeps the gate-fidelity match with Rails.
+  // gate. All adapters support views, so this gates nothing at runtime; it keeps
+  // the gate-fidelity match with Rails.
   itIfSupports("views", "reading", async () => {
     const records = await Paperback.all();
     expect(records.map((b: any) => b.name)).toEqual([books("awdr").name]);

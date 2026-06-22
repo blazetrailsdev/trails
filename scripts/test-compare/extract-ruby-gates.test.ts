@@ -185,4 +185,126 @@ describe("Ruby extractor gate detection", () => {
     expect(g["uses offset"] ?? null).toBeNull();
     expect(g["bare skip is a guard"]).toEqual({ guards: ["always_skip"], source: ["body-skip"] });
   });
+
+  it("captures a connection `respond_to?(:X)` capability wrapper as a guard", () => {
+    const g = rubyGates({
+      "cases/adapter_test.rb": `
+        class AdapterTest < ActiveRecord::TestCase
+          if ActiveRecord::Base.lease_connection.respond_to?(:reset_pk_sequence!)
+            def test_reset_empty_table; end
+          end
+        end
+      `,
+    });
+    expect(g["reset empty table"]).toEqual({
+      guards: ["respond_to_reset_pk_sequence"],
+      source: ["class"],
+    });
+  });
+
+  it("captures a connection capability predicate wrapper as a guard", () => {
+    const g = rubyGates({
+      "cases/adapter_test.rb": `
+        if ActiveRecord::Base.lease_connection.savepoint_errors_invalidate_transactions?
+          class InvalidateTransactionTest < ActiveRecord::TestCase
+            def test_invalidates_transaction_on_rollback_error; end
+          end
+        end
+        # A non-connection predicate must NOT become a guard.
+        if some_flag.enabled?
+          test "unrelated flag" do; end
+        end
+      `,
+    });
+    expect(g["invalidates transaction on rollback error"]).toEqual({
+      guards: ["savepoint_errors_invalidate_transactions"],
+      source: ["class"],
+    });
+    expect(g["unrelated flag"] ?? null).toBeNull();
+  });
+
+  it("does not treat a predicate on a connection METHOD RESULT as a capability guard", () => {
+    const g = rubyGates({
+      "cases/transaction_isolation_test.rb": `
+        class TransactionIsolationTest < ActiveRecord::TestCase
+          if ActiveRecord::Base.lease_connection.transaction_isolation_levels.include?(:read_uncommitted)
+            test "read uncommitted" do; end
+          end
+        end
+      `,
+    });
+    // \`include?\` here is Array#include? on \`…levels\`, not a connection
+    // capability — only the receiver's terminal method (\`lease_connection\`) is a
+    // connection, so no \`include\` guard is emitted.
+    expect(g["read uncommitted"] ?? null).toBeNull();
+  });
+
+  it("propagates the including class's gate to a mixed-in module's tests", () => {
+    const g = rubyGates({
+      "cases/view_test.rb": `
+        module ViewBehavior
+          def test_reading; end
+        end
+        if ActiveRecord::Base.lease_connection.supports_views?
+          class ViewWithPrimaryKeyTest < ActiveRecord::TestCase
+            include ViewBehavior
+          end
+        end
+      `,
+    });
+    expect(g["reading"]).toEqual({ features: ["views"], source: ["class"] });
+  });
+
+  it("keeps a module ungated when its first include is unconditional", () => {
+    const g = rubyGates({
+      "cases/transactions_test.rb": `
+        module TransactionCallbacksTests
+          def test_transaction_open?; end
+        end
+        class TransactionTest < ActiveRecord::TestCase
+          include TransactionCallbacksTests
+        end
+        class TransactionsWithTransactionalFixturesTest < ActiveRecord::TestCase
+          include TransactionCallbacksTests
+        end if ActiveRecord::Base.lease_connection.supports_savepoints?
+      `,
+    });
+    // First include (TransactionTest) is unconditional, so the module's tests
+    // run on every adapter — no gate, even though a later include is gated.
+    expect(g["transaction open?"] ?? null).toBeNull();
+  });
+
+  it("preserves a mixed-in module test's in-body skip guard", () => {
+    const g = rubyGates({
+      "cases/connection_pool_test.rb": `
+        module ConnectionPoolTests
+          def test_new_connection_no_query
+            skip("Can't test with in-memory dbs") if in_memory_db?
+          end
+        end
+        class ConnectionPoolTest < ActiveRecord::TestCase
+          include ConnectionPoolTests
+        end
+      `,
+    });
+    expect(g["new connection no query"]).toEqual({
+      guards: ["in_memory_db"],
+      source: ["body-skip"],
+    });
+  });
+
+  it("keeps a never-included module's definition-site gate", () => {
+    const g = rubyGates({
+      "cases/some_test.rb": `
+        if ActiveRecord::Base.lease_connection.supports_views?
+          module OnlyDefinedHere
+            def test_defined_under_gate; end
+          end
+        end
+      `,
+    });
+    // The module is never \`include\`d in this file, so it falls back to the gate
+    // in force at its definition site (\`supports_views?\`) rather than ungated.
+    expect(g["defined under gate"]).toEqual({ features: ["views"], source: ["class"] });
+  });
 });

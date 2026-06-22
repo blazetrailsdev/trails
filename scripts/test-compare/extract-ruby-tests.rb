@@ -111,8 +111,18 @@ class TestExtractor
     @source_lines = source.lines
     @gate_stack = []
     @file_adapter_gate = dir_adapter_gate(rel_path)
+    # Modules that define `def test_*` (e.g. an `ActiveSupport::Concern` mixed
+    # into a test case) are not test cases themselves — their tests run once per
+    # including class, inheriting that class's gate. Collect them here keyed by
+    # name; `@module_collect` is the live bucket while walking a module body.
+    @modules = {}
+    @module_collect = nil
+    @module_includes = {}
+    @module_def_gates = {}
 
     walk(sexp)
+
+    flush_collected_modules
 
     return if @test_cases.empty?
 
@@ -146,11 +156,13 @@ class TestExtractor
       process_def(node)
     when :class
       process_class(node)
+    when :module
+      process_module(node)
     when :if, :unless, :if_mod, :unless_mod, :elsif
       process_conditional(node)
     when :program, :bodystmt, :body_stmt, :stmts_add, :stmts_new,
          :begin, :else,
-         :rescue, :ensure, :while, :until, :case, :when, :module
+         :rescue, :ensure, :while, :until, :case, :when
       node.each { |child| walk(child) if child.is_a?(Array) }
     else
       node.each { |child| walk(child) if child.is_a?(Array) }
@@ -219,8 +231,74 @@ class TestExtractor
     return unless name
 
     @describe_stack.push(name)
+    # A class body always emits its `def test_*` directly (even a class nested
+    # inside a module is a real test case), so suspend any module collection.
+    prev = @module_collect
+    @module_collect = nil
     walk_body(node[3] || node[2])
+    @module_collect = prev
     @describe_stack.pop
+  end
+
+  # `module Foo ... end` — when its body defines `def test_*`, the module is a
+  # mixin, not a test case. Stash those tests under the module name; they are
+  # materialized (with the including class's gate) wherever the module is
+  # `include`d. Non-test module bodies (nested classes, helpers) walk normally.
+  def process_module(node)
+    name = const_name(node[1])
+    prev = @module_collect
+    @module_collect = []
+    walk_body(node[2])
+    collected = @module_collect
+    @module_collect = prev
+    if name && !collected.empty?
+      @modules[name] = (@modules[name] || []) + collected
+      # Remember the gate in force at the definition site, used as a fallback for
+      # a module that is never `include`d in this file (mixed in from elsewhere,
+      # or defined under an `if supports_X?` it textually sits inside) so it keeps
+      # its definition-site gate rather than emitting ungated.
+      @module_def_gates[name] ||= @gate_stack.dup
+    end
+  end
+
+  # `include SomeModule` inside a class body — record the enclosing gate so the
+  # module's tests inherit it when flushed. The tests are emitted once (bare),
+  # which the comparator suffix-matches to the FIRST including class block, so
+  # the FIRST include's gate wins. Crucially this means a module mixed into an
+  # ungated class first (e.g. `TransactionCallbacksTests` into the unconditional
+  # `TransactionTest`) stays ungated even if a later include is gated — those
+  # tests really do run on every adapter.
+  def process_include(args, node)
+    name = const_name_from_args(args)
+    return unless name
+    @module_includes[name] ||= @gate_stack.dup
+  end
+
+  # Emit every collected mixin module's tests once (bare — no class ancestor, as
+  # before), but stamped with the gate of the class(es) it is `include`d into.
+  # A module mixed into a class under `if supports_views?` thus yields tests
+  # gated `features:[views]`, matching the class's own `def test_*`.
+  def flush_collected_modules
+    @modules.each do |name, tests|
+      gate_stack = @module_includes[name] || @module_def_gates[name] || []
+      saved = @gate_stack
+      @gate_stack = gate_stack
+      tests.each { |t| @test_cases << materialize_module_test(t) }
+      @gate_stack = saved
+    end
+  end
+
+  def materialize_module_test(t)
+    path = (@describe_stack + [t[:description]]).join(" > ")
+    add_gate({
+      path: path,
+      description: t[:description],
+      ancestors: @describe_stack.dup,
+      file: @current_file,
+      line: t[:line],
+      style: "def_test",
+      assertions: t[:assertions],
+    }, nil, body_gate: t[:body_gate])
   end
 
   def process_command(node)
@@ -234,6 +312,8 @@ class TestExtractor
       process_it(args, node)
     when "test"
       process_test_macro(args, node)
+    when "include"
+      process_include(args, node)
     end
   end
 
@@ -382,6 +462,18 @@ class TestExtractor
     line = extract_line(node)
     assertions = extract_assertions_from_def(node)
 
+    # Inside a mixin module body: stash, don't emit. Materialized at end of file
+    # by flush_collected_modules, with the include-site gate from process_include.
+    if @module_collect
+      # Capture the in-body `skip … if/unless` gate now — the raw sexp isn't
+      # retained past collection, so it can't be recomputed at materialization.
+      @module_collect << {
+        description: desc, line: line, assertions: assertions,
+        body_gate: body_skip_gate(node)
+      }
+      return
+    end
+
     path = (@describe_stack + [desc]).join(" > ")
 
     @test_cases << add_gate({
@@ -430,14 +522,16 @@ class TestExtractor
 
   # Attach a :gate to a test_case from its dir gate, the enclosing
   # `current_adapter?` stack, and any in-body `skip ... if/unless` guards.
-  def add_gate(test_case, body_node)
+  # `body_gate` defaults to `:compute` (derive from `body_node`); module tests
+  # pass their precomputed in-body skip gate instead, since the sexp is gone.
+  def add_gate(test_case, body_node, body_gate: :compute)
     parts = []
     parts << { adapters: @file_adapter_gate } if @file_adapter_gate
     @gate_stack.each { |g| parts << g }
     sources = []
     sources << "dir" if @file_adapter_gate
     sources << "class" unless @gate_stack.empty?
-    body_gate = body_skip_gate(body_node)
+    body_gate = body_skip_gate(body_node) if body_gate == :compute
     if body_gate
       parts << body_gate
       sources << "body-skip"
@@ -536,6 +630,21 @@ class TestExtractor
       elsif name == "database_version"
         acc[:guards] << "version"
         return
+      elsif name == "respond_to?" && connection_receiver?(node)
+        # `connection.respond_to?(:reset_pk_sequence!)` — a capability probe the
+        # extractor can't evaluate statically. Record one guard per probed
+        # method (stripped of its `!`/`?` suffix) so the wrapper is captured.
+        extract_symbol_args(node).each do |s|
+          acc[:guards] << "respond_to_#{s.sub(/[!?]+\z/, "")}"
+        end
+        return
+      elsif name.end_with?("?") && connection_receiver?(node)
+        # Any other connection capability predicate, e.g.
+        # `connection.savepoint_errors_invalidate_transactions?`. Captured as a
+        # guard (incomparable but not unconditional), so a faithful TS gate on
+        # the same wrapper isn't flagged over-gated.
+        acc[:guards] << name.sub(/\?\z/, "")
+        return
       end
     end
     node.each { |c| scan_run_condition(c, acc, negated) if c.is_a?(Array) }
@@ -617,10 +726,49 @@ class TestExtractor
     when :command_call then ident_name(node[3])
     when :fcall, :vcall then ident_name(node[1])
     when :method_add_arg
-      node[1].is_a?(Array) && node[1][0] == :fcall ? ident_name(node[1][1]) : nil
+      # Recurse so a receiver call with args — `conn.respond_to?(:x)` parses as
+      # `[:method_add_arg, [:call, ...], [:arg_paren, ...]]` — resolves to its
+      # method name, not just the parenless `:fcall` form.
+      node[1].is_a?(Array) ? call_ident_name(node[1]) : nil
     when :method_add_block
       node[1].is_a?(Array) ? call_ident_name(node[1]) : nil
     when :call then ident_name(node[3])
+    end
+  end
+
+  # Receiver sexp of a call-ish node (nil for argument-less fcalls / vcalls).
+  def call_receiver(node)
+    return nil unless node.is_a?(Array)
+    case node[0]
+    when :call, :command_call then node[1]
+    when :method_add_arg, :method_add_block then call_receiver(node[1])
+    end
+  end
+
+  CONNECTION_RECEIVER_IDENTS = %w[connection lease_connection conn @connection].freeze
+
+  # Is this call's receiver DIRECTLY a database connection? Recognizes the idioms
+  # used to reach one in Rails tests — `@connection`, `connection`,
+  # `lease_connection`, `conn`, `ActiveRecord::Base.lease_connection` — so a
+  # capability predicate (`respond_to?(:x)`,
+  # `savepoint_errors_invalidate_transactions?`) on it can be captured as a guard
+  # rather than treated as an opaque conditional. Only the receiver's TERMINAL
+  # method/ident is checked, so `connection.transaction_isolation_levels.include?`
+  # (an `Array#include?`, not a connection capability) is correctly excluded.
+  def connection_receiver?(node)
+    name = receiver_terminal_name(call_receiver(node))
+    !name.nil? && CONNECTION_RECEIVER_IDENTS.include?(name)
+  end
+
+  # The trailing method/ident of a receiver chain — `lease_connection` for
+  # `ActiveRecord::Base.lease_connection`, `@connection` for the ivar.
+  def receiver_terminal_name(node)
+    return nil unless node.is_a?(Array)
+    case node[0]
+    when :@ident, :@const, :@ivar then node[1]
+    when :var_ref, :vcall then receiver_terminal_name(node[1])
+    when :call, :command_call then ident_name(node[3])
+    when :method_add_arg, :method_add_block then receiver_terminal_name(node[1])
     end
   end
 
@@ -837,6 +985,22 @@ class TestExtractor
     else
       nil
     end
+  end
+
+  # First constant referenced in an arg list — the module name in
+  # `include SomeModule` (`[:args_add_block, [[:var_ref, [:@const, ...]]], …]`).
+  def const_name_from_args(args)
+    return nil unless args.is_a?(Array)
+    if %i[var_ref const_ref const_path_ref top_const_ref].include?(args[0])
+      return const_name(args)
+    end
+    args.each do |child|
+      if child.is_a?(Array)
+        result = const_name_from_args(child)
+        return result if result
+      end
+    end
+    nil
   end
 
   def ident_name(node)
