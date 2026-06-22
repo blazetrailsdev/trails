@@ -601,7 +601,9 @@ describe("NamedScopingTest", () => {
 
     for (const method of ["destroyAll", "reset", "deleteAll"] as const) {
       const before = post.comments.containingTheLetterE();
-      await post.comments[method]();
+      // Mirror Rails' `post.association(:comments).public_send(method)`: drive
+      // the reset through the association object, not the proxy reader.
+      await post.association("comments")[method]();
       // Rails asserts `assert_not_same` to prove the proxy's cached named-scope
       // relation is invalidated. trails does not yet cache named-scope relations
       // on the proxy — each call rebuilds a fresh Relation — so this holds
