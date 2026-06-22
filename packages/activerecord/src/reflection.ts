@@ -683,6 +683,13 @@ export class MacroReflection extends AbstractReflection {
   }
 
   private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
+    // Rails coerces `class_name` with `.to_s` in AbstractReflection#class_name,
+    // so a Symbol works for every macro (belongs_to, has_many, …). JS has no
+    // Ruby symbol; the faithful analogue is a `Symbol("…")`, normalized to its
+    // description here so all reflection consumers see a string.
+    if (typeof options.className === "symbol") {
+      options = { ...options, className: options.className.description ?? "" };
+    }
     const counterCache = options.counterCache;
     if (counterCache) {
       let active = true;

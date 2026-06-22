@@ -1052,7 +1052,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("with symbol class name", () => {
     expect(() => {
       const developer = new DeveloperWithSymbolClassName({});
-      association(developer, "projects");
+      // Mirrors Rails' `developer.projects`; also force klass resolution so the
+      // Symbol class_name (`:ProjectWithSymbolsForKeys`) is actually resolved,
+      // not merely declared.
+      void (developer as any).projects;
+      void (DeveloperWithSymbolClassName as any)._reflectOnAssociation("projects").klass;
     }).not.toThrow();
   });
 

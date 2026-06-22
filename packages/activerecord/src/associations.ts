@@ -645,10 +645,11 @@ export class Associations {
     name: string,
     options: AssociationOptions & { joinTable?: string } = {},
   ): void {
-    // Rails coerces `class_name` with `.to_s`, so a Symbol like
-    // `class_name: :ProjectWithSymbolsForKeys` is accepted. JS has no Ruby
-    // symbol; the faithful analogue is a `Symbol("…")`, which we normalize to
-    // its description here before the builder reads `options.className`.
+    // `class_name` Symbol coercion is handled generically in
+    // MacroReflection#normalizeOptions (mirroring Rails' AbstractReflection#
+    // class_name `.to_s`), but the HABTM builder reads `options.className`
+    // directly for foreign-key and join-table derivation — before any
+    // reflection is constructed — so the same coercion is repeated here.
     const rawClassName = (options as { className?: unknown }).className;
     if (typeof rawClassName === "symbol") {
       options = { ...options, className: rawClassName.description ?? "" };
