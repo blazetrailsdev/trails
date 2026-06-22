@@ -2843,10 +2843,14 @@ export class Relation<T extends Base> {
     const result = await this._conn().selectAll(sql, "SQL", eagerBinds);
     const rows = result.toArray();
 
-    // Mirrors JoinDependency#instantiate: the instantiation notification's
-    // record_count is the raw JOIN result-set length (rows, including the
-    // duplicated parent rows), not the distinct-parent count.
-    const eagerPayload = { record_count: rows.length, class_name: this._modelClass.name };
+    // Mirrors JoinDependency#instantiate: record_count is the raw JOIN
+    // result-set length (rows, including duplicated parent rows), not the
+    // distinct-parent count, and class_name is the join_root's `base_klass`
+    // name — the STI base, not the queried subclass.
+    const eagerPayload = {
+      record_count: rows.length,
+      class_name: this._modelClass.baseClass.name,
+    };
     const { parents, associations } = Notifications.instrument(
       "instantiation.active_record",
       eagerPayload,
