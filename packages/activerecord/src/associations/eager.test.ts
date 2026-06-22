@@ -4646,8 +4646,13 @@ describe("EagerAssociationTest", () => {
     const people = await (Person as any).males().includes("primaryContact").toArray();
     expect(people).toHaveLength(2);
     for (const person of people) {
-      const contact = person._preloadedAssociations.get("primaryContact");
-      expect(contact).not.toBeNull();
+      // Rails: assert_no_queries { assert_not_nil person.primary_contact } — the
+      // reader must serve the preloaded target without firing a query.
+      let contact: any;
+      await assertNoQueries(false, async () => {
+        contact = await person.primaryContact;
+        expect(contact).not.toBeNull();
+      });
       const direct = await (Person as any).find(person.id);
       const directContact = await direct.primaryContact;
       expect(contact.id).toBe(directContact.id);
