@@ -391,7 +391,7 @@ export class Association {
     return false;
   }
 
-  get reader(): Base | Base[] | null {
+  get reader(): Base | Base[] | null | Promise<Base | null> {
     return this.target;
   }
 
