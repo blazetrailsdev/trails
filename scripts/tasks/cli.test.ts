@@ -183,6 +183,24 @@ describe("ready", () => {
     expect(ready(idx).map((s) => s.id)).toEqual(["active"]);
   });
 
+  it("excludes a ready story whose RFC is null-status or absent from the index", () => {
+    const idx = index([
+      story({ id: "active", rfc: "0001-r" }), // active → included
+      story({ id: "nullStatus", rfc: "0006-r" }), // RFC present but status null → excluded
+      story({ id: "danglingRfc", rfc: "0099-r" }), // rfc absent from index.rfcs → excluded
+    ]);
+    idx.rfcs.push({
+      id: "0006-r",
+      title: "R6",
+      status: null,
+      owner: "@x",
+      packages: [],
+      clusters: ["c1"],
+      file_path: "0006-r/README.md",
+    });
+    expect(ready(idx).map((s) => s.id)).toEqual(["active"]);
+  });
+
   it("honors --rfc filter", () => {
     const idx = index([
       story({ id: "a", rfc: "0001-r" }),

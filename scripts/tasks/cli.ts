@@ -172,6 +172,9 @@ export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
     // (README: draft-RFC stories "should not be claimed"); a `ready` story
     // under a closed RFC is almost certainly stale. Only active RFCs feed
     // pickup. Uses index.rfcs status already in scope — no extra fs reads.
+    // A null status or an rfc absent from the index also fails this check and
+    // is excluded — the conservative default: don't surface a story whose RFC
+    // can't be confirmed active.
     if (rfcStatus.get(s.rfc) !== "active") return false;
     if (opts.rfc && s.rfc !== opts.rfc) return false;
     if (s.deps.some((d) => storyStatus.get(d) !== "done")) return false;
