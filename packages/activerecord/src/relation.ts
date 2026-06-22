@@ -2586,6 +2586,16 @@ export class Relation<T extends Base> {
       if (token !== this._loadToken) return [];
       loadedRecords = this._records;
       this.loadRecords(loadedRecords);
+      // Rails' `instantiate_records(rows, &block)` yields the per-record block in
+      // the eager branch too (`records.each(&block)`), not just simple
+      // instantiation. The eager path here builds records via JoinDependency and
+      // bypasses `_instrumentInstantiation` (which is where the block otherwise
+      // fires), so run it explicitly — otherwise an AssociationRelation's
+      // owner→child inverse wiring + owner-mode strict_loading would be dropped
+      // for `owner.posts.eager_load(:x)` / promoted-includes loads. Runs before
+      // the residual `preload_associations` below, matching Rails' ordering.
+      const eagerBlock = this._instantiateBlock;
+      if (eagerBlock) for (const record of loadedRecords) eagerBlock(record);
     } else {
       const sql = this._toSql();
       // _compileSelectSql captures the SELECT's retryability and bind values
