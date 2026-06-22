@@ -222,12 +222,23 @@ describe("NamedScopingTest", () => {
   // current-scope-capturing variant.
   it.skip("scopes honor current scopes from when defined", () => {});
 
-  // Engine gap: `scope` does not raise when the body is not callable.
-  it.skip("scopes body is a callable", () => {});
+  it("scopes body is a callable", () => {
+    const klass = class extends Post {};
+    expect(() =>
+      (klass as any).scope("containingTheLetterZ", Post.where("body LIKE '%z%'")),
+    ).toThrow("The scope body needs to be callable.");
+  });
 
-  // Engine gap: `scope` does not raise on names that collide with Relation
-  // methods (records/to_ary/to_sql/explain).
-  it.skip("scopes name is relation method", () => {});
+  it("scopes name is relation method", () => {
+    // trails Relation method names (Rails: records/to_ary/to_sql/explain).
+    const conflicts = ["records", "toArray", "toSql", "explain"];
+    for (const name of conflicts) {
+      const klass = class extends Post {};
+      expect(() => (klass as any).scope(name, (q: any) => q.where({ approved: true }))).toThrow(
+        new RegExp(`You tried to define a scope named "${name}" on the model`),
+      );
+    }
+  });
 
   it("active records have scope named  all  ", async () => {
     expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
@@ -368,9 +379,46 @@ describe("NamedScopingTest", () => {
     expect(topic.author_name).toBe("lifo");
   });
 
-  // Engine gap: no reserved/conflicting scope-name guard (create/relation/new/
-  // all/public/... should raise; existing-method names should not).
-  it.skip("reserved scope names", () => {});
+  it("reserved scope names", () => {
+    class ReservedKlass extends Topic {
+      static pub() {}
+      static pri() {}
+      static pro() {}
+    }
+    (ReservedKlass as any).scope("approved", (q: any) => q.where({ approved: true }));
+    class ReservedSubklass extends ReservedKlass {}
+
+    const conflicts = [
+      "create",
+      "relation",
+      "new",
+      "all",
+      "public",
+      "protected",
+      "private",
+      "name",
+      "superclass",
+    ];
+    for (const name of conflicts) {
+      const re = new RegExp(`You tried to define a scope named "${name}" on the model`);
+      expect(() =>
+        (ReservedKlass as any).scope(name, (q: any) => q.where({ approved: true })),
+      ).toThrow(re);
+      expect(() =>
+        (ReservedSubklass as any).scope(name, (q: any) => q.where({ approved: true })),
+      ).toThrow(re);
+    }
+
+    const nonConflicts = ["findByTitle", "approved", "pub", "pri", "pro", "open"];
+    for (const name of nonConflicts) {
+      expect(() =>
+        (ReservedKlass as any).scope(name, (q: any) => q.where({ approved: true })),
+      ).not.toThrow();
+      expect(() =>
+        (ReservedSubklass as any).scope(name, (q: any) => q.where({ approved: true })),
+      ).not.toThrow();
+    }
+  });
 
   it("spaces in scope names", async () => {
     // Rails defines `scope :"title containing space", ->(space: " ") { ... }`
@@ -571,10 +619,11 @@ describe("NamedScopingTest", () => {
   // table is absent; trails has no without_table fixture model.
   it.skip("scoped are lazy loaded if table still does not exist", () => {});
 
-  // Engine gap: `defaultScope` does not raise ArgumentError when handed an
-  // eager Relation instead of a callable (Rails guards this in
-  // `Scoping::Default::ClassMethods#default_scope`).
-  it.skip("eager default scope relations are remove", () => {});
+  it("eager default scope relations are remove", () => {
+    const welcome = posts("welcome");
+    const klass = class extends Post {};
+    expect(() => (klass as any).defaultScope(Post.where({ id: welcome.id }))).toThrow();
+  });
 
   it("subclass merges scopes properly", async () => {
     expect(await (SpecialComment as any).where({ body: "go wild" }).created().count()).toBe(1);
