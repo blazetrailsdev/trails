@@ -200,12 +200,15 @@ export class FileStore extends Store implements CacheStore {
   private modifyValue(name: string, amount: number, options: StoreOptions): number {
     const key = this.normalizeKey(name, options);
     const version = this.normalizeVersion(name, options) ?? null;
+    // Rails coerces `amount = Integer(amount)` once (file_store.rb:226) and uses
+    // it uniformly for the seed write, the return, and the hit-path addition.
+    const amt = Math.trunc(amount);
     const entry = this.readEntry(key, options);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
-      this.write(name, Math.trunc(amount), options);
-      return amount;
+      this.write(name, amt, options);
+      return amt;
     }
-    const num = toI(entry.value) + amount;
+    const num = toI(entry.value) + amt;
     this.writeEntry(
       key,
       new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
