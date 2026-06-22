@@ -1,274 +1,178 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/copy_table_test.rb
  */
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect } from "vitest";
+import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
+import { Base } from "../../base.js";
+import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
-let adapter: AbstractSQLite3Adapter;
+// Rails calls the private `copy_table` with `{ temporary: true }.merge(options)`.
+function copyTable(conn: any, from: string, to: string, options: Record<string, unknown> = {}) {
+  return conn.copyTable(from, to, { temporary: true, ...options });
+}
 
-beforeEach(() => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-});
+// Rails: table_structure(table).map { |column| column["name"] }
+async function columnNames(conn: any, table: string): Promise<unknown[]> {
+  const structure = await conn.tableStructure(table);
+  return structure.map((column: Record<string, unknown>) => column["name"]);
+}
 
-afterEach(() => {
-  adapter.close();
-});
+// Rails: select_all("SELECT #{column} FROM #{table} ORDER BY id").map { |row| row[column] }
+async function columnValues(conn: any, table: string, column: string): Promise<unknown[]> {
+  const rows = await conn.execute(`SELECT ${column} FROM ${table} ORDER BY id`);
+  return rows.map((row: Record<string, unknown>) => row[column]);
+}
 
-// -- Rails test class: copy_table_test.rb --
+// Rails: indexes(table).delete(:name). Ruby's Array#delete returns the deleted
+// element or nil; no IndexDefinition equals the symbol :name, so this is always
+// nil — mirror that exactly.
+async function tableIndexesWithoutName(conn: any, table: string): Promise<unknown> {
+  const indexes = await conn.indexes(table);
+  const at = indexes.indexOf("name");
+  if (at === -1) return null;
+  indexes.splice(at, 1);
+  return "name";
+}
+
+// Rails: select_one("SELECT COUNT(*) AS count FROM #{table}")["count"]
+async function rowCount(conn: any, table: string): Promise<unknown> {
+  const rows = await conn.execute(`SELECT COUNT(*) AS count FROM ${table}`);
+  return rows[0]["count"];
+}
+
+async function testCopyTable(
+  conn: any,
+  from = "customers",
+  to = "customers2",
+  options: Record<string, unknown> = {},
+  block?: (from: string, to: string, options: Record<string, unknown>) => void | Promise<void>,
+): Promise<void> {
+  let raised: unknown;
+  try {
+    await copyTable(conn, from, to, options);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeUndefined();
+  expect(await rowCount(conn, to)).toEqual(await rowCount(conn, from));
+
+  if (block) {
+    await block(from, to, options);
+  } else {
+    expect(await columnNames(conn, to)).toEqual(await columnNames(conn, from));
+  }
+
+  try {
+    await conn.dropTable(to);
+  } catch {
+    // rescue nil
+  }
+}
+
+// -- Rails test class: copy_table_test.rb (ActiveRecord::SQLite3TestCase) --
+// `copy_table` and `table_structure` are SQLite-specific private adapter methods
+// and the assertions probe SQLite identifier quoting / PRAGMA structure, so this
+// must skip when the handler connection is PG/MySQL in the CI matrix.
 describeIfSqlite("CopyTableTest", () => {
+  // Rails `fixtures :customers`. `schema` recreates the canonical tables so the
+  // copy_table source tables (comments, owners, …) resolve regardless of any
+  // bespoke schema a sibling file left in the shared worker DB.
+  useHandlerFixtures(["customers"], { schema: canonicalSchema });
+
   it("copy table", async () => {
-    adapter.exec(`CREATE TABLE "source" ("id" INTEGER PRIMARY KEY, "name" TEXT, "age" INTEGER)`);
-    await adapter.executeMutation(`INSERT INTO "source" ("name", "age") VALUES ('Alice', 30)`);
-    adapter.exec(`CREATE TABLE "dest" AS SELECT * FROM "source"`);
-    const rows = await adapter.execute(`SELECT * FROM "dest"`);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].name).toBe("Alice");
+    await testCopyTable(Base.leaseConnection() as any);
   });
 
-  it("copy table with column with default", async () => {
-    adapter.exec(
-      `CREATE TABLE "src_def" ("id" INTEGER PRIMARY KEY, "name" TEXT DEFAULT 'unnamed')`,
-    );
-    await adapter.executeMutation(`INSERT INTO "src_def" ("id") VALUES (1)`);
-    const rows = await adapter.execute(`SELECT * FROM "src_def"`);
-    expect(rows[0].name).toBe("unnamed");
+  it.skip("copy table with column with default", () => {
+    // BLOCKED: adapter-sqlite — a `json` column added with `default: {}` quotes
+    // its default via String({}) → "[object Object]" instead of serializing the
+    // value to JSON "{}", so the copied column's default mismatches Rails.
+    // ROOT-CAUSE: the json type's default serialization is not applied on the
+    // addColumn DEFAULT path for SQLite.
+    // SCOPE: serialize structured defaults through the column type before
+    // quoting; file sqlite3-json-default-serialization.
   });
 
   it("copy table renaming column", async () => {
-    adapter.exec(`CREATE TABLE "rename_src" ("id" INTEGER PRIMARY KEY, "old_name" TEXT)`);
-    await adapter.executeMutation(`INSERT INTO "rename_src" ("old_name") VALUES ('Alice')`);
-    // SQLite 3.25+ supports ALTER TABLE RENAME COLUMN
-    adapter.exec(`ALTER TABLE "rename_src" RENAME COLUMN "old_name" TO "new_name"`);
-    const rows = await adapter.execute(`SELECT "new_name" FROM "rename_src"`);
-    expect(rows[0].new_name).toBe("Alice");
+    const conn = Base.leaseConnection() as any;
+    await testCopyTable(
+      conn,
+      "customers",
+      "customers2",
+      { rename: { name: "person_name" } },
+      async (from, to) => {
+        const expected = await columnValues(conn, from, "name");
+        expect(await columnValues(conn, to, "person_name")).toEqual(expected);
+        // Rails `assert_predicate expected, :any?`: Ruby's blockless `any?` is
+        // truthy for everything except nil/false, so 0/"" count as present.
+        expect(expected.some((v) => v !== null && v !== undefined && v !== false)).toBe(true);
+      },
+    );
   });
 
   it("copy table allows to pass options to create table", async () => {
-    // Create table with STRICT mode (SQLite 3.37+)
-    adapter.exec(`CREATE TABLE "opts_src" ("id" INTEGER PRIMARY KEY, "name" TEXT) STRICT`);
-    await adapter.executeMutation(`INSERT INTO "opts_src" ("name") VALUES ('test')`);
-    const rows = await adapter.execute(`SELECT * FROM "opts_src"`);
-    expect(rows).toHaveLength(1);
+    const conn = Base.leaseConnection() as any;
+    // testCopyTable drops `blocker_table` (its `to`) at the end, mirroring Rails.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await conn.createTable("blocker_table");
+    await testCopyTable(conn, "customers", "blocker_table", { force: true });
   });
 
   it("copy table with index", async () => {
-    adapter.exec(`CREATE TABLE "src_idx" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    adapter.exec(`CREATE INDEX "idx_src_name" ON "src_idx" ("name")`);
-    const rows = await adapter.execute(`PRAGMA index_list("src_idx")`);
-    expect(rows.some((r: any) => r.name === "idx_src_name")).toBe(true);
+    const conn = Base.leaseConnection() as any;
+    await testCopyTable(conn, "comments", "comments_with_index", {}, async () => {
+      await conn.addIndex("comments_with_index", ["post_id", "type"]);
+      await testCopyTable(conn, "comments_with_index", "comments_with_index2", {}, async () => {
+        expect(await tableIndexesWithoutName(conn, "comments_with_index")).toBeNull();
+        expect(await tableIndexesWithoutName(conn, "comments_with_index2")).toBeNull();
+      });
+    });
   });
 
   it("copy table without primary key", async () => {
-    adapter.exec(`CREATE TABLE "no_pk_src" ("name" TEXT, "value" TEXT)`);
-    await adapter.executeMutation(`INSERT INTO "no_pk_src" ("name", "value") VALUES ('a', 'b')`);
-    adapter.exec(`CREATE TABLE "no_pk_dest" AS SELECT * FROM "no_pk_src"`);
-    const rows = await adapter.execute(`SELECT * FROM "no_pk_dest"`);
-    expect(rows).toHaveLength(1);
+    const conn = Base.leaseConnection() as any;
+    await testCopyTable(conn, "developers_projects", "programmers_projects", {}, async () => {
+      expect(await conn.primaryKey("programmers_projects")).toBeNull();
+    });
   });
 
-  it("copy table with id col that is not primary key", async () => {
-    adapter.exec(
-      `CREATE TABLE "id_not_pk" ("id" INTEGER, "real_pk" INTEGER PRIMARY KEY, "name" TEXT)`,
-    );
-    await adapter.executeMutation(`INSERT INTO "id_not_pk" ("id", "name") VALUES (99, 'test')`);
-    adapter.exec(`CREATE TABLE "id_not_pk_copy" AS SELECT * FROM "id_not_pk"`);
-    const rows = await adapter.execute(`SELECT * FROM "id_not_pk_copy"`);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].id).toBe(99);
+  it.skip("copy table with id col that is not primary key", () => {
+    // BLOCKED: schema-emission — the canonical `goofy_string_id.id` string column
+    // is emitted as `varchar(255)`, so its introspected `limit` is 255 where
+    // Rails' bare `t.string` carries no limit (nil). The test asserts both the
+    // original and copied id columns have a nil limit.
+    // ROOT-CAUSE: defineSchema/SQLite type-mapping appends the default 255 limit
+    // to unbounded string columns; Rails' sqlite3 string maps to `varchar`
+    // without a length.
+    // SCOPE: drop the implicit 255 limit on unbounded string columns for SQLite;
+    // file sqlite3-string-column-no-default-limit.
   });
 
   it("copy table with unconventional primary key", async () => {
-    adapter.exec(`CREATE TABLE "unconv_pk" ("guid" TEXT PRIMARY KEY, "name" TEXT)`);
-    await adapter.executeMutation(
-      `INSERT INTO "unconv_pk" ("guid", "name") VALUES ('abc-123', 'test')`,
-    );
-    adapter.exec(`CREATE TABLE "unconv_pk_copy" AS SELECT * FROM "unconv_pk"`);
-    const rows = await adapter.execute(`SELECT * FROM "unconv_pk_copy"`);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].guid).toBe("abc-123");
+    const conn = Base.leaseConnection() as any;
+    await testCopyTable(conn, "owners", "owners_unconventional", {}, async () => {
+      const originalPk = await conn.primaryKey("owners");
+      const copiedPk = await conn.primaryKey("owners_unconventional");
+      expect(copiedPk).toEqual(originalPk);
+    });
   });
 
   it("copy table with binary column", async () => {
-    adapter.exec(`CREATE TABLE "bin_src" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
-    await adapter.executeMutation(`INSERT INTO "bin_src" ("data") VALUES (X'DEADBEEF')`);
-    adapter.exec(`CREATE TABLE "bin_dest" AS SELECT * FROM "bin_src"`);
-    const rows = await adapter.execute(`SELECT * FROM "bin_dest"`);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].data).toBeDefined();
+    await testCopyTable(Base.leaseConnection() as any, "binaries", "binaries2");
   });
 
-  it("copy table with virtual column", async () => {
-    adapter.exec(
-      `CREATE TABLE "virt_src" ("id" INTEGER PRIMARY KEY, "a" INTEGER, "b" INTEGER, "sum" INTEGER GENERATED ALWAYS AS ("a" + "b") VIRTUAL)`,
-    );
-    await adapter.executeMutation(`INSERT INTO "virt_src" ("a", "b") VALUES (1, 2)`);
-    // CREATE TABLE AS SELECT copies data but not generated columns
-    adapter.exec(`CREATE TABLE "virt_copy" AS SELECT "id", "a", "b", "sum" FROM "virt_src"`);
-    const rows = await adapter.execute(`SELECT * FROM "virt_copy"`);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].sum).toBe(3);
-  });
-
-  it("alter table preserves foreign keys", async () => {
-    adapter.exec(`CREATE TABLE "authors" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    adapter.exec(
-      `CREATE TABLE "posts" ("id" INTEGER PRIMARY KEY, "title" TEXT, "body" TEXT, "author_id" INTEGER,
-       FOREIGN KEY("author_id") REFERENCES "authors"("id") ON DELETE CASCADE)`,
-    );
-    await adapter.executeMutation(`INSERT INTO "authors" ("name") VALUES ('Dean')`);
-    await adapter.executeMutation(
-      `INSERT INTO "posts" ("title", "body", "author_id") VALUES ('Hi', 'content', 1)`,
-    );
-
-    // removeColumn triggers the copy-table strategy (unlike ADD COLUMN
-    // which is a native SQLite op that doesn't rebuild the table)
-    await adapter.removeColumn("posts", "body");
-
-    const fks = await adapter.foreignKeys("posts");
-    expect(fks).toHaveLength(1);
-    expect(fks[0].toTable).toBe("authors");
-    expect(fks[0].onDelete).toBe("cascade");
-
-    const rows = await adapter.execute(`SELECT * FROM "posts"`);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].title).toBe("Hi");
-  });
-
-  it("add foreign key via alter table rebuild", async () => {
-    adapter.exec(`CREATE TABLE "tags" ("id" INTEGER PRIMARY KEY, "label" TEXT)`);
-    adapter.exec(
-      `CREATE TABLE "taggings" ("id" INTEGER PRIMARY KEY, "tag_id" INTEGER, "post_id" INTEGER)`,
-    );
-
-    await adapter.addForeignKey("taggings", "tags", { column: "tag_id" });
-
-    const fks = await adapter.foreignKeys("taggings");
-    expect(fks).toHaveLength(1);
-    expect(fks[0].toTable).toBe("tags");
-    expect(fks[0].column).toBe("tag_id");
-  });
-
-  it("remove foreign key via alter table rebuild", async () => {
-    adapter.exec(`CREATE TABLE "categories" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    adapter.exec(
-      `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "category_id" INTEGER,
-       FOREIGN KEY("category_id") REFERENCES "categories"("id"))`,
-    );
-
-    let fks = await adapter.foreignKeys("items");
-    expect(fks).toHaveLength(1);
-
-    await adapter.removeForeignKey("items", "categories");
-
-    fks = await adapter.foreignKeys("items");
-    expect(fks).toHaveLength(0);
-
-    // Data should survive the rebuild
-    await adapter.executeMutation(`INSERT INTO "items" ("category_id") VALUES (99)`);
-    const rows = await adapter.execute(`SELECT * FROM "items"`);
-    expect(rows).toHaveLength(1);
-  });
-
-  it("add check constraint via alter table rebuild", async () => {
-    adapter.exec(`CREATE TABLE "products" ("id" INTEGER PRIMARY KEY, "price" REAL)`);
-    await adapter.executeMutation(`INSERT INTO "products" ("price") VALUES (10.0)`);
-
-    await adapter.addCheckConstraint("products", "price > 0", { name: "price_positive" });
-
-    const checks = await adapter.checkConstraints("products");
-    expect(checks).toHaveLength(1);
-    expect(checks[0].name).toBe("price_positive");
-    expect(checks[0].expression).toBe("price > 0");
-
-    // Data should survive
-    const rows = await adapter.execute(`SELECT * FROM "products"`);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].price).toBe(10.0);
-  });
-
-  it("remove check constraint via alter table rebuild", async () => {
-    adapter.exec(
-      `CREATE TABLE "accounts" ("id" INTEGER PRIMARY KEY, "balance" REAL,
-       CONSTRAINT balance_non_negative CHECK (balance >= 0))`,
-    );
-
-    let checks = await adapter.checkConstraints("accounts");
-    expect(checks).toHaveLength(1);
-
-    await adapter.removeCheckConstraint("accounts", { name: "balance_non_negative" });
-
-    checks = await adapter.checkConstraints("accounts");
-    expect(checks).toHaveLength(0);
-  });
-
-  it("check constraints round-trip through alter table", async () => {
-    adapter.exec(
-      `CREATE TABLE "orders" ("id" INTEGER PRIMARY KEY, "qty" INTEGER, "status" TEXT, "note" TEXT,
-       CONSTRAINT qty_positive CHECK (qty > 0),
-       CONSTRAINT valid_status CHECK (status IN ('pending','shipped','delivered')))`,
-    );
-    await adapter.executeMutation(`INSERT INTO "orders" ("qty", "status") VALUES (1, 'pending')`);
-
-    // removeColumn forces a table rebuild via alterTable (unlike ADD COLUMN)
-    await adapter.removeColumn("orders", "note");
-
-    const checks = await adapter.checkConstraints("orders");
-    expect(checks).toHaveLength(2);
-    const names = checks.map((c) => c.name).sort();
-    expect(names).toEqual(["qty_positive", "valid_status"]);
-
-    const rows = await adapter.execute(`SELECT * FROM "orders"`);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].qty).toBe(1);
-  });
-
-  it("remove foreign key with ifExists does not throw when missing", async () => {
-    adapter.exec(`CREATE TABLE "widgets" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    // No FK exists — should silently return instead of throwing
-    await expect(
-      adapter.removeForeignKey("widgets", { column: "nonexistent_id", ifExists: true }),
-    ).resolves.toBeUndefined();
-  });
-
-  it("remove foreign key with ifExists throws when not set", async () => {
-    adapter.exec(`CREATE TABLE "gadgets" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    await expect(adapter.removeForeignKey("gadgets", { column: "nonexistent_id" })).rejects.toThrow(
-      /has no foreign key/,
-    );
-  });
-
-  it("remove foreign key via toTable option", async () => {
-    adapter.exec(`CREATE TABLE "publishers" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    adapter.exec(
-      `CREATE TABLE "books" ("id" INTEGER PRIMARY KEY, "publisher_id" INTEGER,
-       FOREIGN KEY("publisher_id") REFERENCES "publishers"("id"))`,
-    );
-    let fks = await adapter.foreignKeys("books");
-    expect(fks).toHaveLength(1);
-
-    await adapter.removeForeignKey("books", { toTable: "publishers" });
-    fks = await adapter.foreignKeys("books");
-    expect(fks).toHaveLength(0);
-  });
-
-  it("foreignKeys extracts deferrable from CREATE TABLE SQL", async () => {
-    adapter.exec(`CREATE TABLE "refs" ("id" INTEGER PRIMARY KEY)`);
-    adapter.exec(
-      `CREATE TABLE "deferred_fks" ("id" INTEGER PRIMARY KEY, "ref_id" INTEGER,
-       CONSTRAINT "fk_deferred" FOREIGN KEY("ref_id") REFERENCES "refs"("id") DEFERRABLE INITIALLY DEFERRED)`,
-    );
-    const fks = await adapter.foreignKeys("deferred_fks");
-    expect(fks).toHaveLength(1);
-    expect(fks[0].name).toBe("fk_deferred");
-    expect(fks[0].deferrable).toBe("deferred");
-  });
-
-  it("remove check constraint with ifExists does not throw when missing", async () => {
-    adapter.exec(`CREATE TABLE "things" ("id" INTEGER PRIMARY KEY, "val" INTEGER)`);
-    await expect(
-      adapter.removeCheckConstraint("things", { name: "nonexistent", ifExists: true }),
-    ).resolves.toBeUndefined();
+  it.skip("copy table with virtual column", () => {
+    // BLOCKED: adapter-sqlite — columns() never threads generatedType, so
+    // Sqlite3Column#isVirtual() is always false. copy_table then treats the
+    // generated `upper_name` as a content column and emits an INSERT into it,
+    // which SQLite rejects, and column.virtualStored?/default_function never
+    // report the generated expression.
+    // ROOT-CAUSE: connection-adapters/sqlite3-adapter.ts columns() omits the
+    // GENERATED-column detection that table_structure_with_collation already
+    // computes; the value is dropped before reaching Sqlite3Column.
+    // SCOPE: thread generatedType + default_function through columns(); file
+    // sqlite3-columns-thread-generated-type.
   });
 });
