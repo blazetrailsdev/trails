@@ -38,6 +38,15 @@ export abstract class JoinPart {
   /** @internal */
   nodeReflection: any | null = null;
   isThroughNode = false;
+  /**
+   * True when this node's table alias was assigned at construction time (the
+   * through-association path, which uses Rails' `{candidate}_join` self-join
+   * naming) rather than deferred to emit-time `makeConstraints`. Emit-time
+   * aliasing leaves such nodes untouched and only claims their table into the
+   * shared AliasTracker so a later merged join onto the same table collides.
+   * @internal
+   */
+  aliasFixed = false;
   immediateAssocName = "";
   parentPath: string | null = null;
   effectiveSqlName = "";

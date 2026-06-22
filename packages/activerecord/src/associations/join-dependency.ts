@@ -266,27 +266,36 @@ export class JoinDependency {
       return null;
     }
 
-    // Register the join's table for collision tracking, mirroring
-    // `aliased_table_for`: the real table on first use, otherwise the
-    // reflection's `alias_candidate` (`{plural_name}_{parent_table}`, with `_N`
-    // on repeat), not `t{index}`. Referenced-table aliasing
-    // (`includes(:author).references(:author)` → `authors AS author`) is NOT
-    // resolved here — it is deferred to `makeConstraints` (join_dependency.rb:202),
-    // mirroring Rails' lazy consumption of `@references`.
+    // Decide the join's table alias. There are two regimes, split on whether the
+    // target table already appears in THIS dependency's construction tracker
+    // (the base table is pre-seeded, so a self-join onto it counts):
+    //
+    //  - FIRST USE (no collision): DEFER aliasing to emit-time `makeConstraints`.
+    //    Build against the real table and claim it in the construction tracker
+    //    (so a later same-dependency join detects the collision). At emit, a
+    //    fresh/shared AliasTracker re-resolves it — keeping the real name when
+    //    standalone, or aliasing to `alias_candidate` when a `merge` brings a
+    //    cross-dependency join onto the same table (Rails' single `build_joins`
+    //    alias_tracker). These nodes are NOT `aliasFixed`.
+    //
+    //  - COLLISION (repeat within this dependency — self-joins, the same table
+    //    reached by two include paths): alias NOW, against the construction
+    //    tracker, to Rails' `alias_candidate`. A name-based emit-time rebind
+    //    cannot disentangle a self-join chain whose ON references the same real
+    //    table on both sides, so these are settled at construction and marked
+    //    `aliasFixed`; emit only reference-renames or claims them.
+    const collision = (this._aliasTracker.aliases.get(targetTable!) ?? 0) !== 0;
     let effectiveName: string;
-    if ((this._aliasTracker.aliases.get(targetTable!) ?? 0) === 0) {
-      this._aliasTracker.aliases.set(targetTable!, 1);
-      effectiveName = targetTable!;
-    } else {
-      // Collision: route through AliasTracker with the Rails alias candidate
-      // (aliasNameFor bumps the candidate's count and suffixes `_N` on repeat).
+    if (collision) {
       const parentTableName = modelClass.tableName;
       const candidate = reflection
         ? reflection.aliasCandidate(parentTableName)
         : `${targetTable!}_${parentTableName}`;
       effectiveName = this._aliasTracker.aliasNameFor(candidate);
+    } else {
+      effectiveName = targetTable!;
+      this._aliasTracker.aliases.set(targetTable!, 1);
     }
-
     const targetArelTable =
       effectiveName === targetTable!
         ? new Table(targetTable!)
@@ -321,12 +330,13 @@ export class JoinDependency {
       );
       arelJoin = joins[0] as Nodes.Join;
       scopeJoinSources = joinAssoc.joinSources;
-      // When the target table was aliased (collision), scope/STI predicates from
-      // klass.all() reference the unaliased table. Rebind to the aliased table.
-      // Skip when the source (foreign) table shares the target's real name — a
-      // self-join — because a name-based rebind cannot tell the join's own
-      // (already-aliased) target columns from the foreign-side columns, and would
-      // wrongly rewrite the FK equality's foreign reference onto the alias.
+      // When the target was aliased NOW (construction-time collision), scope/STI
+      // predicates from klass.all() reference the unaliased table — rebind them
+      // to the alias. Skip when the source (foreign) table shares the target's
+      // real name (a self-join): a name-based rebind cannot tell the join's own
+      // target columns from the foreign-side columns and would corrupt the FK
+      // equality. (A deferred first-use join has effectiveName === targetTable,
+      // so this is a no-op for it.)
       if (effectiveName !== targetTable! && sourceAlias !== targetTable!) {
         const on = (arelJoin as any).right as Nodes.On;
         const rebound = rebindTableReferences(on.expr as Nodes.Node, targetTable!, targetArelTable);
@@ -349,6 +359,9 @@ export class JoinDependency {
       if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
         const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
         if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
+          // A construction-aliased self-join: the scope predicates from
+          // `klass.all()` reference the unaliased target table; rebind them to
+          // the alias (they only name the target, so this is collision-safe).
           let scopeAst: Nodes.Node = scopeRel._whereClause.ast;
           if (effectiveName !== targetTable!) {
             scopeAst = rebindTableReferences(scopeAst, targetTable!, targetArelTable);
@@ -380,6 +393,7 @@ export class JoinDependency {
     treePart.arelJoin = arelJoin;
     treePart.nodeReflection = reflection ?? null;
     treePart.isThroughNode = false;
+    treePart.aliasFixed = collision;
     this._insertTreeNode(treePart);
     return treePart;
   }
@@ -601,7 +615,15 @@ export class JoinDependency {
     aliasTracker?: AliasTracker,
     references?: string[],
   ): Nodes.Join[] {
-    if (aliasTracker) this._aliasTracker = aliasTracker;
+    // Aliasing is now resolved here, at emit-time, against the AliasTracker —
+    // either the shared one threaded in from `build_joins` (so merged joins
+    // collide and alias) or, for a standalone dependency, a fresh tracker seeded
+    // with just the base table. A fresh tracker per emit keeps re-emitting the
+    // same dependency idempotent (no carried-over collision counts) and mirrors
+    // Rails creating one `AliasTracker.create(connection, table_name, joins)` per
+    // `build_joins`.
+    this._aliasTracker =
+      aliasTracker ?? new AliasTracker(undefined, new Map([[this._baseAlias, 1]]));
     this._references = new Map();
     if (references) {
       for (const tableName of references) this._references.set(tableName, tableName);
@@ -696,49 +718,76 @@ export class JoinDependency {
   }
 
   /**
-   * Lazily resolve a referenced-table alias for `child`, mirroring Rails
-   * `make_constraints` reading `table_name = @references[reflection.name]` and
-   * feeding it to `alias_tracker.aliased_table_for(klass.arel_table, table_name)
-   * { reflection.alias_candidate(parent.table_name) }` (join_dependency.rb:202,
-   * alias_tracker.rb).
+   * Emit-time table aliasing for `child`, mirroring Rails `make_constraints`
+   * reading `table_name = @references[reflection.name] || reflection.table_name`
+   * and feeding it to `alias_tracker.aliased_table_for(klass.arel_table,
+   * table_name) { reflection.alias_candidate(parent.table_name) }`
+   * (join_dependency.rb:202, alias_tracker.rb).
    *
-   * `includes(:author).references(:author)` records `author` in `@references`;
-   * when the join for `:author` is emitted, `aliased_table_for` uses the
-   * referenced name on its first use (`authors AS author`), and otherwise — when
-   * that name is already taken — the reflection's `alias_candidate`
-   * (`{plural}_{parent}`, with `_N` on repeat), NOT a numeric suffix of the
-   * referenced name. The node's `effectiveSqlName`/`arelTable` and the join's
-   * (and its children's) ON predicates are rebound so the SELECT projection and
-   * SQL stay consistent. Idempotent: once the node already carries the resolved
-   * name, it no-ops.
+   * This is the single point where a single-step belongs_to/has_many join's
+   * table alias is assigned — against the shared `AliasTracker`: the real table
+   * on first use, else the referenced name
+   * (`includes(:author).references(:author)` → `authors AS author`) on its first
+   * use, else the reflection's `alias_candidate` (`{plural}_{parent}`,
+   * `authors_categorizations`, with `_N` on repeat). It replaces BOTH the old
+   * construction-time aliasing and the separate shared-tracker re-alias pass:
+   * because every JoinDependency in a `build_joins` emits against one shared
+   * tracker in order, a `merge` that joins an already-joined table collides here
+   * and is aliased, with no seed/re-alias plumbing.
+   *
+   * Through-built nodes carry a construction-time alias (Rails' `{candidate}_join`
+   * self-join scheme); they are left untouched and only have their table claimed
+   * (`_claimNodeTable`) so a later merged join onto it still collides. The node's
+   * `effectiveSqlName`/`arelTable` and the join's (and its children's) ON
+   * predicates are rebound so the SELECT projection and SQL stay consistent.
+   * Idempotent: once the node already carries the resolved name, it no-ops.
    * @internal
    */
-  private _applyReferencedAlias(parent: JoinPart, child: JoinPart): void {
-    if (this._references.size === 0 || !(child instanceof JoinAssociation)) return;
-    const referenced = this._references.get(child.immediateAssocName);
-    if (!referenced || referenced === child.effectiveSqlName) return;
-
-    const tableName = child.tableName;
-    // Inline of aliased_table_for(klass.arel_table, table_name) { candidate }:
-    // the referenced name on first use, else the reflection's alias_candidate.
-    let newName: string;
-    if ((this._aliasTracker.aliases.get(referenced) ?? 0) === 0) {
-      this._aliasTracker.aliases.set(referenced, 1);
-      newName = referenced;
-    } else {
-      const parentTableName = (parent.baseKlass as any)?.tableName ?? parent.table;
-      newName = this._aliasTracker.aliasNameFor(child.reflection.aliasCandidate(parentTableName));
+  private _resolveChildAlias(parent: JoinPart, child: JoinPart): void {
+    if (!(child instanceof JoinAssociation)) {
+      this._claimNodeTable(child);
+      return;
     }
-    this._rebindChildAlias(child, newName);
+    const referenced = this._references.get(child.immediateAssocName);
+    // Through-built nodes keep their construction-time self-join alias; the
+    // collision pass is skipped. But a free reference still renames them — Rails
+    // `make_constraints` consumes `@references` uniformly across the chain — so
+    // referenced-aliasing applies even when `aliasFixed`.
+    if (child.aliasFixed && !referenced) {
+      this._claimNodeTable(child);
+      return;
+    }
+    const lookupName = referenced ?? child.tableName;
+    const parentTableName = (parent.baseKlass as any)?.tableName ?? (parent as any).table;
+    const alias = this._aliasTracker.aliasNameForTable(lookupName, () =>
+      child.reflection.aliasCandidate(parentTableName),
+    );
+    this._rebindChildAlias(child, alias ?? lookupName);
+  }
+
+  /**
+   * Claim a node's real table (and any construction-fixed alias) into the
+   * tracker without re-aliasing — used for through-built and non-reflection
+   * nodes. Mirrors `aliased_table_for`'s count bookkeeping so a later merged
+   * join onto the same table is detected as a collision.
+   * @internal
+   */
+  private _claimNodeTable(child: JoinPart): void {
+    const t = child.tableName;
+    if (!t) return;
+    if ((this._aliasTracker.aliases.get(t) ?? 0) === 0) this._aliasTracker.aliases.set(t, 1);
+    const eff = child.effectiveSqlName;
+    if (eff && eff !== t) {
+      this._aliasTracker.aliases.set(eff, (this._aliasTracker.aliases.get(eff) ?? 0) + 1);
+    }
   }
 
   /**
    * Re-point `child` to the SQL alias `newName`: rebuild its arelTable, JOIN
    * left side, and ON predicate (and its children's ON predicates that
    * referenced its old table) so the SELECT projection and JOIN clause name the
-   * same table. No-op when `child` already carries `newName`. Shared by the
-   * referenced-table aliasing (`_applyReferencedAlias`) and the shared-tracker
-   * re-aliasing (`realiasAgainstSharedTracker`).
+   * same table. No-op when `child` already carries `newName`. Driven by the
+   * emit-time aliasing pass (`_resolveChildAlias`).
    * @internal
    */
   private _rebindChildAlias(child: JoinPart, newName: string): void {
@@ -775,46 +824,13 @@ export class JoinDependency {
     this._aliasesCache = undefined;
   }
 
-  /**
-   * Re-resolve every association join in this dependency against a shared
-   * `AliasTracker`, aliasing any table the tracker already claims to the
-   * reflection's `alias_candidate(parent_table)` (`authors_categorizations`).
-   *
-   * Rails shares one `alias_tracker` across all join dependencies in
-   * `build_joins`, so a `merge` that brings an association join onto a table the
-   * outer relation already joins is aliased. trails builds each cross-klass
-   * merged dependency with its own tracker at merge time (seeded only with its
-   * own base), so the duplicate join is never detected as a collision. This
-   * walks the dependency parent→child (so a parent's alias is settled before its
-   * children rebind onto it) and applies `aliased_table_for` semantics via
-   * `aliasNameForTable`, mirroring Rails' lazy per-node aliasing in
-   * `make_constraints`.
-   */
-  realiasAgainstSharedTracker(tracker: AliasTracker): void {
-    this._aliasTracker = tracker;
-    const visit = (parent: JoinPart): void => {
-      for (const child of parent.children) {
-        if (child instanceof JoinAssociation) {
-          const parentTableName = (parent.baseKlass as any)?.tableName ?? (parent as any).table;
-          const alias = tracker.aliasNameForTable(child.tableName, () =>
-            child.reflection.aliasCandidate(parentTableName),
-          );
-          this._rebindChildAlias(child, alias ?? child.tableName);
-        }
-        visit(child);
-      }
-    };
-    visit(this._joinRoot);
-    this._aliasesCache = undefined;
-  }
-
   /** @internal */
   private makeConstraints(
     parent: JoinPart,
     child: JoinPart,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
-    this._applyReferencedAlias(parent, child);
+    this._resolveChildAlias(parent, child);
     const joins: Nodes.Join[] = [];
     const arelJoin = child.arelJoin;
     if (arelJoin) {
@@ -1502,6 +1518,7 @@ export class JoinDependency {
         treePart.arelJoin = arelJoin;
         treePart.nodeReflection = reflection;
         treePart.isThroughNode = false;
+        treePart.aliasFixed = true;
         this._insertTreeNode(treePart);
         targetNode = treePart;
       } else {
