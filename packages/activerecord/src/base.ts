@@ -3183,15 +3183,21 @@ export class Base extends Model {
         ...(autoIncColumn ? [autoIncColumn] : []),
         ...pkArr.filter((p) => p !== autoIncColumn && colNames.has(p)),
       ];
-      // Emit an EXPLICIT `RETURNING` clause only when there is exactly one column
-      // to read back. trails' scalar adapters surface a single value (PG's
-      // executeMutation returns only the first RETURNING column), so a multi-column
-      // RETURNING can't be mapped. A single column — auto-increment (`id`,
-      // `pet_id`, a non-PK `id`) or a lone PK — is named so the value reads back
-      // even when the adapter's default `RETURNING id` would target a non-existent
-      // `id` column. For the multi-column composite-PK case we omit it and rely on
-      // the adapter's default id read-back, assigned to the first unset target.
-      const explicitReturning = writeTargets.length === 1 ? writeTargets : undefined;
+      // Emit an EXPLICIT `RETURNING` clause naming the column the generated value
+      // belongs to. trails' scalar adapters surface a single value (PG's
+      // executeMutation returns only the first RETURNING column), so we can name at
+      // most one. When the auto-increment column is known, name IT — otherwise PG's
+      // `sqlForInsert` derives `RETURNING <insertPk>` from the pk arg, which is the
+      // model PK (e.g. `title` for TitlePrimaryKeyTopic) and yields the wrong value
+      // for the non-PK auto-increment `id`. When it's not flagged (reflection gap),
+      // fall back to naming a lone PK column; for the multi-column composite-PK case
+      // omit it and rely on the adapter's default id read-back, assigned to the
+      // first unset target.
+      const explicitReturning = autoIncColumn
+        ? [autoIncColumn]
+        : writeTargets.length === 1
+          ? writeTargets
+          : undefined;
       // Mirrors Rails `_insert_record`, which passes `primary_key || false` as the
       // pk arg: `false` opts the adapter out of any pk-derived RETURNING for a
       // key-less table, while a scalar pk is the fallback column when no explicit
