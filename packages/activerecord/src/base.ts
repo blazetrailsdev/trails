@@ -3201,8 +3201,16 @@ export class Base extends Model {
       // Mirrors Rails `_insert_record`, which passes `primary_key || false` as the
       // pk arg: `false` opts the adapter out of any pk-derived RETURNING for a
       // key-less table, while a scalar pk is the fallback column when no explicit
-      // `returning` list is given.
-      const insertPk = Array.isArray(ctor.primaryKey) ? undefined : ctor.primaryKey || false;
+      // `returning` list is given. Rails reflects `primary_key` as nil for an
+      // id-less table; trails' `primaryKey` instead assumes the "id" convention
+      // until the pk cache is warm, so guard on the column actually existing (the
+      // same filter `writeTargets` uses) to avoid emitting `RETURNING "id"` against
+      // a table with no `id` column.
+      const insertPk = Array.isArray(ctor.primaryKey)
+        ? undefined
+        : ctor.primaryKey && colNames.has(ctor.primaryKey)
+          ? ctor.primaryKey
+          : false;
       const rawId = await ctor.connection.execInsert(
         sql,
         `${ctor.name} Create`,
