@@ -17,7 +17,7 @@ import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-tra
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { Post } from "../test-helpers/models/post.js";
+import { Post, FirstPost } from "../test-helpers/models/post.js";
 import { Author, AuthorFavorite, AuthorAddress } from "../test-helpers/models/author.js";
 import { Comment, VerySpecialComment } from "../test-helpers/models/comment.js";
 import { Tag } from "../test-helpers/models/tag.js";
@@ -31,8 +31,6 @@ import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Person } from "../test-helpers/models/person.js";
-import { Reader } from "../test-helpers/models/reader.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -3693,16 +3691,40 @@ describe("EagerAssociationTest", () => {
     expect(devs.length).toBe(1);
     expect(devs[0].name).toBe("David");
   });
-  it.skip("scoping with a circular preload", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("scoping with a circular preload", async () => {
+    // Rails: Comment.preload(post: :comments).scoping { Comment.find(1) }
+    // The pushed scope carries the preload values, so `find` inside the block
+    // runs the circular preload (comment -> post -> comments). It must not loop
+    // or error, and `find` must still return the matching record.
+    const post = await Post.create({ title: "P", body: "b" });
+    const c1 = await Comment.create({ post_id: post.id, body: "c1" });
+
+    const rel = (Comment as any).all().preload({ post: "comments" });
+    const found = await (Comment as any).scoping(rel, async () => {
+      return await (Comment as any).find(c1.id);
+    });
+    expect(found.id).toBe(c1.id);
+    // The current scope's preload values are applied by `find`, so the circular
+    // preload actually traverses post -> comments (the original loop hazard).
+    const loadedPost = found._preloadedAssociations.get("post");
+    expect(loadedPost.id).toBe(post.id);
+    expect(loadedPost._preloadedAssociations.get("comments").map((c: any) => c.id)).toContain(
+      c1.id,
+    );
   });
 
-  it.skip("circular preload does not modify unscoped", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("circular preload does not modify unscoped", async () => {
+    // Rails: FirstPost.preload(comments: :first_post).find(1) must not let
+    // FirstPost's default scope (where id: 1) leak into a later unscoped lookup.
+    registerModel("FirstPost", FirstPost);
+    const post1 = await Post.create({ id: 1, title: "P1", body: "b" });
+    const post2 = await Post.create({ id: 2, title: "P2", body: "b" });
+    await Comment.create({ post_id: post1.id, body: "c1" });
+
+    const expected = await (FirstPost as any).unscoped().find(post2.id);
+    await (FirstPost as any).all().preload({ comments: "firstPost" }).find(post1.id);
+    const after = await (FirstPost as any).unscoped().find(post2.id);
+    expect(after.id).toBe(expected.id);
   });
 
   it("belongs_to association ignores the scoping", async () => {
@@ -4612,15 +4634,56 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("preload belongs to uses exclusive scope", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preload belongs to uses exclusive scope", async () => {
+    // Rails: Person.males.includes(:primary_contact) — the preload of
+    // primary_contact must use the association's own (exclusive) scope, not the
+    // caller's `males` scope, so non-male contacts are still loaded.
+    const f1 = await Person.create({ first_name: "F1", gender: "F" });
+    const f2 = await Person.create({ first_name: "F2", gender: "F" });
+    const m1 = await Person.create({ first_name: "M1", gender: "M", primary_contact_id: f1.id });
+    const m2 = await Person.create({ first_name: "M2", gender: "M", primary_contact_id: f2.id });
+
+    const people = await (Person as any).males().includes("primaryContact").toArray();
+    expect(people).toHaveLength(2);
+    for (const person of people) {
+      // Rails: assert_no_queries { assert_not_nil person.primary_contact } — the
+      // reader must serve the preloaded target without firing a query.
+      let contact: any;
+      await assertNoQueries(false, async () => {
+        contact = await person.primaryContact;
+        expect(contact).not.toBeNull();
+      });
+      const direct = await (Person as any).find(person.id);
+      const directContact = await direct.primaryContact;
+      expect(contact.id).toBe(directContact.id);
+    }
+    expect(
+      people.find((p: any) => p.id === m1.id)._preloadedAssociations.get("primaryContact").id,
+    ).toBe(f1.id);
+    expect(
+      people.find((p: any) => p.id === m2.id)._preloadedAssociations.get("primaryContact").id,
+    ).toBe(f2.id);
   });
-  it.skip("preload has many uses exclusive scope", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preload has many uses exclusive scope", async () => {
+    // Rails: Person.males.includes(:agents) — the preload of agents must use the
+    // association's exclusive scope, not the caller's `males` scope, so non-male
+    // agents are still loaded.
+    const m1 = await Person.create({ first_name: "M1", gender: "M" });
+    const m2 = await Person.create({ first_name: "M2", gender: "M" });
+    await Person.create({ first_name: "A1", gender: "F", primary_contact_id: m1.id });
+    await Person.create({ first_name: "A2", gender: "F", primary_contact_id: m2.id });
+
+    const people = await (Person as any).males().includes("agents").toArray();
+    expect(people).toHaveLength(2);
+    for (const person of people) {
+      const agents = person._preloadedAssociations.get("agents");
+      const direct = await (Person as any).find(person.id);
+      const directAgents = await direct.agents.toArray();
+      expect(agents.map((a: any) => a.id).sort()).toEqual(
+        directAgents.map((a: any) => a.id).sort(),
+      );
+      expect(agents.length).toBe(1);
+    }
   });
   it.skip("preload has one using primary key", () => {
     // BLOCKED: associations — eager-loading feature gap
