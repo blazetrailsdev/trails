@@ -482,6 +482,31 @@ export function adapterClass(this: typeof Base): Promise<new (...args: any[]) =>
   >;
 }
 
+/**
+ * Synchronous, non-leasing variant of {@link adapterClass}. Resolves the
+ * adapter constructor from a directly-assigned `_adapter` (test/simple setups)
+ * or the pool's pre-warmed sync adapter cache, without ever leasing a
+ * connection. Returns `null` when no pool/adapter is resolvable yet. Mirrors
+ * Rails' `model.adapter_class` — a class-level lookup that does not check out a
+ * connection — for code paths (e.g. `column_name_with_order_matcher`) that only
+ * need static adapter metadata.
+ */
+export function adapterClassSync(
+  this: typeof Base,
+): (new (...args: any[]) => DatabaseAdapter) | null {
+  const directAdapter = (this as any)._adapter;
+  if (directAdapter) {
+    return directAdapter.constructor as new (...args: any[]) => DatabaseAdapter;
+  }
+  let pool: ConnectionPool | undefined;
+  try {
+    pool = connectionPool.call(this);
+  } catch {
+    return null;
+  }
+  return pool.dbConfig.adapterClassSync() as (new (...args: any[]) => DatabaseAdapter) | null;
+}
+
 export function removeConnection(this: typeof Base): DatabaseConfig | undefined {
   const name = connectionSpecificationName.call(this);
   if (
@@ -1045,6 +1070,7 @@ export const ClassMethods = {
   connection,
   isPrimaryClass,
   adapterClass,
+  adapterClassSync,
   removeConnection,
   schemaCache,
   clearCacheBang,

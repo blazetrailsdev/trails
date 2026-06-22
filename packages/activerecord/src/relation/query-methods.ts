@@ -200,9 +200,13 @@ interface QueryMethodsHost {
 
 function resolveOrderMatcher(host: QueryMethodsHost): RegExp {
   try {
-    // Mirrors Rails' `model.adapter_class.column_name_with_order_matcher`.
-    const adapter: any = host._modelClass.connection;
-    return adapter?.constructor?.columnNameWithOrderMatcher?.() ?? abstractOrderMatcher();
+    // Mirrors Rails' `model.adapter_class.column_name_with_order_matcher` — a
+    // class-level lookup that does NOT lease a connection. Reading the
+    // deprecated `.connection` getter here would permanently check out a
+    // connection under `permanent_connection_checkout = :deprecated|:disallowed`
+    // whenever an ordered relation is built outside a `with_connection` scope.
+    const adapterClass: any = host._modelClass.adapterClassSync?.();
+    return adapterClass?.columnNameWithOrderMatcher?.() ?? abstractOrderMatcher();
   } catch {
     // No adapter configured — fall back to abstract pattern.
     return abstractOrderMatcher();
