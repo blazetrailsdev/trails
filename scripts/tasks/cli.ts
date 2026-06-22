@@ -167,6 +167,12 @@ export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
   const storyStatus = new Map(index.stories.map((s) => [s.id, s.status]));
   return index.stories.filter((s) => {
     if (s.status !== "ready") return false;
+    // A story is only claimable if its OWN RFC is active. A `ready` story
+    // under a draft/postponed/superseded RFC violates the lifecycle invariant
+    // (README: draft-RFC stories "should not be claimed"); a `ready` story
+    // under a closed RFC is almost certainly stale. Only active RFCs feed
+    // pickup. Uses index.rfcs status already in scope — no extra fs reads.
+    if (rfcStatus.get(s.rfc) !== "active") return false;
     if (opts.rfc && s.rfc !== opts.rfc) return false;
     if (s.deps.some((d) => storyStatus.get(d) !== "done")) return false;
     if (s.deps_rfc.some((d) => rfcStatus.get(d) !== "closed")) return false;
