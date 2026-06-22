@@ -2573,6 +2573,16 @@ export class Relation<T extends Base> {
       this._modelClass as unknown as { ensureSchemaLoaded(): Promise<void> }
     ).ensureSchemaLoaded();
 
+    // Rails Relation#exec_main_query short-circuits a contradictory
+    // where-clause (e.g. `where(id: [])`, which compiles to an empty `IN`)
+    // to a frozen `[]` *before* issuing any SQL. Mirror that here so no
+    // SELECT is sent and `.explain` collects zero queries. Distinct from
+    // `.none()` (`_isNone`), handled in toArray/_execQueriesForExplain.
+    if (this._whereClause.isContradiction()) {
+      this.loadRecords([]);
+      return [];
+    }
+
     // Capture the load token before any await so we can detect if a
     // reset() landed while the query was in flight and bail without
     // clobbering the fresh state.

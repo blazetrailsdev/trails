@@ -207,6 +207,14 @@ describe("ExplainTest", () => {
     expect(plan).toBe("");
   });
 
+  it("yields empty output for a contradiction relation", async () => {
+    // A contradictory where-clause (empty `IN`) short-circuits in
+    // `exec_main_query` to `[]` without issuing a SELECT, so
+    // `collecting_queries_for_explain` captures nothing — same as `.none()`.
+    const plan = await Car.where({ id: [] }).explain();
+    expect(plan).toBe("");
+  });
+
   it("renders binds via adapter.typeCast + Ruby-inspect form", async () => {
     // Mirrors Rails' `exec_explain`:
     //   binds.map { |attr| render_bind(c, attr) }.inspect
