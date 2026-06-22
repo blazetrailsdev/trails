@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, BigDecimal } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
@@ -40,6 +40,7 @@ import {
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import { typeCastedBinds, transactionIsolationLevels } from "./abstract/database-statements.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
@@ -703,6 +704,24 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         !(v instanceof Uint8Array)
       ) {
         v = (v as { bytes: Uint8Array }).bytes;
+      }
+      // Normalize Temporal date/time and BigDecimal values through MySQL's own
+      // typeCast (microsecond-capped quotedDate / BigDecimal#to_s("F")). The
+      // write path now binds datetime columns that were previously inlined, so
+      // an un-normalized Temporal.Instant would otherwise reach mysql2 as an ISO
+      // string with a `Z` suffix and 9 nanosecond digits — rejected by strict
+      // MySQL as "Incorrect datetime value". Scoped to these object types so
+      // binary Buffers/Uint8Arrays and plain scalars pass straight through
+      // (mysqlTypeCast would throw on a Uint8Array).
+      if (
+        v instanceof BigDecimal ||
+        v instanceof Temporal.Instant ||
+        v instanceof Temporal.ZonedDateTime ||
+        v instanceof Temporal.PlainDateTime ||
+        v instanceof Temporal.PlainDate ||
+        v instanceof Temporal.PlainTime
+      ) {
+        v = this.typeCast(v);
       }
       return v === true ? 1 : v === false ? 0 : v;
     });

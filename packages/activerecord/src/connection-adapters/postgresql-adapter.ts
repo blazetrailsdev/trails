@@ -3129,6 +3129,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (schema) sql += ` SCHEMA ${schema}`;
     await this.exec(sql);
     await this.reloadTypeMap();
+    // Creating/dropping an extension reassigns its types' OIDs. Any cached
+    // prepared statement that bound or returned one of those types embeds the
+    // now-stale OID in its server-side plan, so re-executing it raises
+    // "cache lookup failed for type <oid>". Evict the statement cache so the
+    // next query re-prepares against the fresh OIDs. (Rails relies on PG's
+    // automatic re-planning plus its cached-plan-failure retry; trails' single
+    // pinned client + node-pg's client-side name cache do not get that for
+    // free, so we clear explicitly here.)
+    this.clearCacheBang();
   }
 
   async disableExtension(
@@ -3157,6 +3166,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     } else {
       await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(extName)}${cascade}`);
     }
+    // See enableExtension: dropping an extension removes its types' OIDs, so any
+    // cached prepared statement referencing them would raise "cache lookup
+    // failed for type <oid>" on re-execution. Evict the statement cache.
+    this.clearCacheBang();
   }
 
   async databaseExists(name: string): Promise<boolean> {
