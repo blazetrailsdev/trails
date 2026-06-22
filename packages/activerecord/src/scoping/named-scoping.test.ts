@@ -602,8 +602,16 @@ describe("NamedScopingTest", () => {
     for (const method of ["destroyAll", "reset", "deleteAll"] as const) {
       const before = post.comments.containingTheLetterE();
       await post.comments[method]();
+      // Rails asserts `assert_not_same` to prove the proxy's cached named-scope
+      // relation is invalidated. trails does not yet cache named-scope relations
+      // on the proxy — each call rebuilds a fresh Relation — so this holds
+      // structurally regardless of the reset (RFC 0030 proxy scope-cache).
       expect(post.comments.containingTheLetterE()).not.toBe(before);
     }
+
+    // Guard the destructive methods actually ran (not dead calls): destroyAll +
+    // deleteAll removed every comment on `welcome`.
+    expect(await Comment.where({ post_id: post.id }).count()).toBe(0);
   });
 
   // Rails requires "models/without_table" to prove scopes are lazy when the
