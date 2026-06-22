@@ -127,7 +127,7 @@ import {
 } from "./explain.js";
 import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
-import { rubyInspectArray, inspectArelValue, inspectOrderClause } from "./relation/ruby-inspect.js";
+import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import type { PrettyPrinter } from "./pretty-print.js";
 import { JoinDependency } from "./associations/join-dependency.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
@@ -177,12 +177,12 @@ function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | 
 }
 
 /**
- * Inline a WhereClause's predicates to SQL for the synchronous `inspect`
- * query-chain (a trails deviation: Rails `inspect` blocks on DB I/O, which sync
- * JS can't). Rails' WhereClause has no `to_sql` — inline where-SQL is produced
- * at the Relation level via `conn.unprepared_statement { conn.to_sql(arel) }` —
- * so this glue lives here with its only consumer, not on WhereClause, and routes
- * the Arel AND/SqlLiteral-wrapped AST through the connection visitor.
+ * Inline a WhereClause's predicates to SQL. Rails' WhereClause has no `to_sql`
+ * — inline where-SQL is produced at the Relation level via
+ * `conn.unprepared_statement { conn.to_sql(arel) }` — so this glue lives here,
+ * routing the Arel AND/SqlLiteral-wrapped AST through the connection visitor.
+ * Consumed by `_whereMatchesUnscopedBaseline` (the WHERE half of `isEmptyScope`)
+ * to compare a relation's predicate SQL against the unscoped baseline.
  */
 function _whereClauseToSql(
   whereClause: WhereClause,
@@ -1385,49 +1385,32 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#inspect
    */
   inspect(): string {
-    // Rails loads the records (synchronously) and renders
-    // `#<ClassName [rec.inspect, ...]>`, truncating at 11 with `...`.
-    // When this relation is already loaded its records are available
-    // synchronously, so we reproduce that format faithfully. The unloaded
-    // path can't: Rails performs blocking DB I/O inside `inspect`, which a
-    // synchronous JS method returning a string cannot do — so we fall back
-    // to the query-chain representation below.
+    // Rails renders `#<ClassName [rec.inspect, ...]>`, loading the records
+    // synchronously (blocking DB I/O) when the relation isn't already loaded
+    // and truncating the entry list at 11 with `...`. The wrapper carries NO
+    // model name: Rails' `self.class.name` is the relation class itself —
+    // `"ActiveRecord::Relation"` for `Post.limit(2)`, not `Post` (relations_test
+    // "relations show the records in #inspect", relations_test.rb:2108-2111) —
+    // so model identity surfaces only through the inspected records. We use
+    // `this.constructor.name` to keep that class-not-model semantics and to
+    // preserve the Relation / CollectionProxy / AssociationRelation distinction
+    // (three distinct Rails classes); the unqualified vs `ActiveRecord::`-
+    // namespaced gap is a pre-existing deviation shared with the loaded branch,
+    // not specific to this path.
     if (this._loaded) {
       const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
       const entries = this._records.slice(0, max).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${this.constructor.name} [${entries.join(", ")}]>`;
     }
-    const parts: string[] = [];
-    parts.push(`${this._modelClass.name}.all`);
-    if (!this._whereClause.isEmpty()) {
-      const sql = _whereClauseToSql(this._whereClause, this._conn() as any);
-      if (sql) parts.push(`.where(${JSON.stringify(sql)})`);
-    }
-    if (this._orderClauses.length > 0) {
-      const orders = this._orderClauses.map((c) => inspectOrderClause(c));
-      parts.push(`.order(${orders.join(", ")})`);
-    }
-    if (this._limitValue !== null) {
-      parts.push(`.limit(${this._limitValue})`);
-    }
-    if (this._offsetValue !== null) {
-      parts.push(`.offset(${this._offsetValue})`);
-    }
-    if (this._selectColumns !== null) {
-      const cols = this._selectColumns.map((c) => inspectArelValue(c));
-      parts.push(`.select(${cols.join(", ")})`);
-    }
-    if (this._isDistinct) {
-      parts.push(`.distinct`);
-    }
-    if (this._groupColumns.length > 0) {
-      parts.push(`.group(${JSON.stringify(this._groupColumns)})`);
-    }
-    if (this._isNone) {
-      parts.push(`.none`);
-    }
-    return parts.join("");
+    // Unloaded: Rails blocks on DB I/O here to load the records; a synchronous
+    // JS method returning a string cannot. Rather than invent a divergent
+    // query-chain representation, keep Rails' wrapper shape and elide the
+    // not-yet-loaded entries with `...`. The faithful record-printing path is
+    // async — `await relation.toArray()` (or `prettyPrint`) loads first, after
+    // which `inspect` takes the loaded branch above. This is the same sync-JS
+    // deviation already documented on `prettyPrint`.
+    return `#<${this.constructor.name} [...]>`;
   }
 
   /**

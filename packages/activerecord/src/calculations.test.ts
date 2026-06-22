@@ -6419,9 +6419,9 @@ describe("CalculationsTest", () => {
       }
     }
     const str = User.where({ name: "Alice" }).limit(5).inspect();
-    expect(str).toContain("User");
-    expect(str).toContain("Alice");
-    expect(str).toContain("limit(5)");
+    // Unloaded relations render Rails' `#<ClassName [...]>` wrapper with the
+    // not-yet-loaded entries elided (sync JS can't block on DB I/O to load).
+    expect(str).toBe("#<Relation [...]>");
   });
 
   // Rails guide: toModel returns self (ActiveModel::Conversion)
