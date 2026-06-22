@@ -380,32 +380,57 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm lint
-  prettier:
-    name: Prettier
+  # Consolidated sub-minute PR/push preflight checks. Each of prettier,
+  # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
+  # work; GitHub bills every job rounded UP to a whole minute, so running them
+  # as three jobs cost 3 billed minutes for ~25s of compute. Folding them into
+  # one job's sequential steps bills 1 minute while keeping each check's failure
+  # independently legible in the step log. Each step preserves its original
+  # event/author guard via a per-step `if:` so it no-ops (rather than skipping
+  # the whole job) when its condition isn't met. Deliberately NOT folded into
+  # `changes` — that job is on the critical path of every downstream gate, and a
+  # prettier/attribution failure there would block gate computation.
+  preflight:
+    name: Preflight
     needs: changes
-    # Prettier doesn't need the workspace installed. Skip `pnpm install`
-    # entirely and run prettier directly via `npx`. The version below MUST
-    # equal the exact pin in root `package.json` devDependencies; the
-    # `prettier` entry there is intentionally pinned (no `^`) so CI and
-    # local `pnpm format` can never drift.
+    # Needs the PR body for the attribution step; the diff-based steps need
+    # full history (fetch-depth: 0) to diff against the PR base SHA.
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      # Single source of truth for the forbidden-attribution markers, shared by
+      # the PR-body and commit-message scans below so the two can't drift apart.
+      # Matched case-insensitively (grep -iE).
+      ATTRIBUTION_RE: 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          # This job runs prettier via `npx` and never installs pnpm, but
+          # The prettier step runs via `npx` and never installs pnpm, but
           # setup-node v5 defaults `package-manager-cache: true` and would
           # try to cache the pnpm store from the `packageManager` field in
           # package.json — failing with "Unable to locate executable pnpm".
           package-manager-cache: false
-      # Check only the files changed on this PR/push, not the whole tree.
-      # `__ALL__` is the fallback sentinel from the `changes` job (diff
+
+      # Prettier. Runs on push + PR. The version below MUST equal the exact pin
+      # in root `package.json` devDependencies; the `prettier` entry there is
+      # intentionally pinned (no `^`) so CI and local `pnpm format` can never
+      # drift. Checks only the files changed on this PR/push, not the whole
+      # tree. `__ALL__` is the fallback sentinel from the `changes` job (diff
       # couldn't be computed); empty means nothing checkable changed.
       # `--ignore-unknown` skips paths Prettier has no parser for, and
       # `.prettierignore` is still honored.
-      - env:
+      - name: Prettier
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        env:
           PRETTIER_FILES: ${{ needs.changes.outputs.prettier_files }}
         run: |
           set -euo pipefail
@@ -417,6 +442,88 @@ jobs:
             printf '%s\n' "$PRETTIER_FILES" \
               | xargs -r -d '\n' npx --yes prettier@3.8.1 --check --ignore-unknown
           fi
+
+      # RFC 0011 Phase 4 guardrail. AR work tracking moved to the tasks repo;
+      # `docs/activerecord/` is frozen so the two-source-of-truth split can't
+      # self-heal. Fail any PR that adds or modifies a file under that path,
+      # with a single allowlisted exception. PR-only: push/schedule have no PR
+      # base to diff against. Only `docs/activerecord/` is policed — other
+      # docs/ trees stay live until their own cutover.
+      - name: Docs ActiveRecord Freeze
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # The one tracker that stays under docs/activerecord/.
+          ALLOWLIST='docs/activerecord/parity-verification.md'
+          # Triple-dot: diff against the merge-base, not the base tip, so
+          # unrelated commits merged to main since this branch diverged don't
+          # show up. --diff-filter=ACMR ignores deletions (removing a tracker
+          # is allowed). Path-scope to docs/activerecord/ so nothing else is
+          # policed.
+          changed=$(git diff --name-only --diff-filter=ACMR \
+            "$BASE_SHA"..."$HEAD_SHA" -- docs/activerecord/ || true)
+          offending=$(printf '%s\n' "$changed" \
+            | grep -E '^docs/activerecord/' \
+            | grep -vxF "$ALLOWLIST" || true)
+          if [ -n "$offending" ]; then
+            echo "::error::AR work tracking lives in the tasks repo — add a story, not a doc. Offending files:"
+            printf '%s\n' "$offending"
+            exit 1
+          fi
+          echo "No new or modified docs/activerecord trackers."
+
+      # PR attribution check. Scoped to deanmarano-authored PRs: the project
+      # forbids Claude attribution in *his* PR descriptions and commits (see
+      # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
+      # contributors are unaffected; push/schedule have no PR body.
+      - name: Forbid Claude attribution in PR body
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.login == 'deanmarano'
+        run: |
+          set -euo pipefail
+          # Fetch the *live* body rather than reading the event payload. The
+          # PR triggers don't include `edited`, so a body edit won't re-fire
+          # CI — but a manual job re-run hits the API fresh and will see the
+          # fix. Reading the payload would replay the stale original body and
+          # leave the check permanently red.
+          body=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
+          if printf '%s' "$body" | grep -qiE "$ATTRIBUTION_RE"; then
+            echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
+            exit 1
+          fi
+          echo "No forbidden Claude attribution found in PR body."
+      - name: Forbid Claude attribution in commit messages
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.login == 'deanmarano'
+        run: |
+          set -euo pipefail
+          # Scan every commit message on the PR, not just the PR body. The body
+          # check above misses `Co-authored-by:` trailers that live in commits —
+          # and GitHub's squash-merge auto-aggregates those branch-commit
+          # trailers into the merge commit on `main`, which is exactly how a
+          # Claude attribution reached main past the body check.
+          #
+          # The pulls/{n}/commits endpoint caps at 250 commits even with
+          # --paginate, so a >250-commit PR would leave its tail unscanned. Fail
+          # closed in that case rather than passing on a partial scan — this repo
+          # squashes and has a 500-LOC ceiling, so 250 commits never happens
+          # legitimately; if it does, squash/rebase before re-running.
+          count=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
+          if [ "$count" -gt 250 ]; then
+            echo "::error::PR has $count commits, exceeding the 250-commit API scan cap. Squash or rebase the branch so commit messages can be fully scanned, then re-run this job."
+            exit 1
+          fi
+          messages=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
+          if printf '%s' "$messages" | grep -qiE "$ATTRIBUTION_RE"; then
+            echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
+            exit 1
+          fi
+          echo "No forbidden Claude attribution found in commit messages."
 
   guides-typecheck:
     name: Guides Code Type Check
@@ -886,112 +993,6 @@ jobs:
       - name: Build docs (typedoc + VitePress)
         run: pnpm --filter @blazetrails/website run docs:build
 
-  pr-attribution:
-    name: PR Attribution Check
-    # Independent of the `changes` gate — it inspects the PR body, not the
-    # diff, so docs_only / per-package gates don't apply. Only meaningful on
-    # PRs (push/schedule have no PR body) and scoped to deanmarano-authored
-    # ones: the project forbids Claude attribution in *his* PR descriptions
-    # (see CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
-    # contributors are unaffected.
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.user.login == 'deanmarano'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      pull-requests: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-      REPO: ${{ github.repository }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      # Single source of truth for the forbidden-attribution markers, shared by
-      # the PR-body and commit-message scans below so the two can't drift apart.
-      # Matched case-insensitively (grep -iE).
-      ATTRIBUTION_RE: 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'
-    steps:
-      - name: Forbid Claude attribution in PR body
-        run: |
-          set -euo pipefail
-          # Fetch the *live* body rather than reading the event payload. The
-          # PR triggers don't include `edited`, so a body edit won't re-fire
-          # CI — but a manual job re-run hits the API fresh and will see the
-          # fix. Reading the payload would replay the stale original body and
-          # leave the check permanently red.
-          body=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
-          if printf '%s' "$body" | grep -qiE "$ATTRIBUTION_RE"; then
-            echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
-            exit 1
-          fi
-          echo "No forbidden Claude attribution found in PR body."
-      - name: Forbid Claude attribution in commit messages
-        run: |
-          set -euo pipefail
-          # Scan every commit message on the PR, not just the PR body. The body
-          # check above misses `Co-authored-by:` trailers that live in commits —
-          # and GitHub's squash-merge auto-aggregates those branch-commit
-          # trailers into the merge commit on `main`, which is exactly how a
-          # Claude attribution reached main past the body check.
-          #
-          # The pulls/{n}/commits endpoint caps at 250 commits even with
-          # --paginate, so a >250-commit PR would leave its tail unscanned. Fail
-          # closed in that case rather than passing on a partial scan — this repo
-          # squashes and has a 500-LOC ceiling, so 250 commits never happens
-          # legitimately; if it does, squash/rebase before re-running.
-          count=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
-          if [ "$count" -gt 250 ]; then
-            echo "::error::PR has $count commits, exceeding the 250-commit API scan cap. Squash or rebase the branch so commit messages can be fully scanned, then re-run this job."
-            exit 1
-          fi
-          messages=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
-          if printf '%s' "$messages" | grep -qiE "$ATTRIBUTION_RE"; then
-            echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
-            exit 1
-          fi
-          echo "No forbidden Claude attribution found in commit messages."
-
-  docs-activerecord-freeze:
-    name: Docs ActiveRecord Freeze
-    # RFC 0011 Phase 4 guardrail. AR work tracking moved to the tasks repo;
-    # `docs/activerecord/` is frozen so the two-source-of-truth split can't
-    # self-heal. Fail any PR that adds or modifies a file under that path,
-    # with a single allowlisted exception. Independent of the `changes` gate
-    # (it inspects the diff directly) and PR-only: push/schedule have no PR
-    # base to diff against, and the skip is allowlisted in the `ci` job below.
-    # Only `docs/activerecord/` is policed — other docs/ trees stay live
-    # until their own cutover.
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Forbid new or modified docs/activerecord trackers
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          # The one tracker that stays under docs/activerecord/.
-          ALLOWLIST='docs/activerecord/parity-verification.md'
-          # Triple-dot: diff against the merge-base, not the base tip, so
-          # unrelated commits merged to main since this branch diverged don't
-          # show up. --diff-filter=ACMR ignores deletions (removing a tracker
-          # is allowed). Path-scope to docs/activerecord/ so nothing else is
-          # policed.
-          changed=$(git diff --name-only --diff-filter=ACMR \
-            "$BASE_SHA"..."$HEAD_SHA" -- docs/activerecord/ || true)
-          offending=$(printf '%s\n' "$changed" \
-            | grep -E '^docs/activerecord/' \
-            | grep -vxF "$ALLOWLIST" || true)
-          if [ -n "$offending" ]; then
-            echo "::error::AR work tracking lives in the tasks repo — add a story, not a doc. Offending files:"
-            printf '%s\n' "$offending"
-            exit 1
-          fi
-          echo "No new or modified docs/activerecord trackers."
-
   rails-comparison:
     name: Rails API/Test Comparison
     needs: changes
@@ -1274,7 +1275,7 @@ jobs:
       - changes
       - build-and-typecheck
       - lint
-      - prettier
+      - preflight
       - guides-typecheck
       - dx-type-tests
       - virtualized-dx-type-tests
@@ -1289,8 +1290,6 @@ jobs:
       - mysql-tests
       - maria-tests
       - website
-      - pr-attribution
-      - docs-activerecord-freeze
       - rails-comparison
       - schema-parity-rails
       - schema-parity-trails
@@ -1348,14 +1347,12 @@ jobs:
               [ "$result" = "skipped" ] || continue
               case "$job" in
                 changes|ci) continue ;;
-                pr-attribution)
-                  # Only runs on deanmarano-authored PRs; skip is always
-                  # legitimate (non-PR events, or any other author).
-                  continue
-                  ;;
-                docs-activerecord-freeze)
-                  # Only runs on pull_request events; skip on push/schedule
-                  # is always legitimate (no PR base to diff against).
+                preflight)
+                  # Always runs (its prettier / docs-AR-freeze / pr-attribution
+                  # steps self-gate via per-step `if:`, so an inapplicable check
+                  # no-ops rather than skipping the job). A whole-job skip only
+                  # happens if `changes` itself failed — already caught above —
+                  # so treat any skip here as legitimate.
                   continue
                   ;;
                 mysql-tests)
