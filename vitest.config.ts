@@ -217,11 +217,18 @@ const alias = {
 // passes `--coverage` (and `--coverage.all` to count untested files in the
 // denominator). No `thresholds` key is set, so coverage NEVER fails the build.
 //
-// activerecord / activerecord-cli are excluded from the baseline: their suite
-// forks 6 workers and dominates CI time, so AR coverage is tracked as a
-// separate opt-in follow-up rather than folded into the light-package baseline.
+// activerecord / activerecord-cli are excluded from the light-package baseline:
+// their suite forks 6 workers and dominates CI time. AR coverage is collected
+// separately on the sqlite lane only (story ar-sqlite-lane-coverage-reporting,
+// RFC 0028) by setting AR_COVERAGE=1, which flips the include/exclude below to
+// scope coverage to activerecord source. Keeping it env-gated means the light
+// `coverage` job's `--coverage.all` baseline stays honest (it never counts AR
+// source at 0%, and the AR run never counts the light packages at 0%).
 // website is excluded (built, not unit-tested here).
-const COVERAGE_INCLUDE = ["packages/*/src/**/*.ts", "packages/*/src/**/*.mts"];
+const AR_COVERAGE = process.env.AR_COVERAGE === "1";
+const COVERAGE_INCLUDE = AR_COVERAGE
+  ? ["packages/activerecord/src/**/*.ts", "packages/activerecord/src/**/*.mts"]
+  : ["packages/*/src/**/*.ts", "packages/*/src/**/*.mts"];
 const COVERAGE_EXCLUDE = [
   "**/*.test.ts",
   "**/*.test.mts",
@@ -232,8 +239,9 @@ const COVERAGE_EXCLUDE = [
   "**/test-support/**",
   "**/*.config.ts",
   "packages/website/**",
-  "packages/activerecord/**",
-  "packages/activerecord-cli/**",
+  // The AR run scopes COVERAGE_INCLUDE to activerecord; the light baseline run
+  // excludes it (its 6-fork suite dominates CI time and isn't run there).
+  ...(AR_COVERAGE ? [] : ["packages/activerecord/**", "packages/activerecord-cli/**"]),
   // trails-tsc tests aren't run in the coverage job (their subprocess-spawning
   // watcher/build tests trip vitest's worker-RPC timeout under load); exclude
   // its source too so `--coverage.all` doesn't count it at 0% and skew the base.

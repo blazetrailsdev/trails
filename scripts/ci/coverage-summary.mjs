@@ -48,8 +48,13 @@ for (const [pkg, acc] of [...pkgs].sort((a, b) => a[0].localeCompare(b[0]))) {
   );
 }
 lines.push("");
+// The AR sqlite lane scopes coverage to activerecord; the light baseline run
+// excludes it. Tailor the footnote to whichever report this is.
+const hasAr = pkgs.has("activerecord") || pkgs.has("activerecord-cli");
 lines.push(
-  "_Coverage is collected for reporting only and never fails the build. activerecord / activerecord-cli are excluded from this baseline (tracked as a separate follow-up)._",
+  hasAr
+    ? "_Coverage is collected for reporting only and never fails the build. This report is the activerecord sqlite-lane coverage (RFC 0028); the light-package baseline is reported separately by the Coverage job._"
+    : "_Coverage is collected for reporting only and never fails the build. activerecord / activerecord-cli are excluded from this baseline (collected separately on the sqlite lane)._",
 );
 
 const out = lines.join("\n") + "\n";

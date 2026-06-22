@@ -632,6 +632,53 @@ jobs:
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
 
+  # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
+  # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and
+  # publishes the numbers to the run UI + lcov/json artifacts. This is a
+  # SEPARATE, non-blocking job rather than a `--coverage` flag bolted onto
+  # `sqlite-tests`, because a local micro-benchmark measured the flag adding
+  # ~37% to vitest wall time — material slowdown for a job that gates merges
+  # (sqlite-tests is in the `ci` aggregator's `needs:`). Keeping coverage in its
+  # own `continue-on-error` job off the `ci` needs-graph means it can never slow
+  # the critical path or block a merge; the no-threshold vitest config means it
+  # can never fail on low coverage either. Mirrors the light-package `coverage`
+  # job above.
+  ar-sqlite-coverage:
+    name: Active Record SQLite Coverage (reporting-only)
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      # AR_COVERAGE=1 scopes the vitest coverage include to activerecord source
+      # (see vitest.config.ts). Only the main AR suite is covered; the cli run
+      # is intentionally omitted so it can't clobber the report.
+      - run: pnpm vitest run packages/activerecord/ --coverage --coverage.all
+        env:
+          AR_COVERAGE: "1"
+      - name: Write AR coverage summary to run UI
+        if: always()
+        run: node scripts/ci/coverage-summary.mjs
+      - name: Upload AR coverage report (lcov + json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ar-coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          if-no-files-found: warn
+          retention-days: 14
+
   postgres-tests:
     name: Active Record PostgreSQL Tests
     needs: changes
