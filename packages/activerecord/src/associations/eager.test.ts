@@ -17,9 +17,9 @@ import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-tra
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { Post, FirstPost } from "../test-helpers/models/post.js";
+import { Post, FirstPost, SpecialPost, StiPost } from "../test-helpers/models/post.js";
 import { Author, AuthorFavorite, AuthorAddress } from "../test-helpers/models/author.js";
-import { Comment, VerySpecialComment } from "../test-helpers/models/comment.js";
+import { Comment, VerySpecialComment, SpecialComment } from "../test-helpers/models/comment.js";
 import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Reader, LazyReader } from "../test-helpers/models/reader.js";
@@ -30,9 +30,12 @@ import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
+import { Account } from "../test-helpers/models/account.js";
+import { Member } from "../test-helpers/models/member.js";
+import { Membership } from "../test-helpers/models/membership.js";
+import { Club } from "../test-helpers/models/club.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Sponsor } from "../test-helpers/models/sponsor.js";
-import { Member } from "../test-helpers/models/member.js";
 import { Essay } from "../test-helpers/models/essay.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
@@ -1906,11 +1909,6 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(1);
     expect(comments[0].body).toBe("does it hurt");
   });
-  it.skip("preloading with has one through an sti with after initialize", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("preloading has many through with implicit source", async () => {
     class EagerImpOwner extends Base {
       static {
@@ -1957,11 +1955,6 @@ describe("EagerAssociationTest", () => {
       className: "EagerImpItem",
     });
     expect(items).toHaveLength(1);
-  });
-  it.skip("eager with has many through an sti join model with conditions on both", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
   it("eager with has many through join model with conditions", async () => {
     class EagerHmtCondAuthor extends Base {
@@ -4328,11 +4321,6 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("eager with has one through join model with conditions on the through", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("including duplicate objects from has many", async () => {
     // Rails: car_post belongs to 2 categories via habtm; includes({ posts: :comments })
     // on categories should yield the SAME comment object for each category's posts[0].
@@ -4556,11 +4544,6 @@ describe("EagerAssociationTest", () => {
     const titles = comments.map((c: any) => c._preloadedAssociations.get("eabtPost")?.title);
     expect(titles).toContain("Welcome");
     expect(titles).toContain("Other");
-  });
-  it.skip("eager with has one dependent does not destroy dependent", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
   it("preload belongs to uses exclusive scope", async () => {
     // Rails: Person.males.includes(:primary_contact) — the preload of
@@ -5885,6 +5868,158 @@ describe("EagerAssociationTest", () => {
       actual[comment.text] = comment._preloadedAssociations.get("post").title;
     }
     expect(actual).toEqual({ "great post1!": "post1", "great post2!": "post2" });
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical STI Post/Comment fixtures) — ports the
+// preload/eager-load-through-STI-join-model cases over the real Author / Post /
+// StiPost / SpecialPost / Comment / SpecialComment models. Same describe name as
+// the other EagerAssociationTest blocks so test:compare matches the Rails
+// `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { authors } = useHandlerFixtures(["authors", "posts", "comments"]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection,
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  enableSti(Post);
+  enableSti(Comment);
+  registerModel(Author);
+  registerModel(Post);
+  registerModel(SpecialPost);
+  registerSubclass(SpecialPost);
+  registerModel(StiPost);
+  registerSubclass(StiPost);
+  registerModel(Comment);
+  registerModel(SpecialComment);
+  registerSubclass(SpecialComment);
+
+  it("preloading with has one through an sti with after initialize", async () => {
+    const authorA = await Author.create({ name: "A" });
+    const authorB = await Author.create({ name: "B" });
+    const postA = await StiPost.create({
+      author_id: authorA.id,
+      title: "TITLE",
+      body: "BODY",
+    });
+    const postB = await SpecialPost.create({
+      author_id: authorB.id,
+      title: "TITLE",
+      body: "BODY",
+    });
+    const commentA = await SpecialComment.create({ post_id: postA.id, body: "TEST" });
+    const commentB = await SpecialComment.create({ post_id: postB.id, body: "TEST" });
+
+    // Mirrors Rails `reset_callbacks(StiPost, :initialize) do ... end`: register a
+    // temporary after_initialize that references the `author` association, then
+    // remove it so the global StiPost model is left untouched for other tests.
+    const referenceAuthor = function (this: Base): void {
+      this.association("author");
+    };
+    try {
+      StiPost.afterInitialize(referenceAuthor);
+      const comments = await SpecialComment.all()
+        .where({ id: [commentA.id, commentB.id] })
+        .includes("author")
+        .toArray();
+      for (const comment of comments) {
+        expect(comment.association("author").target).toBeTruthy();
+      }
+    } finally {
+      StiPost.skipCallback("initialize", "after", referenceAuthor);
+    }
+  });
+
+  it("eager with has many through an sti join model with conditions on both", async () => {
+    const author = (await Author.all()
+      .includes("specialNonexistentPostComments")
+      .order("authors.id")
+      .first()) as Author;
+    expect(author.association("specialNonexistentPostComments").target).toEqual([]);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Member/Membership/Club fixtures) — ports the
+// has_one-through-join-model-with-conditions-on-the-through case over the real
+// Member / Membership / Club models. Same describe name as the other
+// EagerAssociationTest blocks so test:compare matches the Rails
+// `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { members } = useHandlerFixtures(["members", "memberships", "clubs"]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection,
+      {
+        members: canonicalSchema.members,
+        memberships: canonicalSchema.memberships,
+        clubs: canonicalSchema.clubs,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Member);
+  enableSti(Membership);
+  registerModel(Membership);
+  registerModel(Club);
+
+  it("eager with has one through join model with conditions on the through", async () => {
+    const member = await Member.all().includes("favoriteClub").find(members("some_other_guy").id);
+    expect(member.association("favoriteClub").target ?? null).toBeNull();
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Firm/Account fixtures) — ports the
+// has_one-dependent-does-not-destroy-dependent case over the real STI
+// Company/Firm + Account models. Same describe name as the other
+// EagerAssociationTest blocks so test:compare matches the Rails
+// `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { companies } = useHandlerFixtures(["companies", "accounts"]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection,
+      {
+        companies: canonicalSchema.companies,
+        accounts: canonicalSchema.accounts,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Company);
+  enableSti(Company);
+  registerModel(Firm);
+  registerSubclass(Firm);
+  registerModel(Client);
+  registerSubclass(Client);
+  registerModel(Account);
+
+  it("eager with has one dependent does not destroy dependent", async () => {
+    const firstFirm = companies("first_firm") as Firm;
+    expect(await firstFirm.loadHasOne("account")).not.toBeNull();
+
+    const f = (await Firm.all()
+      .includes("account")
+      .where("companies.name = ?", "37signals")
+      .first()) as Firm;
+    expect(f.association("account").target ?? null).not.toBeNull();
+
+    const reloaded = await Firm.find(firstFirm.id);
+    expect((f.association("account").target as Account).id).toBe(
+      (await reloaded.loadHasOne("account"))!.id,
+    );
   });
 });
 
