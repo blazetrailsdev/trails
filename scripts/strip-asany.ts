@@ -101,7 +101,22 @@ export function findCandidateCasts(text: string): CastSpan[] {
   };
   visit(source);
 
-  return spans;
+  // Nested casts (e.g. `((foo as any).bar as any).baz`) yield spans where the
+  // outer span encloses the inner one. The caller applies edits end-to-start,
+  // which only keeps offsets stable for *disjoint* spans — an enclosed edit
+  // would mutate text inside a not-yet-applied span and corrupt it. Keep only
+  // the outermost of any enclosing pair; idempotency sweeps the inner cast on
+  // a subsequent run (its parent cast is gone, so it's no longer nested).
+  return spans.filter(
+    (span) =>
+      !spans.some(
+        (other) =>
+          other !== span &&
+          other.start <= span.start &&
+          span.end <= other.end &&
+          (other.start < span.start || span.end < other.end),
+      ),
+  );
 }
 
 /** Apply a single cast-span removal to `text`, returning the new text. */

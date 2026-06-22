@@ -29,6 +29,12 @@ describe("findCandidateCasts", () => {
   it("skips terminal casts with no member access", () => {
     expect(findCandidateCasts("const y = x as any;")).toEqual([]);
   });
+
+  it("keeps only the outermost of an enclosing (nested) cast pair", () => {
+    const spans = findCandidateCasts("((foo as any).bar as any).baz");
+    expect(spans).toHaveLength(1);
+    expect(spans[0].member).toBe("baz");
+  });
 });
 
 describe("removeCast", () => {
@@ -48,6 +54,16 @@ describe("removeCast", () => {
     const text = "(5 as any).toFixed";
     const [span] = findCandidateCasts(text);
     expect(removeCast(text, span)).toBe("(5).toFixed");
+  });
+
+  it("strips a nested cast pair across two idempotent passes without corruption", () => {
+    let text = "((foo as any).bar as any).baz";
+    const [outer] = findCandidateCasts(text);
+    text = removeCast(text, outer);
+    expect(text).toBe("(foo as any).bar.baz");
+    const [inner] = findCandidateCasts(text);
+    text = removeCast(text, inner);
+    expect(text).toBe("foo.bar.baz");
   });
 
   it("removes only the targeted casts when applied end-to-start", () => {
