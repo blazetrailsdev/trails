@@ -2660,53 +2660,52 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     }
   }
 
-  // Named left outer joins (short-circuit path: only left_outer_joins_values,
-  // no explicit joins). Rails processes these as named_join → OuterJoin type.
-  if (namedJoins.length > 0) {
-    const jd = constructJoinDependency.call(this, namedJoins, Nodes.OuterJoin);
-    const constraintNodes = jd.joinConstraints(
-      stashedJoins,
-      aliases,
-      (this as any)._aliasableReferences(),
-    );
-    for (const node of constraintNodes) arel.source.right.push(node);
-  } else if (stashedJoins.length > 0) {
-    // Stashed join dependencies (eager_load or left_outer combined with explicit
-    // joins) — generate join SQL via joinConstraints (mirrors build_joins:1896).
-    const [primary, ...rest] = stashedJoins;
-    const constraintNodes = primary.joinConstraints(
-      rest,
-      aliases,
-      (this as any)._aliasableReferences(),
-    );
-    for (const node of constraintNodes) arel.source.right.push(node);
-  }
-
   // One AliasTracker shared with the cross-klass merged dependencies, mirroring
   // Rails' single `build_joins` alias_tracker (see _applyJoinsToManager). Use the
   // tracker threaded in from `build_from` when present, else build a fresh one.
   const sharedTracker = aliases ?? buildMergedJoinAliasTracker(this as any);
-  // Named INNER joins routed through JoinDependency (nested-through chains that
-  // need AliasTracker self-join aliasing). Emitted as a standalone JoinDependency
-  // with InnerJoin type so it produces the canonical `*_<owner>_join` aliases
-  // (mirrors Rails joins_values → named_join with InnerJoin).
+  const references = (this as any)._aliasableReferences();
+
+  // Rails build_joins (query_methods.rb:1893-1896) emits ALL named association
+  // joins — joins_values (InnerJoin) plus the folded left_outer JoinDependency —
+  // through a SINGLE `join_dependency.join_constraints(stashed_joins, …)` call, so
+  // an association joined both ways (`joins(:posts).left_outer_joins(:posts)`)
+  // dedups via `walk` to one INNER JOIN. trails keeps joins_values association
+  // names in `_namedInnerJoins` (separate from the Arel-node `_joinValues`), so we
+  // assemble that single named JoinDependency here and fold the stashed buckets
+  // into it, mirroring `_applyJoinsToManager` on the live SQL path.
+  //
+  // Tracker: pass `undefined` to the named JD's joinConstraints (the JD aliases
+  // against its own per-dep tracker) and let `seedTrackerFromJdNodes` be the sole
+  // claim of its tables into the shared tracker — passing the shared tracker too
+  // would double-count an aliased table.
   if (this._namedInnerJoins.length > 0) {
+    // `namedJoins` is only populated by buildJoinBuckets' left-outer-only
+    // short-circuit, which does NOT fold the left JD (it leaves joins_values for
+    // the caller). Since joins_values (_namedInnerJoins) IS present, fold that
+    // left-outer JD into the inner JD's stashed set now (Rails build_join_buckets
+    // :1843), ahead of any eager/explicit stashed joins.
+    const foldedLeft =
+      namedJoins.length > 0
+        ? [constructJoinDependency.call(this, namedJoins, Nodes.OuterJoin)]
+        : [];
+    const stashed = [...foldedLeft, ...stashedJoins];
     const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
-    // Thread references_values so a join referenced by a where-hash / per-join
-    // hash select key aliases its table to the referenced name (first use), and a
-    // duplicate join onto the same table to its alias_candidate (Rails
-    // build_joins:1896). The where-hash keys resolve to the same aliased name
-    // (`joinTableAliasFor`), so the WHERE and JOIN stay in sync.
-    //
-    // Do NOT thread `aliases` into the JD's own joinConstraints (mirror
-    // _applyJoinsToManager, which passes `undefined`): the JD aliases against its
-    // own per-dep tracker, then `seedTrackerFromJdNodes` is the sole claim of its
-    // tables into the shared tracker. Passing the shared tracker here too would
-    // double-count an aliased table — `_applyReferencedAlias` would bump it once,
-    // and the seed would bump the same effective alias again.
-    for (const node of jd.joinConstraints([], undefined, (this as any)._aliasableReferences()))
+    for (const node of jd.joinConstraints(stashed, undefined, references))
       arel.source.right.push(node);
     seedTrackerFromJdNodes(sharedTracker, jd);
+    for (const s of stashed) seedTrackerFromJdNodes(sharedTracker, s);
+  } else if (namedJoins.length > 0) {
+    // Pure left-outer-only short-circuit (no joins_values): named_join → OuterJoin.
+    const jd = constructJoinDependency.call(this, namedJoins, Nodes.OuterJoin);
+    for (const node of jd.joinConstraints(stashedJoins, aliases, references))
+      arel.source.right.push(node);
+  } else if (stashedJoins.length > 0) {
+    // Stashed join dependencies (eager_load or left_outer combined with explicit
+    // joins) — generate join SQL via joinConstraints (mirrors build_joins:1896).
+    const [primary, ...rest] = stashedJoins;
+    for (const node of primary.joinConstraints(rest, aliases, references))
+      arel.source.right.push(node);
   }
 
   // Cross-klass merged JoinDependencies (Rails merge_joins): built against the
