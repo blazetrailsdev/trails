@@ -143,6 +143,64 @@ describe("ready", () => {
     ).toEqual(["a", "e"]);
   });
 
+  it("excludes ready stories whose own RFC is not active", () => {
+    const idx = index([
+      story({ id: "active", rfc: "0001-r" }), // 0001-r active → included
+      story({ id: "draft", rfc: "0003-r" }), // draft RFC → excluded
+      story({ id: "postponed", rfc: "0004-r" }), // postponed → excluded
+      story({ id: "superseded", rfc: "0005-r" }), // superseded → excluded
+      story({ id: "closed", rfc: "0002-r", cluster: "c3" }), // closed → excluded
+    ]);
+    idx.rfcs.push(
+      {
+        id: "0003-r",
+        title: "R3",
+        status: "draft",
+        owner: "@x",
+        packages: [],
+        clusters: ["c1"],
+        file_path: "0003-r/README.md",
+      },
+      {
+        id: "0004-r",
+        title: "R4",
+        status: "postponed",
+        owner: "@x",
+        packages: [],
+        clusters: ["c1"],
+        file_path: "0004-r/README.md",
+      },
+      {
+        id: "0005-r",
+        title: "R5",
+        status: "superseded",
+        owner: "@x",
+        packages: [],
+        clusters: ["c1"],
+        file_path: "0005-r/README.md",
+      },
+    );
+    expect(ready(idx).map((s) => s.id)).toEqual(["active"]);
+  });
+
+  it("excludes a ready story whose RFC is null-status or absent from the index", () => {
+    const idx = index([
+      story({ id: "active", rfc: "0001-r" }), // active → included
+      story({ id: "nullStatus", rfc: "0006-r" }), // RFC present but status null → excluded
+      story({ id: "danglingRfc", rfc: "0099-r" }), // rfc absent from index.rfcs → excluded
+    ]);
+    idx.rfcs.push({
+      id: "0006-r",
+      title: "R6",
+      status: null,
+      owner: "@x",
+      packages: [],
+      clusters: ["c1"],
+      file_path: "0006-r/README.md",
+    });
+    expect(ready(idx).map((s) => s.id)).toEqual(["active"]);
+  });
+
   it("honors --rfc filter", () => {
     const idx = index([
       story({ id: "a", rfc: "0001-r" }),
