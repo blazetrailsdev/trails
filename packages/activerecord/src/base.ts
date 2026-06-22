@@ -3150,25 +3150,35 @@ export class Base extends Model {
     // wrong target. The reflected columns also drive the explicit `RETURNING`
     // clause for PG, which must name the right column.
     this._pendingOperation = (async () => {
-      // Ensure reflected columns so auto-increment detection is reliable even when
-      // a sibling test invalidated the shared schema cache (RFC 0031 schema-warm).
-      // The sync `columns()` returns synthesized plain shapes (no
-      // `isAutoIncrementedByDb`) on a cold cache, so warm from the adapter first
-      // when that's what we'd get.
-      let insertCols = (ctor as any).columns() as {
+      const insertCols = (ctor as any).columns() as {
         name: string;
         isAutoIncrementedByDb?(): boolean;
       }[];
-      const reflected = (cols: typeof insertCols): boolean =>
-        cols.some((c) => typeof c.isAutoIncrementedByDb === "function");
-      if (!reflected(insertCols) && typeof (ctor as any).loadSchemaFromAdapter === "function") {
-        await (ctor as any).loadSchemaFromAdapter();
-        insertCols = (ctor as any).columns();
-      }
       const colNames = new Set(insertCols.map((c) => c.name));
-      const autoIncColumn = insertCols.find(
+      let autoIncColumn = insertCols.find(
         (c) => typeof c.isAutoIncrementedByDb === "function" && c.isAutoIncrementedByDb(),
       )?.name;
+      // The sync `columns()` returns synthesized plain shapes (no
+      // `isAutoIncrementedByDb`) on a cold schema cache — common when a sibling
+      // test invalidated it (RFC 0031 schema-warm). Reflect READ-ONLY from the
+      // adapter to recover the auto-increment column. We deliberately do NOT call
+      // `loadSchemaFromAdapter`/`loadSchema`: those run `applyColumnsHash`, which
+      // reconciles reflected columns into the model's attribute definitions and
+      // would clobber reflection-typed attributes (e.g. a float `temperature`
+      // would lose its cast type mid-suite). `connection.columns` only queries the
+      // DB and returns Column objects, with no attribute-definition side effects.
+      if (
+        autoIncColumn === undefined &&
+        !insertCols.some((c) => typeof c.isAutoIncrementedByDb === "function") &&
+        typeof (ctor.connection as any).columns === "function"
+      ) {
+        const reflectedCols = (await (ctor.connection as any).columns(ctor.tableName)) as {
+          name: string;
+          isAutoIncrementedByDb?(): boolean;
+        }[];
+        for (const c of reflectedCols) colNames.add(c.name);
+        autoIncColumn = reflectedCols.find((c) => c.isAutoIncrementedByDb?.())?.name;
+      }
       const pkArr = Array.isArray(ctor.primaryKey)
         ? ctor.primaryKey
         : ctor.primaryKey
