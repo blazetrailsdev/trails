@@ -50,6 +50,7 @@ jobs:
       unit_tests_affected: ${{ steps.filter.outputs.unit_tests_affected }}
       guides_affected: ${{ steps.filter.outputs.guides_affected }}
       website_affected: ${{ steps.filter.outputs.website_affected }}
+      comparison_affected: ${{ steps.filter.outputs.comparison_affected }}
       website_label: ${{ steps.filter.outputs.website_label }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
@@ -148,6 +149,29 @@ jobs:
           # `release` label, which always runs it). The job is also
           # exercised post-merge by push-to-main.
           WEBSITE_PKGS_RE='^packages/website/'
+          # comparison_affected gates the Rails API/Test Comparison job. That
+          # job is only meaningful when Rails-port package source, the compare
+          # tooling (scripts/{api,test,fixtures}-compare/), or the vendored
+          # upstream Ruby sources changed — plus cross-cutting infra (INFRA_RE)
+          # below. A scripts/tasks-only, website-only, or other tooling-only
+          # change can't move any comparison output, so it skips.
+          # packages/website/ is EXCLUDED: it's the SvelteKit docs site, never
+          # one of apiComparePackages() (vendor/sources.ts), so the comparison
+          # never scans it — it is filtered out of comparison_files below
+          # before the COMPARISON_RE `^packages/` clause is applied.
+          # NOTE: scripts/api-compare/conventions.ts regenerates
+          # docs/ruby-ts-conventions.md (checked by api:conventions --check in
+          # the job); the scripts/api-compare/ clause keeps that drift check
+          # gated on. As with the package gates, infra_files (which carves out
+          # scripts/tasks/) feeds the INFRA_RE half of the OR.
+          # docs/ruby-ts-conventions.md is ALSO matched directly: it's the
+          # generated artifact the conventions check guards, and the docs_only
+          # logic above (`:234`) deliberately keeps a hand-edit of it
+          # non-docs-only so the drift check still runs. Mirror that here — a
+          # PR that edits ONLY that file matches neither INFRA_RE nor the
+          # package/vendor clauses, so without this it would skip the very
+          # check the docs_only exception was built to preserve.
+          COMPARISON_RE='^(packages/|scripts/(api|test|fixtures)-compare/|vendor/|docs/ruby-ts-conventions\.md$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
@@ -159,6 +183,7 @@ jobs:
             echo "unit_tests_affected=true"   >> "$GITHUB_OUTPUT"
             echo "guides_affected=true"       >> "$GITHUB_OUTPUT"
             echo "website_affected=true"      >> "$GITHUB_OUTPUT"
+            echo "comparison_affected=true"   >> "$GITHUB_OUTPUT"
           }
 
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
@@ -237,6 +262,7 @@ jobs:
                   echo "unit_tests_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "guides_affected=false"       >> "$GITHUB_OUTPUT"
                   echo "website_affected=false"      >> "$GITHUB_OUTPUT"
+                  echo "comparison_affected=false"   >> "$GITHUB_OUTPUT"
                 else
                   # scripts/tasks/ is the tasks-management CLI. Its tests ride
                   # ONLY on the unit-tests vitest run (UNIT_TESTS_PKGS_RE), never
@@ -265,6 +291,16 @@ jobs:
                   set_gate unit_tests_affected   "$UNIT_TESTS_PKGS_RE"
                   set_gate guides_affected       "$GUIDES_PKGS_RE"
                   set_gate website_affected      "$WEBSITE_PKGS_RE"
+                  # comparison_affected can't reuse set_gate: it must first
+                  # drop packages/website/ (which the comparison never scans)
+                  # so a website-only PR skips the job. INFRA_RE still applies
+                  # via infra_files (website doesn't match INFRA_RE anyway).
+                  comparison_files=$(echo "$files" | grep -vE '^packages/website/' || true)
+                  if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$comparison_files" | grep -qE "$COMPARISON_RE"; then
+                    echo "comparison_affected=true"  >> "$GITHUB_OUTPUT"
+                  else
+                    echo "comparison_affected=false" >> "$GITHUB_OUTPUT"
+                  fi
                 fi
                 ;;
             esac
@@ -912,7 +948,9 @@ jobs:
   rails-comparison:
     name: Rails API/Test Comparison
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.comparison_affected == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -1232,6 +1270,7 @@ jobs:
           UNIT_TESTS_AFFECTED: ${{ needs.changes.outputs.unit_tests_affected }}
           GUIDES_AFFECTED: ${{ needs.changes.outputs.guides_affected }}
           WEBSITE_AFFECTED: ${{ needs.changes.outputs.website_affected }}
+          COMPARISON_AFFECTED: ${{ needs.changes.outputs.comparison_affected }}
           WEBSITE_LABEL: ${{ needs.changes.outputs.website_label }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
@@ -1303,6 +1342,12 @@ jobs:
                 guides-typecheck)
                   [ "$GUIDES_AFFECTED" = "false" ] && continue
                   ;;
+                rails-comparison)
+                  # Legitimate skip when no comparison-relevant path changed
+                  # (no packages/**, scripts/{api,test,fixtures}-compare/**,
+                  # vendor/**, or cross-cutting infra).
+                  [ "$COMPARISON_AFFECTED" = "false" ] && continue
+                  ;;
                 website)
                   # Legitimate skip when website_affected is false AND no
                   # website/release label opted the job in.
@@ -1328,7 +1373,7 @@ jobs:
                   [ "$any_parity" = "false" ] && continue
                   ;;
               esac
-              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
+              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED comparison_affected=$COMPARISON_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
               unexpected=1
             done < <(echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
           fi
