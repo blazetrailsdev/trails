@@ -10,7 +10,7 @@ import {
   AssociationNotFoundError,
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
-import { raiseCompositePrimaryKeyMismatch } from "./associations/validate-through-reflection.js";
+import { routeThroughCheckValidity } from "./associations/validate-through-reflection.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import type { AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
@@ -493,7 +493,7 @@ async function _insertCollectionRecordFallback(
     if (primaryKey.length !== foreignKey.length) {
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message.
-      raiseCompositePrimaryKeyMismatch(ctor, assoc.name);
+      routeThroughCheckValidity(ctor, assoc.name);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -512,7 +512,7 @@ async function _insertCollectionRecordFallback(
   } else {
     // Route through the reflection's canonical checkValidityBang (Rails'
     // single raise site) so the error carries the Rails-faithful message.
-    raiseCompositePrimaryKeyMismatch(ctor, assoc.name);
+    routeThroughCheckValidity(ctor, assoc.name);
     // No reflection resolvable — minimal trails-only fallback guard.
     throw new CompositePrimaryKeyMismatchError({
       activeRecord: ctor.name,
@@ -602,7 +602,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
       if (primaryKey.length !== foreignKey.length) {
         // Route through the reflection's canonical checkValidityBang (Rails'
         // single raise site) so the error carries the Rails-faithful message.
-        raiseCompositePrimaryKeyMismatch(record.constructor as typeof Base, assoc.name);
+        routeThroughCheckValidity(record.constructor as typeof Base, assoc.name);
         // No reflection resolvable — minimal trails-only fallback guard.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: (record.constructor as typeof Base).name,
@@ -621,7 +621,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     } else {
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message.
-      raiseCompositePrimaryKeyMismatch(record.constructor as typeof Base, assoc.name);
+      routeThroughCheckValidity(record.constructor as typeof Base, assoc.name);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: (record.constructor as typeof Base).name,

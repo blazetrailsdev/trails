@@ -218,7 +218,7 @@ export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends Thr
  * `autosave-association.ts` and `associations.ts` (inline-fallback /
  * scope-building / autosave / `:as` collapse paths) now route through that
  * canonical `checkValidityBang` first — via
- * `raiseCompositePrimaryKeyMismatch` (validate-through-reflection.ts) — so a
+ * `routeThroughCheckValidity` (validate-through-reflection.ts) — so a
  * resolvable reflection raises the Rails-faithful error derived from
  * `active_record_primary_key` / `association_primary_key`. The bare-guard
  * throw below each call remains only as a minimal fallback for paths that

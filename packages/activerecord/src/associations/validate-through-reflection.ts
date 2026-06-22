@@ -132,6 +132,6 @@ export function validateReflectionValidity(modelClass: typeof Base, assocName: s
  * detected a mismatch, so healthy associations never reach it — no regression
  * risk for working paths.
  */
-export function raiseCompositePrimaryKeyMismatch(modelClass: typeof Base, assocName: string): void {
+export function routeThroughCheckValidity(modelClass: typeof Base, assocName: string): void {
   validateReflectionValidity(modelClass, assocName);
 }

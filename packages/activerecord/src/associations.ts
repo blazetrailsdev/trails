@@ -73,7 +73,7 @@ import { AssociationScope, invokeScopeLambda } from "./associations/association-
 import type { Association as AssociationInstance } from "./associations/association.js";
 import {
   validateThroughReflection,
-  raiseCompositePrimaryKeyMismatch,
+  routeThroughCheckValidity,
 } from "./associations/validate-through-reflection.js";
 import { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
@@ -1225,7 +1225,7 @@ export async function loadBelongsTo(
       if (pkCols.length !== foreignKey.length) {
         // Route through the reflection's canonical checkValidityBang (Rails'
         // single raise site) so the error carries the Rails-faithful message.
-        raiseCompositePrimaryKeyMismatch(ctor, assocName);
+        routeThroughCheckValidity(ctor, assocName);
         // No reflection registered (lower-level test helper) — minimal guard.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
@@ -1352,7 +1352,7 @@ export async function loadHasOne(
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      raiseCompositePrimaryKeyMismatch(ctor, assocName);
+      routeThroughCheckValidity(ctor, assocName);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -1365,7 +1365,7 @@ export async function loadHasOne(
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      raiseCompositePrimaryKeyMismatch(ctor, assocName);
+      routeThroughCheckValidity(ctor, assocName);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -1415,7 +1415,7 @@ export async function loadHasOne(
       if (pkCols.length !== foreignKey.length) {
         // Route through the reflection's canonical checkValidityBang (Rails'
         // single raise site) so the error carries the Rails-faithful message.
-        raiseCompositePrimaryKeyMismatch(ctor, assocName);
+        routeThroughCheckValidity(ctor, assocName);
         // No reflection registered (lower-level test helper) — minimal guard.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
@@ -1493,7 +1493,7 @@ export function buildHasOne(
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      raiseCompositePrimaryKeyMismatch(ctor, _assocName);
+      routeThroughCheckValidity(ctor, _assocName);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -1643,7 +1643,7 @@ export async function loadHasMany(
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      raiseCompositePrimaryKeyMismatch(ctor, assocName);
+      routeThroughCheckValidity(ctor, assocName);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -1656,7 +1656,7 @@ export async function loadHasMany(
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      raiseCompositePrimaryKeyMismatch(ctor, assocName);
+      routeThroughCheckValidity(ctor, assocName);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -1717,7 +1717,7 @@ export async function loadHasMany(
       if (pkCols.length !== foreignKey.length) {
         // Route through the reflection's canonical checkValidityBang (Rails'
         // single raise site) so the error carries the Rails-faithful message.
-        raiseCompositePrimaryKeyMismatch(ctor, assocName);
+        routeThroughCheckValidity(ctor, assocName);
         // No reflection registered (lower-level test helper) — minimal guard.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
@@ -1909,7 +1909,7 @@ export function computeHasManyWhere(
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      raiseCompositePrimaryKeyMismatch(ctor, assocName);
+      routeThroughCheckValidity(ctor, assocName);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -1924,7 +1924,7 @@ export function computeHasManyWhere(
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      raiseCompositePrimaryKeyMismatch(ctor, assocName);
+      routeThroughCheckValidity(ctor, assocName);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -1981,7 +1981,7 @@ export function computeHasManyWhere(
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      raiseCompositePrimaryKeyMismatch(ctor, assocName);
+      routeThroughCheckValidity(ctor, assocName);
       // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
@@ -2003,7 +2003,7 @@ export function computeHasManyWhere(
   if (Array.isArray(primaryKey)) {
     // Route through the reflection's canonical checkValidityBang (Rails'
     // single raise site) so the error carries the Rails-faithful message.
-    raiseCompositePrimaryKeyMismatch(ctor, assocName);
+    routeThroughCheckValidity(ctor, assocName);
     // No reflection resolvable — minimal trails-only fallback guard.
     throw new CompositePrimaryKeyMismatchError({
       activeRecord: ctor.name,

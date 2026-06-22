@@ -500,6 +500,45 @@ describe("AssociationScope", () => {
     ).rejects.toThrow(CompositePrimaryKeyMismatchError);
   });
 
+  it("addConstraints routes a composite-PK mismatch through checkValidityBang", async () => {
+    // The scope-building bypass path (AssociationScope.scope → addConstraints)
+    // never constructs an Association, so it doesn't reach the canonical
+    // `reflection.check_validity!` that `Association#initialize` runs. The
+    // length guard now routes through the real reflection's checkValidityBang
+    // so the error carries the Rails-faithful message derived from
+    // active_record_primary_key / foreign_key — note the FK renders as the
+    // reflection's scalar `broken_order_id`, NOT the trails-computed
+    // `["broken_order_id"]` array the old guard produced.
+    const { CompositePrimaryKeyMismatchError } = await import("../index.js");
+    class AscCpkBook extends Base {
+      static {
+        this.attribute("broken_order_id", "integer");
+      }
+    }
+    class AscCpkBrokenOrder extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "status"];
+        this.hasMany("books", { className: "AscCpkBook", foreignKey: "broken_order_id" });
+      }
+    }
+    registerModel(AscCpkBook);
+    registerModel(AscCpkBrokenOrder);
+    const owner = new AscCpkBrokenOrder({ shop_id: 1, status: "active" });
+    const reflection = (AscCpkBrokenOrder as any)._reflectOnAssociation("books");
+    let error: Error | undefined;
+    try {
+      AssociationScope.scope({ owner, reflection, klass: AscCpkBook });
+    } catch (e) {
+      error = e as Error;
+    }
+    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
+    expect(error?.message).toBe(
+      `Association AscCpkBrokenOrder#books primary key ["shop_id", "status"] doesn't match with foreign key broken_order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
+  });
+
   it("polymorphic belongsTo uses runtime klass's primary key (non-id PK)", () => {
     // BelongsToReflection#joinPrimaryKey hard-codes "id" for polymorphic
     // associations because the target klass isn't known at definition
