@@ -6,11 +6,11 @@ describe("MemoryStoreTest", () => {
   let store: MemoryStore;
 
   beforeEach(() => {
-    store = new MemoryStore({ expiresIn: 60_000 });
+    store = new MemoryStore({ expiresIn: 60 });
   });
 
   it("increment preserves expiry", async () => {
-    store.write("counter", 0, { expiresIn: 200 });
+    store.write("counter", 0, { expiresIn: 0.2 });
     store.increment("counter", 1);
     expect(store.read("counter")).toBe(1);
     await new Promise((r) => setTimeout(r, 50));
@@ -38,7 +38,7 @@ describe("MemoryStoreTest", () => {
   });
 
   it("write expired value with unless exist", async () => {
-    store.write("key", "expired", { expiresIn: 10 });
+    store.write("key", "expired", { expiresIn: 0.01 });
     await new Promise((r) => setTimeout(r, 20));
     store.write("key", "new", { unlessExist: true });
     expect(store.read("key")).toBe("new");
@@ -144,23 +144,23 @@ describe("CacheStoreRaceConditionTtlTest", () => {
   });
 
   it("fetch with race condition ttl", async () => {
-    store.write("foo", "bar", { expiresIn: 20 });
+    store.write("foo", "bar", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
     // Within the race window: stale entry is bumped; caller regenerates
-    const result = store.fetch("foo", { raceConditionTtl: 200 }, () => "new");
+    const result = store.fetch("foo", { raceConditionTtl: 0.2 }, () => "new");
     expect(result).toBe("new");
     // Now the store has the new value
     expect(store.read("foo")).toBe("new");
   });
 
   it("fetch with race condition ttl serves stale to concurrent readers", async () => {
-    store.write("foo", "stale", { expiresIn: 20 });
+    store.write("foo", "stale", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
     // Simulate a concurrent reader by reading inside the fallback callback.
     // At that point handleExpiredEntry has bumped the entry back into the store,
     // so read() returns the stale value (not null) — the race-window guarantee.
     let seenDuringRegen: unknown;
-    store.fetch("foo", { raceConditionTtl: 500 }, () => {
+    store.fetch("foo", { raceConditionTtl: 0.5 }, () => {
       seenDuringRegen = store.read("foo");
       return "fresh";
     });
@@ -169,17 +169,17 @@ describe("CacheStoreRaceConditionTtlTest", () => {
   });
 
   it("fetch without race condition ttl deletes expired entry", async () => {
-    store.write("foo", "bar", { expiresIn: 20 });
+    store.write("foo", "bar", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
     const result = store.fetch("foo", () => "new");
     expect(result).toBe("new");
   });
 
   it("race condition ttl beyond window deletes expired entry", async () => {
-    store.write("foo", "bar", { expiresIn: 20 });
+    store.write("foo", "bar", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 200));
     // Beyond the race window: entry is deleted normally
-    const result = store.fetch("foo", { raceConditionTtl: 50 }, () => "regen");
+    const result = store.fetch("foo", { raceConditionTtl: 0.05 }, () => "regen");
     expect(result).toBe("regen");
   });
 });
