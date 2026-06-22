@@ -3,33 +3,30 @@ import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Entry } from "./entry.js";
-import { Store, type WriteOptions } from "./store.js";
-import { type CacheEntry, namespaceKey, isExpired, extractCacheOptions } from "./entry-record.js";
+import { Store, type StoreOptions } from "./store.js";
+import { type CacheEntry, isExpired } from "./entry-record.js";
 
 const FILENAME_MAX_SIZE = 228;
-const MISS = Symbol("miss");
 
 export class FileStore extends Store implements CacheStore {
   private cacheDir: string;
-  private namespace?: string;
-  private defaultExpiresIn?: number;
 
   constructor(cacheDir: string, options?: CacheOptions) {
     super(options ?? {});
     this.cacheDir = String(cacheDir);
-    this.namespace = options?.namespace;
-    this.defaultExpiresIn = options?.expiresIn;
   }
 
-  // Abstract entry hooks of the instrumented Store base, backed by on-disk records.
-  // Round-trip the stored expiry and version so base methods routed through these
-  // hooks (e.g. the inherited fetchMulti/readMultiEntries) see a faithful Entry
-  // and can apply isExpired()/isMismatched() like Rails read_entry. Read the raw
-  // record rather than readValue() — the base layer owns the expired-entry
-  // decision when called via these hooks. A malformed payload degrades to a miss,
-  // mirroring Rails deserialize_entry's rescue (cache.rb) so fetchMulti behaves
-  // like the single-key read/fetch paths.
-  protected readEntry(key: string, _options: Record<string, unknown>): Entry | null {
+  // Abstract entry hooks of the instrumented Store base, backed by on-disk
+  // records. FileStore overrides only these hooks plus the file-layout helpers
+  // (clear/cleanup/deleteMatched/increment/decrement) and inherits the
+  // instrumented base read/write/delete/exist?/fetch/*Multi public methods,
+  // exactly like Rails FileStore (file_store.rb).
+  //
+  // readEntry round-trips the stored expiry and version so base methods (e.g.
+  // the inherited fetch/fetchMulti/readMultiEntries) can apply
+  // isExpired()/isMismatched() like Rails read_entry. A malformed payload
+  // degrades to a miss, mirroring Rails deserialize_entry's rescue (cache.rb).
+  protected readEntry(key: string, _options: StoreOptions): Entry | null {
     const stored = this.readFile(this.keyToPath(key));
     if (!stored || stored.encodedValue === undefined) return null;
     let value: unknown;
@@ -41,7 +38,11 @@ export class FileStore extends Store implements CacheStore {
     }
     return new Entry(value, { expiresAt: stored.expiresAt, version: stored.version ?? null });
   }
-  protected writeEntry(key: string, entry: Entry, _options: Record<string, unknown>): boolean {
+
+  protected writeEntry(key: string, entry: Entry, options: StoreOptions): boolean {
+    // Mirrors Rails write_serialized_entry (file_store.rb:124-129): unless_exist
+    // refuses the write when the file merely exists, regardless of expiry.
+    if (options.unlessExist && getFs().existsSync(this.keyToPath(key))) return false;
     this.writeFile(this.keyToPath(key), {
       encodedValue: coder.dump(entry.value),
       expiresAt: entry.expiresAt,
@@ -50,7 +51,8 @@ export class FileStore extends Store implements CacheStore {
     });
     return true;
   }
-  protected deleteEntry(key: string, _options: Record<string, unknown>): boolean {
+
+  protected deleteEntry(key: string, _options: StoreOptions): boolean {
     const filePath = this.keyToPath(key);
     try {
       if (getFs().existsSync(filePath)) {
@@ -59,11 +61,6 @@ export class FileStore extends Store implements CacheStore {
       }
     } catch {}
     return false;
-  }
-
-  private resolveKey(key: string, options?: CacheOptions): string {
-    const ns = options?.namespace ?? this.namespace;
-    return namespaceKey(String(key), ns);
   }
 
   private keyToPath(key: string): string {
@@ -98,86 +95,6 @@ export class FileStore extends Store implements CacheStore {
     const dir = getPath().dirname(filePath);
     getFs().mkdirSync(dir, { recursive: true });
     getFs().writeFileSync(filePath, JSON.stringify(entry), "utf-8");
-  }
-
-  override read(key: string, options?: CacheOptions): unknown {
-    const rk = this.resolveKey(key, options);
-    return this.instrument("read", rk, options, (payload) => {
-      const value = this.readValue(rk);
-      payload.hit = value !== MISS;
-      return value === MISS ? null : value;
-    });
-  }
-
-  // Decoded value, or MISS (so a cached null/undefined is not read as a miss).
-  private readValue(rk: string): unknown {
-    const filePath = this.keyToPath(rk);
-    const entry = this.readFile(filePath);
-    if (!entry) return MISS;
-    if (isExpired(entry)) {
-      try {
-        getFs().unlinkSync(filePath);
-      } catch {}
-      return MISS;
-    }
-    if (entry.encodedValue === undefined) return MISS; // old format, treat as miss
-    return coder.load(entry.encodedValue);
-  }
-
-  override write(key: string, value: unknown, options?: CacheOptions): boolean {
-    const rk = this.resolveKey(key, options);
-    return this.instrument("write", rk, options, () => this.storeFile(rk, value, options));
-  }
-
-  private storeFile(rk: string, value: unknown, options?: CacheOptions): boolean {
-    if (options?.unlessExist && this.readValue(rk) !== MISS) return false;
-
-    const expiresIn = options?.expiresIn ?? this.defaultExpiresIn;
-    const expiresAt = expiresIn != null ? Date.now() + expiresIn : null;
-    const entry: CacheEntry = {
-      encodedValue: coder.dump(value),
-      expiresAt,
-      version: options?.version != null ? String(options.version) : undefined,
-      accessedAt: Date.now(),
-    };
-    this.writeFile(this.keyToPath(rk), entry);
-    return true;
-  }
-
-  override delete(key: string, options?: CacheOptions): boolean {
-    const rk = this.resolveKey(key, options);
-    return this.instrument("delete", rk, options, () => this.deleteEntry(rk, {}));
-  }
-
-  override exist(key: string, options?: CacheOptions): boolean {
-    const rk = this.resolveKey(key, options);
-    return this.instrument("exist?", rk, undefined, () => this.readValue(rk) !== MISS);
-  }
-
-  override fetch(
-    key: string,
-    optionsOrFallback?: CacheOptions | ((key: string, opts: WriteOptions) => unknown),
-    maybeFallback?: (key: string, opts: WriteOptions) => unknown,
-  ): unknown {
-    let options: CacheOptions | undefined;
-    let fallback: ((key: string, opts: WriteOptions) => unknown) | undefined;
-
-    if (typeof optionsOrFallback === "function") {
-      fallback = optionsOrFallback;
-    } else {
-      options = optionsOrFallback;
-      fallback = maybeFallback;
-    }
-
-    const cached = this.read(key, options);
-    if (cached !== null) return cached;
-
-    if (fallback) {
-      const value = (fallback as () => unknown)();
-      this.write(key, value, options);
-      return value;
-    }
-    return null;
   }
 
   override clear(): void {
@@ -231,49 +148,6 @@ export class FileStore extends Store implements CacheStore {
     } catch {}
   }
 
-  override readMulti(...keys: [...string[], CacheOptions] | string[]): Record<string, unknown> {
-    const options = extractCacheOptions<CacheOptions>(keys as unknown[]);
-    const names = keys as string[];
-    const rkeys = names.map((n) => this.resolveKey(n, options));
-    return this.instrumentMulti("read_multi", rkeys, options, (payload) => {
-      const result: Record<string, unknown> = {};
-      for (const name of names) {
-        const value = this.readValue(this.resolveKey(name, options));
-        if (value !== MISS) result[name] = value;
-      }
-      payload.hits = Object.keys(result).map((n) => this.resolveKey(n, options));
-      return result;
-    });
-  }
-
-  override writeMulti(
-    hash: Record<string, unknown>,
-    options?: CacheOptions,
-  ): Record<string, unknown> {
-    if (Object.keys(hash).length === 0) return hash;
-    const normalizedHash: Record<string, unknown> = {};
-    for (const [name, value] of Object.entries(hash)) {
-      normalizedHash[this.resolveKey(name, options)] = value;
-    }
-    return this.instrumentMulti("write_multi", normalizedHash, options, () => {
-      for (const [name, value] of Object.entries(hash)) {
-        this.storeFile(this.resolveKey(name, options), value, options);
-      }
-      return normalizedHash;
-    });
-  }
-
-  override deleteMulti(names: string[], options?: CacheOptions): number {
-    const rkeys = names.map((k) => this.resolveKey(k, options));
-    return this.instrumentMulti("delete_multi", rkeys, options, () => {
-      let count = 0;
-      for (const rk of rkeys) {
-        if (this.deleteEntry(rk, {})) count++;
-      }
-      return count;
-    });
-  }
-
   override deleteMatched(pattern: string | RegExp): void {
     if (!getFs().existsSync(this.cacheDir)) return;
     const re = typeof pattern === "string" ? new RegExp(pattern) : pattern;
@@ -300,27 +174,35 @@ export class FileStore extends Store implements CacheStore {
     } catch {}
   }
 
-  override increment(key: string, amount = 1, options?: CacheOptions): number | null {
-    const rk = this.resolveKey(key, options);
-    return this.instrument("increment", rk, { amount }, () =>
-      this.modifyValue(rk, amount, options),
+  // Rails FileStore instruments increment/decrement with the normalized key
+  // (file_store.rb:62-64), unlike MemoryStore which uses the raw name.
+  override increment(name: string, amount = 1, options?: StoreOptions): number | null {
+    const merged = this.mergedOptions(options);
+    const key = this.normalizeKey(name, merged);
+    return this.instrument("increment", key, { amount }, () =>
+      this.modifyValue(key, amount, merged),
     );
   }
 
-  override decrement(key: string, amount = 1, options?: CacheOptions): number | null {
-    const rk = this.resolveKey(key, options);
-    return this.instrument("decrement", rk, { amount }, () =>
-      this.modifyValue(rk, -amount, options),
+  override decrement(name: string, amount = 1, options?: StoreOptions): number | null {
+    const merged = this.mergedOptions(options);
+    const key = this.normalizeKey(name, merged);
+    return this.instrument("decrement", key, { amount }, () =>
+      this.modifyValue(key, -amount, merged),
     );
   }
 
-  private modifyValue(rk: string, amount: number, options?: CacheOptions): number | null {
-    const current = this.readValue(rk);
-    if (current === MISS) return null;
-    const num = Number(current);
+  private modifyValue(key: string, amount: number, options: StoreOptions): number | null {
+    const entry = this.readEntry(key, options);
+    if (!entry || entry.isExpired()) return null;
+    const num = Number(entry.value);
     if (isNaN(num)) return null;
     const next = num + amount;
-    this.storeFile(rk, next, options);
+    this.writeEntry(
+      key,
+      new Entry(next, { expiresAt: entry.expiresAt, version: entry.version }),
+      options,
+    );
     return next;
   }
 }

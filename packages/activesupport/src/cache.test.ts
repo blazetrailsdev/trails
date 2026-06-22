@@ -286,7 +286,7 @@ describe("FileStoreTest", () => {
 
   beforeEach(() => {
     cacheDir = mkdtempSync(join(tmpdir(), "file-store-"));
-    store = new FileStore(cacheDir, { expiresIn: 60_000 });
+    store = new FileStore(cacheDir, { expiresIn: 60 });
   });
 
   afterEach(() => {
@@ -354,7 +354,7 @@ describe("FileStoreTest", () => {
   });
 
   it("expiry: entry not readable after expiresIn", async () => {
-    store.write("tmp", "value", { expiresIn: 10 });
+    store.write("tmp", "value", { expiresIn: 0.01 });
     await new Promise((r) => setTimeout(r, 20));
     expect(store.read("tmp")).toBeNull();
   });
