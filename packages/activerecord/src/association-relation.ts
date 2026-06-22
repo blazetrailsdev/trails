@@ -215,7 +215,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * way back, so accessing the inverse would re-query.
    */
   async toArray(): Promise<T[]> {
-    const records = await super.toArray();
     const owner = this._association.owner;
     const reflection = this._association.reflection;
     // Resolve the inverse association name via the registered Reflection,
@@ -251,8 +250,18 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
         _readAttribute: (n: string) => unknown;
       };
       const ownerPersisted = ownerRec.isPersisted?.() ?? true;
-      for (const r of records) {
-        const childRec = r as unknown as {
+      // Wire the inverse inside the instantiation block (mirrors Rails'
+      // `AssociationRelation#exec_queries` yielding `set_inverse_instance_from_queries`
+      // per record) so it lands BEFORE `preload_associations` runs. Wiring after
+      // the load would overwrite a nested preload: e.g. `author.posts.includes(author:
+      // :first_posts)` preloads `first_posts` onto a freshly-loaded author, then a
+      // post-load inverse pass would replace `post.author` with the bare owner, losing
+      // the preloaded `first_posts`. Wiring first makes the preloader see `post.author`
+      // already loaded (the owner) and populate `first_posts` on that same record.
+      const prevBlock = this._instantiateBlock;
+      this._instantiateBlock = (record: T): void => {
+        if (prevBlock) prevBlock(record);
+        const childRec = record as unknown as {
           isPersisted?: () => boolean;
           _readAttribute: (n: string) => unknown;
         };
@@ -270,10 +279,12 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
           // No reflection metadata → preserve prior behavior and wire.
           inversable = true;
         }
-        if (!inversable) continue;
-        _cacheSingularTarget(r as Base, inverseName, owner);
-      }
+        if (!inversable) return;
+        _cacheSingularTarget(record as Base, inverseName, owner);
+      };
     }
+
+    const records = await super.toArray();
 
     // Rails' `exec_queries` calls `set_strict_loading` for EVERY record
     // unconditionally — it propagates the owner's mode (which may be

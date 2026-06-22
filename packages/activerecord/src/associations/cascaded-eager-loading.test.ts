@@ -137,12 +137,15 @@ describe("CascadedEagerLoadingTest", () => {
     });
   });
 
-  it.skip("eager association loading with nil associations", () => {
-    // BLOCKED: includes/preload do not tolerate nil arguments.
-    // ROOT-CAUSE: Author.includes(nil) / includes([:posts, nil]) — Rails ignores
-    //   nil entries; trails' includesBang pushes them through and the preloader
-    //   raises `AssociationNotFoundError: Association named 'null'`.
-    //   Tracked: RFC 0030 story cascaded-eager-nil-and-proxy-preload-convergence.
+  it("eager association loading with nil associations", async () => {
+    let authors = await Author.includes(null).toArray();
+    expect(authors).toHaveLength(3);
+
+    authors = await Author.includes(["posts", null]).toArray();
+    expect(authors).toHaveLength(3);
+
+    authors = await Author.includes({ posts: null }).toArray();
+    expect(authors).toHaveLength(3);
   });
 
   it("eager association loading with cascaded two levels with two has many associations", async () => {
@@ -318,14 +321,17 @@ describe("CascadedEagerLoadingTest", () => {
     expect(catSum).toBe(3);
   });
 
-  it.skip("preloaded records are not duplicated", () => {
-    // BLOCKED: preload through an inverse_of parent does not populate the nested
-    //   association.
-    // ROOT-CAUSE: author.posts.includes(author: :first_posts) must equal
-    //   Post.where(author:).includes(author: :first_posts); trails returns 0 on
-    //   the proxy path because post.author inverse_of resolves to the cached
-    //   parent author without first_posts preloaded.
-    //   Tracked: RFC 0030 story cascaded-eager-nil-and-proxy-preload-convergence.
+  it("preloaded records are not duplicated", async () => {
+    const author = (await Author.first())!;
+    const expectedPosts = await Post.where({ author }).includes({ author: "firstPosts" }).toArray();
+    const expected = expectedPosts.map(
+      (post) => targetArr(target(post, "author")!, "firstPosts").length,
+    );
+    const actualPosts = await (author as any).posts.includes({ author: "firstPosts" }).toArray();
+    const actual = actualPosts.map(
+      (post: Base) => targetArr(target(post, "author")!, "firstPosts").length,
+    );
+    expect(actual).toEqual(expected);
   });
 
   it.skip("preloading across has one constrains loaded records", () => {
