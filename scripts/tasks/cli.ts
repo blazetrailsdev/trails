@@ -1696,7 +1696,7 @@ export function buildStoryContent(
   const body =
     opts.body != null
       ? `\n${opts.body.replace(/^\n+/, "").replace(/\n+$/, "")}\n`
-      : "\n## Context\n\n## Acceptance criteria\n";
+      : "\n## Context\n\n## Acceptance criteria\n\n## Definition of done\n\n## Verification\n";
   // Default to `draft` here, not `ready`: this pure generator has no view of the
   // parent RFC's status, and an unguarded `ready` would let a direct caller
   // produce an immediately-claimable story under a still-draft RFC. `newStory`

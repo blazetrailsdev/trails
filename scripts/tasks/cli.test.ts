@@ -1525,6 +1525,8 @@ describe("buildStoryContent", () => {
     expect(content).toContain(`claim: null`);
     expect(content).toContain(`## Context`);
     expect(content).toContain(`## Acceptance criteria`);
+    expect(content).toContain(`## Definition of done`);
+    expect(content).toContain(`## Verification`);
   });
 
   it("applies all flags", () => {
