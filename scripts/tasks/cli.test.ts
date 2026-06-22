@@ -1875,10 +1875,11 @@ describe("newStory status default", () => {
 
 // A mutator refusal (the post-pull re-check that fires when a concurrent agent
 // won the race) runs INSIDE commitAndPush's acquired tasks lock. It must release
-// the lock on the way out — each refusal throws (rather than process.exit) so the
-// throw unwinds through the mutator rollback and commitAndPush's `finally`. The
-// `pull` mock mutates the tree to recreate the concurrent-agent collision the
-// pre-flight check could not have seen, so the re-check inside the mutator fires.
+// the lock on the way out — each refusal throws MutatorEarlyExit (rather than
+// process.exit, which would skip the lock's `finally`), so commitAndPush releases
+// the lock before honoring the exit-4 race code. The `pull` mock mutates the tree
+// to recreate the concurrent-agent collision the pre-flight check could not have
+// seen, so the re-check inside the mutator fires.
 describe("mutator refusals release the shared lock (no process.exit leak)", () => {
   afterEach(() => __setLockDirForTest(null));
 
@@ -1915,8 +1916,9 @@ describe("mutator refusals release the shared lock (no process.exit leak)", () =
       if (label === "pull") writeFileSync(storyFile, "concurrent\n");
       return "" as never;
     });
-    expect(() => newStory("0005-gaps", "s", { allowEmpty: true }, dir)).toThrow(
-      /already exists \(created by concurrent agent\)/,
+    expect(() => newStory("0005-gaps", "s", { allowEmpty: true }, dir)).toThrow(/exit 4/);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/already exists \(created by concurrent agent\)/),
     );
     expect(existsSync(lockFile(lockDir))).toBe(false);
   });
@@ -1932,8 +1934,9 @@ describe("mutator refusals release the shared lock (no process.exit leak)", () =
       if (label === "pull") mkdirSync(rfcDir, { recursive: true });
       return "" as never;
     });
-    expect(() => newRfc("my-rfc", {}, dir)).toThrow(
-      /already exists \(created by concurrent agent\)/,
+    expect(() => newRfc("my-rfc", {}, dir)).toThrow(/exit 4/);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/already exists \(created by concurrent agent\)/),
     );
     expect(existsSync(lockFile(lockDir))).toBe(false);
   });
@@ -1953,7 +1956,8 @@ describe("mutator refusals release the shared lock (no process.exit leak)", () =
       if (label === "pull") rmSync(placeholder, { recursive: true, force: true });
       return "" as never;
     });
-    expect(() => finalize("0000-foo", false, dir)).toThrow(/no longer exists/);
+    expect(() => finalize("0000-foo", false, dir)).toThrow(/exit 4/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/no longer exists/));
     expect(existsSync(lockFile(lockDir))).toBe(false);
   });
 });
