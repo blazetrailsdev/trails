@@ -316,6 +316,10 @@ export class SchemaCache {
     if (this._primaryKeys.has(tableName)) return this._primaryKeys.get(tableName);
     const cols = this._columns.get(tableName);
     if (!cols) return undefined;
+    // Composite-PK ordering follows reflected column order. That matches the
+    // constraint order for the canonical fixtures; a table whose PK columns are
+    // declared out of column order would need the async `primaryKeys` query
+    // (which sorts by the constraint's key ordinal) to disambiguate.
     const pkCols = cols.filter((c) => c.primaryKey).map((c) => c.name);
     if (pkCols.length === 0) return undefined;
     return pkCols.length === 1 ? pkCols[0] : pkCols;
