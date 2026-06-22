@@ -21,21 +21,12 @@ import { readFile, stat } from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { describe, it, expect } from "vitest";
+// Reuse the rule's own namespace map + path mapping so this file-independent
+// check can never drift from the file-driven rule it backstops.
+import { PKG_NS, rubyToSrcRel } from "./rails-error-parity.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-
-// Mirrors PKG_NS in rails-error-parity.mjs: in-scope package → Ruby namespace.
-const PKG_NS = {
-  activerecord: "active_record/",
-  activemodel: "active_model/",
-  activesupport: "active_support/",
-};
-
-// Mirrors rubyToSrcRel in rails-error-parity.mjs.
-function rubyToSrcRel(rubyFile) {
-  return rubyFile.split("/").slice(1).join("/").replace(/\.rb$/, ".ts").replace(/_/g, "-");
-}
 
 function entryKey(e) {
   return `${e.package}::${e.rubyFile}::${e.name}`;

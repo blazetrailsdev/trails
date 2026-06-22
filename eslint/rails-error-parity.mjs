@@ -17,6 +17,11 @@
  * Pre-existing violators are grandfathered via the ratchet baseline
  * `eslint/rails-error-parity-exclude.json` (it only shrinks). Manifest:
  *   pnpm tsx scripts/build-rails-error-manifest.ts
+ *
+ * Blind spot: this check is file-driven, so a manifest class whose mapped home
+ * file does not exist yet (the feature is unported) is never linted and passes
+ * silently. `rails-error-parity-unported.test.mjs` backstops that gap from the
+ * manifest side, against the `rails-error-parity-unported.json` allowlist.
  */
 import fs from "fs";
 import path from "path";
@@ -54,7 +59,7 @@ const ROOT_BASES = new Set(
 // manifest entries whose rubyFile lives under this namespace map onto the
 // package's TS source tree — e.g. `arel/errors.rb` (Arel is vendored under
 // activerecord/lib) belongs to the arel package, not activerecord/errors.ts.
-const PKG_NS = {
+export const PKG_NS = {
   activerecord: "active_record/",
   activemodel: "active_model/",
   activesupport: "active_support/",
@@ -95,7 +100,7 @@ function repoRel(filename) {
  * `attribute-methods/serialization.ts` — without the `_`→`-` step the parity
  * check would silently match nothing for any nested scattered error file.
  */
-function rubyToSrcRel(rubyFile) {
+export function rubyToSrcRel(rubyFile) {
   const parts = rubyFile.split("/");
   const tail = parts.slice(1).join("/");
   return tail.replace(/\.rb$/, ".ts").replace(/_/g, "-");
