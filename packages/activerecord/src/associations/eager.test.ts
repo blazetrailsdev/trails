@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/eager_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   Base,
   registerModel,
@@ -11,6 +11,7 @@ import {
   EagerLoadPolymorphicError,
 } from "../index.js";
 import { association, loadHasMany, loadHasManyThrough } from "../associations.js";
+import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -26,6 +27,11 @@ import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
+import { Account } from "../test-helpers/models/account.js";
+import { Citation } from "../test-helpers/models/citation.js";
+import { Book } from "../test-helpers/models/book.js";
+import { ShardedBlog, ShardedBlogPost, ShardedComment } from "../test-helpers/models/sharded.js";
+import { captureSql } from "../testing/sql-capture.js";
 import { Project } from "../test-helpers/models/project.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
@@ -3277,16 +3283,6 @@ describe("EagerAssociationTest", () => {
     expect(count).toBe(2);
   });
 
-  it.skip("association loading notification", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("base messages", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("load with sti sharing association", async () => {
     class StiShareComment extends Base {
       static {
@@ -3315,11 +3311,6 @@ describe("EagerAssociationTest", () => {
     const loaded = (comments[0] as any)._preloadedAssociations.get("stiSharePost");
     expect(loaded).not.toBeNull();
     expect(loaded.title).toBe("T");
-  });
-  it.skip("dont create temporary active record instances", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
   it.skip("order on join table with include and limit", () => {
     // BLOCKED: associations — eager-loading feature gap
@@ -4300,11 +4291,6 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("preloading belongs_to association SQL", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it.skip("preloading has_many association associated by a composite query_constraints", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
@@ -4423,16 +4409,6 @@ describe("EagerAssociationTest", () => {
     expect(receipt.number).toBe("R001");
   });
 
-  it.skip("preloading too many ids", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("eager loading too many ids", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it.skip("eager with has one through join model with conditions on the through", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
@@ -4677,16 +4653,6 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("preload has one using primary key", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("include has one using primary key", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("preloading empty belongs to", async () => {
     // Rails: Client.create!(client_of: beyond_max_id) then preload(:firm) → nil firm
     class PebClient extends Base {
@@ -4838,15 +4804,84 @@ describe("EagerAssociationTest", () => {
 });
 
 describe("EagerLoadingTooManyIdsTest", () => {
-  it.skip("preloading too many ids", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  setupHandlerSuite();
+  // Mirrors the citations.yml fixture: 65536 rows (id 0..65535, book2_id i*i).
+  // The point of these tests is that preload/eager_load split an IN clause whose
+  // id list exceeds the adapter's bind-parameter limit, so the row count must be
+  // the real fixture size. The per-row reload in useHandlerFixtures is too slow
+  // at this scale, so seed via chunked insertAll (no reload) and clean up after.
+  const TOTAL = 65536;
+  beforeAll(async () => {
+    await defineSchema(
+      { citations: canonicalSchema.citations, books: canonicalSchema.books } as Schema,
+      { dropExisting: true },
+    );
+    registerModel(Citation);
+    registerModel(Book);
+    const rows: { id: number; book2_id: number }[] = [];
+    for (let i = 0; i < TOTAL; i++) rows.push({ id: i, book2_id: i * i });
+    for (let i = 0; i < rows.length; i += 5000) {
+      await Citation.insertAll(rows.slice(i, i + 5000));
+    }
+  }, 120_000);
+
+  afterAll(async () => {
+    await Base.connection.executeMutation("DELETE FROM citations");
   });
-  it.skip("eager loading too many ids", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+
+  it("preloading too many ids", async () => {
+    expect((await Citation.preload("referenceOf").toArray()).length).toBe(await Citation.count());
+  }, 30_000);
+
+  it("eager loading too many ids", async () => {
+    expect(await Citation.all().eagerLoad("citations").offset(0).size()).toBe(
+      await Citation.count(),
+    );
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (sharded composite-query_constraints fixtures) — preloading
+// `Sharded::BlogPost#comments` (a has_many keyed by [blog_id, blog_post_id]) must
+// emit a composite IN clause: `blog_id IN (...) AND blog_post_id IN (...)`. Same
+// describe name so test:compare matches the Rails `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { shardedBlogs } = useHandlerFixtures([
+    "shardedBlogs",
+    "shardedBlogPosts",
+    "shardedComments",
+  ]);
+  beforeAll(async () => {
+    await defineSchema(
+      {
+        sharded_blogs: canonicalSchema.sharded_blogs,
+        sharded_blog_posts: canonicalSchema.sharded_blog_posts,
+        sharded_comments: canonicalSchema.sharded_comments,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel("ShardedBlog", ShardedBlog);
+  registerModel("ShardedBlogPost", ShardedBlogPost);
+  registerModel("ShardedComment", ShardedComment);
+
+  it("preloading belongs_to association SQL", async () => {
+    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
+    const posts = ShardedBlogPost.where({ blog_id: blogIds }).includes("comments");
+
+    const sqls = await captureSql(async () => {
+      const loaded = (await posts.toArray()) as Base[];
+      const commentsCollection = loaded.map((p) =>
+        (p as any)._preloadedAssociations.get("comments"),
+      );
+      expect(commentsCollection.length).toBe(3);
+    });
+    const sql = sqls[sqls.length - 1];
+
+    expect(sql).toMatch(
+      /WHERE "sharded_comments"\."blog_id" IN \(.+\) AND "sharded_comments"\."blog_post_id" IN \(.+\)/,
+    );
   });
 });
 
@@ -4980,6 +5015,67 @@ describe("EagerAssociationTest", () => {
       .limit(5)
       .toArray();
     expect(developers).toHaveLength(3);
+  });
+
+  // Rails (eager_test.rb): mirrors the `messages_for` helper — subscribe to a
+  // notification, run the block, collect the events, then unsubscribe.
+  async function messagesFor(
+    name: string,
+    fn: () => Promise<void>,
+  ): Promise<Array<{ payload: Record<string, unknown> }>> {
+    const notifications: Array<{ payload: Record<string, unknown> }> = [];
+    const sub = Notifications.subscribe(name, (e) => {
+      notifications.push({ payload: e.payload });
+    });
+    try {
+      await fn();
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    return notifications;
+  }
+
+  it("association loading notification", async () => {
+    const notifications = await messagesFor("instantiation.active_record", async () => {
+      await Developer.all()
+        .includes("projects")
+        .where({ "developers_projects.access_level": 1 })
+        .limit(5)
+        .toArray();
+    });
+
+    const payload = notifications[0].payload;
+    const count = (
+      await Developer.all()
+        .includes("projects")
+        .where({ "developers_projects.access_level": 1 })
+        .limit(5)
+        .toArray()
+    ).length;
+
+    // eagerloaded row count should be greater than just developer count
+    expect(payload.record_count as number).toBeGreaterThan(count);
+    expect(payload.class_name).toBe(Developer.name);
+  });
+
+  it("base messages", async () => {
+    const notifications = await messagesFor("instantiation.active_record", async () => {
+      await Developer.all().toArray();
+    });
+    const payload = notifications[0].payload;
+
+    expect(payload.record_count).toBe((await Developer.all().toArray()).length);
+    expect(payload.class_name).toBe(Developer.name);
+  });
+
+  it("dont create temporary active record instances", async () => {
+    Developer.instanceCount = 0;
+    const developers = await Developer.all()
+      .includes("projects")
+      .where({ "developers_projects.access_level": 1 })
+      .limit(5)
+      .toArray();
+    expect(Developer.instanceCount).toBe(developers.length);
   });
 });
 
@@ -5432,6 +5528,55 @@ describe("EagerAssociationTest", () => {
     expect(firm.id).toBe(companies("first_firm").id);
     const clients = (await (firm as any).clients.toArray()) as Base[];
     expect(clients.map((c) => c.id)).toEqual([companies("first_client").id]);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (companies + accounts fixtures) — `has_one
+// :account_using_primary_key` keys Account.firm_id off Firm.firm_id (the
+// association's `primary_key: "firm_id"`), so eager/preloading it returns the
+// signals37 account for first_firm (firm_id 1). Same describe name so
+// test:compare matches the Rails `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { accounts } = useHandlerFixtures(["companies", "accounts"]);
+  beforeAll(async () => {
+    await defineSchema(
+      {
+        companies: canonicalSchema.companies,
+        accounts: canonicalSchema.accounts,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Company);
+  registerModel(Firm);
+  registerModel(Client);
+  registerModel(Account);
+
+  it("preload has one using primary key", async () => {
+    const expected = accounts("signals37");
+    const firm = (await Firm.all()
+      .includes("accountUsingPrimaryKey")
+      .order("companies.id")
+      .first()) as Firm;
+    await assertNoQueries(false, async () => {
+      const account = (firm as any).accountUsingPrimaryKey;
+      expect(account.id).toBe(expected.id);
+    });
+  });
+
+  it("include has one using primary key", async () => {
+    const expected = accounts("signals37");
+    const firms = await Firm.all()
+      .includes("accountUsingPrimaryKey")
+      .order("accounts.id")
+      .toArray();
+    const firm = firms.find((f) => f.id === 1)!;
+    await assertNoQueries(false, async () => {
+      const account = (firm as any).accountUsingPrimaryKey;
+      expect(account.id).toBe(expected.id);
+    });
   });
 });
 

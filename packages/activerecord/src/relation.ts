@@ -2843,10 +2843,19 @@ export class Relation<T extends Base> {
     const result = await this._conn().selectAll(sql, "SQL", eagerBinds);
     const rows = result.toArray();
 
-    const { parents, associations } = jd.instantiateFromRows(
-      rows,
-      this._isStrictLoading,
-      result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+    // Mirrors JoinDependency#instantiate: the instantiation notification's
+    // record_count is the raw JOIN result-set length (rows, including the
+    // duplicated parent rows), not the distinct-parent count.
+    const eagerPayload = { record_count: rows.length, class_name: this._modelClass.name };
+    const { parents, associations } = Notifications.instrument(
+      "instantiation.active_record",
+      eagerPayload,
+      () =>
+        jd.instantiateFromRows(
+          rows,
+          this._isStrictLoading,
+          result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+        ),
     );
 
     const inverseMap = new Map<string, string | undefined>();
