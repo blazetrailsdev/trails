@@ -259,8 +259,9 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
 }
 
 export function currentTimeFromProperTimezone(): Temporal.Instant {
-  // Mirrors Rails' Timestamp#current_time_from_proper_timezone → Time.current,
-  // which honors ActiveSupport time travel (travel/travelTo/freezeTime).
+  // Mirrors Rails' Timestamp#current_time_from_proper_timezone, which reads
+  // Time.now(.utc) — stubbed by ActiveSupport's TimeHelpers so it honors
+  // travel/travelTo/freezeTime. currentTimeInstant() is the trails equivalent.
   return currentTimeInstant();
 }
 
