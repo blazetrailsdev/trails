@@ -182,6 +182,27 @@ describe("CacheStoreRaceConditionTtlTest", () => {
     const result = store.fetch("foo", { raceConditionTtl: 0.05 }, () => "regen");
     expect(result).toBe("regen");
   });
+
+  // Inherited Store#fetch_multi routes through the readEntry hook, which must
+  // reconstruct the stored expiry so an expired entry is a miss + regenerate
+  // (cache.rb read_multi_entries -> read_entry). Without expiry round-trip the
+  // reconstructed Entry would look fresh and serve stale data.
+  it("fetch_multi honors entry expiration", async () => {
+    store.write("foo", "old", { expiresIn: 0.02 });
+    await new Promise((r) => setTimeout(r, 40));
+    const result = store.fetchMulti("foo", "bar", (key) => `${key}-generated`);
+    expect(result).toEqual({ foo: "foo-generated", bar: "bar-generated" });
+    expect(store.read("foo")).toBe("foo-generated");
+  });
+
+  // The persisted version must round-trip through readEntry so the inherited
+  // readMultiEntries' isMismatched check fires (cache.rb), making a version
+  // mismatch a miss + regenerate.
+  it("fetch_multi honors version mismatch", () => {
+    store.write("foo", "old", { version: "v1" });
+    const result = store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);
+    expect(result).toEqual({ foo: "foo-generated" });
+  });
 });
 
 describe("MemoryStore coder fidelity", () => {

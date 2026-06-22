@@ -12,6 +12,7 @@ export interface CacheEntry {
   encodedValue: string;
   expiresAt: number | null; // timestamp ms, null = no expiry
   accessedAt: number;
+  version?: string | null; // Rails Entry version for isMismatched checks; undefined when no version supplied
 }
 
 /** @internal */

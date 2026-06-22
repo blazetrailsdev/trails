@@ -1,6 +1,7 @@
 import { getFs, getPath } from "../fs-adapter.js";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
+import { DeserializationError } from "./deserialization-error.js";
 import { Entry } from "./entry.js";
 import { Store, type WriteOptions } from "./store.js";
 import { type CacheEntry, namespaceKey, isExpired, extractCacheOptions } from "./entry-record.js";
@@ -21,14 +22,30 @@ export class FileStore extends Store implements CacheStore {
   }
 
   // Abstract entry hooks of the instrumented Store base, backed by on-disk records.
+  // Round-trip the stored expiry and version so base methods routed through these
+  // hooks (e.g. the inherited fetchMulti/readMultiEntries) see a faithful Entry
+  // and can apply isExpired()/isMismatched() like Rails read_entry. Read the raw
+  // record rather than readValue() — the base layer owns the expired-entry
+  // decision when called via these hooks. A malformed payload degrades to a miss,
+  // mirroring Rails deserialize_entry's rescue (cache.rb) so fetchMulti behaves
+  // like the single-key read/fetch paths.
   protected readEntry(key: string, _options: Record<string, unknown>): Entry | null {
-    const value = this.readValue(key);
-    return value === MISS ? null : new Entry(value);
+    const stored = this.readFile(this.keyToPath(key));
+    if (!stored || stored.encodedValue === undefined) return null;
+    let value: unknown;
+    try {
+      value = coder.load(stored.encodedValue);
+    } catch (e) {
+      if (e instanceof DeserializationError) return null;
+      throw e;
+    }
+    return new Entry(value, { expiresAt: stored.expiresAt, version: stored.version ?? null });
   }
   protected writeEntry(key: string, entry: Entry, _options: Record<string, unknown>): boolean {
     this.writeFile(this.keyToPath(key), {
       encodedValue: coder.dump(entry.value),
       expiresAt: entry.expiresAt,
+      version: entry.version,
       accessedAt: Date.now(),
     });
     return true;
@@ -120,6 +137,7 @@ export class FileStore extends Store implements CacheStore {
     const entry: CacheEntry = {
       encodedValue: coder.dump(value),
       expiresAt,
+      version: options?.version != null ? String(options.version) : undefined,
       accessedAt: Date.now(),
     };
     this.writeFile(this.keyToPath(rk), entry);
