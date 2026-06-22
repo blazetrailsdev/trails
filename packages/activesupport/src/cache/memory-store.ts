@@ -130,10 +130,12 @@ export class MemoryStore extends Store implements CacheStore {
       return amount;
     }
     const num = toI(entry.value) + amount;
+    // Rails calls `write_entry(key, entry)` with no options (memory_store.rb:255),
+    // so `unless_exist` never suppresses the hit-path rewrite; pass `{}` to match.
     this.writeEntry(
       key,
       new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
-      merged,
+      {},
     );
     return num;
   }
