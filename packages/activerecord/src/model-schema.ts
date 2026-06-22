@@ -811,11 +811,11 @@ export function loadSchema(this: SchemaHost): void {
   // (the synthesize fallback below builds its `columnsHash` from declared
   // attributes). A partially-declared model that still lacks a typed
   // primary-key def must NOT mark the load terminal: the implicit PK got no
-  // registered type, so `_castAttributeValue` would fall through to `parseInt`
-  // (→ number) while the read path deserializes the live int8 PK to BigInt on
-  // PG — input-cast and read diverge. Leaving `_schemaLoaded` unset lets the
-  // next load (at instantiate, after the find SELECT has warmed the schema
-  // cache) reflect the real PK type.
+  // registered type, so `_castAttributeValue` would return the raw string id
+  // while the read path deserializes the live int8 PK to BigInt on PG —
+  // input-cast and read diverge. Leaving `_schemaLoaded` unset lets the next
+  // load (at instantiate, after the find SELECT has warmed the schema cache)
+  // reflect the real PK type.
   let pkStillMissing = false;
   if (workHost._attributeDefinitions.size > 0) {
     const pks = Array.isArray(workHost.primaryKey)
