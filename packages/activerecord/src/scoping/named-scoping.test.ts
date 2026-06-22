@@ -557,13 +557,13 @@ describe("NamedScopingTest", () => {
   it.skip("scopes are cached on associations", () => {});
   it.skip("scopes with arguments are cached on associations", () => {});
 
-  // The canonical Comment now carries Rails' `newest` scope
-  // (`order("id DESC").first`), but this case asserts that
-  // `post.comments.newest` returns the SAME (cached) record after a
-  // `post.comments.create` until `post.reload` — i.e. it depends on association
-  // scope-result caching (see "scopes are cached on associations"), which
-  // trails does not implement: each `post.comments.newest()` rebuilds a fresh
-  // relation and re-queries, so the post-create call returns the new comment.
+  // Rails' `newest` is a `comments` association-extension method on Post
+  // (`has_many :comments do def newest; created.last; end end`,
+  // post.rb:80-82), body `created.last` — NOT a Comment scope. Beyond needing
+  // that association-block extension, this case asserts `post.comments.newest`
+  // returns the SAME (cached) record after a `post.comments.create` until
+  // `post.reload` — i.e. it depends on association scope-result caching (see
+  // "scopes are cached on associations"), which trails does not implement.
   // Tracked with the association scope-cache work in RFC 0030.
   it.skip("scopes to get newest", () => {});
 
