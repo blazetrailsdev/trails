@@ -861,20 +861,12 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
     );
   }
 
-  const { adapterName, connectUrl } = deriveAdapterAndUrl(dbConfig);
-  if (!adapterName) {
-    throw new AdapterNotSpecified(
-      `Database configuration for "${env}" must include an adapter name or a URL. ` +
-        `Add config/database.json, set DATABASE_URL, or call ${modelClass.name}.establishConnection(url)`,
-    );
-  }
-
-  await establishWithConfig(
-    modelClass,
-    adapterName,
-    connectUrl,
-    dbConfig.configuration as Record<string, unknown>,
-  );
+  // Rails has no separate no-arg path: `config_or_env ||= DEFAULT_ENV` then the
+  // same `resolve_config_for_connection` funnel (connection_handling.rb:50-53).
+  // The looked-up DatabaseConfig is handed straight to the shared object funnel
+  // — adapter/url derivation and the handler call live in establishWithDbConfig
+  // — instead of re-deriving and rebuilding a fresh config here.
+  await establishWithDbConfig(modelClass, dbConfig);
 }
 
 async function loadConfigFile(modelClass: typeof Base): Promise<RawConfigurations> {
