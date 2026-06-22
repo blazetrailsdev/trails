@@ -1428,7 +1428,7 @@ export class Table {
     return this._require("isCheckConstraintExists").call(this._schema, this._tableName, options);
   }
 
-  async primaryKey(): Promise<string | null> {
+  async primaryKey(): Promise<string | string[] | null> {
     return this._require("primaryKey").call(this._schema, this._tableName);
   }
 
@@ -1533,5 +1533,5 @@ export interface SchemaStatementsLike {
     options?: Record<string, unknown>,
   ): Promise<void>;
   isCheckConstraintExists?(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
-  primaryKey?(tableName: string): Promise<string | null>;
+  primaryKey?(tableName: string): Promise<string | string[] | null>;
 }
