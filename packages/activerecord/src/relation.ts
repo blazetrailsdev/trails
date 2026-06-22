@@ -9,7 +9,7 @@ import {
   DeleteManager,
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { withQueryConnection } from "./connection-handling.js";
+import { withQueryConnection, currentQueryConnection } from "./connection-handling.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import {
   ActiveRecordError,
@@ -668,8 +668,8 @@ export class Relation<T extends Base> {
       }
       const cloned = rel._clone();
       const ownerTable = (rel._modelClass as any).tableName;
-      const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
-      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
+      const quoteTable = (n: string) => (rel._conn() as any).quoteTableName(n);
+      const aliasLength = (rel._conn() as any).tableAliasLength();
       const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
       let effectiveTable = target.table;
       for (const join of target.joins) {
@@ -716,8 +716,8 @@ export class Relation<T extends Base> {
       }
       const cloned = rel._clone();
       const ownerTable = (rel._modelClass as any).tableName;
-      const quoteTable = (n: string) => (rel._modelClass as any).connection.quoteTableName(n);
-      const aliasLength = (rel._modelClass as any).connection.tableAliasLength();
+      const quoteTable = (n: string) => (rel._conn() as any).quoteTableName(n);
+      const aliasLength = (rel._conn() as any).tableAliasLength();
       const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
       let effectiveTable = target.table;
       for (const join of target.joins) {
@@ -798,12 +798,7 @@ export class Relation<T extends Base> {
     const manualJoins = this._joinValues.map((v) =>
       typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v,
     );
-    const tracker = new AliasTracker(
-      aliasLength,
-      undefined,
-      manualJoins,
-      (this._modelClass as any).connection,
-    );
+    const tracker = new AliasTracker(aliasLength, undefined, manualJoins, this._conn() as any);
     const ownerTable = (this._modelClass as any).tableName;
     const jdJoins: Array<{ table: string; assoc: string }> = [];
 
@@ -1311,7 +1306,7 @@ export class Relation<T extends Base> {
     // Arel nodes are passed through untouched.
     let orderMatcher: RegExp | undefined;
     try {
-      orderMatcher = resolveColumnNameWithOrderMatcher(this._modelClass.connection);
+      orderMatcher = resolveColumnNameWithOrderMatcher(this._conn());
     } catch {
       orderMatcher = abstractColumnNameWithOrderMatcher();
     }
@@ -1406,7 +1401,7 @@ export class Relation<T extends Base> {
     const parts: string[] = [];
     parts.push(`${this._modelClass.name}.all`);
     if (!this._whereClause.isEmpty()) {
-      const sql = _whereClauseToSql(this._whereClause, (this._modelClass as any).connection);
+      const sql = _whereClauseToSql(this._whereClause, this._conn() as any);
       if (sql) parts.push(`.where(${JSON.stringify(sql)})`);
     }
     if (this._orderClauses.length > 0) {
@@ -2562,11 +2557,12 @@ export class Relation<T extends Base> {
       return this._loadAsyncPromise;
     }
     // Run the query inside `with_connection` so the pool releases the connection
-    // afterwards instead of holding it permanently. `preventPermanentCheckout`
-    // neutralizes the deprecated `_modelClass.connection` reads on the build /
-    // execute path (they resolve to the already-checked-out connection) under
-    // `permanent_connection_checkout = :deprecated | :disallowed`. Mirrors Rails,
-    // whose read paths run inside `with_connection`.
+    // afterwards instead of holding it permanently. The build / execute path
+    // reads the threaded connection via `_conn()` (see {@link withQueryConnection})
+    // rather than the deprecated `.connection` getter, so it never flips the lease
+    // permanent under `permanent_connection_checkout = :deprecated | :disallowed`.
+    // Mirrors Rails, whose read paths run inside `with_connection` and thread the
+    // yielded connection.
     return this._withQueryConnection(() => this._toArrayInner());
   }
 
@@ -2602,7 +2598,7 @@ export class Relation<T extends Base> {
       // visitor's collector here would be wrong: from(ArelNode) recompiles and
       // resets it, and set operations compile each side separately.
       const allowRetry = this._setOperation ? false : this._lastSelectRetryable;
-      const result = await this._modelClass.connection.selectAll(
+      const result = await this._conn().selectAll(
         sql,
         `${this._modelClass.name} Load`,
         this._lastSelectBinds,
@@ -2793,12 +2789,9 @@ export class Relation<T extends Base> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
     if (this._eagerLoadBypassesJoinDependency()) {
       const sql = this._toSql();
-      const result = await this._modelClass.connection.selectAll(
-        sql,
-        "Eager Load",
-        this._lastSelectBinds,
-        { preparable: this._lastSelectPreparable },
-      );
+      const result = await this._conn().selectAll(sql, "Eager Load", this._lastSelectBinds, {
+        preparable: this._lastSelectPreparable,
+      });
       this._records = this._instrumentInstantiation(
         result.toArray(),
         result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
@@ -2819,7 +2812,7 @@ export class Relation<T extends Base> {
       const sql = this._toSql();
       // selectAll (not execute) so the adapter-reported column_types cast
       // extra/computed select columns, matching the JOIN and plain load paths.
-      const result = await this._modelClass.connection.selectAll(sql, "SQL", this._lastSelectBinds);
+      const result = await this._conn().selectAll(sql, "SQL", this._lastSelectBinds);
       this._records = this._instrumentInstantiation(
         result.toArray(),
         result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
@@ -2857,7 +2850,7 @@ export class Relation<T extends Base> {
     // column_types are available to type-cast extra/computed `select` columns
     // hydrated onto the base record — mirroring Rails' JoinDependency#instantiate,
     // which slices `result_set.column_types`.
-    const result = await this._modelClass.connection.selectAll(sql, "SQL", eagerBinds);
+    const result = await this._conn().selectAll(sql, "SQL", eagerBinds);
     const rows = result.toArray();
 
     const { parents, associations } = jd.instantiateFromRows(
@@ -3008,7 +3001,7 @@ export class Relation<T extends Base> {
     queries: [string, unknown[]][],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const adapter = this._modelClass.connection;
+    const adapter = this._conn();
     if (typeof adapter?.explain !== "function") {
       return "EXPLAIN not supported by this adapter";
     }
@@ -3070,7 +3063,7 @@ export class Relation<T extends Base> {
         // happens to implement `typeCast`, and nothing we ship does
         // without it.
         throw new Error(
-          `Relation#explain: adapter ${this._modelClass.connection.adapterName} does not implement typeCast()`,
+          `Relation#explain: adapter ${this._conn().adapterName} does not implement typeCast()`,
         );
       }
       return this._normalizeExplainBindValue(adapter.typeCast(b));
@@ -3414,7 +3407,7 @@ export class Relation<T extends Base> {
     // to the adapter's generic "SQL" default.
     const [existsSql, existsBinds] = rel._compileAstWithBinds(manager.ast);
     const rows = await rel._withQueryConnection(() =>
-      rel._modelClass.connection.execute(existsSql, existsBinds, `${rel._modelClass.name} Exists?`),
+      rel._conn().execute(existsSql, existsBinds, `${rel._modelClass.name} Exists?`),
     );
     return rows.length > 0;
   }
@@ -3583,7 +3576,7 @@ export class Relation<T extends Base> {
     // rather than column_name_with_order_matcher (which is stricter, for order).
     const stringColumns = columns.filter((c): c is string => typeof c === "string");
     if (stringColumns.length > 0) {
-      disallowRawSqlBang(stringColumns, resolveColumnNameMatcher(this._modelClass.connection));
+      disallowRawSqlBang(stringColumns, resolveColumnNameMatcher(this._conn()));
     }
 
     const table = this._modelClass.arelTable;
@@ -3645,7 +3638,7 @@ export class Relation<T extends Base> {
     this._applyCtesAndAnnotationsToManager(manager);
 
     const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
-    const result = await this._modelClass.connection.selectAll(
+    const result = await this._conn().selectAll(
       pluckSql,
       `${this._modelClass.name} Pluck`,
       pluckBinds,
@@ -3730,7 +3723,7 @@ export class Relation<T extends Base> {
     }
 
     const [updateSql, updateBinds] = this._compileAstWithBinds(stmtAst);
-    const count = await this._modelClass.connection.execUpdate(
+    const count = await this._conn().execUpdate(
       updateSql,
       `${this._modelClass.name} Update All`,
       updateBinds,
@@ -3820,7 +3813,7 @@ export class Relation<T extends Base> {
     }
 
     const [deleteSql, deleteBinds] = this._compileAstWithBinds(stmtAst);
-    const count = await this._modelClass.connection.execDelete(
+    const count = await this._conn().execDelete(
       deleteSql,
       `${this._modelClass.name} Delete All`,
       deleteBinds,
@@ -3860,7 +3853,7 @@ export class Relation<T extends Base> {
     }
 
     const [touchSql, touchBinds] = this._compileAstWithBinds(um.ast);
-    return this._modelClass.connection.executeMutation(touchSql, touchBinds);
+    return this._conn().executeMutation(touchSql, touchBinds);
   }
 
   /**
@@ -4560,12 +4553,12 @@ export class Relation<T extends Base> {
    * unconditionally (it never branches on `preparedStatements`), so the scope is
    * kept only for parity should `toSql` later adopt Rails' flag-driven
    * `collector` dispatch. There is exactly one render path: like Rails'
-   * `with_connection`, `_modelClass.connection` always yields a real connection
+   * `with_connection`, `_conn()` always yields a real connection
    * (raising `ConnectionNotEstablished` when none is configured, as Rails does),
    * never a quoter stand-in.
    */
   private _toSqlViaConnection(node: Nodes.Node): string {
-    const adapter = this._modelClass.connection;
+    const adapter = this._conn();
     const wasPrepared = adapter.preparedStatements;
     adapter.preparedStatements = false;
     try {
@@ -4789,7 +4782,7 @@ export class Relation<T extends Base> {
     const [idSql, idBinds] = this._compileAstWithBinds(
       this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
     );
-    const idRows = await this._modelClass.connection.execute(idSql, idBinds);
+    const idRows = await this._conn().execute(idSql, idBinds);
     return idRows.map((row) => row[basePk] ?? Object.values(row).pop());
   }
 
@@ -4812,7 +4805,7 @@ export class Relation<T extends Base> {
     // inlining needed) and hand the rendered text to the adapter's string
     // `columns_for_distinct`.
     const pkSql = this._arelVisitor().compile(table.get(basePk));
-    const adapter = this._modelClass.connection as unknown as {
+    const adapter = this._conn() as unknown as {
       columnsForDistinct?: (cols: string, orders: (string | Nodes.Node)[]) => string | string[];
     };
     // Qualify a bare known-column order to the base table (mirroring
@@ -4959,10 +4952,21 @@ export class Relation<T extends Base> {
     return withQueryConnection(this._modelClass as unknown as typeof Base, run);
   }
 
-  /** Resolve the connection through the public getter, returning null for HABTM join models with no established connection. */
+  /**
+   * The connection for internal query execution: the one threaded by the
+   * enclosing `withQueryConnection` wrap when present, else the model's public
+   * `.connection`. Mirrors Rails threading the `with_connection` block parameter
+   * so internal reads don't re-lease via the deprecated `.connection` getter.
+   * @internal
+   */
+  private _conn(): DatabaseAdapter {
+    return currentQueryConnection() ?? this._modelClass.connection;
+  }
+
+  /** Resolve the connection through {@link _conn}, returning null for HABTM join models with no established connection. */
   private _resolveAdapter(): DatabaseAdapter | null {
     try {
-      return this._modelClass.connection;
+      return this._conn();
     } catch (e) {
       if (e instanceof ConnectionNotEstablished) return null;
       throw e;
@@ -5179,7 +5183,7 @@ export class Relation<T extends Base> {
    */
   private _quoteBareColumn(name: string): string {
     if (this._selectVisitor() !== null) {
-      return this._modelClass.connection.quoteColumnName(name);
+      return this._conn().quoteColumnName(name);
     }
     return `"${name.replace(/"/g, '""')}"`;
   }
@@ -5764,7 +5768,7 @@ export class Relation<T extends Base> {
     // Only a finder-type-condition class has a non-empty unscoped baseline; for
     // anything else a non-empty WHERE means a real, non-empty scope.
     if (!klass.isFinderNeedsTypeCondition?.()) return false;
-    const connection = klass.connection;
+    const connection = this._conn();
     if (!connection?.toSql) return false;
     // Build the baseline against this relation's own table so an alias-qualified
     // relation compares its type_condition against an identically-qualified one
@@ -6049,7 +6053,7 @@ export class Relation<T extends Base> {
           subColumn.maximum().as("timestamp"),
         );
         const [outerSql] = this._compileAstWithBinds(outerManager.ast);
-        const rows = await this._modelClass.connection.execute(outerSql, innerBinds);
+        const rows = await this._conn().execute(outerSql, innerBinds);
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       } else {
@@ -6057,10 +6061,7 @@ export class Relation<T extends Base> {
         query._orderClauses = [];
         query._rawOrderClauses = [];
         query._selectColumns = [countStar.as("size"), maxNode.as("timestamp")];
-        const rows = await this._modelClass.connection.execute(
-          query._toSql(),
-          query._lastSelectBinds,
-        );
+        const rows = await this._conn().execute(query._toSql(), query._lastSelectBinds);
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       }
@@ -6260,7 +6261,7 @@ export class Relation<T extends Base> {
   private async execMainQuery(): Promise<Record<string, unknown>[]> {
     if (this._isNone) return [];
     const sql = this._toSql();
-    const result = await this._modelClass.connection.execute(sql, this._lastSelectBinds);
+    const result = await this._conn().execute(sql, this._lastSelectBinds);
     return result;
   }
 

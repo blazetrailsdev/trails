@@ -3069,6 +3069,10 @@ export class Base extends Model {
 
   private _performInsert(): void {
     const ctor = this.constructor as typeof Base;
+    // Use the connection threaded by the enclosing `withQueryConnection` wrap
+    // (Rails' `with_connection` block parameter) rather than the deprecated
+    // `.connection` getter, so the INSERT doesn't flip the lease permanent.
+    const adapter = ConnectionHandling.currentQueryConnection() ?? ctor.connection;
 
     // If suppressed, skip the actual insert but update record state
     if (_isSuppressed(ctor)) {
@@ -3120,8 +3124,8 @@ export class Base extends Model {
     let sql: string;
     let insertBinds: unknown[] = [];
     if (columns.length === 0) {
-      const emptyValue = ctor.connection.emptyInsertStatementValue();
-      sql = `INSERT INTO ${ctor.connection.quoteTableName(table.name)} ${emptyValue}`;
+      const emptyValue = adapter.emptyInsertStatementValue();
+      sql = `INSERT INTO ${adapter.quoteTableName(table.name)} ${emptyValue}`;
     } else {
       const im = new InsertManager(table);
       const insertValues: [InstanceType<typeof Nodes.Node>, unknown][] = columns.map((c, i) => {
@@ -3146,7 +3150,7 @@ export class Base extends Model {
         return [table.get(c), val];
       });
       im.insert(insertValues);
-      [sql, insertBinds] = ctor.connection.toSqlAndBinds(im);
+      [sql, insertBinds] = adapter.toSqlAndBinds(im);
     }
     // The single value scalar adapters surface on INSERT (SQLite's
     // lastInsertRowid, MySQL's insertId, or the adapter's default `RETURNING id`)
@@ -3180,9 +3184,9 @@ export class Base extends Model {
       if (
         autoIncColumn === undefined &&
         !insertCols.some((c) => typeof c.isAutoIncrementedByDb === "function") &&
-        typeof (ctor.connection as any).columns === "function"
+        typeof (adapter as any).columns === "function"
       ) {
-        const reflectedCols = (await (ctor.connection as any).columns(ctor.tableName)) as {
+        const reflectedCols = (await (adapter as any).columns(ctor.tableName)) as {
           name: string;
           isAutoIncrementedByDb?(): boolean;
         }[];
@@ -3238,7 +3242,7 @@ export class Base extends Model {
         : ctor.primaryKey && colNames.has(ctor.primaryKey)
           ? ctor.primaryKey
           : false;
-      const rawId = await ctor.connection.execInsert(
+      const rawId = await adapter.execInsert(
         sql,
         `${ctor.name} Create`,
         insertBinds,
@@ -3252,8 +3256,8 @@ export class Base extends Model {
       // generated value.
       const isResult = rawId !== null && typeof rawId === "object" && "rows" in rawId;
       const insertedId =
-        isResult && typeof (ctor.connection as any).lastInsertedId === "function"
-          ? (ctor.connection as any).lastInsertedId(rawId)
+        isResult && typeof (adapter as any).lastInsertedId === "function"
+          ? (adapter as any).lastInsertedId(rawId)
           : rawId;
       if (insertedId != null) {
         // Write the generated value into the first still-unset target (the
@@ -3289,6 +3293,9 @@ export class Base extends Model {
 
   private _performUpdate(): void {
     const ctor = this.constructor as typeof Base;
+    // Thread the `withQueryConnection` connection rather than the deprecated
+    // `.connection` getter (see `_performInsert`).
+    const adapter = ConnectionHandling.currentQueryConnection() ?? ctor.connection;
 
     // If suppressed, skip the actual update
     if (_isSuppressed(ctor)) {
@@ -3391,8 +3398,8 @@ export class Base extends Model {
     }
     _Persistence.applyDefaultAndGlobalConstraints(um as any, ctor);
 
-    const [updateSql, updateBinds] = ctor.connection.toSqlAndBinds(um);
-    this._pendingOperation = ctor.connection
+    const [updateSql, updateBinds] = adapter.toSqlAndBinds(um);
+    this._pendingOperation = adapter
       .execUpdate(updateSql, `${ctor.name} Update`, updateBinds)
       .then((affected) => {
         if (ctor.lockingEnabled && affected === 0) {
@@ -3431,6 +3438,9 @@ export class Base extends Model {
    */
   private async _destroyRow(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
+    // Thread the `withQueryConnection` connection rather than the deprecated
+    // `.connection` getter (see `_performInsert`).
+    const adapter = ConnectionHandling.currentQueryConnection() ?? ctor.connection;
 
     let didDelete = false;
     const destroyResult = await cbRunAll(ctor.prototype, "destroy", this, async () => {
@@ -3471,12 +3481,8 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
-        const [deleteSql, deleteBinds] = ctor.connection.toSqlAndBinds(dm);
-        const affected = await ctor.connection.execDelete(
-          deleteSql,
-          `${ctor.name} Destroy`,
-          deleteBinds,
-        );
+        const [deleteSql, deleteBinds] = adapter.toSqlAndBinds(dm);
+        const affected = await adapter.execDelete(deleteSql, `${ctor.name} Destroy`, deleteBinds);
         if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }

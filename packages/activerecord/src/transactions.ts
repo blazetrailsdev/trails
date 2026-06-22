@@ -14,7 +14,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Rollback } from "./errors.js";
 export { Rollback };
-import { withQueryConnection } from "./connection-handling.js";
+import { withQueryConnection, currentQueryConnection } from "./connection-handling.js";
 
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
@@ -84,13 +84,14 @@ export async function transaction<T>(
   }
 
   // Mirrors Rails `ActiveRecord::Transactions::ClassMethods#transaction`, which
-  // runs inside `with_connection { |c| c.transaction(...) }`. `preventPermanentCheckout`
-  // ensures the deprecated `.connection` reads on the build/callback path return
-  // the already-checked-out connection instead of flipping the lease to permanent
-  // under `permanent_connection_checkout = :deprecated | :disallowed`, so the
-  // pool releases the connection once the transaction completes.
+  // runs inside `with_connection { |c| c.transaction(...) }` and threads the
+  // yielded connection. Reading `currentQueryConnection()` (the threaded
+  // connection) instead of the deprecated `.connection` getter keeps the build/
+  // callback path from flipping the lease permanent under
+  // `permanent_connection_checkout = :deprecated | :disallowed`, so the pool
+  // releases the connection once the transaction completes.
   return withQueryConnection(modelClass, async () => {
-    const adapter = modelClass.connection;
+    const adapter = currentQueryConnection() ?? modelClass.connection;
 
     const result = await dbTransaction.call(
       adapter as any,
@@ -561,10 +562,12 @@ export async function withTransactionReturningStatus<T>(
 
   // Wrap in `with_connection` so the `ensure_finalize` connection probe and the
   // nested transaction don't permanently lease a connection under
-  // `permanent_connection_checkout = :deprecated | :disallowed`.
+  // `permanent_connection_checkout = :deprecated | :disallowed`. The yielded
+  // connection is threaded via `currentQueryConnection()` rather than re-read
+  // off the deprecated `.connection` getter (matching Rails' block parameter).
   await withQueryConnection(modelClass, async () => {
     // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-    const adapter = modelClass.connection;
+    const adapter = currentQueryConnection() ?? modelClass.connection;
     const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
 
     await transaction(modelClass, async () => {
@@ -683,8 +686,10 @@ export function isTransactionIncludeAnyAction(this: Base, actions: string[]): bo
 export async function addToTransaction(this: Base, ensureFinalize = true): Promise<void> {
   const ctor = this.constructor as any;
   // We're always called from within a transaction, so the adapter IS the
-  // current connection — no need to go through withConnection.
-  ctor.connection?.addTransactionRecord?.(this, ensureFinalize);
+  // current connection — use the threaded connection rather than the deprecated
+  // `.connection` getter so we don't flip the lease permanent.
+  const adapter = currentQueryConnection() ?? ctor.connection;
+  adapter?.addTransactionRecord?.(this, ensureFinalize);
 }
 
 // Mirrors: ActiveRecord::Transactions#has_transactional_callbacks?
