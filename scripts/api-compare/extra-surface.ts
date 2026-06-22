@@ -121,6 +121,12 @@ const TS_ALWAYS_ALLOWED = new Set([
  * `groupValues`, …) look novel. This is the camelized `*Value`/`*Values` form
  * of every entry in `MULTI_VALUE_METHODS + SINGLE_VALUE_METHODS +
  * CLAUSE_METHODS`.
+ *
+ * NOTE: unlike `class_attribute`/`alias`/`delegate` (now captured by the Ruby
+ * extractor), this loop's `_value`/`_values`/`_clause` suffix is chosen by a
+ * `case … when *MULTI_VALUE_METHODS` over constants in a *different* file
+ * (`relation.rb`), so the extractor can't model it yet — see RFC 0025 story
+ * `extractor-capture-enumerable-metaprogrammed-surface`. Keep until then.
  */
 const RAILS_RELATION_VALUE_METHODS = new Set([
   "annotateValue",
@@ -188,6 +194,11 @@ const RAILS_RELATION_VALUE_METHODS = new Set([
  * aliases across vendored Rails (abstract + pg + mysql). Filtered from the
  * TS-side name set like {@link TS_ALWAYS_ALLOWED}: a public `integer()` in a
  * schema/adapter file mirrors a real (macro-generated) Rails method.
+ *
+ * NOTE: the bare `alias` entries (`blob`, `numeric`) are now captured by the
+ * Ruby extractor, but the `define_column_methods`-generated bulk (`integer`,
+ * `string`, …) is not, so this set stays until the extractor models that loop
+ * — see RFC 0025 story `extractor-capture-enumerable-metaprogrammed-surface`.
  */
 const RAILS_DSL_GENERATED = new Set([
   "bigint",
