@@ -92,8 +92,12 @@ describe("MemoryStoreTest", () => {
     expect(result).toBe(4);
   });
 
-  it("increment returns null for missing key", () => {
-    expect(store.increment("missing")).toBeNull();
+  it("increment creates a missing key set to amount", () => {
+    // Rails MemoryStore#modify_value creates the key set to Integer(amount) and
+    // returns amount on a missing entry (memory_store.rb:136).
+    expect(store.increment("missing")).toBe(1);
+    expect(store.read("missing")).toBe(1);
+    expect(store.increment("other", 100)).toBe(100);
   });
 
   it("expiry: entry not readable after expiresIn", async () => {

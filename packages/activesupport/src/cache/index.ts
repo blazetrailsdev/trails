@@ -25,7 +25,7 @@ export interface CacheStore {
   readMulti(...keys: [...string[], CacheOptions] | string[]): Record<string, unknown>;
   writeMulti(hash: Record<string, unknown>, options?: CacheOptions): void;
   deleteMulti(names: string[], options?: CacheOptions): number;
-  deleteMatched(pattern: string | RegExp): void;
+  deleteMatched(pattern: string | RegExp, options?: CacheOptions): void;
   increment(key: string, amount?: number, options?: CacheOptions): number | null;
   decrement(key: string, amount?: number, options?: CacheOptions): number | null;
 }

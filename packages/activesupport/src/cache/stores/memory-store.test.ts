@@ -51,6 +51,74 @@ describe("MemoryStoreTest", () => {
   });
 });
 
+describe("CacheIncrementDecrementBehavior", () => {
+  let cache: MemoryStore;
+
+  beforeEach(() => {
+    cache = new MemoryStore();
+  });
+
+  it("test_increment", () => {
+    cache.write("foo", 1, { raw: true });
+    expect(Number(cache.read("foo"))).toBe(1);
+    expect(cache.increment("foo")).toBe(2);
+    expect(Number(cache.read("foo"))).toBe(2);
+    expect(cache.increment("foo")).toBe(3);
+    expect(Number(cache.read("foo"))).toBe(3);
+
+    // Rails: a missing key is created set to `amount` (memory_store.rb:136).
+    expect(cache.increment("bar")).toBe(1);
+    expect(cache.increment("baz", 100)).toBe(100);
+  });
+
+  it("test_decrement", () => {
+    cache.write("foo", 3, { raw: true });
+    expect(Number(cache.read("foo"))).toBe(3);
+    expect(cache.decrement("foo")).toBe(2);
+    expect(Number(cache.read("foo"))).toBe(2);
+    expect(cache.decrement("foo")).toBe(1);
+    expect(Number(cache.read("foo"))).toBe(1);
+
+    // Non-MemCacheStore backends return -amount on a missing key.
+    expect(cache.decrement("qux")).toBe(-1);
+    expect(cache.decrement("quux", 100)).toBe(-100);
+  });
+
+  it("test_ttl_isnt_updated", async () => {
+    expect(cache.increment("foo", 1, { expiresIn: 0.1 })).toBe(1);
+    // A second increment with a longer TTL must not reset the original expiry.
+    expect(cache.increment("foo", 1, { expiresIn: 5000 })).toBe(2);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(cache.read("foo")).toBeNull();
+  });
+});
+
+describe("CacheDeleteMatchedBehavior", () => {
+  it("test_delete_matched", () => {
+    const cache = new MemoryStore();
+    cache.write("foo", "bar");
+    cache.write("fu", "baz");
+    cache.write("foo/bar", "baz");
+    cache.write("fu/baz", "bar");
+    cache.deleteMatched(/oo/);
+    expect(cache.exist("foo")).toBe(false);
+    expect(cache.exist("fu")).toBe(true);
+    expect(cache.exist("foo/bar")).toBe(false);
+    expect(cache.exist("fu/baz")).toBe(true);
+  });
+
+  it("scopes delete_matched to the configured namespace", () => {
+    // keyMatcher prefixes the namespace into the regex source, so an unanchored
+    // pattern only deletes this store's namespaced keys.
+    const cache = new MemoryStore({ namespace: "ns" });
+    cache.write("foo", "bar");
+    cache.write("fu", "baz");
+    cache.deleteMatched(/oo/);
+    expect(cache.exist("foo")).toBe(false);
+    expect(cache.exist("fu")).toBe(true);
+  });
+});
+
 describe("MemoryStore increment instrumentation", () => {
   it("instruments with the raw, unnormalized name under a namespace", () => {
     // Rails MemoryStore#increment passes `name` (not the normalized key) to

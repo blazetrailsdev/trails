@@ -22,6 +22,11 @@ export interface CacheLogger {
 
 export type StoreOptions = Record<string, unknown>;
 
+/** Mirrors Ruby `Regexp.escape`: escapes regex metacharacters in a literal. */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Mirrors Ruby `Array#extract_options!`: mutably pops a trailing plain-object
  * options hash off the args array, returning it (or undefined). @internal
@@ -470,6 +475,24 @@ export abstract class Store {
     const str = this.expandedKey(key);
     if (!str) throw new ArgumentError("key cannot be blank");
     return this.namespaceKey(str, options);
+  }
+
+  /**
+   * Mirrors Rails `Cache::Store#key_matcher` (cache.rb): when a namespace is
+   * configured, prefixes it into the regex source so a namespaced store scopes
+   * `delete_matched` to its own keys. A `^`-anchored source has the anchor moved
+   * in front of the prefix; an unanchored source is matched anywhere after the
+   * prefix (`.*`).
+   */
+  protected keyMatcher(pattern: RegExp, options?: StoreOptions): RegExp {
+    const ns = options?.namespace ?? this.options.namespace;
+    const prefix = typeof ns === "function" ? (ns as () => string)() : (ns as string | undefined);
+    if (prefix) {
+      let source = pattern.source;
+      source = source.startsWith("^") ? source.slice(1) : `.*${source}`;
+      return new RegExp(`^${escapeRegExp(prefix)}:${source}`, pattern.flags);
+    }
+    return pattern;
   }
 
   protected namespaceKey(key: string, options?: StoreOptions): string {
