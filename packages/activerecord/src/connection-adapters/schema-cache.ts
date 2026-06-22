@@ -291,6 +291,24 @@ export class SchemaCache {
   }
 
   /**
+   * Synchronous, query-free read of whether the data-source map has been
+   * warmed at all (any entries). When false the cache is cold and a sync
+   * caller cannot distinguish a real table from a tableless model.
+   */
+  get dataSourcesWarm(): boolean {
+    return this._dataSourceExists.size > 0;
+  }
+
+  /**
+   * Synchronous, query-free read of whether `name` is a known data source.
+   * `undefined` when the table has not been reflected (caller should treat as
+   * "unknown", not "absent").
+   */
+  getCachedDataSourceExists(name: string): boolean | undefined {
+    return this._dataSourceExists.get(name);
+  }
+
+  /**
    * Synchronous, query-free read of an already-cached primary key. Returns
    * `undefined` when the table's primary key has not been reflected yet (the
    * caller should fall back to the convention default), or the cached value

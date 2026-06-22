@@ -251,6 +251,8 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   const cache = adapter?.schemaCache as
     | {
         getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined;
+        dataSourcesWarm?: boolean;
+        getCachedDataSourceExists?: (n: string) => boolean | undefined;
       }
     | undefined;
   const table = stiTarget.tableName;
@@ -272,13 +274,30 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
     }
   }
 
+  // RFC 0031 R2: Rails' `columns_hash` is purely DB-sourced (model_schema.rb);
+  // `attribute()` overrides a column's type or adds a virtual attribute, it
+  // never changes column membership. With the schema cache always warm (R1) a
+  // real table is recorded as an existing data source. When the per-table
+  // columnsHash entry is momentarily absent (e.g. a sibling DDL test cleared it)
+  // we still synthesize, but for a table-backed model we include ONLY
+  // schema-reflected (`source: "schema"`) defs — never user `attribute()` defs —
+  // so a user attribute that is not a real column does not leak into
+  // column_names. A genuinely tableless attribute-only model (no warm data
+  // source) keeps the full synthesize over its declared attributes.
+  const tableBacked =
+    !!cache &&
+    cache.dataSourcesWarm === true &&
+    typeof cache.getCachedDataSourceExists === "function" &&
+    cache.getCachedDataSourceExists(table) === true;
+
   // Synthesized fallback: filter ignoredColumns and virtual attrs to match
-  // loadSchema's fallback and Rails behavior (virtual attrs are not DB columns).
+  // loadSchema's fallback (virtual attrs are not DB columns).
   const ignored = new Set(this.ignoredColumns ?? []);
   const result: Record<string, ColumnLike> = {};
   for (const [name, def] of this._attributeDefinitions) {
     if (ignored.has(name)) continue;
     if ((def as any).virtual) continue;
+    if (tableBacked && !isSchemaSourcedDef(def)) continue;
     const fn = (def as any).defaultFunction ?? null;
     result[name] = {
       name,
@@ -775,6 +794,42 @@ export function resetColumnInformation(this: SchemaHost): void {
  * For a full async reflection (fetching from the adapter if the cache
  * isn't populated), call `Base.loadSchema()` (base.ts).
  */
+/**
+ * True when an attribute definition originated from schema reflection (a real
+ * DB column) rather than a user `attribute()` declaration. Schema-reflected defs
+ * carry `source: "schema"` / `userProvided: false`; user defs default to user.
+ */
+function isSchemaSourcedDef(def: { source?: string; userProvided?: boolean }): boolean {
+  return (def.source ?? (def.userProvided === false ? "schema" : "user")) === "schema";
+}
+
+/**
+ * True when the model's table is a known data source in an already-warmed
+ * schema cache (RFC 0031 R1). Such a model is table-backed and must take its
+ * columns from the DB, never synthesize them from `attribute()` declarations.
+ * Returns false on a cold cache (size 0) so existing cold-path behavior is
+ * preserved — a sync caller cannot tell a real table from a tableless model
+ * until the cache is warm.
+ */
+function isWarmTableBacked(host: SchemaHost): boolean {
+  let cache:
+    | { dataSourcesWarm?: boolean; getCachedDataSourceExists?: (n: string) => boolean | undefined }
+    | undefined;
+  let table: string;
+  try {
+    cache = host.connection?.schemaCache;
+    table = host.tableName;
+  } catch {
+    return false;
+  }
+  return (
+    !!cache &&
+    cache.dataSourcesWarm === true &&
+    typeof cache.getCachedDataSourceExists === "function" &&
+    cache.getCachedDataSourceExists(table) === true
+  );
+}
+
 export function loadSchema(this: SchemaHost): void {
   if (this._schemaLoaded) return;
 
@@ -854,13 +909,19 @@ export function loadSchema(this: SchemaHost): void {
 
   // Fallback: no schema cache — synthesize a columnsHash view on the
   // work host so subclasses don't fork _columnsHash (which would persist
-  // past a later base reflection).
+  // past a later base reflection). RFC 0031 R2: for a model whose table is a
+  // known (warm) data source, include ONLY schema-reflected defs — a user
+  // `attribute()` (type override / virtual) never changes column membership in
+  // Rails (model_schema.rb). A genuinely tableless attribute-only model keeps
+  // the full synthesize over its declared attributes.
   if (!workHost._columnsHash && workHost._attributeDefinitions.size > 0) {
+    const tableBacked = isWarmTableBacked(workHost);
     const hash: Record<string, unknown> = {};
     const ignored = new Set(workHost._ignoredColumns ?? []);
     for (const [name, def] of workHost._attributeDefinitions) {
       if (ignored.has(name)) continue;
       if (def.virtual) continue;
+      if (tableBacked && !isSchemaSourcedDef(def)) continue;
       const fn = def.defaultFunction ?? null;
       hash[name] = {
         name,
