@@ -434,6 +434,7 @@ describeIfPg("PostgresqlDefaultExpressionTest", () => {
     ctx = new MigrationContext(adapter);
     await ctx.createTable("defaults", { force: true }, (t: any) => {
       t.integer("random_number", { default: () => "random() * 100" });
+      t.string("ruby_on_rails", { default: () => "concat('Ruby ', 'on ', 'Rails')" });
       t.date("modified_date", { default: () => "CURRENT_DATE" });
       t.date("modified_date_function", { default: () => "now()" });
       t.date("fixed_date", { default: "2004-01-01" });
@@ -448,6 +449,9 @@ describeIfPg("PostgresqlDefaultExpressionTest", () => {
       });
       t.datetime("modified_time_function", { default: () => "now()" });
       t.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
+      t.column("char1", "char(1)", { default: "Y" });
+      t.string("char2", { limit: 50, default: "a varchar field" });
+      t.text("char3", { default: "a text field" });
     });
   });
 
@@ -490,6 +494,7 @@ describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
     ctx = new MigrationContext(adapter);
     await ctx.createTable("defaults", { force: true }, (t: any) => {
       t.integer("random_number", { default: () => "ABS(RANDOM())" });
+      t.string("ruby_on_rails", { default: () => "('Ruby ' || 'on ' || 'Rails')" });
       t.date("modified_date", { default: () => "CURRENT_DATE" });
       t.date("modified_date_function", { default: () => "DATE('now')" });
       t.date("fixed_date", { default: "2004-01-01" });
@@ -504,6 +509,9 @@ describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
       });
       t.datetime("modified_time_function", { default: () => "DATETIME('now')" });
       t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+      t.column("char1", "char(1)", { default: "Y" });
+      t.string("char2", { limit: 50, default: "a varchar field" });
+      t.text("char3", { default: "a text field" });
     });
   });
 

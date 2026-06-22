@@ -87,6 +87,7 @@ import {
   quotedDate as sqliteQuotedDate,
   quotedTime as sqliteQuotedTime,
 } from "./sqlite3/quoting.js";
+import { isSqlLiteral } from "./abstract/quoting.js";
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
@@ -820,16 +821,22 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   // Mirrors SQLite3::Quoting#quote_default_expression (sqlite3/quoting.rb:99):
-  // a Proc default that reads as a function call (`\A\w+\(.*\)\z`) must be
-  // wrapped in parentheses for SQLite DDL (`DEFAULT (ABS(RANDOM()))`); bare
-  // keyword expressions (CURRENT_TIMESTAMP / CURRENT_DATE) and non-Proc values
-  // fall through to the abstract form (which prepends ` DEFAULT `).
+  // a Proc default that reads as a function call (`\A\w+\(.*\)\z`) is wrapped in
+  // parentheses for SQLite DDL (`DEFAULT (ABS(RANDOM()))`); any other Proc result
+  // (bare keyword expressions like CURRENT_TIMESTAMP, or an already-parenthesized
+  // expression) is emitted verbatim. Non-Proc values fall through to the abstract
+  // form. The Proc is invoked exactly once (Rails calls `value.call` once), so a
+  // proc with side effects or a SqlLiteral return is not double-evaluated.
   override quoteDefaultExpression(value: unknown, column?: unknown): string {
     if (typeof value === "function") {
       const result = (value as () => unknown)();
-      if (typeof result === "string" && /^\w+\(.*\)$/.test(result)) {
-        return ` DEFAULT (${result})`;
+      if (typeof result === "string") {
+        return /^\w+\(.*\)$/.test(result) ? ` DEFAULT (${result})` : ` DEFAULT ${result}`;
       }
+      if (isSqlLiteral(result)) return ` DEFAULT ${result.value}`;
+      throw new TypeError(
+        "quoteDefaultExpression expected function default to return a string or SqlLiteral",
+      );
     }
     return super.quoteDefaultExpression(value, column);
   }
