@@ -588,13 +588,13 @@ class ApiExtractor
     when "alias_method"
       process_alias_method(args)
     when "class_attribute"
-      process_mattr(args, reader: true, writer: true, predicate: true)
+      process_mattr(args, reader: true, writer: true, predicate: true, class_attr: true)
     when "cattr_accessor", "mattr_accessor"
-      process_mattr(args, reader: true, writer: true, predicate: false)
+      process_mattr(args, reader: true, writer: true, predicate: false, class_attr: false)
     when "cattr_reader", "mattr_reader"
-      process_mattr(args, reader: true, writer: false, predicate: false)
+      process_mattr(args, reader: true, writer: false, predicate: false, class_attr: false)
     when "cattr_writer", "mattr_writer"
-      process_mattr(args, reader: false, writer: true, predicate: false)
+      process_mattr(args, reader: false, writer: true, predicate: false, class_attr: false)
     when "scope"
       process_scope(args)
     when "delegate"
@@ -652,13 +652,13 @@ class ApiExtractor
       when "scope"
         process_scope_from_arg_paren(node[2])
       when "class_attribute"
-        process_mattr(node[2], reader: true, writer: true, predicate: true)
+        process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
       when "cattr_accessor", "mattr_accessor"
-        process_mattr(node[2], reader: true, writer: true, predicate: false)
+        process_mattr(node[2], reader: true, writer: true, predicate: false, class_attr: false)
       when "cattr_reader", "mattr_reader"
-        process_mattr(node[2], reader: true, writer: false, predicate: false)
+        process_mattr(node[2], reader: true, writer: false, predicate: false, class_attr: false)
       when "cattr_writer", "mattr_writer"
-        process_mattr(node[2], reader: false, writer: true, predicate: false)
+        process_mattr(node[2], reader: false, writer: true, predicate: false, class_attr: false)
       when "delegate"
         process_delegate(node[2])
       when "module_function"
@@ -852,41 +852,64 @@ class ApiExtractor
   # `class_attribute`/`cattr_accessor`/`mattr_accessor` (and their reader/writer
   # variants) metaprogram reader/writer/predicate accessors at both the class
   # and instance level. The static `def` walker can't see them, so their TS
-  # ports (`partialInserts`, `defaultShard`, …) look novel without this.
-  # `class_attribute` additionally generates a `?` predicate. The generated
-  # NAMES come from the leading positional symbols only (`leading_symbol_args`
-  # stops at the options hash, so `default: :foo` is never a method name); the
-  # options hash's `instance_*:` flags gate the instance-level accessors below.
-  def process_mattr(args, reader:, writer:, predicate:)
+  # ports (`partialInserts`, `defaultShard`, …) look novel without this. The
+  # generated NAMES come from the leading positional symbols only
+  # (`leading_symbol_args` stops at the options hash, so `default: :foo` is
+  # never a method name); the options hash's `instance_*:` flags gate the
+  # instance-level accessors. The two macro families gate differently, so the
+  # rules below mirror each Rails source exactly:
+  #
+  # - class_attribute (activesupport core_ext/class/attribute.rb): class reader
+  #   & writer always; class `?` only `if instance_predicate`; instance reader
+  #   & writer default to `instance_accessor` (so `instance_accessor: false,
+  #   instance_reader: true` still yields the instance reader); instance `?`
+  #   only `if instance_predicate && instance_reader`. No predicate option ⇒
+  #   predicate defaults true.
+  # - cattr/mattr (activesupport core_ext/module/attribute_accessors.rb): class
+  #   reader/writer always; instance reader/writer only when BOTH
+  #   `instance_<x>` and `instance_accessor` are truthy (AND, both default
+  #   true); no predicate.
+  #
+  # All generated methods are public — class_attribute defines them via a fresh
+  # `class_eval` string, and mattr/cattr document them as public "even if this
+  # method is called with a private or protected access modifier" — so the
+  # enclosing visibility is intentionally ignored.
+  def process_mattr(args, reader:, writer:, predicate:, class_attr:)
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    # Class-level accessors are always generated; instance-level ones can be
-    # suppressed per Rails' `instance_accessor:`/`instance_reader:`/
-    # `instance_writer:`/`instance_predicate:` options. Honoring them keeps the
-    # manifest faithful — emitting instance methods Rails doesn't create would
-    # inject phantom misses into api:compare.
-    inst_default = option_bool(args, "instance_accessor") != false
-    inst_reader = reader && inst_default && option_bool(args, "instance_reader") != false
-    inst_writer = writer && inst_default && option_bool(args, "instance_writer") != false
-    inst_predicate = predicate && option_bool(args, "instance_predicate") != false
+    ia = option_bool(args, "instance_accessor")
+    ia_val = ia.nil? ? true : ia
+    ir = option_bool(args, "instance_reader")
+    iw = option_bool(args, "instance_writer")
 
-    vis = current_visibility
+    if class_attr
+      inst_reader = ir.nil? ? ia_val : ir
+      inst_writer = iw.nil? ? ia_val : iw
+      class_pred = predicate && option_bool(args, "instance_predicate") != false
+      inst_pred = class_pred && inst_reader
+    else
+      inst_reader = (ir != false) && ia_val
+      inst_writer = (iw != false) && ia_val
+      class_pred = false
+      inst_pred = false
+    end
+
     leading_symbol_args(args).each do |name|
-      add_mattr_accessor(target, vis, "#{name}", reader, inst_reader, [])
-      add_mattr_accessor(target, vis, "#{name}=", writer, inst_writer,
+      add_mattr_accessor(target, "#{name}", reader, reader && inst_reader, [])
+      add_mattr_accessor(target, "#{name}=", writer, writer && inst_writer,
                          [{ name: "value", kind: "required" }])
-      add_mattr_accessor(target, vis, "#{name}?", predicate, inst_predicate, [])
+      add_mattr_accessor(target, "#{name}?", class_pred, inst_pred, [])
     end
     maybe_update_module_file(fqn, target)
   end
 
-  def add_mattr_accessor(target, vis, method_name, on_class, on_instance, params)
+  def add_mattr_accessor(target, method_name, on_class, on_instance, params)
     return unless on_class || on_instance
     info = {
       name: method_name,
-      visibility: vis.to_s,
+      visibility: "public",
       params: params,
       file: @current_file,
       notes: "class_attribute",
@@ -955,7 +978,9 @@ class ApiExtractor
   # leading splat of a symbol-array constant (`delegate(*QUERYING_METHODS, to:
   # :all)`) is expanded via @const_symbol_arrays. Only `… to:` forms are
   # recorded — that's the static-resolvable surface (`delegate_missing_to` and
-  # dynamic targets are skipped).
+  # dynamic targets are skipped). `prefix:` (renames to `prefix_method`) and
+  # `private:` are NOT modeled — both appear only in doc comments across the
+  # vendored lib, so recording bare public names is faithful in practice.
   def process_delegate(args)
     list = positional_arg_list(args)
     names = []
