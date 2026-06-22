@@ -5589,7 +5589,7 @@ describe("EagerAssociationTest", () => {
 
   it("including association based on sql condition and no database column", async () => {
     const owner = (await Owner.includingLastPet().first()) as Owner;
-    const lastPet = (await (owner as any).loadBelongsTo("lastPet")) as Pet;
+    const lastPet = owner.association("lastPet").target as Pet;
     expect(lastPet.id).toBe(pets("parrot").id);
   });
 });
