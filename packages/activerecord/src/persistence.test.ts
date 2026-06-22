@@ -927,6 +927,15 @@ describe("PersistenceTest", () => {
     await expect(Topic.destroy(99999)).rejects.toThrow(RecordNotFound);
   });
 
+  // Rails wraps the increment! in `travel(1.second)` to force the new
+  // updated_at/written_on strictly past the captured values. trails' AR
+  // timestamp path reads `Temporal.Now.instant()` directly
+  // (timestamp.ts:261 currentTimeFromProperTimezone), NOT the travel-aware
+  // `currentTimeInstant()`, so `travel`/`travelTo` would be a no-op here —
+  // the real DB round-trip between fixture insert and the touch supplies the
+  // gap instead. Converging the timestamp path onto the travel-aware clock so
+  // this can mirror Rails exactly is tracked:
+  // converge-ar-timestamps-honor-time-travel.
   // Rails: test_increment_with_touch_an_attribute_updates_timestamps
   it("increment with touch an attribute updates timestamps", async () => {
     const topic = topics("first");
