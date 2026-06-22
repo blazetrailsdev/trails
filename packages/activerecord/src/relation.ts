@@ -4820,7 +4820,15 @@ export class Relation<T extends Base> {
     // aliased here too — this subquery can be built before `_buildEagerJoinManager`
     // (the limited-ids path), so it cannot rely on the nodes being pre-aliased.
     // Aliasing is deterministic and idempotent across repeated emits of the JD.
+    // Skip eager OUTER JOINs for `includes ∩ joins` tables — `_applyJoinsToManager`
+    // emits them as the named INNER JOIN below, so re-emitting here would produce
+    // a duplicate join (ambiguous-column error). Mirrors `_buildEagerJoinManager`.
+    const joinedIncludesTables = this._joinedIncludesTables();
     for (const node of jd.joinConstraints([], undefined, this._aliasableReferences())) {
+      const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
+      if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
+        continue;
+      }
       idSubquery.appendJoinNode(node);
     }
     this._applyJoinsToManager(idSubquery);
