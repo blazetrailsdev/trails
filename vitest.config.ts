@@ -6,17 +6,24 @@ import path from "path";
 // caps the vitest worker count for both pools so that concurrent local worktrees
 // don't saturate the machine. Precedence: TRAILS_TEST_FORKS > AR_DB_FORKS > 6.
 // Raise with TRAILS_TEST_FORKS=N for a solo full run; the live AR DB jobs
-// (postgres-tests, maria-tests) set AR_DB_FORKS=8, so those jobs run 8 workers
-// against an 8-slot pool.
+// (postgres-tests, mysql-tests, maria-tests) all set AR_DB_FORKS=8, so those
+// jobs run 8 workers against an 8-slot pool.
 //
 // On the 2-vCPU hosted runner, 8 forks is empirically not over-subscribed for
 // this suite: a measured sweep (story tune-ar-db-forks-to-runner-cores, RFC
 // 0028) found forks=8 and forks=4 wall-clock-indistinguishable (~571s vs ~574s
 // median over 5 runs) because the DDL-heavy suite is IO-bound on the tmpfs DB,
 // so extra forks overlap IO waits rather than contend for the 2 cores. forks=2
-// is non-viable: the slot pool == worker count is below the floor and
-// deterministically deadlocks (acquireAdvisorySlotPg exhausts all slots). 8 is
-// kept as the measured-best value.
+// failed deterministically in all 5 sweep runs (acquireAdvisorySlotPg throws
+// "all 2 advisory lock slots are held" after its bounded 5s retry — it throws,
+// it does not deadlock). The cause is NOT "pool == worker count" per se (forks=8
+// is also pool == workers and is fine); it is the lack of headroom: each worker
+// holds its slot for its whole process lifetime and frees it only on exit
+// (see test-setup-worker-db.ts), so while the fork pool recycles a worker
+// between files a replacement worker can start and try to claim a slot before
+// the outgoing process has exited and released its lock. An 8-slot pool absorbs
+// that transient overlap; a 2-slot pool has no spare slot, so the newcomer
+// exhausts its retry window and throws. 8 is kept as the measured-best value.
 
 const SHARED_EXCLUDE = [
   "**/node_modules/**",
