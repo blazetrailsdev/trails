@@ -377,7 +377,9 @@ export async function performLast(this: FinderRelation, n?: number): Promise<any
   // correct answer, matching `first`'s loaded-cache read.
   if ((this as any)._loaded) {
     const records: any[] = (this as any)._records;
-    return n !== undefined ? records.slice(-n) : (records[records.length - 1] ?? null);
+    if (n === undefined) return records[records.length - 1] ?? null;
+    // Ruby `records.last(0) == []`; `slice(-0)` would return the whole array.
+    return n === 0 ? [] : records.slice(-n);
   }
   // orderByPk/reverseOrder resolve order matchers, which read the deprecated
   // _modelClass.connection getter; run them (and the load) inside the connection
