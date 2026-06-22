@@ -2373,10 +2373,26 @@ function createHabtmJoinModel(
     ).moduleName;
   }
 
-  // Delegate connection to the left (declaring) model
+  // Delegate connection to the left (declaring) model. The join model is rooted
+  // at the AR Base class (to shed domain callbacks), so it would otherwise
+  // resolve to the primary pool. Delegating the connection-spec name keeps writes
+  // (and the threaded-connection check in `threadedConnectionFor`) on the owner's
+  // pool — required when the owner lives in an alternate database.
   Object.defineProperty(JoinModel, "connection", {
     get() {
       return lhsModel.connection;
+    },
+    configurable: true,
+  });
+  // `connectionPool`/`connectionSpecificationName` read the backing field
+  // directly, so delegating the field (not just the static accessor) is what
+  // actually routes the pool lookup to the owner's database.
+  Object.defineProperty(JoinModel, "_connectionSpecificationName", {
+    get() {
+      return lhsModel.connectionSpecificationName;
+    },
+    set(_v: unknown) {
+      /* no-op: always delegates to lhs */
     },
     configurable: true,
   });

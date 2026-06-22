@@ -30,10 +30,16 @@ import { User } from "../test-helpers/models/user.js";
 import { Parrot } from "../test-helpers/models/parrot.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
+import { PriceEstimate } from "../test-helpers/models/price-estimate.js";
 import { RichPerson } from "../test-helpers/models/person.js";
 import { Job } from "../test-helpers/models/job.js";
 import { Computer } from "../test-helpers/models/computer.js";
 import { PublisherArticle, PublisherMagazine } from "../test-helpers/models/publisher.js";
+import { Professor } from "../test-helpers/models/professor.js";
+import { Course } from "../test-helpers/models/course.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupSecondPool } from "../test-helpers/setup-second-pool.js";
+import { isSqliteRun } from "../test-helpers/sqlite-template.js";
 
 // Test-file-local models mirroring the Rails fixture file's inline class
 // definitions (has_and_belongs_to_many_associations_test.rb:63-90).
@@ -99,6 +105,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       "parrotsPirates",
       "treasures",
       "parrotsTreasures",
+      "priceEstimates",
     ],
     { schema: canonicalSchema },
   );
@@ -135,6 +142,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       ProjectWithSymbolsForKeys,
       DeveloperWithSymbolsForKeys,
       DeveloperWithSymbolClassName,
+      PriceEstimate,
     ]) {
       registerModel(m as any);
     }
@@ -915,9 +923,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await (tag as any).saveBang()).toBeTruthy();
   });
 
-  it.skip("has many through polymorphic has manys works", () => {
-    // BLOCKED: associations — polymorphic-through
-    // ROOT-CAUSE: through association traversal with a polymorphic intermediate is not implemented
+  it("has many through polymorphic has manys works", async () => {
+    const redbeard = (await Pirate.findBy({ catchphrase: "Avast!" })) as Pirate;
+    const prices = (await association(redbeard, "treasureEstimates").toArray()).map(
+      (e: any) => e.price,
+    );
+    expect(new Set(prices)).toEqual(new Set(["$10.00", "$20.00"]));
   });
 
   it("symbols as keys", async () => {
@@ -1084,11 +1095,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     }).not.toThrow();
   });
 
-  it.skip("alternate database", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: habtm across two databases requires multi-db connection routing — not yet implemented
-  });
-
   it("habtm scope can unscope", async () => {
     const dev = await Developer.create({ name: "UnscopeDev", salary: 80000 });
     const p1 = await Project.create({ name: "Bravo" });
@@ -1133,9 +1139,17 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     );
   });
 
-  it.skip("has and belongs to many is usable with belongs to required by default", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: belongs_to_required_by_default config not consulted when habtm creates its implicit belongs_to side
+  it("has and belongs to many is usable with belongs to required by default", async () => {
+    const before = await association(
+      (await Project.first())!,
+      "developersRequiredByDefault",
+    ).size();
+    await (association((await Project.first())!, "developersRequiredByDefault") as any).createBang({
+      name: "Sean",
+      salary: 50000,
+    });
+    const after = await association((await Project.first())!, "developersRequiredByDefault").size();
+    expect(after).toBe(before + 1);
   });
 
   it("association name is the same as join table name", async () => {
@@ -1160,5 +1174,25 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proj = await Project.create({ name: "BtProj" });
     await association<Project>(developer, "projects").push(proj);
     expect(await association<Project>(developer, "projects").count()).toBe(1);
+  });
+});
+
+// `Professor`/`Course` live in the `arunit2` second database. Rails runs the
+// suite against two real databases; trails mirrors the split with a second
+// in-memory SQLite pool on `ARUnit2Model`. The PG/MySQL suites don't yet
+// provision a second named database, so gate the cross-pool habtm to SQLite —
+// same gating as `MultipleDbTest`.
+describe.skipIf(!isSqliteRun())("HasAndBelongsToManyAssociationsTest alternate database", () => {
+  setupHandlerSuite();
+  beforeAll(async () => {
+    await setupSecondPool();
+  });
+
+  it("alternate database", async () => {
+    const professor = await Professor.create({ name: "Plum" });
+    const course = await Course.create({ name: "Forensics" });
+    expect(await association(professor, "courses").count()).toBe(0);
+    await expect(association(professor, "courses").push(course)).resolves.not.toThrow();
+    expect(await association(professor, "courses").count()).toBe(1);
   });
 });

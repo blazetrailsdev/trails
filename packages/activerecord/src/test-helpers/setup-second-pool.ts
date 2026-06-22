@@ -5,6 +5,7 @@ import { ARUnit2Model } from "./models/arunit2-model.js";
 import { Course } from "./models/course.js";
 import { College } from "./models/college.js";
 import { Entrant } from "./models/entrant.js";
+import { Professor } from "./models/professor.js";
 import { resolveSecondDatabaseConfig } from "./arunit2-config.js";
 
 /**
@@ -41,6 +42,11 @@ import { resolveSecondDatabaseConfig } from "./arunit2-config.js";
 const ARUNIT2_SCHEMA: Schema = {
   colleges: { name: { type: "string", null: false } },
   courses: { name: { type: "string", null: false }, college_id: "integer" },
+  professors: { name: { type: "string", null: false } },
+  courses_professors: {
+    columns: { course_id: "integer", professor_id: "integer" },
+    primaryKey: false,
+  },
 };
 
 const PRIMARY_SCHEMA: Schema = {
@@ -55,14 +61,17 @@ export async function setupSecondPool(): Promise<void> {
   registerModel(College);
   registerModel(Course);
   registerModel(Entrant);
+  registerModel(Professor);
   const arunit2 = ARUnit2Model.connection;
   const primary = Base.connection;
 
   // The primary database owns only `entrants`; remove the canonical schema's
   // `arunit2`-only tables so the two pools stay disjoint.
   const ss = primary.schemaStatements!();
+  await ss.dropTable("courses_professors", { ifExists: true });
   await ss.dropTable("courses", { ifExists: true });
   await ss.dropTable("colleges", { ifExists: true });
+  await ss.dropTable("professors", { ifExists: true });
 
   await defineSchema(arunit2, ARUNIT2_SCHEMA, { dropExisting: true });
   await defineSchema(primary, PRIMARY_SCHEMA, { dropExisting: true });
