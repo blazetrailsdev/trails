@@ -675,9 +675,12 @@ export class AssociationScope {
     // (relation, owner) per `relation.instance_exec(owner, &scope) ||
     // relation`. For ordinary AssociationReflections we call `scopeFor`
     // when present. ThroughReflection does NOT implement `scopeFor`;
-    // it only exposes `.scope` (delegated to the underlying source
-    // association's scope), so detect through explicitly and invoke
-    // `.scope` directly with the same arity / `this` semantics.
+    // it only exposes `.scope`, which delegates to its `delegateReflection`
+    // (the through reflection's OWN scope — Rails `delegate :scope, to:
+    // :delegate_reflection`, reflection.rb:1229), NOT the source reflection's
+    // scope. So detect through explicitly and invoke `.scope` directly with
+    // the same arity / `this` semantics. The source reflection's scope is a
+    // SEPARATE concern, merged below.
     const head = chain[0] as {
       scopeFor?: (rel: unknown, owner: unknown) => unknown;
       scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
@@ -689,6 +692,35 @@ export class AssociationScope {
     } else if (typeof head.scope === "function") {
       const result = invokeScopeLambda(head.scope as ScopeLambda<unknown>, scope, owner);
       if (result) scope = result;
+    }
+    // Rails folds the source reflection's scope into a has_many/has_one
+    // :through query via `add_constraints`' `chain.reverse_each` over
+    // `reflection.constraints` (association_scope.rb). The head branch above
+    // only applies the through reflection's OWN (delegate) scope; the SOURCE
+    // reflection's scope — e.g.
+    // `Post.has_many :nonexistent_comments, -> { where("comments.id < 0") }`
+    // for `Author.has_many :nonexistent_comments, through: :posts` — lives on
+    // the source reflection and would otherwise be dropped, so the through
+    // query returns all rows instead of the scoped subset. Merge its WHERE/
+    // ORDER predicates here, evaluated against the source klass' table.
+    //
+    // Skip when `source_type:` is set. A `source_type:` through carries any
+    // scope declared on its THROUGH/join model via a `PolymorphicReflection`
+    // chain entry already merged by the loop above (e.g. Tag's
+    // `null_taggings -> { none }` for `null_tagged_posts` flows through and
+    // empties the result) — that path is unaffected here. The piece this
+    // branch would otherwise add is the scope on the polymorphic belongsTo
+    // SOURCE itself, which (a) is not carried by any chain entry, (b) was
+    // never applied before this change either, and (c) cannot be evaluated
+    // because a polymorphic belongsTo's `klass` is uncomputable (it would
+    // raise in `_mergeReflectionScopeChain`). Source-on-`source_type` scope
+    // remains a pre-existing gap, orthogonal to this fix.
+    if (isThrough && !(head as { options?: { sourceType?: unknown } }).options?.sourceType) {
+      const sourceRefl = (head as { sourceReflection?: AbstractReflection | null })
+        .sourceReflection;
+      if (sourceRefl) {
+        scope = this._mergeReflectionScopeChain(scope, sourceRefl, owner);
+      }
     }
     return scope;
   }

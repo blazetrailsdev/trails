@@ -676,12 +676,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(first.id).toBe(newAuthor.id);
   });
 
-  // DEFERRED (tracked: through-source-reflection-scope-not-merged): trails
-  // resolves the source reflection (Post.nonexistentComments) but drops its
-  // `where("comments.id < 0")` scope from the through query, so
-  // author.nonexistentComments returns all 11 of david's comments instead of 0.
-  // Un-skip once has_many :through merges the source reflection's scope.
-  it.skip("has many through uses conditions specified on the has many association", async () => {
+  it("has many through uses conditions specified on the has many association", async () => {
     const author = (await Author.first()) as Author;
     expect(((await (author as any).comments.toArray()) as Base[]).length).toBeGreaterThan(0);
     expect(((await (author as any).nonexistentComments.toArray()) as Base[]).length).toBe(0);
