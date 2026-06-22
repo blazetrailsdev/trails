@@ -5,7 +5,7 @@ import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency nested hydration", () => {
-  let adapter: any;
+  let adapter: ReturnType<typeof createTestAdapter>;
 
   // prettier-ignore
   class Author extends Base {
@@ -23,8 +23,8 @@ describe("JoinDependency nested hydration", () => {
   beforeEach(() => {
     adapter = createTestAdapter();
     for (const m of [Author, Comment, Post]) {
-      (m as any).adapter = adapter;
-      (m as any)._associations = [];
+      m.adapter = adapter;
+      m._associations = [];
       registerModel(m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
