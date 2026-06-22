@@ -3,6 +3,7 @@ import type { ValidatableRecord } from "../validator.js";
 import { isBlank, RoundingHelper, BigDecimal } from "@blazetrails/activesupport";
 import { errorOptions } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
+import { ArgumentError, TypeError as RubyTypeError } from "../attribute-assignment.js";
 
 type NumericValue = number | ((record: ValidatableRecord) => number) | string;
 
@@ -183,11 +184,11 @@ export class NumericalityValidator extends EachValidator {
         typeof val !== "function" &&
         typeof val !== "string"
       ) {
-        throw new Error(`:${key} must be a number, a symbol or a proc`);
+        throw new ArgumentError(`:${key} must be a number, a symbol or a proc`);
       }
     }
     if (this.options.in !== undefined && !Array.isArray(this.options.in)) {
-      throw new Error(":in must be a range");
+      throw new ArgumentError(":in must be a range");
     }
   }
 
@@ -279,13 +280,13 @@ export function optionAsNumber(
   // Throw the consistent validator error rather than silently accepting
   // values that JS Number() happens to coerce (true → 1, Date → epoch).
   if (typeof resolved !== "number" && typeof resolved !== "string") {
-    throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+    throw new RubyTypeError(`Resolved numericality option must be numeric: ${String(resolved)}`);
   }
   if (typeof resolved === "string") {
     if (resolved.trim() === "") {
       // Rails Kernel.Float raises ArgumentError on blank strings, so
       // option_as_number propagates the error.
-      throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+      throw new ArgumentError(`Resolved numericality option must be numeric: ${String(resolved)}`);
     }
     // Rails parse_as_number's elsif chain only falls through for hex
     // literals when the ANCHORED regex matches (HEXADECIMAL_REGEX uses
@@ -299,12 +300,12 @@ export function optionAsNumber(
     // silently coerce 0b/0o, so the explicit guard is load-bearing
     // on the trails side.
     if (HEXADECIMAL_REGEX.test(trimmed) || NON_DECIMAL_LITERAL_REGEX.test(trimmed)) {
-      throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+      throw new ArgumentError(`Resolved numericality option must be numeric: ${String(resolved)}`);
     }
   }
   const numeric = typeof resolved === "number" ? resolved : Number(resolved);
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+    throw new ArgumentError(`Resolved numericality option must be numeric: ${String(resolved)}`);
   }
   return parseAsNumber(numeric, precision, scale);
 }

@@ -136,4 +136,41 @@ class ArgumentError extends globalThis.Error {
   }
 }
 
-export { ArgumentError };
+/**
+ * Mirror of Ruby's `TypeError`. Rails' `Kernel.Float` raises it on
+ * non-Numeric/non-String input; porting it lets numericality option
+ * coercion surface the same class instead of a bare `throw new Error`.
+ */
+class TypeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TypeError";
+  }
+}
+
+/**
+ * Mirror of Ruby's `NameError`. Raised when a name reference is invalid —
+ * e.g. `record.method(:missing)`, which Ruby answers with `NameError`
+ * (not its `NoMethodError` subclass).
+ */
+class NameError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NameError";
+  }
+}
+
+/**
+ * Mirror of Ruby's `NoMethodError` (a subclass of `NameError`). Raised when
+ * a method is sent to a receiver that does not respond to it (e.g.
+ * `nil.include?`); porting it keeps validator guards that emulate that path
+ * faithful to Rails.
+ */
+class NoMethodError extends NameError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
+export { ArgumentError, TypeError, NameError, NoMethodError };
