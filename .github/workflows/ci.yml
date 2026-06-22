@@ -388,7 +388,11 @@ jobs:
   # independently legible in the step log. Each step preserves its original
   # event/author guard via a per-step `if:` so it no-ops (rather than skipping
   # the whole job) when its condition isn't met — prettier alone stays ungated
-  # because, like the standalone job, it runs on every event. Deliberately NOT folded into
+  # because, like the standalone job, it runs on every event. The guarded steps
+  # prefix `!cancelled() &&` to defeat the implicit success() GitHub ANDs onto a
+  # step `if:`, so an earlier step's failure can't skip a later guard — matching
+  # the independent reporting the three replaced parallel jobs had.
+  # Deliberately NOT folded into
   # `changes` — that job is on the critical path of every downstream gate, and a
   # prettier/attribution failure there would block gate computation.
   preflight:
@@ -462,7 +466,11 @@ jobs:
       # base to diff against. Only `docs/activerecord/` is policed — other
       # docs/ trees stay live until their own cutover.
       - name: Docs ActiveRecord Freeze
-        if: github.event_name == 'pull_request'
+        # !cancelled() defeats the implicit success() that GitHub ANDs onto a
+        # step `if:`, so an earlier step's failure (e.g. prettier) can't skip
+        # this guard — preserving the independent reporting the three replaced
+        # parallel jobs had.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -492,9 +500,12 @@ jobs:
       # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
       # contributors are unaffected; push/schedule have no PR body.
       - name: Forbid Claude attribution in PR body
+        # !cancelled() so a prior step's failure can't suppress this guard
+        # (see Docs ActiveRecord Freeze above).
         if: >-
+          ${{ !cancelled() &&
           github.event_name == 'pull_request' &&
-          github.event.pull_request.user.login == 'deanmarano'
+          github.event.pull_request.user.login == 'deanmarano' }}
         run: |
           set -euo pipefail
           # Fetch the *live* body rather than reading the event payload. The
@@ -509,9 +520,12 @@ jobs:
           fi
           echo "No forbidden Claude attribution found in PR body."
       - name: Forbid Claude attribution in commit messages
+        # !cancelled() so a prior step's failure can't suppress this guard
+        # (see Docs ActiveRecord Freeze above).
         if: >-
+          ${{ !cancelled() &&
           github.event_name == 'pull_request' &&
-          github.event.pull_request.user.login == 'deanmarano'
+          github.event.pull_request.user.login == 'deanmarano' }}
         run: |
           set -euo pipefail
           # Scan every commit message on the PR, not just the PR body. The body
