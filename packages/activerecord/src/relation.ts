@@ -34,10 +34,7 @@ import {
   _cacheSingularTarget,
 } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
-import {
-  buildMergedJoinAliasTracker,
-  seedTrackerFromJdNodes,
-} from "./relation/merged-join-alias-tracker.js";
+import { buildMergedJoinAliasTracker } from "./relation/merged-join-alias-tracker.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import {
   underscore as _toUnderscore,
@@ -3307,30 +3304,34 @@ export class Relation<T extends Base> {
       // Rails build_joins → join_constraints(stashed, alias_tracker,
       // references_values). The where-hash keys resolve to the same aliased name
       // (`associatedTable` aliases the resolved table to the key), so the WHERE
-      // and JOIN stay in sync.
+      // and JOIN stay in sync. Aliasing is resolved lazily against the shared
+      // tracker in `makeConstraints`.
       const stashedLeft = leftOuterJd ? [leftOuterJd] : [];
-      for (const node of jd.joinConstraints(stashedLeft, undefined, this._aliasableReferences()))
+      for (const node of jd.joinConstraints(
+        stashedLeft,
+        sharedTracker,
+        this._aliasableReferences(),
+      ))
         manager.appendJoinNode(node);
-      seedTrackerFromJdNodes(sharedTracker, jd);
-      if (leftOuterJd) seedTrackerFromJdNodes(sharedTracker, leftOuterJd);
     } else if (leftOuterJd) {
-      for (const node of leftOuterJd.joinConstraints([], undefined, this._aliasableReferences()))
+      for (const node of leftOuterJd.joinConstraints(
+        [],
+        sharedTracker,
+        this._aliasableReferences(),
+      ))
         manager.appendJoinNode(node);
-      seedTrackerFromJdNodes(sharedTracker, leftOuterJd);
     }
-    // Cross-klass merged JoinDependencies (Rails merge_joins): built against the
-    // source relation's klass with their own tracker, so re-alias their joins
-    // against the shared tracker before emitting (a join onto an already-joined
-    // table becomes `authors_categorizations`).
+    // Cross-klass merged JoinDependencies (Rails merge_joins): emitted against the
+    // same shared tracker, so a join onto an already-joined table aliases at
+    // emit-time in makeConstraints (a join onto an already-joined table becomes
+    // `authors_categorizations`).
     for (const jd of this._namedInnerJoinDeps) {
-      jd.realiasAgainstSharedTracker(sharedTracker);
-      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+      for (const node of jd.joinConstraints([], sharedTracker)) manager.appendJoinNode(node);
     }
     // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
-    // already built against the source relation's klass with OuterJoin type.
+    // emitted against the same shared tracker.
     for (const jd of this._leftOuterJoinDeps) {
-      jd.realiasAgainstSharedTracker(sharedTracker);
-      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+      for (const node of jd.joinConstraints([], sharedTracker)) manager.appendJoinNode(node);
     }
     for (const node of joinNodes) manager.appendJoinNode(node);
   }
@@ -4665,6 +4666,13 @@ export class Relation<T extends Base> {
   ): SelectManager {
     const table = this._modelClass.arelTable;
 
+    // Resolve emit-time table aliases first (Rails make_constraints): a duplicate
+    // join onto an already-joined table (e.g. nested includes reaching the same
+    // table via two paths) is aliased to its `alias_candidate` here, and a join
+    // named by `references` takes the referenced name. This MUST run before the
+    // column-alias projection below, which reads each node's now-aliased table.
+    const joinNodes = jd.joinConstraints([], undefined, this._aliasableReferences());
+
     // Mirrors Rails' apply_column_aliases + `_select!(-> { aliases.columns })`:
     // an explicit `select` keeps its own projection and the JoinDependency only
     // contributes the base PK (t0_r0) plus the joined tables' alias columns.
@@ -4675,8 +4683,8 @@ export class Relation<T extends Base> {
       selectCols.length > 0 ? [...this.arelColumns(selectCols), ...aliasNodes] : aliasNodes;
     const manager = table.project(...(projection as Parameters<typeof table.project>));
 
-    for (const node of jd.nodes) {
-      manager.appendJoinNode(node.arelJoin!);
+    for (const node of joinNodes) {
+      manager.appendJoinNode(node);
     }
 
     this._applyJoinsToManager(manager);
@@ -4743,8 +4751,12 @@ export class Relation<T extends Base> {
         ? table.project(new Nodes.SqlLiteral(distinctSelectSql))
         : table.project(table.get(basePk));
     idSubquery.distinct();
-    for (const node of jd.nodes) {
-      idSubquery.appendJoinNode(node.arelJoin!);
+    // Resolve emit-time aliases (Rails make_constraints) so a duplicate join is
+    // aliased here too — this subquery can be built before `_buildEagerJoinManager`
+    // (the limited-ids path), so it cannot rely on the nodes being pre-aliased.
+    // Aliasing is deterministic and idempotent across repeated emits of the JD.
+    for (const node of jd.joinConstraints([], undefined, this._aliasableReferences())) {
+      idSubquery.appendJoinNode(node);
     }
     this._applyJoinsToManager(idSubquery);
     this._applyWheresToManager(idSubquery, table);

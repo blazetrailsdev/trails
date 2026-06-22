@@ -31,10 +31,7 @@ import { sanitizeLimit } from "../connection-adapters/abstract/database-statemen
 import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
-import {
-  buildMergedJoinAliasTracker,
-  seedTrackerFromJdNodes,
-} from "./merged-join-alias-tracker.js";
+import { buildMergedJoinAliasTracker } from "./merged-join-alias-tracker.js";
 import { foreignKey } from "@blazetrails/activesupport";
 
 /**
@@ -2638,9 +2635,12 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     }
   }
 
-  // One AliasTracker shared with the cross-klass merged dependencies, mirroring
-  // Rails' single `build_joins` alias_tracker (see _applyJoinsToManager). Use the
-  // tracker threaded in from `build_from` when present, else build a fresh one.
+  // One AliasTracker shared across every JoinDependency, mirroring Rails' single
+  // `build_joins` alias_tracker (see _applyJoinsToManager). Each dependency
+  // claims and aliases its tables lazily at emit-time in `makeConstraints`, so
+  // threading this one tracker through every `joinConstraints` is enough to make
+  // a merged join onto an already-joined table collide and alias. Use the tracker
+  // threaded in from `build_from` when present, else build a fresh one.
   const sharedTracker = aliases ?? buildMergedJoinAliasTracker(this as any);
   const references = (this as any)._aliasableReferences();
 
@@ -2653,10 +2653,9 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // assemble that single named JoinDependency here and fold the stashed buckets
   // into it, mirroring `_applyJoinsToManager` on the live SQL path.
   //
-  // Tracker: pass `undefined` to the named JD's joinConstraints (the JD aliases
-  // against its own per-dep tracker) and let `seedTrackerFromJdNodes` be the sole
-  // claim of its tables into the shared tracker — passing the shared tracker too
-  // would double-count an aliased table.
+  // Tracker: pass the shared tracker to every joinConstraints. Each JD claims and
+  // aliases its tables lazily in `makeConstraints`, so a JD emitted after one that
+  // already claimed a table aliases its duplicate join — no separate seed pass.
   if (this._namedInnerJoins.length > 0) {
     // joins_values present → InnerJoin named JD that consumes the stashed bucket
     // (the left-outer JD folded by buildJoinBuckets:1843, plus eager/explicit
@@ -2664,40 +2663,32 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     // short-circuit now also guarding on `_namedInnerJoins`, `named_join` is empty
     // here, so the whole stashed set is exactly `buckets.stashed_join`.
     const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
-    for (const node of jd.joinConstraints(stashedJoins, undefined, references))
+    for (const node of jd.joinConstraints(stashedJoins, sharedTracker, references))
       arel.source.right.push(node);
-    seedTrackerFromJdNodes(sharedTracker, jd);
-    for (const s of stashedJoins) seedTrackerFromJdNodes(sharedTracker, s);
   } else if (namedJoins.length > 0) {
     // Pure left-outer-only short-circuit (no joins_values): named_join → OuterJoin.
     const jd = constructJoinDependency.call(this, namedJoins, Nodes.OuterJoin);
-    for (const node of jd.joinConstraints(stashedJoins, undefined, references))
+    for (const node of jd.joinConstraints(stashedJoins, sharedTracker, references))
       arel.source.right.push(node);
-    seedTrackerFromJdNodes(sharedTracker, jd);
-    for (const s of stashedJoins) seedTrackerFromJdNodes(sharedTracker, s);
   } else if (stashedJoins.length > 0) {
     // Stashed join dependencies (eager_load or left_outer combined with explicit
     // joins) — generate join SQL via joinConstraints (mirrors build_joins:1896).
     const [primary, ...rest] = stashedJoins;
-    for (const node of primary.joinConstraints(rest, undefined, references))
+    for (const node of primary.joinConstraints(rest, sharedTracker, references))
       arel.source.right.push(node);
-    seedTrackerFromJdNodes(sharedTracker, primary);
-    for (const s of rest) seedTrackerFromJdNodes(sharedTracker, s);
   }
 
-  // Cross-klass merged JoinDependencies (Rails merge_joins): built against the
-  // source relation's klass with their own tracker, so re-alias their joins
-  // against the shared tracker before emitting (`authors_categorizations`).
+  // Cross-klass merged JoinDependencies (Rails merge_joins): emitted against the
+  // same shared tracker, so a join onto an already-joined table aliases at
+  // emit-time in makeConstraints (`authors_categorizations`).
   for (const jd of this._namedInnerJoinDeps) {
-    jd.realiasAgainstSharedTracker(sharedTracker);
-    for (const node of jd.joinConstraints([])) arel.source.right.push(node);
+    for (const node of jd.joinConstraints([], sharedTracker)) arel.source.right.push(node);
   }
 
   // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
-  // built against the source relation's klass with OuterJoin type, emitted directly.
+  // emitted against the same shared tracker.
   for (const jd of this._leftOuterJoinDeps) {
-    jd.realiasAgainstSharedTracker(sharedTracker);
-    for (const node of jd.joinConstraints([])) arel.source.right.push(node);
+    for (const node of jd.joinConstraints([], sharedTracker)) arel.source.right.push(node);
   }
 
   for (const node of joinNodes) arel.source.right.push(node);
