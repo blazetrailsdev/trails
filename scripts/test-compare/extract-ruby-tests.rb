@@ -118,6 +118,7 @@ class TestExtractor
     @modules = {}
     @module_collect = nil
     @module_includes = {}
+    @module_def_gates = {}
 
     walk(sexp)
 
@@ -252,6 +253,11 @@ class TestExtractor
     @module_collect = prev
     if name && !collected.empty?
       @modules[name] = (@modules[name] || []) + collected
+      # Remember the gate in force at the definition site, used as a fallback for
+      # a module that is never `include`d in this file (mixed in from elsewhere,
+      # or defined under an `if supports_X?` it textually sits inside) so it keeps
+      # its definition-site gate rather than emitting ungated.
+      @module_def_gates[name] ||= @gate_stack.dup
     end
   end
 
@@ -274,7 +280,7 @@ class TestExtractor
   # gated `features:[views]`, matching the class's own `def test_*`.
   def flush_collected_modules
     @modules.each do |name, tests|
-      gate_stack = @module_includes[name] || []
+      gate_stack = @module_includes[name] || @module_def_gates[name] || []
       saved = @gate_stack
       @gate_stack = gate_stack
       tests.each { |t| @test_cases << materialize_module_test(t) }
@@ -456,8 +462,8 @@ class TestExtractor
     line = extract_line(node)
     assertions = extract_assertions_from_def(node)
 
-    # Inside a mixin module body: stash, don't emit. Materialized per including
-    # class by process_include / flush_unincluded_modules.
+    # Inside a mixin module body: stash, don't emit. Materialized at end of file
+    # by flush_collected_modules, with the include-site gate from process_include.
     if @module_collect
       # Capture the in-body `skip … if/unless` gate now — the raw sexp isn't
       # retained past collection, so it can't be recomputed at materialization.

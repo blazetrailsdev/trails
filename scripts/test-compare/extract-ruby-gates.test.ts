@@ -292,4 +292,19 @@ describe("Ruby extractor gate detection", () => {
       source: ["body-skip"],
     });
   });
+
+  it("keeps a never-included module's definition-site gate", () => {
+    const g = rubyGates({
+      "cases/some_test.rb": `
+        if ActiveRecord::Base.lease_connection.supports_views?
+          module OnlyDefinedHere
+            def test_defined_under_gate; end
+          end
+        end
+      `,
+    });
+    // The module is never \`include\`d in this file, so it falls back to the gate
+    // in force at its definition site (\`supports_views?\`) rather than ungated.
+    expect(g["defined under gate"]).toEqual({ features: ["views"], source: ["class"] });
+  });
 });
