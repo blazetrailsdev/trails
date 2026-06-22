@@ -810,7 +810,14 @@ jobs:
   trails-tsc-coverage:
     name: trails-tsc Coverage (reporting-only)
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    # Gated like the per-area ar-sqlite-coverage job: only run when trails-tsc
+    # (the covered source) or tse-compiler (which its tests exercise) changed,
+    # so this dedicated job doesn't add cost to unrelated PRs. Not in `ci`'s
+    # `needs`, so a skip here never trips the all-jobs gate.
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.trails_tsc_affected == 'true' ||
+       needs.changes.outputs.tse_compiler_affected == 'true')
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -819,13 +826,16 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       # trails-tsc is isolated in its own job: its watcher/build tests spawn
-      # subprocesses that trip vitest's worker-RPC `onTaskUpdate` timeout under
-      # load, which aborts the run and writes no report. Running alone means
+      # subprocesses and run heavy tsc compiles that, under v8 instrumentation,
+      # peg a worker long enough to trip vitest's `onTaskUpdate` worker-RPC
+      # timeout, aborting the run and writing no report. Running alone means
       # such a timeout can only void THIS report, never the shared non-AR
       # coverage run. TRAILS_TSC_COVERAGE=1 scopes coverage to trails-tsc
-      # source; TRAILS_TEST_FORKS=1 removes the fork contention that triggers
-      # the timeout. --test-timeout=60000 absorbs the slower tsc compiles under
-      # v8 instrumentation. Reporting-only (no thresholds → never fails build).
+      # source; TRAILS_TEST_FORKS=1 reduces the fork contention that worsens the
+      # timeout (a residual one is absorbed by dangerouslyIgnoreUnhandledErrors
+      # in vitest.config.ts, gated on the same flag); --test-timeout=60000
+      # absorbs the slower tsc compiles. Reporting-only (no thresholds → never
+      # fails the build).
       - run: pnpm vitest run packages/trails-tsc --coverage --coverage.all --test-timeout=60000
         env:
           TRAILS_TSC_COVERAGE: "1"
