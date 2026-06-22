@@ -1282,11 +1282,11 @@ export class SchemaStatements {
     return {};
   }
 
-  tableOptions(_tableName: string): Record<string, unknown> | null {
+  async tableOptions(_tableName: string): Promise<Record<string, unknown> | null> {
     return null;
   }
 
-  tableComment(_tableName: string): string | null {
+  async tableComment(_tableName: string): Promise<string | null> {
     return null;
   }
 

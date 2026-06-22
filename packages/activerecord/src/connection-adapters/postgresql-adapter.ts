@@ -4194,65 +4194,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async tableComment(tableName: string): Promise<string | null> {
-    const { schema, name } = this.pgQuotedScope(tableName, "BASE TABLE");
-    if (!name) return null;
-    const rows = await this.schemaQuery(`
-      SELECT pg_catalog.obj_description(c.oid, 'pg_class') AS comment
-      FROM pg_catalog.pg_class c
-      LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relname = ${name}
-        AND c.relkind IN ('r','p')
-        AND n.nspname = ${schema}
-    `);
-    return (rows[0]?.comment as string | null) ?? null;
+    return this.pgSchemaStatements().tableComment(tableName);
   }
 
   async tablePartitionDefinition(tableName: string): Promise<string | null> {
-    const { schema, name } = this.pgQuotedScope(tableName, "BASE TABLE");
-    if (!name) return null;
-    const rows = await this.schemaQuery(`
-      SELECT pg_catalog.pg_get_partkeydef(c.oid) AS def
-      FROM pg_catalog.pg_class c
-      LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relname = ${name}
-        AND c.relkind IN ('r','p')
-        AND n.nspname = ${schema}
-    `);
-    return (rows[0]?.def as string | null) ?? null;
+    return this.pgSchemaStatements().tablePartitionDefinition(tableName);
   }
 
   async inheritedTableNames(tableName: string): Promise<string[]> {
-    const { schema, name } = this.pgQuotedScope(tableName, "BASE TABLE");
-    if (!name) return [];
-    const rows = await this.schemaQuery(`
-      SELECT parent.relname AS name
-      FROM pg_catalog.pg_inherits i
-      JOIN pg_catalog.pg_class child  ON i.inhrelid  = child.oid
-      JOIN pg_catalog.pg_class parent ON i.inhparent = parent.oid
-      LEFT JOIN pg_namespace n ON n.oid = child.relnamespace
-      WHERE child.relname = ${name}
-        AND child.relkind IN ('r','p')
-        AND n.nspname = ${schema}
-      ORDER BY i.inhseqno
-    `);
-    return rows.map((r) => r.name as string);
+    return this.pgSchemaStatements().inheritedTableNames(tableName);
   }
 
   async tableOptions(tableName: string): Promise<Record<string, unknown>> {
-    // supportsNativePartitioning() reads databaseVersion; ensure it's populated.
-    await this.getDatabaseVersion();
-    const options: Record<string, unknown> = {};
-    const comment = await this.tableComment(tableName);
-    if (comment !== null) options.comment = comment;
-    const inherited = await this.inheritedTableNames(tableName);
-    if (inherited.length > 0) {
-      options.options = `INHERITS (${inherited.join(", ")})`;
-    }
-    if (!options.options && this.supportsNativePartitioning()) {
-      const partDef = await this.tablePartitionDefinition(tableName);
-      if (partDef) options.options = `PARTITION BY ${partDef}`;
-    }
-    return options;
+    return this.pgSchemaStatements().tableOptions(tableName);
   }
 
   async serialSequence(tableName: string, column: string): Promise<string | null> {
@@ -4953,38 +4907,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       attgenerated: string | null;
     }[]
   > {
-    const identityCol = this.supportsIdentityColumns()
-      ? "attidentity"
-      : `${this.quote("")}::varchar`;
-    const generatedCol = this.supportsVirtualColumns()
-      ? "attgenerated"
-      : `${this.quote("")}::varchar`;
-    const rows = await this.schemaQuery(
-      `SELECT a.attname, format_type(a.atttypid, a.atttypmod),
-              pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod,
-              c.collname, col_description(a.attrelid, a.attnum) AS comment,
-              ${identityCol} AS identity,
-              ${generatedCol} AS attgenerated
-         FROM pg_attribute a
-         LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
-         LEFT JOIN pg_type t ON a.atttypid = t.oid
-         LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation
-        WHERE a.attrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
-          AND a.attnum > 0 AND NOT a.attisdropped
-        ORDER BY a.attnum`,
-    );
-    return rows.map((r) => ({
-      attname: r.attname as string,
-      format_type: r.format_type as string,
-      pg_get_expr: (r.pg_get_expr as string | null) ?? null,
-      attnotnull: r.attnotnull as boolean,
-      atttypid: Number(r.atttypid),
-      atttypmod: Number(r.atttypmod),
-      collname: (r.collname as string | null) ?? null,
-      comment: (r.comment as string | null) ?? null,
-      identity: (r.identity as string | null) || null,
-      attgenerated: (r.attgenerated as string | null) || null,
-    }));
+    return this.pgSchemaStatements().columnDefinitions(tableName);
   }
 
   /**
