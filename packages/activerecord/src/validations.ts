@@ -132,10 +132,18 @@ export function _setSuperIsValid(fn: (context?: ValidationContextArg) => boolean
  * fail on a uniqueness collision.
  *
  * Convergence to Rails' observable `valid?` semantics would require an async
- * validation chain (`isValid` returning a `Promise`), which is the explicitly
- * ratified sync-only-validations architecture's blocker: JS has no synchronous
- * DB I/O, and an async `isValid` ripples through every synchronous caller.
- * This is therefore documented as a tracked deviation, not silently accepted.
+ * validation chain (`isValid` returning a `Promise`), which is barred by the
+ * ratified sync-only-validations architecture: `isValid`/`valid?` return a
+ * `boolean`, JS has no synchronous DB I/O, and an async `isValid` would ripple
+ * through every synchronous caller. This deviation is therefore NOT a wontfix:
+ * it is blocked-on-architecture, gated on that sync-only decision being
+ * revisited (the same governing constraint behind the `async`-callback-on-sync
+ * guard in `@blazetrails/activesupport`'s `callbacks.ts`). A standalone
+ * convergence story is intentionally omitted because the only fix — making the
+ * validation chain async — is the very thing that decision forbids; it would be
+ * a no-op until/unless the architecture itself changes. If sync-only is ever
+ * reconsidered, this and `async-validations-honor-validation-context` (the
+ * sibling deviation on the same deferred path) become schedulable together.
  * Note Rails' own `valid?` uniqueness check is a TOCTOU race (the pre-check
  * and the INSERT aren't atomic), so the save-time-only behavior here is closer
  * to the concurrency-safe pattern — but it still diverges observably.
