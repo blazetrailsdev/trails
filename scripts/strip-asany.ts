@@ -27,7 +27,7 @@ import { execFile } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const execFileAsync = promisify(execFile);
@@ -76,10 +76,13 @@ export function findCandidateCasts(text: string): CastSpan[] {
         const member = paren.parent.name.text;
         if (!member.startsWith("_")) {
           const inner = node.expression;
-          if (ts.isLeftHandSideExpression(inner)) {
+          if (ts.isLeftHandSideExpression(inner) && !ts.isNumericLiteral(inner)) {
             // The inner expression binds at least as tightly as member
             // access, so the wrapping parens are redundant too: rewrite
-            // `(foo.bar as any).baz` straight to `foo.bar.baz`.
+            // `(foo.bar as any).baz` straight to `foo.bar.baz`. Numeric
+            // literals are the one LHS exception — `(5 as any).toFixed`
+            // unwrapped to `5.toFixed` lexes `5.` as a float, so keep their
+            // parens.
             spans.push({
               start: paren.getStart(source),
               end: paren.getEnd(),
@@ -190,6 +193,6 @@ async function main(argv: string[]): Promise<void> {
 }
 
 // Only run when executed directly, not when imported by the unit test.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   void main(process.argv.slice(2));
 }

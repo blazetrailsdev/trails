@@ -15,7 +15,7 @@ const fixtureText = readFileSync(FIXTURE, "utf8");
 describe("findCandidateCasts", () => {
   it("matches only `(expr as any).member` with a non-underscore member", () => {
     const members = findCandidateCasts(fixtureText).map((c) => c.member);
-    expect(members).toEqual(["id", "name", "toFixed"]);
+    expect(members).toEqual(["id", "name", "toFixed", "toFixed"]);
   });
 
   it("skips underscore (private) member reaches", () => {
@@ -44,6 +44,12 @@ describe("removeCast", () => {
     expect(removeCast(text, span)).toBe("(a + b).toFixed");
   });
 
+  it("keeps parens around a numeric literal so `5.` is not re-lexed as a float", () => {
+    const text = "(5 as any).toFixed";
+    const [span] = findCandidateCasts(text);
+    expect(removeCast(text, span)).toBe("(5).toFixed");
+  });
+
   it("removes only the targeted casts when applied end-to-start", () => {
     const spans = findCandidateCasts(fixtureText).sort((a, b) => b.start - a.start);
     let out = fixtureText;
@@ -53,6 +59,7 @@ describe("removeCast", () => {
     expect(out).toContain("sink(thing.id);");
     expect(out).toContain("sink(getThing().name);");
     expect(out).toContain("sink((a + b).toFixed);");
+    expect(out).toContain("sink((5).toFixed);");
     // Untouched scopes survive verbatim.
     expect(out).toContain("sink((thing as any)._privateField);");
     expect(out).toContain("sink((thing as any[]).length);");

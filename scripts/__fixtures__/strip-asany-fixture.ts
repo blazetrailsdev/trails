@@ -15,6 +15,9 @@ sink((getThing() as any).name);
 // expression), so the cast's own outer parens drop, leaving `(a + b)`.
 sink(((a + b) as any).toFixed);
 
+// Removable, but parens kept: unwrapping `5.toFixed` would lex `5.` as a float.
+sink((5 as any).toFixed);
+
 // Left alone: underscore reach (private).
 sink((thing as any)._privateField);
 
