@@ -38,13 +38,13 @@ describe("Base.establishConnection", () => {
   });
 
   it("creates a SqliteAdapter from a :memory: URL", async () => {
-    await Base.establishConnection(":memory:");
+    await Base.establishConnection("sqlite3::memory:");
     const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
 
   it("creates a SqliteAdapter from a .sqlite3 file path", async () => {
-    await Base.establishConnection(join(tmpdir(), "test.sqlite3"));
+    await Base.establishConnection(`sqlite3:${join(tmpdir(), "test.sqlite3")}`);
     const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
@@ -57,7 +57,7 @@ describe("Base.establishConnection", () => {
 
   it("throws for an unrecognized URL scheme", async () => {
     await expect(Base.establishConnection("ftp://localhost/db")).rejects.toThrow(
-      /Cannot detect database adapter/,
+      /nonexistent 'ftp' adapter/,
     );
   });
 
@@ -68,7 +68,7 @@ describe("Base.establishConnection", () => {
   });
 
   it("registers the pool with the ConnectionHandler", async () => {
-    await Base.establishConnection(":memory:");
+    await Base.establishConnection("sqlite3::memory:");
     expect(Base.connectionHandler.connectionPools.length).toBe(1);
   });
 
