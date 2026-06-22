@@ -9,6 +9,9 @@ import {
 } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
+import { CpkOrder } from "./test-helpers/models/cpk.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { adapterType } from "./test-adapter.js";
@@ -4571,6 +4574,7 @@ describe("RelationTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
+      cpk_orders: TEST_SCHEMA.cpk_orders,
       block_accounts: {
         credit_limit: "integer",
       },
@@ -5542,13 +5546,23 @@ describe("RelationTest", () => {
     expect(results.length).toBe(1);
   });
 
-  it("find all using where with relation with no selects and composite primary key raises", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
+  it("find all using where with relation with no selects and composite primary key raises", async () => {
+    const subquery = CpkOrder.where({ status: "open" });
+
+    // An explicit select projects a single column, so the composite-PK guard
+    // is not reached — mirrors Rails' `assert_nothing_raised`.
+    await expect(CpkOrder.where({ id: subquery.select("id") }).toArray()).resolves.toBeDefined();
+
+    let error: unknown;
+    try {
+      await CpkOrder.where({ id: subquery }).toArray();
+    } catch (e) {
+      error = e;
     }
-    expect(Post.where({ title: "x" })).toBeInstanceOf(Relation);
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect((error as Error).message).toBe(
+      'Cannot map composite primary key ["shop_id", "id"] to id',
+    );
   });
 
   it("find all using where with relation does not alter select values", () => {

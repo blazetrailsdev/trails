@@ -1,4 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
+import { ArgumentError } from "@blazetrails/activemodel";
+
+import { rubyInspectArray } from "../ruby-inspect.js";
 
 /**
  * Handles Relation values in where conditions by converting them to
@@ -49,7 +52,11 @@ export class RelationHandler {
     const model = value._modelClass;
     const pk = model?.primaryKey ?? "id";
     if (Array.isArray(pk)) {
-      throw new Error(`Cannot map composite primary key ${pk.join(", ")} to ${attribute.name}`);
+      // Rails interpolates `model.primary_key` directly, so the composite array
+      // renders via Ruby's `Array#to_s` (e.g. `["shop_id", "id"]`).
+      throw new ArgumentError(
+        `Cannot map composite primary key ${rubyInspectArray(pk)} to ${attribute.name}`,
+      );
     }
     // Select the table-qualified primary key, mirroring Rails
     // `value.select(value.arel_table[value.primary_key])`. Now that the
