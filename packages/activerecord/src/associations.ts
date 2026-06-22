@@ -2681,7 +2681,8 @@ export async function createThroughAssociation(
       through._writeAttribute(sourceFk, target._readAttribute(targetPk));
       if (sourceAssocDef?.options?.polymorphic) {
         const typeCol = `${underscore(sourceName)}_type`;
-        const typeValue = assocDef.options.sourceType ?? (target.constructor as typeof Base).name;
+        const typeValue =
+          assocDef.options.sourceType ?? polymorphicName(target.constructor as typeof Base);
         through._writeAttribute(typeCol, typeValue);
       }
 

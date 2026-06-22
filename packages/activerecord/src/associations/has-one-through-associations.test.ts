@@ -133,6 +133,13 @@ const TEST_SCHEMA = {
   cc_carriers: {},
   cc_customer_carriers: { customer_id: "integer", carrier_id: "integer" },
   cc_shop_accounts: { customer_carrier_id: "integer" },
+  pst_clubs: { name: "string" },
+  pst_sponsors: {
+    club_id: "integer",
+    sponsorable_id: "integer",
+    sponsorable_type: "string",
+  },
+  pst_members: { name: "string", type: "string" },
 } satisfies Schema;
 
 describe("HasOneThroughAssociationsTest", () => {
@@ -680,6 +687,64 @@ describe("HasOneThroughAssociationsTest", () => {
 
     const noMember = await orgClub.loadHasOne("sponsoredMember");
     expect(noMember).toBeNull();
+  });
+
+  it("create through polymorphic source infers source type as base class polymorphic name", async () => {
+    // Pins the inferred-`_type` fallback in createThroughAssociation's
+    // belongs_to-source branch: when the source `_type` is not given by an
+    // explicit `sourceType`, it must be derived as record.class.polymorphic_name
+    // (base_class.name), not the STI subclass name — matching Rails'
+    // belongs_to polymorphic write (belongs_to_polymorphic_association#replace_keys,
+    // `record.class.polymorphic_name`). With `.name` the STI subclass target
+    // would (incorrectly) store "PstSpecialMember".
+    //
+    // A polymorphic source without an explicit `sourceType` is rejected by
+    // ThroughReflection#checkValidityBang — but that validation runs in
+    // _cacheSingularTarget *after* the through record's `_type` is written and
+    // the transaction commits, so the committed row still pins the inferred
+    // value. The throw is incidental; we assert on the persisted write.
+    class PstMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+      }
+    }
+    enableSti(PstMember);
+    class PstSpecialMember extends PstMember {}
+    registerSubclass(PstSpecialMember);
+    class PstSponsor extends Base {
+      static {
+        this.attribute("club_id", "integer");
+        this.attribute("sponsorable_id", "integer");
+        this.attribute("sponsorable_type", "string");
+        this.belongsTo("sponsorable", { polymorphic: true });
+      }
+    }
+    class PstClub extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasOne("sponsor", { className: "PstSponsor", foreignKey: "club_id" });
+        this.hasOne("sponsoredMember", {
+          className: "PstSpecialMember",
+          through: "sponsor",
+          source: "sponsorable",
+        });
+      }
+    }
+    registerModel(PstMember);
+    registerModel(PstSpecialMember);
+    registerModel(PstSponsor);
+    registerModel(PstClub);
+
+    const club = await PstClub.create({ name: "Moustache Club" });
+    await expect(
+      createThroughAssociation(club, "sponsoredMember", { name: "Groucho" }),
+    ).rejects.toThrow();
+
+    const sponsor = await PstSponsor.findBy({ club_id: club.id });
+    expect(sponsor).not.toBeNull();
+    // base_class.name, NOT the STI subclass "PstSpecialMember".
+    expect((sponsor as any)._readAttribute("sponsorable_type")).toBe("PstMember");
   });
 
   it("eager has one through polymorphic with source type", async () => {
