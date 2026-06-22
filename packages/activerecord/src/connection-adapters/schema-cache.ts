@@ -295,9 +295,34 @@ export class SchemaCache {
    * `undefined` when the table's primary key has not been reflected yet (the
    * caller should fall back to the convention default), or the cached value
    * — which may be `null` for a primary-key-less data source such as a view.
+   *
+   * When the dedicated `_primaryKeys` map has no entry but the columns are
+   * already warm, derive the key from the columns' `primaryKey` flags. This is
+   * what lets `id: false` tables with a custom string PK (e.g. `countries`'
+   * `country_id`) surface the right key after `loadSchema` warms only the
+   * columns hash — without it the caller falls back to the "id" convention and
+   * the model needs an explicit `primary_key=`. Mirrors Rails, where the schema
+   * cache resolves `primary_key` from the reflected table rather than the
+   * convention.
+   *
+   * Deliberately returns `undefined` (not `null`) when the warm columns flag no
+   * primary key: the authoritative keyless→`null` answer comes from the async
+   * `primaryKeys` query, and resolving it here would change a warm-but-unqueried
+   * keyless table's `primary_key` from the "id" convention to `null` — a
+   * behavior change beyond surfacing custom keys. Falling through keeps this a
+   * strictly additive read: a table that resolved "id" before still does.
    */
   getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
-    return this._primaryKeys.has(tableName) ? this._primaryKeys.get(tableName) : undefined;
+    if (this._primaryKeys.has(tableName)) return this._primaryKeys.get(tableName);
+    const cols = this._columns.get(tableName);
+    if (!cols) return undefined;
+    // Composite-PK ordering follows reflected column order. That matches the
+    // constraint order for the canonical fixtures; a table whose PK columns are
+    // declared out of column order would need the async `primaryKeys` query
+    // (which sorts by the constraint's key ordinal) to disambiguate.
+    const pkCols = cols.filter((c) => c.primaryKey).map((c) => c.name);
+    if (pkCols.length === 0) return undefined;
+    return pkCols.length === 1 ? pkCols[0] : pkCols;
   }
 
   async indexes(pool: unknown, tableName: string): Promise<unknown[]> {
