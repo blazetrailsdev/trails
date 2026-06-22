@@ -691,10 +691,12 @@ jobs:
   # can never block a merge. The summary is written to the run UI and the
   # lcov/json reports are uploaded as artifacts. activerecord is deliberately
   # excluded (its 6-fork suite dominates CI time); AR coverage is a follow-up.
-  # trails-tsc is also excluded: its watcher/build tests spawn subprocesses
-  # that are coverage-hostile under load and can trip vitest's worker-RPC
-  # timeout — which aborts the whole run and writes no report, voiding every
-  # other package's numbers. Not worth that risk for a tsc-plugin harness.
+  # trails-tsc is excluded from THIS shared run: its watcher/build tests spawn
+  # subprocesses that are coverage-hostile under load and can trip vitest's
+  # worker-RPC timeout — which aborts the whole run and writes no report,
+  # voiding every other package's numbers. It gets its own coverage signal from
+  # the isolated `trails-tsc-coverage` job below, where such a timeout can only
+  # void trails-tsc's own report.
   coverage:
     name: Coverage (reporting-only)
     needs: changes
