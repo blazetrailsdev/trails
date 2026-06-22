@@ -1387,9 +1387,18 @@ export class Relation<T extends Base> {
   inspect(): string {
     // Rails renders `#<ClassName [rec.inspect, ...]>`, loading the records
     // synchronously (blocking DB I/O) when the relation isn't already loaded
-    // and truncating the entry list at 11 with `...`.
-    const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
+    // and truncating the entry list at 11 with `...`. The wrapper carries NO
+    // model name: Rails' `self.class.name` is the relation class itself —
+    // `"ActiveRecord::Relation"` for `Post.limit(2)`, not `Post` (relations_test
+    // "relations show the records in #inspect", relations_test.rb:2108-2111) —
+    // so model identity surfaces only through the inspected records. We use
+    // `this.constructor.name` to keep that class-not-model semantics and to
+    // preserve the Relation / CollectionProxy / AssociationRelation distinction
+    // (three distinct Rails classes); the unqualified vs `ActiveRecord::`-
+    // namespaced gap is a pre-existing deviation shared with the loaded branch,
+    // not specific to this path.
     if (this._loaded) {
+      const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
       const entries = this._records.slice(0, max).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${this.constructor.name} [${entries.join(", ")}]>`;

@@ -516,9 +516,10 @@ describe("RelationTest", () => {
     it("returns a readable string representation", () => {
       // Unloaded: Rails blocks on DB I/O to load records; sync JS can't, so the
       // entries are elided with `...` inside Rails' `#<ClassName [...]>` wrapper.
+      // The wrapper carries the relation class name (Rails: `ActiveRecord::
+      // Relation`), not the model name — model identity is record-only.
       const str = Post.where({ author: "alice" }).order({ views: "desc" }).limit(5).inspect();
-      expect(str.startsWith("#<")).toBe(true);
-      expect(str).toContain("[...]");
+      expect(str).toBe("#<Relation [...]>");
     });
   });
 
@@ -3465,8 +3466,7 @@ describe("RelationTest", () => {
     const str = rel.inspect();
     // Unloaded relations render Rails' `#<ClassName [...]>` wrapper with the
     // not-yet-loaded entries elided (sync JS can't block on DB I/O to load).
-    expect(str.startsWith("#<")).toBe(true);
-    expect(str).toContain("[...]");
+    expect(str).toBe("#<Relation [...]>");
   });
 });
 
@@ -6494,12 +6494,11 @@ describe("RelationTest", () => {
     }
     const rel = Post.where({ title: "hello" });
     const inspected = rel.inspect();
-    // Rails renders `#<ClassName [records]>`. trails reproduces the wrapper
-    // shape; an unloaded relation elides the entries with `...` because sync JS
-    // can't block on DB I/O to load them (see Relation#inspect).
-    expect(typeof inspected).toBe("string");
-    expect(inspected.startsWith("#<")).toBe(true);
-    expect(inspected).toContain("[...]");
+    // Rails renders `#<ActiveRecord::Relation [records]>` — wrapper class name,
+    // no model name. trails reproduces the wrapper shape; an unloaded relation
+    // elides the entries with `...` because sync JS can't block on DB I/O to
+    // load them (see Relation#inspect).
+    expect(inspected).toBe("#<Relation [...]>");
   });
 
   it("relations limit the records in #inspect at 10", async () => {
