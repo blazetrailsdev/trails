@@ -164,7 +164,14 @@ jobs:
           # the job); the scripts/api-compare/ clause keeps that drift check
           # gated on. As with the package gates, infra_files (which carves out
           # scripts/tasks/) feeds the INFRA_RE half of the OR.
-          COMPARISON_RE='^(packages/|scripts/(api|test|fixtures)-compare/|vendor/)'
+          # docs/ruby-ts-conventions.md is ALSO matched directly: it's the
+          # generated artifact the conventions check guards, and the docs_only
+          # logic above (`:234`) deliberately keeps a hand-edit of it
+          # non-docs-only so the drift check still runs. Mirror that here — a
+          # PR that edits ONLY that file matches neither INFRA_RE nor the
+          # package/vendor clauses, so without this it would skip the very
+          # check the docs_only exception was built to preserve.
+          COMPARISON_RE='^(packages/|scripts/(api|test|fixtures)-compare/|vendor/|docs/ruby-ts-conventions\.md$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
