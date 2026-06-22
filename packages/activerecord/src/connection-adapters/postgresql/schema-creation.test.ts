@@ -56,10 +56,6 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(s().visitForeignKeyDefinition(fk2)).toContain("DEFERRABLE INITIALLY DEFERRED");
   });
 
-  it("visitAddForeignKey: NOT VALID when validate=false", () => {
-    expect(s().visitAddForeignKey("a", "b", { validate: false })).toContain("NOT VALID");
-  });
-
   it("visitValidateConstraint", () => {
     expect(s().visitValidateConstraint("c")).toBe('VALIDATE CONSTRAINT "c"');
   });

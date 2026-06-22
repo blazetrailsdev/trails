@@ -7,7 +7,6 @@
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import {
   type ForeignKeyDefinition,
-  type ReferentialAction,
   type ColumnOptions,
   type AddColumnOptions,
   type TableDefinition as AbstractTableDefinition,
@@ -20,8 +19,6 @@ import type {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
 } from "./schema-definitions.js";
-import { singularize, underscore } from "@blazetrails/activesupport";
-import { Utils } from "./utils.js";
 
 type PgTableDef = AbstractTableDefinition & {
   exclusionConstraints: ExclusionConstraintDefinition[];
@@ -100,30 +97,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected override visitAlterTable(o: any): string {
-    // Pull out FK adds so super doesn't process them — we re-add them below
-    // with NOT VALID appended when validate is false.
-    const fkAdds: ForeignKeyDefinition[] = Array.isArray(o.foreignKeyAdds)
-      ? o.foreignKeyAdds.splice(0)
-      : [];
-    let sql: string;
-    try {
-      sql = super.visitAlterTable(o);
-    } finally {
-      // Restore so the object is left in its original state even if super throws.
-      if (fkAdds.length > 0) o.foreignKeyAdds.push(...fkAdds);
-    }
-    if (fkAdds.length > 0) {
-      const table = this.adapter.quoteTableName(o.name);
-      const fkParts = fkAdds.map((fk) => {
-        let part = `ADD ${this.visitForeignKeyDefinition(fk)}`;
-        if (!fk.validate) part += " NOT VALID";
-        return part;
-      });
-      // super already emitted "ALTER TABLE <t> " — if there were no other
-      // parts, sql ends with a trailing space; otherwise append with ", ".
-      const separator = sql.trimEnd() === `ALTER TABLE ${table}` ? " " : ", ";
-      sql = sql.trimEnd() + separator + fkParts.join(", ");
-    }
+    let sql = super.visitAlterTable(o);
     const pgParts: string[] = [];
     if (Array.isArray(o.constraintValidations)) {
       for (const name of o.constraintValidations) pgParts.push(this.visitValidateConstraint(name));
@@ -146,29 +120,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  visitAddForeignKey(fromTable: string, toTable: string, options: Record<string, unknown>): string {
-    const fromName = Utils.extractSchemaQualifiedName(fromTable);
-    const toName = Utils.extractSchemaQualifiedName(toTable);
-    const column = (options.column as string) ?? `${underscore(singularize(toName.identifier))}_id`;
-    const primaryKey = (options.primaryKey as string) ?? "id";
-    const name = (options.name as string) ?? `fk_rails_${fromName.identifier}_${column}`;
-
-    let sql = `ALTER TABLE ${this.adapter.quoteTableName(fromTable)} ADD CONSTRAINT ${this.adapter.quoteIdentifier(name)} `;
-    sql += `FOREIGN KEY (${this.adapter.quoteIdentifier(column)}) REFERENCES ${this.adapter.quoteTableName(toTable)} (${this.adapter.quoteIdentifier(primaryKey)})`;
-
-    if (options.onDelete) {
-      sql += ` ${this.actionSql("DELETE", options.onDelete as ReferentialAction)}`;
-    }
-    if (options.onUpdate) {
-      sql += ` ${this.actionSql("UPDATE", options.onUpdate as ReferentialAction)}`;
-    }
-    if (typeof options.deferrable === "string") {
-      sql += ` DEFERRABLE INITIALLY ${options.deferrable.toUpperCase()}`;
-    }
-    if (options.validate === false) {
-      sql += " NOT VALID";
-    }
-
+  protected override visitAddForeignKey(o: ForeignKeyDefinition): string {
+    let sql = super.visitAddForeignKey(o);
+    if (!o.validate) sql += " NOT VALID";
     return sql;
   }
 
