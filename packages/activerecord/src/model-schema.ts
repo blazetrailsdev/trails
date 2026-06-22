@@ -807,15 +807,16 @@ export function loadSchema(this: SchemaHost): void {
 
   // Cache-miss path: with the schema cache always warm (RFC 0031), a
   // table-backed model reflects from the persistent cache entry above and
-  // returns. Reaching here means a genuinely tableless attribute-only model
-  // (the synthesize fallback below builds its `columnsHash` from declared
-  // attributes). A partially-declared model that still lacks a typed
-  // primary-key def must NOT mark the load terminal: the implicit PK got no
-  // registered type, so `_castAttributeValue` would fall through to `parseInt`
-  // (→ number) while the read path deserializes the live int8 PK to BigInt on
-  // PG — input-cast and read diverge. Leaving `_schemaLoaded` unset lets the
-  // next load (at instantiate, after the find SELECT has warmed the schema
-  // cache) reflect the real PK type.
+  // returns — so the int8→BigInt PK divergence that the old `_castAttributeValue`
+  // parseInt fallback worried about cannot arise on this path. Reaching here
+  // means a genuinely tableless attribute-only model (the synthesize fallback
+  // below builds its `columnsHash` from declared attributes), which has no
+  // adapter-resolved PK type at all. If such a model still lacks a typed
+  // primary-key def, do NOT mark the load terminal: leaving `_schemaLoaded`
+  // unset lets a later load replace the synthesized view with real reflected
+  // columns once a cache entry exists. `_castAttributeValue` returning the raw
+  // string id for a tableless model in the meantime is harmless — there is no
+  // DB column type to cast through.
   let pkStillMissing = false;
   if (workHost._attributeDefinitions.size > 0) {
     const pks = Array.isArray(workHost.primaryKey)
