@@ -5,6 +5,7 @@ import type { AssociationReflection, AbstractReflection } from "../reflection.js
 import { AliasTracker } from "./alias-tracker.js";
 import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
+import { raiseCompositePrimaryKeyMismatch } from "./validate-through-reflection.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 
 /**
@@ -432,7 +433,10 @@ export class AssociationScope {
     if (joinPks.length !== joinFks.length) {
       const name = (reflection as { name?: string }).name ?? "<unknown>";
       const ownerName = (owner.constructor as typeof Base).name;
-      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
+      // Route through the reflection's canonical checkValidityBang (Rails'
+      // single raise site) so the error carries the Rails-faithful message.
+      raiseCompositePrimaryKeyMismatch(owner.constructor as typeof Base, name);
+      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
@@ -550,7 +554,11 @@ export class AssociationScope {
           .reflection ?? (reflection as { name?: string; activeRecord?: { name?: string } });
       const name = base.name ?? "<unknown>";
       const ownerName = base.activeRecord?.name ?? "<unknown>";
-      // Tracked deviation (composite-pk guard): no Rails equivalent here — see errors.ts.
+      // Route through the reflection's canonical checkValidityBang (Rails'
+      // single raise site) so the error carries the Rails-faithful message.
+      const ownerClass = base.activeRecord as unknown as typeof Base | undefined;
+      if (ownerClass) raiseCompositePrimaryKeyMismatch(ownerClass, name);
+      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
