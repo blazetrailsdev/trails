@@ -645,6 +645,14 @@ export class Associations {
     name: string,
     options: AssociationOptions & { joinTable?: string } = {},
   ): void {
+    // Rails coerces `class_name` with `.to_s`, so a Symbol like
+    // `class_name: :ProjectWithSymbolsForKeys` is accepted. JS has no Ruby
+    // symbol; the faithful analogue is a `Symbol("…")`, which we normalize to
+    // its description here before the builder reads `options.className`.
+    const rawClassName = (options as { className?: unknown }).className;
+    if (typeof rawClassName === "symbol") {
+      options = { ...options, className: rawClassName.description ?? "" };
+    }
     HabtmBuilder.build(this, name, options as Record<string, unknown>, {
       defaultJoinTableName,
       singleFk,
@@ -2352,6 +2360,17 @@ function createHabtmJoinModel(
   // delete/destroy operations that issue PK-based WHERE clauses.
   JoinModel._tableName = joinTableName;
   JoinModel.primaryKey = [ownerFk, targetFk];
+
+  // Carry the declaring model's Ruby module path onto the anonymous join model
+  // so its source `belongsTo` resolves an unqualified target class name
+  // (e.g. "Article") namespace-relative to the owner (→ "Publisher::Article").
+  // Without this, the join model's `activeRecord` is the bare `HABTM_*` class
+  // and the compute_type walk has no nesting to try.
+  if ((lhsModel as { moduleName?: string }).moduleName) {
+    (JoinModel as { moduleName?: string }).moduleName = (
+      lhsModel as { moduleName?: string }
+    ).moduleName;
+  }
 
   // Delegate connection to the left (declaring) model
   Object.defineProperty(JoinModel, "connection", {

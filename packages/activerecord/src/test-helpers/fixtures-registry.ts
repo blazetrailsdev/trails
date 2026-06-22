@@ -231,6 +231,10 @@ export const fixtureRegistry = {
     model: () => import("./models/computer.js").then((m) => m.Computer),
     data: FixtureData.computerFixtureData,
   },
+  computersDevelopers: {
+    joinTable: "computers_developers",
+    data: FixtureData.computersDevelopersFixtureData,
+  },
   content: {
     model: () => import("./models/content.js").then((m) => m.Content),
     data: FixtureData.contentFixtureData,

@@ -32,6 +32,47 @@ import { Pirate } from "../test-helpers/models/pirate.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
 import { RichPerson } from "../test-helpers/models/person.js";
 import { Job } from "../test-helpers/models/job.js";
+import { Computer } from "../test-helpers/models/computer.js";
+import { PublisherArticle, PublisherMagazine } from "../test-helpers/models/publisher.js";
+
+// Test-file-local models mirroring the Rails fixture file's inline class
+// definitions (has_and_belongs_to_many_associations_test.rb:63-90).
+class ProjectWithSymbolsForKeys extends Base {
+  static _tableName = "projects";
+
+  static {
+    this.hasAndBelongsToMany("developers", {
+      className: "DeveloperWithSymbolsForKeys",
+      joinTable: "developers_projects",
+      foreignKey: "project_id",
+      associationForeignKey: "developer_id",
+    });
+  }
+}
+
+class DeveloperWithSymbolsForKeys extends Base {
+  static _tableName = "developers";
+
+  static {
+    this.hasAndBelongsToMany("projects", {
+      className: "ProjectWithSymbolsForKeys",
+      joinTable: "developers_projects",
+      associationForeignKey: "project_id",
+      foreignKey: "developer_id",
+    });
+  }
+}
+
+class DeveloperWithSymbolClassName extends Developer {
+  static {
+    // Rails: `class_name: :ProjectWithSymbolsForKeys` (a Symbol). The faithful
+    // JS analogue of a Ruby symbol is `Symbol("…")`; the HABTM builder coerces
+    // it to its description, mirroring Rails' `class_name.to_s`.
+    this.hasAndBelongsToMany("projects", {
+      className: Symbol("ProjectWithSymbolsForKeys") as unknown as string,
+    });
+  }
+}
 
 // ==========================================================================
 // HasAndBelongsToManyAssociationsTest — mirrors
@@ -39,11 +80,13 @@ import { Job } from "../test-helpers/models/job.js";
 // Developer/Project models + developers_projects fixtures.
 // ==========================================================================
 describe("HasAndBelongsToManyAssociationsTest", () => {
-  const { developers, projects } = useHandlerFixtures(
+  const { developers, projects, computers } = useHandlerFixtures(
     [
       "developers",
       "projects",
       "developersProjects",
+      "computers",
+      "computersDevelopers",
       "categories",
       "posts",
       "categoriesPosts",
@@ -86,6 +129,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       RichPerson,
       Tag,
       Tagging,
+      Computer,
+      PublisherArticle,
+      PublisherMagazine,
+      ProjectWithSymbolsForKeys,
+      DeveloperWithSymbolsForKeys,
+      DeveloperWithSymbolClassName,
     ]) {
       registerModel(m as any);
     }
@@ -961,14 +1010,24 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((Vertex as any)._reflectOnAssociation("sources").joinTable).toBe("edges");
   });
 
-  it.skip("has and belongs to many in a namespaced model pointing to a namespaced model", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: className resolution for namespaced models (e.g. "MyModule::Project") not handled in habtm lookup
+  it("has and belongs to many in a namespaced model pointing to a namespaced model", async () => {
+    const magazine = await PublisherMagazine.create({});
+    const article = await PublisherArticle.create({});
+    await association(magazine, "articles").push(article as any);
+    await magazine.save();
+
+    const articles = await association(magazine, "articles").toArray();
+    expect(articles.map((a: any) => a.id)).toContain((article as any).id);
   });
 
-  it.skip("has and belongs to many in a namespaced model pointing to a non namespaced model", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: cross-namespace className resolution (namespaced owner → top-level target) not handled
+  it("has and belongs to many in a namespaced model pointing to a non namespaced model", async () => {
+    const article = await PublisherArticle.create({});
+    const tag = await Tag.create({});
+    await association(article, "tags").push(tag as any);
+    await article.save();
+
+    const tags = await association(article, "tags").toArray();
+    expect(tags.map((t: any) => t.id)).toContain((tag as any).id);
   });
 
   it("redefine habtm", async () => {
@@ -979,14 +1038,22 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await child.save()).toBe(true);
   });
 
-  it.skip("habtm with reflection using class name and fixtures", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test relies on fixture data loaded by Rails fixture system; no equivalent in-memory fixture setup
+  it("habtm with reflection using class name and fixtures", async () => {
+    // `shared_computers` → camelCase `sharedComputers` reflection (class_name: "Computer").
+    expect((Developer as any)._reflectOnAssociation("sharedComputers")).not.toBeNull();
+    // Rails additionally asserts developers.yml literally contains "shared_computers"
+    // (the only way the bug reproduced). trails has no YAML association loader, so the
+    // join row lives in the computersDevelopers fixture — exercised by the data assertion below.
+    const david = developers("david");
+    const sharedComputers = await association(david, "sharedComputers").toArray();
+    expect((sharedComputers[0] as any).id).toBe((computers("laptop") as any).id);
   });
 
-  it.skip("with symbol class name", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: Ruby allows class_name: :Project (symbol); TS port only accepts string — symbol coercion not handled
+  it("with symbol class name", () => {
+    expect(() => {
+      const developer = new DeveloperWithSymbolClassName({});
+      association(developer, "projects");
+    }).not.toThrow();
   });
 
   it.skip("alternate database", () => {
