@@ -690,6 +690,29 @@ export class AssociationScope {
       const result = invokeScopeLambda(head.scope as ScopeLambda<unknown>, scope, owner);
       if (result) scope = result;
     }
+    // Rails folds the source reflection's scope into a has_many/has_one
+    // :through query via `add_constraints`' `chain.reverse_each` over
+    // `reflection.constraints` (association_scope.rb). The head branch above
+    // only applies the through reflection's OWN (delegate) scope; the SOURCE
+    // reflection's scope — e.g.
+    // `Post.has_many :nonexistent_comments, -> { where("comments.id < 0") }`
+    // for `Author.has_many :nonexistent_comments, through: :posts` — lives on
+    // the source reflection and would otherwise be dropped, so the through
+    // query returns all rows instead of the scoped subset. Merge its WHERE/
+    // ORDER predicates here, evaluated against the source klass' table.
+    //
+    // Skip when `source_type:` is set: a polymorphic through carries its
+    // source via a `PolymorphicReflection` already present in the chain (a
+    // non-head entry merged by the loop above), and the source belongsTo's
+    // `klass` is uncomputable (polymorphic) — merging it here would both
+    // double-apply and raise.
+    if (isThrough && !(head as { options?: { sourceType?: unknown } }).options?.sourceType) {
+      const sourceRefl = (head as { sourceReflection?: AbstractReflection | null })
+        .sourceReflection;
+      if (sourceRefl) {
+        scope = this._mergeReflectionScopeChain(scope, sourceRefl, owner);
+      }
+    }
     return scope;
   }
 
