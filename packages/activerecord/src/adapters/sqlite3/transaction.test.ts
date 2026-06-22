@@ -7,20 +7,33 @@
  * semantics as possible within that constraint.
  */
 import { it, expect, afterEach } from "vitest";
+import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import { describeIfSqlite } from "./test-helper.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 
+// better-sqlite3 doesn't set SQLITE_OPEN_URI, so this URI is opened as a
+// *literal on-disk filename* in the process cwd rather than a shared-cache
+// in-memory DB (see sqlite-template.ts). That materializes a junk file named
+// `file::memory:?cache=shared` next to the repo, so afterEach unlinks it.
 const SHARED_CACHE_DB = "file::memory:?cache=shared";
 
 const openAdapters: AbstractSQLite3Adapter[] = [];
-afterEach(() => {
+afterEach(async () => {
   while (openAdapters.length) {
     try {
       openAdapters.pop()!.close();
     } catch {
       // best-effort
+    }
+  }
+  const fs = await getFsAsync();
+  for (const suffix of ["", "-wal", "-shm"]) {
+    try {
+      await fs.unlink!(SHARED_CACHE_DB + suffix);
+    } catch {
+      // never created / already gone — nothing to do.
     }
   }
 });
