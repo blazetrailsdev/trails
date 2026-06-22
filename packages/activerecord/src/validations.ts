@@ -118,6 +118,27 @@ export function _setSuperIsValid(fn: (context?: ValidationContextArg) => boolean
  * Runs validations with automatic context (:create for new records,
  * :update for persisted). Sets _validationContext for the duration
  * matching Rails' with_validation_context.
+ *
+ * TRACKED DEVIATION (pending convergence) — uniqueness is NOT run here.
+ * Rails' `valid?` runs the full validation chain, including the DB-backed
+ * `UniquenessValidator`, because Ruby's DB I/O is synchronous: `valid?`
+ * issues the `SELECT 1 ... WHERE attr = ?` inline and returns `false` on a
+ * collision. trails keeps the validation chain synchronous (`isValid`
+ * returns a `boolean`, never a `Promise`) by design, so uniqueness — which
+ * needs a DB round-trip — is registered into the deferred `_asyncValidations`
+ * registry (see {@link validatesUniqueness}) and drained only at save time by
+ * `Base#_runAsyncValidations` (awaited from persistence). Consequence:
+ * `record.isValid()` can return `true` and then `save()`/`saveBang()` still
+ * fail on a uniqueness collision.
+ *
+ * Convergence to Rails' observable `valid?` semantics would require an async
+ * validation chain (`isValid` returning a `Promise`), which is the explicitly
+ * ratified sync-only-validations architecture's blocker: JS has no synchronous
+ * DB I/O, and an async `isValid` ripples through every synchronous caller.
+ * This is therefore documented as a tracked deviation, not silently accepted.
+ * Note Rails' own `valid?` uniqueness check is a TOCTOU race (the pre-check
+ * and the INSERT aren't atomic), so the save-time-only behavior here is closer
+ * to the concurrency-safe pattern — but it still diverges observably.
  */
 export function isValid(this: ValidationsHost, context?: ValidationContextArg): boolean {
   const effectiveContext =

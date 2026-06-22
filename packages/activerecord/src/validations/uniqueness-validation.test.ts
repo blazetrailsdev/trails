@@ -108,6 +108,43 @@ describe("UniquenessValidationTest", () => {
     expect(p2.isValid()).toBe(true);
   });
 
+  // TRACKED DEVIATION (pending convergence): Rails' `valid?` runs the
+  // DB-backed UniquenessValidator inline (Ruby DB I/O is synchronous), so
+  // `record.valid?` returns false on a collision. trails keeps the validation
+  // chain synchronous (`isValid` returns a boolean), so uniqueness is deferred
+  // to save time via the _asyncValidations registry. These tests pin that
+  // observable divergence: isValid() does NOT reflect uniqueness, but save()
+  // does. See the note on `isValid` in validations.ts.
+  it("isValid does not run uniqueness validations (validatesUniqueness)", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.validatesUniqueness("title");
+      }
+    }
+    await Post.create({ title: "hello" });
+    const p2 = new Post({ title: "hello" });
+    // Sync-looking call path passes despite the collision (deviation).
+    expect(p2.isValid()).toBe(true);
+    // The collision is caught at save time, where the async chain drains.
+    expect(await p2.save()).toBe(false);
+    expect(p2.errors.on("title")).toBeTruthy();
+  });
+
+  it("isValid does not run uniqueness validations (validates uniqueness: true)", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { uniqueness: true });
+      }
+    }
+    await Post.create({ title: "hello" });
+    const p2 = new Post({ title: "hello" });
+    expect(p2.isValid()).toBe(true);
+    expect(await p2.save()).toBe(false);
+    expect(p2.errors.on("title")).toBeTruthy();
+  });
+
   it("validates uniqueness with validates", async () => {
     class Post extends Base {
       static {
