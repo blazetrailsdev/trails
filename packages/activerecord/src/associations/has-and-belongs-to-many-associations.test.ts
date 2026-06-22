@@ -826,10 +826,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await (developer as any).save();
     await developer.reload();
     expect((await association<Project>(developer, "projects").toArray()).length).toBe(2);
-    expect(await association<Project>(developer, "projects").isInclude(activeRecord)).toBe(true);
-    expect(await association<Project>(developer, "projects").isInclude(actionController)).toBe(
-      true,
-    );
+    const ids = [...((await (developer as any).projectIds) as number[])]
+      .map(Number)
+      .sort((a, b) => a - b);
+    expect(ids).toEqual([activeRecord.id, actionController.id].map(Number).sort((a, b) => a - b));
   });
 
   it("assign ids ignoring blanks", async () => {
@@ -845,10 +845,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await (developer as any).save();
     await developer.reload();
     expect((await association<Project>(developer, "projects").toArray()).length).toBe(2);
-    expect(await association<Project>(developer, "projects").isInclude(activeRecord)).toBe(true);
-    expect(await association<Project>(developer, "projects").isInclude(actionController)).toBe(
-      true,
-    );
+    const ids = [...((await (developer as any).projectIds) as number[])]
+      .map(Number)
+      .sort((a, b) => a - b);
+    expect(ids).toEqual([activeRecord.id, actionController.id].map(Number).sort((a, b) => a - b));
   });
 
   it("singular ids are reloaded after collection concat", async () => {
