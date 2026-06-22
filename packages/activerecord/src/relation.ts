@@ -5343,12 +5343,25 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#references
    */
   references(...tables: Array<string | Nodes.SqlLiteral>): Relation<T> {
-    const rel = this._clone().referencesBang(...tables) as Relation<T>;
     // Tag bare-string references as manual so they don't act as eager-load join
     // aliases — mirrors Rails seeding @references only from SqlLiteral
     // references (`Arel.sql("…")`). A SqlLiteral reference IS aliasable and so
     // is excluded here. See QueryMethodsHost._manualReferences.
-    const manual = tables.filter((t): t is string => !(t instanceof Nodes.SqlLiteral));
+    //
+    // Aliasability is decided on a name's FIRST occurrence: Rails dedupes via
+    // `references_values |= table_names` (union keeps the existing object), so a
+    // later bare `references("foo")` does not un-alias an earlier
+    // `references(Arel.sql("foo"))`. Mirror that by only tagging bare strings
+    // whose value is not already a known reference before this call.
+    const seen = new Set(this._referencesValues);
+    const manual: string[] = [];
+    for (const t of tables) {
+      const name = t instanceof Nodes.SqlLiteral ? t.value : t;
+      if (seen.has(name)) continue; // first occurrence wins (Rails `|=` keeps it)
+      seen.add(name);
+      if (!(t instanceof Nodes.SqlLiteral)) manual.push(name);
+    }
+    const rel = this._clone().referencesBang(...tables) as Relation<T>;
     rel._manualReferences = [...new Set([...rel._manualReferences, ...manual])];
     return rel;
   }
