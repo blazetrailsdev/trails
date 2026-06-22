@@ -35,19 +35,21 @@ for (const [adapter, dumps] of Object.entries(byAdapter)) {
   const byFile = {};
   let totalMs = 0;
   let totalCount = 0;
-  const bump = (bucket, key, ms) => {
-    const a = (bucket[key] ??= { count: 0, ms: 0 });
-    a.count += 1;
-    a.ms += ms;
+  // Merge the per-worker pre-aggregated maps (ddl-profile.ts emits aggregates,
+  // not raw records).
+  const merge = (dest, src) => {
+    for (const [key, v] of Object.entries(src ?? {})) {
+      const a = (dest[key] ??= { count: 0, ms: 0 });
+      a.count += v.count;
+      a.ms += v.ms;
+    }
   };
   for (const d of dumps) {
-    for (const r of d.records ?? []) {
-      totalMs += r.ms;
-      totalCount += 1;
-      bump(byOp, r.op, r.ms);
-      bump(byTable, `${r.op} ${r.table ?? "?"}`, r.ms);
-      bump(byFile, r.file, r.ms);
-    }
+    totalMs += d.totalMs ?? 0;
+    totalCount += d.totalCount ?? 0;
+    merge(byOp, d.byOp);
+    merge(byTable, d.byTable);
+    merge(byFile, d.byFile);
   }
   const top = (bucket, n) =>
     Object.entries(bucket)

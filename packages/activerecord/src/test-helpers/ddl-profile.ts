@@ -6,13 +6,16 @@
  * type, table, and test file. Entirely gated behind `DDL_PROFILE=1` — when the
  * flag is off, `install()` is a no-op and there is zero cost on any code path.
  *
- * How it works: on install we monkey-patch the three write/DDL primitives
- * (`execute`, `executeMutation`, `executeBatch`) on each adapter prototype,
- * classify the SQL by leading keyword, time the call with `performance.now()`,
- * and append a record. A `process.on("exit")` handler dumps a JSON summary.
+ * How it works: on install we monkey-patch the two leaf write/DDL primitives
+ * (`execute`, `executeMutation`) on each adapter prototype, classify the SQL by
+ * leading keyword, time the call with `performance.now()`, and append a record.
+ * (`executeBatch` is intentionally NOT patched — it re-dispatches through these
+ * two, so wrapping it would double-count.) The setup file flushes a JSON
+ * summary per worker from an `afterAll` hook, since vitest kills forked workers
+ * before `process.on("exit")` handlers run (those remain as a backstop).
  *
- * This is deliberately isolated in one file with no imports into production
- * code so it can be deleted wholesale. See the audit report for findings.
+ * This is deliberately isolated in one file with no production imports so it
+ * can be deleted wholesale. See the audit report for findings.
  */
 import { getFs } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -44,7 +47,31 @@ export function ddlProfileEnabled(): boolean {
   return process.env.DDL_PROFILE === "1";
 }
 
-const records: DdlRecord[] = [];
+interface OpAgg {
+  count: number;
+  ms: number;
+}
+// Live, bounded aggregates updated on each op. We deliberately do NOT retain a
+// per-op record array: a full-suite worker issues tens of thousands of DDL ops
+// and flush() runs after every test file, so keeping + re-serializing the whole
+// array each flush would be O(files × ops) with multi-MB writes. The aggregate
+// maps are bounded by distinct ops/tables/files, so flush stays cheap. A small
+// capped sample of statements is kept purely for classification spot-checking.
+const agg = {
+  totalCount: 0,
+  totalMs: 0,
+  byOp: {} as Record<string, OpAgg>,
+  byTable: {} as Record<string, OpAgg>,
+  byFile: {} as Record<string, OpAgg>,
+};
+const SQL_SAMPLE_CAP = 50;
+const sqlSamples: { op: DdlOp; sql: string }[] = [];
+
+function bump(bucket: Record<string, OpAgg>, key: string, ms: number): void {
+  const a = (bucket[key] ??= { count: 0, ms: 0 });
+  a.count += 1;
+  a.ms += ms;
+}
 
 // In a full-suite run one worker executes many files, so a fixed env var can't
 // attribute records. vitest's `expect.getState().testPath` is set throughout a
@@ -119,7 +146,14 @@ export function classifyDdl(sqlRaw: string): { op: DdlOp; table: string | null }
 }
 
 export function recordDdl(rec: DdlRecord): void {
-  records.push(rec);
+  agg.totalCount += 1;
+  agg.totalMs += rec.ms;
+  bump(agg.byOp, rec.op, rec.ms);
+  bump(agg.byTable, `${rec.op} ${rec.table ?? "?"}`, rec.ms);
+  bump(agg.byFile, rec.file, rec.ms);
+  if (rec.sql && sqlSamples.length < SQL_SAMPLE_CAP) {
+    sqlSamples.push({ op: rec.op, sql: rec.sql });
+  }
 }
 
 /** Wrap one adapter primitive so DDL calls are timed and recorded. */
@@ -128,19 +162,8 @@ function wrap(proto: Record<string, unknown>, method: string, sqlArgIndex: numbe
   if (typeof orig !== "function") return;
   proto[method] = async function patched(this: unknown, ...args: unknown[]) {
     const arg = args[sqlArgIndex];
-    // executeBatch takes string[]; execute/executeMutation take a single string.
-    const sqls: string[] = Array.isArray(arg)
-      ? (arg as string[])
-      : typeof arg === "string"
-        ? [arg]
-        : [];
-    const classified = sqls
-      .map((s) => {
-        const c = classifyDdl(s);
-        return c ? { ...c, sql: s.trim().slice(0, 120) } : null;
-      })
-      .filter((c): c is { op: DdlOp; table: string | null; sql: string } => c !== null);
-    if (classified.length === 0) {
+    const c = typeof arg === "string" ? classifyDdl(arg) : null;
+    if (!c) {
       return orig.apply(this, args);
     }
     const adapterName = (this as { constructor: { name: string } }).constructor.name;
@@ -148,20 +171,14 @@ function wrap(proto: Record<string, unknown>, method: string, sqlArgIndex: numbe
     try {
       return await orig.apply(this, args);
     } finally {
-      const ms = performance.now() - t0;
-      // Attribute the whole call's elapsed ms to each classified statement,
-      // splitting evenly when a batch carried several (executeBatch case).
-      const per = ms / classified.length;
-      for (const c of classified) {
-        recordDdl({
-          op: c.op,
-          table: c.table,
-          adapter: adapterName,
-          file: currentFile(),
-          ms: per,
-          sql: c.sql,
-        });
-      }
+      recordDdl({
+        op: c.op,
+        table: c.table,
+        adapter: adapterName,
+        file: currentFile(),
+        ms: performance.now() - t0,
+        sql: (arg as string).trim().slice(0, 120),
+      });
     }
   };
 }
@@ -182,11 +199,15 @@ export async function install(): Promise<void> {
     import("../connection-adapters/sqlite3-adapter.js"),
   ]);
 
+  // Patch only the two leaf primitives. Every `executeBatch` implementation
+  // re-dispatches each statement through `execute` (PG) or `executeMutation`
+  // (abstract/mysql/sqlite), so wrapping it too would double-count batched
+  // truncate/fixture DDL — and the leaf calls give better per-statement
+  // attribution (real table names, real per-statement timing).
   for (const klass of [PostgreSQLAdapter, Mysql2Adapter, AbstractSQLite3Adapter]) {
     const proto = klass.prototype as unknown as Record<string, unknown>;
     wrap(proto, "execute", 0);
     wrap(proto, "executeMutation", 0);
-    wrap(proto, "executeBatch", 0);
   }
 
   if (process.env.DDL_PROFILE_DEBUG === "1") {
@@ -204,44 +225,14 @@ export function flush(): void {
   dumpSummary();
 }
 
-interface OpAgg {
-  count: number;
-  ms: number;
-}
-
-function summarize() {
-  const byOp: Record<string, OpAgg> = {};
-  const byTable: Record<string, OpAgg> = {};
-  const byFile: Record<string, OpAgg> = {};
-  let totalMs = 0;
-  let totalCount = 0;
-
-  const bump = (bucket: Record<string, OpAgg>, key: string, ms: number) => {
-    const a = (bucket[key] ??= { count: 0, ms: 0 });
-    a.count += 1;
-    a.ms += ms;
-  };
-
-  for (const r of records) {
-    totalMs += r.ms;
-    totalCount += 1;
-    bump(byOp, r.op, r.ms);
-    bump(byTable, `${r.op} ${r.table ?? "?"}`, r.ms);
-    bump(byFile, r.file, r.ms);
-  }
-
-  return { totalCount, totalMs, byOp, byTable, byFile };
-}
-
 function dumpSummary(): void {
   if (process.env.DDL_PROFILE_DEBUG === "1") {
-    console.error(`[DDL_PROFILE] dumpSummary pid ${process.pid}, ${records.length} records`);
+    console.error(`[DDL_PROFILE] dumpSummary pid ${process.pid}, ${agg.totalCount} ops`);
   }
-  if (records.length === 0) return;
-  const summary = summarize();
+  if (agg.totalCount === 0) return;
   // One file per worker. A full-suite worker runs many test files and calls
   // flush() in afterAll after each, so we overwrite cumulatively — the final
-  // write holds every record this worker saw. Filename is unique per worker.
+  // write holds the worker's complete aggregates. Filename is unique per worker.
   const dir = process.env.DDL_PROFILE_OUT_DIR;
   const workerId = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
   const out =
@@ -253,10 +244,13 @@ function dumpSummary(): void {
     adapter: process.env.ARCONN ?? "sqlite3",
     pgUrl: process.env.PG_TEST_URL ?? null,
     mysqlUrl: process.env.MYSQL_TEST_URL ?? null,
-    file: currentFile(),
     capturedAt: Temporal.Now.instant().toString(),
-    ...summary,
-    records,
+    totalCount: agg.totalCount,
+    totalMs: agg.totalMs,
+    byOp: agg.byOp,
+    byTable: agg.byTable,
+    byFile: agg.byFile,
+    sqlSamples,
   };
   try {
     const fs = getFs();
@@ -264,7 +258,7 @@ function dumpSummary(): void {
     fs.writeFileSync(out, JSON.stringify(payload, null, 2));
     if (process.env.DDL_PROFILE_DEBUG === "1") {
       console.error(
-        `[DDL_PROFILE] ${summary.totalCount} DDL ops, ${summary.totalMs.toFixed(1)}ms → ${out}`,
+        `[DDL_PROFILE] ${agg.totalCount} DDL ops, ${agg.totalMs.toFixed(1)}ms → ${out}`,
       );
     }
   } catch {
