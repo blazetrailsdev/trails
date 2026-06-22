@@ -600,6 +600,25 @@ describe("PreloaderTest", () => {
     expect(sqls).toHaveLength(2);
   });
 
+  it("isEmpty materializes an empty relation and reports true", async () => {
+    const relation = Post.where({ id: -1 });
+    const preloader = new Preloader({ records: relation, associations: "comments" });
+    expect(await preloader.isEmpty()).toBe(true);
+    // Materialized once: a subsequent call() issues no preload query.
+    const sqls = await captureSql(async () => {
+      await preloader.call();
+    });
+    expect(sqls).toHaveLength(0);
+  });
+
+  it("isEmpty reports false for a non-empty relation", async () => {
+    const author = await Author.create({ name: "David" });
+    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
+    const relation = Post.where({ id: post.id });
+    const preloader = new Preloader({ records: relation, associations: "comments" });
+    expect(await preloader.isEmpty()).toBe(false);
+  });
+
   it("preload does not concatenate duplicate records", async () => {
     const author = await Author.create({ name: "David" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });

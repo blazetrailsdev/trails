@@ -16,7 +16,9 @@ export class Batch {
   private _availableRecords: Map<typeof Base, Base[]>;
 
   constructor(preloaders: Preloader[], availableRecords: (Base | Base[])[] = []) {
-    this._preloaders = preloaders.filter((p) => !p.isEmpty());
+    // Empty preloaders are rejected in `call()` — `isEmpty()` is async because
+    // it may materialize a Relation, mirroring Rails' `records.length`.
+    this._preloaders = preloaders;
     this._availableRecords = new Map();
     for (const record of availableRecords.flat()) {
       const klass = (record.constructor as typeof Base).baseClass;
@@ -30,6 +32,12 @@ export class Batch {
   }
 
   async call(): Promise<void> {
+    const active: Preloader[] = [];
+    for (const preloader of this._preloaders) {
+      if (!(await preloader.isEmpty())) active.push(preloader);
+    }
+    this._preloaders = active;
+
     let branches: Branch[] = this._preloaders.flatMap((p) => p.branches);
 
     while (branches.length > 0) {
