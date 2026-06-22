@@ -8,7 +8,7 @@ describe("FileStoreTest", () => {
   let store: FileStore;
   beforeEach(() => {
     cacheDir = mkdtempSync(join(tmpdir(), "file-store-"));
-    store = new FileStore(cacheDir, { expiresIn: 60_000 });
+    store = new FileStore(cacheDir, { expiresIn: 60 });
   });
   afterEach(() => {
     try {
@@ -73,7 +73,7 @@ describe("FileStoreTest", () => {
   });
 
   it("cleanup removes all expired entries", async () => {
-    store.write("foo", "bar", { expiresIn: 10 });
+    store.write("foo", "bar", { expiresIn: 0.01 });
     store.write("baz", "qux");
     await new Promise((r) => setTimeout(r, 20));
     store.cleanup();
@@ -108,7 +108,7 @@ describe("FileStoreTest", () => {
   // (cache.rb read_multi_entries -> read_entry). Without expiry round-trip the
   // reconstructed Entry would look fresh and serve stale data.
   it("fetch_multi honors entry expiration", async () => {
-    store.write("foo", "old", { expiresIn: 10 });
+    store.write("foo", "old", { expiresIn: 0.01 });
     await new Promise((r) => setTimeout(r, 20));
     const result = store.fetchMulti("foo", "bar", (key) => `${key}-generated`);
     expect(result).toEqual({ foo: "foo-generated", bar: "bar-generated" });
