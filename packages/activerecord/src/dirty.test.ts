@@ -451,12 +451,20 @@ describe("DirtyTest", () => {
     expect(pirate.changes).toEqual({});
   });
 
-  it.skip("attribute will change!", () => {
-    // BLOCKED: dirty — `attribute_will_change!` (force-dirty a value) is not
-    // exposed on instances; only the internal `attributeWillChangeBang`
-    // dispatch exists. The test also does `catchphrase << " matey!"` (in-place
-    // string mutation), impossible with JS immutable strings. SCOPE: public
-    // will_change! API + a mutable-string attribute type, separate PR.
+  it("attribute will change!", async () => {
+    const pirate = (await Pirate.createBang({ catchphrase: "arr" })) as Rec;
+
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+    expect((pirate as any).catchphraseWillChange()).toBeTruthy();
+    expect(pirate.attributeChanged("catchphrase")).toBe(true);
+    expect(pirate.attributeChange("catchphrase")).toEqual(["arr", "arr"]);
+
+    // Rails mutates the string in place (`catchphrase << " matey!"`); JS strings
+    // are immutable, so reassign the concatenated value. The will_change! force
+    // above pins the original at "arr", so the observable change is identical.
+    pirate.catchphrase = `${pirate.catchphrase} matey!`;
+    expect(pirate.attributeChanged("catchphrase")).toBe(true);
+    expect(pirate.attributeChange("catchphrase")).toEqual(["arr", "arr matey!"]);
   });
 
   it("virtual attribute will change", async () => {
@@ -886,12 +894,32 @@ describe("DirtyTest", () => {
     // serialized binary string (`data << "bar"`). JS strings are immutable.
   });
 
-  it.skip("changes is correct for subclass", () => {
-    // BLOCKED: JS language — Rails overrides only the *reader*
-    // (`def catchphrase; super.upcase; end`) while keeping the generated writer.
-    // A subclass `get catchphrase()` in JS shadows the inherited accessor pair,
-    // dropping the setter, so `pirate.catchphrase =` throws. No clean
-    // reader-only override with working super-setter in JS class fields.
+  it("changes is correct for subclass", async () => {
+    // Rails overrides only the reader (`def catchphrase; super.upcase; end`),
+    // keeping the generated writer. A JS getter override shadows the inherited
+    // accessor pair and drops the setter, so re-add a setter; both delegate to
+    // `readAttribute`/`writeAttribute` — the trails analog of the `super`
+    // accessor — for a functionally reader-only override. Dirty tracking reads
+    // the raw stored value (not the public reader), so `changes` is unaffected.
+    const Foo = class extends Pirate {
+      get catchphrase(): unknown {
+        const v = (this as any).readAttribute("catchphrase") as string | null;
+        return v == null ? v : v.toUpperCase();
+      }
+      set catchphrase(v: unknown) {
+        (this as any).writeAttribute("catchphrase", v);
+      }
+    };
+
+    const pirate = (await Foo.createBang({ catchphrase: "arrrr" })) as Rec;
+
+    const newCatchphrase = "arrrr matey!";
+
+    pirate.catchphrase = newCatchphrase;
+    expect(pirate.attributeChanged("catchphrase")).toBe(true);
+
+    expect((pirate as any).catchphrase).toBe(newCatchphrase.toUpperCase());
+    expect(pirate.changes).toEqual({ catchphrase: ["arrrr", newCatchphrase] });
   });
 
   it.skip("changes is correct if override attribute reader", () => {
