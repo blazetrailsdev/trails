@@ -17,7 +17,7 @@ import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-tra
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { Post } from "../test-helpers/models/post.js";
+import { Post, FirstPost } from "../test-helpers/models/post.js";
 import { Author, AuthorFavorite, AuthorAddress } from "../test-helpers/models/author.js";
 import { Comment, VerySpecialComment } from "../test-helpers/models/comment.js";
 import { Tag } from "../test-helpers/models/tag.js";
@@ -31,8 +31,6 @@ import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Person } from "../test-helpers/models/person.js";
-import { Reader } from "../test-helpers/models/reader.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -48,12 +46,6 @@ const TEST_SCHEMA: Schema = {
   awex_posts: { awex_author_id: "integer", mention: "string" },
   bt_scope_authors: { name: "string" },
   bt_scope_posts: { title: "string", bt_scope_author_id: "integer" },
-  cp_mod_comments: { body: "string", cp_mod_post_id: "integer" },
-  cp_mod_posts: { title: "string", featured: "boolean" },
-  scp_comments: { body: "string", scp_post_id: "integer" },
-  scp_posts: { title: "string" },
-  pbtu_people: { name: "string", gender: "string", primary_contact_id: "integer" },
-  phmu_people: { name: "string", gender: "string", primary_contact_id: "integer" },
   cpk_hm_items: { order_shop_id: "integer", order_id: "integer", product: "string" },
   cpk_hm_orders: {
     columns: { shop_id: "integer", id: "integer", name: "string" },
@@ -3701,68 +3693,37 @@ describe("EagerAssociationTest", () => {
   });
   it("scoping with a circular preload", async () => {
     // Rails: Comment.preload(post: :comments).scoping { Comment.find(1) }
-    // The circular preload (comment -> post -> comments) must not loop or error
-    // when the relation is pushed onto the scope stack.
-    class ScpComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("scp_post_id", "integer");
-        this.belongsTo("scpPost", { className: "ScpPost", foreignKey: "scp_post_id" });
-      }
-    }
-    class ScpPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("scpComments", { className: "ScpComment", foreignKey: "scp_post_id" });
-      }
-    }
-    registerModel("ScpComment", ScpComment);
-    registerModel("ScpPost", ScpPost);
+    // The pushed scope carries the preload values, so `find` inside the block
+    // runs the circular preload (comment -> post -> comments). It must not loop
+    // or error, and `find` must still return the matching record.
+    const post = await Post.create({ title: "P", body: "b" });
+    const c1 = await Comment.create({ post_id: post.id, body: "c1" });
 
-    const post = await ScpPost.create({ title: "P" });
-    const c1 = await ScpComment.create({ body: "c1", scp_post_id: post.id });
-
-    const rel = (ScpComment as any).all().preload({ scpPost: "scpComments" });
-    const found = await (ScpComment as any).scoping(rel, async () => {
-      return await (ScpComment as any).find(c1.id);
+    const rel = (Comment as any).all().preload({ post: "comments" });
+    const found = await (Comment as any).scoping(rel, async () => {
+      return await (Comment as any).find(c1.id);
     });
     expect(found.id).toBe(c1.id);
+    // The current scope's preload values are applied by `find`, so the circular
+    // preload actually traverses post -> comments (the original loop hazard).
+    const loadedPost = found._preloadedAssociations.get("post");
+    expect(loadedPost.id).toBe(post.id);
+    expect(loadedPost._preloadedAssociations.get("comments").map((c: any) => c.id)).toContain(
+      c1.id,
+    );
   });
 
   it("circular preload does not modify unscoped", async () => {
-    // Rails: FirstPost.preload(comments: :first_post).find(1) must not let the
-    // default scope leak into a subsequent unscoped lookup.
-    class CpModComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("cp_mod_post_id", "integer");
-        this.belongsTo("cpModFirstPost", {
-          className: "CpModPost",
-          foreignKey: "cp_mod_post_id",
-        });
-      }
-    }
-    class CpModPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("featured", "boolean");
-        this.hasMany("cpModComments", {
-          className: "CpModComment",
-          foreignKey: "cp_mod_post_id",
-        });
-        this.defaultScope((rel: any) => rel.where({ featured: true }));
-      }
-    }
-    registerModel("CpModComment", CpModComment);
-    registerModel("CpModPost", CpModPost);
+    // Rails: FirstPost.preload(comments: :first_post).find(1) must not let
+    // FirstPost's default scope (where id: 1) leak into a later unscoped lookup.
+    registerModel("FirstPost", FirstPost);
+    const post1 = await Post.create({ id: 1, title: "P1", body: "b" });
+    const post2 = await Post.create({ id: 2, title: "P2", body: "b" });
+    await Comment.create({ post_id: post1.id, body: "c1" });
 
-    const post1 = await (CpModPost as any).unscoped().create({ title: "P1", featured: true });
-    const post2 = await (CpModPost as any).unscoped().create({ title: "P2", featured: false });
-    await CpModComment.create({ body: "c1", cp_mod_post_id: post1.id });
-
-    const expected = await (CpModPost as any).unscoped().find(post2.id);
-    await (CpModPost as any).all().preload({ cpModComments: "cpModFirstPost" }).find(post1.id);
-    const after = await (CpModPost as any).unscoped().find(post2.id);
+    const expected = await (FirstPost as any).unscoped().find(post2.id);
+    await (FirstPost as any).all().preload({ comments: "firstPost" }).find(post1.id);
+    const after = await (FirstPost as any).unscoped().find(post2.id);
     expect(after.id).toBe(expected.id);
   });
 
@@ -4677,33 +4638,17 @@ describe("EagerAssociationTest", () => {
     // Rails: Person.males.includes(:primary_contact) — the preload of
     // primary_contact must use the association's own (exclusive) scope, not the
     // caller's `males` scope, so non-male contacts are still loaded.
-    class PbtuPerson extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("gender", "string");
-        this.attribute("primary_contact_id", "integer");
-        this.belongsTo("primaryContact", {
-          className: "PbtuPerson",
-          foreignKey: "primary_contact_id",
-        });
-      }
-    }
-    registerModel("PbtuPerson", PbtuPerson);
+    const f1 = await Person.create({ first_name: "F1", gender: "F" });
+    const f2 = await Person.create({ first_name: "F2", gender: "F" });
+    const m1 = await Person.create({ first_name: "M1", gender: "M", primary_contact_id: f1.id });
+    const m2 = await Person.create({ first_name: "M2", gender: "M", primary_contact_id: f2.id });
 
-    const f1 = await PbtuPerson.create({ name: "F1", gender: "F" });
-    const f2 = await PbtuPerson.create({ name: "F2", gender: "F" });
-    const m1 = await PbtuPerson.create({ name: "M1", gender: "M", primary_contact_id: f1.id });
-    const m2 = await PbtuPerson.create({ name: "M2", gender: "M", primary_contact_id: f2.id });
-
-    const people = await (PbtuPerson as any)
-      .where({ gender: "M" })
-      .includes("primaryContact")
-      .toArray();
+    const people = await (Person as any).males().includes("primaryContact").toArray();
     expect(people).toHaveLength(2);
     for (const person of people) {
       const contact = person._preloadedAssociations.get("primaryContact");
       expect(contact).not.toBeNull();
-      const direct = await (PbtuPerson as any).find(person.id);
+      const direct = await (Person as any).find(person.id);
       const directContact = await direct.primaryContact;
       expect(contact.id).toBe(directContact.id);
     }
@@ -4718,29 +4663,16 @@ describe("EagerAssociationTest", () => {
     // Rails: Person.males.includes(:agents) — the preload of agents must use the
     // association's exclusive scope, not the caller's `males` scope, so non-male
     // agents are still loaded.
-    class PhmuPerson extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("gender", "string");
-        this.attribute("primary_contact_id", "integer");
-        this.hasMany("agents", {
-          className: "PhmuPerson",
-          foreignKey: "primary_contact_id",
-        });
-      }
-    }
-    registerModel("PhmuPerson", PhmuPerson);
+    const m1 = await Person.create({ first_name: "M1", gender: "M" });
+    const m2 = await Person.create({ first_name: "M2", gender: "M" });
+    await Person.create({ first_name: "A1", gender: "F", primary_contact_id: m1.id });
+    await Person.create({ first_name: "A2", gender: "F", primary_contact_id: m2.id });
 
-    const m1 = await PhmuPerson.create({ name: "M1", gender: "M" });
-    const m2 = await PhmuPerson.create({ name: "M2", gender: "M" });
-    await PhmuPerson.create({ name: "A1", gender: "F", primary_contact_id: m1.id });
-    await PhmuPerson.create({ name: "A2", gender: "F", primary_contact_id: m2.id });
-
-    const people = await (PhmuPerson as any).where({ gender: "M" }).includes("agents").toArray();
+    const people = await (Person as any).males().includes("agents").toArray();
     expect(people).toHaveLength(2);
     for (const person of people) {
       const agents = person._preloadedAssociations.get("agents");
-      const direct = await (PhmuPerson as any).find(person.id);
+      const direct = await (Person as any).find(person.id);
       const directAgents = await direct.agents.toArray();
       expect(agents.map((a: any) => a.id).sort()).toEqual(
         directAgents.map((a: any) => a.id).sort(),
