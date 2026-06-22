@@ -2571,14 +2571,18 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
     const namedLeft = selectNamedJoins.call(this, this._leftOuterJoinsValues, stashedLeft);
 
     if (
+      this._namedInnerJoins.length === 0 &&
       this._joinValues.length === 0 &&
       this._joinClauses.length === 0 &&
       this._eagerLoadAssociations.length === 0
     ) {
-      // Only left outer joins, no explicit joins or eager stash — short-circuit
-      // (query_methods.rb:1838-1842: `if joins_values.empty?`). In Rails, eager
-      // stash lives inside joins_values; here it's a separate field so we must
-      // also exclude it from the short-circuit to avoid dropping eager-load JOINs.
+      // Only left outer joins, no inner/explicit joins or eager stash —
+      // short-circuit (query_methods.rb:1838-1842: `if joins_values.empty?`). In
+      // Rails `joins_values` holds both inner association names AND the eager
+      // stash; trails splits those into `_namedInnerJoins` and
+      // `_eagerLoadAssociations`, so both must be empty too — otherwise the
+      // left-outer JD belongs in `stashed_join` (folded below), not `named_join`,
+      // and the inner names would be dropped / double-emitted downstream.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
       return buckets;
@@ -2680,32 +2684,31 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // claim of its tables into the shared tracker — passing the shared tracker too
   // would double-count an aliased table.
   if (this._namedInnerJoins.length > 0) {
-    // `namedJoins` is only populated by buildJoinBuckets' left-outer-only
-    // short-circuit, which does NOT fold the left JD (it leaves joins_values for
-    // the caller). Since joins_values (_namedInnerJoins) IS present, fold that
-    // left-outer JD into the inner JD's stashed set now (Rails build_join_buckets
-    // :1843), ahead of any eager/explicit stashed joins.
-    const foldedLeft =
-      namedJoins.length > 0
-        ? [constructJoinDependency.call(this, namedJoins, Nodes.OuterJoin)]
-        : [];
-    const stashed = [...foldedLeft, ...stashedJoins];
+    // joins_values present → InnerJoin named JD that consumes the stashed bucket
+    // (the left-outer JD folded by buildJoinBuckets:1843, plus eager/explicit
+    // stash), so `walk` dedups a both-ways association to one INNER JOIN. With the
+    // short-circuit now also guarding on `_namedInnerJoins`, `named_join` is empty
+    // here, so the whole stashed set is exactly `buckets.stashed_join`.
     const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
-    for (const node of jd.joinConstraints(stashed, undefined, references))
+    for (const node of jd.joinConstraints(stashedJoins, undefined, references))
       arel.source.right.push(node);
     seedTrackerFromJdNodes(sharedTracker, jd);
-    for (const s of stashed) seedTrackerFromJdNodes(sharedTracker, s);
+    for (const s of stashedJoins) seedTrackerFromJdNodes(sharedTracker, s);
   } else if (namedJoins.length > 0) {
     // Pure left-outer-only short-circuit (no joins_values): named_join → OuterJoin.
     const jd = constructJoinDependency.call(this, namedJoins, Nodes.OuterJoin);
-    for (const node of jd.joinConstraints(stashedJoins, aliases, references))
+    for (const node of jd.joinConstraints(stashedJoins, undefined, references))
       arel.source.right.push(node);
+    seedTrackerFromJdNodes(sharedTracker, jd);
+    for (const s of stashedJoins) seedTrackerFromJdNodes(sharedTracker, s);
   } else if (stashedJoins.length > 0) {
     // Stashed join dependencies (eager_load or left_outer combined with explicit
     // joins) — generate join SQL via joinConstraints (mirrors build_joins:1896).
     const [primary, ...rest] = stashedJoins;
-    for (const node of primary.joinConstraints(rest, aliases, references))
+    for (const node of primary.joinConstraints(rest, undefined, references))
       arel.source.right.push(node);
+    seedTrackerFromJdNodes(sharedTracker, primary);
+    for (const s of rest) seedTrackerFromJdNodes(sharedTracker, s);
   }
 
   // Cross-klass merged JoinDependencies (Rails merge_joins): built against the
