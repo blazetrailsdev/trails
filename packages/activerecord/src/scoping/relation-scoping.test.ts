@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, Range, RecordNotFound, registerModel } from "../index.js";
 
-import { adapterType } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -734,17 +733,7 @@ describe("NestedRelationScopingTest", () => {
     });
   });
 
-  // BLOCKED on PG: the non-pooled BEGIN/ROLLBACK path used by withTransactionalFixtures
-  // (forced by the pool-size-1 Proxy workaround) does not protect against concurrent
-  // writes on the same pg.Client; Promise.all of 11 creates within the outer transaction
-  // causes 25P02 (transaction aborted). #2279 closed the pool-layer Bug 2 race but the
-  // test-fixture layer still serializes on a single client. Needs withHandlerTransactionalFixtures
-  // helper (pooled-pin path compatible with handler-resolved adapter) to run on PG.
-  // Rails runs this unconditionally; this is a tracked trails test-infra gap, not an
-  // adapter-fidelity gate, so it is encoded as a runtime guard (incomparable to Rails)
-  // pending convergence story `relation-scoping-pg-handler-transactional-fixtures`.
-  const pgConcurrentFixturesBlocked = adapterType === "postgres";
-  it.skipIf(pgConcurrentFixturesBlocked)("merge inner scope has priority", async () => {
+  it("merge inner scope has priority", async () => {
     const { Post } = makeModel();
     await Promise.all(
       Array.from({ length: 11 }, (_v, i) => Post.create({ title: `Post ${i}`, author: "Someone" })),
