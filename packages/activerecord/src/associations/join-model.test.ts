@@ -630,13 +630,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(comment.id).toBe(comments("more_greetings").id);
   });
 
-  // DEFERRED (tracked: through-polymorphic-source-applies-type-condition): when a
-  // has_many :through walks a polymorphic `as: :taggable` source (Post.taggings),
-  // trails omits the `taggable_type = 'Post'` predicate, so author.taggings_2 /
-  // author.taggings return every tagging whose taggable_id collides with the
-  // owner's post ids (e.g. Rating/Item/FakeModel rows). Un-skip once the
-  // polymorphic type condition is threaded through the source reflection.
-  it.skip("has many through polymorphic has one", async () => {
+  it("has many through polymorphic has one", async () => {
     const david = await Author.find(authors("david").id);
     const taggings2 = (await (david as any).taggings_2.toArray()) as Base[];
     // Rails: Tagging.find(1, 2).sort_by(&:id) — welcome_general + thinking_general.
@@ -647,7 +641,7 @@ describe("AssociationsJoinModelTest", () => {
     );
   });
 
-  it.skip("has many through polymorphic has many", async () => {
+  it("has many through polymorphic has many", async () => {
     const david = await Author.find(authors("david").id);
     const davidTaggings = (await (david as any).taggings.distinct().toArray()) as Base[];
     expect(davidTaggings.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual([

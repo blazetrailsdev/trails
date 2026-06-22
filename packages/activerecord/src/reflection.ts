@@ -1446,6 +1446,31 @@ export class ThroughReflection extends AbstractReflection {
     return this.sourceReflection?.foreignType ?? this.delegateReflection.foreignType;
   }
 
+  /**
+   * The polymorphic `*_type` column a through chain must filter on. Rails'
+   * `AssociationReflection#type` is `options[:as] && "#{as}_type"` — only a
+   * polymorphic has_many/has_one `as:` source contributes a type column; a
+   * belongs_to `polymorphic:` source returns nil there (its type filter is
+   * carried by a PolymorphicReflection chain entry instead). Without this,
+   * `AssociationScope.nextChainScope` reads `undefined` for the through chain
+   * head and omits e.g. `taggings.taggable_type = 'Post'`, leaking rows whose
+   * FK collides across taggable types.
+   *
+   * Mirrors Rails delegating `type` through to the source reflection.
+   */
+  get type(): string | null {
+    const src = this.sourceReflection as
+      | (AssociationReflection & { belongsTo(): boolean })
+      | ThroughReflection
+      | null;
+    if (!src) return null;
+    if (src.isThroughReflection?.()) return (src as ThroughReflection).type;
+    if ((src as any).options?.as && !(src as any).belongsTo?.()) {
+      return (src as AssociationReflection).type;
+    }
+    return null;
+  }
+
   get scope(): ((...args: any[]) => any) | null {
     return this.delegateReflection.scope;
   }
