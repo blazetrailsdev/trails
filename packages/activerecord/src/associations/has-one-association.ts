@@ -4,6 +4,7 @@ import { loadHasOne } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
+import { reflectOnAllAssociations } from "../reflection.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { polymorphicName } from "../inheritance.js";
@@ -111,6 +112,7 @@ export class HasOneAssociation extends SingularAssociation {
 
       case "destroy":
         (target as any).destroyedByAssociation = this.reflection;
+        seedDestroyInverseOwner(this);
         if (typeof (target as any).destroy === "function") {
           await (target as any).destroy();
         }
@@ -329,6 +331,51 @@ export function sameRecord(a: Base | null, b: Base | null): boolean {
   return (a as { isEqual?: (other: unknown) => boolean }).isEqual?.(b) === true;
 }
 
+/**
+ * Before a `dependent: :destroy` cascade runs the target's `destroy`, seed the
+ * target's inverse belongs_to with the owner so the child's `before_destroy`
+ * callbacks can read the parent synchronously.
+ *
+ * Rails relies on the child's `belongs_to` reader to lazily issue a synchronous
+ * DB query inside the callback (e.g. Account#before_destroy reads `account.firm`
+ * to record `destroyed_account_ids[firm.id]`). Our belongs_to reader is async,
+ * so an unloaded parent surfaces as a Promise that sync callbacks must skip.
+ * Seeding the loaded owner here makes the parent reachable synchronously,
+ * matching Rails' observable behaviour without a query. Automatic name-based
+ * inverse detection does not fire for this pair (Company#account ↔ Account#firm
+ * names don't match), so we resolve the inverse by foreign-key equality instead.
+ *
+ * @internal
+ */
+function seedDestroyInverseOwner(assoc: HasOneAssociation): void {
+  const target = assoc.target;
+  if (!target) return;
+  const owner = assoc.owner;
+  const targetCtor = (target as any).constructor as typeof Base;
+  if (typeof (target as any).association !== "function") return;
+  const ownFk = JSON.stringify((assoc as any).foreignKeyColumns());
+  for (const ref of reflectOnAllAssociations(targetCtor, "belongsTo")) {
+    const concrete = ref as unknown as { name: string; foreignKey: unknown; klass?: typeof Base };
+    let fk: unknown;
+    let klass: typeof Base | undefined;
+    try {
+      fk = concrete.foreignKey;
+      klass = concrete.klass;
+    } catch {
+      continue;
+    }
+    if (JSON.stringify(Array.isArray(fk) ? fk : [fk]) !== ownFk) continue;
+    // The owner must actually be an instance of the belongs_to's target class,
+    // so we don't seed an unrelated association that happens to share the FK.
+    if (klass && !(owner instanceof (klass as any))) continue;
+    try {
+      (target as any).association(ref.name).inversedFrom(owner);
+    } catch {
+      // A non-invertible / unresolved belongs_to is simply left untouched.
+    }
+  }
+}
+
 /** @internal */
 async function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<void> {
   const target = assoc.target;
@@ -343,6 +390,7 @@ async function removeTargetBang(assoc: HasOneAssociation, method: string): Promi
     // `destroyed_by_association`) before destroying, and only destroy when the
     // record is actually persisted.
     (target as any).destroyedByAssociation = assoc.reflection;
+    seedDestroyInverseOwner(assoc);
     if (target.isPersisted()) await ((target as any).destroy?.() ?? Promise.resolve());
     return;
   }

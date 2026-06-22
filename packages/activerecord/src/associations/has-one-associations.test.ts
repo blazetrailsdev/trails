@@ -246,10 +246,14 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("association change calls destroy", () => {
-    // BLOCKED: the displaced Account's `firm` belongs_to inverse is not set
-    // during the has_one writer's dependent-destroy, so the Account
-    // before_destroy can't record into `destroyed_account_ids`. Needs
-    // automatic inverse_of detection between Firm#account and Account#firm.
+    // BLOCKED: the JS property setter (`firm.account = Account.new`) cannot
+    // await, so the displaced account is not loaded at queue time and
+    // `persistReplace` has no `previousTarget` to dependent-destroy. The
+    // before_destroy inverse-owner seed (has-one-association.ts) already
+    // makes the cascade record `destroyed_account_ids` once the displaced
+    // record IS known (see "dependence"); what remains is loading the
+    // existing DB target on an unloaded property-setter replace. Tracked by
+    // follow-on story unskip-has-one-load-displaced-on-replace.
   });
 
   it("natural assignment to already associated record", async () => {
@@ -262,11 +266,15 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(company, "account")).id).toBe(account.id);
   });
 
-  it.skip("dependence", () => {
-    // BLOCKED: the dependent-destroyed Account's `firm` belongs_to inverse is
-    // not set during cascade, so the Account before_destroy can't record into
-    // `destroyed_account_ids`. Needs automatic inverse_of detection between
-    // Firm#account and Account#firm.
+  it("dependence", async () => {
+    const numAccounts = (await Account.count()) as number;
+    const firm = (await Firm.find(1)) as any;
+    expect(await readHasOne(firm, "account")).not.toBeNull();
+    const accountId = (await readHasOne(firm, "account")).id;
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
+    await firm.destroy();
+    expect(await Account.count()).toBe(numAccounts - 1);
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([accountId]);
   });
 
   it("exclusive dependence", async () => {
