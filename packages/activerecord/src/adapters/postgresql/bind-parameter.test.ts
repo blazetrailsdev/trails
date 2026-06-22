@@ -23,7 +23,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     async function assertQuotedAs(expected: string, value: unknown, match = 0) {
       const relation = Post.where("title = ?", value);
       expect(relation.toSql()).toBe(`SELECT "posts".* FROM "posts" WHERE (title = ${expected})`);
-      expect(await relation.toArray()).toHaveLength(match);
+      if (match === 0) {
+        expect(await relation.toArray()).toHaveLength(0);
+      } else {
+        expect(await relation.count()).toBe(match);
+      }
     }
 
     it("where with string for string column using bind parameters", async () => {
