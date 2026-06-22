@@ -72,6 +72,8 @@ import {
   stringFlag,
   StoryEntry,
   TASKS_DIR,
+  dirtyWorktreeLines,
+  syncWorktreeToOrigin,
   claimAgeHours,
   isStaleClaim,
   staleClaims,
@@ -2787,5 +2789,75 @@ describe("duplicate RFC-dir reconciliation", () => {
       "finalized",
     );
     expect(existsSync(join(dir, "rfcs", "0000-foo", "stories", "r1.md"))).toBe(true);
+  });
+});
+
+describe("dirtyWorktreeLines", () => {
+  it("reports tracked edits and ignores untracked + generated index files", () => {
+    const porcelain = [
+      " M rfcs/0024/stories/x.md", // tracked, unstaged edit
+      "A  rfcs/0024/stories/y.md", // staged add
+      "?? rfcs/0024/stories/new.md", // untracked — survives reset --hard
+      " M index.md", // generated — rebuilt + re-staged on demand
+    ].join("\n");
+    expect(dirtyWorktreeLines(porcelain)).toEqual([
+      "M rfcs/0024/stories/x.md",
+      "A  rfcs/0024/stories/y.md",
+    ]);
+  });
+
+  it("treats an empty porcelain as clean", () => {
+    expect(dirtyWorktreeLines("")).toEqual([]);
+  });
+});
+
+describe("syncWorktreeToOrigin (pre-read sync)", () => {
+  function setup() {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const seen: string[] = [];
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "status") return "" as never; // clean by default
+      return "" as never;
+    });
+    return { seen };
+  }
+
+  it("fetches + resets --hard origin/main when the worktree is clean", () => {
+    const { seen } = setup();
+    syncWorktreeToOrigin();
+    // status probe first, then the freshness sync runs unchanged.
+    expect(seen).toEqual(["status", "fetch", "reset"]);
+  });
+
+  it("skips reset --hard (no silent data loss) when the worktree has tracked edits", () => {
+    const seen: string[] = [];
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "status") return " M rfcs/0024/stories/x.md" as never;
+      return "" as never;
+    });
+    syncWorktreeToOrigin();
+    // The status probe ran, but the destructive reset --hard never did.
+    expect(seen).toEqual(["status"]);
+    expect(seen).not.toContain("reset");
+    expect(err).toHaveBeenCalled();
+    expect(String(err.mock.calls[0][0])).toMatch(/uncommitted changes/);
+  });
+
+  it("still syncs when only untracked files are present", () => {
+    const seen: string[] = [];
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "status") return "?? rfcs/0024/stories/new.md" as never;
+      return "" as never;
+    });
+    syncWorktreeToOrigin();
+    expect(seen).toEqual(["status", "fetch", "reset"]);
   });
 });

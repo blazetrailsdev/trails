@@ -314,6 +314,22 @@ function restoreGeneratedFiles(cwd: string | undefined): void {
   }
 }
 
+// Parse `git status --porcelain` into the dirty lines that a rebase or
+// `reset --hard` would corrupt or discard — i.e. tracked edits the user would
+// lose. git() trims its output, so the first line loses porcelain's leading
+// status column space (" M foo" → "M foo"); re-trim every line and strip the
+// 1–2 char XY code + whitespace to recover the path, rather than slicing a
+// fixed offset. Untracked files (`??`) survive both a rebase and `reset --hard`,
+// so they're ignored, as are GENERATED_INDEX_FILES (restoreGeneratedFiles
+// resets them to HEAD and the tasks pre-commit hook rebuilds + re-stages them).
+export function dirtyWorktreeLines(porcelain: string): string[] {
+  return porcelain
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("??"))
+    .filter((l) => !GENERATED_INDEX_FILES.includes(l.replace(/^\S{1,2}\s+/, "")));
+}
+
 // Refuse to mutate when the working tree has uncommitted edits the user made by
 // hand (e.g. editing a story's frontmatter, then running `priority`). The
 // mutation loop's leading `git pull --rebase` runs *before* the mutator, so such
@@ -322,9 +338,6 @@ function restoreGeneratedFiles(cwd: string | undefined): void {
 // edits are stashed, rebased over, and reapplied — writing literal git conflict
 // markers into the story frontmatter when upstream touched the same lines. Both
 // corrupt or strand the edit, so stop up front and tell the user to commit.
-// GENERATED_INDEX_FILES are excluded: restoreGeneratedFiles already reset them
-// to HEAD, and the tasks pre-commit hook rebuilds + re-stages them anyway.
-// Untracked files (`??`) are ignored — they don't block a rebase.
 function assertCleanWorktree(cwd: string | undefined): void {
   let porcelain: string;
   try {
@@ -332,15 +345,7 @@ function assertCleanWorktree(cwd: string | undefined): void {
   } catch {
     return; // not a git repo / git unavailable — the pull path surfaces it
   }
-  // git() trims its output, so the first line loses porcelain's leading status
-  // column space (" M foo" → "M foo"); re-trim every line and strip the 1–2
-  // char XY code + whitespace to recover the path, rather than slicing a fixed
-  // offset. Untracked files (`??`) don't block a rebase, so they're ignored.
-  const dirty = porcelain
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("??"))
-    .filter((l) => !GENERATED_INDEX_FILES.includes(l.replace(/^\S{1,2}\s+/, "")));
+  const dirty = dirtyWorktreeLines(porcelain);
   if (dirty.length === 0) return;
   const where = cwd ?? TASKS_DIR;
   console.error(
@@ -361,9 +366,40 @@ function assertCleanWorktree(cwd: string | undefined): void {
 // canonical fallback and explicit $TASKS_DIR overrides are left alone.
 function syncFromOrigin(): void {
   if (!TASKS_DIR_IS_SYMLINK) return;
+  syncWorktreeToOrigin();
+}
+
+// The actual fetch + `reset --hard origin/main`, factored out of the
+// TASKS_DIR_IS_SYMLINK guard so it can be exercised directly in tests.
+// `reset --hard` silently discards uncommitted *tracked* edits, so it must
+// never run against a dirty worktree: an agent authoring a story body (editing
+// a tracked story.md) and then running any read before committing would lose
+// it. When the worktree carries such edits we skip the sync entirely, warn
+// loudly, and serve the possibly-stale index — never destroy unsaved work.
+// Untracked new files survive `reset --hard`, so they don't block the sync.
+export function syncWorktreeToOrigin(cwd?: string): void {
   try {
-    git(["fetch", "--quiet", "origin"], { silent: true });
-    git(["reset", "--hard", "--quiet", "origin/main"], { silent: true });
+    let porcelain: string;
+    try {
+      porcelain = git(["status", "--porcelain"], { silent: true, cwd });
+    } catch {
+      return; // not a git repo / git unavailable — leave the checkout untouched
+    }
+    const dirty = dirtyWorktreeLines(porcelain);
+    if (dirty.length > 0) {
+      const where = cwd ?? TASKS_DIR;
+      console.error(
+        `warning: ${where} has uncommitted changes; skipping the pre-read sync ` +
+          `to origin/main so they aren't discarded by reset --hard:\n` +
+          dirty.map((l) => `  ${l}`).join("\n") +
+          `\n  The index may be stale. Commit or stash these edits, then re-run:\n` +
+          `    git -C "${where}" add -A && git -C "${where}" commit -m "wip"\n` +
+          `  or stash them:  git -C "${where}" stash`,
+      );
+      return;
+    }
+    git(["fetch", "--quiet", "origin"], { silent: true, cwd });
+    git(["reset", "--hard", "--quiet", "origin/main"], { silent: true, cwd });
   } catch {
     /* best-effort — stale data is better than a broken CLI */
   }
