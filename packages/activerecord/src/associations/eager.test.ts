@@ -31,6 +31,8 @@ import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { Project } from "../test-helpers/models/project.js";
+import { Person } from "../test-helpers/models/person.js";
+import { Reader } from "../test-helpers/models/reader.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -2250,16 +2252,6 @@ describe("EagerAssociationTest", () => {
     });
     expect(books).toHaveLength(1);
   });
-  it.skip("eager count performed on a has many association with multi table conditional", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("eager count performed on a has many through association with multi table conditional", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("eager with has and belongs to many and limit", async () => {
     // Rails: test_eager_with_has_and_belongs_to_many_and_limit
     //   Post.all.merge!(includes: :categories, order: "posts.id", limit: 3).to_a
@@ -2492,12 +2484,6 @@ describe("EagerAssociationTest", () => {
     const cats = (posts[0] as any)._preloadedAssociations.get("habtmInhSpecialCategories");
     expect(cats).toHaveLength(1);
   });
-  it.skip("eager with multi table conditional properly counts the records when using size", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-
   it("eager with invalid association reference", async () => {
     class EagerWidget extends Base {
       static {
@@ -5171,12 +5157,14 @@ describe("EagerAssociationTest", () => {
 // `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { authors, posts, comments } = useHandlerFixtures([
+  const { authors, posts, comments, people } = useHandlerFixtures([
     "authors",
     "posts",
     "comments",
     "categories",
     "categoriesPosts",
+    "people",
+    "readers",
   ]);
   beforeAll(async () => {
     await defineSchema(
@@ -5187,6 +5175,8 @@ describe("EagerAssociationTest", () => {
         comments: canonicalSchema.comments,
         categories: canonicalSchema.categories,
         categories_posts: canonicalSchema.categories_posts,
+        people: canonicalSchema.people,
+        readers: canonicalSchema.readers,
       } as Schema,
       { dropExisting: true },
     );
@@ -5197,6 +5187,8 @@ describe("EagerAssociationTest", () => {
   registerModel(VerySpecialComment);
   registerModel(Category);
   registerModel(Categorization);
+  registerModel(Person);
+  registerModel(Reader);
 
   it("loading with multiple associations", async () => {
     const loaded = await Post.all()
@@ -5208,6 +5200,47 @@ describe("EagerAssociationTest", () => {
     expect((first.association("categories").target as Base[]).length).toBe(2);
     const commentIds = (first.association("comments").target as Base[]).map((c) => c.id);
     expect(commentIds).toContain(comments("greetings").id);
+  });
+
+  it("eager count performed on a has many association with multi table conditional", async () => {
+    const author = authors("david") as any;
+    const allPosts = (await author.posts.toArray()) as Base[];
+    let authorPostsWithoutComments = 0;
+    for (const post of allPosts) {
+      if (((await (post as any).comments.toArray()) as Base[]).length === 0)
+        authorPostsWithoutComments++;
+    }
+    const count = await author.posts
+      .includes("comments")
+      .where("comments.id is null")
+      .references("comments")
+      .count();
+    expect(count).toBe(authorPostsWithoutComments);
+  });
+
+  it("eager count performed on a has many through association with multi table conditional", async () => {
+    const person = people("michael") as any;
+    const allPosts = (await person.posts.toArray()) as Base[];
+    let personPostsWithoutComments = 0;
+    for (const post of allPosts) {
+      if (((await (post as any).comments.toArray()) as Base[]).length === 0)
+        personPostsWithoutComments++;
+    }
+    const count = await person.postsWithNoComments.count();
+    expect(count).toBe(personPostsWithoutComments);
+  });
+
+  it("eager with multi table conditional properly counts the records when using size", async () => {
+    const author = authors("david") as any;
+    const allPosts = (await author.posts.toArray()) as Base[];
+    const postsWithNoComments: Base[] = [];
+    for (const post of allPosts) {
+      if (((await (post as any).comments.toArray()) as Base[]).length === 0)
+        postsWithNoComments.push(post);
+    }
+    expect(await author.postsWithNoComments.size()).toBe(postsWithNoComments.length);
+    const loaded = (await author.postsWithNoComments.toArray()) as Base[];
+    expect(loaded.map((p) => p.id)).toEqual(postsWithNoComments.map((p) => p.id));
   });
 
   it("loading from an association that has a hash of conditions", async () => {
