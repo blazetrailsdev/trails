@@ -20,6 +20,11 @@ const RESTRICTED_CLASS_METHODS = new Set([
   "relation",
 ]);
 
+// Own properties every class function carries (`Base.length`/`Base.prototype`);
+// they are not AR-defined methods, so — unlike Rails' `name` — they must not
+// count as dangerous. `name` stays dangerous via RESTRICTED_CLASS_METHODS.
+const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
+
 /**
  * Mirrors `ActiveRecord::AttributeMethods::ClassMethods#dangerous_class_method?`:
  * a name is dangerous if it is in `RESTRICTED_CLASS_METHODS` or if AR::Base (or
@@ -30,6 +35,7 @@ const RESTRICTED_CLASS_METHODS = new Set([
  */
 function isDangerousClassMethod(name: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(name)) return true;
+  if (INTRINSIC_FUNCTION_PROPS.has(name)) return false;
   let klass: any = Base;
   while (klass && klass !== Function.prototype && klass !== Object.prototype) {
     if (Object.prototype.hasOwnProperty.call(klass, name)) return true;

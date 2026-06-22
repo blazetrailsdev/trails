@@ -4,18 +4,6 @@ import type { Relation } from "../relation.js";
 import { ScopeRegistry } from "../scoping.js";
 
 /**
- * Mirrors Rails' `scope.is_a?(Relation)` check without importing the `Relation`
- * value (avoids a load-order cycle): a loaded relation exposes `load`/`toArray`.
- */
-function isRelationLike(value: unknown): boolean {
-  return (
-    value != null &&
-    typeof (value as any).load === "function" &&
-    typeof (value as any).toArray === "function"
-  );
-}
-
-/**
  * Manages evaluating and applying default scopes.
  *
  * Mirrors: ActiveRecord::Scoping::Default::DefaultScope
@@ -148,7 +136,10 @@ export function defaultScope<T extends typeof Base>(
   fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
   optionsOrAllQueries?: { allQueries?: boolean } | boolean,
 ): void {
-  if (isRelationLike(fn) || typeof fn !== "function") {
+  // Rails: `scope.is_a?(Relation) || !scope.respond_to?(:call)`. A trails
+  // Relation is a non-callable object, so the callable check alone covers both
+  // (an eager `Model.where(...)` relation included).
+  if (typeof fn !== "function") {
     throw new ArgumentError(
       "Support for calling #default_scope without a block is removed. For " +
         "example instead of `default_scope where(color: 'red')`, please use " +
