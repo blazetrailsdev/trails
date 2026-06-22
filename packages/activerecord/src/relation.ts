@@ -5767,8 +5767,13 @@ export class Relation<T extends Base> {
     };
   }
 
+  /** Mirrors Rails' `Relation#values_for_queries` (relation.rb:1286):
+   *  `@values.except(:extending, :skip_query_cache, :strict_loading)`. This is
+   *  the canonical key the preloader uses to decide whether two loaders
+   *  coalesce (Preloader::Association::LoaderQuery#eql?/#hash). */
   valuesForQueries(): Record<string, unknown> {
-    return this.values();
+    const { extending: _extending, strictLoading: _strictLoading, ...rest } = this.values();
+    return rest;
   }
 
   /** True when this relation's WHERE equals the model's unscoped baseline —
