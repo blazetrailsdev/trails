@@ -850,12 +850,13 @@ class ApiExtractor
   end
 
   # `class_attribute`/`cattr_accessor`/`mattr_accessor` (and their reader/writer
-  # variants) metaprogram reader/writer/predicate accessors as BOTH instance and
-  # class methods. The static `def` walker can't see them, so their TS ports
-  # (`partialInserts`, `defaultShard`, …) look novel without this. `class_attribute`
-  # additionally generates a `?` predicate. A trailing options hash
-  # (`default:`, `instance_writer:`) is ignored — `leading_symbol_args` stops at
-  # the first `bare_assoc_hash`.
+  # variants) metaprogram reader/writer/predicate accessors at both the class
+  # and instance level. The static `def` walker can't see them, so their TS
+  # ports (`partialInserts`, `defaultShard`, …) look novel without this.
+  # `class_attribute` additionally generates a `?` predicate. The generated
+  # NAMES come from the leading positional symbols only (`leading_symbol_args`
+  # stops at the options hash, so `default: :foo` is never a method name); the
+  # options hash's `instance_*:` flags gate the instance-level accessors below.
   def process_mattr(args, reader:, writer:, predicate:)
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
@@ -873,15 +874,15 @@ class ApiExtractor
 
     vis = current_visibility
     leading_symbol_args(args).each do |name|
-      add_mattr_accessor(target, name, vis, "#{name}", reader, inst_reader, [])
-      add_mattr_accessor(target, name, vis, "#{name}=", writer, inst_writer,
+      add_mattr_accessor(target, vis, "#{name}", reader, inst_reader, [])
+      add_mattr_accessor(target, vis, "#{name}=", writer, inst_writer,
                          [{ name: "value", kind: "required" }])
-      add_mattr_accessor(target, name, vis, "#{name}?", predicate, inst_predicate, [])
+      add_mattr_accessor(target, vis, "#{name}?", predicate, inst_predicate, [])
     end
     maybe_update_module_file(fqn, target)
   end
 
-  def add_mattr_accessor(target, _name, vis, method_name, on_class, on_instance, params)
+  def add_mattr_accessor(target, vis, method_name, on_class, on_instance, params)
     return unless on_class || on_instance
     info = {
       name: method_name,
