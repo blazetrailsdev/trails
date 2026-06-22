@@ -33,7 +33,9 @@ export type Quoter = Pick<
  * run before a connection is established. @internal
  */
 const ABSTRACT_QUOTER: Quoter = {
-  quote: (v) => abstractQuote(v),
+  // `abstractQuote` requires a host receiver; this ANSI fallback has no adapter,
+  // so bind a bare host — date/time values route through the module helpers.
+  quote: (v) => abstractQuote.call({}, v),
   quoteIdentifier: (n) => abstractQuoteIdentifier(n),
   // ANSI fallback: the abstract `quoteTableNameForAssignment` delegates to the
   // throwing `quoteColumnName`, so render `"table"."attr"` directly here.

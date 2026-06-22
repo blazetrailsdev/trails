@@ -179,7 +179,7 @@ export function columnNameWithOrderMatcher(): RegExp {
  * dispatch lands on MySQL's {@link quotedDate}. Booleans fall through to the
  * abstract `"TRUE"`/`"FALSE"`; binds serialize to 1/0 via {@link castBoundValue}.
  */
-export function quote(this: QuotingDispatchHost | void, value: unknown): string {
+export function quote(this: QuotingDispatchHost, value: unknown): string {
   // Non-finite numbers (±Infinity, NaN) have no MySQL literal — `String(Infinity)`
   // produces the bareword `Infinity`, which MySQL parses as an identifier and
   // throws "Unknown column 'Infinity'". Mirror PG's behavior and quote them as
@@ -257,7 +257,7 @@ export function quotedDate(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#type_cast
  */
-export function typeCast(this: QuotingDispatchHost | void, value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (typeof value === "symbol") return value.description ?? String(value);
   if (value === true) return unquotedTrue();
   if (value === false) return unquotedFalse();

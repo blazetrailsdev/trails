@@ -11,7 +11,7 @@ import {
   columnNameWithOrderMatcher,
   IntegerOutOf64BitRange,
   lookupCastTypeFromColumn,
-  quote,
+  quote as quoteFn,
   quoteDefaultExpression,
   quotedBinary,
   quotedDate,
@@ -19,9 +19,15 @@ import {
   quotedTrue,
   quoteSchemaName,
   quoteTableNameForAssignment,
-  typeCast,
+  typeCast as typeCastFn,
   unescapeBytea,
 } from "./quoting.js";
+
+// `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
+// PG's quotedDate so date/time values reach the BC-suffixing override.
+const HOST = { quotedDate };
+const quote = (value: unknown): string => quoteFn.call(HOST, value);
+const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
 describe("PostgreSQL quoting", () => {
   it("inherits abstract boolean SQL literals", () => {
@@ -243,7 +249,7 @@ describe("PostgreSQL quoting", () => {
     // Rails' PG#quote calls super, whose Date branch is `'#{quoted_date(value)}'`
     // — dispatching through PG's BC-aware quoted_date. Threading `this` reaches it.
     const v = Temporal.PlainDate.from("-000043-03-15");
-    expect(quote.call({ quotedDate }, v)).toBe("'0044-03-15 BC'");
+    expect(quoteFn.call({ quotedDate }, v)).toBe("'0044-03-15 BC'");
   });
 
   it("typeCast(new Date()) throws — Date is no longer accepted", () => {

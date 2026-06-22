@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
-  quote,
+  quote as quoteFn,
   quoteIdentifier,
-  typeCast,
+  typeCast as typeCastFn,
   quotedBinary,
   unquoteIdentifier,
   castBoundValue,
@@ -12,6 +12,12 @@ import {
   columnNameWithOrderMatcher,
 } from "./quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
+
+// `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
+// the adapter prototype so date/time values reach MySQL's quotedDate override.
+const HOST = Object.create(AbstractMysqlAdapter.prototype) as object;
+const quote = (value: unknown): string => quoteFn.call(HOST, value);
+const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
 describe("MySQL quoting — quote", () => {
   it("returns NULL for null / undefined", () => {

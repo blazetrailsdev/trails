@@ -421,7 +421,7 @@ describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", ()
     const { quote: standaloneQuote } = await import("./mysql/quoting.js");
     const adapter = await makeAdapter();
     for (const s of ["it's", "back\\slash", "\0null\nbyte\rreturn\x1aeof", "'; DROP TABLE t; --"]) {
-      expect(adapter.quote(s)).toBe(standaloneQuote(s));
+      expect(adapter.quote(s)).toBe(standaloneQuote.call(adapter, s));
     }
   });
 });

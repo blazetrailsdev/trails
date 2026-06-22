@@ -2,24 +2,33 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { minutes, BigDecimal } from "@blazetrails/activesupport";
 import {
-  quote,
+  quote as quoteFn,
   quoteString,
   quoteColumnName,
   quoteTableName,
   quoteTableNameForAssignment,
   quotedDate,
-  quotedTime,
+  quotedTime as quotedTimeFn,
   quotedTrue,
   unquotedTrue,
   quotedFalse,
   unquotedFalse,
   quotedBinary,
-  typeCast,
+  typeCast as typeCastFn,
   castBoundValue,
   sanitizeAsSqlComment,
   columnNameMatcher,
   columnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
+
+// `quote` / `typeCast` / `quotedTime` require a host receiver (no receiver-less
+// dispatch); bind an empty host so date/time values route through the abstract
+// module helpers.
+const HOST = {};
+const quote = (value: unknown): string => quoteFn.call(HOST, value);
+const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
+const quotedTime = (value: Temporal.PlainTime | Temporal.PlainDateTime): string =>
+  quotedTimeFn.call(HOST, value);
 import {
   formatInstantForSql,
   formatPlainTimeForSql,
