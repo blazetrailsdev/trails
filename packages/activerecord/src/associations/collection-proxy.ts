@@ -3,7 +3,6 @@ import { Relation } from "../relation.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
-import { rubyInspectArray } from "../relation/ruby-inspect.js";
 
 // Late-bound AssociationRelation constructor to break circular imports
 // (association-relation.ts extends Relation, which would otherwise
@@ -45,11 +44,7 @@ import {
   CompositePrimaryKeyMismatchError,
 } from "./errors.js";
 import { getInheritanceColumn, findStiClass, stiEnabled, polymorphicName } from "../inheritance.js";
-import {
-  hasQueryConstraints as ownerHasQueryConstraints,
-  queryConstraintsList as ownerQueryConstraintsList,
-  compositeQueryConstraintsList,
-} from "../persistence.js";
+import { compositeQueryConstraintsList } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   association,
@@ -1822,97 +1817,38 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     throughAssoc: AssociationDefinition,
     ctor: typeof Base,
   ): { fkCols: string[]; pkCols: string[] } {
-    // Mirror Reflection's foreignKey resolution (reflection.ts:520-535 +
-    // deriveFkQueryConstraints at :548-585). When the owner has class-level
-    // query constraints and no explicit option, the derived `<owner>_id`
-    // *replaces* the owner-PK column inside the constraints list (rather
-    // than taking the constraints verbatim, which would put `id` on the
-    // join table instead of the actual FK column).
-    let ownerFk: string | string[];
-    if (throughAssoc.options.foreignKey !== undefined) {
-      ownerFk = throughAssoc.options.foreignKey;
-    } else if (throughAssoc.options.queryConstraints) {
-      ownerFk = throughAssoc.options.queryConstraints;
-    } else {
-      // Prefer the rich reflection's scalar foreignKey, derived from the class
-      // that *declared* the through association (`reflection.active_record`),
-      // not the STI subclass owner instance — mirrors Rails
-      // `reflection.foreign_key`. For a `SpecialPost` owner whose
-      // `has_many :readers` is declared on `Post` this yields `post_id`, not
-      // `special_post_id`. A composite reflection FK falls through to the
-      // query-constraint derivation below (unchanged).
-      const reflFk = ctor._reflectOnAssociation?.(throughAssoc.name)?.foreignKey;
-      const derivedFk = typeof reflFk === "string" ? reflFk : `${underscore(ctor.name)}_id`;
-      const constraints = ownerHasQueryConstraints.call(ctor as any)
-        ? ownerQueryConstraintsList.call(ctor as any)
-        : null;
-      if (!constraints) {
-        ownerFk = derivedFk;
-      } else if (constraints.includes(derivedFk)) {
-        // Mirrors Reflection#deriveFkQueryConstraints (reflection.ts:573):
-        // when the derived FK is itself one of the constraint columns, the
-        // FK is just that scalar — the remaining constraints come from
-        // scope chains, not the join FK.
-        ownerFk = derivedFk;
-      } else {
-        // Mirror Reflection#deriveFkQueryConstraints validation
-        // (reflection.ts:555-571): only 2-column constraints are derivable,
-        // and the owner's scalar primary key must be one of them.
-        if (constraints.length > 2) {
-          throw new ConfigurationError(
-            `The query constraints list on the \`${ctor.name}\` model has more than 2 ` +
-              `attributes. Active Record is unable to derive the query constraints ` +
-              `for the association. You need to explicitly define the query constraints ` +
-              `for this association.`,
-          );
-        }
-        const ownerPk = ctor.primaryKey;
-        const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
-        if (ownerPkStr && !constraints.includes(ownerPkStr)) {
-          throw new ConfigurationError(
-            `The query constraints on the \`${ctor.name}\` model does not include the primary ` +
-              `key so Active Record is unable to derive the foreign key constraints for ` +
-              `the association. You need to explicitly define the query constraints for this ` +
-              `association.`,
-          );
-        }
-        if (ownerPkStr && constraints[0] === ownerPkStr) {
-          ownerFk = [derivedFk, constraints[1]];
-        } else if (ownerPkStr && constraints[1] === ownerPkStr) {
-          ownerFk = [constraints[0], derivedFk];
-        } else {
-          // Mirrors reflection.ts:583-588 — when constraints can't be
-          // resolved (e.g. composite owner PK with class-level
-          // queryConstraints), we cannot derive a join-table FK shape
-          // without producing invalid columns.
-          throw new ConfigurationError(
-            `Active Record couldn't correctly interpret the query constraints ` +
-              `for the \`${ctor.name}\` model. The query constraints on \`${ctor.name}\` are ` +
-              `\`${rubyInspectArray(constraints)}\` and the foreign key is \`${derivedFk}\`. ` +
-              `You need to explicitly set the query constraints for this association.`,
-          );
-        }
-      }
-    }
+    // Rails reads owner attributes straight off the through reflection:
+    // `through_reflection.foreign_key` / `through_reflection.active_record_primary_key`
+    // (through_association.rb:84). The rich Reflection already computes every
+    // case the join/preload paths use — `foreignKey` runs the option →
+    // queryConstraints → deriveFkQueryConstraints resolution (reflection.ts:781),
+    // and `activeRecordPrimaryKey` runs the option → queryConstraintsList →
+    // id-collapse resolution (reflection.ts:1049) — and both derive from the
+    // class that *declared* the association (`reflection.active_record`), so an
+    // STI subclass owner resolves `post_id` not `special_post_id`. Delegate
+    // rather than keep a parallel copy.
+    const reflection = ctor._reflectOnAssociation?.(throughAssoc.name) as
+      | { foreignKey?: string | string[]; activeRecordPrimaryKey?: string | string[] }
+      | undefined;
+
+    // Only the unregistered/anonymous owner (no reflection) falls back to the
+    // conventional `<owner>_id` against the owner's primary key.
+    const ownerFk: string | string[] =
+      reflection?.foreignKey ??
+      throughAssoc.options.foreignKey ??
+      throughAssoc.options.queryConstraints ??
+      `${underscore(ctor.name)}_id`;
     const fkCols = Array.isArray(ownerFk) ? ownerFk : [ownerFk];
 
-    // Mirror Reflection#active_record_primary_key (reflection.rb:587-603).
-    // `options[:query_constraints]` describes the *foreign-key* shape on the
-    // join table — Rails never reuses it as the owner PK. The owner PK comes
-    // from the class-level `query_constraints_list`, falling back to the
-    // model's primaryKey when the option is set on the association but the
-    // owner class itself has no class-level constraints.
     let ownerPk: string | string[];
-    if (throughAssoc.options.primaryKey !== undefined) {
+    if (reflection?.activeRecordPrimaryKey !== undefined) {
+      ownerPk = reflection.activeRecordPrimaryKey;
+    } else if (throughAssoc.options.primaryKey !== undefined) {
       ownerPk = throughAssoc.options.primaryKey;
     } else if (
-      ownerHasQueryConstraints.call(ctor as any) ||
-      throughAssoc.options.queryConstraints
-    ) {
-      ownerPk = ownerQueryConstraintsList.call(ctor as any) ?? ctor.primaryKey;
-    } else if (
-      // Rails' id-collapse: a scalar FK against a composite PK that includes
-      // "id" pairs with the scalar "id" column (reflection.ts:791-793).
+      // Reflection-less fallback only: reproduce Reflection#activeRecordPrimaryKey's
+      // id-collapse (reflection.ts:1063-1065) — a scalar FK against a composite PK
+      // that includes "id" pairs with the scalar "id" column.
       fkCols.length === 1 &&
       Array.isArray(ctor.primaryKey) &&
       ctor.primaryKey.includes("id")
