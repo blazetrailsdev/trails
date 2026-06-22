@@ -5342,12 +5342,14 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#references
    */
-  references(...tables: string[]): Relation<T> {
+  references(...tables: Array<string | Nodes.SqlLiteral>): Relation<T> {
     const rel = this._clone().referencesBang(...tables) as Relation<T>;
-    // Tag these as manual (bare-string) references so they don't act as
-    // eager-load join aliases — mirrors Rails seeding @references only from
-    // SqlLiteral references. See QueryMethodsHost._manualReferences.
-    rel._manualReferences = [...new Set([...rel._manualReferences, ...tables])];
+    // Tag bare-string references as manual so they don't act as eager-load join
+    // aliases — mirrors Rails seeding @references only from SqlLiteral
+    // references (`Arel.sql("…")`). A SqlLiteral reference IS aliasable and so
+    // is excluded here. See QueryMethodsHost._manualReferences.
+    const manual = tables.filter((t): t is string => !(t instanceof Nodes.SqlLiteral));
+    rel._manualReferences = [...new Set([...rel._manualReferences, ...manual])];
     return rel;
   }
 

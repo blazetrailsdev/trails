@@ -89,15 +89,48 @@ describe("PredicateBuilderTest", () => {
     }
   });
 
-  it.skip("registering new handlers for joins", () => {
-    // BLOCKED: relation/join-dependency — custom-handler propagation into the
-    // scoped belongs_to lambda now works (emits `... ~ 'rails'`), but trails
-    // joins the target on its real table name (`topics`) where Rails aliases
-    // the join to the association name (`regexp_topic`). trails only aliases on
-    // name collision (Rails alias_candidate); aliasing a differently-named
-    // belongs_to join to its association name is a JoinDependency gap.
-    // ROOT-CAUSE: join-dependency does not alias non-colliding belongs_to joins
-    // to the association name. Tracked: RFC 0027 join-dependency-fidelity.
+  it("registering new handlers for joins", () => {
+    // Rails: Reply.joins(:regexp_topic).references(Arel.sql("regexp_topic")).to_sql
+    // aliases the joined `topics` table to the association name `regexp_topic`
+    // (an aliasable SqlLiteral reference), yielding `"regexp_topic"."title" ~ 'rails'`.
+    class RegexFilter3 {
+      constructor(public source: string) {}
+    }
+    class JTopic extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+      }
+    }
+    class JReply extends Base {
+      static {
+        this.tableName = "replies";
+        this.attribute("parent_id", "integer");
+        this.belongsTo("regexp_topic", {
+          className: "JTopic",
+          foreignKey: "parent_id",
+          scope: (rel: any) => rel.where({ title: new RegexFilter3("rails") }),
+        });
+      }
+    }
+    registerModel("JTopic", JTopic);
+    registerModel("JReply", JReply);
+    JTopic.predicateBuilder.registerHandler(RegexFilter3, {
+      call: (attr, val: RegexFilter3) =>
+        new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
+    });
+    try {
+      const sql = JReply.joins("regexp_topic")
+        .references(new Nodes.SqlLiteral("regexp_topic") as any)
+        .toSql();
+      expect(sql).toMatch(
+        new RegExp(`${escapeRegExp(quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),
+      );
+    } finally {
+      modelRegistry.delete("JTopic");
+      modelRegistry.delete("JReply");
+      (JTopic as any)._predicateBuilder = null;
+    }
   });
 
   it("references with schema", () => {
