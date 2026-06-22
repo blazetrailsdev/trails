@@ -629,7 +629,31 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/
+      #
+      # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting,
+      # RFC 0028): collected on the sqlite lane only (the cheapest backend), and
+      # ONLY for this main AR run — the activerecord-cli step below stays
+      # coverage-free so it doesn't clobber the report. AR_COVERAGE=1 scopes the
+      # vitest coverage include to activerecord source (see vitest.config.ts).
+      # There is NO threshold gate — the summary/upload steps are `if: always()`
+      # and never fail the build; the test run itself gates exactly as before.
+      - run: pnpm vitest run packages/activerecord/ --coverage --coverage.all
+        env:
+          AR_COVERAGE: "1"
+      - name: Write AR coverage summary to run UI
+        if: always()
+        run: node scripts/ci/coverage-summary.mjs
+      - name: Upload AR coverage report (lcov + json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ar-coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          if-no-files-found: warn
+          retention-days: 14
       - run: pnpm vitest run packages/activerecord-cli
 
   postgres-tests:
