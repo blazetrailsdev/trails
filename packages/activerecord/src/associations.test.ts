@@ -2044,7 +2044,12 @@ describe("AssociationsTest", () => {
     const fav2 = await association(author, "authorFavorites")
       .where({ author: Author.where({ id: author.id }) })
       .toArray();
-    expect(fav2.map((f: any) => f.id)).toEqual(favs.map((f: any) => f.id));
+    // Rails: `assert_equal favs, fav2` compares arrays element-wise with AR
+    // record `==` (class + id), not mapped ids. Mirror that with `equals`.
+    expect(fav2.length).toEqual(favs.length);
+    fav2.forEach((f: any, i: number) => {
+      expect(f.equals(favs[i])).toBe(true);
+    });
   });
 
   it("loading the association target should keep child records marked for destruction", async () => {
