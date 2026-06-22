@@ -314,24 +314,14 @@ function restoreGeneratedFiles(cwd: string | undefined): void {
   }
 }
 
-// Refuse to mutate when the working tree has uncommitted edits the user made by
-// hand (e.g. editing a story's frontmatter, then running `priority`). The
-// mutation loop's leading `git pull --rebase` runs *before* the mutator, so such
-// edits sit dirty during the rebase: with rebase.autoStash off the pull aborts
-// ("cannot pull with rebase: You have unstaged changes"), and with it on the
-// edits are stashed, rebased over, and reapplied — writing literal git conflict
-// markers into the story frontmatter when upstream touched the same lines. Both
-// corrupt or strand the edit, so stop up front and tell the user to commit.
-// GENERATED_INDEX_FILES are excluded: restoreGeneratedFiles already reset them
-// to HEAD, and the tasks pre-commit hook rebuilds + re-stages them anyway.
-// Untracked files (`??`) are ignored — they don't block a rebase.
-// Parse `git status --porcelain` into the dirty lines that would survive a
-// rebase or `reset --hard` collision — i.e. tracked edits the user would lose.
-// git() trims its output, so the first line loses porcelain's leading status
-// column space (" M foo" → "M foo"); re-trim every line and strip the 1–2
-// char XY code + whitespace to recover the path, rather than slicing a fixed
-// offset. Untracked files (`??`) survive both a rebase and `reset --hard`, so
-// they're ignored, as are GENERATED_INDEX_FILES (rebuilt + re-staged on demand).
+// Parse `git status --porcelain` into the dirty lines that a rebase or
+// `reset --hard` would corrupt or discard — i.e. tracked edits the user would
+// lose. git() trims its output, so the first line loses porcelain's leading
+// status column space (" M foo" → "M foo"); re-trim every line and strip the
+// 1–2 char XY code + whitespace to recover the path, rather than slicing a
+// fixed offset. Untracked files (`??`) survive both a rebase and `reset --hard`,
+// so they're ignored, as are GENERATED_INDEX_FILES (restoreGeneratedFiles
+// resets them to HEAD and the tasks pre-commit hook rebuilds + re-stages them).
 export function dirtyWorktreeLines(porcelain: string): string[] {
   return porcelain
     .split("\n")
@@ -340,6 +330,14 @@ export function dirtyWorktreeLines(porcelain: string): string[] {
     .filter((l) => !GENERATED_INDEX_FILES.includes(l.replace(/^\S{1,2}\s+/, "")));
 }
 
+// Refuse to mutate when the working tree has uncommitted edits the user made by
+// hand (e.g. editing a story's frontmatter, then running `priority`). The
+// mutation loop's leading `git pull --rebase` runs *before* the mutator, so such
+// edits sit dirty during the rebase: with rebase.autoStash off the pull aborts
+// ("cannot pull with rebase: You have unstaged changes"), and with it on the
+// edits are stashed, rebased over, and reapplied — writing literal git conflict
+// markers into the story frontmatter when upstream touched the same lines. Both
+// corrupt or strand the edit, so stop up front and tell the user to commit.
 function assertCleanWorktree(cwd: string | undefined): void {
   let porcelain: string;
   try {
