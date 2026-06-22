@@ -16,6 +16,7 @@
  * method-lookup semantics.
  */
 import { resolveValue } from "./resolve-value.js";
+import { ArgumentError, NoMethodError } from "../attribute-assignment.js";
 import {
   rangeIncludesValue,
   rangeIncludesStringValue,
@@ -65,7 +66,7 @@ interface ClusivityHost {
 export function checkValidityBang(this: ClusivityHost): void {
   const d = this.delimiter();
   if (d === undefined || d === null) {
-    throw new Error(ERROR_MESSAGE);
+    throw new ArgumentError(ERROR_MESSAGE);
   }
   // Symmetric with isMemberOf — anything membership accepts must also
   // pass validity. Maps Ruby duck checks to TS analogues:
@@ -89,7 +90,7 @@ export function checkValidityBang(this: ClusivityHost): void {
   const isCallable = typeof d === "function";
   // ActiveSupport Range responds to #cover? / #include? — accept it like Rails.
   if (!isString && !hasIncludeMethod && !isIterable && !isCallable && !isRange(d)) {
-    throw new Error(ERROR_MESSAGE);
+    throw new ArgumentError(ERROR_MESSAGE);
   }
 }
 
@@ -226,8 +227,8 @@ function isMemberOf(members: unknown, value: unknown): boolean {
   // loudly. Mirror that — silent `return false` would convert a config
   // bug into a routine validation failure.
   if (members === null || members === undefined) {
-    throw new TypeError(
-      `inclusion/exclusion: :in or :within resolved to ${members === null ? "null" : "undefined"}`,
+    throw new NoMethodError(
+      `undefined method 'include?' for ${members === null ? "null" : "undefined"}`,
     );
   }
   // String#include? in Ruby is substring match; JS String#includes matches

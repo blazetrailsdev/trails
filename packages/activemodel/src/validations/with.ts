@@ -1,12 +1,13 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
+import { ArgumentError, NoMethodError } from "../attribute-assignment.js";
 
 export class WithValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attribute: string, _value: unknown): void {
     const methodName = this.options.with as string;
     const method = (record as unknown as Record<string, unknown>)[methodName];
     if (typeof method !== "function") {
-      throw new globalThis.Error(
+      throw new NoMethodError(
         `WithValidator expected ${methodName} to be a function on the record`,
       );
     }
@@ -25,9 +26,7 @@ export class WithValidator extends EachValidator {
     super.checkValidity();
     const methodName = this.options.with;
     if (typeof methodName !== "string" || methodName.trim().length === 0) {
-      throw new globalThis.Error(
-        "WithValidator requires the :with option to be a non-blank string",
-      );
+      throw new ArgumentError("WithValidator requires the :with option to be a non-blank string");
     }
   }
 }
