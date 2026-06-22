@@ -887,9 +887,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       array?: boolean;
     } = {},
   ): ChangeColumnDefinition {
-    void tableName;
-    const cd = new ColumnDefinition(columnName, type as ColumnType, options);
-    cd.sqlType = this.typeToSql(type, options);
+    // Mirrors PostgreSQL::SchemaStatements#build_change_column_definition: route
+    // through the table definition so PG-specific column normalization
+    // (virtual/`as:` resolution, datetime/timestamp physical-type recording,
+    // aliased types) is applied — the visitor recomputes `sqlType`, so we do not
+    // set it here.
+    const td = this.createTableDefinition(tableName);
+    const cd = td.newColumnDefinition(columnName, type as ColumnType, options as ColumnOptions);
     return new ChangeColumnDefinition(cd, columnName);
   }
 
