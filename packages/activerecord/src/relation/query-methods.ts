@@ -234,9 +234,10 @@ function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[])
   return this;
 }
 
-function referencesBang(this: QueryMethodsHost, ...tables: string[]): any {
+function referencesBang(this: QueryMethodsHost, ...tables: Array<string | Nodes.SqlLiteral>): any {
   for (const t of tables) {
-    if (t && !this._referencesValues.includes(t)) this._referencesValues.push(t);
+    const name = t instanceof Nodes.SqlLiteral ? t.value : t;
+    if (name && !this._referencesValues.includes(name)) this._referencesValues.push(name);
   }
   return this;
 }
