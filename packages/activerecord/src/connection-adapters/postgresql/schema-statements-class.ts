@@ -1496,7 +1496,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // Sequences & primary keys
   // ---------------------------------------------------------------------------
 
-  async primaryKey(tableName: string): Promise<string | string[] | null> {
+  override async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, table } = this.pg.parseSchemaQualifiedName(tableName);
 
     let tableCondition: string;
