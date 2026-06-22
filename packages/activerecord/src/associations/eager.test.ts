@@ -779,26 +779,6 @@ describe("EagerAssociationTest", () => {
     const children = (parents[0] as any).association("eagerHmNoPkChildren").target;
     expect(children).toHaveLength(1);
   });
-  it.skip("type cast in where references association name", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("attribute alias in where references association name", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("calculate with string in from and eager loading", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("with two tables in from without getting double quoted", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("duplicate middle objects", async () => {
     class EagerDupParent extends Base {
       static {
@@ -3836,16 +3816,6 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("including associations with where.not adds implicit references", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("including association based on sql condition and no database column", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("preloading of instance dependent associations is supported", async () => {
     class PIDASAuthor extends Base {
       static {
@@ -5243,6 +5213,37 @@ describe("EagerAssociationTest", () => {
     expect(loaded.map((p) => p.id)).toEqual(postsWithNoComments.map((p) => p.id));
   });
 
+  it("test_calculate_with_string_in_from_and_eager_loading", async () => {
+    const count = await Post.from("authors, posts")
+      .eagerLoad("comments")
+      .where("posts.author_id = authors.id")
+      .count();
+    expect(count).toBe(10);
+  });
+
+  it("test_with_two_tables_in_from_without_getting_double_quoted", async () => {
+    const loaded = await Post.select("posts.*")
+      .from("authors, posts")
+      .eagerLoad("comments")
+      .where("posts.author_id = authors.id")
+      .order("posts.id")
+      .toArray();
+    const firstComments = (await (loaded[0] as any).comments.toArray()) as Base[];
+    expect(firstComments).toHaveLength(2);
+  });
+
+  it("including associations with where.not adds implicit references", async () => {
+    let author!: Author;
+    await assertQueriesCount(2, false, async () => {
+      author = (await Author.includes("posts")
+        .whereNot({ posts: { title: "Welcome to the weblog" } })
+        .last()) as Author;
+    });
+    await assertNoQueries(false, () => {
+      expect((author.association("posts").target as Base[]).length).toBe(2);
+    });
+  });
+
   it("loading from an association that has a hash of conditions", async () => {
     const author = await Author.all()
       .includes("helloPostsWithHashConditions")
@@ -5567,7 +5568,7 @@ describe("EagerAssociationTest", () => {
 // Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  useHandlerFixtures(["owners", "pets"]);
+  const { pets } = useHandlerFixtures(["owners", "pets"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -5584,6 +5585,12 @@ describe("EagerAssociationTest", () => {
   it("eager association loading with belongs to and foreign keys", async () => {
     const pets = await Pet.all().includes("owner").toArray();
     expect(pets).toHaveLength(4);
+  });
+
+  it("including association based on sql condition and no database column", async () => {
+    const owner = (await Owner.includingLastPet().first()) as Owner;
+    const lastPet = (await (owner as any).loadBelongsTo("lastPet")) as Pet;
+    expect(lastPet.id).toBe(pets("parrot").id);
   });
 });
 
