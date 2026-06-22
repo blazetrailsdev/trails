@@ -37,7 +37,6 @@ import { Computer } from "../test-helpers/models/computer.js";
 import { PublisherArticle, PublisherMagazine } from "../test-helpers/models/publisher.js";
 import { Professor } from "../test-helpers/models/professor.js";
 import { Course } from "../test-helpers/models/course.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { setupSecondPool } from "../test-helpers/setup-second-pool.js";
 import { isSqliteRun } from "../test-helpers/sqlite-template.js";
 
@@ -1095,6 +1094,20 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     }).not.toThrow();
   });
 
+  // `Professor`/`Course` live in the `arunit2` second database. Rails runs the
+  // suite against two real databases; trails mirrors the split with a second
+  // in-memory SQLite pool on `ARUnit2Model`. The PG/MySQL suites don't yet
+  // provision a second named database, so gate the cross-pool habtm to SQLite —
+  // same gating as `MultipleDbTest`.
+  it.skipIf(!isSqliteRun())("alternate database", async () => {
+    await setupSecondPool();
+    const professor = await Professor.create({ name: "Plum" });
+    const course = await Course.create({ name: "Forensics" });
+    expect(await association(professor, "courses").count()).toBe(0);
+    await expect(association(professor, "courses").push(course)).resolves.not.toThrow();
+    expect(await association(professor, "courses").count()).toBe(1);
+  });
+
   it("habtm scope can unscope", async () => {
     const dev = await Developer.create({ name: "UnscopeDev", salary: 80000 });
     const p1 = await Project.create({ name: "Bravo" });
@@ -1174,25 +1187,5 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proj = await Project.create({ name: "BtProj" });
     await association<Project>(developer, "projects").push(proj);
     expect(await association<Project>(developer, "projects").count()).toBe(1);
-  });
-});
-
-// `Professor`/`Course` live in the `arunit2` second database. Rails runs the
-// suite against two real databases; trails mirrors the split with a second
-// in-memory SQLite pool on `ARUnit2Model`. The PG/MySQL suites don't yet
-// provision a second named database, so gate the cross-pool habtm to SQLite —
-// same gating as `MultipleDbTest`.
-describe.skipIf(!isSqliteRun())("HasAndBelongsToManyAssociationsTest alternate database", () => {
-  setupHandlerSuite();
-  beforeAll(async () => {
-    await setupSecondPool();
-  });
-
-  it("alternate database", async () => {
-    const professor = await Professor.create({ name: "Plum" });
-    const course = await Course.create({ name: "Forensics" });
-    expect(await association(professor, "courses").count()).toBe(0);
-    await expect(association(professor, "courses").push(course)).resolves.not.toThrow();
-    expect(await association(professor, "courses").count()).toBe(1);
   });
 });
