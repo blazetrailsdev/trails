@@ -660,20 +660,16 @@ export async function establishConnection(
 
   if (config === undefined) {
     await autoConnect(modelClass);
-  } else if (config instanceof DatabaseConfig) {
-    // Mirrors Rails `establish_connection(db_config)`: resolve the adapter and
-    // connection args from the DatabaseConfig object and register the object
-    // itself as the pool's `db_config` (no re-parsing into a fresh hash). This
-    // is the faithful `run_without_connection` restore path.
-    await establishWithDbConfig(modelClass, config);
   } else {
-    // Mirrors Rails `establish_connection(config_or_env)`: resolve the
-    // string/hash argument to a DatabaseConfig via the shared resolver (which
-    // also plants the connection_specification_name, exactly as
-    // resolve_config_for_connection does for connects_to), then funnel through
-    // the single object path so the pool stores the resolved config verbatim
-    // instead of rebuilding a fresh UrlConfig/HashConfig. tz validation and
-    // buildAdapterArg live inside establishWithDbConfig.
+    // Mirrors Rails `establish_connection(config_or_env)`
+    // (connection_handling.rb:51-54): every input — string URL, hash, or an
+    // already-resolved DatabaseConfig (the `run_without_connection` restore
+    // path) — funnels through `resolve_config_for_connection`, which plants the
+    // connection_specification_name and then `configurations.resolve(...)` (a
+    // no-op that returns the object unchanged for a DatabaseConfig). The
+    // resolved object then goes to the handler verbatim, so the pool stores it
+    // as-is instead of rebuilding a fresh UrlConfig/HashConfig. tz validation
+    // and buildAdapterArg live inside establishWithDbConfig.
     const dbConfig = resolveConfigForConnection.call(modelClass, config);
     await establishWithDbConfig(modelClass, dbConfig);
   }
