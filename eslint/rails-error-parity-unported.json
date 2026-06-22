@@ -1,0 +1,62 @@
+[
+  {
+    "package": "activerecord",
+    "name": "DestroyAssociationAsyncError",
+    "rubyFile": "active_record/destroy_association_async_job.rb",
+    "reason": "active_record/destroy_association_async_job.rb (dependent: :destroy_async job) is unported."
+  },
+  {
+    "package": "activerecord",
+    "name": "FixtureError",
+    "rubyFile": "active_record/fixtures.rb",
+    "reason": "active_record/fixtures.rb (fixtures subsystem) is unported."
+  },
+  {
+    "package": "activerecord",
+    "name": "FormatError",
+    "rubyFile": "active_record/fixtures.rb",
+    "reason": "active_record/fixtures.rb (fixtures subsystem) is unported."
+  },
+  {
+    "package": "activerecord",
+    "name": "PrimaryKeyError",
+    "rubyFile": "active_record/fixture_set/table_row.rb",
+    "reason": "active_record/fixture_set/table_row.rb (fixtures subsystem) is unported."
+  },
+  {
+    "package": "activesupport",
+    "name": "DeprecationException",
+    "rubyFile": "active_support/deprecation/behaviors.rb",
+    "reason": "active_support/deprecation/behaviors.rb (Deprecation#raise behavior) is unported."
+  },
+  {
+    "package": "activesupport",
+    "name": "DisallowedType",
+    "rubyFile": "active_support/core_ext/hash/conversions.rb",
+    "reason": "active_support/core_ext/hash/conversions.rb (Hash#to_xml/from_xml) is unported."
+  },
+  {
+    "package": "activesupport",
+    "name": "InvalidContentError",
+    "rubyFile": "active_support/encrypted_configuration.rb",
+    "reason": "active_support/encrypted_configuration.rb (encryption) is unported."
+  },
+  {
+    "package": "activesupport",
+    "name": "InvalidKeyError",
+    "rubyFile": "active_support/encrypted_configuration.rb",
+    "reason": "active_support/encrypted_configuration.rb (encryption) is unported."
+  },
+  {
+    "package": "activesupport",
+    "name": "ParsingError",
+    "rubyFile": "active_support/duration/iso8601_parser.rb",
+    "reason": "active_support/duration/iso8601_parser.rb (ISO8601 duration parser) is unported."
+  },
+  {
+    "package": "activesupport",
+    "name": "SoleItemExpectedError",
+    "rubyFile": "active_support/core_ext/enumerable.rb",
+    "reason": "active_support/core_ext/enumerable.rb (Enumerable#sole/#pick) is unported."
+  }
+]
