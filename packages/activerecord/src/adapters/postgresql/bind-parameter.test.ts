@@ -14,23 +14,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     useHandlerFixtures(["authors", "posts"], { schema: canonicalSchema });
 
     // Mirrors Rails' private `assert_quoted_as(expected, value, match: 0)`:
-    // Post.where("title = ?", value) renders `value` into the SQL with the PG
-    // adapter's quoting, and the row query confirms the cast.
-    //
-    // DIVERGENCE: Rails binds the `?` as a parameter ($1) at execution, so PG
-    // casts e.g. an integer against the varchar `title` and the query returns
-    // empty. trails inlines the raw fragment into the executed SQL, so a
-    // type-mismatched comparison like `title = 0` raises 42883 in PG instead of
-    // returning empty. We therefore assert the rendered SQL for every case
-    // (which matches Rails verbatim) and only execute the row query for the
-    // matching string case. Tracked for convergence:
-    // RFC 0023 story `relation-raw-fragment-bind-parameterization`.
+    // Post.where("title = ?", value) inlines `value` into the displayed SQL with
+    // the PG adapter's quoting (`to_sql` parity), while at execution the `?` is
+    // bound as a parameter so PG casts the value against the varchar `title`
+    // column. A type-mismatched value (integer/float/boolean/decimal/rational)
+    // therefore returns no rows rather than raising 42883, matching Rails'
+    // `relation.to_a.size`.
     async function assertQuotedAs(expected: string, value: unknown, match = 0) {
       const relation = Post.where("title = ?", value);
       expect(relation.toSql()).toBe(`SELECT "posts".* FROM "posts" WHERE (title = ${expected})`);
-      if (match > 0) {
-        expect(await relation.count()).toBe(match);
-      }
+      expect(await relation.toArray()).toHaveLength(match);
     }
 
     it("where with string for string column using bind parameters", async () => {
