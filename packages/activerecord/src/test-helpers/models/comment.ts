@@ -2,6 +2,18 @@
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 
+// Rails: `class OopsError < RuntimeError; end` — raised by the OopsExtension
+// `destroy_all` override that the `oops_comments` scope extends onto its
+// relation.
+export class OopsError extends Error {}
+
+// Rails: `module OopsExtension; def destroy_all; raise OopsError; end; end`.
+const OopsExtension = {
+  destroyAll(): never {
+    throw new OopsError("oops");
+  },
+};
+
 export class Comment extends Base {
   declare author_id: number | null;
   declare author_type: string | null;
@@ -16,6 +28,12 @@ export class Comment extends Base {
     this.scope("created", (q: any) => q.all());
     this.scope("orderedByPostId", (q: any) => q.order("comments.post_id DESC"));
     this.scope("allAsScope", (q: any) => q.all());
+    // Rails: `scope :newest, -> { order("id DESC").first }` — terminates in
+    // `.first`, so the scope yields the most-recently-created record (a
+    // Promise here) rather than a relation.
+    this.scope("newest", (q: any) => q.order("id DESC").first());
+    // Rails: `scope :oops_comments, -> { extending OopsExtension }`.
+    this.scope("oopsComments", (q: any) => q.all(), OopsExtension);
 
     this.belongsTo("post", { counterCache: true });
     this.belongsTo("author", { polymorphic: true });

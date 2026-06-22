@@ -153,6 +153,7 @@ describe("DelegationTest", () => {
       "isAny",
       "isMany",
       "isOne",
+      "isNone",
       "isEmpty",
     ] as const;
 

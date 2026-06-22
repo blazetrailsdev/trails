@@ -23,7 +23,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
-import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
+import { Comment, SpecialComment, OopsError } from "../test-helpers/models/comment.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Developer } from "../test-helpers/models/developer.js";
 
@@ -247,11 +247,15 @@ describe("NamedScopingTest", () => {
     expect(ids(last2)).toEqual(ids(ordered.slice(-2)));
   });
 
-  // Engine deviation: `last()` on an already-loaded, unordered relation still
-  // issues a query instead of reading from the loaded records cache (Rails
-  // asserts 0 queries here). Tracked by test:compare until the cache-read path
-  // covers `last`.
-  it.skip("first and last should not use query when results are loaded", () => {});
+  it("first and last should not use query when results are loaded", async () => {
+    const t = (Topic as any).base();
+    await t.load();
+    const sql = await capSql(async () => {
+      await t.first();
+      await t.last();
+    });
+    expect(sql.length).toBe(0);
+  });
 
   it("empty should not load results", async () => {
     const t = (Topic as any).base();
@@ -392,10 +396,11 @@ describe("NamedScopingTest", () => {
     expect(chainedGot).toEqual(chainedExpected);
   });
 
-  // Rails asserts `to_a.select(&:approved) == to_a.find_all(&:approved)` — i.e.
-  // Ruby Array#select and Array#find_all are aliases. trails materializes to a
-  // plain JS array with only `.filter`, so there is no distinct relation method
-  // to compare; the case has no meaningful trails analog.
+  // Permanently descoped: Rails asserts `to_a.select(&:approved) ==
+  // to_a.find_all(&:approved)` — i.e. Ruby Array#select and Array#find_all are
+  // aliases. trails materializes to a plain JS array with only `.filter`, so
+  // there is no distinct relation method to compare; the case has no meaningful
+  // trails analog and never will.
   it.skip("find all should behave like select", () => {});
 
   it("rand should select a random object from proxy", async () => {
@@ -471,14 +476,14 @@ describe("NamedScopingTest", () => {
     expect(uniq).toEqual([sti.id]);
   });
 
-  // Rails `scope :ordered, -> { Reply.order(:id) }` references the Reply class
-  // directly, escaping the association's `parent_id` constraint, so
-  // `topics(:first).approved_replies.ordered` returns BOTH approved replies
-  // (second + fourth, regardless of parent). The canonical Reply.ordered chains
-  // off the relation (`q.order("id")`) and does not escape — trails returns only
-  // [second]. Converging Reply.ordered to reference the class (and verifying the
-  // association proxy honors the escape) is tracked in RFC 0030.
-  it.skip("class method in scope", () => {});
+  it("class method in scope", async () => {
+    // Reply.ordered = `-> { Reply.order(:id) }` references the class, escaping
+    // the approved_replies association's parent_id constraint, so it returns
+    // BOTH approved replies (second + fourth) regardless of parent.
+    const first = (await Topic.find(topics("first").id)) as any;
+    const rows = await first.approvedReplies.ordered().toArray();
+    expect(ids(rows)).toEqual([topics("second").id, topics("fourth").id]);
+  });
 
   it("chaining doesnt leak conditions to another scopes", async () => {
     const expected = Topic.where({ approved: false }).where({
@@ -552,9 +557,14 @@ describe("NamedScopingTest", () => {
   it.skip("scopes are cached on associations", () => {});
   it.skip("scopes with arguments are cached on associations", () => {});
 
-  // Rails: `post.comments.newest` (scope `order("id DESC").first`) must change
-  // after creating a new comment. The canonical Comment carries no `newest`
-  // scope, so there is no faithful body to assert against yet.
+  // The canonical Comment now carries Rails' `newest` scope
+  // (`order("id DESC").first`), but this case asserts that
+  // `post.comments.newest` returns the SAME (cached) record after a
+  // `post.comments.create` until `post.reload` — i.e. it depends on association
+  // scope-result caching (see "scopes are cached on associations"), which
+  // trails does not implement: each `post.comments.newest()` rebuilds a fresh
+  // relation and re-queries, so the post-create call returns the new comment.
+  // Tracked with the association scope-cache work in RFC 0030.
   it.skip("scopes to get newest", () => {});
 
   // Rails iterates [:destroy_all, :reset, :delete_all] and asserts the cached
@@ -567,9 +577,14 @@ describe("NamedScopingTest", () => {
   // scope-cache work in RFC 0030.
   it.skip("scopes are reset on association reload", () => {});
 
-  // Rails requires "models/without_table" to prove scopes are lazy when the
-  // table is absent; trails has no without_table fixture model.
-  it.skip("scoped are lazy loaded if table still does not exist", () => {});
+  it("scoped are lazy loaded if table still does not exist", async () => {
+    // Rails: `assert_nothing_raised { require "models/without_table" }` — the
+    // default_scope lambda must not query the (absent) table at definition
+    // time. Importing the model (declaring the class + default scope) must not
+    // throw.
+    const mod = await import("../test-helpers/models/without-table.js");
+    expect(mod.WithoutTable).toBeDefined();
+  });
 
   // Engine gap: `defaultScope` does not raise ArgumentError when handed an
   // eager Relation instead of a callable (Rails guards this in
@@ -580,15 +595,18 @@ describe("NamedScopingTest", () => {
     expect(await (SpecialComment as any).where({ body: "go wild" }).created().count()).toBe(1);
   });
 
-  // Rails: Comment.unscoped.oops_comments.destroy_all raises OopsError from a
-  // scope extension method; trails has no oops_comments extension.
-  it.skip("model class should respond to extending", () => {});
+  it("model class should respond to extending", () => {
+    // Rails: Comment.unscoped.oops_comments.destroy_all raises OopsError from
+    // the OopsExtension `destroy_all` override the scope extends onto its
+    // relation.
+    expect(() => (Comment as any).unscoped().oopsComments().destroyAll()).toThrow(OopsError);
+  });
 
-  // Rails asserts `Topic.none?` (true only when no records exist) — the
-  // semantic opposite of `any?`. trails implements no `isNone` predicate at the
-  // relation/Querying layers and `base.ts` delegates `isAny`/`isMany`/`isOne`
-  // but not `isNone`, so there is no faithful body for this case yet.
-  it.skip("model class should respond to none", () => {});
+  it("model class should respond to none", async () => {
+    expect(await Topic.isNone()).toBe(false);
+    await Topic.deleteAll();
+    expect(await Topic.isNone()).toBe(true);
+  });
 
   it("model class should respond to one", async () => {
     expect(await Topic.isOne()).toBe(false);
