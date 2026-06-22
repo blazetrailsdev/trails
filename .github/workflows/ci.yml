@@ -387,7 +387,8 @@ jobs:
   # one job's sequential steps bills 1 minute while keeping each check's failure
   # independently legible in the step log. Each step preserves its original
   # event/author guard via a per-step `if:` so it no-ops (rather than skipping
-  # the whole job) when its condition isn't met. Deliberately NOT folded into
+  # the whole job) when its condition isn't met — prettier alone stays ungated
+  # because, like the standalone job, it runs on every event. Deliberately NOT folded into
   # `changes` — that job is on the critical path of every downstream gate, and a
   # prettier/attribution failure there would block gate computation.
   preflight:
@@ -398,6 +399,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      # contents: read for the two checkout-based steps (prettier reads the
+      # tree, docs-AR-freeze diffs it); pull-requests: read for the attribution
+      # step's `gh api repos/.../pulls` calls. Declaring `permissions:` zeroes
+      # every unlisted scope, so contents must be listed explicitly even though
+      # it is part of the default token.
+      contents: read
       pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
@@ -420,8 +427,14 @@ jobs:
           # package.json — failing with "Unable to locate executable pnpm".
           package-manager-cache: false
 
-      # Prettier. Runs on push + PR. The version below MUST equal the exact pin
-      # in root `package.json` devDependencies; the `prettier` entry there is
+      # Prettier. Unconditional, exactly as the standalone job was: it runs on
+      # push and PR (the events that carry a meaningful diff) and also on the
+      # weekly `schedule` sweep / `workflow_dispatch`, where the `changes` job
+      # falls back to `prettier_files=__ALL__` and the whole tree is checked.
+      # The two checks below need a per-step `if:` to no-op off `pull_request`;
+      # prettier does not, so leaving it ungated keeps coverage identical to the
+      # pre-consolidation job. The version below MUST equal the exact pin in
+      # root `package.json` devDependencies; the `prettier` entry there is
       # intentionally pinned (no `^`) so CI and local `pnpm format` can never
       # drift. Checks only the files changed on this PR/push, not the whole
       # tree. `__ALL__` is the fallback sentinel from the `changes` job (diff
@@ -429,7 +442,6 @@ jobs:
       # `--ignore-unknown` skips paths Prettier has no parser for, and
       # `.prettierignore` is still honored.
       - name: Prettier
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
         env:
           PRETTIER_FILES: ${{ needs.changes.outputs.prettier_files }}
         run: |
