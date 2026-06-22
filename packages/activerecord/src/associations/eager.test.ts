@@ -37,8 +37,6 @@ import { Book } from "../test-helpers/models/book.js";
 import { ShardedBlog, ShardedBlogPost, ShardedComment } from "../test-helpers/models/sharded.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Person } from "../test-helpers/models/person.js";
-import { Reader } from "../test-helpers/models/reader.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
