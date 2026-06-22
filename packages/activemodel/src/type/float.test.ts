@@ -85,8 +85,10 @@ describe("FloatTest", () => {
     expect(Number.isNaN(type.serialize("NaN"))).toBe(true);
   });
 
-  it("typeCastForSchema(NaN) still returns '\"NaN\"'", () => {
+  it("typeCastForSchema dumps the float specials as Ruby constants", () => {
     const type = new Types.FloatType();
-    expect(type.typeCastForSchema(NaN)).toBe('"NaN"');
+    expect(type.typeCastForSchema(NaN)).toBe("::Float::NAN");
+    expect(type.typeCastForSchema(Infinity)).toBe("::Float::INFINITY");
+    expect(type.typeCastForSchema(-Infinity)).toBe("-::Float::INFINITY");
   });
 });

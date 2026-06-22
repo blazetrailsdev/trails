@@ -1061,9 +1061,11 @@ describe("SchemaDumperTest", () => {
 
 describe("SchemaDumperDefaultsTest", () => {
   let ctx: MigrationContext;
+  let adapter: TestDatabaseAdapter;
   beforeEach(async () => {
     const f = freshCtx();
     ctx = f.ctx;
+    adapter = f.adapter;
   });
 
   it("schema dump defaults with universally supported types", async () => {
@@ -1089,13 +1091,23 @@ describe("SchemaDumperDefaultsTest", () => {
     expect(output).toMatch(/text.*"text_with_default".*default: "John"/);
   });
 
-  it.skipIf(adapterType !== "postgres")("schema dump with column infinity default", (ctx) => {
-    ctx.skip();
-    // BLOCKED: PG default-introspection path — float defaults arrive as the bare
-    // string "Infinity"/"NaN" (no ::cast), and datetime/date defaults are already
-    // rendered as the Ruby literal `::Float::INFINITY` via the OID type's
-    // typeCastForSchema, so the fix is not in cleanDefault. Tracked by
-    // c1-schema-dumper-pg-infinity-default (RFC 0030).
+  it.skipIf(adapterType !== "postgres")("schema dump with column infinity default", async () => {
+    await ctx.createTable("infinity_defaults", {}, (t) => {
+      t.float("float_with_inf_default", { default: Infinity });
+      t.float("float_with_nan_default", { default: NaN });
+      t.datetime("beginning_of_time", { default: -Infinity });
+      t.datetime("end_of_time", { default: Infinity });
+      t.date("date_with_neg_inf_default", { default: -Infinity });
+      t.date("date_with_pos_inf_default", { default: Infinity });
+    });
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const output = await TopLevelDumper.dumpTableSchema(adapter, "infinity_defaults");
+    expect(output).toMatch(/t\.float\("float_with_inf_default",.*default: ::Float::INFINITY/);
+    expect(output).toMatch(/t\.float\("float_with_nan_default",.*default: ::Float::NAN/);
+    expect(output).toMatch(/t\.datetime\("beginning_of_time",.*default: -::Float::INFINITY/);
+    expect(output).toMatch(/t\.datetime\("end_of_time",.*default: ::Float::INFINITY/);
+    expect(output).toMatch(/t\.date\("date_with_neg_inf_default",.*default: -::Float::INFINITY/);
+    expect(output).toMatch(/t\.date\("date_with_pos_inf_default",.*default: ::Float::INFINITY/);
   });
 });
 
@@ -1356,6 +1368,7 @@ afterAll(async () => {
   await ctx.dropTable("goofy_string_id", o);
   await ctx.dropTable("ignored_table", o);
   await ctx.dropTable("indexed", o);
+  await ctx.dropTable("infinity_defaults", o);
   await ctx.dropTable("key_tests", o);
   await ctx.dropTable("limits", o);
   await ctx.dropTable("myapp_posts", o);
