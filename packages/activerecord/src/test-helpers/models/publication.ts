@@ -21,16 +21,18 @@ export class Publication extends Base {
     this.hasMany("editorships");
     this.hasMany("editors", { through: "editorships" });
 
-    this.afterInitialize(function (this: Publication) {
-      (this as any).editorInChief = (this as any).buildEditorInChief({ name: "John Doe" });
+    this.afterInitialize((record: Publication) => {
+      record.editorInChief = (record as any).buildEditorInChief({ name: "John Doe" });
     });
 
-    this.afterSaveCommit(async function (this: Publication) {
-      this.touchName();
+    this.afterSaveCommit((record: Publication) => {
+      record.touchName();
     });
   }
 
   touchName() {
-    (this as any).name = `${(this as any).name} (touched)`;
+    // `name` is a restricted attribute in trails (collides with Function#name),
+    // so no `.name` getter/setter is generated — read/write the column directly.
+    this.writeAttribute("name", `${this.readAttribute("name")} (touched)`);
   }
 }
