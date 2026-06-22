@@ -192,11 +192,10 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       const existing = this.readForeignType();
       // Delegated-type round-trip: a *_type already stored that matches one of
       // this class's registry keys is a caller-configured type string — return
-      // it verbatim (not demodulized). It can only be a full `::` key here, which
-      // only a `storeFullClassName`-on write produces, so this never co-occurs
-      // with a flag-off store of a demodulized value. Fresh writes (the case the
-      // store-full-sti-class tests exercise) have `existing === null` and fall
-      // through to the demodulize path below.
+      // it verbatim, which is correct regardless of `storeFullClassName` (it is
+      // the exact key the model is registered under, full `::` or bare). Fresh
+      // writes (the case the store-full-sti-class tests exercise) have
+      // `existing === null` and fall through to the demodulize path below.
       if (existing && matching.includes(existing)) return existing;
       name = matching.reduce((best, k) =>
         (k.match(/::/g) ?? []).length > (best.match(/::/g) ?? []).length ? k : best,
