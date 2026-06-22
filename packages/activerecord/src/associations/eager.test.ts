@@ -5060,7 +5060,7 @@ describe("EagerAssociationTest", () => {
     }
     expect(await author.postsWithNoComments.size()).toBe(postsWithNoComments.length);
     const loaded = (await author.postsWithNoComments.toArray()) as Base[];
-    expect(loaded.map((p) => p.id).sort()).toEqual(postsWithNoComments.map((p) => p.id).sort());
+    expect(loaded.map((p) => p.id)).toEqual(postsWithNoComments.map((p) => p.id));
   });
 
   it("loading from an association that has a hash of conditions", async () => {
