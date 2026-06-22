@@ -223,6 +223,22 @@ describe("Ruby extractor gate detection", () => {
     expect(g["unrelated flag"] ?? null).toBeNull();
   });
 
+  it("does not treat a predicate on a connection METHOD RESULT as a capability guard", () => {
+    const g = rubyGates({
+      "cases/transaction_isolation_test.rb": `
+        class TransactionIsolationTest < ActiveRecord::TestCase
+          if ActiveRecord::Base.lease_connection.transaction_isolation_levels.include?(:read_uncommitted)
+            test "read uncommitted" do; end
+          end
+        end
+      `,
+    });
+    // \`include?\` here is Array#include? on \`…levels\`, not a connection
+    // capability — only the receiver's terminal method (\`lease_connection\`) is a
+    // connection, so no \`include\` guard is emitted.
+    expect(g["read uncommitted"] ?? null).toBeNull();
+  });
+
   it("propagates the including class's gate to a mixed-in module's tests", () => {
     const g = rubyGates({
       "cases/view_test.rb": `
@@ -256,5 +272,24 @@ describe("Ruby extractor gate detection", () => {
     // First include (TransactionTest) is unconditional, so the module's tests
     // run on every adapter — no gate, even though a later include is gated.
     expect(g["transaction open?"] ?? null).toBeNull();
+  });
+
+  it("preserves a mixed-in module test's in-body skip guard", () => {
+    const g = rubyGates({
+      "cases/connection_pool_test.rb": `
+        module ConnectionPoolTests
+          def test_new_connection_no_query
+            skip("Can't test with in-memory dbs") if in_memory_db?
+          end
+        end
+        class ConnectionPoolTest < ActiveRecord::TestCase
+          include ConnectionPoolTests
+        end
+      `,
+    });
+    expect(g["new connection no query"]).toEqual({
+      guards: ["in_memory_db"],
+      source: ["body-skip"],
+    });
   });
 });

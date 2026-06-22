@@ -292,7 +292,7 @@ class TestExtractor
       line: t[:line],
       style: "def_test",
       assertions: t[:assertions],
-    }, nil)
+    }, nil, body_gate: t[:body_gate])
   end
 
   def process_command(node)
@@ -459,7 +459,12 @@ class TestExtractor
     # Inside a mixin module body: stash, don't emit. Materialized per including
     # class by process_include / flush_unincluded_modules.
     if @module_collect
-      @module_collect << { description: desc, line: line, assertions: assertions }
+      # Capture the in-body `skip … if/unless` gate now — the raw sexp isn't
+      # retained past collection, so it can't be recomputed at materialization.
+      @module_collect << {
+        description: desc, line: line, assertions: assertions,
+        body_gate: body_skip_gate(node)
+      }
       return
     end
 
@@ -511,14 +516,16 @@ class TestExtractor
 
   # Attach a :gate to a test_case from its dir gate, the enclosing
   # `current_adapter?` stack, and any in-body `skip ... if/unless` guards.
-  def add_gate(test_case, body_node)
+  # `body_gate` defaults to `:compute` (derive from `body_node`); module tests
+  # pass their precomputed in-body skip gate instead, since the sexp is gone.
+  def add_gate(test_case, body_node, body_gate: :compute)
     parts = []
     parts << { adapters: @file_adapter_gate } if @file_adapter_gate
     @gate_stack.each { |g| parts << g }
     sources = []
     sources << "dir" if @file_adapter_gate
     sources << "class" unless @gate_stack.empty?
-    body_gate = body_skip_gate(body_node)
+    body_gate = body_skip_gate(body_node) if body_gate == :compute
     if body_gate
       parts << body_gate
       sources << "body-skip"
@@ -732,27 +739,31 @@ class TestExtractor
     end
   end
 
-  CONNECTION_RECEIVER_IDENTS = %w[connection lease_connection conn].freeze
+  CONNECTION_RECEIVER_IDENTS = %w[connection lease_connection conn @connection].freeze
 
-  # Is this call's receiver a database connection? Recognizes the idioms used to
-  # reach one in Rails tests — `@connection`, `connection`, `lease_connection`,
-  # `conn`, `ActiveRecord::Base.lease_connection` — so a capability predicate
-  # (`respond_to?(:x)`, `savepoint_errors_invalidate_transactions?`) on it can be
-  # captured as a guard rather than treated as an opaque conditional.
+  # Is this call's receiver DIRECTLY a database connection? Recognizes the idioms
+  # used to reach one in Rails tests — `@connection`, `connection`,
+  # `lease_connection`, `conn`, `ActiveRecord::Base.lease_connection` — so a
+  # capability predicate (`respond_to?(:x)`,
+  # `savepoint_errors_invalidate_transactions?`) on it can be captured as a guard
+  # rather than treated as an opaque conditional. Only the receiver's TERMINAL
+  # method/ident is checked, so `connection.transaction_isolation_levels.include?`
+  # (an `Array#include?`, not a connection capability) is correctly excluded.
   def connection_receiver?(node)
-    recv = call_receiver(node)
-    return false unless recv
-    names = []
-    collect_call_idents(recv, names)
-    names.any? { |n| CONNECTION_RECEIVER_IDENTS.include?(n) || n == "@connection" }
+    name = receiver_terminal_name(call_receiver(node))
+    !name.nil? && CONNECTION_RECEIVER_IDENTS.include?(name)
   end
 
-  def collect_call_idents(node, out)
-    return unless node.is_a?(Array)
+  # The trailing method/ident of a receiver chain — `lease_connection` for
+  # `ActiveRecord::Base.lease_connection`, `@connection` for the ivar.
+  def receiver_terminal_name(node)
+    return nil unless node.is_a?(Array)
     case node[0]
-    when :@ident, :@const, :@ivar then out << node[1]
+    when :@ident, :@const, :@ivar then node[1]
+    when :var_ref, :vcall then receiver_terminal_name(node[1])
+    when :call, :command_call then ident_name(node[3])
+    when :method_add_arg, :method_add_block then receiver_terminal_name(node[1])
     end
-    node.each { |c| collect_call_idents(c, out) if c.is_a?(Array) }
   end
 
   def extract_symbol_args(node)
