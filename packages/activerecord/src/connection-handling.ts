@@ -723,6 +723,17 @@ async function establishWithDbConfig(
     );
   }
 
+  // The handler reads the adapter off the resolved config (resolvePoolConfig).
+  // When it was inferred from a bare URL — e.g. the `:memory:` shorthand a
+  // DATABASE_URL carries with no scheme — rather than present in the hash,
+  // surface it on the config so the verbatim object the pool stores still
+  // names its adapter. Rails' URL configs always parse a scheme, so their
+  // configuration_hash always carries an adapter; this restores that invariant
+  // for the scheme-less shorthand the old rebuild path used to backfill.
+  if (!dbConfig.adapter) {
+    (config as { adapter?: string }).adapter = adapterName;
+  }
+
   await establishWithConfig(modelClass, adapterName, connectUrl, config, dbConfig);
   if (tz) setDefaultTimezone(tz);
 }
