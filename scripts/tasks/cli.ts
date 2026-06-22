@@ -699,6 +699,22 @@ function rollbackWorktree(cwd: string | undefined, createdPath?: string): void {
   }
 }
 
+// Thrown by a mutator callback that has decided — against the *post-pull* state,
+// inside commitAndPush's acquired lock — to abort the commit and exit WITHOUT a
+// real error: an idempotent no-op (already in the target state, exit 0), a benign
+// concurrent-race conflict (exit 2), or a lost create/finalize race the pull
+// surfaced (exit 4). A bare `process.exit` here would skip the lock's `finally`
+// and leak the shared lock until stale-steal; a plain throw would surface as an
+// exit-1 crash with a stack and lose the specific exit code. This sentinel
+// carries the intended exit code, and commitAndPush honors it only AFTER its
+// `finally` releases the lock. The callback prints its own user-facing line first.
+export class MutatorEarlyExit extends Error {
+  constructor(readonly code: number) {
+    super(`mutator early exit ${code}`);
+    this.name = "MutatorEarlyExit";
+  }
+}
+
 // Pull-rebase → run mutator → commit → push, retrying once on
 // non-fast-forward. `mutator` is run inside each attempt so a rebased
 // index file is re-read between tries. Throws (and asks caller to
@@ -811,6 +827,7 @@ export function commitAndPush(opts: {
   // explicitly too (releaseTasksLock is idempotent; stale-steal backstops a
   // crash where neither runs).
   const lock = acquireTasksLock(cwd);
+  let earlyExit: MutatorEarlyExit | null = null;
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -858,6 +875,15 @@ export function commitAndPush(opts: {
         // re-raise so the real error surfaces (the top-level handler prints
         // its message + stack) instead of a swallowed bare exit.
         rollbackWorktree(cwd, opts.createdPath);
+        // A mutator that chose to abort cleanly against the post-pull state (an
+        // idempotent no-op, or a benign concurrent-race conflict) throws
+        // MutatorEarlyExit rather than process.exit — exiting here would skip the
+        // lock's `finally` and leak it. Capture it and break so `finally`
+        // releases the lock; the exit with its intended code happens below.
+        if (e instanceof MutatorEarlyExit) {
+          earlyExit = e;
+          break;
+        }
         throw e;
       }
       try {
@@ -885,6 +911,9 @@ export function commitAndPush(opts: {
   } finally {
     releaseTasksLock(lock);
   }
+  // Lock released by the `finally` above; now it's safe to exit with the code the
+  // mutator asked for without leaking it.
+  if (earlyExit) process.exit(earlyExit.code);
 }
 
 // All mutations enter via `flip`. The order — `inGitTasks()` then
@@ -956,12 +985,14 @@ function claim(id: string, assignee: string): void {
       // is a success, not a conflict. (A within-invocation retry can't reach
       // here: commitAndPush only resets-and-retries on a *lost* race, where our
       // push never landed and the claim is still null or held by someone else.)
+      // This runs inside commitAndPush's lock; throw the early-exit sentinel
+      // (not process.exit, which would skip the lock's `finally` and leak it).
       console.log(`claimed ${id} as ${assignee}`);
-      process.exit(0);
+      throw new MutatorEarlyExit(0);
     }
     if (state === "taken") {
       console.error(`error: ${id} is already claimed`);
-      process.exit(2);
+      throw new MutatorEarlyExit(2);
     }
     const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     editFrontmatter(file, {
@@ -1131,14 +1162,16 @@ function setStatus(id: string, target: StoryStatus): void {
     const fresh = statusOf(readFileSync(file, "utf8"));
     if (fresh === target) {
       // Concurrent agent already landed this exact move; the pull brought it
-      // back. Re-applying would leave nothing to commit, so bail cleanly.
+      // back. Re-applying would leave nothing to commit, so bail cleanly. Throw
+      // the early-exit sentinel (not process.exit) so commitAndPush's lock is
+      // released by its `finally` before the exit — a bare exit would leak it.
       console.log(`${id} already ${target}`);
-      process.exit(0);
+      throw new MutatorEarlyExit(0);
     }
     const error = statusTransitionError(fresh, target);
     if (error !== null) {
       console.error(`error: ${error} for ${id}`);
-      process.exit(2);
+      throw new MutatorEarlyExit(2);
     }
     editFrontmatter(file, statusEdits(fresh, target));
   });
@@ -1845,9 +1878,13 @@ export function newStory(
     mutator: () => {
       // Re-check after pull: another agent may have pushed the same story since
       // the pre-pull existsSync above, and writeFileSync would silently overwrite it.
+      // This runs inside commitAndPush's acquired lock; a bare process.exit would
+      // skip the lock's `finally` and leak it. Throw MutatorEarlyExit so the lock
+      // is released before the (benign race, exit 4) exit. No fs mutation has
+      // happened yet, so the rollback stays clean.
       if (existsSync(storyFile)) {
         console.error(`error: story "${storySlug}" already exists (created by concurrent agent)`);
-        process.exit(4);
+        throw new MutatorEarlyExit(4);
       }
       mkdirSync(storiesDir, { recursive: true });
       writeFileSync(
@@ -2037,9 +2074,12 @@ export function finalize(slug: string, dryRun: boolean, tasksDir = TASKS_DIR): v
     mutator: () => {
       // Re-check after the pull: a concurrent finalize may have already numbered
       // and renamed this dir away, in which case there is nothing left to do.
+      // This runs inside commitAndPush's acquired lock; a bare process.exit would
+      // skip the lock's `finally` and leak it. Throw MutatorEarlyExit so the lock
+      // is released before the (benign race, exit 4) exit. No fs mutation yet.
       if (!existsSync(dir)) {
         console.error(`error: rfcs/${slug} no longer exists (finalized by a concurrent agent?)`);
-        process.exit(4);
+        throw new MutatorEarlyExit(4);
       }
       // Rename + rewrite + strip + rebuild index in place (no git of its own).
       execFileSync(process.execPath, ["scripts/finalize-rfc.mjs", slug], {
@@ -2214,9 +2254,13 @@ export function newRfc(
     mutator: () => {
       // Re-check after pull: another agent may have pushed the same RFC since
       // the pre-pull existsSync above, and we must not clobber their README.
+      // This runs inside commitAndPush's acquired lock; a bare process.exit would
+      // skip the lock's `finally` and leak it. Throw MutatorEarlyExit so the lock
+      // is released before the (benign race, exit 4) exit. No fs mutation has
+      // happened yet, so the rollback stays clean.
       if (existsSync(rfcDir)) {
         console.error(`error: RFC "${rfcId}" already exists (created by concurrent agent)`);
-        process.exit(4);
+        throw new MutatorEarlyExit(4);
       }
       mkdirSync(rfcDir, { recursive: true });
       writeFileSync(readmeFile, buildRfcContent(slug, { ...opts, body, date: today() }));

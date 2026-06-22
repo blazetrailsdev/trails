@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -24,6 +24,7 @@ import {
   acquireTasksLock,
   buildRfcContent,
   buildStoryContent,
+  MutatorEarlyExit,
   readRfcStatus,
   isEffectivelyEmptyBody,
   checkCheckboxesDone,
@@ -945,6 +946,31 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
   });
 
+  // A mutator that decided against the post-pull state to abort cleanly (the
+  // claim idempotent re-claim / setStatus already-in-target paths) throws
+  // MutatorEarlyExit rather than process.exit. commitAndPush must release the
+  // lock via its `finally` BEFORE honoring the exit code, so the benign abort
+  // can't leak the shared lock. exit 0 = idempotent success, exit 2 = conflict.
+  for (const code of [0, 2]) {
+    it(`releases the lock then exits ${code} when a mutator throws MutatorEarlyExit`, () => {
+      const { exit, lockDir } = setup();
+      expect(() =>
+        commitAndPush({
+          message: "test",
+          fileToStage: "/some/file.md",
+          mutator: () => {
+            throw new MutatorEarlyExit(code);
+          },
+          raceMessage: "no",
+          raceExitCode: 99,
+        }),
+      ).toThrow(`exit ${code}`);
+      // The lock file is gone — released by `finally` before the exit ran.
+      expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
+      expect(exit).toHaveBeenCalledWith(code);
+    });
+  }
+
   // Mimic execFileSync's failure shape: attach .stderr to the error so
   // commitAndPush's race-vs-real-failure discriminator can inspect it.
   function pushError(stderr: string): Error {
@@ -1844,6 +1870,95 @@ describe("newStory status default", () => {
   it("honors an explicit --status regardless of RFC status", () => {
     expect(statusOfNewStory("0005-gaps", "draft", { status: "ready" })).toBe("ready");
     expect(statusOfNewStory("0005-gaps", "active", { status: "draft" })).toBe("draft");
+  });
+});
+
+// A mutator refusal (the post-pull re-check that fires when a concurrent agent
+// won the race) runs INSIDE commitAndPush's acquired tasks lock. It must release
+// the lock on the way out — each refusal throws MutatorEarlyExit (rather than
+// process.exit, which would skip the lock's `finally`), so commitAndPush releases
+// the lock before honoring the exit-4 race code. The `pull` mock mutates the tree
+// to recreate the concurrent-agent collision the pre-flight check could not have
+// seen, so the re-check inside the mutator fires.
+describe("mutator refusals release the shared lock (no process.exit leak)", () => {
+  afterEach(() => __setLockDirForTest(null));
+
+  function setup(): string {
+    const lockDir = mkdtempSync(join(tmpdir(), "trails-cap-lock-"));
+    __setLockDirForTest(lockDir);
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    return lockDir;
+  }
+
+  function lockFile(lockDir: string): string {
+    return join(lockDir, "tasks-cli.lock");
+  }
+
+  it("newStory: a story the pull surfaced after pre-flight throws, lock removed", () => {
+    const lockDir = setup();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", "0005-gaps", "stories"), { recursive: true });
+    writeFileSync(
+      join(dir, "rfcs", "0005-gaps", "README.md"),
+      `---\nrfc: "0005-gaps"\ntitle: "R"\nstatus: active\n---\nbody\n`,
+    );
+    const storyFile = join(dir, "rfcs", "0005-gaps", "stories", "s.md");
+    // pull surfaces a concurrent agent's story under the same path; the mutator's
+    // post-pull existsSync re-check must throw rather than clobber it.
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      if (label === "pull") writeFileSync(storyFile, "concurrent\n");
+      return "" as never;
+    });
+    expect(() => newStory("0005-gaps", "s", { allowEmpty: true }, dir)).toThrow(/exit 4/);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/already exists \(created by concurrent agent\)/),
+    );
+    expect(existsSync(lockFile(lockDir))).toBe(false);
+  });
+
+  it("newRfc: an RFC dir the pull surfaced after pre-flight throws, lock removed", () => {
+    const lockDir = setup();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    const rfcDir = join(dir, "rfcs", "0000-my-rfc");
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      if (label === "pull") mkdirSync(rfcDir, { recursive: true });
+      return "" as never;
+    });
+    expect(() => newRfc("my-rfc", {}, dir)).toThrow(/exit 4/);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/already exists \(created by concurrent agent\)/),
+    );
+    expect(existsSync(lockFile(lockDir))).toBe(false);
+  });
+
+  it("finalize: a dir the pull renamed away throws, lock removed", () => {
+    const lockDir = setup();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    const placeholder = join(dir, "rfcs", "0000-foo");
+    mkdirSync(placeholder, { recursive: true });
+    // A concurrent finalize numbered + renamed the dir away during the pull, so
+    // the mutator's post-pull existsSync re-check must throw rather than re-run
+    // finalize-rfc.mjs against a vanished dir.
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      if (label === "pull") rmSync(placeholder, { recursive: true, force: true });
+      return "" as never;
+    });
+    expect(() => finalize("0000-foo", false, dir)).toThrow(/exit 4/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/no longer exists/));
+    expect(existsSync(lockFile(lockDir))).toBe(false);
   });
 });
 
