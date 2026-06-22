@@ -3461,11 +3461,6 @@ describe("EagerAssociationTest", () => {
     const parents = await EagerReordParent.all().includes("eagerReordChild").toArray();
     expect((parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.value).toBe("V");
   });
-  it.skip("joins with includes should preload via joins", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("join eager with empty order should generate valid sql", async () => {
     class JeeoPost extends Base {
       static {
