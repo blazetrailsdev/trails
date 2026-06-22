@@ -719,12 +719,21 @@ function _dispatchAssociationAttrs(
   }
 }
 
-// Column types whose database value is a plain string the driver can bind as
-// an untyped parameter without losing an implicit cast. Used by the write path
-// to decide which values to bind (vs inline) so null-byte strings round-trip.
-const BINDABLE_STRING_TYPES = new Set(["string", "text", "immutable_string"]);
-function isBindableStringColumn(typeName: string | undefined): boolean {
-  return typeName !== undefined && BINDABLE_STRING_TYPES.has(typeName);
+// Build the Arel value node for one write-path column (INSERT VALUES / UPDATE
+// SET). Mirrors Rails' `_insert_record`/`_update_record`, which hand every
+// column to the Arel visitor as an `ActiveModel::Attribute` so
+// `visit_ActiveModel_Attribute → collector.add_bind(o)` binds it as a typed
+// prepared-statement parameter (`type_casted_binds`) — null bytes round-trip
+// and the column's type travels to the driver, instead of being inlined via
+// `quote()`. Array columns keep their bespoke inline quoting: their database
+// value is an adapter-specific aggregate literal (`{…}` / `ARRAY[…]`) that the
+// drivers cannot bind as a single scalar parameter.
+function writePathValueNode(
+  def: { type?: { name?: string } } | undefined,
+  raw: unknown,
+): InstanceType<typeof Nodes.Node> | unknown {
+  if (def?.type?.name === "array") return arelSql(quoteSqlValue(raw, true));
+  return new Nodes.BindParam(raw);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -3124,27 +3133,10 @@ export class Base extends Model {
       sql = `INSERT INTO ${ctor.connection.quoteTableName(table.name)} ${emptyValue}`;
     } else {
       const im = new InsertManager(table);
-      const insertValues: [InstanceType<typeof Nodes.Node>, unknown][] = columns.map((c, i) => {
-        const def = ctor._attributeDefinitions.get(c);
-        const isArray = def?.type?.name === "array";
-        const raw = values[i];
-        // Bind string/text-column values as prepared-statement parameters
-        // (matching Rails' type_casted_binds) instead of inlining them, so a
-        // value containing a null byte (\x00) round-trips rather than truncating
-        // the inlined SQL at the C-string boundary. Scoped to string/text
-        // columns because an untyped bound parameter coerces cleanly there;
-        // other types stay inline so the visitor's `quote()` can both finish
-        // serializing intermediate objects (binary/json) and carry the implicit
-        // cast that custom-OID columns (hstore, enum) need. Arrays keep their
-        // bespoke inline quoting.
-        const val =
-          !isArray && isBindableStringColumn(def?.type?.name) && typeof raw === "string"
-            ? new Nodes.BindParam(raw)
-            : isArray
-              ? arelSql(quoteSqlValue(raw, true))
-              : raw;
-        return [table.get(c), val];
-      });
+      const insertValues: [InstanceType<typeof Nodes.Node>, unknown][] = columns.map((c, i) => [
+        table.get(c),
+        writePathValueNode(ctor._attributeDefinitions.get(c), values[i]),
+      ]);
       im.insert(insertValues);
       [sql, insertBinds] = ctor.connection.toSqlAndBinds(im);
     }
@@ -3324,22 +3316,10 @@ export class Base extends Model {
     if (declaredChanges.length === 0) return;
 
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = declaredChanges.map(
-      (key) => {
-        const val = dbValues[key];
-        const def = ctor._attributeDefinitions.get(key);
-        const isArray = def?.type?.name === "array";
-        // Bind string/text-column SET values as prepared-statement parameters
-        // (see _performInsert) so null-byte values survive; other types stay
-        // inline.
-        return [
-          table.get(key),
-          !isArray && isBindableStringColumn(def?.type?.name) && typeof val === "string"
-            ? new Nodes.BindParam(val)
-            : isArray
-              ? arelSql(quoteSqlValue(val, true))
-              : val,
-        ];
-      },
+      (key) => [
+        table.get(key),
+        writePathValueNode(ctor._attributeDefinitions.get(key), dbValues[key]),
+      ],
     );
 
     // Optimistic locking: include lock column in WHERE and increment it.

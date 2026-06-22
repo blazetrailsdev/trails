@@ -138,6 +138,20 @@ function _driverBind(value: unknown): unknown {
   if (value && typeof value === "object" && "valueForDatabase" in value) {
     value = (value as { valueForDatabase: unknown }).valueForDatabase;
   }
+  // A binary column's database value can be a `Type::Binary::Data` wrapper
+  // (e.g. from EncryptedAttributeType) rather than a bare Uint8Array. Unwrap it
+  // to its bytes so the driver binds it as a blob; sqliteTypeCast would
+  // otherwise reject the wrapper object ("can't cast [object Object]").
+  // Duck-typed (`bytes: Uint8Array`) to survive split @blazetrails/activemodel
+  // module identity in the dep tree (mirrors the PG adapter's _bindForPg).
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    (value as { bytes?: unknown }).bytes instanceof Uint8Array &&
+    !(value instanceof Uint8Array)
+  ) {
+    value = (value as { bytes: Uint8Array }).bytes;
+  }
   return sqliteTypeCast(value);
 }
 

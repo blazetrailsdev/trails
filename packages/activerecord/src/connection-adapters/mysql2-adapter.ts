@@ -692,6 +692,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       if (v && typeof v === "object" && "valueForDatabase" in v) {
         v = (v as { valueForDatabase: unknown }).valueForDatabase;
       }
+      // Unwrap a `Type::Binary::Data` wrapper (e.g. EncryptedAttributeType on a
+      // binary column) to its bytes so mysql2 binds a Buffer rather than
+      // JSON-stringifying the wrapper object. Duck-typed to survive split
+      // @blazetrails/activemodel module identity (mirrors the PG _bindForPg).
+      if (
+        v !== null &&
+        typeof v === "object" &&
+        (v as { bytes?: unknown }).bytes instanceof Uint8Array &&
+        !(v instanceof Uint8Array)
+      ) {
+        v = (v as { bytes: Uint8Array }).bytes;
+      }
       return v === true ? 1 : v === false ? 0 : v;
     });
   }
