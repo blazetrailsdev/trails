@@ -1447,33 +1447,19 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   /**
-   * The polymorphic `*_type` column a through chain must filter on. Rails
-   * delegates `:type` to `source_reflection` (reflection.rb:973-974), where
-   * `AssociationReflection#type` is set ONLY for an `as:` source — `@type =
-   * options[:foreign_type] || "#{options[:as]}_type" if options[:as]`
-   * (reflection.rb:519). A `polymorphic:` belongs_to source has `type == nil`
-   * there (it sets `foreign_type` instead, line 520) and carries its type
-   * filter via a PolymorphicReflection chain entry, so this returns null for
-   * it. Without this getter, `AssociationScope.nextChainScope` reads
-   * `undefined` for the through chain head and omits e.g.
-   * `taggings.taggable_type = 'Post'`, leaking rows whose FK collides across
-   * taggable types.
-   *
-   * We cannot delegate to `source.type` verbatim because trails'
-   * `AssociationReflection#type` conflates Rails' distinct `type` /
-   * `foreign_type` (it returns `foreignType`, which is non-null for a
-   * `polymorphic:` belongs_to). Guarding on `options.as` reproduces Rails'
-   * as:-only semantics; nested-through sources delegate recursively, matching
-   * Rails' chained `delegate :type`.
+   * The polymorphic `*_type` column a through chain must filter on. Rails:
+   * `delegate :type, ..., to: :source_reflection` (reflection.rb:973-974).
+   * The source's own `type` already encodes the correct value: an `as:`
+   * has_many/has_one source yields `"#{as}_type"`, a `polymorphic:` belongs_to
+   * source yields `null` (BelongsToReflection#type override, reflection.ts:1313 —
+   * it carries its filter via a PolymorphicReflection chain entry instead), and
+   * a nested-through source delegates recursively through this same getter.
+   * Without it, `AssociationScope.nextChainScope` reads `undefined` for the
+   * through chain head and omits e.g. `taggings.taggable_type = 'Post'`, leaking
+   * rows whose FK collides across taggable types.
    */
   get type(): string | null {
-    const src = this.sourceReflection;
-    if (!src) return null;
-    if (src.isThroughReflection?.()) return (src as ThroughReflection).type;
-    if ((src as AssociationReflection).options?.as) {
-      return (src as AssociationReflection).type;
-    }
-    return null;
+    return this.sourceReflection?.type ?? null;
   }
 
   get scope(): ((...args: any[]) => any) | null {
