@@ -40,6 +40,7 @@ export class Preloader {
 
   private _tree: Branch;
   private _availableRecords: (Base | Base[])[];
+  private _materialized: boolean;
 
   constructor(options: PreloaderOptions) {
     this.records = options.records;
@@ -55,32 +56,40 @@ export class Preloader {
       associateByDefault: this.associateByDefault,
       scope: this.scope,
     });
-    // A Relation is materialized lazily in `call()`; an array is the final set.
-    if (!isRelation(this.records)) {
-      this._tree.preloadedRecords = this.records;
+    // An array is the final record set; a Relation is materialized lazily by
+    // `materialize()`, driven from the `isEmpty()` check in `Batch`.
+    this._materialized = !isRelation(this.records);
+    if (this._materialized) {
+      this._tree.preloadedRecords = this.records as Base[];
     }
   }
 
-  isEmpty(): boolean {
+  /**
+   * Rails' `empty?` is `associations.nil? || records.length == 0`, where
+   * `records.length` materializes a Relation. We can't run that query
+   * synchronously (async I/O), so emptiness is async: it materializes the
+   * Relation just as Rails does, then reads the final record count — so an
+   * *empty* Relation correctly reports `true`. `materialize()` runs the query
+   * once per preloader, so `Batch`'s reject-then-load keeps the observable
+   * query count unchanged.
+   */
+  async isEmpty(): Promise<boolean> {
     if (this.associations == null) return true;
-    // Rails' `empty?` reads `records.length`, which materializes a Relation
-    // synchronously — so an *empty* relation returns `true` there. We can't
-    // run that query synchronously, so a not-yet-materialized Relation is
-    // always reported non-empty and the materializing query is deferred to
-    // `call()`. The observable query count is unchanged: Rails materializes in
-    // `empty?` then `Batch` rejects the now-empty preloader (1 query, no
-    // preload); we materialize in `call()` and the 0-record branch issues no
-    // preload (1 query). The deviation is only the boolean a caller would see
-    // from `isEmpty()` alone on an empty relation — no current caller gates on
-    // that without also calling `call()`.
-    if (isRelation(this.records)) return false;
-    return this.records.length === 0;
+    await this.materialize();
+    return this._tree.preloadedRecords.length === 0;
+  }
+
+  /**
+   * Loads a Relation's records into the root branch exactly once. A no-op for
+   * the array path (already set in the constructor) and for repeat calls.
+   */
+  async materialize(): Promise<void> {
+    if (this._materialized) return;
+    this._tree.preloadedRecords = await (this.records as Relation<Base>).toArray();
+    this._materialized = true;
   }
 
   async call(): Promise<Association[]> {
-    if (isRelation(this.records)) {
-      this._tree.preloadedRecords = await this.records.toArray();
-    }
     const batch = new Batch([this], this._availableRecords);
     await batch.call();
     return this.loaders;
