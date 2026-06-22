@@ -2,10 +2,21 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) sets the advisory-lock slot
-// pool size. TRAILS_TEST_FORKS caps the vitest worker count for both pools so
-// that concurrent local worktrees don't saturate the machine. Precedence:
-// TRAILS_TEST_FORKS > AR_DB_FORKS > 6. Raise with TRAILS_TEST_FORKS=N for a
-// solo full run; CI sets AR_DB_FORKS=4 so those jobs stay at 4 workers.
+// pool size AND, via TEST_FORKS below, the vitest worker count. TRAILS_TEST_FORKS
+// caps the vitest worker count for both pools so that concurrent local worktrees
+// don't saturate the machine. Precedence: TRAILS_TEST_FORKS > AR_DB_FORKS > 6.
+// Raise with TRAILS_TEST_FORKS=N for a solo full run; the live AR DB jobs
+// (postgres-tests, maria-tests) set AR_DB_FORKS=8, so those jobs run 8 workers
+// against an 8-slot pool.
+//
+// On the 2-vCPU hosted runner, 8 forks is empirically not over-subscribed for
+// this suite: a measured sweep (story tune-ar-db-forks-to-runner-cores, RFC
+// 0028) found forks=8 and forks=4 wall-clock-indistinguishable (~571s vs ~574s
+// median over 5 runs) because the DDL-heavy suite is IO-bound on the tmpfs DB,
+// so extra forks overlap IO waits rather than contend for the 2 cores. forks=2
+// is non-viable: the slot pool == worker count is below the floor and
+// deterministically deadlocks (acquireAdvisorySlotPg exhausts all slots). 8 is
+// kept as the measured-best value.
 
 const SHARED_EXCLUDE = [
   "**/node_modules/**",
