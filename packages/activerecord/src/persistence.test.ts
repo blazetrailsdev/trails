@@ -25,6 +25,7 @@ import {
   registerModel,
 } from "./index.js";
 import { itIfSupports } from "./test-helpers/supports.js";
+import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -1856,6 +1857,13 @@ describe("PersistenceTest", () => {
     // uuid is a PG-only defineSchema type, so the schema is only applied on
     // postgres; the tests below are individually gated to the same adapter.
     if (adapterType !== "postgres") return;
+    // Mirror Rails' postgresql_specific_schema.rb header:
+    //   enable_extension!("uuid-ossp", connection)
+    //   enable_extension!("pgcrypto", connection) if supports_pgcrypto_uuid?
+    // uuid-ossp supplies uuid_generate_v4() for chat_messages_custom_pk.
+    const connection = Base.connection as PostgreSQLAdapter;
+    await connection.enableExtension("uuid-ossp");
+    await connection.enableExtension("pgcrypto");
     await defineSchema(POSTGRESQL_SPECIFIC_SCHEMA);
   });
 

@@ -1686,12 +1686,17 @@ export const TEST_SCHEMA: Schema = {
  * rejects on SQLite/MySQL, so this schema must only ever be applied on the
  * postgres adapter.
  *
- * Rails picks `gen_random_uuid()` when pgcrypto is available and falls back to
- * `uuid_generate_v4()` (uuid-ossp) otherwise; `gen_random_uuid()` is built into
- * PostgreSQL 13+ and needs no extension, so we use it unconditionally.
+ * Rails sets `uuid_default = supports_pgcrypto_uuid? ? {} : { default:
+ * "uuid_generate_v4()" }` and applies it to `:chat_messages`. With pgcrypto
+ * available (always true on our postgres lane — `supports_pgcrypto_uuid?` is
+ * PG >= 9.4) the column gets the adapter's default uuid function,
+ * `gen_random_uuid()`. `:chat_messages_custom_pk` hardcodes the uuid-ossp
+ * `uuid_generate_v4()`, so the postgres test DB must have the `uuid-ossp`
+ * extension enabled (Rails does `enable_extension!("uuid-ossp")`).
  */
 export const POSTGRESQL_SPECIFIC_SCHEMA: Schema = {
   // create_table :chat_messages, id: :uuid, force: true, **uuid_default
+  // (uuid_default = {} when supports_pgcrypto_uuid? → gen_random_uuid())
   chat_messages: {
     columns: {
       id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
@@ -1703,7 +1708,7 @@ export const POSTGRESQL_SPECIFIC_SCHEMA: Schema = {
   //   t.uuid :message_id, primary_key: true, default: "uuid_generate_v4()"
   chat_messages_custom_pk: {
     columns: {
-      message_id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
+      message_id: { type: "uuid", defaultFunction: "uuid_generate_v4()" },
       content: "text",
     },
     primaryKey: ["message_id"],
