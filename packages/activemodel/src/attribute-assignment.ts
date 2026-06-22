@@ -149,15 +149,28 @@ class TypeError extends globalThis.Error {
 }
 
 /**
- * Mirror of Ruby's `NoMethodError`. Raised when a method is sent to a
- * receiver that does not respond to it (e.g. `nil.include?`); porting it
- * keeps validator guards that emulate that path faithful to Rails.
+ * Mirror of Ruby's `NameError`. Raised when a name reference is invalid —
+ * e.g. `record.method(:missing)`, which Ruby answers with `NameError`
+ * (not its `NoMethodError` subclass).
  */
-class NoMethodError extends globalThis.Error {
+class NameError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NameError";
+  }
+}
+
+/**
+ * Mirror of Ruby's `NoMethodError` (a subclass of `NameError`). Raised when
+ * a method is sent to a receiver that does not respond to it (e.g.
+ * `nil.include?`); porting it keeps validator guards that emulate that path
+ * faithful to Rails.
+ */
+class NoMethodError extends NameError {
   constructor(message: string) {
     super(message);
     this.name = "NoMethodError";
   }
 }
 
-export { ArgumentError, TypeError, NoMethodError };
+export { ArgumentError, TypeError, NameError, NoMethodError };

@@ -1,15 +1,16 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { ArgumentError, NoMethodError } from "../attribute-assignment.js";
+import { ArgumentError, NameError } from "../attribute-assignment.js";
 
 export class WithValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attribute: string, _value: unknown): void {
     const methodName = this.options.with as string;
     const method = (record as unknown as Record<string, unknown>)[methodName];
     if (typeof method !== "function") {
-      throw new NoMethodError(
-        `WithValidator expected ${methodName} to be a function on the record`,
-      );
+      // Mirrors Rails with.rb:9 `record.method(method_name)`, which raises
+      // NameError (not its NoMethodError subclass) when the record has no
+      // such method.
+      throw new NameError(`undefined method '${methodName}' for ${String(record)}`);
     }
     // Mirrors with.rb:8-12: arity == 0 → call without arg, else with attr.
     // JS divergence: rest-param ((...args) => {}) and default-param ((x = "") => {})
