@@ -437,17 +437,7 @@ export class LoaderQuery {
   private static _idCounter = 0;
 
   private _valuesForQueries(): string {
-    if (typeof this.scope?.valuesForQueries === "function") {
-      return JSON.stringify(this.scope.valuesForQueries());
-    }
-    // Stable fallback: serialize where/order/limit values if available
-    const where =
-      this.scope?._whereClause?.predicates?.length ??
-      this.scope?.whereClause?.predicates?.length ??
-      0;
-    const order = this.scope?._orderValues?.length ?? this.scope?.orderValues?.length ?? 0;
-    if (where === 0 && order === 0) return "";
-    return this.scope?.toSql?.() ?? "";
+    return JSON.stringify(this.scope.valuesForQueries());
   }
 
   async loadRecordsForKeys(
