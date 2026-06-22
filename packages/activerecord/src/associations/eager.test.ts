@@ -31,8 +31,6 @@ import { Categorization } from "../test-helpers/models/categorization.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Person } from "../test-helpers/models/person.js";
-import { Reader } from "../test-helpers/models/reader.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
