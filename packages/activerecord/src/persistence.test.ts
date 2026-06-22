@@ -30,7 +30,12 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import {
+  TEST_SCHEMA as canonicalSchema,
+  POSTGRESQL_SPECIFIC_SCHEMA,
+} from "./test-helpers/test-schema.js";
+import { adapterType } from "./test-adapter.js";
+import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
@@ -1832,4 +1837,44 @@ describe("PersistenceTest", () => {
     expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
     expect((developer as any).salary).toBe(80000);
   });
+});
+
+// ==========================================================================
+// PersistenceTest — PostgreSQL-only uuid primary-key create coverage.
+// Both Rails tests are guarded `if current_adapter?(:PostgreSQLAdapter)`; the
+// `chat_messages` / `chat_messages_custom_pk` tables live only in
+// postgresql_specific_schema.rb and use uuid PKs, which defineSchema rejects on
+// SQLite/MySQL — so the schema setup and both tests are gated to the postgres
+// adapter (the tests stay in a `PersistenceTest` describe to mirror Rails).
+// ==========================================================================
+describe("PersistenceTest", () => {
+  registerModel(ChatMessage);
+  registerModel(ChatMessageCustomPk);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    // uuid is a PG-only defineSchema type, so the schema is only applied on
+    // postgres; the tests below are individually gated to the same adapter.
+    if (adapterType !== "postgres") return;
+    await defineSchema(POSTGRESQL_SPECIFIC_SCHEMA);
+  });
+
+  it.skipIf(adapterType !== "postgres")("create model with uuid pk populates id", async () => {
+    const message = await ChatMessage.create({ content: "New Message" });
+    expect((message as any).id).not.toBeNull();
+
+    const messageReloaded = await ChatMessage.find((message as any).id);
+    expect((messageReloaded as any).content).toBe("New Message");
+  });
+
+  it.skipIf(adapterType !== "postgres")(
+    "create model with custom named uuid pk populates id",
+    async () => {
+      const message = await ChatMessageCustomPk.create({ content: "New Message" });
+      expect((message as any).message_id).not.toBeNull();
+
+      const messageReloaded = await ChatMessageCustomPk.find((message as any).message_id);
+      expect((messageReloaded as any).content).toBe("New Message");
+    },
+  );
 });
