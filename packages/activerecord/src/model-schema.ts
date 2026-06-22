@@ -518,17 +518,29 @@ export function _returningColumnsForInsert(
   this: SchemaHost,
   connection: { returnValueAfterInsert?(column: { name: string }): boolean },
 ): string[] {
-  // Mirrors Rails: columns the adapter populates server-side on INSERT (the
-  // auto-increment PK, DB-computed defaults, …). Falls back to the PK when the
-  // adapter reports none.
-  const autoPopulated = columns
-    .call(this)
-    .filter((c: { name: string }) => connection.returnValueAfterInsert?.(c))
-    .map((c: { name: string }) => c.name);
+  // Mirrors Rails _returning_columns_for_insert: the columns the DB auto-populates
+  // on INSERT (auto-increment / serial / identity columns and DB-computed
+  // defaults), falling back to the PK when the adapter reports none.
+  // `returnValueAfterInsert` calls `column.isAutoPopulated`, which only the
+  // reflected Column objects implement; the synthesized column-hash fallback (used
+  // before the schema cache is warm) holds plain shapes, so skip those — they
+  // carry no auto-increment metadata and the PK fallback below covers them.
+  const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
+  const autoPopulated = cols
+    .filter(
+      (c) => typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
+    )
+    .map((c) => c.name);
   if (autoPopulated.length > 0) return autoPopulated;
+  // PK fallback. Restrict to columns that actually exist on the table: Rails
+  // reflects `primary_key` as nil for a table without that column (e.g. an
+  // id-less HABTM join table whose model still defaults `primary_key` to "id"),
+  // so `Array(primary_key)` is empty there — which also keeps the scalar
+  // write-back from storing a phantom `id` attribute on an id-less model.
+  const colNames = new Set(cols.map((c) => c.name));
   const pk = this.primaryKey;
-  if (Array.isArray(pk)) return pk;
-  return pk ? [pk] : [];
+  const pkArr = Array.isArray(pk) ? pk : pk ? [pk] : [];
+  return pkArr.filter((p) => colNames.has(p));
 }
 
 export function resetSequenceName(this: SchemaHost): void {
