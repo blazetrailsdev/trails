@@ -663,7 +663,12 @@ export class SchemaDumper {
     return this.create(sourceOrAdapter, options).dump();
   }
 
-  static async dumpTableSchema(source: SchemaSource, tableName: string): Promise<string> {
+  static dumpTableSchema(adapter: DatabaseAdapter, tableName: string): Promise<string>;
+  static dumpTableSchema(source: SchemaSource, tableName: string): Promise<string>;
+  static async dumpTableSchema(
+    source: SchemaSource | DatabaseAdapter,
+    tableName: string,
+  ): Promise<string> {
     const wrappedSource = isDatabaseAdapter(source) ? new AdapterSchemaSource(source) : source;
     // Instantiate the adapter-specific subclass when the adapter exposes
     // createSchemaDumper() (PostgreSQLAdapter and Mysql2Adapter). Falls back to

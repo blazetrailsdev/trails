@@ -11,12 +11,14 @@ export class FloatType extends NumericValueType {
   }
 
   typeCastForSchema(value: unknown): string {
+    // Mirrors Rails float.rb#type_cast_for_schema: the float specials dump as
+    // bare Ruby constants so the schema reload re-applies them as Float values.
     if (typeof value === "number") {
-      if (isNaN(value)) return '"NaN"';
-      if (value === Infinity) return '"Infinity"';
-      if (value === -Infinity) return '"-Infinity"';
+      if (isNaN(value)) return "::Float::NAN";
+      if (value === Infinity) return "::Float::INFINITY";
+      if (value === -Infinity) return "-::Float::INFINITY";
     }
-    return JSON.stringify(value) ?? String(value);
+    return super.typeCastForSchema(value);
   }
 
   /** @internal Rails-private helper. */
