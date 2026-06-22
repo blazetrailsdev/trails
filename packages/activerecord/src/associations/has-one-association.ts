@@ -345,6 +345,12 @@ export function sameRecord(a: Base | null, b: Base | null): boolean {
  * inverse detection does not fire for this pair (Company#account ↔ Account#firm
  * names don't match), so we resolve the inverse by foreign-key equality instead.
  *
+ * Rails seeds exactly one inverse instance (`set_inverse_instance` writes the
+ * single `inverse_of` reflection), so we seed only the first FK-matching
+ * belongs_to and stop — otherwise a child with two associations on the same FK
+ * (e.g. `Account#firm` and `Account#unautosaved_firm`) would get the owner
+ * cached onto both, a side effect Rails would not produce.
+ *
  * @internal
  */
 function seedDestroyInverseOwner(assoc: HasOneAssociation): void {
@@ -372,7 +378,9 @@ function seedDestroyInverseOwner(assoc: HasOneAssociation): void {
       (target as any).association(ref.name).inversedFrom(owner);
     } catch {
       // A non-invertible / unresolved belongs_to is simply left untouched.
+      continue;
     }
+    return;
   }
 }
 
