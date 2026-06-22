@@ -15,6 +15,18 @@ interface MemoryRecord {
   accessedAt: number;
 }
 
+// Mirrors Ruby `#to_i`: Integer/Float truncate toward zero, a String yields its
+// leading integer (0 when none), and anything else is 0.
+function toI(value: unknown): number {
+  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "bigint") return Number(value);
+  if (typeof value === "string") {
+    const m = value.match(/^\s*[-+]?\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+  }
+  return 0;
+}
+
 export class MemoryStore extends Store implements CacheStore {
   private data: Map<string, MemoryRecord> = new Map();
   private sizeLimit: number;
@@ -65,21 +77,25 @@ export class MemoryStore extends Store implements CacheStore {
 
   // Mirrors Rails MemoryStore#cleanup (memory_store.rb): instrumented, deletes
   // every expired entry.
-  override cleanup(): void {
+  override cleanup(options?: CacheOptions): void {
+    const merged = this.mergedOptions(options);
     this.instrument("cleanup", null, { size: this.data.size }, () => {
       for (const [key, rec] of this.data) {
-        if (this.recordExpired(rec)) this.data.delete(key);
+        if (this.recordExpired(rec)) this.deleteEntry(key, merged);
       }
     });
   }
 
   // Mirrors Rails MemoryStore#delete_matched (memory_store.rb): instrumented with
-  // the matcher.
-  override deleteMatched(pattern: string | RegExp): void {
-    const re = typeof pattern === "string" ? new RegExp(pattern) : pattern;
-    this.instrument("delete_matched", String(re), undefined, () => {
+  // the matcher, which is run through keyMatcher so a namespaced store scopes the
+  // deletion to its own (namespace-prefixed) keys.
+  override deleteMatched(pattern: string | RegExp, options?: CacheOptions): void {
+    const merged = this.mergedOptions(options);
+    const raw = typeof pattern === "string" ? new RegExp(pattern) : pattern;
+    this.instrument("delete_matched", String(raw), undefined, () => {
+      const matcher = this.keyMatcher(raw, merged);
       for (const key of this.data.keys()) {
-        if (re.test(key)) this.data.delete(key);
+        if (key.match(matcher) !== null) this.deleteEntry(key, merged);
       }
     });
   }
@@ -87,27 +103,39 @@ export class MemoryStore extends Store implements CacheStore {
   // Rails MemoryStore instruments increment/decrement with the raw, unnormalized
   // name (memory_store.rb:149,167) — unlike FileStore, which uses the normalized
   // key (file_store.rb:62-64).
-  override increment(name: string, amount = 1, options?: CacheOptions): number | null {
+  override increment(name: string, amount = 1, options?: CacheOptions): number {
     return this.instrument("increment", name, { amount }, () =>
-      this.modifyValue(this.normalizeKey(name, this.mergedOptions(options)), amount),
+      this.modifyValue(name, amount, options),
     );
   }
 
-  override decrement(name: string, amount = 1, options?: CacheOptions): number | null {
+  override decrement(name: string, amount = 1, options?: CacheOptions): number {
     return this.instrument("decrement", name, { amount }, () =>
-      this.modifyValue(this.normalizeKey(name, this.mergedOptions(options)), -amount),
+      this.modifyValue(name, -amount, options),
     );
   }
 
-  private modifyValue(key: string, amount: number): number | null {
-    const rec = this.data.get(key);
-    if (!rec || this.recordExpired(rec)) return null;
-    const current = Number(coder.load(rec.encodedValue));
-    if (isNaN(current)) return null;
-    const next = current + amount;
-    rec.encodedValue = coder.dump(next);
-    rec.accessedAt = Date.now();
-    return next;
+  // Mirrors Rails MemoryStore#modify_value (memory_store.rb): on a missing,
+  // expired, or version-mismatched entry it *creates* the key set to
+  // Integer(amount) through the instrumented write path and returns amount (so
+  // `increment("foo") # => 1`); on a hit it adds to entry.value.to_i, preserving
+  // the entry's expiresAt/version.
+  private modifyValue(name: string, amount: number, options?: CacheOptions): number {
+    const merged = this.mergedOptions(options);
+    const key = this.normalizeKey(name, merged);
+    const version = this.normalizeVersion(name, merged) ?? null;
+    const entry = this.readEntry(key, merged);
+    if (!entry || entry.isExpired() || entry.isMismatched(version)) {
+      this.write(name, Math.trunc(amount), options);
+      return amount;
+    }
+    const num = toI(entry.value) + amount;
+    this.writeEntry(
+      key,
+      new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
+      merged,
+    );
+    return num;
   }
 
   prune(targetSize: number, maxTime?: number): void {
