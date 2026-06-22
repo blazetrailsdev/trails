@@ -100,9 +100,9 @@ export class PolymorphicArrayValue {
 
   /** @internal */
   private polymorphicName(klass: unknown): string | null {
-    if (klass && typeof (klass as any) === "function") {
+    if (typeof klass === "function") {
       return polymorphicName(klass as typeof Base);
     }
-    return (klass as any)?.name ?? null;
+    return (klass as { name?: string } | null)?.name ?? null;
   }
 }

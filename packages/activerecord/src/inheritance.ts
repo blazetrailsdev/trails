@@ -299,9 +299,9 @@ export function polymorphicName(modelClass: typeof Base): string {
 }
 
 /** The bare constant name — the segment after the final `::`. Mirrors Ruby's
- * `String#demodulize`, used by `sti_name`/`polymorphic_name` when the
- * `store_full_*` flags are off. */
-function demodulize(name: string): string {
+ * `String#demodulize`, used by `sti_name`/`polymorphic_name` (and the
+ * belongs_to inverse write) when the `store_full_*` flags are off. */
+export function demodulize(name: string): string {
   const idx = name.lastIndexOf("::");
   return idx === -1 ? name : name.slice(idx + 2);
 }

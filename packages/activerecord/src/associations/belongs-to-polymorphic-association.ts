@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { resolveModel, loadBelongsTo, modelRegistry } from "../associations.js";
-import { baseClass } from "../inheritance.js";
+import { baseClass, demodulize } from "../inheritance.js";
 import { underscore } from "@blazetrails/activesupport";
 import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
 
@@ -180,6 +180,12 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       name: string;
       _registryKeys?: string[];
     };
+    // Cannot delegate to the static `polymorphicName(ctor)`: that derives the
+    // full name from `moduleName`/`_demodulizedName`, but some polymorphic
+    // targets are registered only under a `::`-qualified registry key with no
+    // matching `moduleName` (JS flattens `Access::NoticeMessage` to the bare
+    // `AccessNoticeMessage` class name). The registry key is the authoritative
+    // full name here; the static would return the un-namespaced JS name.
     const matching = (ctor._registryKeys ?? []).filter((k) => modelRegistry.get(k) === ctor);
     let name: string;
     if (matching.length > 0) {
@@ -191,13 +197,12 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     } else {
       name = ctor.name;
     }
-    // Rails' `polymorphic_name` demodulizes the base-class name when
-    // `store_full_class_name` is off; honor that on the inverse write path too.
-    if ((ctor as typeof Base & { storeFullClassName?: boolean }).storeFullClassName === false) {
-      const idx = name.lastIndexOf("::");
-      return idx === -1 ? name : name.slice(idx + 2);
-    }
-    return name;
+    // `store_full_class_name` is read on `record.class` (Rails reads it on self,
+    // not base_class); as an inherited class_attribute the two agree. When off,
+    // demodulize via the same helper `polymorphic_name` uses.
+    const storeFull = (record.constructor as typeof Base & { storeFullClassName?: boolean })
+      .storeFullClassName;
+    return storeFull === false ? demodulize(name) : name;
   }
 
   private readForeignType(): string | null {
