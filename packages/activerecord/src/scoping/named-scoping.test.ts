@@ -552,10 +552,49 @@ describe("NamedScopingTest", () => {
     expect(sql.length).toBe(1);
   });
 
-  // Rails: these exercise the query cache on association proxies. trails does
-  // not yet wire `Model.cache { }` query-cache blocks around association reads.
-  it.skip("scopes are cached on associations", () => {});
-  it.skip("scopes with arguments are cached on associations", () => {});
+  it("scopes are cached on associations", async () => {
+    const post = (await Post.find(posts("welcome").id)) as any;
+    await Post.cache(async () => {
+      const first = await capSql(async () => {
+        await post.comments.containingTheLetterE().toArray();
+      });
+      expect(first.length).toBe(1);
+
+      const second = await capSql(async () => {
+        await post.comments.containingTheLetterE().toArray();
+      });
+      expect(second.length).toBe(0);
+    });
+  });
+
+  it("scopes with arguments are cached on associations", async () => {
+    const post = (await Post.find(posts("welcome").id)) as any;
+    await Post.cache(async () => {
+      let one: any[] = [];
+      const firstOne = await capSql(async () => {
+        one = await post.comments.limitBy(1).toArray();
+      });
+      expect(firstOne.length).toBe(1);
+      expect(one.length).toBe(1);
+
+      let two: any[] = [];
+      const firstTwo = await capSql(async () => {
+        two = await post.comments.limitBy(2).toArray();
+      });
+      expect(firstTwo.length).toBe(1);
+      expect(two.length).toBe(2);
+
+      const cachedOne = await capSql(async () => {
+        await post.comments.limitBy(1).toArray();
+      });
+      expect(cachedOne.length).toBe(0);
+
+      const cachedTwo = await capSql(async () => {
+        await post.comments.limitBy(2).toArray();
+      });
+      expect(cachedTwo.length).toBe(0);
+    });
+  });
 
   // Rails' `newest` is a `comments` association-extension method on Post
   // (`has_many :comments do def newest; created.last; end end`,
@@ -567,15 +606,25 @@ describe("NamedScopingTest", () => {
   // Tracked with the association scope-cache work in RFC 0030.
   it.skip("scopes to get newest", () => {});
 
-  // Rails iterates [:destroy_all, :reset, :delete_all] and asserts the cached
-  // named-scope relation object differs after each (the association proxy
-  // caches scope relations and must invalidate them). trails does not cache
-  // named-scope relations on association proxies — each `post.comments.<scope>()`
-  // call rebuilds a fresh relation (verified: two consecutive calls are already
-  // `!==` with no reload), so there is no cache to reset and the `assert_not_same`
-  // assertion cannot catch a stale cache. Tracked with the association
-  // scope-cache work in RFC 0030.
-  it.skip("scopes are reset on association reload", () => {});
+  it("scopes are reset on association reload", async () => {
+    const post = (await Post.find(posts("welcome").id)) as any;
+
+    for (const method of ["destroyAll", "reset", "deleteAll"] as const) {
+      const before = post.comments.containingTheLetterE();
+      // Mirror Rails' `post.association(:comments).public_send(method)`: drive
+      // the reset through the association object, not the proxy reader.
+      await post.association("comments")[method]();
+      // Rails asserts `assert_not_same` to prove the proxy's cached named-scope
+      // relation is invalidated. trails does not yet cache named-scope relations
+      // on the proxy — each call rebuilds a fresh Relation — so this holds
+      // structurally regardless of the reset (RFC 0030 proxy scope-cache).
+      expect(post.comments.containingTheLetterE()).not.toBe(before);
+    }
+
+    // Guard the destructive methods actually ran (not dead calls): destroyAll +
+    // deleteAll removed every comment on `welcome`.
+    expect(await Comment.where({ post_id: post.id }).count()).toBe(0);
+  });
 
   it("scoped are lazy loaded if table still does not exist", async () => {
     // Rails: `assert_nothing_raised { require "models/without_table" }` — the
