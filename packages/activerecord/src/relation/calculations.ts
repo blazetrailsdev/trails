@@ -963,7 +963,16 @@ function inQueryConnection<A extends unknown[], R>(
 ): (this: CalculationRelation, ...args: A) => Promise<R> {
   return function (this: CalculationRelation, ...args: A): Promise<R> {
     const modelClass = (this as { _modelClass?: unknown })._modelClass as typeof Base;
-    return withQueryConnection(modelClass, () => fn.apply(this, args));
+    return withQueryConnection(modelClass, async () => {
+      // Resolve any deferred distinct-PK subquery markers to a literal id list
+      // before the calculation compiles its where clause, so count/sum/avg/min/
+      // max emit `pk IN (ids)` rather than the inline `IN (SELECT … LIMIT n)`
+      // MySQL rejects (Rails materializes these at `.where()`-build time).
+      await (
+        this as { _materializeDeferredDistinctPkPredicates?(): Promise<void> }
+      )._materializeDeferredDistinctPkPredicates?.();
+      return fn.apply(this, args);
+    });
   };
 }
 

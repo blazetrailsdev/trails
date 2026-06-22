@@ -3395,6 +3395,10 @@ export class Relation<T extends Base> {
         }
       }
     }
+    // Resolve any deferred distinct-PK subquery markers to a literal id list
+    // before compiling the probe (Rails materializes at `.where()`-build time).
+    await rel._materializeDeferredDistinctPkPredicates();
+    if (rel._whereClause.isContradiction()) return false;
     // Mirrors Rails' `SELECT 1 AS one FROM ... LIMIT 1`: a dedicated
     // existence probe that never instantiates records (no after_find /
     // association loading) and doesn't go through count()'s limit
@@ -3523,6 +3527,10 @@ export class Relation<T extends Base> {
   private async _pluckInner(
     ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
+    // Resolve any deferred distinct-PK subquery markers to a literal id list
+    // before compiling, so pluck (like Rails) emits `pk IN (ids)` rather than
+    // the inline `IN (SELECT … LIMIT n)` MySQL rejects.
+    await this._materializeDeferredDistinctPkPredicates();
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
     // the eager values) and recurses, so the plucked columns can reference the
@@ -3674,6 +3682,7 @@ export class Relation<T extends Base> {
     if (Object.keys(updates).length === 0)
       throw new ArgumentError("Empty list of attributes to change");
     if (this._isNone) return 0;
+    await this._materializeDeferredDistinctPkPredicates();
 
     const table = this._modelClass.arelTable;
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
@@ -3758,6 +3767,7 @@ export class Relation<T extends Base> {
    */
   async deleteAll(): Promise<number> {
     if (this._isNone) return 0;
+    await this._materializeDeferredDistinctPkPredicates();
 
     // Mirrors Rails `INVALID_METHODS_FOR_DELETE_ALL = [:distinct, :with,
     // :with_recursive]`: `delete_all` cannot honor these clauses, so it raises
@@ -4487,9 +4497,16 @@ export class Relation<T extends Base> {
    * limitable (i.e. at least one is a collection). Rails materializes the
    * limited DISTINCT primary keys for this case to avoid `IN (SELECT … LIMIT n)`
    * (which MySQL rejects); trails defers that to relation load time.
+   *
+   * A grouped relation is excluded, mirroring Rails
+   * `apply_join_dependency(eager_loading: group_values.empty?)`
+   * (finder_methods.rb:457): a grouped subquery passes `eager_loading: false`,
+   * which skips the `distinct_relation_for_primary_key` materialization and
+   * builds the plain `IN (SELECT … GROUP BY …)` subquery instead.
    * @internal
    */
   _isDeferredDistinctPkSubquery(): boolean {
+    if (this._groupColumns.length > 0) return false;
     if (!this._eagerLoadingForSql()) return false;
     if (this._limitValue === null && this._offsetValue === null) return false;
     return !this._eagerReflectionsAreLimitable(this._deferredDistinctPkEagerSpecs());
@@ -4542,8 +4559,18 @@ export class Relation<T extends Base> {
    * `IN`, which `WhereClause#isContradiction` short-circuits to a no-query empty
    * result (Rails' `none!` semantics). Idempotent: substituted nodes are plain
    * `In`/`NotIn`, so a re-load finds nothing to do.
+   *
+   * Substitution mutates `this._whereClause.predicates` in place and bakes the
+   * ids permanently, mirroring Rails, which fixes the materialized ids at
+   * `.where()`-build time. Consequence: reloading the SAME relation object after
+   * the underlying rows change reuses the first load's parent ids rather than
+   * re-querying — re-run the original `where(x: <subquery>)` for fresh ids.
+   * Called from every terminal that compiles the where clause (toArray, pluck,
+   * exists, the calculations, updateAll/deleteAll) so the literal id list — not
+   * the unportable inline `IN (SELECT … LIMIT n)` — reaches all of them.
+   * @internal
    */
-  private async _materializeDeferredDistinctPkPredicates(): Promise<void> {
+  async _materializeDeferredDistinctPkPredicates(): Promise<void> {
     const predicates = this._whereClause.predicates;
     for (let i = 0; i < predicates.length; i++) {
       const node = predicates[i];

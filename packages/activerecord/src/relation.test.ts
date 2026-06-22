@@ -1885,4 +1885,40 @@ describe("RelationTest", () => {
     // No main Post SELECT was issued (contradiction short-circuit before SQL).
     expect(queries.some((sql) => /author_id/i.test(sql) && /\bIN\b/i.test(sql))).toBe(false);
   });
+
+  // The deferred materialization must fire for every terminal that compiles the
+  // where clause — not just toArray — or count/pluck/exists would render the
+  // inline LIMIT-in-IN subquery MySQL rejects. Rails materializes at
+  // `.where()`-build time, so all terminals see `pk IN (ids)`.
+  it("count, pluck, and exists over an eager-loading limited collection subquery materialize distinct primary keys", async () => {
+    const subquery = () => CanonAuthor.eagerLoad("posts").order("id").limit(2);
+    const limitedAuthorIds = await CanonAuthor.order("id").limit(2).pluck("id");
+    const expectedPostIds = await CanonPost.where({ author_id: limitedAuthorIds })
+      .order("id")
+      .pluck("id");
+
+    let count = 0;
+    const countQueries = await captureSql(async () => {
+      count = (await CanonPost.where({ author_id: subquery() }).count()) as number;
+    });
+    expect(count).toBe(expectedPostIds.length);
+    // No terminal renders the inline LIMIT-in-IN subquery MySQL rejects.
+    expect(countQueries.every((sql) => !/IN\s*\(\s*SELECT/i.test(sql))).toBe(true);
+
+    const pluckedIds = await CanonPost.where({ author_id: subquery() }).order("id").pluck("id");
+    expect(pluckedIds).toEqual(expectedPostIds);
+
+    expect(await CanonPost.where({ author_id: subquery() }).exists()).toBe(true);
+  });
+
+  // Rails `apply_join_dependency(eager_loading: group_values.empty?)`
+  // (finder_methods.rb:457): a grouped subquery passes `eager_loading: false`,
+  // skipping distinct_relation_for_primary_key — so a grouped eager+limit
+  // subquery is NOT deferred and builds the plain `IN (SELECT … GROUP BY …)`.
+  it("where with a grouped eager-loading limited subquery does not defer materialization", () => {
+    const subquery = CanonAuthor.eagerLoad("posts").group("authors.id").limit(2);
+    const sql = CanonPost.where({ author_id: subquery }).toSql();
+    expect(sql).toMatch(/IN \(SELECT/i);
+    expect(sql).toMatch(/GROUP BY/i);
+  });
 });
